@@ -565,27 +565,22 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     private volatile IBloomFilter bloomFilter = null;
 
-    synchronized final public ICounterSet getCounters() {
+    final public CounterSet getCounters() {
 
-        if (counterSet == null) {
+    	final CounterSet counterSet = new CounterSet();
 
-            counterSet = new CounterSet();
-
-            int i = 0;
-            for(AbstractBTree t : sources) {
-                
-                counterSet.makePath("view[" + i + "]").attach(t.getCounters());
-                
-                i++;
+        int i = 0;
+        for(AbstractBTree t : sources) {
             
-            }
-
-        }
+            counterSet.makePath("view[" + i + "]").attach(t.getCounters());
+            
+            i++;
         
+        }
+
         return counterSet;
         
     }
-    private CounterSet counterSet;
 
     /**
      * The counter for the first source.

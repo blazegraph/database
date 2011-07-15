@@ -31,7 +31,8 @@ import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
 
@@ -44,7 +45,7 @@ import com.bigdata.service.Split;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery {
+public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery, IIndexLocalCounter, ICounterSetAccess {
 
     /**
      * The description of the resources comprising the index view.
@@ -57,19 +58,12 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery {
     public IndexMetadata getIndexMetadata();
     
     /**
-     * A restart-safe counter. For an unpartitioned index, this a single counter
-     * for the entire index with an initial value of zero (0) and it is stored
-     * in the index {@link Checkpoint} record. For a partitioned index, there is a
-     * distinct counter for each index partition, the partition identifier is
-     * used as the high int32 bits of the counter, and the low int32 of the
-     * counter has an initial value of zero (0) in each index partition.
-     */
-    public ICounter getCounter();
-    
-    /**
+     * {@inheritDoc}
+     * <p>
      * Interesting performance counters and other statistics about the index.
      */
-    public ICounterSet getCounters();
+    @Override
+    public CounterSet getCounters();
     
     /**
      * Submits an index procedure that operations on a single key to the

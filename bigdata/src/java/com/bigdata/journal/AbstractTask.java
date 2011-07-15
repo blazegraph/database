@@ -53,6 +53,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -423,7 +424,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     private class DirtyListener implements IDirtyListener {
         
         final String name;
-        final BTree btree;
+        final ICheckpointProtocol btree;
         
         public String toString() {
             
@@ -432,7 +433,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
-        DirtyListener(final String name, final BTree ndx) {
+        DirtyListener(final String name, final ICheckpointProtocol ndx) {
             
             assert name!=null;
             
@@ -450,7 +451,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * @param btree
          *            The {@link BTree} reporting that it is dirty.
          */
-        public void dirtyEvent(final BTree btree) {
+        public void dirtyEvent(final ICheckpointProtocol btree) {
 
             assert btree == this.btree;
 
@@ -1045,7 +1046,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                     if(INFO) log.info("Registering index on Name2Addr: "+entry.name);
 
-                    name2Addr.registerIndex(entry.name, commitList
+                    name2Addr.registerIndex(entry.name, (BTree)commitList
                             .get(entry.name).btree);
 
                 } else {

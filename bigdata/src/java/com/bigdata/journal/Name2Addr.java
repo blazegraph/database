@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -57,6 +58,7 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
@@ -143,7 +145,7 @@ public class Name2Addr extends BTree {
      * reachable owing to their existence in the {@link #commitList}.
      */
 //    private WeakValueCache<String, BTree> indexCache = null;
-    private ConcurrentWeakValueCache<String, BTree> indexCache = null;
+    private ConcurrentWeakValueCache<String, ICheckpointProtocol> indexCache = null;
 
     /**
      * Holds hard references for the dirty indices along with the index name.
@@ -176,7 +178,7 @@ public class Name2Addr extends BTree {
     private class DirtyListener implements IDirtyListener, Comparable<DirtyListener> {
         
         final String name;
-        final BTree btree;
+        final ICheckpointProtocol btree;
         boolean needsCheckpoint;
         long checkpointAddr = 0L;
         
@@ -190,7 +192,7 @@ public class Name2Addr extends BTree {
             
         }
         
-        private DirtyListener(String name, BTree btree, boolean needsCheckpoint) {
+        private DirtyListener(String name, ICheckpointProtocol btree, boolean needsCheckpoint) {
             
             assert name!=null;
             
@@ -239,7 +241,7 @@ public class Name2Addr extends BTree {
          * 
          * @param btree
          */
-        public void dirtyEvent(BTree btree) {
+        public void dirtyEvent(final ICheckpointProtocol btree) {
 
             assert btree == this.btree;
 
@@ -247,7 +249,7 @@ public class Name2Addr extends BTree {
             
             synchronized(Name2Addr.this) {
                 
-                final BTree cached = indexCache.get(name);
+                final ICheckpointProtocol cached = indexCache.get(name);
 
                 if (cached == null) {
 
@@ -414,8 +416,8 @@ public class Name2Addr extends BTree {
         // indexCache = new WeakValueCache<String, BTree>(
         // new LRUCache<String, BTree>(cacheCapacity));
 
-        indexCache = new ConcurrentWeakValueCacheWithTimeout<String, BTree>(
-                cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
+		indexCache = new ConcurrentWeakValueCacheWithTimeout<String, ICheckpointProtocol>(
+				cacheCapacity, TimeUnit.MILLISECONDS.toNanos(cacheTimeout));
 
     }
     
@@ -428,7 +430,7 @@ public class Name2Addr extends BTree {
      * @throws IllegalStateException
      *             unless this is the {@link ITx#UNISOLATED} instance.
      */
-    Iterator<java.util.Map.Entry<String, WeakReference<BTree>>> indexCacheEntryIterator() {
+    private Iterator<java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>>> indexCacheEntryIterator() {
 
         assertUnisolatedInstance();
         
@@ -691,7 +693,7 @@ public class Name2Addr extends BTree {
              * otherwise atomic.
              */
             
-            btree = indexCache.get(name);
+            btree = (BTree)indexCache.get(name);
             
         }
 
@@ -868,7 +870,7 @@ public class Name2Addr extends BTree {
      *            updating the {@link Entry} from {@link BTree#getCheckpoint()}
      */
     synchronized protected void putOnCommitList(final String name,
-            final BTree btree, final boolean needsCheckpoint) {
+            final ICheckpointProtocol btree, final boolean needsCheckpoint) {
 
         assertUnisolatedInstance();
 
@@ -910,7 +912,7 @@ public class Name2Addr extends BTree {
      *            If an existing entry for that name may be replaced.
      */
     synchronized protected void putIndexCache(final String name,
-            final BTree btree, final boolean replace) {
+            final ICheckpointProtocol btree, final boolean replace) {
 
         assertUnisolatedInstance();
         
@@ -957,7 +959,7 @@ public class Name2Addr extends BTree {
         
         assertUnisolatedInstance();
         
-        return indexCache.get(name);
+        return (BTree)indexCache.get(name);
         
     }
     
@@ -992,7 +994,7 @@ public class Name2Addr extends BTree {
         }
         
         // remove the name -> btree mapping from the transient cache.
-        final BTree btree = indexCache.remove(name);
+        final BTree btree = (BTree)indexCache.remove(name);
         
         if (btree != null) {
 
@@ -1045,16 +1047,16 @@ public class Name2Addr extends BTree {
 //        final Iterator<ICacheEntry<String, BTree>> itr = indexCache.
 //        .entryIterator();
 
-        final Iterator<java.util.Map.Entry<String, WeakReference<BTree>>> itr = indexCacheEntryIterator();
+        final Iterator<java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>>> itr = indexCacheEntryIterator();
 
         while (itr.hasNext()) {
 
 //            final ICacheEntry<String, BTree> entry = itr.next();
-            final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr.next();
+            final java.util.Map.Entry<String, WeakReference<ICheckpointProtocol>> entry = itr.next();
 
             final String name = entry.getKey();
 
-            final BTree btree = entry.getValue().get();
+            final ICheckpointProtocol btree = entry.getValue().get();
 
             if (btree == null) {
 
@@ -1064,7 +1066,7 @@ public class Name2Addr extends BTree {
                 
             }
             
-            final IndexMetadata md = btree.getIndexMetadata();
+			final IndexMetadata md = ((BTree) btree).getIndexMetadata();
 
             final LocalPartitionMetadata pmd = md.getPartitionMetadata();
 
@@ -1088,7 +1090,10 @@ public class Name2Addr extends BTree {
 			 * as the caller holds the CounterSet object!
 			 */
 
-            tmp.makePath(path).attach(btree.getCounters());
+			final CounterSet counterSet = ((ICounterSetAccess) btree)
+					.getCounters();
+
+			tmp.makePath(path).attach(counterSet);
 
         }
         

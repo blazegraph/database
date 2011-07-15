@@ -98,15 +98,16 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
         
         try {
 
-            final HTree htree = new HTree(store, addressBits, false/* rawRecords */) {
-                IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
-                	return new HardReferenceQueue<PO>(//
-                            new NoEvictionListener(),//
-                            20000,//writeRetentionQueueCapacity,//
-                            10//writeRetentionQueueScan//
-                    );
-                }
-            };
+//            final HTree htree = new HTree(store, addressBits, false/* rawRecords */) {
+//                IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
+//                	return new HardReferenceQueue<PO>(//
+//                            new NoEvictionListener(),//
+//                            20000,//writeRetentionQueueCapacity,//
+//                            10//writeRetentionQueueScan//
+//                    );
+//                }
+//            };
+			final HTree htree = getHTree(store, addressBits, false/* rawRecords */);
 
             try {
             // Verify initial conditions.
@@ -138,7 +139,7 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
                         if (log.isDebugEnabled()) {
                         	log.debug("verifying: " + j);
                         }
-                        //assertEquals(b, htree.lookupFirst(b));
+                        assertEquals(b, htree.lookupFirst(b));
                         
 //                        // TODO Verify the iterator.
 //                        final byte[][] tmp = new byte[i][];

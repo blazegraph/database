@@ -160,7 +160,7 @@ import com.bigdata.rawstore.IRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeView {
+public class BTree extends AbstractBTree implements ICommitter, ICheckpointProtocol {// ILocalBTreeView {
     
     final public int getHeight() {
         
@@ -646,25 +646,6 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
     }
     
-    /**
-     * Sets the lastCommitTime.
-     * <p>
-     * Note: The lastCommitTime is set by a combination of the
-     * {@link AbstractJournal} and {@link Name2Addr} based on the actual
-     * commitTime of the commit during which an {@link Entry} for that index was
-     * last committed. It is set for both historical index reads and unisolated
-     * index reads using {@link Entry#commitTime}. The lastCommitTime for an
-     * unisolated index will advance as commits are performed with that index.
-     * 
-     * @param lastCommitTime
-     *            The timestamp of the last committed state of this index.
-     * 
-     * @throws IllegalArgumentException
-     *             if lastCommitTime is ZERO (0).
-     * @throws IllegalStateException
-     *             if the timestamp is less than the previous value (it is
-     *             permitted to advance but not to go backwards).
-     */
     final public void setLastCommitTime(final long lastCommitTime) {
         
         if (lastCommitTime == 0L)
@@ -856,19 +837,13 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
 //    }
     
     /**
-     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
+     * {@inheritDoc}
+     * <p>
+     * This checkpoint operation {@link #flush()}es dirty nodes, the optional
      * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
      * and then writes a new {@link Checkpoint} record on the backing store,
      * saves a reference to the current {@link Checkpoint} and returns the
      * address of that {@link Checkpoint} record.
-     * <p>
-     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
-     * is at the store level and uses {@link Checkpoint}s to ensure that the
-     * state of the {@link BTree} is current on the backing store.
-     * 
-     * @return The address at which the {@link Checkpoint} record for the
-     *         {@link BTree} was written onto the store. The {@link BTree} can
-     *         be reloaded from this {@link Checkpoint} record.
      * 
      * @see #writeCheckpoint2(), which returns the {@link Checkpoint} record
      *      itself.
@@ -972,12 +947,6 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
     }
     
-    /**
-     * Returns the most recent {@link Checkpoint} record for this {@link BTree}.
-     * 
-     * @return The most recent {@link Checkpoint} record for this {@link BTree}
-     *         and never <code>null</code>.
-     */
     final public Checkpoint getCheckpoint() {
 
         if (checkpoint == null)
@@ -987,6 +956,25 @@ public class BTree extends AbstractBTree implements ICommitter {// ILocalBTreeVi
         
     }
     
+    final public long getRecordVersion() {
+    	
+    	return recordVersion;
+
+    }
+    
+    final public long getMetadataAddr() {
+
+    	return metadata.getMetadataAddr();
+
+    }
+    
+    final public long getRootAddr() {
+    	
+		return (root == null ? getCheckpoint().getRootAddr() : root
+				.getIdentity());
+		
+    }
+        
 //    /**
 //     * Return true iff the state of this B+Tree has been modified since the last
 //     * {@link Checkpoint} record associated with the given address.

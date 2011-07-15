@@ -289,7 +289,7 @@ public class TestDirtyListener extends AbstractBTreeTestCase {
          * <p>
          * Note: The {@link #expected} flag is cleared after each invocation.
          */
-        public void dirtyEvent(BTree btree) {
+        public void dirtyEvent(ICheckpointProtocol btree) {
             
             assertTrue("expected",expected);
             

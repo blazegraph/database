@@ -32,7 +32,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IResourceManager;
@@ -181,7 +181,7 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
         
         return getIndex().getCounters();
         

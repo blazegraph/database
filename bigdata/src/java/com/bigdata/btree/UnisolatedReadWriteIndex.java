@@ -45,8 +45,9 @@ import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
@@ -273,7 +274,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * Canonicalizing mapping for the locks used to control access to the
      * unisolated index.
      */
-    static final private WeakHashMap<IIndex, ReadWriteLock> locks = new WeakHashMap<IIndex,ReadWriteLock>();
+    static final private WeakHashMap<ICommitter, ReadWriteLock> locks = new WeakHashMap<ICommitter,ReadWriteLock>();
     
     /**
      * The default capacity for iterator reads against the underlying index. The
@@ -344,7 +345,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     }
 
 	/**
-	 * Canonicalizing factory for the {@link ReadWriteLock} for a {@link BTree}.
+	 * Canonicalizing factory for the {@link ReadWriteLock} for an {@link ICommitter}.
 	 * 
 	 * @param btree
 	 *            The btree.
@@ -353,20 +354,21 @@ public class UnisolatedReadWriteIndex implements IIndex {
 	 * @throws IllegalArgumentException
 	 *             if the argument is <code>null</code>.
 	 */
-	private ReadWriteLock getReadWriteLock(final BTree btree) {
+    // Note: Exposed to HTree, at least for now.
+	public static ReadWriteLock getReadWriteLock(final ICommitter btree) {
 
-		if (ndx == null)
+		if (btree == null)
 			throw new IllegalArgumentException();
 		
 		synchronized (locks) {
 
-			ReadWriteLock readWriteLock = locks.get(ndx);
+			ReadWriteLock readWriteLock = locks.get(btree);
 
 			if (readWriteLock == null) {
 
 				readWriteLock = new ReentrantReadWriteLock(false/* fair */);
 
-				locks.put(ndx, readWriteLock);
+				locks.put(btree, readWriteLock);
 
 			}
 
@@ -393,7 +395,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
 
     }
 
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
 
         return ndx.getCounters();
         

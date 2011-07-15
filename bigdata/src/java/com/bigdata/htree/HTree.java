@@ -29,39 +29,62 @@ package com.bigdata.htree;
 
 import java.io.PrintStream;
 import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.IBloomFilter;
+import com.bigdata.btree.ICheckpointProtocol;
+import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IDirtyListener;
+import com.bigdata.btree.IIndexLocalCounter;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.LeafTupleIterator;
 import com.bigdata.btree.Node;
+import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.PO;
+import com.bigdata.btree.ReadOnlyCounter;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.htree.HTree.AbstractPage;
+import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
+import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Resolver;
@@ -94,7 +117,9 @@ import cutthecrap.utils.striterators.Striterator;
  *          length keys, but can be optimized for int32 keys easily enough.
  */
 public class HTree extends AbstractHTree 
-//	implements 
+	implements 
+	IIndexLocalCounter,
+	ICheckpointProtocol
 //	IIndex, 
 //  ISimpleBTree//, IAutoboxBTree, ILinearList, IBTreeStatistics, ILocalBTreeView
 //  IRangeQuery
@@ -108,15 +133,15 @@ public class HTree extends AbstractHTree
      * {@link #splitDirectoryPage(DirectoryPage, int, AbstractPage)} for a write
      * up on this.
      */
-    /*private*/ final int splitBits;
+    /*private*/ final int splitBits = 1; // in [1:addressBits];
     
     /*
      * metadata about the index.
      * 
      * @todo this data should be rolled into the IndexMetadata object.
      */
-    private final boolean versionTimestamps;
-    private final boolean deleteMarkers;
+	private final boolean versionTimestamps = false;
+	private final boolean deleteMarkers = false;
     private final boolean rawRecords;
 
 	/**
@@ -137,6 +162,30 @@ public class HTree extends AbstractHTree
 	 */
 	protected long nentries;
     
+	/**
+	 * The value of the record version number that will be assigned to the next
+	 * node or leaf written onto the backing store. This number is incremented
+	 * each time a node or leaf is written onto the backing store. The initial
+	 * value is ZERO (0). The first value assigned to a node or leaf will be
+	 * ZERO (0).
+	 */
+    protected long recordVersion;
+    
+    /**
+     * The mutable counter exposed by #getCounter()}.
+     * <p>
+     * Note: This is <code>protected</code> so that it will be visible to
+     * {@link Checkpoint} which needs to write the actual value store in this
+     * counter into its serialized record (without the partition identifier).
+     */
+    protected AtomicLong counter;
+
+	/**
+	 * A buffer used to encode a raw record address for a mutable {@link BTree}
+	 * and otherwise <code>null</code>.
+	 */
+    private final ByteArrayBuffer recordAddrBuf;
+    
     final public long getNodeCount() {
         
         return nnodes;
@@ -155,150 +204,875 @@ public class HTree extends AbstractHTree
         
     }
 
-	public boolean isReadOnly() {
-		return false; // TODO set by ctor.
-	}
+    /**
+     * The constructor sets this field initially based on a {@link Checkpoint}
+     * record containing the only address of the {@link IndexMetadata} for the
+     * index. Thereafter this reference is maintained as the {@link Checkpoint}
+     * record last written by {@link #writeCheckpoint()} or read by
+     * {@link #load(IRawStore, long)}.
+     */
+    private Checkpoint checkpoint = null;
+    
+    final public Checkpoint getCheckpoint() {
 
-	/**
-	 * The root of the {@link HTree}. This is always a {@link DirectoryPage}.
-	 * <p>
-	 * The hard reference to the root node is cleared if the index is
-	 * {@link #close() closed}. This method automatically {@link #reopen()}s the
-	 * index if it is closed, making it available for use.
-	 */
-    final protected DirectoryPage getRoot() {
-
-        // make sure that the root is defined.
-        if (root == null)
-            reopen();
-
-        return root;
+        if (checkpoint == null)
+            throw new AssertionError();
+        
+        return checkpoint;
+        
+    }
+    
+    final public long getRecordVersion() {
+    	
+    	return recordVersion;
 
     }
     
-    // TODO implement close/reopen protocol per AbstractBTree.
-    protected void reopen() {
+    final public long getMetadataAddr() {
+
+    	return metadata.getMetadataAddr();
+
+    }
+        
+    final public long getRootAddr() {
     	
-    	throw new UnsupportedOperationException();
-    	
+		return (root == null ? getCheckpoint().getRootAddr() : root
+				.getIdentity());
+		
     }
 
     /**
+     * Return true iff changes would be lost unless the B+Tree is flushed to the
+     * backing store using {@link #writeCheckpoint()}.
+     * <p>
+     * Note: In order to avoid needless checkpoints this method will return
+     * <code>false</code> if:
+     * <ul>
+     * <li> the metadata record is persistent -AND-
+     * <ul>
+     * <li> EITHER the root is <code>null</code>, indicating that the index
+     * is closed (in which case there are no buffered writes);</li>
+     * <li> OR the root of the btree is NOT dirty, the persistent address of the
+     * root of the btree agrees with {@link Checkpoint#getRootAddr()}, and the
+     * {@link #counter} value agrees {@link Checkpoint#getCounter()}.</li>
+     * </ul>
+     * </li>
+     * </ul>
      * 
-     * @param store
-     *            The backing store.
-     * @param addressBits
-     *            The #of bits in the address map for a directory bucket. The
-     *            #of children for a directory is <code>2^addressBits</code>.
-     *            For example, a value of <code>10</code> means a
-     *            <code>10</code> bit address space in the directory. Such a
-     *            directory would provide direct addressing for
-     *            <code>1024</code> child references. Given an overhead of
-     *            <code>8</code> bytes per child address, that would result in
-     *            an expected page size of 8k before compression.
-     * @throws IllegalArgumentException
-     *             if addressBits is LT ONE (1).
-     * @throws IllegalArgumentException
-     *             if addressBits is GT (16) (fan out of 65536).
+     * @return <code>true</code> true iff changes would be lost unless the
+     *         B+Tree was flushed to the backing store using
+     *         {@link #writeCheckpoint()}.
      */
-    public HTree(final IRawStore store, final int addressBits) {
+    public boolean needsCheckpoint() {
 
-    	this(store, addressBits, true/* rawRecords */);
+        if(!checkpoint.hasCheckpointAddr()) {
+            
+            /*
+             * The checkpoint record needs to be written.
+             */
+            
+            return true;
+            
+        }
+        
+        if(metadata.getMetadataAddr() == 0L) {
+            
+            /*
+             * The index metadata record was replaced and has not yet been
+             * written onto the store.
+             */
+            
+            return true;
+            
+        }
+        
+        if(metadata.getMetadataAddr() != checkpoint.getMetadataAddr()) {
+            
+            /*
+             * The index metadata record was replaced and has been written on
+             * the store but the checkpoint record does not reflect the new
+             * address yet.
+             */
+            
+            return true;
+            
+        }
+        
+        if(checkpoint.getCounter() != counter.get()) {
+            
+            // The counter has been modified.
+            
+            return true;
+            
+        }
+        
+        if(root != null ) {
+            
+            if (root.isDirty()) {
+
+                // The root node is dirty.
+
+                return true;
+
+            }
+            
+            if(checkpoint.getRootAddr() != root.getIdentity()) {
+        
+                // The root node has a different persistent identity.
+                
+                return true;
+                
+            }
+            
+        }
+
+        /*
+         * No apparent change in persistent state so we do NOT need to do a
+         * checkpoint.
+         */
+        
+        return false;
+        
+//        if (metadata.getMetadataAddr() != 0L && //
+//                (root == null || //
+//                        ( !root.dirty //
+//                        && checkpoint.getRootAddr() == root.identity //
+//                        && checkpoint.getCounter() == counter.get())
+//                )
+//        ) {
+//            
+//            return false;
+//            
+//        }
+//
+//        return true;
+     
+    }
+    
+    /**
+     * Method updates the index metadata associated with this {@link BTree}.
+     * The new metadata record will be written out as part of the next index
+     * {@link #writeCheckpoint()}.
+     * <p>
+     * Note: this method should be used with caution.
+     * 
+     * @param indexMetadata
+     *            The new metadata description for the {@link BTree}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the new value is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the new {@link IndexMetadata} record has already been
+     *             written on the store - see
+     *             {@link IndexMetadata#getMetadataAddr()}
+     * @throws UnsupportedOperationException
+     *             if the index is read-only.
+     */
+    final public void setIndexMetadata(final IndexMetadata indexMetadata) {
+        
+        assertNotReadOnly();
+
+        if (indexMetadata == null)
+            throw new IllegalArgumentException();
+
+        if (indexMetadata.getMetadataAddr() != 0)
+            throw new IllegalArgumentException();
+
+        this.metadata = indexMetadata;
+        
+        // gets us on the commit list for Name2Addr.
+        fireDirtyEvent();
+        
+    }
+    
+    /**
+     * Handle request for a commit by {@link #writeCheckpoint()}ing dirty nodes
+     * and leaves onto the store, writing a new metadata record, and returning
+     * the address of that metadata record.
+     * <p>
+     * Note: In order to avoid needless writes the existing metadata record is
+     * always returned if {@link #needsCheckpoint()} is <code>false</code>.
+     * <p>
+     * Note: The address of the existing {@link Checkpoint} record is always
+     * returned if {@link #getAutoCommit() autoCommit} is disabled.
+     * 
+     * @return The address of a {@link Checkpoint} record from which the btree
+     *         may be reloaded.
+     */
+    public long handleCommit(final long commitTime) {
+
+        assertNotTransient();
+        assertNotReadOnly();
+
+		/*
+		 * Note: Acquiring this lock provides for atomicity of the checkpoint of
+		 * the BTree during the commit protocol. Without this lock, users of the
+		 * UnisolatedReadWriteIndex could be concurrently modifying the BTree
+		 * while we are attempting to snapshot it for the commit.
+		 * 
+		 * Note: An alternative design would declare a global read/write lock
+		 * for mutation of the indices in addition to the per-BTree read/write
+		 * lock provided by UnisolatedReadWriteIndex. Rather than taking the
+		 * per-BTree write lock here, we would take the global write lock in the
+		 * AbstractJournal's commit protocol, e.g., commitNow(). The global read
+		 * lock would be taken by UnisolatedReadWriteIndex before taking the
+		 * per-BTree write lock. This is effectively a hierarchical locking
+		 * scheme and could provide a workaround if deadlocks are found to occur
+		 * due to lock ordering problems with the acquisition of the
+		 * UnisolatedReadWriteIndex lock (the absence of lock ordering problems
+		 * really hinges around UnisolatedReadWriteLocks not being taken for
+		 * more than one index at a time.)
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/288
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/278
+		 */
+		final Lock lock = UnisolatedReadWriteIndex.getReadWriteLock(this).writeLock();
+		try {
+
+			if (/* autoCommit && */needsCheckpoint()) {
+
+				/*
+				 * Flush the btree, write a checkpoint record, and return the
+				 * address of that checkpoint record. The [checkpoint] reference
+				 * is also updated.
+				 */
+
+				return writeCheckpoint();
+
+			}
+
+			/*
+			 * There have not been any writes on this btree or auto-commit is
+			 * disabled.
+			 * 
+			 * Note: if the application has explicitly invoked writeCheckpoint()
+			 * then the returned address will be the address of that checkpoint
+			 * record and the BTree will have a new checkpoint address made
+			 * restart safe on the backing store.
+			 */
+
+			return checkpoint.getCheckpointAddr();
+
+		} finally {
+
+			lock.unlock();
+
+		}
 
     }
 
-	/**
-	 * 
-	 * 
-	 * @param store
-	 *            The backing store.
-	 * @param addressBits
-	 *            The #of bits in the address map for a directory bucket. The
-	 *            #of children for a directory is <code>2^addressBits</code>.
-	 *            For example, a value of <code>10</code> means a
-	 *            <code>10</code> bit address space in the directory. Such a
-	 *            directory would provide direct addressing for
-	 *            <code>1024</code> child references. Given an overhead of
-	 *            <code>8</code> bytes per child address, that would result in
-	 *            an expected page size of 8k before compression.
-	 * @param rawRecords
-	 *            <code>true</code> if raw records are in use.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if addressBits is LT ONE (1).
-	 * @throws IllegalArgumentException
-	 *             if addressBits is GT (16) (fan out of 65536).
-	 */
-    public HTree(final IRawStore store, final int addressBits,
-            final boolean rawRecords) {
+    /**
+     * Returns an {@link ICounter}. The {@link ICounter} is mutable iff the
+     * {@link BTree} is mutable. All {@link ICounter}s returned by this method
+     * report and increment the same underlying counter.
+     * <p>
+     * Note: When the {@link BTree} is part of a scale-out index then the
+     * counter will assign values within a namespace defined by the partition
+     * identifier.
+     */
+    public ICounter getCounter() {
 
-//    	super(store, nodeFactory, readOnly, addressBits, metadata, recordCompressorFactory);
-		super(store, false/*readOnly*/, addressBits);
+        ICounter counter = new Counter(this);
+        
+        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
 
-		this.splitBits = 1;// in [1:addressBits];
-		
-        // @todo from IndexMetadata
-        this.versionTimestamps = false;
-        this.deleteMarkers = false;
-        this.rawRecords = rawRecords;
+        if (pmd != null) {
+
+        	throw new UnsupportedOperationException();
+//            counter = new PartitionedCounter(pmd.getPartitionId(), counter);
+
+        }
+
+        if (isReadOnly()) {
+
+            return new ReadOnlyCounter(counter);
+
+        }
+
+        return counter;
+
+    }
+    
+    /**
+     * Mutable counter.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public static class Counter implements ICounter {
+
+        private final HTree htree;
+        
+        public Counter(final HTree btree) {
+            
+            if (btree == null)
+                throw new IllegalArgumentException();
+            
+            this.htree = btree;
+            
+        }
+        
+        public long get() {
+            
+            return htree.counter.get();
+            
+        }
+
+        public long incrementAndGet() {
+            
+            final long counter = htree.counter.incrementAndGet();
+            
+            if (counter == htree.checkpoint.getCounter() + 1) {
+
+                /*
+                 * The first time the counter is incremented beyond the value in
+                 * the checkpoint record we fire off a dirty event to put the
+                 * BTree on the commit list.
+                 */
+                
+            	htree.fireDirtyEvent();
+            	
+            }
+                
+            if (counter == 0L) {
+
+                /*
+                 * The counter has wrapped back to ZERO.
+                 */
+                
+                throw new RuntimeException("Counter overflow");
+
+            }
+            
+            return counter;
+            
+        }
+        
+    } // class Counter
+    
+    /**
+     * Required constructor form for {@link BTree} and any derived subclasses.
+     * This constructor is used both to create a new {@link BTree}, and to load
+     * a {@link BTree} from the store using a {@link Checkpoint} record.
+     * 
+     * @param store
+     *            The store.
+     * @param checkpoint
+     *            A {@link Checkpoint} record for that {@link BTree}.
+     * @param metadata
+     *            The metadata record for that {@link BTree}.
+     * @param readOnly
+     *            When <code>true</code> the {@link BTree} will be immutable.
+     * 
+     * @see BTree#create(IRawStore, IndexMetadata)
+     * @see BTree#load(IRawStore, long, boolean)
+     */
+//	 * @throws IllegalArgumentException
+//	 *             if addressBits is LT ONE (1).
+//	 * @throws IllegalArgumentException
+//	 *             if addressBits is GT (16) (fan out of 65536).
+    public HTree(final IRawStore store, final Checkpoint checkpoint,
+            final IndexMetadata metadata, final boolean readOnly) {
+
+        super(  store, 
+                NodeFactory.INSTANCE, //
+                readOnly, // read-only
+                metadata,//
+                metadata.getBtreeRecordCompressorFactory()
+                );
+
+//        this.readOnly = readOnly;
+        
+        if (checkpoint == null) {
+
+            throw new IllegalArgumentException();
+            
+        }
+
+        if (store != null) {
+
+            if (checkpoint.getMetadataAddr() != metadata.getMetadataAddr()) {
+
+                // must agree.
+                throw new IllegalArgumentException();
+
+            }
+
+        }
+
+        if (metadata.getConflictResolver() != null && !metadata.isIsolatable()) {
+
+            throw new IllegalArgumentException(
+                    "Conflict resolver may only be used with isolatable indices");
+            
+        }
+
+        setCheckpoint(checkpoint);
+        
+//        // save the address from which the index metadata record was read.
+//        this.lastMetadataAddr = metadata.getMetadataAddr();
+        
+        /*
+         * Note: the mutable BTree has a limit here so that split() will always
+         * succeed. That limit does not apply for an immutable btree.
+         */
+        assert readOnly || writeRetentionQueue.capacity() >= IndexMetadata.Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY;
 
         /*
-         * The initial setup of the hash tree is a root directory page whose
-         * global depth is the #of address bits (which is the maximum value that
-         * global depth can take on for a given hash tree). There is a single
-         * bucket page and all entries in the root directory page point to that
-         * bucket. This means that the local depth of the initial bucket page
-         * will be zero (you can prove this for yourself by consulting the
-         * tables generated by TestHTree). With a depth of zero, the initial
-         * bucket page will have buddy hash buckets which can hold only a single
-         * distinct hash key (buckets always have to handle duplicates of a hash
-         * key).
-         * 
-         * From this initial configuration, inserts of 2 distinct keys which
-         * fall into the same buddy hash tables will cause that buddy hash
-         * buckets in the initial bucket page to split, increasing the depth of
-         * the resulting bucket page by one. Additional splits driven by inserts
-         * of distinct keys will eventually cause the local depth of some bucket
-         * page to exceed the global depth of the root and a new level will be
-         * introduced below the root. The hash tree can continue to grow in this
-         * manner, gradually adding depth where there are bit prefixes for which
-         * there exists a lot of variety in the observed keys.
+         * Note: Re-open is deferred so that we can mark the BTree as read-only
+         * before we read the root node.
          */
+//        reopen();
+
+        /*
+         * Buffer used to encode addresses into the tuple value for a mutable
+         * B+Tree.
+         */
+		recordAddrBuf = readOnly ? null
+				: new ByteArrayBuffer(Bytes.SIZEOF_LONG);
+		
+		this.rawRecords = metadata.getRawRecords();
         
+		newRoot();
+
+	}
+
+	/**
+	 * Sets the {@link #checkpoint} and initializes the mutable fields from the
+	 * ê * checkpoint record. In order for this operation to be atomic, the
+	 * caller must be synchronized on the {@link HTree} or otherwise guaranteed
+	 * to have exclusive access, e.g., during the ctor or when the {@link HTree}
+	 * is mutable and access is therefore required to be single-threaded.
+	 */
+    private void setCheckpoint(final Checkpoint checkpoint) {
+
+        this.checkpoint = checkpoint; // save reference.
+        
+        // Note: Height is not uniform for an HTree.
+//        this.height = checkpoint.getHeight();
+        
+        this.nnodes = checkpoint.getNodeCount();
+        
+        this.nleaves = checkpoint.getLeafCount();
+        
+        this.nentries = checkpoint.getEntryCount();
+        
+        this.counter = new AtomicLong( checkpoint.getCounter() );
+
+        this.recordVersion = checkpoint.getRecordVersion();
+        
+    }
+
+    /**
+     * Creates and sets new root {@link Leaf} on the B+Tree and (re)sets the
+     * various counters to be consistent with that root.  This is used both
+     * by the constructor for a new {@link BTree} and by {@link #removeAll()}.
+     * <p>
+     * Note: The {@link #getCounter()} is NOT changed by this method.
+     */
+    final private void newRoot() {
+
+//        height = 0;
+
+        nnodes = 0;
+        
+        nentries = 0;
+
+        final boolean wasDirty = root != null && root.isDirty();
+        
+        nleaves = 0;
+
+		/*
+		 * The initial setup of the hash tree is a root directory page whose
+		 * global depth is the #of address bits (which is the maximum value that
+		 * global depth can take on for a given hash tree). There is a single
+		 * bucket page and all entries in the root directory page point to that
+		 * bucket. This means that the local depth of the initial bucket page
+		 * will be zero (you can prove this for yourself by consulting the
+		 * tables generated by TestHTree). With a depth of zero, the initial
+		 * bucket page will have buddy hash buckets which can hold only a single
+		 * distinct hash key (buckets always have to handle duplicates of a hash
+		 * key).
+		 * 
+		 * From this initial configuration, inserts of 2 distinct keys which
+		 * fall into the same buddy hash tables will cause that buddy hash
+		 * buckets in the initial bucket page to split, increasing the depth of
+		 * the resulting bucket page by one. Additional splits driven by inserts
+		 * of distinct keys will eventually cause the local depth of some bucket
+		 * page to exceed the global depth of the root and a new level will be
+		 * introduced below the root. The hash tree can continue to grow in this
+		 * manner, gradually adding depth where there are bit prefixes for which
+		 * there exists a lot of variety in the observed keys.
+		 */
+
 		// Initial root.
 		final DirectoryPage r = new DirectoryPage(//
 				this,// the owning htree instance
 				addressBits // the global depth of the root.
-				);
+		);
 		nnodes++;
-        assert r.getSlotsPerBuddy() == (1 << addressBits) : "slotsPerBuddy="
-                + r.getSlotsPerBuddy();
-        assert r.getNumBuddies() == 1 : "numBuddies=" + r.getNumBuddies();
+		assert r.getSlotsPerBuddy() == (1 << addressBits) : "slotsPerBuddy="
+				+ r.getSlotsPerBuddy();
+		assert r.getNumBuddies() == 1 : "numBuddies=" + r.getNumBuddies();
 
 		// Data for the root.
 		final MutableDirectoryPageData rdata = (MutableDirectoryPageData) r.data;
 
-        // Initial bucket.
+		// Initial bucket.
 		final BucketPage b = new BucketPage(this, 0/* globalDepth */);
 		nleaves++;
 
 		final int nslots = r.getSlotsPerBuddy() * r.getNumBuddies();
 
 		for (int i = 0; i < nslots; i++) {
-		
+
 			b.parent = (Reference) r.self;
-			
+
 			r.childRefs[i] = (Reference) b.self;
 
 			rdata.childAddr[i] = 0L;
-			
+
 		}
-		
+
 		this.root = r;
-		
+
+        // Note: Counter is unchanged!
+//        counter = new AtomicLong( 0L );
+
+        // TODO support bloom filter?
+//        if (metadata.getBloomFilterFactory() != null) {
+//
+//            /*
+//             * Note: Allocate a new bloom filter since the btree is now empty
+//             * and set its reference on the BTree. We need to do this here in
+//             * order to (a) overwrite the old reference when we are replacing
+//             * the root, e.g., for removeAll(); and (b) to make sure that the
+//             * bloomFilter reference is defined since the checkpoint will not
+//             * have its address until the next time we call writeCheckpoint()
+//             * and therefore readBloomFilter() would fail if we did not create
+//             * and assign the bloom filter here.
+//             */
+//            
+//            bloomFilter = metadata.getBloomFilterFactory().newBloomFilter();
+//            
+//        }
+        
+        /*
+         * Note: a new root leaf is created when an empty btree is (re-)opened.
+         * However, if the BTree is marked as read-only then do not fire off a
+         * dirty event.
+         */
+        if(!wasDirty && !readOnly) {
+            
+            fireDirtyEvent();
+            
+        }
+        
     }
 
-	/*
+    @Override
+    protected void _reopen() {
+        
+        if (checkpoint.getRootAddr() == 0L) {
+
+            /*
+             * Create the root leaf.
+             * 
+             * Note: if there is an optional bloom filter, then it is created
+             * now.
+             */
+            
+            newRoot();
+            
+        } else {
+            
+            /*
+             * Read the root node of the HTree.
+             */
+			root = (DirectoryPage) readNodeOrLeaf(checkpoint.getRootAddr(),
+					addressBits);
+
+            // Note: The optional bloom filter will be read lazily. 
+            
+        }
+
+    }
+
+    final public long getLastCommitTime() {
+        
+        return lastCommitTime;
+        
+    }
+
+    final public long getRevisionTimestamp() {
+        
+        if (readOnly)
+            throw new UnsupportedOperationException(ERROR_READ_ONLY);
+
+        return lastCommitTime + 1;
+        
+    }
+    
+    final public void setLastCommitTime(final long lastCommitTime) {
+        
+        if (lastCommitTime == 0L)
+            throw new IllegalArgumentException();
+        
+        if (this.lastCommitTime == lastCommitTime) {
+
+            // No change.
+            
+            return;
+            
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("old=" + this.lastCommitTime + ", new=" + lastCommitTime);
+        // Note: Commented out to allow replay of historical transactions.
+        /*if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
+
+            throw new IllegalStateException("Updated lastCommitTime: old="
+                    + this.lastCommitTime + ", new=" + lastCommitTime);
+            
+        }*/
+
+        this.lastCommitTime = lastCommitTime;
+        
+    }
+
+    /**
+     * The lastCommitTime of the {@link Checkpoint} record from which the
+     * {@link BTree} was loaded.
+     * <p>
+     * Note: Made volatile on 8/2/2010 since it is not otherwise obvious what
+     * would guarantee visibility of this field, through I do seem to remember
+     * that visibility might be guaranteed by how the BTree class is discovered
+     * and returned to the class. Still, it does no harm to make this a volatile
+     * read.
+     */
+    volatile private long lastCommitTime = 0L;// Until the first commit.
+    
+    /**
+     * Return the {@link IDirtyListener}.
+     */
+    final public IDirtyListener getDirtyListener() {
+        
+        return listener;
+        
+    }
+
+    /**
+     * Set or clear the listener (there can be only one).
+     * 
+     * @param listener The listener.
+     */
+    final public void setDirtyListener(final IDirtyListener listener) {
+
+        assertNotReadOnly();
+        
+        this.listener = listener;
+        
+    }
+    
+    private IDirtyListener listener;
+
+    /**
+     * Fire an event to the listener (iff set).
+     */
+    final protected void fireDirtyEvent() {
+
+        assertNotReadOnly();
+
+        final IDirtyListener l = this.listener;
+
+        if (l == null)
+            return;
+
+        if (Thread.interrupted()) {
+
+            throw new RuntimeException(new InterruptedException());
+
+        }
+
+        l.dirtyEvent(this);
+        
+    }
+
+    /**
+     * Flush the nodes of the {@link BTree} to the backing store. After invoking
+     * this method the root of the {@link BTree} will be clean.
+     * <p>
+     * Note: This does NOT flush all persistent state. See
+     * {@link #writeCheckpoint()} which also handles the optional bloom filter,
+     * the {@link IndexMetadata}, and the {@link Checkpoint} record itself.
+     * 
+     * @return <code>true</code> if anything was written.
+     */
+    final public boolean flush() {
+
+        assertNotTransient();
+        assertNotReadOnly();
+        
+        if (root != null && root.isDirty()) {
+
+            writeNodeRecursive(root);
+            
+            if(log.isInfoEnabled())
+                log.info("flushed root: addr=" + root.getIdentity());
+            
+            return true;
+            
+        }
+        
+        return false;
+
+    }
+
+    /**
+     * Returns an immutable view of this {@link HTree}. If {@link BTree} is
+     * already read-only, then <i>this</i> instance is returned. Otherwise, a
+     * read-only {@link BTree} is loaded from the last checkpoint and returned.
+     * 
+     * @throws IllegalStateException
+     *             If the {@link BTree} is dirty.
+     * 
+     * @todo The {@link Checkpoint} could hold a {@link WeakReference} singleton
+     *       to the read-only view loaded from that checkpoint.
+     */
+    public HTree asReadOnly() {
+
+        if (isReadOnly()) {
+
+            return this;
+            
+        }
+
+        if(needsCheckpoint())
+            throw new IllegalStateException();
+
+		return HTree
+				.load(store, checkpoint.getCheckpointAddr(), true/* readOnly */);
+
+    }
+
+    /**
+     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
+     * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
+     * and then writes a new {@link Checkpoint} record on the backing store,
+     * saves a reference to the current {@link Checkpoint} and returns the
+     * address of that {@link Checkpoint} record.
+     * <p>
+     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
+     * is at the store level and uses {@link Checkpoint}s to ensure that the
+     * state of the {@link BTree} is current on the backing store.
+     * 
+     * @return The address at which the {@link Checkpoint} record for the
+     *         {@link BTree} was written onto the store. The {@link BTree} can
+     *         be reloaded from this {@link Checkpoint} record.
+     * 
+     * @see #writeCheckpoint2(), which returns the {@link Checkpoint} record
+     *      itself.
+     *      
+     * @see #load(IRawStore, long)
+     */
+    final public long writeCheckpoint() {
+    
+        // write checkpoint and return address of that checkpoint record.
+        return writeCheckpoint2().getCheckpointAddr();
+        
+    }
+
+    /**
+     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
+     * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
+     * and then writes a new {@link Checkpoint} record on the backing store,
+     * saves a reference to the current {@link Checkpoint} and returns the
+     * address of that {@link Checkpoint} record.
+     * <p>
+     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
+     * is at the store level and uses {@link Checkpoint}s to ensure that the
+     * state of the {@link BTree} is current on the backing store.
+     * 
+     * @return The {@link Checkpoint} record for the {@link BTree} was written
+     *         onto the store. The {@link BTree} can be reloaded from this
+     *         {@link Checkpoint} record.
+     * 
+     * @see #load(IRawStore, long)
+     */
+    final public Checkpoint writeCheckpoint2() {
+        
+        assertNotTransient();
+        assertNotReadOnly();
+        
+//        assert root != null : "root is null"; // i.e., isOpen().
+
+        // flush any dirty nodes.
+        flush();
+        
+        // pre-condition: all nodes in the tree are clean.
+        assert root == null || !root.isDirty();
+
+//        { // TODO support bloom filter?
+//            /*
+//             * Note: Use the [AbstractBtree#bloomFilter] reference here!!!
+//             * 
+//             * If that reference is [null] then the bloom filter is either
+//             * clean, disabled, or was not configured. For any of those (3)
+//             * conditions we will use the address of the bloom filter from the
+//             * last checkpoint record. If the bloom filter is clean, then we
+//             * will just carry forward its old address. Otherwise the address in
+//             * the last checkpoint record will be 0L and that will be carried
+//             * forward.
+//             */
+//            final BloomFilter filter = this.bloomFilter;
+//
+//            if (filter != null && filter.isDirty() && filter.isEnabled()) {
+//
+//                /*
+//                 * The bloom filter is enabled, is loaded and is dirty, so write
+//                 * it on the store now.
+//                 */
+//
+//                filter.write(store);
+//
+//            }
+//            
+//        }
+        
+        if (metadata.getMetadataAddr() == 0L) {
+            
+            /*
+             * The index metadata has been modified so we write out a new
+             * metadata record on the store.
+             */
+            
+            metadata.write(store);
+            
+        }
+        
+        // create new checkpoint record.
+        checkpoint = metadata.newCheckpoint(this);
+        
+        // write it on the store.
+        checkpoint.write(store);
+        
+        if (BigdataStatics.debug||log.isInfoEnabled()) {
+            final String msg = "name=" + metadata.getName()
+                    + ", writeQueue{size=" + writeRetentionQueue.size()
+                    + ",distinct=" + ndistinctOnWriteRetentionQueue + "} : "
+                    + checkpoint;
+            if (BigdataStatics.debug)
+                System.err.println(msg);
+            if (log.isInfoEnabled())
+                log.info(msg);
+        }
+        
+        // return the checkpoint record.
+        return checkpoint;
+        
+    }
+
+    /*
 	 * CRUD API.
 	 * 
 	 * TODO The hash tree intrinsically supports duplicate keys. This means that
@@ -1409,7 +2183,7 @@ public class HTree extends AbstractHTree
 	    assert oldDepth + 1 == newDepth;
 	    
 		// #of slots on the bucket page (invariant given addressBits).
-		final int slotsOnPage = (1 << addressBits);
+		final int slotsOnPage = (1 << oldBucket.slotsOnPage());
 
 		// #of address slots in each old buddy hash bucket.
 		final int slotsPerOldBuddy = (1 << oldDepth);
@@ -1605,13 +2379,14 @@ public class HTree extends AbstractHTree
 			log.info("bucketPage=" + oldPage.toShortString());
 		
 		// #of slots on a page.
-		final int slotsPerPage = 1 << addressBits;
+        final int bucketSlotsPerPage = oldPage.slotsOnPage();
+        final int dirSlotsPerPage =  1 << this.addressBits;
 
 		// allocate new nodes and relink the tree.
 		{
 
 			// 1/2 of the slots will point to each of the new bucket pages.
-			final int npointers = slotsPerPage >> 1;
+			final int npointers = dirSlotsPerPage >> 1;
 
 			// The local depth of the new bucket pages.
 			final int localDepth = HTreeUtil.getLocalDepth(addressBits,
@@ -1633,7 +2408,7 @@ public class HTree extends AbstractHTree
 				final long oldAddr = oldPage.isPersistent() ? oldPage
 						.getIdentity() : 0L;
 				final MutableDirectoryPageData data = (MutableDirectoryPageData) pp.data;
-				for (int i = 0; i < slotsPerPage && !found; i++) {
+				for (int i = 0; i < dirSlotsPerPage && !found; i++) {
 					if (oldPage.isPersistent()) {
 						if (data.childAddr[i] == oldAddr)
 							found = true; // same address
@@ -1656,7 +2431,7 @@ public class HTree extends AbstractHTree
 			b.parent = (Reference) newParent.self;
 
 			// Link the new bucket pages into the new parent directory page.
-			for (int i = 0; i < slotsPerPage; i++) {
+			for (int i = 0; i < dirSlotsPerPage; i++) {
 				newParent.childRefs[i] = (Reference) (i < npointers ? a.self
 						: b.self);
 			}
@@ -1679,9 +2454,9 @@ public class HTree extends AbstractHTree
 		 * keys).
 		 */
 		// reindexTuples(oldPage, a, b);
-		IRaba okeys = oldPage.getKeys();
-		IRaba ovals = oldPage.getValues();
-		for (int i = 0; i < slotsPerPage; i++) {
+		final IRaba okeys = oldPage.getKeys();
+		final IRaba ovals = oldPage.getValues();
+		for (int i = 0; i < bucketSlotsPerPage; i++) {
 
 			// insertRawTuple(oldPage, i);
 			if (okeys.get(i) != null)
@@ -3514,6 +4289,40 @@ public class HTree extends AbstractHTree
 		
 		abstract void insertRawTuple(final byte[] key, final byte[] val, final int buddy);
 
+	    /**
+	     * Post-order traversal of nodes and leaves in the tree. For any given node,
+	     * its children are always visited before the node itself (hence the node
+	     * occurs in the post-order position in the traversal). The iterator is NOT
+	     * safe for concurrent modification.
+	     * 
+	     * @param dirtyNodesOnly
+	     *            When true, only dirty nodes and leaves will be visited
+	     * 
+	     * @return Iterator visiting {@link AbstractPage}s.
+	     */
+	    final public Iterator<AbstractPage> postOrderNodeIterator(
+	            final boolean dirtyNodesOnly) {
+
+	        return postOrderNodeIterator(dirtyNodesOnly, false/* nodesOnly */);
+
+	    }
+
+	    /**
+	     * Post-order traversal of nodes and leaves in the tree. For any given node,
+	     * its children are always visited before the node itself (hence the node
+	     * occurs in the post-order position in the traversal). The iterator is NOT
+	     * safe for concurrent modification.
+	     * 
+	     * @param dirtyNodesOnly
+	     *            When true, only dirty nodes and leaves will be visited
+	     * @param nodesOnly
+	     *            When <code>true</code>, the leaves will not be visited.
+	     * 
+	     * @return Iterator visiting {@link AbstractPage}s.
+	     */
+	    abstract public Iterator<AbstractPage> postOrderNodeIterator(
+	            final boolean dirtyNodesOnly, final boolean nodesOnly);
+	    
 	} // class AbstractPage
 
 	/**
@@ -3689,7 +4498,7 @@ public class HTree extends AbstractHTree
 			super(htree, true/* dirty */, globalDepth);
             
             data = new MutableBucketData(//
-                    (1 << htree.addressBits), // fan-out
+                    slotsOnPage(), // fan-out
                     htree.versionTimestamps,//
                     htree.deleteMarkers,//
                     htree.rawRecords//
@@ -3710,47 +4519,58 @@ public class HTree extends AbstractHTree
 		 * @return <code>true</code> if a tuple is found in the buddy hash
 		 *         bucket for the specified key.
 		 */
-		boolean contains(final byte[] key, final int buddyOffset) {
+        boolean contains(final byte[] key, final int buddyOffset) {
 
-			if (key == null)
-				throw new IllegalArgumentException();
+            if (key == null)
+                    throw new IllegalArgumentException();
 
-			// #of slots on the page.
-			final int slotsOnPage = (1 << htree.addressBits);
+            // #of slots on the page.                                                                                                                                                                                
+            final int slotsOnPage = slotsOnPage(); // (1 << htree.addressBits);                                                                                                                                      
 
-			// #of address slots in each buddy hash table.
-			final int slotsPerBuddy = (1 << globalDepth);
+            // #of address slots in each buddy hash table.                                                                                                                                                           
+            // final int slotsPerBuddy = (1 << globalDepth);                                                                                                                                                         
 
-//			// #of buddy tables on a page.
-//			final int nbuddies = (slotsOnPage) / slotsPerBuddy;
+//          // #of buddy tables on a page.                                                                                                                                                                           
+//          final int nbuddies = (slotsOnPage) / slotsPerBuddy;                                                                                                                                                      
 
-			final int lastSlot = buddyOffset + slotsPerBuddy;
+            // final int lastSlot = buddyOffset + slotsPerBuddy;                                                                                                                                                     
 
-			// range check buddyOffset.
-			if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-				throw new IndexOutOfBoundsException();
+            // range check buddyOffset.                                                                                                                                                                              
+            // if (buddyOffset < 0 || buddyOffset >= slotsOnPage)                                                                                                                                                    
+            //      throw new IndexOutOfBoundsException();                                                                                                                                                           
 
-			/*
-			 * Locate the first unassigned tuple in the buddy bucket.
-			 * 
-			 * TODO Faster comparison with a coded key in the raba by either (a)
-			 * asking the raba to do the equals() test; or (b) copying the key
-			 * from the raba into a buffer which we reuse for each test. This is
-			 * another way in which the hash table keys raba differs from the
-			 * btree keys raba.
-			 */
-			final IRaba keys = getKeys();
-			for (int i = buddyOffset; i < lastSlot; i++) {
-				if (!keys.isNull(i)) {
-					if(BytesUtil.bytesEqual(key,keys.get(i))) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}
+            /*                                                                                                                                                                                                       
+             * Locate the first unassigned tuple in the buddy bucket.                                                                                                                                                
+             *                                                                                                                                                                                                       
+             * TODO Faster comparison with a coded key in the raba by either (a)                                                                                                                                     
+             * asking the raba to do the equals() test; or (b) copying the key                                                                                                                                       
+             * from the raba into a buffer which we reuse for each test. This is                                                                                                                                     
+             * another way in which the hash table keys raba differs from the                                                                                                                                        
+             * btree keys raba.                                                                                                                                                                                      
+             */
+            final IRaba keys = getKeys();
+            for (int i = 0; i < slotsOnPage; i++) {
+                    if (!keys.isNull(i)) {
+                            if(BytesUtil.bytesEqual(key,keys.get(i))) {
+                                    return true;
+                            }
+                    }
+            }
+            return false;
+    }
 
-		/**
+		/**                                                                                                               
+         * There is no reason why the number of slots in a BucketPage should be the same as the number in                 
+         * a DirectoryPage.                                                                                               
+         *                                                                                                                
+         * @return number of slots available in this BucketPage                                                           
+         */
+        final int slotsOnPage() {
+                // return 16;                                                                                             
+                return 1 << htree.addressBits;
+        }
+
+        /**
 		 * Return the first value found in the buddy hash bucket for the
 		 * specified key.
 		 * 
@@ -3766,45 +4586,52 @@ public class HTree extends AbstractHTree
 		 *         diagnostic if the application allows <code>null</code> values
 		 *         into the index.
 		 */
-		final byte[] lookupFirst(final byte[] key, final int buddyOffset) {
+        final byte[] lookupFirst(final byte[] key, final int buddyOffset) {
 
-			if (key == null)
-				throw new IllegalArgumentException();
+            if (key == null)
+                    throw new IllegalArgumentException();
 
-			// #of slots on the page.
-			final int slotsOnPage = (1 << htree.addressBits);
+            // #of slots on the page.                                                                                                                                                                                
+            final int slotsOnPage = slotsOnPage();
 
-			// #of address slots in each buddy hash table.
-			final int slotsPerBuddy = (1 << globalDepth);
+//            // #of address slots in each buddy hash table.                                                                                                                                                           
+//            final int slotsPerBuddy = (1 << globalDepth);
 
-//			// #of buddy tables on a page.
-//			final int nbuddies = (slotsOnPage) / slotsPerBuddy;
+//          // #of buddy tables on a page.                                                                                                                                                                           
+//          final int nbuddies = (slotsOnPage) / slotsPerBuddy;                                                                                                                                                      
 
-			final int lastSlot = buddyOffset + slotsPerBuddy;
+//            final int lastSlot = buddyOffset + slotsPerBuddy;
 
-			// range check buddyOffset.
-			if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-				throw new IndexOutOfBoundsException();
+            // range check buddyOffset.                                                                                                                                                                              
+            if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
+                    throw new IndexOutOfBoundsException();
 
-			/*
-			 * Locate the first unassigned tuple in the buddy bucket.
-			 * 
-			 * TODO Faster comparison with a coded key in the raba by either (a)
-			 * asking the raba to do the equals() test; or (b) copying the key
-			 * from the raba into a buffer which we reuse for each test. This is
-			 * another way in which the hash table keys raba differs from the
-			 * btree keys raba.
-			 */
-			final IRaba keys = getKeys();
-			for (int i = buddyOffset; i < lastSlot; i++) {
-				if (!keys.isNull(i)) {
-					if(BytesUtil.bytesEqual(key,keys.get(i))) {
-						return getValues().get(i);
-					}
-				}
-			}
-			return null;
-		}
+            /*                                                                                                                                                                                                       
+             * Locate the first unassigned tuple in the buddy bucket.                                                                                                                                                
+             *                                                                                                                                                                                                       
+             * TODO Faster comparison with a coded key in the raba by either (a)                                                                                                                                     
+             * asking the raba to do the equals() test; or (b) copying the key                                                                                                                                       
+             * from the raba into a buffer which we reuse for each test. This is                                                                                                                                     
+             * another way in which the hash table keys raba differs from the                                                                                                                                        
+             * btree keys raba.                                                                                                                                                                                      
+             */
+            final IRaba keys = getKeys();
+//          for (int i = buddyOffset; i < lastSlot; i++) {                                                                                                                                                           
+//                  if (!keys.isNull(i)) {                                                                                                                                                                           
+//                          if(BytesUtil.bytesEqual(key,keys.get(i))) {                                                                                                                                              
+//                                  return getValues().get(i);                                                                                                                                                       
+//                          }                                                                                                                                                                                        
+//                  }                                                                                                                                                                                                
+//          }                                                                                                                                                                                                        
+            for (int i = 0; i < slotsOnPage; i++) {
+                    if (!keys.isNull(i)) {
+                            if(BytesUtil.bytesEqual(key,keys.get(i))) {
+                                    return getValues().get(i);
+                            }
+                    }
+            }
+            return null;
+        }
 
 		/**
 		 * Return an iterator which will visit each tuple in the buddy hash
@@ -3852,132 +4679,132 @@ public class HTree extends AbstractHTree
 		 * @throws IndexOutOfBoundsException
 		 *             if <i>buddyOffset</i> is out of the allowed range.
 		 */
-		boolean insert(final byte[] key, final byte[] val,
-				final DirectoryPage parent, 
-				final int buddyOffset) {
-
-			if (key == null)
-				throw new IllegalArgumentException();
-
-			if (parent == null)
-				throw new IllegalArgumentException();
+        boolean insert(final byte[] key, final byte[] val,
+                final DirectoryPage parent,
+                final int buddyOffset) {
+		
+	        if (key == null)
+	                throw new IllegalArgumentException();
+	
+	        if (parent == null)
+	                throw new IllegalArgumentException();
 
 			// #of slots on the page.
-			final int slotsOnPage = (1 << htree.addressBits);
-
-			// #of address slots in each buddy hash table.
-			final int slotsPerBuddy = (1 << globalDepth);
-
-			// #of buddy tables on a page.
-			final int nbuddies = (slotsOnPage) / slotsPerBuddy;
-
-			final int lastSlot = buddyOffset + slotsPerBuddy;
-
-			// range check buddyOffset.
-			if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-				throw new IndexOutOfBoundsException();
-
-			// TODO if(!mutable) copyOnWrite().insert(key,val,parent,buddyOffset);
-
-            /*
-             * Locate the first unassigned tuple in the buddy bucket.
-             * 
-             * Note: Given the IRaba data structure, this will require us to
-             * examine the keys for a null. The "keys" rabas do not allow nulls,
-             * so we will need to use a "values" raba (nulls allowed) for the
-             * bucket keys. Unless we keep the entries in a buddy bucket dense
-             * (maybe making them dense when they are persisted for faster
-             * scans, but why bother for mutable buckets?) we will have to scan
-             * the entire buddy bucket to find an open slot (or just to count
-             * the #of slots which are currently in use).
-             * 
-             * TODO Cache the location of the last known empty slot. If it is in
-             * the same buddy bucket then we can use it immediately. Otherwise
-             * we can scan for the first empty slot in the given buddy bucket.
-             */
-            final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
-            final MutableValueBuffer vals = (MutableValueBuffer) getValues();
+			final int slotsOnPage = slotsOnPage();
+		
+	        // #of address slots in each buddy hash table.                                                                                                                                                           
+	        // final int slotsPerBuddy = (1 << globalDepth);                                                                                                                                                         
+	
+	        // #of buddy tables on a page.                                                                                                                                                                           
+	        // final int nbuddies = (slotsOnPage) / slotsPerBuddy;                                                                                                                                                   
+	
+	        // final int lastSlot = buddyOffset + slotsPerBuddy;                                                                                                                                                     
+	
+	        // range check buddyOffset.                                                                                                                                                                              
+	        //if (buddyOffset < 0 || buddyOffset >= slotsOnPage)                                                                                                                                                     
+	        //      throw new IndexOutOfBoundsException();                                                                                                                                                           
+	
+	        // TODO if(!mutable) copyOnWrite().insert(key,val,parent,buddyOffset);                                                                                                                                   
+		
+			/*                                                                                                                                                                                                                   
+			* Locate the first unassigned tuple in the buddy bucket.                                                                                                                                                            
+			*                                                                                                                                                                                                                   
+			* Note: Given the IRaba data structure, this will require us to                                                                                                                                                     
+			* examine the keys for a null. The "keys" rabas do not allow nulls,                                                                                                                                                 
+			* so we will need to use a "values" raba (nulls allowed) for the                                                                                                                                                    
+			* bucket keys. Unless we keep the entries in a buddy bucket dense                                                                                                                                                   
+			* (maybe making them dense when they are persisted for faster                                                                                                                                                       
+			* scans, but why bother for mutable buckets?) we will have to scan                                                                                                                                                  
+			* the entire buddy bucket to find an open slot (or just to count                                                                                                                                                    
+			* the #of slots which are currently in use).                                                                                                                                                                        
+			*                                                                                                                                                                                                                   
+			* TODO Cache the location of the last known empty slot. If it is in                                                                                                                                                 
+			* the same buddy bucket then we can use it immediately. Otherwise                                                                                                                                                   
+			* we can scan for the first empty slot in the given buddy bucket.                                                                                                                                                   
+			*/
+			final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
+			final MutableValueBuffer vals = (MutableValueBuffer) getValues();
 			
-			for (int i = buddyOffset; i < lastSlot; i++) {
-				if (keys.isNull(i)) {
-					keys.nkeys++;
-					keys.keys[i] = key;
-					vals.nvalues++;
-					vals.values[i] = val;
-					// TODO deleteMarker:=false
-					// TODO versionTimestamp:=...
-					((HTree)htree).nentries++;
-					// insert Ok.
-					return true;
-				}
-			}
+			        for (int i = 0; i < slotsOnPage; i++) {
+			                if (keys.isNull(i)) {
+			                        keys.nkeys++;
+			                        keys.keys[i] = key;
+			                        vals.nvalues++;
+			                        vals.values[i] = val;
+			                        // TODO deleteMarker:=false                                                                                                                                                              
+			                        // TODO versionTimestamp:=...                                                                                                                                                            
+			                        ((HTree)htree).nentries++;
+			                        // insert Ok.                                                                                                                                                                            
+			                        return true;
+			                }
+			        }
+		
+		        /*                                                                                                                                                                                                       
+		         * Any buddy bucket which is full is split unless it is the sole                                                                                                                                         
+		         * buddy in the page since a split doubles the size of the buddy                                                                                                                                         
+		         * bucket (unless it is the only buddy on the page) and the tuple                                                                                                                                        
+		         * can therefore be inserted after a split. [This rule is not                                                                                                                                            
+		         * perfect if we allow splits to be driven by the bytes on a page,                                                                                                                                       
+		         * but it should still be Ok.]                                                                                                                                                                           
+		         *                                                                                                                                                                                                       
+		         * Before we can split the sole buddy bucket in a page, we need to                                                                                                                                       
+		         * know whether or not the keys are identical. If they are then we                                                                                                                                       
+		         * let the page grow rather than splitting it. This can be handled                                                                                                                                       
+		         * insert of bucketPage.insert(). It can have a boolean which is set                                                                                                                                     
+		         * false as soon as it sees a key which is not the equals() to the                                                                                                                                       
+		         * probe key (in all bits).                                                                                                                                                                              
+		         *                                                                                                                                                                                                       
+		         * Note that an allowed split always leaves enough room for another                                                                                                                                      
+		         * tuple (when considering only the #of tuples and not their bytes                                                                                                                                       
+		         * on the page). We can still be "out of space" in terms of bytes on                                                                                                                                     
+		         * the page, even for a single tuple. In this edge case, the tuple                                                                                                                                       
+		         * should really be a raw record. That is easily controlled by                                                                                                                                           
+		         * having a maximum inline value byte[] length for a page - probably                                                                                                                                     
+		         * on the order of pageSize/16 which works out to 256 bytes for a 4k                                                                                                                                     
+		         * page.                                                                                                                                                                                                 
+		         */
+		        //if (nbuddies != 1) {                                                                                                                                                                                   
+		                /*                                                                                                                                                                                               
+		                 * Force a split since there is more than one buddy on the page.                                                                                                                                 
+		                 */
+		        //      return false;                                                                                                                                                                                    
+		        //}                                                                                                                                                                                                      
+		
+		        /*                                                                                                                                                                                                       
+		         * There is only one buddy on the page. Now we have to figure out                                                                                                                                        
+		         * whether or not all keys are duplicates.                                                                                                                                                               
+		         */
+		        boolean identicalKeys = true;
+		        for (int i = 0; i < slotsOnPage; i++) {
+		                if(!BytesUtil.bytesEqual(key,keys.get(i))) {
+		                        identicalKeys = false;
+		                        break;
+		                }
+		        }
+		        if(!identicalKeys) {
+		                /*                                                                                                                                                                                               
+		                 * Force a split since it is possible to redistribute some                                                                                                                                       
+		                 * tuples.                                                                                                                                                                                       
+		                 */
+		                return false;
+		        }
+		
+		/*                                                                                                                                                                                                                   
+		* Since the page is full, we need to grow the page (or chain an                                                                                                                                                     
+		* overflow page) rather than splitting the page.                                                                                                                                                                    
+		*                                                                                                                                                                                                                   
+		* TODO Maybe the easiest thing to do is just double the target #of                                                                                                                                                  
+		* slots on the page. We would rely on keys.capacity() in this case                                                                                                                                                  
+		* rather than #slots. In fact, we could just reenter the method                                                                                                                                                     
+		* above after doubling as long as we rely on keys.capacity() in the                                                                                                                                                 
+		* case where nbuddies==1. [Unit test for this case.]                                                                                                                                                                
+		*/
 
-			/*
-			 * Any buddy bucket which is full is split unless it is the sole
-			 * buddy in the page since a split doubles the size of the buddy
-			 * bucket (unless it is the only buddy on the page) and the tuple
-			 * can therefore be inserted after a split. [This rule is not
-			 * perfect if we allow splits to be driven by the bytes on a page,
-			 * but it should still be Ok.]
-			 * 
-			 * Before we can split the sole buddy bucket in a page, we need to
-			 * know whether or not the keys are identical. If they are then we
-			 * let the page grow rather than splitting it. This can be handled
-			 * insert of bucketPage.insert(). It can have a boolean which is set
-			 * false as soon as it sees a key which is not the equals() to the
-			 * probe key (in all bits).
-			 * 
-			 * Note that an allowed split always leaves enough room for another
-			 * tuple (when considering only the #of tuples and not their bytes
-			 * on the page). We can still be "out of space" in terms of bytes on
-			 * the page, even for a single tuple. In this edge case, the tuple
-			 * should really be a raw record. That is easily controlled by
-			 * having a maximum inline value byte[] length for a page - probably
-			 * on the order of pageSize/16 which works out to 256 bytes for a 4k
-			 * page.
-			 */
-			if (nbuddies != 1) {
-				/*
-				 * Force a split since there is more than one buddy on the page.
-				 */
-				return false;
-			}
+                throw new UnsupportedOperationException(
+            "Must overflow since all keys on full buddy bucket are duplicates.");
 
-			/*
-			 * There is only one buddy on the page. Now we have to figure out
-			 * whether or not all keys are duplicates.
-			 */
-			boolean identicalKeys = true;
-			for (int i = buddyOffset; i < buddyOffset + slotsPerBuddy; i++) {
-				if(!BytesUtil.bytesEqual(key,keys.get(i))) {
-					identicalKeys = false;
-					break;
-				}
-			}
-			if(!identicalKeys) {
-				/*
-				 * Force a split since it is possible to redistribute some
-				 * tuples.
-				 */
-				return false;
-			}
-
-            /*
-             * Since the page is full, we need to grow the page (or chain an
-             * overflow page) rather than splitting the page.
-             * 
-             * TODO Maybe the easiest thing to do is just double the target #of
-             * slots on the page. We would rely on keys.capacity() in this case
-             * rather than #slots. In fact, we could just reenter the method
-             * above after doubling as long as we rely on keys.capacity() in the
-             * case where nbuddies==1. [Unit test for this case.]
-             */
-
-			throw new UnsupportedOperationException(
-                    "Must overflow since all keys on full buddy bucket are duplicates.");
-            
         }
-
+        
 		/**
 		 * Insert used when addLevel() is invoked to copy a tuple from an
 		 * existing bucket page into another bucket page. This method is very
@@ -4022,13 +4849,13 @@ public class HTree extends AbstractHTree
 				throw new IllegalArgumentException();
 
 			// #of slots on the page.
-			final int slotsOnPage = (1 << htree.addressBits);
+			final int slotsOnPage = slotsOnPage();
 
 			// #of address slots in each buddy hash table.
 			final int slotsPerBuddy = (1 << globalDepth);
 
 			// #of buddy tables on a page.
-			final int nbuddies = (slotsOnPage) / slotsPerBuddy;
+			final int nbuddies = slotsOnPage / slotsPerBuddy;
 
 			final int lastSlot = buddyOffset + slotsPerBuddy;
 
@@ -4154,7 +4981,7 @@ public class HTree extends AbstractHTree
 		private class InnerBucketPageTupleIterator<E> implements
 				ITupleIterator<E> {
 
-			private final int slotsPerPage = 1 << htree.addressBits;
+			private final int slotsPerPage = slotsOnPage();
 
 			private int nextNonEmptySlot = 0;
 
@@ -4220,44 +5047,73 @@ public class HTree extends AbstractHTree
 			}
 
 		}
-		
+
+		/**
+		 * Visits this leaf if unless it is not dirty and the flag is true, in
+		 * which case the returned iterator will not visit anything.
+		 * 
+		 * {@inheritDoc}
+		 */
 		@Override
-		public void PP(final StringBuilder sb) {
+		@SuppressWarnings("unchecked")
+		public Iterator<AbstractPage> postOrderNodeIterator(
+				final boolean dirtyNodesOnly, final boolean nodesOnly) {
 
-			sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()));
-			
+			if (dirtyNodesOnly && !isDirty()) {
 
-			sb.append("("); // start of address map.
+				return EmptyIterator.DEFAULT;
 
-			// #of buddy tables on a page.
-			final int nbuddies = (1 << htree.addressBits) / (1 << globalDepth);
+			} else if (nodesOnly) {
 
-			// #of address slots in each buddy hash table.
-			final int slotsPerBuddy = (1 << globalDepth);
+				return EmptyIterator.DEFAULT;
 
-			for (int i = 0; i < nbuddies; i++) {
+			} else {
 
-				if (i > 0) // buddy boundary marker
-					sb.append(";");
+				return new SingleValueIterator(this);
 
-				for (int j = 0; j < slotsPerBuddy; j++) {
+	        }
 
-					if (j > 0) // slot boundary marker.
-						sb.append(",");
+	    }
 
-					final int slot = i * slotsPerBuddy + j;
+        @Override
+        public void PP(final StringBuilder sb) {
 
-					sb.append(PPVAL(slot));
-					
-				}
+                sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()));
 
-			}
 
-			sb.append(")"); // end of tuples			
-		
-			sb.append("\n");
+                sb.append("("); // start of address map.                                                                                                                                                                 
 
-		}
+                // #of buddy tables on a page.                                                                                                                                                                           
+                // final int nbuddies = (1 << htree.addressBits) / (1 << globalDepth);                                                                                                                                   
+                final int nbuddies = 1;
+
+                // #of address slots in each buddy hash table.                                                                                                                                                           
+                // final int slotsPerBuddy = (1 << globalDepth);                                                                                                                                                         
+                final int slotsPerBuddy = slotsOnPage();
+
+                for (int i = 0; i < nbuddies; i++) {
+
+                        if (i > 0) // buddy boundary marker                                                                                                                                                              
+                                sb.append(";");
+
+                        for (int j = 0; j < slotsPerBuddy; j++) {
+
+                                if (j > 0) // slot boundary marker.                                                                                                                                                      
+                                        sb.append(",");
+
+                                final int slot = i * slotsPerBuddy + j;
+
+                                sb.append(PPVAL(slot));
+
+                        }
+
+                }
+
+                sb.append(")"); // end of tuples                                                                                                                                                                         
+
+                sb.append("\n");
+
+        }
 
 		/**
 		 * Pretty print a value from the tuple at the specified slot on the
@@ -4599,6 +5455,60 @@ public class HTree extends AbstractHTree
 		}
 
 		/**
+		 * Return the {@link Reference} for the child at that index.
+		 * 
+		 * @param index
+		 *            The index
+		 *            
+		 * @return The {@link Reference}.
+		 */
+		Reference<AbstractPage> getChildRef(final int index) {
+
+			return childRefs[index];
+
+		}
+
+		/**
+		 * This method must be invoked on a parent to notify the parent that the
+		 * child has become persistent. The method scans the weak references for
+		 * the children, finds the index for the specified child, and then sets
+		 * the corresponding index in the array of child addresses.
+		 * 
+		 * @param child
+		 *            The child.
+		 * 
+		 * @exception IllegalStateException
+		 *                if the child is not persistent.
+		 * @exception IllegalArgumentException
+		 *                if the child is not a child of this node.
+		 */
+		void setChildAddr(final AbstractPage child) {
+
+	        assert !isReadOnly();
+
+	        if (!child.isPersistent()) {
+
+	            // The child does not have persistent identity.
+	            throw new IllegalStateException();
+
+	        }
+
+			final int slotsPerPage = 1 << htree.addressBits;
+
+			for (int i = 0; i < slotsPerPage; i++) {
+
+				if (childRefs[i] == child.self) {
+
+					((MutableDirectoryPageData) data).childAddr[i] = child
+							.getIdentity();
+
+				}
+
+			}
+
+	    }
+	    
+	    /**
 		 * Return the child at the specified index in the {@link DirectoryPage}.
 		 * 
 		 * @param index
@@ -4609,7 +5519,7 @@ public class HTree extends AbstractHTree
 		 *            
 		 * @return The child at that index.
 		 */
-		private AbstractPage getChild(final int index) {
+		AbstractPage getChild(final int index) {
 
 			// width of a buddy hash table (#of pointer slots).
 			final int tableWidth = 1 << globalDepth;
@@ -4782,7 +5692,31 @@ public class HTree extends AbstractHTree
 
         }
 
-		/**
+	    /**
+	     * Iterator visits children, recursively expanding each child with a
+	     * post-order traversal of its children and finally visits this node itself.
+	     */
+	    @Override
+	    @SuppressWarnings("unchecked")
+	    public Iterator<AbstractPage> postOrderNodeIterator(
+	            final boolean dirtyNodesOnly, final boolean nodesOnly) {
+
+	        if (dirtyNodesOnly && !dirty) {
+
+	            return EmptyIterator.DEFAULT;
+
+	        }
+
+	        /*
+	         * Iterator append this node to the iterator in the post-order position.
+	         */
+
+	        return new Striterator(postOrderIterator1(dirtyNodesOnly,nodesOnly))
+	                .append(new SingleValueIterator(this));
+
+	    }
+
+	    /**
 		 * Iterator visits children recursively expanding each child with a
 		 * post-order traversal of its children and finally visits this node
 		 * itself.
@@ -4998,7 +5932,111 @@ public class HTree extends AbstractHTree
 
 	    }
 
-		/**
+	    /**
+	     * Visits the children (recursively) using post-order traversal, but does
+	     * NOT visit this node.
+	     */
+	    @SuppressWarnings("unchecked")
+		private Iterator<AbstractPage> postOrderIterator1(
+				final boolean dirtyNodesOnly, final boolean nodesOnly) {
+
+	        /*
+	         * Iterator visits the direct children, expanding them in turn with a
+	         * recursive application of the post-order iterator.
+	         * 
+	         * When dirtyNodesOnly is true we use a child iterator that makes a best
+	         * effort to only visit dirty nodes. Especially, the iterator MUST NOT
+	         * force children to be loaded from disk if the are not resident since
+	         * dirty nodes are always resident.
+	         * 
+	         * The iterator must touch the node in order to guarantee that a node
+	         * will still be dirty by the time that the caller visits it. This
+	         * places the node onto the hard reference queue and increments its
+	         * reference counter. Evictions do NOT cause IO when the reference is
+	         * non-zero, so the node will not be made persistent as a result of
+	         * other node touches. However, the node can still be made persistent if
+	         * the caller explicitly writes the node onto the store.
+	         */
+
+	        // BTree.log.debug("node: " + this);
+	        return new Striterator(childIterator(dirtyNodesOnly))
+	                .addFilter(new Expander() {
+
+	                    private static final long serialVersionUID = 1L;
+
+	                    /*
+	                     * Expand each child in turn.
+	                     */
+	                    protected Iterator expand(final Object childObj) {
+
+	                        /*
+	                         * A child of this node.
+	                         */
+
+	                        final AbstractPage child = (AbstractPage) childObj;
+
+	                        if (dirtyNodesOnly && !child.isDirty()) {
+
+	                            return EmptyIterator.DEFAULT;
+
+	                        }
+
+	                        if (child instanceof DirectoryPage) {
+
+	                            /*
+	                             * The child is a Node (has children).
+	                             */
+
+	                            // visit the children (recursive post-order
+	                            // traversal).
+	                            final Striterator itr = new Striterator(
+	                                    ((DirectoryPage) child).postOrderIterator1(
+	                                            dirtyNodesOnly, nodesOnly));
+
+	                            // append this node in post-order position.
+	                            itr.append(new SingleValueIterator(child));
+
+	                            return itr;
+
+	                        } else {
+
+	                            /*
+	                             * The child is a leaf.
+	                             */
+
+	                            // Visit the leaf itself.
+	                            if (nodesOnly)
+	                                return EmptyIterator.DEFAULT;
+
+	                            return new SingleValueIterator(child);
+
+	                        }
+	                    }
+	                });
+
+	    }
+
+	    /**
+	     * Iterator visits the direct child nodes in the external key ordering.
+	     * 
+	     * @param dirtyNodesOnly
+	     *            When true, only the direct dirty child nodes will be visited.
+	     */
+	    public Iterator<AbstractPage> childIterator(final boolean dirtyNodesOnly) {
+
+	        if (dirtyNodesOnly) {
+
+	            return new DirtyChildIterator(this);
+
+	        } else {
+
+	            return new ChildIterator();
+
+	        }
+
+	    }
+
+	    /**
 		 * TODO We should dump each bucket page once. This could be done either
 		 * by dumping each buddy bucket on the page separately or by skipping
 		 * through the directory page until we get to the next bucket page and
@@ -5413,7 +6451,7 @@ public class HTree extends AbstractHTree
 			this.buddyOffset = buddyOffset;
 
 			// #of slots on the page.
-			final int slotsOnPage = (1 << bucket.htree.addressBits);
+			final int slotsOnPage = bucket.slotsOnPage();
 
 			// #of address slots in each buddy hash table.
 			final int slotsPerBuddy = (1 << bucket.globalDepth);
@@ -5508,7 +6546,7 @@ public class HTree extends AbstractHTree
 	    
 	    /**
 	     * 
-	     * @param btree
+	     * @param htree
 	     * @param flags
 	     */
 	    public Tuple(final AbstractHTree htree, final int flags) {
@@ -5650,7 +6688,7 @@ public class HTree extends AbstractHTree
 		private boolean findNextSlot() {
 			if (currentBucketPage == null)
 				throw new IllegalStateException();
-			final int slotsPerPage = 1 << currentBucketPage.htree.addressBits;
+			final int slotsPerPage = currentBucketPage.slotsOnPage();
 			final IRaba keys = currentBucketPage.getKeys();
 			for (; nextNonEmptySlot < slotsPerPage; nextNonEmptySlot++) {
 				if (keys.isNull(nextNonEmptySlot))
@@ -5697,5 +6735,275 @@ public class HTree extends AbstractHTree
 		}
 
 	}
-	
+
+	/**
+	 * Create a new {@link HTree} or derived class. This method works by writing
+	 * the {@link IndexMetadata} record on the store and then loading the
+	 * {@link HTree} from the {@link IndexMetadata} record.
+	 * 
+	 * @param store
+	 *            The store.
+	 * 
+	 * @param metadata
+	 *            The metadata record.
+	 * 
+	 * @return The newly created {@link HTree}.
+	 * 
+	 * @see #load(IRawStore, long)
+	 * 
+	 * @exception IllegalStateException
+	 *                If you attempt to create two {@link HTree} objects from
+	 *                the same metadata record since the metadata address will
+	 *                have already been noted on the {@link IndexMetadata}
+	 *                object. You can use {@link IndexMetadata#clone()} to
+	 *                obtain a new copy of the metadata object with the metadata
+	 *                address set to <code>0L</code>.
+	 */
+    public static HTree create(final IRawStore store, final IndexMetadata metadata) {
+        
+        if (metadata.getMetadataAddr() != 0L) {
+
+            throw new IllegalStateException("Metadata record already in use");
+            
+        }
+        
+        /*
+         * Write metadata record on store. The address of that record is set as
+         * a side-effect on the metadata object.
+         */
+        metadata.write(store);
+
+        /*
+         * Create checkpoint for the new H+Tree.
+         */
+        final Checkpoint firstCheckpoint = metadata.firstCheckpoint();
+        
+        /*
+         * Write the checkpoint record on the store. The address of the
+         * checkpoint record is set on the object as a side effect.
+         */
+        firstCheckpoint.write(store);
+        
+        /*
+         * Load the HTree from the store using that checkpoint record. There is
+         * no root so a new root leaf will be created when the HTree is opened.
+         */
+        return load(store, firstCheckpoint.getCheckpointAddr(), false/* readOnly */);
+        
+    }
+
+    /**
+     * Create a new {@link HTree} or derived class that is fully transient (NO
+     * backing {@link IRawStore}).
+     * <p>
+     * Fully transient {@link HTree}s provide the functionality of a {@link HTree}
+     * without a backing persistence store. Internally, reachable nodes and
+     * leaves of the transient {@link HTree} use hard references to ensure that
+     * remain strongly reachable. Deleted nodes and leaves simply clear their
+     * references and will be swept by the garbage collector shortly thereafter.
+     * <p>
+     * Operations which attempt to write on the backing store will fail.
+     * <p>
+     * While nodes and leaves are never persisted, the keys and values of the
+     * transient {@link HTree} are unsigned byte[]s. This means that application
+     * keys and values are always converted into unsigned byte[]s before being
+     * stored in the {@link HTree}. Hence if an object that is inserted into
+     * the {@link HTree} and then looked up using the {@link HTree} API, you
+     * WILL NOT get back the same object reference.
+     * <p>
+     * Note: CLOSING A TRANSIENT INDEX WILL DISCARD ALL DATA!
+     * 
+     * @param metadata
+     *            The metadata record.
+     * 
+     * @return The transient {@link HTree}.
+     */
+    @SuppressWarnings("unchecked")
+    public static HTree createTransient(final IndexMetadata metadata) {
+        
+        /*
+         * Create checkpoint for the new HTree.
+         */
+        final Checkpoint firstCheckpoint = metadata.firstCheckpoint();
+
+        /*
+         * Create B+Tree object instance.
+         */
+        try {
+
+            final Class cl = Class.forName(metadata.getHTreeClassName());
+
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor for a class derived from
+             * BTree.
+             */
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    IRawStore.class,//
+                    Checkpoint.class,//
+                    IndexMetadata.class,//
+                    Boolean.TYPE//
+                    });
+
+            final HTree htree = (HTree) ctor.newInstance(new Object[] { //
+                    null , // store
+                    firstCheckpoint, //
+                    metadata, //
+                    false// readOnly
+                    });
+
+            // create the root node.
+            htree.reopen();
+
+            return htree;
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+        
+    }
+
+	/**
+	 * Load an instance of a {@link HTree} or derived class from the store. The
+	 * {@link HTree} or derived class MUST declare a constructor with the
+	 * following signature: <code>
+     * 
+     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
+     * 
+     * </code>
+	 * 
+	 * @param store
+	 *            The store.
+	 * @param addrCheckpoint
+	 *            The address of a {@link Checkpoint} record for the index.
+	 * @param readOnly
+	 *            When <code>true</code> the {@link BTree} will be marked as
+	 *            read-only. Marking has some advantages relating to the locking
+	 *            scheme used by {@link Node#getChild(int)} since the root node
+	 *            is known to be read-only at the time that it is allocated as
+	 *            per-child locking is therefore in place for all nodes in the
+	 *            read-only {@link BTree}. It also results in much higher
+	 *            concurrency for {@link AbstractBTree#touch(AbstractNode)}.
+	 * 
+	 * @return The {@link HTree} or derived class loaded from that
+	 *         {@link Checkpoint} record.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if store is <code>null</code>.
+	 */
+    @SuppressWarnings("unchecked")
+    public static HTree load(final IRawStore store, final long addrCheckpoint,
+            final boolean readOnly) {
+
+		if (store == null)
+			throw new IllegalArgumentException();
+    	
+        /*
+         * Read checkpoint record from store.
+         */
+		final Checkpoint checkpoint;
+		try {
+			checkpoint = Checkpoint.load(store, addrCheckpoint);
+		} catch (Throwable t) {
+			throw new RuntimeException("Could not load Checkpoint: store="
+					+ store + ", addrCheckpoint="
+					+ store.toString(addrCheckpoint), t);
+		}
+
+		/*
+		 * Read metadata record from store.
+		 */
+		final IndexMetadata metadata;
+		try {
+			metadata = IndexMetadata.read(store, checkpoint.getMetadataAddr());
+		} catch (Throwable t) {
+			throw new RuntimeException("Could not read IndexMetadata: store="
+					+ store + ", checkpoint=" + checkpoint, t);
+		}
+
+        if (log.isInfoEnabled()) {
+
+            // Note: this is the scale-out index name for a partitioned index.
+            final String name = metadata.getName();
+
+            log.info((name == null ? "" : "name=" + name + ", ")
+                    + "readCheckpoint=" + checkpoint);
+
+        }
+
+        /*
+         * Create HTree object instance.
+         */
+        try {
+
+            final Class cl = Class.forName(metadata.getHTreeClassName());
+
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor for a class derived from
+             * BTree.
+             */
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    IRawStore.class,//
+                    Checkpoint.class,//
+                    IndexMetadata.class, //
+                    Boolean.TYPE
+                    });
+
+            final HTree htree = (HTree) ctor.newInstance(new Object[] { //
+                    store,//
+                    checkpoint, //
+                    metadata, //
+                    readOnly
+                    });
+
+//            if (readOnly) {
+//
+//                btree.setReadOnly(true);
+//
+//            }
+
+            // read the root node.
+            htree.reopen();
+
+            return htree;
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+    
+    /**
+     * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
+     */
+    protected static class NodeFactory implements INodeFactory {
+
+        public static final INodeFactory INSTANCE = new NodeFactory();
+
+        private NodeFactory() {
+        }
+
+        public BucketPage allocLeaf(final AbstractHTree btree, final long addr,
+                final ILeafData data) {
+
+// FIXME           return new BucketPage(btree, addr, data);
+        	throw new UnsupportedOperationException();
+
+        }
+
+        public DirectoryPage allocNode(final AbstractHTree btree, final long addr,
+                final INodeData data) {
+
+// FIXME            return new DirectoryPage(btree, addr, data);
+        	throw new UnsupportedOperationException();
+
+        }
+
+    }
+
 }

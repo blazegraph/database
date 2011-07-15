@@ -32,7 +32,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 
 import cutthecrap.utils.striterators.IFilter;
@@ -95,7 +95,7 @@ public class DelegateIndex implements IIndex {
         return delegate.getResourceMetadata();
     }
 
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
         return delegate.getCounters();
     }
 

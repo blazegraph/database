@@ -6,6 +6,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -13,26 +14,27 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.AbstractNode;
+import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
-import com.bigdata.btree.DefaultEvictionListener;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
-import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.PO;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.data.IAbstractNodeData;
-import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.data.INodeData;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates;
 import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.htree.HTree.AbstractPage;
 import com.bigdata.htree.HTree.BucketPage;
 import com.bigdata.htree.HTree.DirectoryPage;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.compression.IRecordCompressorFactory;
+import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
@@ -43,7 +45,7 @@ import com.bigdata.service.DataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractHTree {
+abstract public class AbstractHTree implements ICounterSetAccess {
 
     /**
      * The index is already closed.
@@ -64,15 +66,22 @@ abstract public class AbstractHTree {
      * The index is read-only but a mutation operation was requested.
      */
     final protected static String ERROR_READ_ONLY = "Read-only";
-    
-    /**
-     * The index is transient (not backed by persistent storage) but an
-     * operation that requires persistence was requested.
-     */
-    final protected static String ERROR_TRANSIENT = "Transient";
-    
-    private static final transient Logger log = Logger.getLogger(AbstractHTree.class);
-    
+
+	/**
+	 * The index is transient (not backed by persistent storage) but an
+	 * operation that requires persistence was requested.
+	 */
+	final protected static String ERROR_TRANSIENT = "Transient";
+
+	private static final transient Logger log = Logger
+			.getLogger(AbstractHTree.class);
+
+	/**
+	 * Log for {@link AbstractHTree#dump(PrintStream)} and friends.
+	 */
+	public static final Logger dumpLog = Logger.getLogger(AbstractHTree.class
+			.getName() + "#dump");
+
     /**
      * Counters tracking various aspects of the btree.
      * <p>
@@ -82,9 +91,12 @@ abstract public class AbstractHTree {
      */
     private volatile BTreeCounters btreeCounters = new BTreeCounters();
 
-    /**
-     * Counters tracking various aspects of the btree.
-     */
+	/**
+	 * Counters tracking various aspects of the btree.
+	 * 
+	 * TODO Refactor / reuse performance counters for HTree and collect counters
+	 * in the code.
+	 */
     final public BTreeCounters getBtreeCounters() {
     
         return btreeCounters;
@@ -117,12 +129,159 @@ abstract public class AbstractHTree {
 
     }
     
+//	/**
+//	 * {@inheritDoc}
+//	 * <p>
+//	 * Return some "statistics" about the btree including both the static
+//	 * {@link CounterSet} and the {@link BTreeCounters}s.
+//	 * <p>
+//	 * Note: counters reporting directly on the {@link AbstractBTree} use a
+//	 * snapshot mechanism which prevents a hard reference to the
+//	 * {@link AbstractBTree} from being attached to the return
+//	 * {@link CounterSet} object. One consequence is that these counters will
+//	 * not update until the next time you invoke {@link #getCounters()}.
+//	 * <p>
+//	 * Note: In order to snapshot the counters use {@link OneShotInstrument} to
+//	 * prevent the inclusion of an inner class with a reference to the outer
+//	 * {@link AbstractBTree} instance.
+//	 * 
+//	 * @see BTreeCounters#getCounters()
+//	 * 
+//	 * @todo use same instance of BTreeCounters for all BTree instances in
+//	 *       standalone!
+//	 * 
+//	 * @todo estimate heap requirements for nodes and leaves based on their
+//	 *       state (keys, values, and other arrays). report estimated heap
+//	 *       consumption here.
+//	 */
+    public CounterSet getCounters() {
+
+		final CounterSet counterSet = new CounterSet();
+		{
+			
+			counterSet.addCounter("index UUID", new OneShotInstrument<String>(
+					getIndexMetadata().getIndexUUID().toString()));
+
+			counterSet.addCounter("class", new OneShotInstrument<String>(
+					getClass().getName()));
+
+		}
+
+		/*
+		 * Note: These statistics are reported using a snapshot mechanism which
+		 * prevents a hard reference to the AbstractBTree from being attached to
+		 * the CounterSet object!
+		 */
+		{
+
+			final CounterSet tmp = counterSet
+					.makePath(IBTreeCounters.WriteRetentionQueue);
+
+			tmp.addCounter("Capacity", new OneShotInstrument<Integer>(
+					writeRetentionQueue.capacity()));
+
+			tmp.addCounter("Size", new OneShotInstrument<Integer>(
+					writeRetentionQueue.size()));
+
+			tmp.addCounter("Distinct", new OneShotInstrument<Integer>(
+					ndistinctOnWriteRetentionQueue));
+
+        }
+        
+		/*
+		 * Note: These statistics are reported using a snapshot mechanism which
+		 * prevents a hard reference to the AbstractBTree from being attached to
+		 * the CounterSet object!
+		 */
+		{
+
+			final CounterSet tmp = counterSet
+					.makePath(IBTreeCounters.Statistics);
+
+			tmp.addCounter("addressBits", new OneShotInstrument<Integer>(
+					addressBits));
+
+//			tmp.addCounter("height",
+//					new OneShotInstrument<Integer>(getHeight()));
+
+			tmp.addCounter("nodeCount", new OneShotInstrument<Long>(
+					getNodeCount()));
+
+			tmp.addCounter("leafCount", new OneShotInstrument<Long>(
+					getLeafCount()));
+
+			tmp.addCounter("tupleCount", new OneShotInstrument<Long>(
+					getEntryCount()));
+
+//			/*
+//			 * Note: The utilization numbers reported here are a bit misleading.
+//			 * They only consider the #of index positions in the node or leaf
+//			 * which is full, but do not take into account the manner in which
+//			 * the persistence store allocates space to the node or leaf. For
+//			 * example, for the WORM we do perfect allocations but retain many
+//			 * versions. For the RWStore, we do best-fit allocations but recycle
+//			 * old versions. The space efficiency of the persistence store is
+//			 * typically the main driver, not the utilization rate as reported
+//			 * here.
+//			 */
+//			final IBTreeUtilizationReport r = getUtilization();
+//			
+//			// % utilization in [0:100] for nodes
+//			tmp.addCounter("%nodeUtilization", new OneShotInstrument<Integer>(r
+//					.getNodeUtilization()));
+//			
+//			// % utilization in [0:100] for leaves
+//			tmp.addCounter("%leafUtilization", new OneShotInstrument<Integer>(r
+//					.getLeafUtilization()));
+//
+//			// % utilization in [0:100] for the whole tree (nodes + leaves).
+//			tmp.addCounter("%totalUtilization", new OneShotInstrument<Integer>(r
+//					.getTotalUtilization())); // / 100d
+
+			/*
+			 * Compute the average bytes per tuple. This requires access to the
+			 * current entry count, so we have to do this as a OneShot counter
+			 * to avoid dragging in the B+Tree reference.
+			 */
+
+			final long entryCount = getEntryCount();
+
+			final long bytes = btreeCounters.bytesOnStore_nodesAndLeaves.get()
+					+ btreeCounters.bytesOnStore_rawRecords.get();
+
+			final long bytesPerTuple = (long) (entryCount == 0 ? 0d
+					: (bytes / entryCount));
+
+			tmp.addCounter("bytesPerTuple", new OneShotInstrument<Long>(
+					bytesPerTuple));
+
+		}
+
+		/*
+		 * Attach detailed performance counters.
+		 * 
+		 * Note: The BTreeCounters object does not have a reference to the
+		 * AbstractBTree. Its counters will update "live" since we do not
+		 * need to snapshot them.
+		 */
+		counterSet.attach(btreeCounters.getCounters());
+
+        return counterSet;
+
+    }
+   
     /**
      * The backing store.
      */
     protected final IRawStore store;
 
-	/**
+    /**
+     * When <code>true</code> the {@link AbstractHTree} does not permit
+     * mutation.
+     */
+    final protected boolean readOnly;
+
+    /**
 	 * The #of bits in the address space for a directory page (from the
 	 * constructor). This constant is specified when the hash tree is created. A
 	 * directory page has <code>2^addressBits</code> entries. Those entries are
@@ -141,76 +300,57 @@ abstract public class AbstractHTree {
      */
     protected volatile DirectoryPage root;
 
-    /**
-     * Nodes (that is nodes or leaves) are added to a hard reference queue when
-     * they are created or read from the store. On eviction from the queue a
-     * dirty node is serialized by a listener against the {@link IRawStore}.
-     * The nodes and leaves refer to their parent with a {@link WeakReference}s.
-     * Likewise, nodes refer to their children with a {@link WeakReference}.
-     * The hard reference queue in combination with {@link #touch(AbstractNode)}
-     * and with hard references held on the stack ensures that the parent and/or
-     * children remain reachable during operations. Once the node is no longer
-     * strongly reachable weak references to that node may be cleared by the VM -
-     * in this manner the node will become unreachable by navigation from its
-     * ancestors in the btree.  The special role of the hard reference queue is
-     * to further ensure that dirty nodes remain dirty by defering persistence
-     * until the reference count for the node is zero during an eviction from
-     * the queue.
-     * <p>
-     * Note that nodes are evicted as new nodes are added to the hard reference
-     * queue. This occurs in two situations: (1) when a new node is created
-     * during a split of an existing node; and (2) when a node is read in from
-     * the store. Inserts on this hard reference queue always drive evictions.
-     * Incremental writes basically make it impossible for the commit set to get
-     * "too large" - the maximum #of nodes to be written is bounded by the size
-     * of the hard reference queue. This helps to ensure fast commit operations
-     * on the store.
-     * <p>
-     * The minimum capacity for the hard reference queue is two (2) so that a
-     * split may occur without forcing eviction of either node participating in
-     * the split.
-     * <p>
-     * Note: The code in {@link Node#postOrderNodeIterator(boolean, boolean)} and
-     * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
-     * those iterators are used when persisting a node using a post-order
-     * traversal. If a hard reference queue eviction drives the serialization of
-     * a node and we touch the hard reference queue during the post-order
-     * traversal then we break down the semantics of
-     * {@link HardReferenceQueue#add(Object)} as the eviction does not
-     * necessarily cause the queue to reduce in length. Another way to handle
-     * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
-     * objects before is is actually at capacity, but that is also a bit
-     * fragile.
-     * <p>
-     * Note: The {@link #writeRetentionQueue} uses a {@link HardReferenceQueue}.
-     * This is based on a {@link RingBuffer} and is very fast. It does not use a
-     * {@link HashMap} because we can resolve the {@link WeakReference} to the
-     * child {@link Node} or {@link Leaf} using top-down navigation as long as
-     * the {@link Node} or {@link Leaf} remains strongly reachable (that is, as
-     * long as it is on the {@link #writeRetentionQueue} or otherwise strongly
-     * held). This means that lookup in a map is not required for top-down
-     * navigation.
-     * <p>
-     * The {@link LRUNexus} provides an {@link INodeData} / {@link ILeafData}
-     * data record cache based on a hash map with lookup by the address of the
-     * node or leaf. This is tested when the child {@link WeakReference} was
-     * never set or has been cleared. This cache is also used by the
-     * {@link IndexSegment} for the linked-leaf traversal pattern, which does
-     * not use top-down navigation.
-     * 
-     * @todo consider a policy that dynamically adjusts the queue capacities
-     *       based on the height of the btree in order to maintain a cache that
-     *       can contain a fixed percentage, e.g., 5% or 10%, of the nodes in
-     *       the btree. The minimum and maximum size of the cache should be
-     *       bounded. Bounding the minimum size gives better performance for
-     *       small trees. Bounding the maximum size is necessary when the trees
-     *       grow very large. (Partitioned indices may be used for very large
-     *       indices and they can be distributed across a cluster of machines.)
-     *       <p>
-     *       There is a discussion of some issues regarding such a policy in the
-     *       code inside of
-     *       {@link Node#Node(BTree btree, AbstractNode oldRoot, int nentries)}.
-     */
+	/**
+	 * Nodes (that is nodes or leaves) are added to a hard reference queue when
+	 * they are created or read from the store. On eviction from the queue a
+	 * dirty node is serialized by a listener against the {@link IRawStore}. The
+	 * nodes and leaves refer to their parent with a {@link WeakReference}s.
+	 * Likewise, nodes refer to their children with a {@link WeakReference}. The
+	 * hard reference queue in combination with {@link #touch(AbstractPage)} and
+	 * with hard references held on the stack ensures that the parent and/or
+	 * children remain reachable during operations. Once the node is no longer
+	 * strongly reachable weak references to that node may be cleared by the VM
+	 * - in this manner the node will become unreachable by navigation from its
+	 * ancestors in the btree. The special role of the hard reference queue is
+	 * to further ensure that dirty nodes remain dirty by defering persistence
+	 * until the reference count for the node is zero during an eviction from
+	 * the queue.
+	 * <p>
+	 * Note that nodes are evicted as new nodes are added to the hard reference
+	 * queue. This occurs in two situations: (1) when a new node is created
+	 * during a split of an existing node; and (2) when a node is read in from
+	 * the store. Inserts on this hard reference queue always drive evictions.
+	 * Incremental writes basically make it impossible for the commit set to get
+	 * "too large" - the maximum #of nodes to be written is bounded by the size
+	 * of the hard reference queue. This helps to ensure fast commit operations
+	 * on the store.
+	 * <p>
+	 * The minimum capacity for the hard reference queue is two (2) so that a
+	 * split may occur without forcing eviction of either node participating in
+	 * the split.
+	 * <p>
+	 * Note: The code in
+	 * {@link AbstractPage#postOrderNodeIterator(boolean, boolean)} and
+	 * {@link DirtyChildIterator} MUST NOT touch the hard reference queue since
+	 * those iterators are used when persisting a node using a post-order
+	 * traversal. If a hard reference queue eviction drives the serialization of
+	 * a node and we touch the hard reference queue during the post-order
+	 * traversal then we break down the semantics of
+	 * {@link HardReferenceQueue#add(Object)} as the eviction does not
+	 * necessarily cause the queue to reduce in length. Another way to handle
+	 * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
+	 * objects before is is actually at capacity, but that is also a bit
+	 * fragile.
+	 * <p>
+	 * Note: The {@link #writeRetentionQueue} uses a {@link HardReferenceQueue}.
+	 * This is based on a {@link RingBuffer} and is very fast. It does not use a
+	 * {@link HashMap} because we can resolve the {@link WeakReference} to the
+	 * child {@link DirectoryPage} or {@link BucketPage} using top-down
+	 * navigation as long as the {@link DirectoryPage} or {@link BucketPage}
+	 * remains strongly reachable (that is, as long as it is on the
+	 * {@link #writeRetentionQueue} or otherwise strongly held). This means that
+	 * lookup in a map is not required for top-down navigation.
+	 */
     final protected IHardReferenceQueue<PO> writeRetentionQueue;
 
     /**
@@ -219,9 +359,160 @@ abstract public class AbstractHTree {
     protected int ndistinctOnWriteRetentionQueue;
 
     /**
+     * Returns the metadata record for this index.
+     * <p>
+     * Note: If the index is read-only then the metadata object will be cloned
+     * to avoid potential modification. However, only a single cloned copy of
+     * the metadata record will be shared between all callers for a given
+     * instance of this class.
+     * 
+     * @todo the clone once policy is a compromise between driving the read only
+     *       semantics into the {@link IndexMetadata} object, cloning each time,
+     *       and leaving it to the caller to clone as required. Either the
+     *       former or the latter might be a better choice.
+     * 
+     * FIXME if the metadata record is updated (and it can be) then we really
+     * need to invalidate the cloned metadata record also.
+     * 
+     * @return The metadata record for this btree and never <code>null</code>.
+     */
+    public IndexMetadata getIndexMetadata() {
+
+        if (isReadOnly()) {
+
+            if (metadata2 == null) {
+
+                synchronized (this) {
+
+                    if (metadata2 == null) {
+
+                        metadata2 = metadata.clone();
+
+                    }
+
+                }
+
+            }
+
+            return metadata2;
+            
+        }
+        
+        return metadata;
+        
+    }
+    private volatile IndexMetadata metadata2;
+
+    /**
+     * The metadata record for the index. This data rarely changes during the
+     * life of the {@link HTree} object, but it CAN be changed.
+     */
+    protected IndexMetadata metadata;
+
+    /**
+     * Used to serialize and de-serialize the nodes and leaves of the tree.
+     */
+    final protected NodeSerializer nodeSer;
+
+    /**
+     * This is part of a {@link #close()}/{@link #reopen()} protocol that may
+     * be used to reduce the resource burden of an {@link AbstractBTree}. The
+     * method delegates to {@link #_reopen()} if double-checked locking
+     * demonstrates that the {@link #root} is <code>null</code> (indicating
+     * that the index has been closed). This method is automatically invoked by
+     * a variety of methods that need to ensure that the index is available for
+     * use.
+     * 
+     * @see #close()
+     * @see #isOpen()
+     * @see #getRoot()
+     */
+    final protected void reopen() {
+
+        if (root == null) {
+
+            /*
+             * reload the root node.
+             * 
+             * Note: This is synchronized to avoid race conditions when
+             * re-opening the index from the backing store.
+             * 
+             * Note: [root] MUST be marked as [volatile] to guarentee correct
+             * semantics.
+             * 
+             * See http://en.wikipedia.org/wiki/Double-checked_locking
+             */
+
+            synchronized(this) {
+            
+                if (root == null) {
+
+                    // invoke with lock on [this].
+                    _reopen();
+                    
+                }
+                
+            }
+
+        }
+
+    }
+
+    /**
+     * This method is responsible for setting up the root leaf (either new or
+     * read from the store), the bloom filter, etc. It is invoked by
+     * {@link #reopen()} once {@link #root} has been show to be
+     * <code>null</code> with double-checked locking. When invoked in this
+     * context, the caller is guaranteed to hold a lock on <i>this</i>. This is
+     * done to ensure that at most one thread gets to re-open the index from the
+     * backing store.
+     */
+    abstract protected void _reopen();
+
+    /**
+     * An "open" index has its buffers and root node in place rather than having
+     * to reallocate buffers or reload the root node from the store.
+     * 
+     * @return If the index is "open".
+     * 
+     * @see #close()
+     * @see #reopen()
+     * @see #getRoot()
+     */
+    final public boolean isOpen() {
+
+        return root != null;
+
+    }
+
+    /**
+     * Return <code>true</code> iff this is a transient data structure (no
+     * backing store).
+     */
+    final public boolean isTransient() {
+        
+        return store == null;
+        
+    }
+    
+    final protected void assertNotTransient() {
+        
+        if(isTransient()) {
+            
+            throw new UnsupportedOperationException(ERROR_TRANSIENT);
+            
+        }
+        
+    }
+    
+    /**
      * Return <code>true</code> iff this B+Tree is read-only.
      */
-    abstract public boolean isReadOnly();
+    final public boolean isReadOnly() {
+        
+        return readOnly;
+        
+    }
     
     /**
      * 
@@ -240,17 +531,59 @@ abstract public class AbstractHTree {
         
     }
     
-//    /**
-//     * The metadata record for the index. This data rarely changes during the
-//     * life of the {@link HTree} object, but it CAN be changed.
-//     */
-//    protected IndexMetadata metadata;
-
     /**
-     * Used to serialize and de-serialize the nodes and leaves of the tree.
+     * The timestamp associated with the last {@link IAtomicStore#commit()} in
+     * which writes buffered by this index were made restart-safe on the backing
+     * store. The lastCommitTime is set when the index is loaded from the
+     * backing store and updated after each commit. It is ZERO (0L) when
+     * {@link HTree} is first created and will remain ZERO (0L) until the
+     * {@link HTree} is committed.  If the backing store does not support atomic
+     * commits, then this value will always be ZERO (0L).
      */
-    final protected NodeSerializer nodeSer = null;
+    abstract public long getLastCommitTime();
 
+//    /**
+//     * The timestamp associated with unisolated writes on this index. This
+//     * timestamp is designed to allow the interleaving of full transactions
+//     * (whose revision timestamp is assigned by the transaction service) with
+//     * unisolated operations on the same indices.
+//     * <p>
+//     * The revision timestamp assigned by this method is
+//     * <code>lastCommitTime+1</code>. The reasoning is as follows. Revision
+//     * timestamps are assigned by the transaction manager when the transaction
+//     * is validated as part of its commit protocol. Therefore, revision
+//     * timestamps are assigned after the transaction write set is complete.
+//     * Further, the assigned revisionTimestamp will be strictly LT the
+//     * commitTime for that transaction. By using <code>lastCommitTime+1</code>
+//     * we are guaranteed that the revisionTimestamp for new writes (which will
+//     * be part of some future commit point) will always be strictly GT the
+//     * revisionTimestamp of historical writes (which were part of some prior
+//     * commit point).
+//     * <p>
+//     * Note: Unisolated operations using this timestamp ARE NOT validated. The
+//     * timestamp is simply applied to the tuple when it is inserted or updated
+//     * and will become part of the restart safe state of the B+Tree once the
+//     * unisolated operation participates in a commit.
+//     * <p>
+//     * Note: If an unisolated operation were to execute concurrent with a
+//     * transaction commit for the same index then that could produce
+//     * inconsistent results in the index and could trigger concurrent
+//     * modification errors. In order to avoid such concurrent modification
+//     * errors, unisolated operations which are to be mixed with full
+//     * transactions MUST ensure that they have exclusive access to the
+//     * unisolated index before proceeding. There are two ways to do this: (1)
+//     * take the application off line for transactions; (2) submit your unisolated
+//     * operations to the {@link IConcurrencyManager} which will automatically
+//     * impose the necessary constraints on concurrent access to the unisolated
+//     * indices.
+//     * 
+//     * @return The revision timestamp to be assigned to an unisolated write.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the index is read-only.
+//     */
+//    abstract public long getRevisionTimestamp();
+    
     /**
      * The backing store.
      */
@@ -286,6 +619,23 @@ abstract public class AbstractHTree {
      */
     abstract public long getEntryCount();
     
+    /**
+	 * The root of the {@link HTree}. This is always a {@link DirectoryPage}.
+	 * <p>
+	 * The hard reference to the root node is cleared if the index is
+	 * {@link #close() closed}. This method automatically {@link #reopen()}s the
+	 * index if it is closed, making it available for use.
+	 */
+    final protected DirectoryPage getRoot() {
+
+        // make sure that the root is defined.
+        if (root == null)
+            reopen();
+
+        return root;
+
+    }
+
     /**
      * Fast summary information about the B+Tree.
      */
@@ -326,32 +676,32 @@ abstract public class AbstractHTree {
         
     }
 
-    /**
-     * @param store
-     *            The persistence store.
-     * @param nodeFactory
-     *            Object that provides a factory for node and leaf objects.
-     * @param readOnly
-     *            <code>true</code> IFF it is <em>known</em> that the
-     *            {@link AbstractBTree} is read-only.
-     * @param metadata
-     *            The {@link IndexMetadata} object for this B+Tree.
-     * @param recordCompressorFactory
-     *            Object that knows how to (de-)compress the serialized data
-     *            records.
-     * 
-     * @throws IllegalArgumentException
-     *             if addressBits is LT ONE (1).
-     * @throws IllegalArgumentException
-     *             if addressBits is GT (16).
-     */
+	/**
+	 * @param store
+	 *            The persistence store.
+	 * @param nodeFactory
+	 *            Object that provides a factory for node and leaf objects.
+	 * @param readOnly
+	 *            <code>true</code> IFF it is <em>known</em> that the
+	 *            {@link AbstractHTree} is read-only.
+	 * @param metadata
+	 *            The {@link IndexMetadata} object for this
+	 *            {@link AbstractHTree}.
+	 * @param recordCompressorFactory
+	 *            Object that knows how to (de-)compress the serialized data
+	 *            records.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if addressBits is LT ONE (1).
+	 * @throws IllegalArgumentException
+	 *             if addressBits is GT (16).
+	 */
     protected AbstractHTree(//
             final IRawStore store,//
-//            final INodeFactory nodeFactory,//
+            final INodeFactory nodeFactory,//
             final boolean readOnly,
-            final int addressBits // TODO Move into IndexMetadata?
-//            final IndexMetadata metadata,//
-//            final IRecordCompressorFactory<?> recordCompressorFactory
+            final IndexMetadata metadata,//
+            final IRecordCompressorFactory<?> recordCompressorFactory
             ) {
 
         // show the copyright banner during startup.
@@ -360,6 +710,25 @@ abstract public class AbstractHTree {
         if (store == null)
             throw new IllegalArgumentException();
 
+        if (nodeFactory == null)
+            throw new IllegalArgumentException();
+
+        // Note: MAY be null (implies a transient BTree).
+//        assert store != null;
+
+        if (metadata == null)
+            throw new IllegalArgumentException();
+
+        // save a reference to the immutable metadata record.
+        this.metadata = metadata;
+
+//        this.writeTuple = new Tuple(this, KEYS | VALS);
+        
+        this.store = store;
+        this.readOnly = readOnly;
+
+        this.addressBits = metadata.getAddressBits();
+        
         if (addressBits <= 0)
             throw new IllegalArgumentException();
 
@@ -372,30 +741,6 @@ abstract public class AbstractHTree {
              */
             throw new IllegalArgumentException();
         }
-
-//        if (nodeFactory == null)
-//            throw new IllegalArgumentException();
-
-        // Note: MAY be null (implies a transient BTree).
-//        assert store != null;
-
-//        if (metadata == null)
-//            throw new IllegalArgumentException();
-//
-//        // save a reference to the immutable metadata record.
-//        this.metadata = metadata;
-
-//        this.writeTuple = new Tuple(this, KEYS | VALS);
-        
-        this.store = store;
-        this.addressBits = addressBits;
-//        this.branchingFactor = 1 << addressBits;
-
-//        /*
-//         * Compute the minimum #of children/values. This is the same whether
-//         * this is a Node or a Leaf.
-//         */
-//        minChildren = (branchingFactor + 1) >> 1;
 
 ////        /*
 ////         * The Memoizer is not used by the mutable B+Tree since it is not safe
@@ -420,15 +765,15 @@ abstract public class AbstractHTree {
          */
         this.writeRetentionQueue = newWriteRetentionQueue(readOnly);
 
-//        this.nodeSer = new NodeSerializer(//
-//                store, // addressManager
-//                nodeFactory,//
-//                branchingFactor,//
-//                0, //initialBufferCapacity
-//                metadata,//
-//                readOnly,//
-//                recordCompressorFactory
-//                );
+        this.nodeSer = new NodeSerializer(//
+                store, // addressManager
+                nodeFactory,//
+                addressBits,//
+                0, //initialBufferCapacity
+                metadata,//
+                readOnly,//
+                recordCompressorFactory
+                );
         
 //        if (store == null) {
 //
@@ -510,7 +855,7 @@ abstract public class AbstractHTree {
              * corresponding objects would be wired into the cache.
              * 
              * I've worked around this issue by scoping the buffers to the
-             * AbstractBTree instance. When the B+Tree container is closed, all
+             * AbstractBTree instance. When the HTree container is closed, all
              * buffered updates were discarded. This nicely eliminated the
              * problems with "escaping" threads. This approach also has the
              * maximum concurrency since there is no blocking when adding a
@@ -556,7 +901,7 @@ abstract public class AbstractHTree {
 	 */
 	public boolean dump(final PrintStream out) {
 
-		return dump(BTree.dumpLog.getEffectiveLevel(), out, false/* materialize */);
+		return dump(HTree.dumpLog.getEffectiveLevel(), out, false/* materialize */);
 
     }
 
@@ -617,7 +962,7 @@ abstract public class AbstractHTree {
      * </p>
      * <p>
      * If the node is not found on a scan of the head of the queue, then it is
-     * appended to the queue and its {@link AbstractNode#referenceCount} is
+     * appended to the queue and its {@link AbstractPage#referenceCount} is
      * incremented. If a node is being appended to the queue and the queue is at
      * capacity, then this will cause a reference to be evicted from the queue.
      * If the reference counter for the evicted node or leaf is zero and the
@@ -658,131 +1003,480 @@ abstract public class AbstractHTree {
      *       btree, this does not cause a problem but can lead to unexpected
      *       values for the reference counters and
      *       {@link #ndistinctOnWriteRetentionQueue}.
-     * 
-     * @todo This might be abstract here and final in BTree and in IndexSegment.
-     *       For {@link IndexSegment}, we know it is read-only so we do not need
-     *       to test anything. For {@link BTree}, we can break encapsulation and
-     *       check whether or not the {@link BTree} is read-only more readily
-     *       than we can in this class.
      */
-//    synchronized
-//    final 
-    protected void touch(final AbstractPage node) {
+//  synchronized
+//  final 
+	protected void touch(final AbstractPage node) {
 
-        assert node != null;
+		assert node != null;
 
-        /*
-         * Note: DO NOT update the last used timestamp for the B+Tree here! This
-         * is a huge performance penalty!
-         */
-//        touch();
+		/*
+		 * Note: DO NOT update the last used timestamp for the B+Tree here! This
+		 * is a huge performance penalty!
+		 */
+		// touch();
 
-        if (isReadOnly()) {
+		if (readOnly) {
 
-            doTouch(node);
+			doTouch(node);
 
-            return;
+			return;
 
-        }
+		}
 
-        /*
-         * Note: Synchronization appears to be necessary for the mutable BTree.
-         * Presumably this provides safe publication when the application is
-         * invoking operations on the same mutable BTree instance from different
-         * threads but it coordinating those threads in order to avoid
-         * concurrent operations, e.g., by using the UnisolatedReadWriteIndex
-         * wrapper class. The error which is prevented by synchronization is
-         * RingBuffer#add(ref) reporting that size == capacity, which indicates
-         * that the size was not updated consistently and hence is basically a
-         * concurrency problem.
-         * 
-         * @todo Actually, I think that this is just a fence post in ringbuffer
-         * beforeOffer() method and the code might work without the synchronized
-         * block if the fence post was fixed.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/201
-         */
+		doSyncTouch(node);
 
-        synchronized (this) {
+	}
 
-            doTouch(node);
+	/**
+	 * Note: Synchronization is necessary for the mutable {@link BTree}. The
+	 * underlying reason is the {@link UnisolatedReadWriteIndex} permits
+	 * concurrent readers. Reads drive evictions so concurrent calls of
+	 * {@link #touch()} are possible. When the B+Tree is mutable, those calls
+	 * must be coordinated via a lock to prevent concurrent modification when
+	 * touches drive the eviction of a dirty node or leaf.
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/71 (Concurrency
+	 *      problem with unisolated btree and memoizer)
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/201 (Hot spot in
+	 *      AbstractBTree#touch())
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/284
+	 *      (IndexOfOfBounds? in Node#getChild())
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/288 (Node already
+	 *      coded)
+	 * 
+	 *      and possibly
+	 * 
+	 * @see https://sourceforge.net/apps/trac/bigdata/ticket/149 (NULL passed to
+	 *      readNodeOrLeaf)
+	 */
+	private final void doSyncTouch(final AbstractPage node) {
 
-        }
+		synchronized (this) {
 
-    }
-    
-    private final void doTouch(final AbstractPage node) {
+			doTouch(node);
+
+		}
+
+	}
+
+	private final void doTouch(final AbstractPage node) {
+
+		/*
+		 * We need to guarentee that touching this node does not cause it to be
+		 * made persistent. The condition of interest would arise if the queue
+		 * is full and the referenceCount on the node is zero before this method
+		 * was called. Under those circumstances, simply appending the node to
+		 * the queue would cause it to be evicted and made persistent.
+		 * 
+		 * We avoid this by incrementing the reference counter before we touch
+		 * the queue. Since the reference counter will therefore be positive if
+		 * the node is selected for eviction, eviction will not cause the node
+		 * to be made persistent.
+		 * 
+		 * Note: Only mutable BTrees may have dirty nodes and the mutable BTree
+		 * is NOT thread-safe so we do not need to use synchronization or an
+		 * AtomicInteger for the referenceCount field.
+		 * 
+		 * Note: The reference counts and the #of distinct nodes or leaves on
+		 * the writeRetentionQueue are not exact for a read-only B+Tree because
+		 * neither synchronization nor atomic counters are used to track that
+		 * information.
+		 */
+
+		// assert isReadOnly() || ndistinctOnWriteRetentionQueue > 0;
+
+		node.referenceCount++;
+
+		if (!writeRetentionQueue.add(node)) {
+
+			/*
+			 * A false return indicates that the node was found on a scan of the
+			 * tail of the queue. In this case we do NOT want the reference
+			 * counter to be incremented since we have not actually added
+			 * another reference to this node onto the queue. Therefore we
+			 * decrement the counter (since we incremented it above) for a net
+			 * change of zero(0) across this method.
+			 */
+
+			node.referenceCount--;
+
+		} else {
+
+			/*
+			 * Since we just added a node or leaf to the hard reference queue we
+			 * now update the #of distinct nodes and leaves on the hard
+			 * reference queue.
+			 * 
+			 * Also see {@link DefaultEvictionListener}.
+			 */
+
+			if (node.referenceCount == 1) {
+
+				ndistinctOnWriteRetentionQueue++;
+
+			}
+
+		}
+
+		// if (useFinger && node instanceof ILeafData) {
+		//
+		// if (finger == null || finger.get() != node) {
+		//
+		// finger = new WeakReference<Leaf>((Leaf) node);
+		//
+		// }
+		//
+		// }
+
+	}
+
+    /**
+     * Write a dirty node and its children using a post-order traversal that
+     * first writes any dirty leaves and then (recursively) their parent nodes.
+     * The parent nodes are guaranteed to be dirty if there is a dirty child so
+     * this never triggers copy-on-write. This is used as part of the commit
+     * protocol where it is invoked with the root of the tree, but it may also
+     * be used to incrementally flush dirty non-root {@link Node}s.
+     * 
+     * Note: This will throw an exception if the backing store is read-only.
+     * 
+     * @param node
+     *            The root of the hierarchy of nodes to be written. The node
+     *            MUST be dirty. The node this does NOT have to be the root of
+     *            the tree and it does NOT have to be a {@link Node}.
+     */
+    final protected void writeNodeRecursive(final AbstractPage node) {
+
+        final long begin = System.currentTimeMillis();
         
+        assert root != null; // i.e., isOpen().
+        assert node != null;
+        assert node.isDirty();
+        assert !node.isDeleted();
+        assert !node.isPersistent();
+
         /*
-         * We need to guarantee that touching this node does not cause it to be
-         * made persistent. The condition of interest would arise if the queue
-         * is full and the referenceCount on the node is zero before this method
-         * was called. Under those circumstances, simply appending the node to
-         * the queue would cause it to be evicted and made persistent.
-         * 
-         * We avoid this by incrementing the reference counter before we touch
-         * the queue. Since the reference counter will therefore be positive if
-         * the node is selected for eviction, eviction will not cause the node
-         * to be made persistent.
-         * 
-         * Note: Only mutable BTrees may have dirty nodes and the mutable BTree
-         * is NOT thread-safe so we do not need to use synchronization or an
-         * AtomicInteger for the referenceCount field.
-         * 
-         * Note: The reference counts and the #of distinct nodes or leaves on
-         * the writeRetentionQueue are not exact for a read-only B+Tree because
-         * neither synchronization nor atomic counters are used to track that
-         * information.
+         * Note we have to permit the reference counter to be positive and not
+         * just zero here since during a commit there will typically still be
+         * references on the hard reference queue but we need to write out the
+         * nodes and leaves anyway. If we were to evict everything from the hard
+         * reference queue before a commit then the counters would be zero but
+         * the queue would no longer be holding our nodes and leaves and they
+         * would be GC'd soon since they would no longer be strongly reachable.
          */
+        assert node.referenceCount >= 0;
 
-//        assert isReadOnly() || ndistinctOnWriteRetentionQueue > 0;
+        // #of dirty nodes written (nodes or leaves)
+        int ndirty = 0;
 
-        node.referenceCount++;
+        // #of dirty leaves written.
+        int nleaves = 0;
 
-        if (!writeRetentionQueue.add(node)) {
+        /*
+         * Post-order traversal of children and this node itself. Dirty nodes
+         * get written onto the store.
+         * 
+         * Note: This iterator only visits dirty nodes.
+         */
+        final Iterator<AbstractPage> itr = node.postOrderNodeIterator(
+                true/* dirtyNodesOnly */, false/* nodesOnly */);
 
-            /*
-             * A false return indicates that the node was found on a scan of the
-             * tail of the queue. In this case we do NOT want the reference
-             * counter to be incremented since we have not actually added
-             * another reference to this node onto the queue. Therefore we
-             * decrement the counter (since we incremented it above) for a net
-             * change of zero(0) across this method.
-             */
+        while (itr.hasNext()) {
 
-            node.referenceCount--;
+            final AbstractPage t = itr.next();
 
-        } else {
+            assert t.isDirty();
 
-            /*
-             * Since we just added a node or leaf to the hard reference queue we
-             * now update the #of distinct nodes and leaves on the hard
-             * reference queue.
-             * 
-             * Also see {@link DefaultEvictionListener}.
-             */
+            if (t != root) {
 
-            if (node.referenceCount == 1) {
+                /*
+                 * The parent MUST be defined unless this is the root node.
+                 */
 
-                ndistinctOnWriteRetentionQueue++;
+                assert t.parent != null;
+                assert t.parent.get() != null;
 
             }
 
+            // write the dirty node on the store.
+            writeNodeOrLeaf(t);
+
+            ndirty++;
+            
+//            if (BigdataStatics.debug && ndirty > 0 && ndirty % 1000 == 0) {
+//				System.out.println("nwritten=" + ndirty + " in "
+//						+ (System.currentTimeMillis() - begin) + "ms");
+//            }
+
+            if (t instanceof BucketPage)
+                nleaves++;
+
         }
 
-//      if (useFinger && node instanceof ILeafData) {
-        //
-//                    if (finger == null || finger.get() != node) {
-        //
-//                        finger = new WeakReference<Leaf>((Leaf) node);
-        //
-//                    }
-        //
-//                }
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        if (log.isInfoEnabled() || elapsed > 5000) {
+
+            /*
+             * Note: latency here is nearly always a side effect of GC. Unless
+             * you are running the cms-i or similar GC policy, you can see
+             * multi-second GC pauses. Those pauses will cause messages to be
+             * emitted here. This is especially true with multi-GB heaps.
+             */
+
+            final int nnodes = ndirty - nleaves;
+            
+			final String s = "wrote: "
+					+ (metadata.getName() != null ? "name="
+							+ metadata.getName() + ", " : "") + ndirty
+					+ " records (#nodes=" + nnodes + ", #leaves=" + nleaves
+					+ ") in " + elapsed + "ms : addrRoot=" + node.getIdentity();
+
+            if (elapsed > 5000) {
+
+//            	System.err.println(s);
+//
+//            } else if (elapsed > 500/*ms*/) {
+
+                // log at warning level when significant latency results.
+                log.warn(s);
+
+            } else {
+            
+                log.info(s);
+                
+            }
+            
+        }
+        
+    }
+
+    /**
+     * Codes the node and writes the coded record on the store (non-recursive).
+     * The node MUST be dirty. If the node has a parent, then the parent is
+     * notified of the persistent identity assigned to the node by the store.
+     * This method is NOT recursive and dirty children of a node will NOT be
+     * visited. By coding the nodes and leaves as they are evicted from the
+     * {@link #writeRetentionQueue}, the B+Tree continuously converts nodes and
+     * leaves to their more compact coded record forms which results in a
+     * smaller in memory footprint.
+     * <p>
+     * Note: For a transient B+Tree, this merely codes the node but does not
+     * write the node on the store (there is none).
+     * 
+     * @throws UnsupportedOperationException
+     *             if the B+Tree (or the backing store) is read-only.
+     * 
+     * @return The persistent identity assigned by the store.
+     */
+    protected long writeNodeOrLeaf(final AbstractPage node) {
+
+        assert root != null; // i.e., isOpen().
+        assert node != null;
+        assert node.htree == this;
+        assert node.isDirty();
+        assert !node.isDeleted();
+        assert !node.isPersistent();
+        assert !node.isReadOnly();
+        assertNotReadOnly();
+        
+        /*
+         * Note we have to permit the reference counter to be positive and not
+         * just zero here since during a commit there will typically still be
+         * references on the hard reference queue but we need to write out the
+         * nodes and leaves anyway. If we were to evict everything from the hard
+         * reference queue before a commit then the counters would be zero but
+         * the queue would no longer be holding our nodes and leaves and they
+         * would be GC'd soon as since they would no longer be strongly
+         * reachable.
+         */
+        assert node.referenceCount >= 0;
+
+        /*
+         * Note: The parent should be defined unless this is the root node.
+         * 
+         * Note: A parent CAN NOT be serialized before all of its children have
+         * persistent identity since it needs to write the identity of each
+         * child in its serialization record.
+         */
+        final DirectoryPage parent = node.getParentDirectory();
+
+        if (parent == null) {
+
+            assert node == root;
+
+        } else {
+
+            // parent must be dirty if child is dirty.
+            assert parent.isDirty();
+
+            // parent must not be persistent if it is dirty.
+            assert !parent.isPersistent();
+
+        }
+
+//        if (debug)
+//            node.assertInvariants();
+        
+        // the coded data record.
+        final AbstractFixedByteArrayBuffer slice;
+        {
+
+            final long begin = System.nanoTime();
+
+            /*
+             * Code the node or leaf, replacing the data record reference on the
+             * node/leaf with a reference to the coded data record.
+             * 
+             * Note: This is optimized for the very common use case where we
+             * want to have immediate access to the coded data record. In that
+             * case, many of the IRabaCoder implementations can be optimized by
+             * passing the underlying coding object (FrontCodedByteArray,
+             * HuffmanCodec's decoder) directly into an alternative ctor for the
+             * decoder. This gives us "free" decoding for the case when we are
+             * coding the record. The coded data record is available from the
+             * IRabaDecoder.
+             * 
+             * About the only time when we do not need to do this is the
+             * IndexSegmentBuilder, since the coded record will not be used
+             * other than to write it on the disk.
+             */
+			if (node.isLeaf()) {
+
+				// code data record and _replace_ the data ref.
+				((BucketPage) node).data = nodeSer
+						.encodeLive(((BucketPage) node).data);
+
+				// slice onto the coded data record.
+				slice = ((BucketPage) node).data();
+
+				btreeCounters.leavesWritten++;
+
+			} else {
+
+				// code data record and _replace_ the data ref.
+				((DirectoryPage) node).data = nodeSer
+						.encodeLive(((DirectoryPage) node).data);
+
+				// slice onto the coded data record.
+				slice = ((DirectoryPage) node).data();
+
+                btreeCounters.nodesWritten++;
+
+            }
+            
+            btreeCounters.serializeNanos += System.nanoTime() - begin;
+            
+        }
+
+        if (store == null) {
+
+            /*
+             * This is a transient B+Tree so we do not actually write anything
+             * on the backing store.
+             */
+
+            // No longer dirty (prevents re-coding on re-eviction).
+            node.setDirty(false);
+
+            return 0L;
+            
+        }
+        
+        // write the serialized node or leaf onto the store.
+        final long addr;
+        final long oldAddr;
+        {
+
+            final long begin = System.nanoTime();
+            
+            // wrap as ByteBuffer and write on the store.
+            addr = store.write(slice.asByteBuffer());
+            
+            // now we have a new address, delete previous identity if any
+            if (node.isPersistent()) {
+            	oldAddr = node.getIdentity();
+            } else {
+            	oldAddr = 0;
+            }
+
+            final int nbytes = store.getByteCount(addr);
+            
+            btreeCounters.writeNanos += System.nanoTime() - begin;
+    
+            btreeCounters.bytesWritten += nbytes;
+
+    		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(nbytes);
+
+        }
+
+        /*
+         * The node or leaf now has a persistent identity and is marked as
+         * clean. At this point it's data record is read-only. Any changes
+         * directed to this node or leaf MUST trigger copy-on-write and convert
+         * the data record to a mutable instance before proceeding.
+         */
+
+        node.setIdentity(addr);
+        if (oldAddr != 0L) {
+//            if (storeCache!=null) {
+//                // remove from cache.
+//            	storeCache.remove(oldAddr);
+//            }
+			deleteNodeOrLeaf(oldAddr);//, node instanceof Node);
+        }
+
+        node.setDirty(false);
+
+        if (parent != null) {
+
+            // Set the persistent identity of the child on the parent.
+            parent.setChildAddr(node);
+
+            // // Remove from the dirty list on the parent.
+            // parent.dirtyChildren.remove(node);
+
+        }
+
+//        if (storeCache != null) {
+//
+//            /*
+//             * Put the data record (the delegate) into the cache, touching it on
+//             * the backing LRU.
+//             * 
+//             * Note: This provides an unfair retention for recently written
+//             * nodes or leaves equal to that of recently read nodes or leaves. I
+//             * do not know what to do about that. However, the total size across
+//             * all per-store caches is (SHOULD BE) MUCH larger than the write
+//             * retention queue so that bias may not matter that much.
+//             */
+//            if (null != storeCache.putIfAbsent(addr, node.getDelegate())) {
+//
+//                /*
+//                 * Note: For a WORM store, the address is always new so there
+//                 * will not be an entry in the cache for that address.
+//                 * 
+//                 * Note: For a RW store, the addresses can be reused and the
+//                 * delete of the old address MUST have cleared the entry for
+//                 * that address from the store's cache.
+//                 */
+//                
+//                throw new AssertionError("addr already in cache: " + addr
+//                        + " for " + store.getFile());
+//                
+//            }
+//            
+//        }
+        
+        return addr;
 
     }
 
-	/**
+    /**
 	 * Read an {@link AbstractPage} from the store.
 	 * <p>
 	 * Note: Callers SHOULD be synchronized in order to ensure that only one
@@ -945,7 +1639,7 @@ abstract public class AbstractHTree {
 	 * 
 	 * @return A reference to that node.
 	 * 
-	 * @see AbstractNode#self
+	 * @see AbstractPage#self
 	 * @see SoftReference
 	 * @see WeakReference
 	 */
@@ -971,7 +1665,7 @@ abstract public class AbstractHTree {
         if (store == null) {
 
             /*
-             * Note: Used for transient BTrees.
+             * Note: Used for transient HTrees.
              */
             
             return new HardReference<AbstractPage>(child);
@@ -1032,4 +1726,118 @@ abstract public class AbstractHTree {
         
     }
     
+	/**
+	 * The maximum length of a <code>byte[]</code> value stored within a leaf
+	 * for this {@link BTree}. This value only applies when raw record support
+	 * has been enabled for the {@link BTree}. Values greater than this in
+	 * length will be written as raw records on the backing persistence store.
+	 * 
+	 * @return The maximum size of an inline <code>byte[]</code> value before it
+	 *         is promoted to a raw record.
+	 */
+    int getMaxRecLen() {
+    	
+    	return metadata.getMaxRecLen();
+    	
+    }
+
+	/**
+	 * Read the raw record from the backing store.
+	 * <p>
+	 * Note: This does not cache the record. In general, the file system cache
+	 * should do a good job here.
+	 * 
+	 * @param addr
+	 *            The record address.
+	 * 
+	 * @return The data.
+	 * 
+	 * @todo performance counters for raw records read.
+	 * 
+	 * FIXME Add raw record compression.
+	 */
+	ByteBuffer readRawRecord(final long addr) {
+
+		// read from the backing store.
+		final ByteBuffer b = getStore().read(addr);
+
+		final int nbytes = getStore().getByteCount(addr);
+		
+		btreeCounters.rawRecordsRead.increment();
+        btreeCounters.rawRecordsBytesRead.add(nbytes);
+
+		return b;
+
+	}
+
+	/**
+	 * Write a raw record on the backing store.
+	 * 
+	 * @param b
+	 *            The data.
+	 *            
+	 * @return The address at which the data was written.
+	 * 
+	 * FIXME Add raw record compression.
+	 */
+	long writeRawRecord(final byte[] b) {
+
+		if(isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+		
+		// write the value on the backing store.
+		final long addr = getStore().write(ByteBuffer.wrap(b));
+		
+		final int nbytes = b.length;
+		
+		btreeCounters.rawRecordsWritten++;
+		btreeCounters.rawRecordsBytesWritten += nbytes;
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(nbytes);
+
+		return addr;
+		
+    }
+
+	/**
+	 * Delete a raw record from the backing store.
+	 * 
+	 * @param addr
+	 *            The address of the record.
+	 */
+	void deleteRawRecord(final long addr) {
+		
+		if(isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+
+		getStore().delete(addr);
+		
+		final int nbytes = getStore().getByteCount(addr);
+		
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(-nbytes);
+		
+	}
+
+	/**
+	 * Delete a node or leaf from the backing store, updating various
+	 * performance counters.
+	 * 
+	 * @param addr
+	 *            The address of the node or leaf.
+	 */
+	void deleteNodeOrLeaf(final long addr) {
+
+		if(addr == IRawStore.NULL)
+			throw new IllegalArgumentException();
+		
+		if (isReadOnly())
+			throw new IllegalStateException(ERROR_READ_ONLY);
+
+		getStore().delete(addr);
+
+		final int nbytes = getStore().getByteCount(addr);
+
+		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-nbytes);
+
+	}
+
 }

@@ -47,13 +47,14 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
-import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
+import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.LongPacker;
 import com.bigdata.io.SerializerUtil;
@@ -1000,7 +1001,36 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + ".indexPartitionCount").intern();
 
         String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
+
+        /*
+         * htree package options.
+         */
         
+        /**
+         * The name of a class derived from {@link HTree} that will be used to
+         * re-load the index. 
+         */
+        String HTREE_CLASS_NAME = HTree.class.getName()+".className";
+
+		/**
+		 * The name of an optional property whose value specifies the number of
+		 * address bits for an {@link HTree} (default
+		 * {@value #DEFAULT_HTREE_ADDRESS_BITS}).
+		 * <p>
+		 * The #of children for a directory is <code>2^addressBits</code>. For
+		 * example, a value of <code>10</code> means a <code>10</code> bit
+		 * address space in the directory. Such a directory would provide direct
+		 * addressing for <code>1024</code> child references. Given an overhead
+		 * of <code>8</code> bytes per child address, that would result in an
+		 * expected page size of 8k before compression.
+		 * 
+		 * @see #DEFAULT_HTREE_BRANCHING_FACTOR
+		 */
+		String HTREE_ADDRESS_BITS = HTree.class.getPackage().getName()
+				+ ".addressBits";
+
+		String DEFAULT_HTREE_ADDRESS_BITS = "10";
+
     }
 
     /**
@@ -1108,6 +1138,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
 //     */
 //    private long indexSegmentLeafCacheTimeout;
+    
+    /*
+     * HTree
+     */
+
+    /**
+     * @see Options#HTREE_CLASS_NAME
+     */
+    private String htreeClassName;
+
+    /**
+     * @see Options#HTREE_ADDRESS_BITS
+     */
+    private int addressBits;
     
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
@@ -1846,6 +1890,44 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     }
 
+    /*
+     * HTree
+     */
+    
+
+    /**
+     * The name of a class derived from {@link HTree} that will be used to
+     * re-load the index.
+     * 
+     * @see Options#HTREE_CLASS_NAME
+     */
+    public final String getHTreeClassName() {
+
+        return htreeClassName;
+
+    }
+    
+    public void setHTreeClassName(final String className) {
+
+        if (className == null)
+            throw new IllegalArgumentException();
+
+        this.htreeClassName = className;
+        
+    }
+
+	public int getAddressBits() {
+
+		return addressBits;
+
+	}
+    
+	public void setAddressBits(final int addressBits) {
+
+		this.addressBits = addressBits;
+
+	}
+    
     /**
      * Create an instance of a class known to implement the specified interface
      * from a class name.
@@ -2366,6 +2448,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             
         }
         
+        /*
+         * HTree
+         */
+        
+        /* Intern'd to reduce duplication on the heap. Will be com.bigdata.btree.BTree or
+         * com.bigdata.btree.IndexSegment and occasionally a class derived from BTree.
+         */
+        this.htreeClassName = getProperty(indexManager, properties, namespace,
+                Options.HTREE_CLASS_NAME, HTree.class.getName()).intern();
+
+		this.addressBits = Integer.parseInt(getProperty(indexManager,
+				properties, namespace, Options.HTREE_ADDRESS_BITS,
+				Options.DEFAULT_HTREE_ADDRESS_BITS));
+
         if (log.isInfoEnabled())
             log.info(toString());
         
@@ -2450,7 +2546,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
         sb.append(", branchingFactor=" + branchingFactor);
         sb.append(", pmd=" + pmd);
-        sb.append(", class=" + btreeClassName);
+        sb.append(", btreeClassName=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
 //        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeysCoder=" + nodeKeysCoder);//.getClass().getName());
@@ -2483,6 +2579,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                         : indexSegmentRecordCompressorFactory));
         sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
         sb.append(", scatterSplitConfiguration=" + scatterSplitConfiguration);
+        // htree
+        sb.append(", htreeClassName=" + htreeClassName);
+        sb.append(", addressBits=" + addressBits);
 
         return sb.toString();
         
@@ -2500,6 +2599,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * {@link Options#DEFAULT_MAX_REC_LEN}.
 	 */
     private static transient final int VERSION1 = 0x1;
+
+	/**
+	 * This version adds support for {@link HTree}. This includes
+	 * {@link #addressBits} and {@link #htreeClassName}.
+	 */
+    private static transient final int VERSION2 = 0x2;
 
 //    /**
 //     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
@@ -2580,7 +2685,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION1;
+    private static transient final int CURRENT_VERSION = VERSION2;
 //    private static transient final int CURRENT_VERSION = VERSION10;
     
     /**
@@ -2594,7 +2699,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         switch (version) {
         case VERSION0:
         case VERSION1:
-//        case VERSION2:
+        case VERSION2:
 //        case VERSION3:
 //        case VERSION4:
 //        case VERSION5:
@@ -2839,12 +2944,26 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             scatterSplitConfiguration = (ScatterSplitConfiguration) in.readObject();
             
 //        }
+            
+		if (version >= VERSION2) {
+
+			addressBits = LongPacker.unpackInt(in);
+		
+			htreeClassName = in.readUTF();
+
+		} else {
+
+        	addressBits = 10;
+        	
+        	htreeClassName = HTree.class.getName();
+        	
+        }
         
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        final int version = CURRENT_VERSION;
+    	final int version = CURRENT_VERSION;
         
         LongPacker.packLong(out, version);
 
@@ -2958,6 +3077,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
 //        }
 
+		if (version >= VERSION2) {
+
+			LongPacker.packLong(out, addressBits);
+
+			out.writeUTF(htreeClassName);
+
+        }
+            
     }
 
     /**
@@ -3141,6 +3268,55 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             final Checkpoint checkpoint = (Checkpoint) ctor
                     .newInstance(new Object[] { //
                             btree //
+                    });
+            
+            return checkpoint;
+            
+        } catch(Exception ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+
+    /**
+     * Create a {@link Checkpoint} for a {@link BTree}.
+     * <p>
+     * The caller is responsible for writing the {@link Checkpoint} record onto
+     * the store.
+     * <p>
+     * The class identified by {@link #getCheckpointClassName()} MUST declare a
+     * public constructor with the following method signature
+     * 
+     * <pre>
+     *   ...( HTree btree )
+     * </pre>
+     * 
+     * @param htree
+     *            The {@link HTree}.
+     * 
+     * @return The {@link Checkpoint}.
+     */
+    @SuppressWarnings("unchecked")
+    final public Checkpoint newCheckpoint(final HTree htree) {
+        
+        try {
+            
+            final Class cl = Class.forName(getCheckpointClassName());
+            
+            /*
+             * Note: A NoSuchMethodException thrown here means that you did not
+             * declare the required public constructor.
+             */
+            
+            final Constructor ctor = cl.getConstructor(new Class[] {
+                    HTree.class //
+                    });
+
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { //
+                            htree //
                     });
             
             return checkpoint;

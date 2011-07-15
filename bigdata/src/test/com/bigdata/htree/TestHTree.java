@@ -30,8 +30,6 @@ package com.bigdata.htree;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.HTree.BucketPage;
 import com.bigdata.htree.HTree.DirectoryPage;
@@ -62,96 +60,6 @@ public class TestHTree extends AbstractHTreeTestCase {
      */
     public TestHTree(String name) {
         super(name);
-    }
-    
-    public void test_ctor_correctRejection() {
-        
-		try {
-			new HTree(null/* store */, 2/* addressBits */);
-			fail("Expecting: " + IllegalArgumentException.class);
-		} catch (IllegalArgumentException ex) {
-			if (log.isInfoEnabled())
-				log.info("Ignoring expected exception: " + ex);
-		}
-
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				new HTree(store, 0/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
-		}
-
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				new HTree(store, -1/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
-		}
-
-		// address bits is too large.
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				new HTree(store, 17/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
-		}
-
-		/*
-		 * and spot check some valid ctor forms to verify that no exceptions are
-		 * thrown.
-		 */
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			new HTree(store, 1/* addressBits */); // min addressBits
-			new HTree(store, 16/* addressBits */); // max addressBits
-		}
-
-    }
-    
-    /**
-     * Basic test for correct construction of the initial state of an
-     * {@link HTree}.
-     */
-    public void test_ctor() {
-
-        final int addressBits = 10; // implies ~ 4k page size.
-        
-        final IRawStore store = new SimpleMemoryRawStore();
-
-        try {
-
-            final HTree htree = new HTree(store, addressBits);
-            
-			assertTrue("store", store == htree.getStore());
-			assertEquals("addressBits", addressBits, htree.getAddressBits());
-			assertEquals("nnodes", 1, htree.getNodeCount());
-			assertEquals("nleaves", 1, htree.getLeafCount());
-			assertEquals("nentries", 0, htree.getEntryCount());
-            
-        } finally {
-
-            store.destroy();
-            
-        }
-
     }
 
     /**
@@ -191,7 +99,7 @@ public class TestHTree extends AbstractHTreeTestCase {
             // a key which we never insert and which should never be found by lookup.
             final byte[] unused = new byte[]{-127};
             
-            final HTree htree = new HTree(store, addressBits, false/* rawRecords */);
+            final HTree htree = getHTree(store, addressBits);
             
             // Verify initial conditions.
             assertTrue("store", store == htree.getStore());
@@ -289,6 +197,8 @@ public class TestHTree extends AbstractHTreeTestCase {
              * </pre>
              */
             htree.insert(k2, v2);
+			if (log.isInfoEnabled())
+				log.info(htree.PP());
             assertEquals("nnodes", 1, htree.getNodeCount());
             assertEquals("nleaves", 2, htree.getLeafCount());
             assertEquals("nentries", 2, htree.getEntryCount());
@@ -731,7 +641,7 @@ public class TestHTree extends AbstractHTreeTestCase {
             final byte[] v5 = new byte[]{0x05};
             final byte[] v6 = new byte[]{0x06};
             
-            final HTree htree = new HTree(store, addressBits, false/*rawRecords*/);
+            final HTree htree = getHTree(store, addressBits);
 
             // Note: The test assumes splitBits := 1.
             assertEquals("splitBits", 1, htree.splitBits);
@@ -937,7 +847,7 @@ public class TestHTree extends AbstractHTreeTestCase {
 
         try {
 
-            final HTree htree = new HTree(store, addressBits, false/* rawRecords */);
+            final HTree htree = getHTree(store, addressBits);
 
             // Verify initial conditions.
             assertTrue("store", store == htree.getStore());
@@ -985,7 +895,7 @@ public class TestHTree extends AbstractHTreeTestCase {
             final byte[] v6 = new byte[]{0x06};
             final byte[] v8 = new byte[]{0x08};
             
-            final HTree htree = new HTree(store, addressBits, false/*rawRecords*/);
+            final HTree htree = getHTree(store, addressBits);
             
             try {
 	
