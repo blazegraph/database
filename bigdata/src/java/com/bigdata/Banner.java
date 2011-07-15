@@ -30,6 +30,7 @@ package com.bigdata;
 
 import java.lang.reflect.Method;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -47,7 +48,7 @@ import com.bigdata.counters.AbstractStatisticsCollector;
  */
 public class Banner {
 
-    private static boolean didBanner;
+    private final static AtomicBoolean didBanner = new AtomicBoolean(false);
 
     /**
      * Environment variables understood by the {@link Banner} class.
@@ -70,9 +71,9 @@ public class Banner {
 
     }
     
-    synchronized static public void banner() {
+    static public void banner() {
         
-        if(!didBanner) {
+        if(didBanner.compareAndSet(false/*expect*/, true/*update*/)) {
         
             final boolean quiet = Boolean.getBoolean(Options.QUIET);
 
@@ -81,8 +82,6 @@ public class Banner {
                 System.out.println(banner);
 
             }
-         
-            didBanner = true;
             
             final Logger log = Logger.getLogger("com.bigdata");
 
