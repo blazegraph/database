@@ -982,7 +982,7 @@ public class TestHTree extends AbstractHTreeTestCase {
      */
     public void test_stressInsert() {
 
-        final int limit = 10; // Note: Ok @ 10; broken by 20. dup keys showing up.
+        final int limit = 2048; // Note: Ok @ 10; broken by 20. dup keys showing up.
         
         // validate against ground truth even N inserts.
         final int validateInterval = 1;
@@ -1006,7 +1006,8 @@ public class TestHTree extends AbstractHTreeTestCase {
 
             for (int i = 0; i < limit; i++) {
 
-                final byte[] key = keyBuilder.reset().append((byte)i).getKey();
+                // final byte[] key = keyBuilder.reset().append((byte)i).getKey();
+                final byte[] key = keyBuilder.reset().append(i).getKey();
 
                 keys[i] = key;
                 htree.insert(key, key);
@@ -1018,9 +1019,11 @@ public class TestHTree extends AbstractHTreeTestCase {
                     for (int j = 0; j <= i; j++) {
 
                         final byte[] b = keys[j];
-                        System.out.println("verifying: " + j);
-                        if (j == 2 && i == 5)
-                            System.out.println("debug point");
+                        if (log.isDebugEnabled()) {
+                        	log.debug("verifying: " + j);
+	                        if (j == 2 && i == 5)
+	                            log.debug("debug point");
+                        }
                         assertEquals(b, htree.lookupFirst(b));
                         
 //                        // TODO Verify the iterator.
@@ -1089,51 +1092,65 @@ public class TestHTree extends AbstractHTreeTestCase {
             final byte[] v8 = new byte[]{0x08};
             
             final HTree htree = new HTree(store, addressBits, false/*rawRecords*/);
-
-            // Verify initial conditions.
-            assertTrue("store", store == htree.getStore());
-            assertEquals("addressBits", addressBits, htree.getAddressBits());
-
-            // Note: The test is assumes splitBits := 1.
-            assertEquals("splitBits", 1, htree.splitBits);
-
-            final DirectoryPage root = htree.getRoot();
-
-            htree.insert(k1, v1);
-            htree.insert(k2, v2);
-
-            assertEquals(v1, htree.lookupFirst(k1));
-            assertEquals(v2, htree.lookupFirst(k2));
-
-            assertTrue(root == htree.getRoot());
-            final BucketPage a = (BucketPage) root.childRefs[0].get();
             
-			if (log.isInfoEnabled())
-				log.info("1#: Bit resolution: " + a.getPrefixLength()
-						+ ", additional bits required: "
-						+ a.distinctBitsRequired());
-
-			assertTrue(a.distinctBitsRequired() == 4);
-            
-            htree.insert(k3, v3);
-            htree.insert(k8, v8);
-            
-			if (log.isInfoEnabled())
-				log.info("2#: Bit resolution: " + a.getPrefixLength()
-						+ ", additional bits required: "
-						+ a.distinctBitsRequired());
-
-			assertTrue(a.distinctBitsRequired() == 2);
-
-            // insert extra level
-            htree.insert(k4, v4);
-            
-			if (log.isInfoEnabled())
-				log.info("3#: Bit resolution: " + a.getPrefixLength()
-						+ ", additional bits required: "
-						+ a.distinctBitsRequired());
-
-			assertTrue(a.distinctBitsRequired() == 2);
+            try {
+	
+	            // Verify initial conditions.
+	            assertTrue("store", store == htree.getStore());
+	            assertEquals("addressBits", addressBits, htree.getAddressBits());
+	
+	            // Note: The test is assumes splitBits := 1.
+	            assertEquals("splitBits", 1, htree.splitBits);
+	
+	            final DirectoryPage root = htree.getRoot();
+	
+	            htree.insert(k1, v1);
+	            htree.insert(k2, v2);
+	
+	            assertEquals(v1, htree.lookupFirst(k1));
+	            assertEquals(v2, htree.lookupFirst(k2));
+	
+	            assertTrue(root == htree.getRoot());
+	            final BucketPage a = (BucketPage) root.childRefs[0].get();
+	            
+				if (log.isInfoEnabled())
+					log.info("1#: Bit resolution: " + a.getPrefixLength()
+							+ ", additional bits required: "
+							+ a.distinctBitsRequired());
+	
+				assertTrue(a.distinctBitsRequired() == 4);
+	            
+	            htree.insert(k3, v3);
+	            htree.insert(k8, v8);
+	            
+		        final BucketPage b = (BucketPage) root.childRefs[0].get();
+	
+		        if (log.isInfoEnabled())
+					log.info("2#: Bit resolution: " + b.getPrefixLength()
+							+ ", additional bits required: "
+							+ b.distinctBitsRequired());
+	
+				assertTrue(b.distinctBitsRequired() == 2);
+	
+	            // insert extra level
+	            htree.insert(k4, v4);
+	            
+		        final DirectoryPage pd = (DirectoryPage) root.childRefs[0].get();
+		        final DirectoryPage ppd = (DirectoryPage) pd.childRefs[0].get();
+		        final BucketPage c = (BucketPage) ppd.childRefs[0].get();
+	
+		        if (log.isInfoEnabled())
+					log.info("3#: Bit resolution: " + c.getPrefixLength()
+							+ ", additional bits required: "
+							+ c.distinctBitsRequired());
+	
+				assertTrue(c.distinctBitsRequired() == 1);
+            } catch (Throwable t) {
+            	if (log.isInfoEnabled())
+            		log.info("Pretty Print Error: " + htree.PP());
+            	
+            	throw new RuntimeException(t);
+            }
 
         } finally {
             
