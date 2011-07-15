@@ -1838,8 +1838,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
     
 	/**
 	 * The maximum length of a <code>byte[]</code> value stored within a leaf
-	 * for this {@link BTree}. This value only applies when raw record support
-	 * has been enabled for the {@link BTree}. Values greater than this in
+	 * for this {@link HTree}. This value only applies when raw record support
+	 * has been enabled for the {@link HTree}. Values greater than this in
 	 * length will be written as raw records on the backing persistence store.
 	 * 
 	 * @return The maximum size of an inline <code>byte[]</code> value before it

@@ -39,6 +39,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * and are often 32-bit integers. The tuple values may be either "raw records"
  * on the backing {@link IRawStore} or inline within the page.
  * 
+ * FIXME Add support for raw records (copy from BTree's Leaf class).
+ * 
  * TODO One way to tradeoff the simplicity of a local tuple array with the
  * requirement to hold an arbitrary number of duplicate keys within a bucket is
  * to split the bucket if it becomes full regardless of whether or not there are
