@@ -24,12 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Nov 5, 2006
  */
-package com.bigdata.btree;
+package com.bigdata.htree;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.DefaultNodeCoder;
@@ -37,7 +38,7 @@ import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.htree.HTree;
+import com.bigdata.htree.HTree.AbstractPage;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
@@ -45,6 +46,7 @@ import com.bigdata.io.IDataRecord;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.io.compression.NOPRecordCompressor;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 
@@ -78,7 +80,7 @@ import com.bigdata.rawstore.IRawStore;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: NodeSerializer.java 3305 2010-07-27 15:08:28Z thompsonbry $
  * 
  * @see AbstractBTree
  * @see IndexMetadata
@@ -173,7 +175,7 @@ public class NodeSerializer {
      * The total initial buffer capacity is this value times the
      * {@link #branchingFactor}.
      */
-    public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = 64;
+    public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 / 4;
     
     /**
      * Constructor is disallowed.
@@ -185,43 +187,47 @@ public class NodeSerializer {
 
     }
 
-	/**
-	 * Designated constructor.
-	 * 
-	 * @param nodeFactory
-	 *            An object that knows how to construct {@link INodeData}s and
-	 *            {@link ILeafData leaves}.
-	 * 
-	 * @param addressBits
-	 *            The #of address bits for target {@link HTree}.
-	 * 
-	 * @param initialBufferCapacity
-	 *            The initial capacity for internal buffer used to serialize
-	 *            nodes and leaves. The buffer will be resized as necessary
-	 *            until it is sufficient for the records being serialized for
-	 *            the {@link HTree}. When zero (0), a default is used. A
-	 *            non-zero value is worth specifying only when the actual buffer
-	 *            size is consistently less than the default for some
-	 *            {@link HTree}. See {@link #DEFAULT_BUFFER_CAPACITY_PER_ENTRY}
-	 * 
-	 * @param indexMetadata
-	 *            The {@link IndexMetadata} record for the index.
-	 * 
-	 * @param readOnly
-	 *            <code>true</code> IFF the caller is asserting that they WILL
-	 *            NOT attempt to serialize any nodes or leaves using this
-	 *            {@link NodeSerializer} instance.
-	 * 
-	 *            FIXME {@link IRecordCompressorFactory} should either be used
-	 *            here or moved into the {@link IRawStore} impl.
-	 * 
-	 * @todo the {@link IAddressManager} is not used any more. It was used by
-	 *       the {@link IAddressSerializer}.
-	 */
+    /**
+     * Designated constructor.
+     * 
+     * @param nodeFactory
+     *            An object that knows how to construct {@link INodeData}s and
+     *            {@link ILeafData leaves}.
+     * 
+     * @param branchingFactor
+     *            The branching factor for target B+Tree. For the
+     *            {@link IndexSegmentBuilder} this should be the branching
+     *            factor of the {@link IndexSegment} which is being generated.
+     *            Otherwise it is the branching factor of the
+     *            {@link AbstractBTree} itself.
+     * 
+     * @param initialBufferCapacity
+     *            The initial capacity for internal buffer used to serialize
+     *            nodes and leaves. The buffer will be resized as necessary
+     *            until it is sufficient for the records being serialized for
+     *            the {@link BTree}. When zero (0), a default is used. A
+     *            non-zero value is worth specifying only when the actual buffer
+     *            size is consistently less than the default for some
+     *            {@link BTree}. See {@link #DEFAULT_BUFFER_CAPACITY_PER_ENTRY}
+     * 
+     * @param indexMetadata
+     *            The {@link IndexMetadata} record for the index.
+     * 
+     * @param readOnly
+     *            <code>true</code> IFF the caller is asserting that they WILL
+     *            NOT attempt to serialize any nodes or leaves using this
+     *            {@link NodeSerializer} instance.
+     * 
+     *            FIXME {@link IRecordCompressorFactory} should either be used
+     *            here or moved into the {@link IRawStore} impl.
+     * 
+     * @todo the {@link IAddressManager} is not used any more. It was used by
+     *       the {@link IAddressSerializer}.
+     */
     public NodeSerializer(//
             final IAddressManager addressManager,
             final INodeFactory nodeFactory,//
-            final int addressBits,//
+            final int branchingFactor,
             final int initialBufferCapacity, //
             final IndexMetadata indexMetadata,//
             final boolean readOnly,//
@@ -259,8 +265,8 @@ public class NodeSerializer {
             
             if (initialBufferCapacity == 0) {
                 
-				this.initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
-						* (1 << addressBits);
+                this.initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
+                        * branchingFactor;
 
             } else {
 
@@ -375,7 +381,7 @@ public class NodeSerializer {
      *            
      * @return The node or leaf.
      */
-    public AbstractNode<?> wrap(final AbstractBTree btree, final long addr,
+    public AbstractPage wrap(final AbstractHTree btree, final long addr,
             final IAbstractNodeData data) {
 
         //        assert btree != null;

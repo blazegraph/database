@@ -98,7 +98,8 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * @throws IllegalStateException
      *             If the identity is already defined.
      */
-    void setIdentity(final long key) throws IllegalStateException {
+    // Note: public since also used by the htree package
+    public void setIdentity(final long key) throws IllegalStateException {
 
         if (key == NULL) {
 

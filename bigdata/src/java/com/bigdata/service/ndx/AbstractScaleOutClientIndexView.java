@@ -1292,7 +1292,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      * Return a new {@link CounterSet} backed by the {@link ScaleOutIndexCounters}
      * for this scale-out index.
      */
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
 
         return getFederation().getIndexCounters(name).getCounters();
 

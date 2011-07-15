@@ -6,6 +6,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 
+import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
 
@@ -107,6 +108,15 @@ public class Checkpoint implements Externalizable {
         }
         
         return addrCheckpoint;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff the checkpoint address is defined.
+     */
+    final public boolean hasCheckpointAddr() {
+        
+    	return addrCheckpoint != 0L;
         
     }
 
@@ -336,7 +346,7 @@ public class Checkpoint implements Externalizable {
      */
     public Checkpoint(final BTree btree) {
         
-        this(btree.metadata.getMetadataAddr(),//
+        this(btree.getMetadataAddr(),//
                 /*
                  * root node or leaf.
                  * 
@@ -345,8 +355,9 @@ public class Checkpoint implements Externalizable {
                  * there is no root and a new root leaf will be created on
                  * demand.
                  */
-                (btree.root == null ? btree.getCheckpoint().getRootAddr()
-                        : btree.root.getIdentity()),//
+        		btree.getRootAddr(),//
+//                (btree.root == null ? btree.getCheckpoint().getRootAddr()
+//                        : btree.root.getIdentity()),//
                 /*
                  * optional bloom filter.
                  * 
@@ -365,9 +376,64 @@ public class Checkpoint implements Externalizable {
                 btree.nnodes,//
                 btree.nleaves,//
                 btree.nentries,//
-                btree.counter.get(),//
-                btree.recordVersion,//
+                btree.getCounter().get(),//
+                btree.getRecordVersion(),//
                 IndexTypeEnum.BTree//
+                );
+           
+    }
+
+    /**
+     * Creates a {@link Checkpoint} record from an {@link HTree}.
+     * <p>
+     * Pre-conditions:
+     * <ul>
+     * <li>The root is clean.</li>
+     * <li>The metadata record is clean.</li>
+     * <li>The optional bloom filter is clean if it is defined.</li>
+     * </ul>
+     * Note: if the root is <code>null</code> then the root is assumed to be
+     * clean and the root address from the last {@link Checkpoint} record is
+     * used. Otherwise the address of the root is used (in which case it MUST be
+     * defined).
+     * 
+     * @param htree
+     *            The {@link HTree}.
+     */
+    public Checkpoint(final HTree htree) {
+        
+        this(htree.getMetadataAddr(),//
+                /*
+                 * root node or leaf.
+                 * 
+                 * Note: if the [root] reference is not defined then we use the
+                 * address in the last checkpoint record. if that is 0L then
+                 * there is no root and a new root leaf will be created on
+                 * demand.
+                 */
+        		htree.getRootAddr(),//
+                /*
+                 * optional bloom filter.
+                 * 
+                 * Note: if the [bloomFilter] reference is not defined then we
+                 * use the address in the last checkpoint record. if that is 0L
+                 * then there is no bloom filter. If the [bloomFilter] reference
+                 * is defined but the bloom filter has been disabled, then we
+                 * also write a 0L so that the bloom filter is no longer
+                 * reachable from the new checkpoint.
+                 */
+//                (htree.bloomFilter == null ? htree.getCheckpoint()
+//                        .getBloomFilterAddr()
+//                        : htree.bloomFilter.isEnabled() ? htree.bloomFilter
+//                                .getAddr() : 0L),//
+                0L, // TODO No bloom filter yet. Do we want to support this?
+                0, // htree.height,// Note: HTree is not balanced (height not uniform)
+                htree.getNodeCount(),//
+                htree.getLeafCount(),//
+                htree.getEntryCount(),//
+                htree.getCounter().get(),//
+                htree.getRecordVersion(),//
+                IndexTypeEnum.HTree//
                 );
            
     }

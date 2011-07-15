@@ -84,7 +84,7 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
             final byte[] v5 = new byte[] { 0x12 };
             final byte[] v6 = new byte[] { 0x13 };
 
-            final HTree htree = new HTree(store, addressBits, false/* rawRecords */);
+            final HTree htree = getHTree(store, addressBits, false/* rawRecords */);
 
             // Note: The test assumes splitBits := 1.
             assertEquals("splitBits", 1, htree.splitBits);

@@ -736,6 +736,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
 	/**
+	 * {@inheritDoc}
+	 * <p>
 	 * Return some "statistics" about the btree including both the static
 	 * {@link CounterSet} and the {@link BTreeCounters}s.
 	 * <p>
@@ -758,7 +760,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 	 *       state (keys, values, and other arrays). report estimated heap
 	 *       consumption here.
 	 */
-    public ICounterSet getCounters() {
+    public CounterSet getCounters() {
 
 		final CounterSet counterSet = new CounterSet();
 		{

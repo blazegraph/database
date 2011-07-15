@@ -29,16 +29,26 @@ package com.bigdata.htree;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.NoEvictionListener;
+import com.bigdata.btree.PO;
 import com.bigdata.btree.data.ILeafData;
+import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.rawstore.IRawStore;
 
 public class AbstractHTreeTestCase extends TestCase2 {
 
-	public AbstractHTreeTestCase() {
+    public AbstractHTreeTestCase() {
 	}
 
 	public AbstractHTreeTestCase(String name) {
@@ -129,5 +139,84 @@ public class AbstractHTreeTestCase extends TestCase2 {
 		}
 
 	}
+
+	/**
+	 * Return a new {@link HTree} backed by a simple transient store that will
+	 * NOT evict leaves or nodes onto the store. The leaf cache will be large
+	 * and cache evictions will cause exceptions if they occur. This provides an
+	 * indication if cache evictions are occurring so that the tests of basic
+	 * tree operations in this test suite are known to be conducted in an
+	 * environment without incremental writes of leaves onto the store. This
+	 * avoids copy-on-write scenarios and let's us test with the knowledge that
+	 * there should always be a hard reference to a child or parent.
+	 * 
+	 * @param addressBits
+	 *            The addressBts.
+	 */
+	public HTree getHTree(final IRawStore store, final int addressBits) {
+
+		return getHTree(store, addressBits, false/* rawRecords */);
+		
+	}
+
+	public HTree getHTree(final IRawStore store, final int addressBits,
+			final boolean rawRecords) {
+
+		return getHTree(store, addressBits, rawRecords, 
+				DefaultTupleSerializer.newInstance());
+
+	}
+	
+	public HTree getHTree(final IRawStore store, final int addressBits,
+			final boolean rawRecords, final ITupleSerializer tupleSer) {
+
+		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+		if (rawRecords) {
+			metadata.setRawRecords(true);
+			metadata.setMaxRecLen(0);
+		}
+        
+        metadata.setAddressBits(addressBits);
+
+        metadata.setTupleSerializer(tupleSer);
+        
+        // override the HTree class.
+        metadata.setHTreeClassName(NoEvictionHTree.class.getName());
+
+        return (NoEvictionHTree) HTree.create(store, metadata);
+        
+    }
+    
+	/**
+     * Specifies a {@link NoEvictionListener}.
+     *  
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class NoEvictionHTree extends HTree {
+
+        /**
+         * @param store
+         * @param checkpoint
+         * @param metadata
+         */
+        public NoEvictionHTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
+         
+            super(store, checkpoint, metadata, readOnly);
+            
+        }
+
+        @Override
+        protected HardReferenceQueue<PO> newWriteRetentionQueue(boolean readOnly) {
+
+            return new HardReferenceQueue<PO>(//
+                    new NoEvictionListener(),//
+                    20000,//
+                    10//
+            );
+
+        }
+        
+    }
 
 }
