@@ -54,7 +54,7 @@ public class TestIndexCounter extends AbstractHTreeTestCase {
     }
 
     /**
-     * Unit test for {@link HTree.Counter} to verify basic increment behavior.
+     * Unit test for {@link Counter} to verify basic increment behavior.
      */
     public void test_counter() {
         
@@ -86,7 +86,7 @@ public class TestIndexCounter extends AbstractHTreeTestCase {
 
     /**
      * Unit test for overflow conditions at the int32 and int64 boundary for
-     * {@link HTree.Counter}.
+     * {@link Counter}.
      */
     public void test_counter_overflow() {
         

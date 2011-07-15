@@ -29,7 +29,6 @@ package com.bigdata.htree;
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.cache.IHardReferenceQueue;
-import com.bigdata.htree.HTree.AbstractPage;
 
 /**
  * Hard reference cache eviction listener writes a dirty node or leaf onto the

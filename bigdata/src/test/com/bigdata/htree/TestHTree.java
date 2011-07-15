@@ -31,8 +31,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
-import com.bigdata.htree.HTree.BucketPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.htree.data.MockBucketData;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;

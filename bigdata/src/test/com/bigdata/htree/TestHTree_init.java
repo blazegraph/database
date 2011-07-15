@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.InnerCause;
 
 /**
  * Unit tests for bootstrap of an {@link HTree} instance.
@@ -21,9 +22,7 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 	/**
 	 * Test initialization of an {@link HTree}.
 	 * 
-	 * TODO Add test with store := null (transient mode).
-	 * 
-	 * TODO Test high level create/load methods.
+	 * TODO Add test with store := null (this is now the transient mode).
 	 */
 	public void test_init_min_addressBits() {
 
@@ -98,49 +97,54 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 
     }
 
-    // TODO The thrown exceptions are wrapped, so we have to test w/ inner cause.
-    public void test_ctor_correctRejection() {
+    public void test_ctor_correctRejection_addressBits_0() {
 
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				getHTree(store, 0/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
+		final IRawStore store = new SimpleMemoryRawStore();
+		try {
+			doCorrectRejectionTest(store, 0/*addressBits*/);
+		} finally {
+			store.destroy();
 		}
-
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				getHTree(store, -1/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
-		}
-
-		// address bits is too large.
-		{
-			final IRawStore store = new SimpleMemoryRawStore();
-			try {
-				getHTree(store, 17/* addressBits */);
-				fail("Expecting: " + IllegalArgumentException.class);
-			} catch (IllegalArgumentException ex) {
-				if (log.isInfoEnabled())
-					log.info("Ignoring expected exception: " + ex);
-			} finally {
-				store.destroy();
-			}
-		}
-
     }
 
+    public void test_ctor_correctRejection_addressBits_negative() {
+
+		final IRawStore store = new SimpleMemoryRawStore();
+		try {
+			doCorrectRejectionTest(store, -1/*addressBits*/);
+		} finally {
+			store.destroy();
+		}
+    }
+
+    public void test_ctor_correctRejection_addressBits_tooLarge() {
+
+		final IRawStore store = new SimpleMemoryRawStore();
+		try {
+			doCorrectRejectionTest(store, 17/*addressBits*/);
+		} finally {
+			store.destroy();
+		}
+    }
+    
+	/*
+	 * Note: The thrown exceptions are wrapped, so we have to test w/ inner
+	 * cause.
+	 */
+    private void doCorrectRejectionTest(final IRawStore store, final int addressBits) {
+    	
+			try {
+				getHTree(store, addressBits);
+				fail("Expecting: " + IllegalArgumentException.class);
+			} catch (Throwable t) {
+				if (InnerCause.isInnerCause(t, IllegalArgumentException.class)) {
+					if (log.isInfoEnabled())
+						log.info("Ignoring expected exception: " + t);
+				} else {
+					fail("Expecting: " + IllegalArgumentException.class);
+				}
+			}
+
+    }
+    
 }

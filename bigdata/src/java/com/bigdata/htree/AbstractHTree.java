@@ -12,13 +12,17 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTree.IBTreeCounters;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.Node;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.data.IAbstractNodeData;
@@ -29,15 +33,17 @@ import com.bigdata.cache.RingBuffer;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
-import com.bigdata.htree.HTree.AbstractPage;
-import com.bigdata.htree.HTree.BucketPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressorFactory;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class for a persistence capable extensible hash tree.
@@ -413,6 +419,113 @@ abstract public class AbstractHTree implements ICounterSetAccess {
      * Used to serialize and de-serialize the nodes and leaves of the tree.
      */
     final protected NodeSerializer nodeSer;
+
+    /**
+     * The contract for {@link #close()} is to reduce the resource burden of the
+     * index (by discarding buffers) while not rendering the index inoperative.
+     * Unless the {@link AbstractHTree} {@link #isTransient()}, a HTree that
+     * has been {@link #close() closed} MAY be {@link #reopen() reopened} at any
+     * time (conditional on the continued availability of the backing store).
+     * Such an index reference remains valid after a {@link #close()}. A closed
+     * index is transparently restored by either {@link #getRoot()} or
+     * {@link #reopen()}.
+     * <p>
+     * Note: A {@link #close()} on a dirty index MUST discard writes rather than
+     * flushing them to the store and MUST NOT update its {@link Checkpoint}
+     * record - ({@link #close()} is used to discard indices with partial
+     * writes when an {@link AbstractTask} fails). If you are seeking to
+     * {@link #close()} a mutable {@link HTree} that it state can be recovered
+     * by {@link #reopen()} then you MUST write a new {@link Checkpoint} record
+     * before closing the index.
+     * <p>
+     * Note: CLOSING A TRANSIENT INDEX WILL DISCARD ALL DATA!
+     * <p>
+     * This implementation clears the hard reference queue (releasing all node
+     * references), releases the hard reference to the root node, and releases
+     * the buffers on the {@link NodeSerializer} (they will be naturally
+     * reallocated on reuse).
+     * <p>
+     * Note: {@link AbstractHTree} is NOT thread-safe and {@link #close()} MUST
+     * be invoked in a context in which there will not be concurrent threads --
+     * the natural choice being the single-threaded commit service on the
+     * journal.
+     * 
+     * @exception IllegalStateException
+     *                if the root is <code>null</code>, indicating that the
+     *                index is already closed.
+     * 
+     * @exception IllegalStateException
+     *                if the root is dirty (this implies that this is a mutable
+     *                HTree and there are mutations that have not been written
+     *                through to the store)
+     */
+    synchronized public void close() {
+
+        if (root == null) {
+
+            throw new IllegalStateException(ERROR_CLOSED);
+
+        }
+
+        if (log.isInfoEnabled() || BigdataStatics.debug) {
+
+            final String msg = "HTree close: name="
+                    + metadata.getName()
+                    + ", dirty="
+                    + root.isDirty()
+                    + ", nnodes="
+                    + getNodeCount()
+                    + ", nleaves="
+                    + getLeafCount()
+                    + ", nentries="
+                    + getEntryCount()
+                    + ", impl="
+                    + (this instanceof HTree ? ((HTree) this).getCheckpoint()
+                            .toString() : getClass().getSimpleName());
+
+            if (log.isInfoEnabled())
+                log.info(msg);
+
+        }
+
+        /*
+         * Release buffers.
+         */
+        if (nodeSer != null) {
+         
+            nodeSer.close();
+            
+        }
+
+        /*
+         * Clear the hard reference queue.
+         * 
+         * Note: This is safe since we know as a pre-condition that the root
+         * node is clean and therefore that there are no dirty nodes or leaves
+         * in the hard reference queue.
+         * 
+         * @todo Clearing the write retention queue here is important. However,
+         * it may fail to transfer clean nodes and leaves to the global LRU.
+         */
+        writeRetentionQueue.clear(true/* clearRefs */);
+        ndistinctOnWriteRetentionQueue = 0;
+        
+//        if (readRetentionQueue != null) {
+//            
+//            readRetentionQueue.clear(true/* clearRefs */);
+//            
+//        }
+
+        /*
+         * Clear the reference to the root node (permits GC).
+         */
+        root = null;
+
+// TODO Support bloom filter?
+//         release the optional bloom filter.
+//        bloomFilter = null;
+        
+    }
 
     /**
      * This is part of a {@link #close()}/{@link #reopen()} protocol that may
@@ -1838,6 +1951,58 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
 		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-nbytes);
 
+	}
+
+	/** The #of index entries. */
+	abstract public long rangeCount();
+	
+	/**
+	 * Simple iterator visits all tuples in the {@link HTree} in order by the
+	 * effective prefix of their keys. Since the key is typically a hash of some
+	 * fields in the associated application data record, this will normally
+	 * visit application data records in what appears to be an arbitrary order.
+	 * Tuples within a buddy hash bucket will be delivered in a random order.
+	 * <p>
+	 * Note: The {@link HTree} does not currently maintain metadata about the
+	 * #of spanned tuples in a {@link DirectoryPage}. Without that we can not
+	 * provide fast range counts, linear list indexing, etc.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public ITupleIterator rangeIterator() {
+		
+		return new BucketPageTupleIterator(this,
+				IRangeQuery.DEFAULT/* flags */, new Striterator(
+						getRoot().postOrderIterator()).addFilter(new Filter() {
+					private static final long serialVersionUID = 1L;
+					public boolean isValid(final Object obj) {
+						return ((AbstractPage) obj).isLeaf();
+					}
+				}));
+	
+	}
+
+	/**
+	 * Visits the values stored in the {@link HTree} in order by the effective
+	 * prefix of their keys. Since the key is typically a hash of some fields in
+	 * the associated application data record, this will normally visit
+	 * application data records in what appears to be an arbitrary order. Tuples
+	 * within a buddy hash bucket will be delivered in a random order.
+	 * <p>
+	 * Note: This allocates a new byte[] for each visited value. It is more
+	 * efficient to reuse a buffer for each visited {@link Tuple}. This can be
+	 * done using {@link #rangeIterator()}.
+	 * 
+	 * TODO Must resolve references to raw records.
+	 */
+	@SuppressWarnings("unchecked")
+	public Iterator<byte[]> values() {
+		
+		return new Striterator(rangeIterator()).addFilter(new Resolver(){
+			private static final long serialVersionUID = 1L;
+			protected Object resolve(final Object obj) {
+				return ((ITuple<?>)obj).getValue();
+			}});
+		
 	}
 
 }

@@ -30,8 +30,6 @@ import java.lang.ref.Reference;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.bigdata.htree.HTree.AbstractPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 
 /**
  * Visits the direct dirty children of a {@link DirectoryPage} in the index
