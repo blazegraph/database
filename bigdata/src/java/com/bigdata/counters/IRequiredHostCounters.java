@@ -73,9 +73,14 @@ public interface IRequiredHostCounters extends ICounterHierarchy {
 
     /*
      * CPU
+     * 
+     * TODO It would be great to have IO Wait as a required counter, but we
+     * do not have access to it under Windows (last I checked). 
+     * 
+     * See IHostCounters#CPU_PercentIOWait
      */
     
-    /** Percentage of the time the processor is not idle. */
+    /** Percentage of the time the processor is not idle in [0:1]. */
     String CPU_PercentProcessorTime = CPU + ps
             + "% Processor Time";
 

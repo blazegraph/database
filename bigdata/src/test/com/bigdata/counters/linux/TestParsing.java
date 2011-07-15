@@ -60,7 +60,8 @@ public class TestParsing extends TestCase2 {
         
         final String[] fields = SysstatUtil.splitDataLine(header);
 
-        System.err.println(Arrays.toString(fields));
+		if (log.isInfoEnabled())
+			log.info(Arrays.toString(fields));
         
         assertEquals(new String[] { "06:35:15 AM", "PID", "%user", "%system",
                 "%CPU", "CPU", "Command" }, fields);
@@ -76,7 +77,8 @@ public class TestParsing extends TestCase2 {
         
         final String[] fields = SysstatUtil.splitDataLine(data);
 
-        System.err.println(Arrays.toString(fields));
+        if(log.isInfoEnabled())
+        	log.info(Arrays.toString(fields));
         
         assertEquals(new String[] {"06:35:15 AM", "501", "0.00", "0.01", "0.00", "1", "kjournald"}, fields);
         
@@ -90,7 +92,7 @@ public class TestParsing extends TestCase2 {
      */
     public void test_pidStat_data_parse() {
 
-        DateFormat f = SysstatUtil.newDateFormat();
+        final DateFormat f = SysstatUtil.newDateFormat();
 
         System.err.println("Format: " + f.format(new Date()));
 
@@ -127,7 +129,8 @@ public class TestParsing extends TestCase2 {
 
             for (int i = 0; i < fields.length; i++) {
 
-                System.err.println("fields[" + i + "]=[" + fields[i] + "]");
+            	if(log.isInfoEnabled())
+                	log.info("fields[" + i + "]=[" + fields[i] + "]");
                 
             }
             
