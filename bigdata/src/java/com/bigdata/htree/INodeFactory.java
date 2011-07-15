@@ -25,8 +25,6 @@ package com.bigdata.htree;
 
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.htree.HTree.BucketPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 
 /**
  * Interface for creating nodes or leaves.

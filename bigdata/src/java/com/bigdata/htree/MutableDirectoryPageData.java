@@ -1,8 +1,6 @@
 package com.bigdata.htree;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.htree.HTree.BucketPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.rawstore.IRawStore;

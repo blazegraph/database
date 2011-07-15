@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.htree;
 
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
-import com.bigdata.htree.HTree.BucketPage;
-import com.bigdata.htree.HTree.DirectoryPage;
 import com.bigdata.htree.data.MockBucketData;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;

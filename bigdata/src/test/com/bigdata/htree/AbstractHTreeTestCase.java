@@ -26,18 +26,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+//import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
+//import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NoEvictionListener;
@@ -218,5 +225,572 @@ public class AbstractHTreeTestCase extends TestCase2 {
         }
         
     }
+
+//	/**
+//	 * A suite of tests designed to verify that one htree correctly represents
+//	 * the information present in a ground truth htree. The test verifies the
+//	 * #of entries, the keys and values, and lookup by key. The address bits,
+//	 * #of nodes and #of leaves may differ (the test does not presume that the
+//	 * htrees were built with the same branching factor, but merely with the
+//	 * same data).
+//	 * 
+//	 * @param expected
+//	 *            The ground truth htree.
+//	 * @param actual
+//	 *            The htree that is being validated.
+//	 */
+//    static public void assertSameBTree(final AbstractHTree expected,
+//            final AbstractHTree actual) {
+//
+//        assert expected != null;
+//        
+//        assert actual != null;
+//        
+//        // Must be the same "index".
+//        assertEquals("indexUUID", expected.getIndexMetadata().getIndexUUID(),
+//                actual.getIndexMetadata().getIndexUUID());
+//        
+////        // The #of entries must agree.
+////        assertEquals("entryCount", expected.getEntryCount(), actual
+////                .rangeCount(null, null));
+//
+//        /*
+//         * Verify the forward tuple iterator.
+//         * 
+//         * Note: This compares the total ordering of the actual btree against
+//         * the total ordering of a ground truth BTree <p> Note: This uses the
+//         * {@link AbstractBTree#rangeIterator()} method. Due to the manner in
+//         * which that iterator is implemented, the iterator does NOT rely on the
+//         * separator keys. Therefore while this validates the total order it
+//         * does NOT validate that the index may be searched by key (or by entry
+//         * index).
+//         */
+//        {
+//        
+//            final long actualTupleCount = doEntryIteratorTest(expected
+//                    .values(), actual.values());
+//
+//            // verifies based on what amounts to an exact range count.
+//            assertEquals("entryCount", expected.getEntryCount(),
+//                    actualTupleCount);
+//            
+//        }
+//
+//        /*
+//         * Verify the reverse tuple iterator.
+//         */
+//        {
+//            
+//            final long actualTupleCount = doEntryIteratorTest(//
+//                    expected.rangeIterator(null/* fromKey */, null/* toKey */,
+//                            0/* capacity */, IRangeQuery.KEYS
+//                                    | IRangeQuery.VALS | IRangeQuery.REVERSE,
+//                            null/* filter */),
+//                    //
+//                    actual.rangeIterator(null/* fromKey */, null/* toKey */,
+//                            0/* capacity */, IRangeQuery.KEYS
+//                                    | IRangeQuery.VALS | IRangeQuery.REVERSE,
+//                            null/* filter */));
+//
+//            // verifies based on what amounts to an exact range count.
+//            assertEquals("entryCount", expected.getEntryCount(),
+//                    actualTupleCount);
+//
+//        }
+//
+//        /*
+//         * Extract the ground truth mapping from the input btree.
+//         */
+//		if (expected.getEntryCount() <= Integer.MAX_VALUE) {
+//
+//			final int entryCount = (int) expected.getEntryCount();
+//
+//			final byte[][] keys = new byte[entryCount][];
+//
+//			final byte[][] vals = new byte[entryCount][];
+//
+//			getKeysAndValues(expected, keys, vals);
+//
+//			/*
+//			 * Verify lookup against the segment with random keys choosen from
+//			 * the input btree. This vets the separatorKeys. If the separator
+//			 * keys are incorrect then lookup against the index segment will
+//			 * fail in various interesting ways.
+//			 */
+//			doRandomLookupTest("actual", actual, keys, vals);
+//
+//			/*
+//			 * Verify lookup by entry index with random keys. This vets the
+//			 * childEntryCounts[] on the nodes of the generated index segment.
+//			 * If the are wrong then this test will fail in various interesting
+//			 * ways.
+//			 */
+//			if (actual instanceof AbstractBTree) {
+//
+//				doRandomIndexOfTest("actual", ((AbstractBTree) actual), keys,
+//						vals);
+//
+//			}
+//
+//		}
+//
+//        /*
+//         * Examine the btree for inconsistencies (we also examine the ground
+//         * truth btree for inconsistencies to be paranoid).
+//         */
+//
+//        if(log.isInfoEnabled())
+//            log.info("Examining expected tree for inconsistencies");
+//        assert expected.dump(System.err);
+//
+//        /*
+//         * Note: An IndexSegment can underflow a leaf or node if rangeCount was
+//         * an overestimate so we can't run this task against an IndexSegment.
+//         */
+//        if(actual instanceof /*Abstract*/BTree) {
+//            if(log.isInfoEnabled())
+//                log.info("Examining actual tree for inconsistencies");
+//            assert ((AbstractBTree)actual).dump(System.err);
+//        }
+//
+//    }
+//
+//    /**
+//     * Compares the total ordering of two B+Trees as revealed by their range
+//     * iterators
+//     * 
+//     * @param expected
+//     *            The ground truth iterator.
+//     * 
+//     * @param actual
+//     *            The iterator to be tested.
+//     * 
+//     * @return The #of tuples that were visited in <i>actual</i>.
+//     * 
+//     * @see #doRandomLookupTest(String, AbstractBTree, byte[][], Object[])
+//     * @see #doRandomIndexOfTest(String, AbstractBTree, byte[][], Object[])
+//     */
+//    static protected long doEntryIteratorTest(
+//            final ITupleIterator<?> expectedItr,
+//            final ITupleIterator<?> actualItr
+//            ) {
+//
+//        int index = 0;
+//
+//        long actualTupleCount = 0L;
+//        
+//        while( expectedItr.hasNext() ) {
+//            
+//            if( ! actualItr.hasNext() ) {
+//                
+//                fail("The iterator is not willing to visit enough entries");
+//                
+//            }
+//            
+//            final ITuple<?> expectedTuple = expectedItr.next();
+//            
+//            final ITuple<?> actualTuple = actualItr.next();
+//            
+//            actualTupleCount++;
+//            
+//            final byte[] expectedKey = expectedTuple.getKey();
+//            
+//            final byte[] actualKey = actualTuple.getKey();
+//
+////            System.err.println("index=" + index + ": key expected="
+////                    + BytesUtil.toString(expectedKey) + ", actual="
+////                    + BytesUtil.toString(actualKey));
+//
+//            try {
+//                
+//                assertEquals(expectedKey, actualKey);
+//                
+//            } catch (AssertionFailedError ex) {
+//                
+//                /*
+//                 * Lazily generate message.
+//                 */
+//                fail("Keys differ: index=" + index + ", expected="
+//                        + BytesUtil.toString(expectedKey) + ", actual="
+//                        + BytesUtil.toString(actualKey), ex);
+//                
+//            }
+//
+//            if (expectedTuple.isDeletedVersion()) {
+//
+//                assert actualTuple.isDeletedVersion();
+//
+//            } else {
+//
+//                final byte[] expectedVal = expectedTuple.getValue();
+//
+//                final byte[] actualVal = actualTuple.getValue();
+//
+//                try {
+//
+//                    assertSameValue(expectedVal, actualVal);
+//
+//                } catch (AssertionFailedError ex) {
+//                    /*
+//                     * Lazily generate message.
+//                     */
+//                    fail("Values differ: index=" + index + ", key="
+//                            + BytesUtil.toString(expectedKey) + ", expected="
+//                            + Arrays.toString(expectedVal) + ", actual="
+//                            + Arrays.toString(actualVal), ex);
+//
+//                }
+//
+//            }
+//
+//            if (expectedTuple.getVersionTimestamp() != actualTuple
+//                    .getVersionTimestamp()) {
+//                /*
+//                 * Lazily generate message.
+//                 */
+//                assertEquals("timestamps differ: index=" + index + ", key="
+//                        + BytesUtil.toString(expectedKey), expectedTuple
+//                        .getVersionTimestamp(), actualTuple
+//                        .getVersionTimestamp());
+//
+//            }
+//            
+//            index++;
+//            
+//        }
+//        
+//        if( actualItr.hasNext() ) {
+//            
+//            fail("The iterator is willing to visit too many entries");
+//            
+//        }
+//        
+//        return actualTupleCount;
+//
+//    }
+//
+//    /**
+//     * Extract all keys and values from the btree in key order.  The caller must
+//     * correctly dimension the arrays before calling this method.
+//     * 
+//     * @param btree
+//     *            The btree.
+//     * @param keys
+//     *            The keys in key order (out).
+//     * @param vals
+//     *            The values in key order (out).
+//     */
+//    static public void getKeysAndValues(final AbstractBTree btree, final byte[][] keys,
+//            final byte[][] vals) {
+//        
+//        final ITupleIterator<?> itr = btree.rangeIterator();
+//
+//        int i = 0;
+//        
+//        while( itr.hasNext() ) {
+//
+//            final ITuple<?> tuple= itr.next();
+//            
+//            final byte[] val = tuple.getValue();
+//            
+//            final byte[] key = tuple.getKey();
+//
+//            assert val != null;
+//            
+//            assert key != null;
+//            
+//            keys[i] = key;
+//            
+//            vals[i] = val;
+//            
+//            i++;
+//            
+//        }
+//        
+//    }
+//    
+//    /**
+//     * Tests the performance of random {@link IIndex#lookup(Object)}s on the
+//     * btree. This vets the separator keys and the childAddr and/or childRef
+//     * arrays since those are responsible for lookup.
+//     * 
+//     * @param label
+//     *            A descriptive label for error messages.
+//     * 
+//     * @param btree
+//     *            The btree.
+//     * 
+//     * @param keys
+//     *            the keys in key order.
+//     * 
+//     * @param vals
+//     *            the values in key order.
+//     */
+//    static public void doRandomLookupTest(final String label,
+//            final IIndex btree, final byte[][] keys, final byte[][] vals) {
+//
+//        final int nentries = keys.length;//btree.rangeCount(null, null);
+//
+//        if (log.isInfoEnabled())
+//            log.info("\ncondition: " + label + ", nentries=" + nentries);
+//
+//        final int[] order = getRandomOrder(nentries);
+//
+//        final long begin = System.currentTimeMillis();
+//
+//        final boolean randomOrder = true;
+//
+//        for (int i = 0; i < nentries; i++) {
+//
+//            final int entryIndex = randomOrder ? order[i] : i;
+//            
+//            final byte[] key = keys[entryIndex];
+//        
+//            final byte[] val = btree.lookup(key);
+//
+//            if (val == null && true) {
+//
+//                // Note: This exists only as a debug point.
+//
+//                btree.lookup(key);
+//
+//            }
+//
+//            final byte[] expectedVal = vals[entryIndex];
+//
+//            assertEquals(expectedVal, val);
+//            
+//        }
+// 
+//        if (log.isInfoEnabled()) {
+//            
+//            final long elapsed = System.currentTimeMillis() - begin;
+//
+//            log.info(label + " : tested " + nentries
+//                + " keys order in " + elapsed + "ms");
+//        
+////        log.info(label + " : " + btree.getCounters().asXML(null/*filter*/));
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * Tests the performance of random lookups of keys and values by entry
+//     * index. This vets the separator keys and childRef/childAddr arrays, which
+//     * are used to lookup the entry index for a key, and also vets the
+//     * childEntryCount[] array, since that is responsible for lookup by entry
+//     * index.
+//     * 
+//     * @param label
+//     *            A descriptive label for error messages.
+//     * @param btree
+//     *            The btree.
+//     * @param keys
+//     *            the keys in key order.
+//     * @param vals
+//     *            the values in key order.
+//     */
+//    static public void doRandomIndexOfTest(final String label,
+//            final AbstractBTree btree, 
+//            final byte[][] keys, final byte[][] vals) {
+//
+//        final int nentries = keys.length;//btree.getEntryCount();
+//
+//        if (log.isInfoEnabled())
+//            log.info("\ncondition: " + label + ", nentries=" + nentries);
+//
+//        final int[] order = getRandomOrder(nentries);
+//
+//        final long begin = System.currentTimeMillis();
+//
+//        final boolean randomOrder = true;
+//
+//        for (int i = 0; i < nentries; i++) {
+//
+//            final int entryIndex = randomOrder ? order[i] : i;
+//
+//            final byte[] key = keys[entryIndex];
+//
+//            assertEquals("indexOf", entryIndex, btree.indexOf(key));
+//
+//            final byte[] expectedVal = vals[entryIndex];
+//
+//            assertEquals("keyAt", key, btree.keyAt(entryIndex));
+//
+//            assertEquals("valueAt", expectedVal, btree.valueAt(entryIndex));
+//
+//        }
+//
+//        if (log.isInfoEnabled()) {
+//
+//            final long elapsed = System.currentTimeMillis() - begin;
+//
+//            log.info(label + " : tested " + nentries + " keys in " + elapsed
+//                    + "ms");
+//
+//// log.info(label + " : " + btree.getBtreeCounters());
+//        }
+//
+//    }
+//    
+//    /**
+//     * Method verifies that the <i>actual</i> {@link ITupleIterator} produces the
+//     * expected values in the expected order. Errors are reported if too few or
+//     * too many values are produced, etc.
+//     */
+//    static public void assertSameIterator(byte[][] expected, ITupleIterator actual) {
+//
+//        assertSameIterator("", expected, actual);
+//
+//    }
+//
+//    /**
+//     * Method verifies that the <i>actual</i> {@link ITupleIterator} produces
+//     * the expected values in the expected order. Errors are reported if too few
+//     * or too many values are produced, etc.
+//     */
+//    static public void assertSameIterator(String msg, final byte[][] expected,
+//            final ITupleIterator actual) {
+//
+//        int i = 0;
+//
+//        while (actual.hasNext()) {
+//
+//            if (i >= expected.length) {
+//
+//                fail(msg + ": The iterator is willing to visit more than "
+//                        + expected.length + " values.");
+//
+//            }
+//
+//            ITuple tuple = actual.next();
+//
+//            final byte[] val = tuple.getValue();
+//
+//            if (expected[i] == null) {
+//
+//                if (val != null) {
+//
+//                    /*
+//                     * Only do message construction if we know that the assert
+//                     * will fail.
+//                     */
+//                    fail(msg + ": Different values at index=" + i
+//                            + ": expected=null" + ", actual="
+//                            + Arrays.toString(val));
+//
+//                }
+//
+//            } else {
+//
+//                if (val == null) {
+//
+//                    /*
+//                     * Only do message construction if we know that the assert
+//                     * will fail.
+//                     */
+//                    fail(msg + ": Different values at index=" + i
+//                            + ": expected=" + Arrays.toString(expected[i])
+//                            + ", actual=null");
+//
+//                }
+//                
+//                if (BytesUtil.compareBytes(expected[i], val) != 0) {
+//                    
+//                    /*
+//                     * Only do message construction if we know that the assert
+//                     * will fail.
+//                     */
+//                    fail(msg + ": Different values at index=" + i
+//                            + ": expected=" + Arrays.toString(expected[i])
+//                            + ", actual=" + Arrays.toString(val));
+//                    
+//                }
+//
+//            }
+//            
+//            i++;
+//
+//        }
+//
+//        if (i < expected.length) {
+//
+//            fail(msg + ": The iterator SHOULD have visited " + expected.length
+//                    + " values, but only visited " + i + " values.");
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * Verifies the data in the two indices using a batch-oriented key range
+//     * scans (this can be used to verify a key-range partitioned scale-out index
+//     * against a ground truth index) - only the keys and values of non-deleted
+//     * index entries in the <i>expected</i> index are inspected.  Deleted index
+//     * entries in the <i>actual</i> index are ignored.
+//     * 
+//     * @param expected
+//     * @param actual
+//     */
+//    public static void assertSameEntryIterator(IIndex expected, IIndex actual) {
+//
+//        final ITupleIterator expectedItr = expected.rangeIterator(null, null);
+//
+//        final ITupleIterator actualItr = actual.rangeIterator(null, null);
+//
+//        assertSameEntryIterator(expectedItr, actualItr);
+//
+//    }
+//    
+//    /**
+//     * Verifies that the iterators visit tuples having the same data in the same
+//     * order.
+//     * 
+//     * @param expectedItr
+//     * @param actualItr
+//     */
+//    public static void assertSameEntryIterator(
+//            final ITupleIterator expectedItr, final ITupleIterator actualItr) { 
+//        
+//        long nvisited = 0L;
+//        
+//        while (expectedItr.hasNext()) {
+//
+//            assertTrue("Expecting another index entry: nvisited=" + nvisited,
+//                    actualItr.hasNext());
+//
+//            final ITuple expectedTuple = expectedItr.next();
+//
+//            final ITuple actualTuple = actualItr.next();
+//
+////            if(true) {
+////                System.err.println("expected: " + expectedTuple);
+////                System.err.println("  actual: " + actualTuple);
+////            }
+//            
+//            nvisited++;
+//
+//            if (!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple
+//                    .getKey())) {
+//
+//                fail("Wrong key: nvisited=" + nvisited + ", expected="
+//                        + expectedTuple + ", actual=" + actualTuple);
+//
+//            }
+//
+//            if (!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple
+//                    .getValue())) {
+//
+//                fail("Wrong value: nvisited=" + nvisited + ", expected="
+//                        + expectedTuple + ", actual=" + actualTuple);
+//                        
+//            }
+//            
+//        }
+//        
+//        assertFalse("Not expecting more tuples", actualItr.hasNext());
+//        
+//    }
 
 }
