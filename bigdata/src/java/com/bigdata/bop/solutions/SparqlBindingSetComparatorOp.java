@@ -6,8 +6,10 @@ import java.util.Map;
 import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 
 /**
  * A comparator for SPARQL binding sets.
@@ -24,6 +26,12 @@ public class SparqlBindingSetComparatorOp extends ComparatorOp {
      */
     private static final long serialVersionUID = 1L;
 
+    public SparqlBindingSetComparatorOp(final ISortOrder<?>[] order) {
+    	
+    	super(BOpBase.NOARGS, NV.asMap(new NV(Annotations.ORDER, order)));
+    	
+    }
+    
     /**
      * Required deep copy constructor.
      */
