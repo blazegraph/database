@@ -5,7 +5,8 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
 
 /**
- * Abstract class for tests of {@link IBucketData} implementations.
+ * Abstract class for tests of {@link ILeafData} implementations for a hash
+ * bucket.
  */
 abstract public class AbstractHashBucketDataRecordTestCase extends
 		AbstractLeafDataRecordTestCase {

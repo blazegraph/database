@@ -79,11 +79,7 @@ public class TestNullValues extends AbstractHTreeTestCase {
 
 		try {
 
-			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-			metadata.setAddressBits(3);
-
-			HTree btree = HTree.create(store, metadata);
+			HTree btree = getHTree(store, 3/* addressBits */);
 
 			final byte[] k1 = new byte[] { 1 };
 

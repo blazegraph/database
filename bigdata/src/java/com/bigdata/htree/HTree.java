@@ -550,8 +550,6 @@ public class HTree extends AbstractHTree
 				: new ByteArrayBuffer(Bytes.SIZEOF_LONG);
 		
 		this.rawRecords = metadata.getRawRecords();
-        
-		newRoot();
 
 	}
 
@@ -721,12 +719,13 @@ public class HTree extends AbstractHTree
             newRoot();
             
         } else {
-            
-            /*
-             * Read the root node of the HTree.
-             */
-			root = (DirectoryPage) readNodeOrLeaf(checkpoint.getRootAddr(),
-					addressBits);
+
+			/*
+			 * Read the root node of the HTree and set its depth, which is
+			 * always [addressBits].
+			 */
+			root = (DirectoryPage) readNodeOrLeaf(checkpoint.getRootAddr());
+			root.globalDepth = addressBits;
 
             // Note: The optional bloom filter will be read lazily. 
             

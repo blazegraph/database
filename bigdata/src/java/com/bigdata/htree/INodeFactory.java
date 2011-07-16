@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.htree;
 
-import com.bigdata.htree.data.IBucketData;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.htree.data.IDirectoryData;
 
 /**
@@ -61,6 +61,6 @@ public interface INodeFactory {
 	 * 
 	 * @return A leaf initialized from those data.
 	 */
-	public BucketPage allocLeaf(AbstractHTree htree, long addr, IBucketData data);
+	public BucketPage allocLeaf(AbstractHTree htree, long addr, ILeafData data);
 
 }

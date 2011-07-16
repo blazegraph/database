@@ -15,7 +15,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.htree.data.IBucketData;
 import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -39,6 +38,11 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * the {@link ILeafData} API. The tuple keys are always inline within the page
  * and are often 32-bit integers. The tuple values may be either "raw records"
  * on the backing {@link IRawStore} or inline within the page.
+ * <p>
+ * The {@link ILeafData#getPriorAddr()} and {@link ILeafData#getNextAddr()}
+ * fields of the {@link ILeafData} record are reserved by the hash tree to
+ * encode the search order for range queries when used in combination with an
+ * order preserving hash function.
  * 
  * TODO One way to tradeoff the simplicity of a local tuple array with the
  * requirement to hold an arbitrary number of duplicate keys within a bucket is
@@ -79,8 +83,14 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * TODO Delete markers will also require some thought. Unless we can purge them
  * out at the tx commit point, we can wind up with a full bucket page consisting
  * of a single buddy bucket filled with deleted tuples all having the same key.
+ * 
+ * TODO Explore cracking. Concerning cracking, we need to be careful about the
+ * thread-safety guarantee. If we did cracking for a mutation operation, that
+ * would be Ok since we are single threaded. However, we could not do cracking
+ * for a read operation even against a mutable HTree since we allow concurrent
+ * read operations as long as there is no writer.
  */
-class BucketPage extends AbstractPage implements IBucketData {
+class BucketPage extends AbstractPage implements ILeafData {
 
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
@@ -211,7 +221,7 @@ class BucketPage extends AbstractPage implements IBucketData {
 	 * @param addr
 	 * @param data
 	 */
-	BucketPage(final HTree htree, final long addr, final IBucketData data) {
+	BucketPage(final HTree htree, final long addr, final ILeafData data) {
 
 		super(htree, false/* dirty */, 0/*unknownGlobalDepth*/);
 

@@ -59,6 +59,8 @@ public class TestAll extends TestCase {
 
         /*
          * Test w/ all key and value coders suitable for directory pages.
+         * 
+         * FIXME Test the DirectoryPage coder class!
          */
 //        suite.addTestSuite(TestNodeDataRecord_Simple.class);
 //        suite.addTestSuite(TestNodeDataRecord_FrontCoded.class);
@@ -75,13 +77,6 @@ public class TestAll extends TestCase {
 		 * 
 		 * @todo test w/ overflow pages (when all keys are the same and the page
 		 * overflows).
-		 * 
-		 * FIXME Test with shaped hash code distributions such that lengthMSB is
-		 * non-zero (it will be frequently zero if we use random data and a
-		 * decent hash function since the bits will tend to be random, but in
-		 * practice using int values for keys will result in hash values with
-		 * leading zeros using the default Java semantics for the hash of an
-		 * int32 value).
 		 */
         suite.addTestSuite(TestBucketDataRecord_Simple_Simple.class);
 //        suite.addTestSuite(TestLeafDataRecord_FrontCoded_CanonicalHuffman.class);

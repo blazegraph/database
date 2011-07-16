@@ -1,7 +1,7 @@
 package com.bigdata.htree;
 
 import com.bigdata.btree.NodeSerializer;
-import com.bigdata.htree.data.IBucketData;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.htree.data.IDirectoryData;
 
 /**
@@ -14,17 +14,17 @@ class NodeFactory implements INodeFactory {
 	private NodeFactory() {
 	}
 
-	public BucketPage allocLeaf(final AbstractHTree btree, final long addr,
-			final IBucketData data) {
-
-		return new BucketPage((HTree) btree, addr, data);
-
-	}
-
 	public DirectoryPage allocNode(final AbstractHTree btree, final long addr,
 			final IDirectoryData data) {
 
 		return new DirectoryPage((HTree) btree, addr, data);
+
+	}
+
+	public BucketPage allocLeaf(final AbstractHTree btree, final long addr,
+			final ILeafData data) {
+
+		return new BucketPage((HTree) btree, addr, data);
 
 	}
 

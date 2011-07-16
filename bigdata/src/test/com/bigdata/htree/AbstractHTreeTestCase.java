@@ -26,31 +26,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
-//import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
-//import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NoEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 
 public class AbstractHTreeTestCase extends TestCase2 {
@@ -169,8 +164,25 @@ public class AbstractHTreeTestCase extends TestCase2 {
 	public HTree getHTree(final IRawStore store, final int addressBits,
 			final boolean rawRecords) {
 
-		return getHTree(store, addressBits, rawRecords, 
-				DefaultTupleSerializer.newInstance());
+//		final ITupleSerializer<?,?> tupleSer = DefaultTupleSerializer.newInstance();
+
+		/*
+		 * TODO This sets up a tuple serializer for a presumed case of 4 byte
+		 * keys (the buffer will be resized if necessary) and explicitly chooses
+		 * the SimpleRabaCoder as a workaround since the keys IRaba for the
+		 * HTree does not report true for isKeys(). Once we work through an
+		 * optimized bucket page design we can revisit this as the
+		 * FrontCodedRabaCoder should be a good choice, but it currently
+		 * requires isKeys() to return true.
+		 */
+		final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
+				new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+				//new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
+				new SimpleRabaCoder(),// keys
+				new SimpleRabaCoder() // vals
+				);
+
+		return getHTree(store, addressBits, rawRecords, tupleSer);
 
 	}
 	
