@@ -376,7 +376,15 @@ public class Checkpoint implements Externalizable {
                 btree.nnodes,//
                 btree.nleaves,//
                 btree.nentries,//
-                btree.getCounter().get(),//
+				/*
+				 * Note: This MUST access the raw counter in scale-out or the
+				 * logic in PartitionedCounter.wrap(long) will observe the
+				 * partitionId in the high word and throw an exception. The
+				 * whole point of that check in PartitionedCounter.wrap(long) is
+				 * to verify that the underlying index local counter has not
+				 * overflowed, which is what we are saving out here.
+				 */
+                btree.counter.get(),//
                 btree.getRecordVersion(),//
                 IndexTypeEnum.BTree//
                 );
