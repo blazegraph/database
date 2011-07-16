@@ -30,12 +30,22 @@ import junit.framework.TestSuite;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.TestIndexCounter;
 import com.bigdata.journal.Journal;
+import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * Aggregates test suites into increasing dependency order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Write integration and stress tests for the {@link HTree}
+ *          against the {@link MemStore} and {@link RWStore}.
+ *          <p>
+ *          RWStore with "RAM" mostly. Converts to disk backed if uses all those
+ *          buffers. Possibly just give the WriteCacheService a bunch of write
+ *          cache buffers (10-100) and have it evict to disk *lazily* rather
+ *          than eagerly (when the #of free buffers is down to 20%).
  * 
  *          TODO Write integration tests for the {@link HTree} against a
  *          {@link Journal}. These tests will have to verify the commit protocol
@@ -88,28 +98,28 @@ public class TestAll_HTree extends TestCase {
 //        suite.addTestSuite(TestIncrementalWrite.class);
 //        // test copy-on-write scenarios.
 //        suite.addTestSuite(TestCopyOnWrite.class);
-//
-//        /*
-//         * test persistence protocols. 
-//         */
-//        // test the commit protocol.
-//        suite.addTestSuite(TestCommit.class);
-//        // test the dirty event protocol.
-//        suite.addTestSuite(TestDirtyListener.class);
+
+        /*
+         * test persistence protocols. 
+         */
+        // test the commit protocol.
+        suite.addTestSuite(TestCommit.class);
+        // test the dirty event protocol.
+        suite.addTestSuite(TestDirtyListener.class);
 //        // test the close/reopen protocol for releasing index buffers.
 //        suite.addTestSuite(TestReopen.class);
-//        // test of storing null values under a key with persistence.
-//        suite.addTestSuite(TestNullValues.class);
-//
+        // test of storing null values under a key with persistence.
+        suite.addTestSuite(TestNullValues.class);
+
 //        /*
 //         * test of transient HTree's (no backing store).
 //         */
 //        suite.addTestSuite(TestTransientHTree.class);
-//
-//        /*
-//         * test index with raw record support enabled.
-//         */
-//        suite.addTestSuite(TestRawRecords.class);
+
+        /*
+         * test index with raw record support enabled.
+         */
+        suite.addTestSuite(TestRawRecords.class);
 
 //        /* TODO Support blooom filters?
 //        

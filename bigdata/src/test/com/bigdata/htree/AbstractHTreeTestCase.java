@@ -202,29 +202,30 @@ public class AbstractHTreeTestCase extends TestCase2 {
      */
     private static class NoEvictionHTree extends HTree {
 
-        /**
-         * @param store
-         * @param checkpoint
-         * @param metadata
-         */
-        public NoEvictionHTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
-         
-            super(store, checkpoint, metadata, readOnly);
-            
-        }
+		/**
+		 * @param store
+		 * @param checkpoint
+		 * @param metadata
+		 */
+		public NoEvictionHTree(IRawStore store, Checkpoint checkpoint,
+				IndexMetadata metadata, boolean readOnly) {
 
-        @Override
-        protected HardReferenceQueue<PO> newWriteRetentionQueue(boolean readOnly) {
+			super(store, checkpoint, metadata, readOnly);
 
-            return new HardReferenceQueue<PO>(//
-                    new NoEvictionListener(),//
-                    20000,//
-                    10//
-            );
+		}
 
-        }
-        
-    }
+		@Override
+		protected HardReferenceQueue<PO> newWriteRetentionQueue(boolean readOnly) {
+
+			return new HardReferenceQueue<PO>(//
+					new NoEvictionListener(),//
+					20000,//
+					10//
+			);
+
+		}
+
+	}
 
 //	/**
 //	 * A suite of tests designed to verify that one htree correctly represents

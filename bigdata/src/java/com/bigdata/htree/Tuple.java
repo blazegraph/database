@@ -20,8 +20,7 @@ class Tuple<E> extends AbstractTuple<E> {
 		if (htree == null)
 			throw new IllegalArgumentException();
 
-		// tupleSer = htree.getIndexMetadata().getTupleSerializer();
-		tupleSer = null;// TODO required for getObject()
+		 tupleSer = htree.getIndexMetadata().getTupleSerializer();
 
 	}
 

@@ -1912,7 +1912,9 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
             
             if (tmp >= MAX_LOCAL_COUNTER) {
 
-                throw new RuntimeException("Counter overflow");
+				throw new RuntimeException("Counter overflow: counter=" + tmp
+						+ ", pid=" + getPartitionId(tmp) + ", ctr="
+						+ getLocalCounter(tmp));
                 
             }
 

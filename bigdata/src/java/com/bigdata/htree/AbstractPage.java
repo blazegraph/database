@@ -114,11 +114,8 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	 * The global depth of a child page is just the local depth of the directory
 	 * page in its parent. The global depth of the child page is often called
 	 * its <em>local depth</em>.
-	 * 
-	 * TODO Since the root directory does not have a parent, its global depth is
-	 * recorded in the checkpoint record [actually, the global depth of the root
-	 * directory might always be <i>addressBits</i> in which case it does not
-	 * need to be stored anywhere].
+	 * <p>
+	 * The global depth of the root is always <i>addressBits</i>.
 	 */
 	public int getGlobalDepth() {
 		return globalDepth;
