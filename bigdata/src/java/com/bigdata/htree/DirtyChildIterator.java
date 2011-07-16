@@ -103,7 +103,7 @@ class DirtyChildIterator implements Iterator<AbstractPage> {
         
 		final int slotsPerPage = 1 << node.htree.addressBits;
 
-        for (; index <= slotsPerPage; index++) {
+        for (; index < slotsPerPage; index++) {
 
 			final Reference<AbstractPage> childRef = node.getChildRef(index);
 

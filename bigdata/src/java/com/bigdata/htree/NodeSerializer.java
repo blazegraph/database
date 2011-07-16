@@ -38,6 +38,8 @@ import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.htree.data.IBucketData;
+import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
@@ -107,12 +109,12 @@ public class NodeSerializer {
     /**
      * Used to code the nodes.
      */
-    final IAbstractNodeDataCoder<INodeData> nodeCoder;
+    final DefaultNodeCoder nodeCoder;
     
     /**
      * Used to code the nodes.
      */
-    final IAbstractNodeDataCoder<ILeafData> leafCoder;
+    final DefaultLeafCoder leafCoder;
     
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
@@ -389,12 +391,12 @@ public class NodeSerializer {
         if (data.isLeaf()) {
 
             // wrap data record as Leaf.
-            return nodeFactory.allocLeaf(btree, addr, (ILeafData) data);
+            return nodeFactory.allocLeaf(btree, addr, (IBucketData) data);
 
         } else {
 
             // wrap data record as Node.
-            return nodeFactory.allocNode(btree, addr, (INodeData) data);
+            return nodeFactory.allocNode(btree, addr, (IDirectoryData) data);
 
         }
 
@@ -439,14 +441,14 @@ public class NodeSerializer {
         final T codedNode;
         if(node.isLeaf()) {
 
-            codedNode = (T) leafCoder
-                    .encodeLive((ILeafData) node, _writeBuffer);
+            codedNode = (T) leafCoder // FIXME begin with SimpleRabaCoder for keys to avoid exception with FrontCodedRabaCoder
+                    .encodeLive((IBucketData) node, _writeBuffer);
 
         } else {
 
-            codedNode = (T) nodeCoder
-                    .encodeLive((INodeData) node, _writeBuffer);
-
+//            codedNode = (T) nodeCoder // FIXME Review DefaultNodeCoder
+//                    .encodeLive((IDirectoryData) node, _writeBuffer);
+        	throw new UnsupportedOperationException();
         }
 
         /*
