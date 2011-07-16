@@ -227,6 +227,20 @@ public class AbstractHTreeTestCase extends TestCase2 {
 
 	}
 
+	/**
+	 * FIXME Write test helper assertSameHTree(). See the code below for a
+	 * starting point.
+	 * 
+	 * @param expected
+	 * @param actual
+	 */
+	static protected void assertSameHTree(final AbstractHTree expected,
+			final AbstractHTree actual) {
+	
+		fail("Write test helper method");
+	
+	}
+    
 //	/**
 //	 * A suite of tests designed to verify that one htree correctly represents
 //	 * the information present in a ground truth htree. The test verifies the
