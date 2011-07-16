@@ -33,7 +33,6 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.MutableLeafData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.htree.data.IBucketData;
 import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -42,7 +41,7 @@ import com.bigdata.rawstore.IRawStore;
 
 /**
  * Implementation maintains Java objects corresponding to the persistent data
- * and defines methods for a variety of mutations on the {@link IBucketData}
+ * and defines methods for a variety of mutations on the {@link ILeafData}
  * record which operate by direct manipulation of the Java objects. The bucket
  * page is logically divided into buddy hash buckets. Unlike a B+Tree, the
  * tuples are neither ordered nor dense and the same key MAY appear multiple
@@ -88,21 +87,12 @@ import com.bigdata.rawstore.IRawStore;
  *          must not cause the assignment of indices to tuples to change when
  *          the caller is iterating through the entries by index.
  * 
- *          TODO When the record is serialized, do we need to allow a decision
- *          function to examine the record and decide whether it must be split?
- *          Since we do not have a fixed target for the page size, but only a
- *          budget, and since compression of keys, values, metadata, and the
- *          encoded record can all be applied, it seems that the decision
- *          function should be in terms of the buffer budget and a maximum #of
- *          entries (e.g., B+Tree branching factor or an equivalent hash bucket
- *          threshold).
- * 
  *          TODO Consider disallowing delete markers and version timestamps for
  *          the {@link HTree} if it is to be used only with in unisolated
  *          contexts in which case we can drop support for that stuff from this
  *          class.
  */
-public class MutableBucketData implements ILeafData { // IBucketData {
+public class MutableBucketData implements ILeafData {
 
     /**
      * A keys associated with each tuple in the bucket page. Each key is a

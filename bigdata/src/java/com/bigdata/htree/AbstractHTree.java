@@ -1831,7 +1831,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
     }
 
-    /**
+	/**
 	 * Read an {@link AbstractPage} from the store.
 	 * <p>
 	 * Note: Callers SHOULD be synchronized in order to ensure that only one
@@ -1839,20 +1839,19 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 	 * the reference to the newly read node or leaf as appropriate into the
 	 * existing data structures (e.g., as the root reference or as a child of a
 	 * node or leaf already live in memory).
+	 * <p>
+	 * Note: The caller MUST set the {@link AbstractPage#globalDepth} on the
+	 * returned value.
 	 * 
 	 * @param addr
 	 *            The address in the store.
-	 * @param globalDepth
-	 *            The global depth of the child directory or bucket page being
-	 *            read from the store. This will be set on the materialized
-	 *            {@link AbstractPage}.
 	 * 
 	 * @return The {@link AbstractPage}.
 	 * 
 	 * @throws IllegalArgumentException
 	 *             if the address is {@link IRawStore#NULL}.
 	 */
-	protected AbstractPage readNodeOrLeaf(final long addr, final int globalDepth) {
+	protected AbstractPage readNodeOrLeaf(final long addr) {
 
         if (addr == IRawStore.NULL)
             throw new IllegalArgumentException();

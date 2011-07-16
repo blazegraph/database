@@ -26,8 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree.data;
 
-import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.IChildData;
+import com.bigdata.btree.data.ITreeNodeData;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -69,6 +69,6 @@ import com.bigdata.rawstore.IRawStore;
  * we really need to use a compressed dictionary representation in order to have
  * efficient storage utilization with good fan out.]
  */
-public interface IDirectoryData extends IAbstractNodeData, IChildData {
+public interface IDirectoryData extends ITreeNodeData {
 
 }

@@ -33,12 +33,11 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
-import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.htree.data.IBucketData;
+import com.bigdata.htree.data.DefaultDirectoryPageCoder;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -90,11 +89,12 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class NodeSerializer {
 
-    /**
-     * An object that knows how to construct {@link Node}s and {@link Leaf}s
-     * from {@link INodeData} and {@link ILeafData} objects.
-     */
-    protected final INodeFactory nodeFactory;
+	/**
+	 * An object that knows how to construct {@link DirectoryPage}s and
+	 * {@link BucketPage}s from {@link IDirectoryData} and {@link ILeafData}
+	 * objects.
+	 */
+	protected final INodeFactory nodeFactory;
 
     /**
      * When <code>true</code> the {@link NodeSerializer} instance will refuse to
@@ -109,12 +109,12 @@ public class NodeSerializer {
     /**
      * Used to code the nodes.
      */
-    final DefaultNodeCoder nodeCoder;
+    final IAbstractNodeDataCoder<IDirectoryData> nodeCoder;
     
     /**
      * Used to code the nodes.
      */
-    final DefaultLeafCoder leafCoder;
+    final IAbstractNodeDataCoder<ILeafData> leafCoder;
     
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
@@ -245,10 +245,20 @@ public class NodeSerializer {
 
         this.readOnly = readOnly;
 
-        // @todo parameter for the node/leaf coder impls or the NodeSerializer?
-        this.nodeCoder = new DefaultNodeCoder(indexMetadata
-                .getNodeKeySerializer());
+		/*
+		 * We are using a specialized coder for the directory pages since they
+		 * do not share many characteristics with a BTree non-leaf node. In
+		 * particular, there are no *keys* in a DirectoryPage and we do not
+		 * current store spanned entry counts or other metadata. Right now, the
+		 * only information in a DirectoryPage is the address map.
+		 * 
+		 * @todo parameter for the node/leaf coder impls or the NodeSerializer?
+		 */
+        this.nodeCoder = new DefaultDirectoryPageCoder();
 
+		/*
+		 * Note: We are using the same leaf coder class as the BTree.
+		 */
         this.leafCoder = new DefaultLeafCoder(indexMetadata
                 .getTupleSerializer().getLeafKeysCoder(), indexMetadata
                 .getTupleSerializer().getLeafValuesCoder());
@@ -391,7 +401,7 @@ public class NodeSerializer {
         if (data.isLeaf()) {
 
             // wrap data record as Leaf.
-            return nodeFactory.allocLeaf(btree, addr, (IBucketData) data);
+            return nodeFactory.allocLeaf(btree, addr, (ILeafData) data);
 
         } else {
 
@@ -441,14 +451,14 @@ public class NodeSerializer {
         final T codedNode;
         if(node.isLeaf()) {
 
-            codedNode = (T) leafCoder // FIXME begin with SimpleRabaCoder for keys to avoid exception with FrontCodedRabaCoder
-                    .encodeLive((IBucketData) node, _writeBuffer);
+            codedNode = (T) leafCoder
+                    .encodeLive((ILeafData) node, _writeBuffer);
 
         } else {
 
-//            codedNode = (T) nodeCoder // FIXME Review DefaultNodeCoder
-//                    .encodeLive((IDirectoryData) node, _writeBuffer);
-        	throw new UnsupportedOperationException();
+            codedNode = (T) nodeCoder
+                    .encodeLive((IDirectoryData) node, _writeBuffer);
+
         }
 
         /*
@@ -524,7 +534,7 @@ public class NodeSerializer {
 
         } else {
 
-            return nodeCoder.encode((INodeData) node, _writeBuffer);
+            return nodeCoder.encode((IDirectoryData) node, _writeBuffer);
 
         }
 

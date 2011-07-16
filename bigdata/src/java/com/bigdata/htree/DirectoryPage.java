@@ -395,8 +395,10 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
          * guarantee to obtain.
          */
 
-		child = htree.readNodeOrLeaf(addr, localDepth/* globalDepthOfChild */);
-//      child = htree.readNodeOrLeaf(addr, childDepth);
+		child = htree.readNodeOrLeaf(addr);
+		
+		// set the depth on the child.
+		child.globalDepth = localDepth;
 
 		/*
 		 * Set the reference for each slot in the buddy bucket which pointed at

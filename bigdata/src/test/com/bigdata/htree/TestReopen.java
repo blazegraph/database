@@ -67,33 +67,25 @@ public class TestReopen extends AbstractHTreeTestCase {
 			/*
 			 * The htree under test.
 			 */
-			final HTree btree;
-			{
-				final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+			final HTree htree = getHTree(store, 2/*addressBits*/);
 
-				md.setAddressBits(2);
+			assertTrue(htree.isOpen());
 
-				btree = HTree.create(store, md);
+			htree.close();
 
-			}
-
-			assertTrue(btree.isOpen());
-
-			btree.close();
-
-			assertFalse(btree.isOpen());
+			assertFalse(htree.isOpen());
 
 			try {
-				btree.close();
+				htree.close();
 				fail("Expecting: " + IllegalStateException.class);
 			} catch (IllegalStateException ex) {
 				if (log.isInfoEnabled())
 					log.info("Ignoring expected exception: " + ex);
 			}
 
-			assertNotNull(btree.getRoot());
+			assertNotNull(htree.getRoot());
 
-			assertTrue(btree.isOpen());
+			assertTrue(htree.isOpen());
 
 		} finally {
 
@@ -115,15 +107,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			/*
 			 * The htree under test.
 			 */
-			final HTree btree;
-			{
-				final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
-
-				md.setAddressBits(2);
-
-				btree = HTree.create(store, md);
-
-			}
+			final HTree htree = getHTree(store, 2/* addressBits */);
 
 			final byte[] k1 = new byte[] { 0x10 };
 			final byte[] k2 = new byte[] { 0x11 };
@@ -135,41 +119,48 @@ public class TestReopen extends AbstractHTreeTestCase {
 			final byte[] v3 = new byte[] { 0x20 };
 			final byte[] v4 = new byte[] { 0x21 };
 
-			btree.insert(k1, v1);
-			btree.insert(k2, v2);
-			btree.insert(k3, v3);
-			btree.insert(k4, v4);
+			htree.insert(k1, v1);
+			htree.insert(k2, v2);
+			htree.insert(k3, v3);
+			htree.insert(k4, v4);
 
 			// dump after inserts.
 			if (log.isInfoEnabled())
-				log.info("Dump after inserts: \n" + btree.PP());
+				log.info("Dump after inserts: \n" + htree.PP());
 
 			// checkpoint the index.
-			btree.writeCheckpoint();
+			htree.writeCheckpoint();
 
 			// force close.
-			btree.close();
+			htree.close();
 
 			// force reopen.
-			assertNotNull(btree.getRoot());
-			assertTrue(btree.isOpen());
+			assertNotNull(htree.getRoot());
+			assertTrue(htree.isOpen());
 
-			// force materialization of the leaves.
-			btree.lookupFirst(k1);
-			btree.lookupFirst(k2);
-			btree.lookupFirst(k3);
-			btree.lookupFirst(k4);
+			// verify data still there.
+			assertEquals(v1, htree.lookupFirst(k1));
+			assertEquals(v2, htree.lookupFirst(k2));
+			assertEquals(v3, htree.lookupFirst(k3));
+			assertEquals(v4, htree.lookupFirst(k4));
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree.values());
 
 			// dump after reopen.
 			if (log.isInfoEnabled())
-				log.info("Dump after reopen: \n" + btree.PP());
+				log.info("Dump after reopen: \n" + htree.PP());
 
 			// reload the tree from the store.
-			final HTree btree2 = HTree.load(store, btree.getCheckpoint()
+			final HTree htree2 = HTree.load(store, htree.getCheckpoint()
 					.getCheckpointAddr(), true/* readOnly */);
 
-			// verify same data.
-			assertSameHTree(btree, btree2);
+			// verify data still there.
+			assertEquals(v1, htree2.lookupFirst(k1));
+			assertEquals(v2, htree2.lookupFirst(k2));
+			assertEquals(v3, htree2.lookupFirst(k3));
+			assertEquals(v4, htree2.lookupFirst(k4));
+			assertSameIteratorAnyOrder(new byte[][] { v1, v2, v3, v4 },
+					htree2.values());
 
 		} finally {
 
@@ -200,16 +191,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			 * will be forced when this tree is closed (node evictions are not
 			 * permitted by the default fixture factory).
 			 */
-			final HTree btree;
-			{
-
-				final IndexMetadata md = new IndexMetadata(indexUUID);
-
-				md.setAddressBits(2);
-
-				btree = HTree.create(store, md);
-
-			}
+			final HTree btree = getHTree(store, 2/*addressBits*/);
 
 			/*
 			 * The btree used to maintain ground truth.

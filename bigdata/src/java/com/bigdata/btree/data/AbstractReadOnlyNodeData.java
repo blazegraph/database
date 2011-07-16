@@ -47,18 +47,18 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
     /**
      * A B+Tree node data record.
      */
-    protected static final byte NODE = 0;
+    public static final byte NODE = 0;
 
     /**
      * A B+Tree leaf data record.
      */
-    protected static final byte LEAF = 1;
+    public static final byte LEAF = 1;
 
     /**
      * A B+Tree leaf data record with with priorAddr and nextAddr fields. This
      * is used for the leaves in an {@link IndexSegment}.
      */
-    protected static final byte LINKED_LEAF = 2;
+    public static final byte LINKED_LEAF = 2;
 
     /**
      * Return <code>true</code> iff the byte indicates an {@link INodeData}
@@ -108,7 +108,7 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
     /**
      * The initial version.
      */
-    protected static final short VERSION0 = 0;
+    public static final short VERSION0 = 0;
     
 	/**
 	 * This version introduces:
@@ -133,22 +133,22 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
 //	 * record version number makes possible some forensic analysis and data
 //	 * recovery which relies on the record version numbers to select among
 //	 * multiple versions of a tuple.</dd>
-    protected final static transient short VERSION1 = 0x01;
+    public final static transient short VERSION1 = 0x01;
 
     /**
      * The current version.
      */
-    protected final static transient short currentVersion = VERSION1;
+    public final static transient short currentVersion = VERSION1;
 
     /**
      * Bit flag for a leaf carrying delete markers for each tuple.
      */
-    protected static final short FLAG_DELETE_MARKERS = 1 << 0;
+    public static final short FLAG_DELETE_MARKERS = 1 << 0;
 
     /**
      * Bit flag for a leaf carrying version timestamps for each tuple.
      */
-    protected static final short FLAG_VERSION_TIMESTAMPS = 1 << 1;
+    public static final short FLAG_VERSION_TIMESTAMPS = 1 << 1;
 
 	/**
 	 * Bit flag for a node or leaf on the RWStore using native int32 addresses
@@ -157,7 +157,7 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
 	 * FIXME Integrate this!  Also, make sure that we test with this mode of
 	 * data storage in the coder test suite. 
 	 */
-    protected static final short FLAG_RWSTORE_ADDRS = 1 << 2;
+    public static final short FLAG_RWSTORE_ADDRS = 1 << 2;
 
 //    /**
 //     * Bit flag indicating that the tuple revision timestamps have been written
@@ -179,14 +179,14 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
     /**
      * Bit flag for a leaf carrying raw record bit flags.
      */
-    protected static final short FLAG_RAW_RECORDS = 1 << 3;
+    public static final short FLAG_RAW_RECORDS = 1 << 3;
     
     /**
      * The size of the field in the data record which encodes whether the data
      * record represents a B+Tree {@link #NODE}, a {@link #LEAF}, or a
      * {@link #LINKED_LEAF}.
      */
-    static protected final int SIZEOF_TYPE = Bytes.SIZEOF_BYTE;
+    static public final int SIZEOF_TYPE = Bytes.SIZEOF_BYTE;
 
     /**
      * The size of the field in the data record which encodes the serialization
@@ -195,27 +195,27 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
      * version information starts after the prior/next addr fields.  Otherwise
      * it starts immediately after the type field.
      */
-    static protected final int SIZEOF_VERSION = Bytes.SIZEOF_SHORT;
+    static public final int SIZEOF_VERSION = Bytes.SIZEOF_SHORT;
 
     /**
      * The size of the field in the data record which encodes bit flags for the
      * node or leaf.
      */
-    static protected final int SIZEOF_FLAGS = Bytes.SIZEOF_SHORT; // @todo byte
+    static public final int SIZEOF_FLAGS = Bytes.SIZEOF_SHORT; // @todo byte
 
     /**
      * The size of the field in the data record which encodes the #of keys in
      * the node or leaf. The #of children in a node is always
      * <code>nkeys+1</code>.
      */
-    static protected final int SIZEOF_NKEYS = Bytes.SIZEOF_INT; // @todo short?
+    static public final int SIZEOF_NKEYS = Bytes.SIZEOF_INT; // @todo short?
 
     /**
      * The size of the field in the data record which encodes the #of bytes in
      * the coded keys (or the coded values). This is an int32 because it is
      * possible that an int16 would limit the size of records for RMI.
      */
-    static protected final int SIZEOF_KEYS_SIZE = Bytes.SIZEOF_INT;
+    static public final int SIZEOF_KEYS_SIZE = Bytes.SIZEOF_INT;
 
 	// Note: This was int32 for VERSION0 and is now int64 (in principle) and a
 	// variable length coding is used when it is written out so this field is
@@ -230,13 +230,13 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
      * The size of a field in the data record which encodes the address of a
      * child node or leaf. TODO Handle int32 addresses natively with FLAG_RWSTORE_ADDRS
      */
-    static protected final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
+    static public final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
 
     /**
      * The size of a field in the data record which encodes the revision
      * timestamp of a tuple in a leaf.
      */
-    static protected final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
+    static public final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
 
     /**
      * The offset of the byte field which codes the type of the node or leaf.
