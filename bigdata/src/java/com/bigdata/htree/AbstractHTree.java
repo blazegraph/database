@@ -7,6 +7,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -23,6 +24,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.Node;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.data.IAbstractNodeData;
@@ -41,6 +43,8 @@ import com.bigdata.journal.IAtomicStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.DataService;
+import com.bigdata.util.concurrent.Computable;
+import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Resolver;
@@ -302,6 +306,245 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 //	 */
 //    protected final int branchingFactor;
     
+    /**
+     * Helper class models a request to load a child node.
+     * <p>
+     * Note: This class must implement equals() and hashCode() since it is used
+     * within the {@link Memoizer} pattern.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static class LoadChildRequest {
+
+        /** The parent node. */
+
+    	final DirectoryPage parent;
+
+        /** The child index. */
+        final int index;
+
+        /**
+         * 
+         * @param parent
+         *            The parent node.
+         * @param index
+         *            The child index.
+         */
+        public LoadChildRequest(final DirectoryPage parent, final int index) {
+    
+            this.parent = parent;
+            
+            this.index = index;
+            
+        }
+
+        /**
+         * Equals returns true iff parent == o.parent and index == o.index.
+         */
+        public boolean equals(final Object o) {
+
+            if (!(o instanceof LoadChildRequest))
+                return false;
+
+            final LoadChildRequest r = (LoadChildRequest) o;
+
+            return parent == r.parent && index == r.index;
+            
+        }
+
+        /**
+         * The hashCode() implementation assumes that the parent's hashCode() is
+         * well distributed and just adds in the index to that value to improve
+         * the chance of a distinct hash value.
+         */
+        public int hashCode() {
+            
+            return parent.hashCode() + index;
+            
+        }
+        
+    }
+
+    /**
+     * Helper loads a child node from the specified address by delegating to
+     * {@link Node#_getChild(int)}.
+     */
+    final private static Computable<LoadChildRequest, AbstractPage> loadChild = new Computable<LoadChildRequest, AbstractPage>() {
+
+        /**
+         * Loads a child node from the specified address.
+         * 
+         * @return A hard reference to that child node.
+         * 
+         * @throws IllegalArgumentException
+         *             if addr is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if addr is {@link IRawStore#NULL}.
+         */
+        public AbstractPage compute(final LoadChildRequest req)
+                throws InterruptedException {
+
+            return req.parent._getChild(req.index, req);
+        
+        }
+        
+    };
+
+    /**
+     * A {@link Memoizer} subclass which exposes an additional method to remove
+     * a {@link FutureTask} from the internal cache. This is used as part of an
+     * explicit protocol in {@link DirectoryPage#_getChild(int)} to clear out cache
+     * entries once the child reference has been set on {@link Node#childRefs}.
+     * This is package private since it must be visible to
+     * {@link DirectoryPage#_getChild(int)}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static class ChildMemoizer extends
+            Memoizer<LoadChildRequest/* request */, AbstractPage/* child */> {
+
+        /**
+         * @param c
+         */
+        public ChildMemoizer(
+                final Computable<LoadChildRequest, AbstractPage> c) {
+
+            super(c);
+
+        }
+
+//        /**
+//         * The approximate size of the cache (used solely for debugging to
+//         * detect cache leaks).
+//         */
+//        int size() {
+//            
+//            return cache.size();
+//            
+//        }
+
+		/**
+		 * Called by the thread which atomically sets the
+		 * {@link DirectoryPage#childRefs} element to the computed
+		 * {@link AbstractPage}. At that point a reference exists to the child
+		 * on the parent.
+		 * 
+		 * @param req
+		 *            The request.
+		 */
+        void removeFromCache(final LoadChildRequest req) {
+
+            if (cache.remove(req) == null) {
+
+                throw new AssertionError();
+                
+            }
+
+        }
+
+//        /**
+//         * Called from {@link AbstractBTree#close()}.
+//         * 
+//         * @todo should we do this?  There should not be any reads against the
+//         * the B+Tree when it is close()d.  Therefore I do not believe there 
+//         * is any reason to clear the FutureTask cache.
+//         */
+//        void clear() {
+//            
+//            cache.clear();
+//            
+//        }
+        
+    };
+
+    /**
+     * Used to materialize children without causing concurrent threads passing
+     * through the same parent node to wait on the IO for the child. This is
+     * <code>null</code> for a mutable B+Tree since concurrent requests are not
+     * permitted for the mutable B+Tree.
+     * 
+     * @see DirectoryPage#getChild(int)
+     */
+    final ChildMemoizer memo;
+
+    /**
+     * {@link Memoizer} pattern for non-blocking concurrent reads of child
+     * nodes. This is package private. Use {@link Node#getChild(int)} instead.
+     * 
+     * @param parent
+     *            The node whose child will be materialized.
+     * @param index
+     *            The index of that child.
+     * 
+     * @return The child and never <code>null</code>.
+     * 
+     * @see DirectoryPage#getChild(int)
+     */
+    AbstractPage loadChild(final DirectoryPage parent, final int index) {
+
+//        if (false && store instanceof Journal
+//                && ((Journal) store).getReadExecutor() != null) {
+//
+//            /*
+//             * This code path materializes the child node using the read
+//             * service. This has the effect of bounding the #of concurrent IO
+//             * requests against the local disk based on the allowed parallelism
+//             * for that read service.
+//             */
+//
+//            final Executor s = ((Journal) store).getReadExecutor();
+//
+//            final FutureTask<AbstractNode<?>> ft = new FutureTask<AbstractNode<?>>(
+//                    new Callable<AbstractNode<?>>() {
+//
+//                        public AbstractNode<?> call() throws Exception {
+//
+//                            return memo.compute(new LoadChildRequest(parent,
+//                                    index));
+//
+//                        }
+//
+//                    });
+//            
+//            s.execute(ft);
+//
+//            try {
+//
+//                return ft.get();
+//
+//            } catch (InterruptedException e) {
+//
+//                throw new RuntimeException(e);
+//
+//            } catch (ExecutionException e) {
+//
+//                throw new RuntimeException(e);
+//
+//            }
+//
+//        } else {
+
+            try {
+
+                return memo.compute(new LoadChildRequest(parent, index));
+
+            } catch (InterruptedException e) {
+
+                /*
+                 * Note: This exception will be thrown iff interrupted while
+                 * awaiting the FutureTask inside of the Memoizer.
+                 */
+
+                throw new RuntimeException(e);
+
+            }
+
+//        }
+
+    }
+
     /**
      * The root directory.
      */
@@ -852,20 +1095,20 @@ abstract public class AbstractHTree implements ICounterSetAccess {
             throw new IllegalArgumentException();
         }
 
-////        /*
-////         * The Memoizer is not used by the mutable B+Tree since it is not safe
-////         * for concurrent operations.
-////         */
-////        memo = !readOnly ? null : new ChildMemoizer(loadChild);
 //        /*
-//         * Note: The Memoizer pattern is now used for both mutable and read-only
-//         * B+Trees. This is because the real constraint on the mutable B+Tree is
-//         * that mutation may not be concurrent with any other operation but
-//         * concurrent readers ARE permitted. The UnisolatedReadWriteIndex
-//         * explicitly permits concurrent read operations by virtue of using a
-//         * ReadWriteLock rather than a single lock.
+//         * The Memoizer is not used by the mutable B+Tree since it is not safe
+//         * for concurrent operations.
 //         */
-//        memo = new ChildMemoizer(loadChild);
+//        memo = !readOnly ? null : new ChildMemoizer(loadChild);
+        /*
+         * Note: The Memoizer pattern is now used for both mutable and read-only
+         * B+Trees. This is because the real constraint on the mutable B+Tree is
+         * that mutation may not be concurrent with any other operation but
+         * concurrent readers ARE permitted. The UnisolatedReadWriteIndex
+         * explicitly permits concurrent read operations by virtue of using a
+         * ReadWriteLock rather than a single lock.
+         */
+        memo = new ChildMemoizer(loadChild);
         
         /*
          * Setup buffer for Node and Leaf objects accessed via top-down
@@ -1609,8 +1852,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 	 * @throws IllegalArgumentException
 	 *             if the address is {@link IRawStore#NULL}.
 	 */
-	protected AbstractPage readNodeOrLeaf(final long addr,
-			final int globalDepth) {
+	protected AbstractPage readNodeOrLeaf(final long addr, final int globalDepth) {
 
         if (addr == IRawStore.NULL)
             throw new IllegalArgumentException();

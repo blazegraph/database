@@ -119,7 +119,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 			{
 				final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
-				md.setBranchingFactor(3);
+				md.setAddressBits(2);
 
 				btree = HTree.create(store, md);
 

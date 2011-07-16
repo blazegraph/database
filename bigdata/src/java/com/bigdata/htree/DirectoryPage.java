@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 
@@ -13,8 +14,12 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
+import com.bigdata.htree.AbstractHTree.ChildMemoizer;
+import com.bigdata.htree.AbstractHTree.LoadChildRequest;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -188,6 +193,133 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 */
 	AbstractPage getChild(final int index) {
 
+        if (htree.memo == null) {
+
+            /*
+             * Optimization for the mutable B+Tree.
+             * 
+             * Note: This optimization depends on the assumption that concurrent
+             * operations are never submitted to the mutable B+Tree. In fact,
+             * the UnisolatedReadWriteIndex *DOES* allow concurrent readers (it
+             * uses a ReentrantReadWriteLock). Therefore this code path is now
+             * expressed conditionally on whether or not the Memoizer object is
+             * initialized by AbstractBTree.
+             * 
+             * Note: Since the caller is single-threaded for the mutable B+Tree
+             * we do not need to use the Memoizer, which just delegates to
+             * _getChild(index). This saves us some object creation and overhead
+             * for this case.
+             */
+
+            return _getChild(index, null/* req */);
+
+        }
+
+        /*
+         * If we can resolve a hard reference to the child then we do not need
+         * to look any further.
+         */
+//        synchronized (childRefs) 
+        {
+
+            /*
+             * Note: we need to synchronize on here to ensure visibility for
+             * childRefs[index] (in case it was updated in another thread). This
+             * is true even for the mutable B+Tree since the caller could use
+             * different threads for different operations. However, this
+             * synchronization will never be contended for the mutable B+Tree.
+             */
+
+            final Reference<AbstractPage> childRef = childRefs[index];
+
+            final AbstractPage child = childRef == null ? null : childRef.get();
+
+            if (child != null) {
+
+                // Already materialized.
+                return child;
+
+            }
+
+        }
+
+        /*
+         * Otherwise we need to go through the Memoizer pattern to achieve
+         * non-blocking access. It will wind up delegating to _getChild(int),
+         * which is immediately below. However, it will ensure that one and only
+         * one thread executes _getChild(int) for a given parent and child
+         * index. That thread will update childRefs[index]. Any concurrent
+         * requests for the same child will wait for the FutureTask inside of
+         * the Memoizer and then return the new value of childRefs[index].
+         */
+
+        return htree.loadChild(this, index);
+
+    }
+
+    /**
+     * Method conditionally reads the child at the specified index from the
+     * backing store and sets its reference on the appropriate element of
+     * {@link #childRefs}. This method assumes that external mechanisms
+     * guarantee that no other thread is requesting the same child via this
+     * method at the same time. For the mutable B+Tree, that guarantee is
+     * trivially given by its single-threaded constraint. For the read-only
+     * B+Tree, {@link AbstractHTree#loadChild(DirectoryPage, int)} provides this
+     * guarantee using a {@link Memoizer} pattern. This method explicitly
+     * handshakes with the {@link ChildMemoizer} to clear the {@link FutureTask}
+     * from the memoizer's internal cache as soon as the reference to the child
+     * has been set on the appropriate element of {@link #childRefs}.
+     * 
+     * @param index
+     *            The index of the child.
+     * @param req
+     *            The key we need to remove the request from the
+     *            {@link ChildMemoizer} cache (and <code>null</code> if this
+     *            method is not invoked by the memoizer pattern).
+     * 
+     * @return The child and never <code>null</code>.
+     */
+    AbstractPage _getChild(final int index, final LoadChildRequest req) {
+
+		/*
+		 * Make sure that the child is not reachable. It could have been
+		 * concurrently set even if the caller had tested this and we do not
+		 * want to read through to the backing store unless we need to.
+		 * 
+		 * Note: synchronizing on childRefs[] should not be necessary. For a
+		 * read-only B+Tree, the synchronization is provided by the Memoizer
+		 * pattern. For a mutable B+Tree, the synchronization is provided by the
+		 * single-threaded contract for mutation and by the requirement to use a
+		 * construct, such as a Queue or the UnisolatedReadWriteIndex, which
+		 * imposes a memory barrier when passing a B+Tree instance between
+		 * threads.
+		 * 
+		 * See http://www.cs.umd.edu/~pugh/java/memoryModel/archive/1096.html
+		 */
+        AbstractPage child;
+        synchronized (childRefs) {
+
+            /*
+             * Note: we need to synchronize on here to ensure visibility for
+             * childRefs[index] (in case it was updated in another thread).
+             */
+            final Reference<AbstractPage> childRef = childRefs[index];
+
+            child = childRef == null ? null : childRef.get();
+
+            if (child != null) {
+
+                // Already materialized.
+                return child;
+
+            }
+
+        }
+
+        /*
+         * The child needs to be read from the backing store.
+         */
+
 		// width of a buddy hash table (#of pointer slots).
 		final int tableWidth = 1 << globalDepth;
 
@@ -196,31 +328,28 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final int tableOffset = index / tableWidth;
 
 		/*
-		 * Look at the entry in the buddy hash table. If there is a reference to
-		 * the child and that reference has not been cleared, then we are done
-		 * and we can return the child reference and the offset of the buddy
-		 * table or bucket within the child.
-		 */
-		final Reference<AbstractPage> ref = childRefs[index];
-
-		AbstractPage child = ref == null ? null : ref.get();
-
-		if (child != null) {
-
-			return child;
-
-		}
-
-		/*
 		 * We need to get the address of the child, figure out the local depth
 		 * of the child (by counting the #of points in the buddy bucket to that
 		 * child), and then materialize the child from its address.
-		 * 
-		 * FIXME MEMORIZER : This all needs to go through a memoizer pattern.
-		 * The hooks for that should be on AbstractHTree(.memo), but I have not
-		 * yet ported that code.
 		 */
 		final long addr = data.getChildAddr(index);
+
+        if (addr == IRawStore.NULL) {
+
+            // dump(Level.DEBUG, System.err);
+            /*
+             * Note: It appears that this can be triggered by a full disk, but I
+             * am not quite certain how a full disk leads to this condition.
+             * Presumably the full disk would cause a write of the child to
+             * fail. In turn, that should cause the thread writing on the B+Tree
+             * to fail. If group commit is being used, the B+Tree should then be
+             * discarded and reloaded from its last commit point.
+             */
+            throw new AssertionError(
+                    "Child does not have persistent identity: this=" + this
+                            + ", index=" + index);
+
+        }
 
 		/*
 		 * Scan to count pointers to child within the buddy hash table.
@@ -252,13 +381,31 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
 				globalDepth, npointers);
 
+        /*
+         * Read the child from the backing store (potentially reads through to
+         * the disk).
+         * 
+         * Note: This is guaranteed to not do duplicate reads. There are two
+         * cases. (A) The mutable B+Tree. Since the mutable B+Tree is single
+         * threaded, this case is trivial. (B) The read-only B+Tree. Here our
+         * guarantee is that the caller is in ft.run() inside of the Memoizer,
+         * and that ensures that only one thread is executing for a given
+         * LoadChildRequest object (the input to the Computable). Note that
+         * LoadChildRequest MUST meet the criteria for a hash map for this
+         * guarantee to obtain.
+         */
+
 		child = htree.readNodeOrLeaf(addr, localDepth/* globalDepthOfChild */);
+//      child = htree.readNodeOrLeaf(addr, childDepth);
 
 		/*
 		 * Set the reference for each slot in the buddy bucket which pointed at
 		 * that child. There will be [npointers] such slots.
-		 */
-		{
+         * 
+         * Note: This code block is synchronized in order to facilitate the safe
+         * publication of the change in childRefs[index] to other threads.
+         */
+        synchronized (childRefs) {
 
 			int n = 0;
 
@@ -268,7 +415,20 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 				if (data.getChildAddr(i) == addr) {
 
-					childRefs[i] = (Reference) child.self;
+		            /*
+		             * Since the childRefs[index] element has not been updated we do so
+		             * now while we are synchronized.
+		             * 
+		             * Note: This paranoia test could be tripped if the caller allowed
+		             * concurrent requests to enter this method for the same child. In
+		             * that case childRefs[index] could have an uncleared reference to
+		             * the child. This would indicate a breakdown in the guarantee we
+		             * require of the caller.
+		             */
+		            assert childRefs[i] == null || childRefs[i].get() == null : "Child is already set: this="
+		                    + this + ", index=" + i;
+
+		            childRefs[i] = (Reference) child.self;
 
 					n++;
 
@@ -276,13 +436,130 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 			}
 
+			// patch parent reference since loaded from store.
+			child.parent = (Reference) this.self;
+
 			assert n == npointers;
 
 		}
 
-		return child;
+        /*
+         * Clear the future task from the memoizer cache.
+         * 
+         * Note: This is necessary in order to prevent the cache from retaining
+         * a hard reference to each child materialized for the B+Tree.
+         * 
+         * Note: This does not depend on any additional synchronization. The
+         * Memoizer pattern guarantees that only one thread actually call
+         * ft.run() and hence runs this code.
+         */
+        if (req != null) {
 
-	}
+            htree.memo.removeFromCache(req);
+
+        }
+
+        return child;
+
+    }
+    
+//    private AbstractPage fixme(final int index) {
+//    	
+//		/*
+//		 * Look at the entry in the buddy hash table. If there is a reference to
+//		 * the child and that reference has not been cleared, then we are done
+//		 * and we can return the child reference and the offset of the buddy
+//		 * table or bucket within the child.
+//		 */
+//		final Reference<AbstractPage> ref = childRefs[index];
+//
+//		AbstractPage child = ref == null ? null : ref.get();
+//
+//		if (child != null) {
+//
+//			return child;
+//
+//		}
+//
+//		// width of a buddy hash table (#of pointer slots).
+//		final int tableWidth = 1 << globalDepth;
+//
+//		// offset in [0:nbuddies-1] to the start of the buddy spanning that
+//		// index.
+//		final int tableOffset = index / tableWidth;
+//
+//		/*
+//		 * We need to get the address of the child, figure out the local depth
+//		 * of the child (by counting the #of points in the buddy bucket to that
+//		 * child), and then materialize the child from its address.
+//		 * 
+//		 * fixme MEMORIZER : This all needs to go through a memoizer pattern.
+//		 * The hooks for that should be on AbstractHTree(.memo), but I have not
+//		 * yet ported that code.
+//		 */
+//		final long addr = data.getChildAddr(index);
+//
+//		/*
+//		 * Scan to count pointers to child within the buddy hash table.
+//		 */
+//		final int npointers;
+//		{
+//
+//			int n = 0; // npointers
+//
+//			final int lastIndex = (tableOffset + tableWidth);
+//
+//			for (int i = tableOffset; i < lastIndex; i++) {
+//
+//				if (data.getChildAddr(i) == addr)
+//					n++;
+//
+//			}
+//
+//			assert n > 0;
+//
+//			npointers = n;
+//
+//		}
+//
+//		/*
+//		 * Find the local depth of the child within this node. this becomes the
+//		 * global depth of the child.
+//		 */
+//		final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
+//				globalDepth, npointers);
+//
+//		child = htree.readNodeOrLeaf(addr, localDepth/* globalDepthOfChild */);
+//
+//		/*
+//		 * Set the reference for each slot in the buddy bucket which pointed at
+//		 * that child. There will be [npointers] such slots.
+//		 */
+//		{
+//
+//			int n = 0;
+//
+//			final int lastIndex = (tableOffset + tableWidth);
+//
+//			for (int i = tableOffset; i < lastIndex; i++) {
+//
+//				if (data.getChildAddr(i) == addr) {
+//
+//					childRefs[i] = (Reference) child.self;
+//
+//					n++;
+//
+//				}
+//
+//			}
+//
+//			assert n == npointers;
+//
+//		}
+//
+//		return child;
+//
+//	}
 
 	public AbstractFixedByteArrayBuffer data() {
 		return data.data();
