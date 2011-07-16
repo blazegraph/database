@@ -23,8 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.htree;
 
-import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.data.INodeData;
+import com.bigdata.htree.data.IBucketData;
+import com.bigdata.htree.data.IDirectoryData;
 
 /**
  * Interface for creating nodes or leaves.
@@ -47,7 +47,7 @@ public interface INodeFactory {
 	 * @return A node initialized from those data.
 	 */
 	public DirectoryPage allocNode(AbstractHTree htree, long addr,
-			INodeData data);
+			IDirectoryData data);
 
 	/**
 	 * Create a leaf.
@@ -61,6 +61,6 @@ public interface INodeFactory {
 	 * 
 	 * @return A leaf initialized from those data.
 	 */
-	public BucketPage allocLeaf(AbstractHTree htree, long addr, ILeafData data);
+	public BucketPage allocLeaf(AbstractHTree htree, long addr, IBucketData data);
 
 }

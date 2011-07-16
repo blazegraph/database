@@ -204,6 +204,22 @@ class BucketPage extends AbstractPage implements IBucketData {
 	}
 
 	/**
+	 * Deserialization constructor - {@link #globalDepth} MUST be set by the
+	 * caller.
+	 * 
+	 * @param htree
+	 * @param addr
+	 * @param data
+	 */
+	BucketPage(final HTree htree, final long addr, final IBucketData data) {
+
+		super(htree, false/* dirty */, 0/*unknownGlobalDepth*/);
+
+		this.data = data;
+
+	}
+
+	/**
 	 * Return <code>true</code> if there is at lease one tuple in the buddy hash
 	 * bucket for the specified key.
 	 * 
