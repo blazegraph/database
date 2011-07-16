@@ -637,6 +637,24 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	}
 
 	/**
+	 * Deserialization constructor - {@link #globalDepth} MUST be set by the
+	 * caller.
+	 * 
+	 * @param htree
+	 * @param addr
+	 * @param data
+	 */
+	DirectoryPage(final HTree htree, final long addr, final IDirectoryData data) {
+
+		super(htree, false/* dirty */, 0/*unknownGlobalDepth*/);
+
+		childRefs = new Reference[(1 << htree.addressBits)];
+
+		this.data = data;
+
+	}
+
+	/**
 	 * Iterator visits children, recursively expanding each child with a
 	 * post-order traversal of its children and finally visits this node itself.
 	 */

@@ -1,8 +1,8 @@
 package com.bigdata.htree;
 
 import com.bigdata.btree.NodeSerializer;
-import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.data.INodeData;
+import com.bigdata.htree.data.IBucketData;
+import com.bigdata.htree.data.IDirectoryData;
 
 /**
  * Factory for mutable nodes and leaves used by the {@link NodeSerializer}.
@@ -15,18 +15,16 @@ class NodeFactory implements INodeFactory {
 	}
 
 	public BucketPage allocLeaf(final AbstractHTree btree, final long addr,
-			final ILeafData data) {
+			final IBucketData data) {
 
-		// FIXME return new BucketPage(btree, addr, data);
-		throw new UnsupportedOperationException();
+		return new BucketPage((HTree) btree, addr, data);
 
 	}
 
 	public DirectoryPage allocNode(final AbstractHTree btree, final long addr,
-			final INodeData data) {
+			final IDirectoryData data) {
 
-		// FIXME return new DirectoryPage(btree, addr, data);
-		throw new UnsupportedOperationException();
+		return new DirectoryPage((HTree) btree, addr, data);
 
 	}
 
