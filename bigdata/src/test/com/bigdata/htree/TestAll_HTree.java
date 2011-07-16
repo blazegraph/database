@@ -106,8 +106,8 @@ public class TestAll_HTree extends TestCase {
         suite.addTestSuite(TestCommit.class);
         // test the dirty event protocol.
         suite.addTestSuite(TestDirtyListener.class);
-//        // test the close/reopen protocol for releasing index buffers.
-//        suite.addTestSuite(TestReopen.class);
+        // test the close/reopen protocol for releasing index buffers.
+        suite.addTestSuite(TestReopen.class);
         // test of storing null values under a key with persistence.
         suite.addTestSuite(TestNullValues.class);
 
