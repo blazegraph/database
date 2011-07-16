@@ -1912,6 +1912,14 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
             
             if (tmp >= MAX_LOCAL_COUNTER) {
 
+				/*
+				 * Note: Checkpoint MUST persist the raw counter in scale-out
+				 * this code will observe the partitionId in the high word and
+				 * throw an exception. The whole point of this check is to
+				 * verify that the underlying index local counter has not
+				 * overflowed. Checkpoint must persistent the raw counter for us
+				 * to do test this.
+				 */
 				throw new RuntimeException("Counter overflow: counter=" + tmp
 						+ ", pid=" + getPartitionId(tmp) + ", ctr="
 						+ getLocalCounter(tmp));
