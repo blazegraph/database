@@ -34,6 +34,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IAtomicStore;
@@ -760,16 +761,15 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         
         sb.append("{ ");
         
-        // TODO restore.
-//        if (metadata.getName() != null) {
-//
-//            sb.append("name=" + metadata.getName());
-//
-//        } else {
-//
-//            sb.append("uuid=" + metadata.getIndexUUID());
-//            
-//        }
+        if (metadata.getName() != null) {
+
+            sb.append("name=" + metadata.getName());
+
+        } else {
+
+            sb.append("uuid=" + metadata.getIndexUUID());
+            
+        }
         
         sb.append(", addressBits=" + getAddressBits());
 
@@ -781,8 +781,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
         sb.append(", leafCount=" + getLeafCount());
 
-//        sb.append(", lastCommitTime=" + getLastCommitTime()); TODO restore
-
+        sb.append(", lastCommitTime=" + getLastCommitTime());
+        
         sb.append("}");
         
         return sb.toString();
@@ -941,10 +941,12 @@ abstract public class AbstractHTree implements ICounterSetAccess {
      */
     IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
 
-    	// FIXME Restore use of the [metadata] object.
-    	final int writeRetentionQueueCapacity = 1000;//metadata.getWriteRetentionQueueCapacity();
-    	final int writeRetentionQueueScan = 5;//metadata.getWriteRetentionQueueScan();
-    	
+		final int writeRetentionQueueCapacity = metadata
+				.getWriteRetentionQueueCapacity();
+
+		final int writeRetentionQueueScan = metadata
+				.getWriteRetentionQueueScan();
+
         if(readOnly) {
 
             /*
@@ -1719,7 +1721,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 //            }
 
             // wrap as Node or Leaf.
-            final AbstractPage node = null;// FIXME nodeSer.wrap(this, addr, data);
+            final AbstractPage node = nodeSer.wrap(this, addr, data);
 
             // Note: The de-serialization ctor already does this.
 //            node.setDirty(false);
@@ -1836,6 +1838,53 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         
     }
     
+	/**
+	 * Encode a raw record address into a byte[] suitable for storing in the
+	 * value associated with a tuple and decoding using
+	 * {@link #decodeRecordAddr(byte[])}
+	 * 
+	 * @param recordAddrBuf
+	 *            The buffer that will be used to format the record address.
+	 * @param addr
+	 *            The raw record address.
+	 * 
+	 * @return A newly allocated byte[] which encodes that address.
+	 */
+	static public byte[] encodeRecordAddr(final ByteArrayBuffer recordAddrBuf,
+			final long addr) {
+
+		recordAddrBuf.reset().putLong(addr);
+
+		return recordAddrBuf.toByteArray();
+
+	}
+
+    /**
+     * Decodes a signed long value as encoded by {@link #appendSigned(long)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded record address.
+     *            
+     * @return The signed long value.
+     */
+    static public long decodeRecordAddr(final byte[] buf) {
+
+        long v = 0L;
+        
+        // big-endian.
+        v += (0xffL & buf[0]) << 56;
+        v += (0xffL & buf[1]) << 48;
+        v += (0xffL & buf[2]) << 40;
+        v += (0xffL & buf[3]) << 32;
+        v += (0xffL & buf[4]) << 24;
+        v += (0xffL & buf[5]) << 16;
+        v += (0xffL & buf[6]) <<  8;
+        v += (0xffL & buf[7]) <<  0;
+
+        return v;
+        
+    }
+
 	/**
 	 * The maximum length of a <code>byte[]</code> value stored within a leaf
 	 * for this {@link HTree}. This value only applies when raw record support
@@ -1988,8 +2037,6 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 	 * Note: This allocates a new byte[] for each visited value. It is more
 	 * efficient to reuse a buffer for each visited {@link Tuple}. This can be
 	 * done using {@link #rangeIterator()}.
-	 * 
-	 * TODO Must resolve references to raw records.
 	 */
 	@SuppressWarnings("unchecked")
 	public Iterator<byte[]> values() {

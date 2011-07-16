@@ -86,7 +86,7 @@ public class HTreeUtil {
         return ((v & -v) == v);
 
     }
-    
+
 	/**
 	 * Return the #of entries in the address map for a page having the given
 	 * local depth. This is <code>2^(globalHashBits - localHashBits)</code>. The
@@ -124,26 +124,24 @@ public class HTreeUtil {
 	 * @throws IllegalArgumentException
 	 *             if <i>localHashBits</i> is greater than
 	 *             <i>globalHashBits</i>.
-	 * 
-	 *             TODO Unit tests.
 	 */
 	public static int getSlotsOnPage(final int globalDepth, final int localDepth) {
 
-        if(localDepth < 0)
-            throw new IllegalArgumentException();
+		if (localDepth < 0)
+			throw new IllegalArgumentException();
 
-        if(globalDepth < 0)
-            throw new IllegalArgumentException();
+		if (globalDepth < 0)
+			throw new IllegalArgumentException();
 
-        if(localDepth > globalDepth)
-            throw new IllegalArgumentException();
+		if (localDepth > globalDepth)
+			throw new IllegalArgumentException();
 
 		// The #of slots entries for the child page.
 		final int numSlotsForPage = (1 << (globalDepth - localDepth));
 
-        return numSlotsForPage;
+		return numSlotsForPage;
 
-    }
+	}
 
 	/**
 	 * Return the local depth of a child page having <i>npointers</i> to that

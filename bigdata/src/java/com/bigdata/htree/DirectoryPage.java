@@ -116,7 +116,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		// Now insert raw values from original page
 		final ITupleIterator tuples = bucketPage.tuples();
 		while (tuples.hasNext()) {
-			ITuple tuple = tuples.next();
+			final ITuple tuple = tuples.next();
 			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
 		}
 	}
@@ -216,7 +216,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		 * of the child (by counting the #of points in the buddy bucket to that
 		 * child), and then materialize the child from its address.
 		 * 
-		 * TODO This all needs to go through a memoizer pattern.
+		 * FIXME MEMORIZER : This all needs to go through a memoizer pattern.
+		 * The hooks for that should be on AbstractHTree(.memo), but I have not
+		 * yet ported that code.
 		 */
 		final long addr = data.getChildAddr(index);
 

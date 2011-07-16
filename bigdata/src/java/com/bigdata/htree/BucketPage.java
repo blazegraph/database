@@ -1,20 +1,21 @@
 package com.bigdata.htree;
 
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.htree.data.IBucketData;
 import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -38,8 +39,6 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * the {@link ILeafData} API. The tuple keys are always inline within the page
  * and are often 32-bit integers. The tuple values may be either "raw records"
  * on the backing {@link IRawStore} or inline within the page.
- * 
- * FIXME Add support for raw records (copy from BTree's Leaf class).
  * 
  * TODO One way to tradeoff the simplicity of a local tuple array with the
  * requirement to hold an arbitrary number of duplicate keys within a bucket is
@@ -81,16 +80,16 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * out at the tx commit point, we can wind up with a full bucket page consisting
  * of a single buddy bucket filled with deleted tuples all having the same key.
  */
-class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
+class BucketPage extends AbstractPage implements IBucketData {
 
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
-	 * operations. {@link ReadOnlyLeafData} is used when the {@link Leaf} is
-	 * made persistent. A read-only data record is automatically converted into
-	 * a {@link MutableBucketData} record when a mutation operation is
+	 * operations. {@link ReadOnlyLeafData} is used when the {@link BucketPage}
+	 * is made persistent. A read-only data record is automatically converted
+	 * into a {@link MutableBucketData} record when a mutation operation is
 	 * requested.
 	 * <p>
-	 * Note: This is package private in order to expose it to {@link Node}.
+	 * Note: This is package private in order to expose it to {@link HTree}.
 	 */
 	ILeafData data;
 
@@ -425,7 +424,7 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 				keys.nkeys++;
 				keys.keys[i] = key;
 				vals.nvalues++;
-				vals.values[i] = val;
+				setValue(i, val);
 				// TODO deleteMarker:=false
 				// TODO versionTimestamp:=...
 				((HTree) htree).nentries++;
@@ -813,9 +812,6 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 	 * 
 	 * @return The pretty print representation of the value associated with the
 	 *         tuple at that slot.
-	 * 
-	 *         TODO Either indirect for raw records or write out the addr of the
-	 *         raw record.
 	 */
 	private String PPVAL(final int index) {
 
@@ -831,10 +827,21 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 
 		if (false/* showValues */) {
 
-			final byte[] value = getValues().get(index);
+			final long addr;
+			if (hasRawRecords()) {
+				addr = getRawRecord(index);
+			} else {
+				addr = IRawStore.NULL;
+			}
 
-			valStr = BytesUtil.toString(value);
+			if (addr != IRawStore.NULL) {
+				// A raw record
+				valStr = "@" + htree.getStore().toString(addr);
+			} else {
+				final byte[] value = getValues().get(index);
 
+				valStr = BytesUtil.toString(value);
+			}
 		} else {
 
 			valStr = null;
@@ -918,12 +925,12 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 		}
 
 		/*
-		 * FIXME Count the #of pointers in each buddy hash table of the parent
+		 * TODO Count the #of pointers in each buddy hash table of the parent
 		 * to each buddy bucket in this bucket page and verify that the
 		 * globalDepth on the child is consistent with the pointers in the
 		 * parent.
 		 * 
-		 * FIXME The same check must be performed for the directory page to
+		 * TODO The same check must be performed for the directory page to
 		 * cross validate the parent child linking pattern with the transient
 		 * cached globalDepth fields.
 		 */
@@ -1022,7 +1029,7 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 					keys.nkeys++;
 					keys.keys[i] = key;
 					vals.nvalues++;
-					vals.values[i] = val;
+					setValue(i, val);
 					// TODO deleteMarker:=false
 					// TODO versionTimestamp:=...
 					((HTree) htree).nentries++;
@@ -1047,4 +1054,141 @@ class BucketPage extends AbstractPage implements ILeafData { // TODO IBucketData
 		}
 	}
 
+	private void setValue(final int entryIndex, final byte[] newval) {
+
+		// Tunnel through to the mutable object.
+        final MutableBucketData data = (MutableBucketData) this.data;
+		
+        /*
+		 * Update the entry on the leaf.
+		 */
+		if (hasRawRecords()) {
+
+			/*
+			 * Note: If the old value was a raw record, we need to delete
+			 * that raw record now.
+			 * 
+			 * Note: If the new value will be a raw record, we need to write
+			 * that raw record onto the store now and save its address into
+			 * the values[] raba.
+			 */
+			final long oaddr = getRawRecord(entryIndex);
+
+			if(oaddr != IRawStore.NULL) {
+				
+				htree.deleteRawRecord(oaddr);
+				
+			}
+			
+			final long maxRecLen = htree.getMaxRecLen();
+			
+			if (newval != null && newval.length > maxRecLen) {
+
+				// write the value on the backing store.
+				final long naddr = htree.writeRawRecord(newval);
+
+				// save its address in the values raba.
+				data.vals.values[entryIndex] = ((HTree) htree)
+						.encodeRecordAddr(naddr);
+				
+				// flag as a raw record.
+				data.rawRecords[entryIndex] = true;
+
+			} else {
+				
+				data.vals.values[entryIndex] = newval;
+			
+				data.rawRecords[entryIndex] = false;
+				
+			}
+			
+		} else {
+
+			data.vals.values[entryIndex] = newval;
+			
+		}
+
+	}
+	
+	/**
+	 * Convenience method returns the byte[] for the given index in the leaf. If
+	 * the tuple at that index is a raw record, then the record is read from the
+	 * backing store. More efficient operations should be performed when copying
+	 * the value into a tuple.
+	 * 
+	 * @param leaf
+	 *            The leaf.
+	 * @param index
+	 *            The index in the leaf.
+	 * 
+	 * @return The data.
+	 * 
+	 * @see AbstractTuple#copy(int, ILeafData)
+	 */
+    public byte[] getValue(final int index) {
+    	
+		if (!hasRawRecords()) {
+		
+			return getValues().get(index);
+			
+		}
+		
+		final long addr = getRawRecord(index);
+		
+		if( addr == IRawStore.NULL) {
+
+			return getValues().get(index);
+
+		}
+		
+		final ByteBuffer tmp = htree.readRawRecord(addr);
+		
+		if (tmp.hasArray() && tmp.arrayOffset() == 0 && tmp.position() == 0
+				&& tmp.limit() == tmp.capacity()) {
+			/*
+			 * Return the backing array.
+			 */
+			return tmp.array();
+		}
+
+		/*
+		 * Copy the data into a byte[].
+		 */
+
+		final int len = tmp.remaining();
+
+		final byte[] a = new byte[len];
+
+		tmp.get(a);
+
+		return a;
+
+    }
+
+	/*
+	 * TODO When writing a method to remove a key/value, the following logic
+	 * should be applied to delete the corresponding raw record on the backing
+	 * store when the tuple is deleted.
+	 */
+//	/*
+//	 * If the tuple was associated with a raw record address, then delete
+//	 * the raw record from the backing store.
+//	 * 
+//	 * Note: The general copy-on-write contract of the B+Tree combined with
+//	 * the semantics of the WORM, RW, and scale-out persistence layers will
+//	 * ensure the actual delete of the raw record is deferred until the
+//	 * commit point from which the tuple was deleted is no longer visible.
+//	 */
+//	if (data.hasRawRecords()) {
+//
+//		final long addr = data.getRawRecord(entryIndex);
+//
+//		if (addr != IRawStore.NULL) {
+//
+//			btree.deleteRawRecord(addr);
+//
+//		}
+//
+//	}
+	
 }
