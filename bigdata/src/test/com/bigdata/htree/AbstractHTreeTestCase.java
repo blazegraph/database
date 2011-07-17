@@ -157,12 +157,12 @@ public class AbstractHTreeTestCase extends TestCase2 {
 	 */
 	public HTree getHTree(final IRawStore store, final int addressBits) {
 
-		return getHTree(store, addressBits, false/* rawRecords */);
-		
+		return getHTree(store, addressBits, false/* rawRecords */, false/* persistent */);
+
 	}
 
 	public HTree getHTree(final IRawStore store, final int addressBits,
-			final boolean rawRecords) {
+			final boolean rawRecords, final boolean persistent) {
 
 //		final ITupleSerializer<?,?> tupleSer = DefaultTupleSerializer.newInstance();
 
@@ -182,12 +182,13 @@ public class AbstractHTreeTestCase extends TestCase2 {
 				new SimpleRabaCoder() // vals
 				);
 
-		return getHTree(store, addressBits, rawRecords, tupleSer);
+		return getHTree(store, addressBits, rawRecords, persistent, tupleSer);
 
 	}
 	
 	public HTree getHTree(final IRawStore store, final int addressBits,
-			final boolean rawRecords, final ITupleSerializer tupleSer) {
+			final boolean rawRecords, final boolean persistent,
+			final ITupleSerializer tupleSer) {
 
 		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
@@ -198,13 +199,26 @@ public class AbstractHTreeTestCase extends TestCase2 {
         
         metadata.setAddressBits(addressBits);
 
-        metadata.setTupleSerializer(tupleSer);
-        
-        // override the HTree class.
-        metadata.setHTreeClassName(NoEvictionHTree.class.getName());
+		metadata.setTupleSerializer(tupleSer);
 
-        return (NoEvictionHTree) HTree.create(store, metadata);
-        
+		if (!persistent) {
+
+			/*
+			 * Does not allow incremental eviction and hence is not persistent.
+			 * This is used to test the basic index maintenance operations
+			 * before we test the persistence integration.
+			 */
+			
+			// override the HTree class.
+			metadata.setHTreeClassName(NoEvictionHTree.class.getName());
+
+			return (NoEvictionHTree) HTree.create(store, metadata);
+
+		}
+		
+		// Will support incremental eviction and persistence.
+		return HTree.create(store, metadata);
+
     }
     
 	/**

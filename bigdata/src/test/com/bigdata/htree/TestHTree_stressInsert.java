@@ -2,13 +2,11 @@ package com.bigdata.htree;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.DefaultEvictionListener;
-import com.bigdata.btree.NoEvictionListener;
-import com.bigdata.btree.PO;
+import cern.colt.Arrays;
+
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -56,7 +54,7 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 
    public void test_stressInsert_noEviction_addressBits2() {
 
-		doStressTest(17/* limit */, 2/* addressBits */);
+		doStressTest(10000/* limit */, 2/* addressBits */);
         
     }
 
@@ -94,20 +92,12 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
         
         final IRawStore store = new SimpleMemoryRawStore();
 
-		final int validateInterval = limit < 100 ? 1 : limit / 100;
+//		final int validateInterval = limit < 100 ? 1 : limit / 100;
         
         try {
 
-//            final HTree htree = new HTree(store, addressBits, false/* rawRecords */) {
-//                IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
-//                	return new HardReferenceQueue<PO>(//
-//                            new NoEvictionListener(),//
-//                            20000,//writeRetentionQueueCapacity,//
-//                            10//writeRetentionQueueScan//
-//                    );
-//                }
-//            };
-			final HTree htree = getHTree(store, addressBits, false/* rawRecords */);
+			final HTree htree = getHTree(store, addressBits,
+					false/* rawRecords */, false/* persistent */);
 
             try {
             // Verify initial conditions.
@@ -120,11 +110,7 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 
             for (int i = 0; i < limit; i++) {
 
-                // final byte[] key = keyBuilder.reset().append((byte)i).getKey();
-                final byte[] key = false ? 
-                		keyBuilder.reset().append((byte) i).getKey()
-                		: keyBuilder.reset().append(i).getKey();
-
+                final byte[] key = keyBuilder.reset().append(i).getKey();
 
                 keys[i] = key;
                 htree.insert(key, key);
@@ -152,17 +138,22 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
                 
             }
 
+            assertEquals(limit, htree.getEntryCount());
+
             // Verify all tuples are found.
             for (int i = 0; i < limit; i++) {
 
                 final byte[] key = keys[i];
 
-                assertEquals(key, htree.lookupFirst(key));
+				final byte[] firstVal = htree.lookupFirst(key);
+
+				if (!BytesUtil.bytesEqual(key, firstVal))
+					fail("Expected: " + BytesUtil.toString(key)
+							+ ", actual="
+							+ Arrays.toString(htree.lookupFirst(key)));
 
             }
             
-            assertEquals(limit, htree.getEntryCount());
-
             // Verify the iterator visits all of the tuples.
             assertSameIteratorAnyOrder(keys, htree.values());
             

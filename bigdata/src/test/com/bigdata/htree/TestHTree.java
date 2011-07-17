@@ -706,7 +706,7 @@ public class TestHTree extends AbstractHTreeTestCase {
                     b);
 
             // verify that [a] will not accept an insert.
-            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+            assertFalse(a.insert(k5, v5));//, root/* parent */, 0/* buddyOffset */));
 
             /**
              * Add a directory level.
@@ -817,7 +817,7 @@ public class TestHTree extends AbstractHTreeTestCase {
                     b);
 
             // verify that [a] will not accept an insert.
-            assertFalse(a.insert(k5, v5, root/* parent */, 0/* buddyOffset */));
+            assertFalse(a.insert(k5, v5));//, root/* parent */, 0/* buddyOffset */));
 
         } finally {
 

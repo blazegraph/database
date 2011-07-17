@@ -229,7 +229,99 @@ class BucketPage extends AbstractPage implements ILeafData {
 
 	}
 
-	/**
+    /**
+     * Copy constructor.
+     * 
+     * @param src
+     *            The source node (must be immutable).
+     * 
+     * @see AbstractPage#copyOnWrite()
+     */
+    protected BucketPage(final BucketPage src) {
+
+        super(src);
+
+        assert !src.isDirty();
+        assert src.isReadOnly();
+//        assert src.isPersistent();
+
+        // steal/clone the data record.
+		this.data = src.isReadOnly() ? new MutableBucketData(src.slotsOnPage(),
+				src.data) : src.data;
+
+        // clear reference on source.
+        src.data = null;
+
+//        /*
+//         * Steal/copy the keys.
+//         * 
+//         * Note: The copy constructor is invoked when we need to begin mutation
+//         * operations on an immutable node or leaf, so make sure that the keys
+//         * are mutable.
+//         */
+//        {
+//
+////            nkeys = src.nkeys;
+//
+//            if (src.getKeys() instanceof MutableKeyBuffer) {
+//
+//                keys = src.getKeys();
+//
+//            } else {
+//
+//                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+//                        .getKeys());
+//
+//            }
+//
+//            // release reference on the source node.
+////            src.nkeys = 0;
+//            src.keys = null;
+//            
+//        }
+//
+////        /*
+////         * Steal the values[].
+////         */
+////
+////        // steal reference and clear reference on the source node.
+////        values = src.values;
+//
+//        /*
+//         * Steal/copy the values[].
+//         * 
+//         * Note: The copy constructor is invoked when we need to begin mutation
+//         * operations on an immutable node or leaf, so make sure that the values
+//         * are mutable.
+//         */
+//        {
+//
+//            if (src.values instanceof MutableValueBuffer) {
+//
+//                values = src.values;
+//
+//            } else {
+//
+//                values = new MutableValueBuffer(src.getBranchingFactor(),
+//                        src.values);
+//
+//            }
+//
+//            // release reference on the source node.
+//            src.values = null;
+//            
+//        }
+//
+//        versionTimestamps = src.versionTimestamps;
+//        
+//        deleteMarkers = src.deleteMarkers;
+        
+//        // Add to the hard reference queue.
+//        btree.touch(this);
+
+    }
+
+    /**
 	 * Return <code>true</code> if there is at lease one tuple in the buddy hash
 	 * bucket for the specified key.
 	 * 
@@ -384,12 +476,6 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 *            The key (all bits, all bytes).
 	 * @param val
 	 *            The value (optional).
-	 * @param parent
-	 *            The parent {@link DirectoryPage} and never <code>null</code>
-	 *            (this is required for the copy-on-write pattern).
-	 * @param buddyOffset
-	 *            The offset into the child of the first slot for the buddy hash
-	 *            table or buddy hash bucket.
 	 * 
 	 * @return <code>false</code> iff the buddy bucket must be split.
 	 * 
@@ -400,8 +486,7 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 * @throws IndexOutOfBoundsException
 	 *             if <i>buddyOffset</i> is out of the allowed range.
 	 */
-	boolean insert(final byte[] key, final byte[] val,
-			final DirectoryPage parent, final int buddyOffset) {
+	boolean insert(final byte[] key, final byte[] val) {
 
 		if (key == null)
 			throw new IllegalArgumentException();
@@ -424,7 +509,30 @@ class BucketPage extends AbstractPage implements ILeafData {
 		// if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
 		// throw new IndexOutOfBoundsException();
 
-		// TODO if(!mutable) copyOnWrite().insert(key,val,parent,buddyOffset);
+        /*
+         * Note: This is one of the few gateways for mutation of a leaf via the
+         * main btree API (insert, lookup, delete). By ensuring that we have a
+         * mutable leaf here, we can assert that the leaf must be mutable in
+         * other methods.
+         */
+        final BucketPage copy = (BucketPage) copyOnWrite();
+
+        if (copy != this) {
+
+			/*
+			 * This leaf has been copied so delegate the operation to the new
+			 * leaf.
+			 * 
+			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+			 * leaf listeners before it clears the [leafListeners] reference so
+			 * not only don't we have to do that here, but we can't since the
+			 * listeners would be cleared before we could fire off the event
+			 * ourselves.
+			 */
+
+			return copy.insert(key, val);
+
+		}
 
 		/*
 		 * Locate the first unassigned tuple in the buddy bucket.
@@ -555,8 +663,8 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 *             if <i>buddyOffset</i> is out of the allowed range.
 	 */
 	boolean insertRawTuple(final BucketPage srcPage, final int srcSlot,
-			final byte[] key, final DirectoryPage parent, final int buddyOffset) {
-
+			final byte[] key) {//, final int buddyOffset) {
+		
 		if (key == null)
 			throw new IllegalArgumentException();
 
@@ -572,14 +680,39 @@ class BucketPage extends AbstractPage implements ILeafData {
 		// #of buddy tables on a page.
 		final int nbuddies = slotsOnPage / slotsPerBuddy;
 
+		final int buddyOffset = 0; // always zero for a bucket page.
+		
 		final int lastSlot = buddyOffset + slotsPerBuddy;
 
 		// range check buddyOffset.
 		if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
 			throw new IndexOutOfBoundsException();
 
-		// TODO if(!mutable) copyOnWrite().insert(key,val,parent,buddyOffset);
+        /*
+         * Note: This is one of the few gateways for mutation of a leaf via the
+         * main btree API (insert, lookup, delete). By ensuring that we have a
+         * mutable leaf here, we can assert that the leaf must be mutable in
+         * other methods.
+         */
+        final BucketPage copy = (BucketPage) copyOnWrite();
 
+        if (copy != this) {
+
+			/*
+			 * This leaf has been copied so delegate the operation to the new
+			 * leaf.
+			 * 
+			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+			 * leaf listeners before it clears the [leafListeners] reference so
+			 * not only don't we have to do that here, but we can't since the
+			 * listeners would be cleared before we could fire off the event
+			 * ourselves.
+			 */
+
+			return copy.insertRawTuple(srcPage, srcSlot, key);//, buddyOffset);
+
+		}
+        
 		/*
 		 * Locate the first unassigned tuple in the buddy bucket.
 		 * 
@@ -841,6 +974,10 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 */
 	private String PPVAL(final int index) {
 
+		if (index>getKeys().capacity()) {
+			throw new RuntimeException("index="+index+", keys.size="+getKeys().size()+", keys.capacity="+getKeys().capacity());
+		}
+		
 		if (getKeys().isNull(index))
 			return "-";
 

@@ -131,7 +131,6 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
 			flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
 			throw new UnsupportedOperationException();
 		}
-
         buf.putShort(flags);
         
 		final int nchildren = node.getChildCount();
