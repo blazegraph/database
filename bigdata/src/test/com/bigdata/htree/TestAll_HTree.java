@@ -129,6 +129,9 @@ public class TestAll_HTree extends TestCase {
 //        suite.addTestSuite(TestBloomFilter.class);
 //        suite.addTestSuite(TestBTreeWithBloomFilter.class);
 
+        // Integration stress test w/ Memory manager.
+        suite.addTestSuite(TestHTreeWithMemStore.class);
+        
         return suite;
 
 	}
