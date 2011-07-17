@@ -550,7 +550,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
         if(btree.debug) assertInvariants();
         
-        btree.touch(this);
+//        btree.touch(this); // Note: Invoked by copyOnWrite() (immediately below)
 
         /*
          * Note: This is one of the few gateways for mutation of a leaf via the

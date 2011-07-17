@@ -27,11 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import java.util.UUID;
-
-import junit.framework.TestCase2;
-
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -41,7 +36,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCommit extends TestCase2 {
+public class TestCommit extends AbstractHTreeTestCase {
 
     /**
      * 
@@ -73,11 +68,8 @@ public class TestCommit extends TestCase2 {
 			final long rootId;
 			{
 
-				final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-				metadata.setAddressBits(3);
-
-				final HTree btree = HTree.create(store, metadata);
+				final HTree btree = getHTree(store, 2/* addressBits */,
+						false/* rawRecords */, true/* persistent */);
 
 				assertTrue(btree.root.isDirty());
 
@@ -99,23 +91,23 @@ public class TestCommit extends TestCase2 {
 			{
 
 				// Load the tree.
-				final HTree btree = HTree
+				final HTree htree = HTree
 						.load(store, addrMetadata, false/* readOnly */);
 
 				// verify addrRoot.
-				assertEquals(rootId, btree.root.getIdentity());
-				assertFalse(btree.root.isDirty());
+				assertEquals(rootId, htree.root.getIdentity());
+				assertFalse(htree.root.isDirty());
 
 //				assertEquals("height", 0, btree.height);
-				assertEquals("#nodes", 1, btree.nnodes);
-				assertEquals("#leaves", 1, btree.nleaves);
-				assertEquals("#entries", 0, btree.nentries);
+				assertEquals("#nodes", 1, htree.nnodes);
+				assertEquals("#leaves", 1, htree.nleaves);
+				assertEquals("#entries", 0, htree.nentries);
 
 				/*
 				 * Commit of tree with clean root writes a new metadata record
 				 * but does not change the addrRoot.
 				 */
-				metadata2 = btree.writeCheckpoint();
+				metadata2 = htree.writeCheckpoint();
 				assertNotSame(addrMetadata, metadata2);
 
 			}
@@ -123,15 +115,16 @@ public class TestCommit extends TestCase2 {
 			{ // re-verify.
 
 				// Load the tree.
-				final HTree btree = HTree.load(store, addrMetadata, false/*readOnly*/);
+				final HTree htree = HTree
+						.load(store, addrMetadata, false/* readOnly */);
 
 				// verify addrRoot.
-				assertEquals(rootId, btree.root.getIdentity());
+				assertEquals(rootId, htree.root.getIdentity());
 
 //				assertEquals("height", 0, btree.height);
-				assertEquals("#nodes", 1, btree.nnodes);
-				assertEquals("#leaves", 1, btree.nleaves);
-				assertEquals("#entries", 0, btree.nentries);
+				assertEquals("#nodes", 1, htree.nnodes);
+				assertEquals("#leaves", 1, htree.nleaves);
+				assertEquals("#entries", 0, htree.nentries);
 
 			}
 

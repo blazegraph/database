@@ -1277,8 +1277,7 @@ public class HTree extends AbstractHTree
 			    final BucketPage bucketPage = (BucketPage) child;
 				
 				// Attempt to insert the tuple into the bucket.
-                if (!bucketPage.insert(key, value, current/* parent */,
-                        buddyOffset)) {
+				if (!bucketPage.insert(key, value)) {
 
 					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
 					
@@ -1397,8 +1396,7 @@ public class HTree extends AbstractHTree
 			    final BucketPage bucketPage = (BucketPage) child;
 				
 				// Attempt to insert the tuple into the bucket.
-				if (!bucketPage.insertRawTuple(src, slot, key,
-						current/* parent */, buddyOffset)) {
+				if (!bucketPage.insertRawTuple(src, slot, key)) {//, buddyOffset)) {
 
 					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
 					
@@ -2304,9 +2302,11 @@ public class HTree extends AbstractHTree
 	 *             if the <i>oldPage</i> is not at maximum depth.
 	 * @throws IllegalStateException
 	 *             if the parent of the <i>oldPage</i> is not mutable.
+	 * 
+	 *             TODO This should really be moved onto BucketPage so the
+	 *             copy-on-write pattern can be maintained.
 	 */
 	DirectoryPage addLevel2(final BucketPage oldPage) {
-		final DirectoryPage newParent;
 		
 		if (oldPage == null)
 			throw new IllegalArgumentException();
@@ -2314,7 +2314,32 @@ public class HTree extends AbstractHTree
 		if (oldPage.globalDepth != addressBits)
 			throw new IllegalStateException();
 
-		// The parent directory page above the old bucket page.
+        /*
+         * Note: This is one of the few gateways for mutation of a leaf via the
+         * main btree API (insert, lookup, delete). By ensuring that we have a
+         * mutable leaf here, we can assert that the leaf must be mutable in
+         * other methods.
+         */
+        final BucketPage copy = (BucketPage) oldPage.copyOnWrite();
+
+        if (copy != oldPage) {
+
+			/*
+			 * This leaf has been copied so delegate the operation to the new
+			 * leaf.
+			 * 
+			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+			 * leaf listeners before it clears the [leafListeners] reference so
+			 * not only don't we have to do that here, but we can't since the
+			 * listeners would be cleared before we could fire off the event
+			 * ourselves.
+			 */
+
+			return addLevel2(copy);
+			
+		}
+
+        // The parent directory page above the old bucket page.
 		final DirectoryPage pp = oldPage.getParentDirectory();
 
 		if (!pp.isDirty())
@@ -2328,6 +2353,7 @@ public class HTree extends AbstractHTree
         final int dirSlotsPerPage =  1 << this.addressBits;
 
 		// allocate new nodes and relink the tree.
+		final DirectoryPage newParent;
 		{
 
 			// 1/2 of the slots will point to each of the new bucket pages.

@@ -56,8 +56,19 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
      */
     private static final long serialVersionUID = 3385188183979794781L;
 
+    /**
+     * The original version for the coded data record.
+     */
     private static final byte VERSION0 = 0x00;
 
+    /**
+     * New version for the coded data record also records the capacity of
+     * the original {@link IRaba}.
+     */
+    private static final byte VERSION1 = 0x01;
+
+    private static final byte CURRENT_VERSION = VERSION1;
+    
     public static transient final SimpleRabaCoder INSTANCE = new SimpleRabaCoder();
     
     /**
@@ -104,6 +115,11 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
     static private final int SIZEOF_FLAGS = 1;
     /** The size of the size field. */
     static private final int SIZEOF_SIZE = Bytes.SIZEOF_INT;
+	/**
+	 * The size of the capacity field.
+	 * @since #VERSION1
+	 */
+    static private final int SIZEOF_CAPACITY = Bytes.SIZEOF_INT;
     /** The size of the field coding the #of elements in the offset[]. */
     static private final int SIZEOF_OFFSET = Bytes.SIZEOF_INT;
 
@@ -114,7 +130,11 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
     /** The byte offset of the field coding the #of entries in the raba. */
     static private final int O_SIZE = O_FLAGS + SIZEOF_FLAGS;
     /** The byte offset to the bit flags coding the nulls. */
-    static private final int O_NULLS = O_SIZE + SIZEOF_SIZE;
+	static private final int O_NULLS(final byte version) {
+		if (version == VERSION0)
+			return O_SIZE + SIZEOF_SIZE;
+		return O_SIZE + SIZEOF_SIZE + SIZEOF_CAPACITY;
+    }
 
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
@@ -127,6 +147,9 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         // The #of entries.
         final int size = raba.size();
 
+        // The logical capacity of the raba.
+        final int capacity = raba.capacity();
+        
         // iff the raba represents B+Tree keys.
         final boolean isKeys = raba.isKeys();
 
@@ -138,7 +161,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         
         // version
         assert buf.pos() == O_VERSION + O_origin;
-        buf.putByte(VERSION0);
+        buf.putByte(CURRENT_VERSION);
 
         // a byte containing a single bit flag.
         assert buf.pos() == O_FLAGS + O_origin;
@@ -148,10 +171,14 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         assert buf.pos() == O_SIZE + O_origin;
         buf.putInt(size);
 
+        // logical capacity.
+		if (CURRENT_VERSION >= VERSION1)
+			buf.putInt(capacity);
+
         // bit flag nulls
         if (!isKeys) {
             
-            assert buf.pos() == O_NULLS + O_origin;
+//            assert buf.pos() == O_NULLS + O_origin;
             
             for (int i = 0; i < size;) {
 
@@ -175,7 +202,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         }
 
         // offset[]
-        assert size > 0 && buf.pos() > O_NULLS + O_origin || size == 0 || isKeys;
+//        assert size > 0 && buf.pos() > O_NULLS + O_origin || size == 0 || isKeys;
         final int O_offsets = buf.pos() + sizeOfOffsets - O_origin;
         int lastOffset = O_offsets;
         for (int i = 0; i < size; i++) {
@@ -212,7 +239,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         final AbstractFixedByteArrayBuffer slice = buf.slice(//
                 O_origin, buf.pos() - O_origin);
 
-        return new CodedRabaImpl(slice, isKeys, size);
+        return new CodedRabaImpl(slice, isKeys, size, capacity, CURRENT_VERSION);
 //        return new CodedRabaImpl(slice);
 
     }
@@ -249,6 +276,14 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         private final int size;
 
         /**
+         * The logical capacity of the {@link IRaba} (cached).
+         */
+        private final int capacity;
+        
+        /** Offset to the bit flag nulls. */
+        private final int o_nulls;
+        
+        /**
          * If the record codes B+Tree keys.
          */
         private final boolean isKeys;
@@ -270,6 +305,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
             switch (version) {
             case VERSION0:
+            case VERSION1:
                 break;
             default:
                 throw new RuntimeException("Unknown version: " + version);
@@ -279,32 +315,46 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
             this.isKeys = data.getByte(O_FLAGS) != 0;
             
             this.size = data.getInt(O_SIZE);
-            
+
+			if (version >= VERSION1)
+				this.capacity = data.getInt(O_SIZE + SIZEOF_SIZE);
+            else
+            	this.capacity = size;
+
             if (size < 0)
+                throw new IllegalArgumentException();
+
+            if (capacity < 0)
                 throw new IllegalArgumentException();
             
             // #of bytes required for the nulls bit flags.
             final int bitFlagByteCount = isKeys ? 0 : BytesUtil
                     .bitFlagByteLength(size);
             
+            o_nulls = O_NULLS(version);
+            
             // offset of the offset[].
-            O_offsets = O_NULLS + bitFlagByteCount;
+            O_offsets = o_nulls + bitFlagByteCount;
 
         }
         
-        public CodedRabaImpl(final AbstractFixedByteArrayBuffer data,
-                final boolean isKeys, final int size) {
+		public CodedRabaImpl(final AbstractFixedByteArrayBuffer data,
+				final boolean isKeys, final int size, final int capacity,
+				final byte version) {
 
             this.data = data;
             this.isKeys = isKeys;
             this.size = size;
+            this.capacity = capacity;
             
             // #of bytes required for the nulls bit flags.
             final int bitFlagByteCount = isKeys ? 0 : BytesUtil
                     .bitFlagByteLength(size);
             
+            o_nulls = O_NULLS(version);
+
             // offset of the offset[].
-            O_offsets = O_NULLS + bitFlagByteCount;
+            O_offsets = o_nulls + bitFlagByteCount;
             
         }
 
@@ -330,7 +380,7 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
         final public int capacity() {
             
-            return size;
+            return capacity;
             
         }
 
@@ -361,12 +411,17 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         
         public boolean isNull(final int index) {
 
+			if (index >= size && index < capacity) {
+				// everything beyond the size and up to the capacity is a null.
+				return true;
+			}
+        	
             rangeCheck(index);
 
             if (isKeys)
                 return false;
             
-            return data.getBit((O_NULLS << 3) + index);
+            return data.getBit((o_nulls << 3) + index);
 
         }
 

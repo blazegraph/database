@@ -37,7 +37,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	/**
 	 * Transient references to the children.
 	 */
-	final Reference<AbstractPage>[] childRefs;
+	// Note: cleared by copyOnWrite when we steal the array.
+	/*final*/ Reference<AbstractPage>[] childRefs;
 
 	/**
 	 * Persistent data.
@@ -83,6 +84,33 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 *            - original bucket
 	 */
 	public void split(final BucketPage bucketPage) {
+
+		/*
+		 * Note: This is one of the few gateways for mutation of a directory via
+		 * the main htree API (insert, lookup, delete). By ensuring that we have
+		 * a mutable directory here, we can assert that the directory must be
+		 * mutable in other methods.
+		 */
+        final DirectoryPage copy = (DirectoryPage) copyOnWrite();
+
+        if (copy != this) {
+
+			/*
+			 * This leaf has been copied so delegate the operation to the new
+			 * leaf.
+			 * 
+			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+			 * leaf listeners before it clears the [leafListeners] reference so
+			 * not only don't we have to do that here, but we can't since the
+			 * listeners would be cleared before we could fire off the event
+			 * ourselves.
+			 */
+
+			copy.split(bucketPage);
+			return;
+			
+		}
+        
 		int start = 0;
 		for (int s = 0; s < this.getChildCount(); s++) {
 			if (bucketPage == getChild(s)) {
@@ -650,13 +678,118 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		super(htree, false/* dirty */, 0/*unknownGlobalDepth*/);
 
-		childRefs = new Reference[(1 << htree.addressBits)];
+        setIdentity(addr);
 
 		this.data = data;
 
+        childRefs = new Reference[(1 << htree.addressBits)];
+
 	}
 
-	/**
+    /**
+     * Copy constructor.
+     * 
+     * @param src
+     *            The source node (must be immutable).
+     * 
+     * @param triggeredByChildId
+     *            The persistent identity of the child that triggered the copy
+     *            constructor. This should be the immutable child NOT the one
+     *            that was already cloned. This information is used to avoid
+     *            stealing the original child since we already made a copy of
+     *            it. It is {@link #NULL} when this information is not
+     *            available, e.g., when the copyOnWrite action is triggered by a
+     *            join() and we are cloning the sibling before we redistribute a
+     *            key to the node/leaf on which the join was invoked.
+     * 
+     * @todo We could perhaps replace this with the conversion of the
+     *       INodeData:data field to a mutable field since the code which
+     *       invokes copyOnWrite() no longer needs to operate on a new Node
+     *       reference. However, I need to verify that nothing else depends on
+     *       the new Node, e.g., the dirty flag, addr, etc.
+     * 
+     * @todo Can't we just test to see if the child already has this node as its
+     *       parent reference and then skip it? If so, then that would remove a
+     *       troublesome parameter from the API.
+     */
+	protected DirectoryPage(final DirectoryPage src,
+			final long triggeredByChildId) {
+
+        super(src);
+
+        assert !src.isDirty();
+
+        assert src.isReadOnly();
+        // assert src.isPersistent();
+
+        /*
+         * Steal/clone the data record.
+         * 
+         * Note: The copy constructor is invoked when we need to begin mutation
+         * operations on an immutable node or leaf, so make sure that the data
+         * record is mutable.
+         */
+        final int slotsOnPage = 1<<htree.addressBits;
+
+        assert src.data != null;
+		this.data = src.isReadOnly() ? new MutableDirectoryPageData(
+				slotsOnPage, src.data) : src.data;
+        assert this.data != null;
+
+        // clear reference on source.
+        src.data = null;
+
+        /*
+         * Steal strongly reachable unmodified children by setting their parent
+         * fields to the new node. Stealing the child means that it MUST NOT be
+         * used by its previous ancestor (our source node for this copy).
+         */
+
+        childRefs = src.childRefs;
+        src.childRefs = null;
+
+        // childLocks = src.childLocks; src.childLocks = null;
+
+        for (int i = 0; i < slotsOnPage; i++) {
+
+            final AbstractPage child = childRefs[i] == null ? null
+                    : childRefs[i].get();
+
+            /*
+             * Note: Both child.identity and triggeredByChildId will always be
+             * 0L for a transient B+Tree since we never assign persistent
+             * identity to the nodes and leaves. Therefore [child.identity !=
+             * triggeredByChildId] will fail for ALL children, including the
+             * trigger, and therefore fail to set the parent on any of them. The
+             * [btree.store==null] test handles this condition and always steals
+             * the child, setting its parent to this new node.
+             * 
+             * FIXME It is clear that testing on child.identity is broken in
+             * some other places for the transient store.
+             */
+            if (child != null
+                    && (htree.store == null || child.getIdentity() != triggeredByChildId)) {
+
+                /*
+                 * Copy on write should never trigger for a dirty node and only
+                 * a dirty node can have dirty children.
+                 */
+                assert !child.isDirty();
+
+                // Steal the child.
+                child.parent = (Reference) this.self;
+                // child.parent = btree.newRef(this);
+
+                // // Keep a reference to the clean child.
+                // childRefs[i] = new WeakReference<AbstractNode>(child);
+
+            }
+
+        }
+
+    }
+
+    /**
 	 * Iterator visits children, recursively expanding each child with a
 	 * post-order traversal of its children and finally visits this node itself.
 	 */
@@ -1365,5 +1498,79 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		return cbuddy;
 	}
+
+    /**
+     * Invoked by {@link #copyOnWrite()} to clear the persistent address for a
+     * child on a cloned parent and set the reference to the cloned child.
+     * 
+     * @param oldChildAddr
+     *            The persistent address of the old child. The entries to be
+     *            updated are located based on this argument. It is an error if
+     *            this address is not found in the list of child addresses for
+     *            this {@link Node}.
+     * @param newChild
+     *            The reference to the new child.
+     */
+    void replaceChildRef(final long oldChildAddr, final AbstractPage newChild) {
+
+        assert oldChildAddr != NULL || htree.store == null;
+        assert newChild != null;
+
+        // This node MUST have been cloned as a pre-condition, so it can not
+        // be persistent.
+        assert !isPersistent();
+        assert !isReadOnly();
+
+        // The newChild MUST have been cloned and therefore MUST NOT be
+        // persistent.
+        assert !newChild.isPersistent();
+
+        assert !isReadOnly();
+
+		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
+
+		final int slotsOnPage = 1 << globalDepth;
+
+		// Scan for location in weak references.
+		int npointers = 0;
+		for (int i = 0; i < slotsOnPage; i++) {
+
+            if (data.childAddr[i] == oldChildAddr) {
+
+                // Clear the old key.
+                data.childAddr[i] = NULL;
+
+                // remove from cache and free the oldChildAddr if the Strategy
+                // supports it.
+                // TODO keep this in case we add in the store cache again.
+//				if (htree.storeCache != null) {
+//					// remove from cache.
+//					htree.storeCache.remove(oldChildAddr);
+//				}
+                // free the oldChildAddr if the Strategy supports it
+                htree.deleteNodeOrLeaf(oldChildAddr);
+                // System.out.println("Deleting " + oldChildAddr);
+
+                // Stash reference to the new child.
+                // childRefs[i] = btree.newRef(newChild);
+                childRefs[i] = (Reference) newChild.self;
+
+                // // Add the new child to the dirty list.
+                // dirtyChildren.add(newChild);
+
+                // Set the parent on the new child.
+                // newChild.parent = btree.newRef(this);
+                newChild.parent = (Reference) this.self;
+
+                npointers++;
+            }
+
+        }
+
+		if (npointers == 0)
+			throw new IllegalArgumentException("Not our child : oldChildAddr="
+					+ oldChildAddr);
+
+    }
 
 }

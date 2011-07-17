@@ -5,7 +5,9 @@ import java.lang.ref.Reference;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.PO;
@@ -19,6 +21,8 @@ import com.bigdata.cache.HardReferenceQueue;
  */
 abstract class AbstractPage extends PO implements // IAbstractNode?,
 		IAbstractNodeData {
+
+    private static final Logger log = Logger.getLogger(AbstractPage.class);
 
 	@Override
 	public String toShortString() {
@@ -309,7 +313,97 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 	}
 
-	public void delete() throws IllegalStateException {
+    /**
+     * Copy constructor.
+     * <p>
+     * Note: The copy constructor steals the state of the source node, creating
+     * a new node with the same state but a distinct (and not yet assigned)
+     * address on the backing store. If the source node has immutable data for
+     * some aspect of its state, then a mutable copy of that data is made.
+     * <p>
+     * Note: The <strong>caller</strong> MUST {@link #delete()} the source node
+     * after invoking this copy constructor. If the backing store supports the
+     * operation, the source node will be reclaimed as free space at the next
+     * commit.
+     * <p>
+     * The source node must be deleted since it is no longer accessible and
+     * various aspects of its state have been stolen by the copy constructor. If
+     * the btree is committed then both the delete of the source node and the
+     * new tree structure will be made restart-safe atomically and all is well.
+     * If the operation is aborted then both changes will be undone and all is
+     * well. In no case can we access the source node after this operation
+     * unless all changes have been aborted, in which case it will simply be
+     * re-read from the backing store.
+     * 
+     * @param src
+     *            The source node.
+     */
+    protected AbstractPage(final AbstractPage src) {
+
+        /*
+         * Note: We do NOT clone the base class since this is a new persistence
+         * capable object, but it is not yet persistent and we do not want to
+         * copy the persistent identity of the source object.
+         */
+		this((HTree) src.htree, true/* dirty */, src.globalDepth);
+
+        // This node must be mutable (it is a new node).
+        assert isDirty();
+        assert !isPersistent();
+        
+        /* The source must not be dirty.  We are cloning it so that we can
+         * make changes on it.
+         */
+//        assert src != null;
+        assert !src.isDirty();
+//        assert src.isPersistent();
+        assert src.isReadOnly();
+
+        /*
+         * Copy the parent reference. The parent must be defined unless the
+         * source is the current root.
+         * 
+         * Note that we reuse the weak reference since it is immutable (it state
+         * is only changed by the VM, not by the application).
+         */
+
+        assert src == htree.root
+                || (src.parent != null && src.parent.get() != null);
+        
+        // copy the parent reference.
+        this.parent = src.parent; // @todo clear src.parent (disconnect it)?
+        
+//        /*
+//         * Steal/copy the keys.
+//         * 
+//         * Note: The copy constructor is invoked when we need to begin mutation
+//         * operations on an immutable node or leaf, so make sure that the keys
+//         * are mutable.
+//         */
+//        {
+//
+////            nkeys = src.nkeys;
+//
+//            if (src.getKeys() instanceof MutableKeyBuffer) {
+//
+//                keys = src.getKeys();
+//
+//            } else {
+//
+//                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+//                        .getKeys());
+//
+//            }
+//
+//            // release reference on the source node.
+////            src.nkeys = 0;
+//            src.keys = null;
+//            
+//        }
+
+    }
+
+    public void delete() throws IllegalStateException {
 
 		if (deleted) {
 
@@ -435,5 +529,166 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	 */
 	abstract public Iterator<AbstractPage> postOrderNodeIterator(
 			final boolean dirtyNodesOnly, final boolean nodesOnly);
+
+    /**
+     * <p>
+     * Return this leaf iff it is dirty (aka mutable) and otherwise return a
+     * copy of this leaf. If a copy is made of the leaf, then a copy will also
+     * be made of each immutable parent up to the first mutable parent or the
+     * root of the tree, which ever comes first. If the root is copied, then the
+     * new root will be set on the {@link HTree}. This method must MUST be
+     * invoked any time an mutative operation is requested for the leaf.
+     * </p>
+     * <p>
+     * Note: You can not modify a node that has been written onto the store.
+     * Instead, you have to clone the node causing it and all nodes up to the
+     * root to be dirty and transient. This method handles that cloning process,
+     * but the caller MUST test whether or not the node was copied by this
+     * method, MUST delegate the mutation operation to the copy iff a copy was
+     * made, and MUST result in an awareness in the caller that the copy exists
+     * and needs to be used in place of the immutable version of the node.
+     * </p>
+     * 
+     * @return Either this leaf or a copy of this leaf.
+     */
+    protected AbstractPage copyOnWrite() {
+        
+        // Always invoked first for a leaf and thereafter in its other form.
+        assert isLeaf();
+        
+        return copyOnWrite(NULL);
+        
+    }
+
+    /**
+     * <p>
+     * Return this node or leaf iff it is dirty (aka mutable) and otherwise
+     * return a copy of this node or leaf. If a copy is made of the node, then a
+     * copy will also be made of each immutable parent up to the first mutable
+     * parent or the root of the tree, which ever comes first. If the root is
+     * copied, then the new root will be set on the {@link HTree}. This method
+     * must MUST be invoked any time an mutative operation is requested for the
+     * leaf.
+     * </p>
+     * <p>
+     * Note: You can not modify a node that has been written onto the store.
+     * Instead, you have to clone the node causing it and all nodes up to the
+     * root to be dirty and transient. This method handles that cloning process,
+     * but the caller MUST test whether or not the node was copied by this
+     * method, MUST delegate the mutation operation to the copy iff a copy was
+     * made, and MUST be aware that the copy exists and needs to be used in
+     * place of the immutable version of the node.
+     * </p>
+     * 
+     * @param triggeredByChildId
+     *            The persistent identity of child that triggered this event if
+     *            any.
+     * 
+     * @return Either this node or a copy of this node.
+     */
+    protected AbstractPage copyOnWrite(final long triggeredByChildId) {
+
+//        if (isPersistent()) {
+        if (!isReadOnly()) {
+
+            /*
+             * Since a clone was not required, we use this as an opportunity to
+             * touch the hard reference queue. This helps us to ensure that
+             * nodes which have been touched recently will remain strongly
+             * reachable.
+             */
+            
+            htree.touch(this);
+            
+            return this;
+
+        }
+
+        if (log.isInfoEnabled()) {
+            log.info("this=" + this + ", trigger=" + triggeredByChildId);
+        }
+
+        // cast to mutable implementation class.
+        final HTree htree = (HTree) this.htree;
+        
+        // identify of the node that is being copied and deleted.
+        final long oldId = this.identity;
+
+        // parent of the node that is being cloned (null iff it is the root).
+        DirectoryPage parent = this.getParentDirectory();
+
+        // the new node (mutable copy of the old node).
+        final AbstractPage newNode;
+
+		if (isLeaf()) {
+
+			newNode = new BucketPage((BucketPage) this);
+
+			htree.getBtreeCounters().leavesCopyOnWrite++;
+
+		} else {
+
+			newNode = new DirectoryPage((DirectoryPage) this,
+					triggeredByChildId);
+
+			htree.getBtreeCounters().nodesCopyOnWrite++;
+
+		}
+        
+        // delete this node now that it has been cloned.
+        this.delete();
+        
+        if (htree.root == this) {
+
+            assert parent == null;
+
+            // Update the root node on the htree.
+            if(log.isInfoEnabled())
+                log.info("Copy-on-write : replaced root node on htree.");
+
+            final boolean wasDirty = htree.root.dirty;
+            
+            assert newNode != null;
+            
+            htree.root = (DirectoryPage) newNode;
+            
+            if (!wasDirty) {
+                
+                htree.fireDirtyEvent();
+                
+            }
+
+        } else {
+
+            /*
+             * Recursive copy-on-write up the tree. This operations stops as
+             * soon as we reach a parent node that is already dirty and
+             * grounds out at the root in any case.
+             */
+            assert parent != null;
+
+            if (!parent.isDirty()) {
+
+                /*
+                 * Note: pass up the identity of the old child since we want
+                 * to avoid having its parent reference reset.
+                 */
+                parent = (DirectoryPage) parent.copyOnWrite(oldId);
+
+            }
+
+            /*
+             * Replace the reference to this child with the reference to the
+             * new child. This makes the old child inaccessible via
+             * navigation. It will be GCd once it falls off of the hard
+             * reference queue.
+             */
+            parent.replaceChildRef(oldId, newNode);
+
+        }
+
+        return newNode;
+
+    }
 
 }
