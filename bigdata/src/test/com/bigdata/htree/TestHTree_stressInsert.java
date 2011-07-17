@@ -1,8 +1,8 @@
 package com.bigdata.htree;
 
-import org.apache.log4j.Logger;
+import java.util.Arrays;
 
-import cern.colt.Arrays;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
