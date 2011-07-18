@@ -224,9 +224,9 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 * <p>
 	 * Overridden to report the size of the address space.
-	 * 
-	 * TODO Alternatively, could report the #of non-null child addresses.
 	 */
 	final public int getChildCount() {
 

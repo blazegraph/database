@@ -110,16 +110,18 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			return;
 			
 		}
-        
+
+        // Note: this.getChildCount() is less direct.
+		final int slotsOnPage = 1 << htree.addressBits;
 		int start = 0;
-		for (int s = 0; s < this.getChildCount(); s++) {
+		for (int s = 0; s < slotsOnPage; s++) {
 			if (bucketPage == getChild(s)) {
 				start = s;
 				break;
 			}
 		}
 		int last = start;
-		for (int s = start + 1; s < this.getChildCount(); s++) {
+		for (int s = start + 1; s < slotsOnPage; s++) {
 			if (bucketPage == getChild(s)) {
 				last++;
 			} else {
@@ -258,6 +260,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
              * synchronization will never be contended for the mutable B+Tree.
              */
 
+			if (index >= childRefs.length) // TODO debug point - remove.
+				throw new IndexOutOfBoundsException();
+        	
             final Reference<AbstractPage> childRef = childRefs[index];
 
             final AbstractPage child = childRef == null ? null : childRef.get();
@@ -722,18 +727,18 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         assert src.isReadOnly();
         // assert src.isPersistent();
 
-        /*
-         * Steal/clone the data record.
-         * 
-         * Note: The copy constructor is invoked when we need to begin mutation
-         * operations on an immutable node or leaf, so make sure that the data
-         * record is mutable.
-         */
-        final int slotsOnPage = 1<<htree.addressBits;
+		/*
+		 * Steal/clone the data record.
+		 * 
+		 * Note: The copy constructor is invoked when we need to begin mutation
+		 * operations on an immutable node or leaf, so make sure that the data
+		 * record is mutable.
+		 */
+		final int slotsOnPage = 1 << htree.addressBits;
 
         assert src.data != null;
 		this.data = src.isReadOnly() ? new MutableDirectoryPageData(
-				slotsOnPage, src.data) : src.data;
+				htree.addressBits, src.data) : src.data;
         assert this.data != null;
 
         // clear reference on source.

@@ -67,6 +67,17 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 	 */
 	public void test_dirtyListener1() {
 
+		// some keys
+		final byte[] k1 = new byte[]{1};
+		final byte[] k2 = new byte[]{2};
+		final byte[] k3 = new byte[]{3};
+		final byte[] k4 = new byte[]{4};
+		final byte[] k5 = new byte[]{5};
+		final byte[] k6 = new byte[]{6};
+		
+		// a value.
+		final byte[] val = new byte[]{};
+
 		/*
 		 * Create a new btree.
 		 */
@@ -80,7 +91,7 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 				final MyDirtyListener listener = new MyDirtyListener();
 
 				// Create a new htree.
-				final HTree btree = getHTree(store, 3/* addressBits */);
+				final HTree btree = getHTree(store, 2/* addressBits */);
 
 				// verify new btree is dirty.
 				assertTrue("dirty", btree.root.isDirty());
@@ -99,28 +110,30 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 
 				// verify event was not generated.
 				listener.assertCounter(0);
-
+				
 				/*
 				 * Write on the btree and verify that the listener is notified.
 				 */
-				btree.insert(new byte[] { 1, 2, 3 }, new byte[] {});
+				btree.insert(k1,val);
+				if(log.isInfoEnabled())
+					log.info("after insert of 1 key:\n"+ btree.PP());
 
 				assertTrue("dirty", btree.root.isDirty());
 
 				listener.assertCounter(1);
 
 				/*
-				 * Write again -- there should be no notice. We write enough
-				 * entries to split the root leaf into a node and two leaves and
-				 * still there should be no notice since the tree is still
-				 * dirty.
+				 * Write again -- there should be no notice at the listener
+				 * since the tree is still dirty. We write enough entries to
+				 * split the initial bucket page.
 				 */
-				btree.insert(new byte[] { 2, 2, 3 }, new byte[] {});
-				btree.insert(new byte[] { 3, 2, 3 }, new byte[] {});
-				btree.insert(new byte[] { 4, 2, 3 }, new byte[] {});
-				assertEquals("nnodes", 1, btree.nnodes);
-				assertEquals("nleaves", 2, btree.nleaves);
-				assertEquals("nentries", 4, btree.nentries);
+				btree.insert(k2,val);
+				btree.insert(k3,val);
+				btree.insert(k4,val);
+				btree.insert(k5,val);
+				if(log.isInfoEnabled())
+					log.info("after insert of 3 more keys:\n"+ btree.PP());
+				assertTrue("nleaves", btree.nleaves > 1);
 
 				listener.assertCounter(1);
 
@@ -132,23 +145,30 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 				assertFalse("dirty", btree.root.isDirty());
 
 				/*
-				 * Insert another record - this overwrites an existing entry,
-				 * but the tree still becomes dirty and the listener gets
-				 * notified.
+				 * Insert another record. The tree still becomes dirty and the
+				 * listener gets notified.
 				 */
 				listener.setExpected(true);
-				btree.insert(new byte[] { 2, 2, 3 }, new byte[] {});
+				btree.insert(k6, val);
 				assertTrue("dirty", btree.root.isDirty());
 				listener.assertCounter(2);
 
 			}
 
+			if (true) {
+				/*
+				 * FIXME The rest of this test relies on the ability to remove
+				 * tuples. It was originally written for the B+Tree. It needs to
+				 * be ported to the HTree once we support removal of key/val
+				 * pairs.
+				 */
+				log.warn("Test is only partly complete. Finish when we add support for removal");
+				return;
+			}
 			/*
 			 * Re-load from addr2 and test removeAll().
-			 * 
-			 * FIXME Enable when removeAll() is written.
 			 */
-			if (false) {
+			{
 
 				// helper class listens for dirty events.
 				final MyDirtyListener listener = new MyDirtyListener();
@@ -298,8 +318,11 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 		 * <p>
 		 * Note: The {@link #expected} flag is cleared after each invocation.
 		 */
-		public void dirtyEvent(ICheckpointProtocol btree) {
+		public void dirtyEvent(final ICheckpointProtocol htree) {
 
+			if(log.isInfoEnabled())
+				log.info("event: htree="+htree);
+			
 			assertTrue("expected", expected);
 
 			expected = false;

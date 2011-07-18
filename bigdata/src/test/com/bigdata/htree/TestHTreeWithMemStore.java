@@ -139,7 +139,7 @@ public class TestHTreeWithMemStore extends TestCase {
 		 * good from the perspective of stressing the persistence store
 		 * integration.
 		 */
-		metadata.setWriteRetentionQueueCapacity(10);
+		metadata.setWriteRetentionQueueCapacity(500);
 		metadata.setWriteRetentionQueueScan(10); // Must be LTE capacity.
 
 		return HTree.create(store, metadata);
@@ -175,8 +175,8 @@ public class TestHTreeWithMemStore extends TestCase {
 
 					keys[i] = key;
 					htree.insert(key, key);
-					if (log.isInfoEnabled())
-						log.info("after key=" + i + "\n" + htree.PP());
+					if (log.isTraceEnabled())
+						log.trace("after key=" + i + "\n" + htree.PP());
 
 				}
 
@@ -204,8 +204,13 @@ public class TestHTreeWithMemStore extends TestCase {
 
 				log.error(t, t);
 
-				log.error("Pretty Print of error state:\n" + htree.PP());
+				try {
+					log.error("Pretty Print of error state:\n" + htree.PP());
+				} catch (Throwable t2) {
+					log.error("Problem in pretty print: t2", t2);
+				}
 
+				// rethrow the original exception.
 				throw new RuntimeException(t);
 
 			}

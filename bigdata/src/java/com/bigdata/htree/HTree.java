@@ -2344,6 +2344,8 @@ public class HTree extends AbstractHTree
 
 		if (!pp.isDirty())
 			throw new IllegalStateException(); // parent must be mutable.
+		if(!(pp.data instanceof MutableDirectoryPageData))
+			throw new IllegalStateException(); // parent must be mutable (should follow automatically if parent is dirty).
 
 		if (log.isInfoEnabled())
 			log.info("bucketPage=" + oldPage.toShortString());
@@ -2378,6 +2380,14 @@ public class HTree extends AbstractHTree
 				boolean found = false;
 				final long oldAddr = oldPage.isPersistent() ? oldPage
 						.getIdentity() : 0L;
+				if (!pp.isDirty()) { 
+					/*
+					 * Note: I have seen the parent go from mutable to immutable
+					 * during an addLevel(). This is presumably because I was
+					 * using a small retention queue (10) in a stress test.
+					 */
+					throw new IllegalStateException(); // parent must be mutable.
+				}
 				final MutableDirectoryPageData data = (MutableDirectoryPageData) pp.data;
 				for (int i = 0; i < dirSlotsPerPage && !found; i++) {
 					if (oldPage.isPersistent()) {
@@ -2429,8 +2439,14 @@ public class HTree extends AbstractHTree
 		final IRaba ovals = oldPage.getValues();
 		for (int i = 0; i < bucketSlotsPerPage; i++) {
 
-			// insertRawTuple(oldPage, i);
-			if (okeys.get(i) != null)
+			/*
+			 * Note: All keys should be non-null.
+			 * 
+			 * Note: Use okeys.isNull() to do a fast check for a null key, not
+			 * okeys.get(i) != null which forces the key to be materialized
+			 * (heap churn).
+			 */
+//			if (okeys.get(i) != null)
 				newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
 
 		}
@@ -3877,8 +3893,9 @@ public class HTree extends AbstractHTree
 		
 		final StringBuilder sb = new StringBuilder();
 		
-		sb.append("Total Entries: " + nentries + "\n");
-		
+		sb.append("#nodes=" + nnodes + ", #leaves=" + nleaves + ", #entries="
+				+ nentries + "\n");
+
 		root.PP(sb);
 		
 		return sb.toString();

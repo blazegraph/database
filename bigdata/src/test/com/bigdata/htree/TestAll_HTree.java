@@ -91,8 +91,8 @@ public class TestAll_HTree extends TestCase {
         // test getCounter()
         suite.addTestSuite(TestIndexCounter.class);
         
-//        // test iterator semantics for visiting only "dirty" nodes or leaves.
-//        suite.addTestSuite(TestDirtyIterators.class);
+        // test iterator semantics for visiting only "dirty" nodes or leaves.
+        suite.addTestSuite(TestDirtyIterators.class);
 //
 //        // test incremental write of leaves and nodes.
 //        suite.addTestSuite(TestIncrementalWrite.class);
