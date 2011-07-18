@@ -53,7 +53,7 @@ class DirtyChildIterator implements Iterator<AbstractPage> {
      * {@link #next()}.
      */
     private int lastVisited = -1;
-
+    
     /**
      * The next child to return or null if we need to scan for the next child.
      * We always test to verify that the child is in fact dirty in
@@ -133,11 +133,27 @@ class DirtyChildIterator implements Iterator<AbstractPage> {
 //             */ 
 //            node.btree.touch(node);
             
+			for (; (index + 1) < slotsPerPage; index++) {
+
+				if (node.childRefs[index + 1] != childRef) {
+					/*
+					 * Skip over all references to the same child until we are
+					 * on the last directory slot which a reference to this
+					 * child. This way, when hasNext() is called again to
+					 * advance to the next distinct child, the visited child
+					 * will not be another pointer to the same child page as the
+					 * last visited child.
+					 */
+					break;
+				}
+
+            }
+            
             break;
             
         }
         
-        return index <= slotsPerPage;
+        return index < slotsPerPage;
     
     }
 

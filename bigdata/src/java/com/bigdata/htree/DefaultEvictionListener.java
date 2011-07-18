@@ -26,6 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree;
 
+import org.apache.log4j.Logger;
+
+import sun.util.logging.resources.logging;
+
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.cache.IHardReferenceQueue;
@@ -40,6 +44,8 @@ import com.bigdata.cache.IHardReferenceQueue;
 public class DefaultEvictionListener implements
         IEvictionListener {
 
+	private static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
+	
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         final AbstractPage node = (AbstractPage) ref;
@@ -83,7 +89,11 @@ public class DefaultEvictionListener implements
         if (node.isDirty() && htree.store != null) {
 //            // this causes transient nodes to be coded on eviction.
 //            if (node.dirty) {
-            
+
+			if (log.isDebugEnabled())
+				log.debug("Evicting: " + (node.isLeaf() ? "leaf" : "node")
+						+ " : " + node.toShortString());
+        	
             if (node.isLeaf()) {
 
                 /*
