@@ -1,64 +1,77 @@
 package com.bigdata.bop.solutions;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.ConcurrentHashMapAnnotations;
+import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.htree.HTree;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * A pipelined DISTINCT operator based on a hash table.
+ * A pipelined DISTINCT operator based on the persistence capable {@link HTree}
+ * suitable for very large solution sets.
  * <p>
  * Note: This implementation is a pipelined operator which inspects each chunk
  * of solutions as they arrive and those solutions which are distinct for each
- * chunk are passed on.
+ * chunk passed on.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class DistinctBindingSetOp extends PipelineOp {
+public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
 	private final static transient Logger log = Logger
-			.getLogger(DistinctBindingSetOp.class);
+			.getLogger(DistinctBindingSetsWithHTreeOp.class);
 	
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends PipelineOp.Annotations,
-            ConcurrentHashMapAnnotations, DistinctAnnotations {
+	public interface Annotations extends PipelineOp.Annotations,
+			HTreeAnnotations, DistinctAnnotations {
 
-    }
+	}
 
     /**
      * Required deep copy constructor.
      */
-    public DistinctBindingSetOp(final DistinctBindingSetOp op) {
+    public DistinctBindingSetsWithHTreeOp(final DistinctBindingSetsWithHTreeOp op) {
         super(op);
     }
 
     /**
      * Required shallow copy constructor.
      */
-    public DistinctBindingSetOp(final BOp[] args,
+    public DistinctBindingSetsWithHTreeOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
 		super(args, annotations);
@@ -86,35 +99,35 @@ public class DistinctBindingSetOp extends PipelineOp {
     }
 
     /**
-     * @see Annotations#INITIAL_CAPACITY
+     * @see Annotations#ADDRESS_BITS
      */
-    public int getInitialCapacity() {
+    public int getAddressBits() {
 
-        return getProperty(Annotations.INITIAL_CAPACITY,
-                Annotations.DEFAULT_INITIAL_CAPACITY);
+		return getProperty(Annotations.ADDRESS_BITS,
+				Annotations.DEFAULT_ADDRESS_BITS);
 
     }
 
-    /**
-     * @see Annotations#LOAD_FACTOR
-     */
-    public float getLoadFactor() {
+	/**
+	 * @see Annotations#RAW_RECORDS
+	 */
+	public boolean getRawRecords() {
 
-        return getProperty(Annotations.LOAD_FACTOR,
-                Annotations.DEFAULT_LOAD_FACTOR);
+		return getProperty(Annotations.RAW_RECORDS,
+				Annotations.DEFAULT_RAW_RECORDS);
 
-    }
+	}
+	
+	/**
+	 * @see Annotations#MAX_RECLEN
+	 */
+	public int getMaxRecLen() {
 
-    /**
-     * @see Annotations#CONCURRENCY_LEVEL
-     */
-    public int getConcurrencyLevel() {
+		return getProperty(Annotations.MAX_RECLEN,
+				Annotations.DEFAULT_MAX_RECLEN);
 
-        return getProperty(Annotations.CONCURRENCY_LEVEL,
-                Annotations.DEFAULT_CONCURRENCY_LEVEL);
+	}
 
-    }
-    
     /**
      * @see Annotations#VARIABLES
      */
@@ -137,10 +150,13 @@ public class DistinctBindingSetOp extends PipelineOp {
     }
 
     /**
-     * Wrapper used for the as bound solutions in the {@link ConcurrentHashMap}.
+     * Wrapper used for the as bound solutions in the {@link HTree}.
      */
-    private static class Solution {
-        private final int hash;
+    private static class Solution implements Serializable {
+    	
+		private static final long serialVersionUID = 1L;
+
+		private final int hash;
 
         private final IConstant<?>[] vals;
 
@@ -187,20 +203,59 @@ public class DistinctBindingSetOp extends PipelineOp {
 		private static final long serialVersionUID = 1L;
 
 		/**
-		 * A concurrent map whose keys are the bindings on the specified
-		 * variables (the keys and the values are the same since the map
-		 * implementation does not allow <code>null</code> values).
+		 * A map whose keys are the bindings on the specified variables. The
+		 * values in the map are <code>null</code>s.
 		 * <p>
 		 * Note: The map is shared state and can not be discarded or cleared
 		 * until the last invocation!!!
 		 */
-        private final ConcurrentHashMap<Solution, Solution> map;
+		private final HTree map;
 
-    	public DistinctStats(final DistinctBindingSetOp op) {
+    	public DistinctStats(final DistinctBindingSetsWithHTreeOp op) {
     		
-            this.map = new ConcurrentHashMap<Solution, Solution>(
-                    op.getInitialCapacity(), op.getLoadFactor(),
-                    op.getConcurrencyLevel());
+    		/*
+    		 * TODO Annotations for key and value raba coders.
+    		 */
+    		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+			metadata.setAddressBits(op.getAddressBits());
+
+			metadata.setRawRecords(op.getRawRecords());
+
+			metadata.setMaxRecLen(op.getMaxRecLen());
+
+			/*
+			 * TODO This sets up a tuple serializer for a presumed case of 4
+			 * byte keys (the buffer will be resized if necessary) and
+			 * explicitly chooses the SimpleRabaCoder as a workaround since the
+			 * keys IRaba for the HTree does not report true for isKeys(). Once
+			 * we work through an optimized bucket page design we can revisit
+			 * this as the FrontCodedRabaCoder should be a good choice, but it
+			 * currently requires isKeys() to return true.
+			 */
+			final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+					new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+					// new FrontCodedRabaCoder(),// Note: reports true for
+					// isKeys()!
+					new SimpleRabaCoder(),// keys : TODO Optimize for int32!
+					new SimpleRabaCoder() // vals
+			);
+
+			metadata.setTupleSerializer(tupleSer);
+
+			/*
+			 * FIXME This must a child memory manager created from the
+			 * IMemoryManager which is backing the query. That means that we
+			 * need access to the IRunningQuery in newStats(). Once we do this
+			 * we can just destroy the MemStore, or its backing IMemoryManager,
+			 * when we are done with the DISTINCT operator.
+			 */
+			final IRawStore store = new SimpleMemoryRawStore();
+			
+//			final IRawStore store = new MemStore(mmgr);
+			
+    		// Will support incremental eviction and persistence.
+    		this.map = HTree.create(store, metadata);    		
 
     	}
     	
@@ -214,18 +269,17 @@ public class DistinctBindingSetOp extends PipelineOp {
         private final BOpContext<IBindingSet> context;
 
 		/**
-		 * A concurrent map whose keys are the bindings on the specified
-		 * variables (the keys and the values are the same since the map
-		 * implementation does not allow <code>null</code> values).
+		 * A map whose keys are the bindings on the specified variables. The
+		 * values in the map are the serialized solutions.
 		 */
-        private final ConcurrentHashMap<Solution, Solution> map;
+        private final HTree map;
 
         /**
          * The variables used to impose a distinct constraint.
          */
         private final IVariable<?>[] vars;
         
-        DistinctTask(final DistinctBindingSetOp op,
+        DistinctTask(final DistinctBindingSetsWithHTreeOp op,
                 final BOpContext<IBindingSet> context) {
 
             this.context = context;
@@ -255,7 +309,13 @@ public class DistinctBindingSetOp extends PipelineOp {
          */
         private IConstant<?>[] accept(final IBindingSet bset) {
 
-            final IConstant<?>[] r = new IConstant<?>[vars.length];
+			/*
+			 * Create a subset of the variable bindings which corresponds to
+			 * those which are the key for the DISTINCT operator and wrap them
+			 * as a Solution.
+			 */
+
+        	final IConstant<?>[] r = new IConstant<?>[vars.length];
 
             for (int i = 0; i < vars.length; i++) {
 
@@ -268,18 +328,70 @@ public class DistinctBindingSetOp extends PipelineOp {
 
             }
 
-            final Solution s = new Solution(r);
-            
+			final Solution s = new Solution(r);
+
 			if (log.isTraceEnabled())
 				log.trace("considering: " + Arrays.toString(r));
 
-            final boolean distinct = map.putIfAbsent(s, s) == null;
-
-			if (distinct && log.isDebugEnabled())
+			/*
+			 * Conditional insert on the map. The solution is distinct (for the
+			 * selected variables) iff the map is modified by the conditional
+			 * insert.
+			 */
+			
+			final boolean modified = insertIfAbsent(s);
+			
+			if (modified && log.isDebugEnabled())
 				log.debug("accepted: " + Arrays.toString(r));
 
-            return distinct ? r : null;
+			return modified ? r : null;
 
+        }
+
+		/**
+		 * Insert the solution into the map iff there is no entry for that
+		 * solution.
+		 * <p>
+		 * Note: This has a signature similar to "putIfAbsent" on a concurrent
+		 * map, but the contract for the {@link HTree} is single threaded under
+		 * mutation so this method does NOT support concurrent updates. Instead,
+		 * it provides a simplified pattern for a conditional insert.
+		 * 
+		 * @param key
+		 *            The key.
+		 * @param val
+		 *            The value.
+		 * 
+		 * @return <code>true</code> iff the index was modified.
+		 */
+        private boolean insertIfAbsent(final Solution s) {
+
+        	final int key = s.hashCode();
+        	
+    		final ITupleIterator<Solution> titr = map.lookupAll(key);
+    		
+    		while(titr.hasNext()) {
+
+    			final ITuple<Solution> t = titr.next();
+
+    			final Solution tmp = t.getObject();
+    			
+    			if(s.equals(tmp)) {
+
+    				if (log.isTraceEnabled())
+    					log.trace("duplicate: " + Arrays.toString(s.vals));
+
+    				// A duplicate solution exists.
+    				return false;
+    				
+    			}
+    			
+    		}
+    		
+			map.insert(s);
+    		
+    		return true;
+    		
         }
 
         public Void call() throws Exception {
@@ -378,7 +490,7 @@ public class DistinctBindingSetOp extends PipelineOp {
 					 * is not going to be cleared until the query goes out of
 					 * scope and is swept by GC.
 					 */
-                    map.clear();
+                    map.close();
 
                 }
                 

@@ -75,7 +75,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Leaf extends AbstractNode<Leaf> implements ILeafData {
+public class Leaf extends AbstractNode<Leaf> implements ILeafData, IRawRecordAccess {
 
     /**
      * The data record. {@link MutableLeafData} is used for all mutation
@@ -2290,5 +2290,11 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 //        }
 //
 //    }
+
+	final public ByteBuffer readRawRecord(long addr) {
+		
+		return btree.readRawRecord(addr);
+
+	}
 
 }

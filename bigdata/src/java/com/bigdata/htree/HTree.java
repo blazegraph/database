@@ -1188,6 +1188,8 @@ public class HTree extends AbstractHTree
 	 *            The key.
 	 * 
 	 * @return The iterator and never <code>null</code>.
+	 * 
+	 * TODO Unit tests for lookupAll(byte[] key)
 	 */
 	public ITupleIterator lookupAll(final byte[] key) {
 		if (key == null)
@@ -1205,7 +1207,7 @@ public class HTree extends AbstractHTree
 				 * Found the bucket page, search it for a match.
 				 */
 				final BucketPage bucketPage = (BucketPage) child;
-				return bucketPage.lookupAll(key, buddyOffset);
+				return bucketPage.lookupAll(key);//, buddyOffset);
 			}
 			/*
 			 * Recursive descent into a child directory page. We have to update
@@ -1464,6 +1466,42 @@ public class HTree extends AbstractHTree
 
 	} // insertRawTuple()
 
+//	/**
+//	 * Insert the value under the key iff there is no entry for that key.
+//	 * <p>
+//	 * Note: This has a signature similar to "putIfAbsent" on a concurrent map,
+//	 * but the contract for the {@link HTree} is single threaded under mutation
+//	 * so this method does NOT support concurrent updates. Instead, it provides
+//	 * a simplified pattern for a conditional insert.
+//	 * 
+//	 * @param key
+//	 *            The key.
+//	 * @param val
+//	 *            The value.
+//	 * 
+//	 * @return <code>true</code> iff the index was modified.
+//	 * 
+//	 *         TODO Optimize this. We can do better by passing along a
+//	 *         conditional flag in the main insert() method since we will only
+//	 *         traverse the tree once.  We can also optimize the conditional
+//	 *         insert on the bucket page.
+//	 */
+//	public boolean insertIfAbsent(final byte[] key, final byte[] val) {
+//		
+//		final boolean found = contains(key);
+//		
+//		if(found) {
+//			
+//			return false;
+//			
+//		}
+//		
+//		insert(key,val);
+//		
+//		return true;
+//		
+//	}
+	
 //    /**
 //     * Handle an insert when the target {@link BucketPage} is full (a single
 //     * buddy hash bucket) but can be split (not all keys in the buckets are

@@ -10,6 +10,7 @@ import org.apache.log4j.Level;
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.IRawRecordAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.data.DefaultLeafCoder;
@@ -90,7 +91,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * for a read operation even against a mutable HTree since we allow concurrent
  * read operations as long as there is no writer.
  */
-class BucketPage extends AbstractPage implements ILeafData {
+class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
@@ -453,9 +454,6 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 * 
 	 * @param key
 	 *            The key.
-	 * @param buddyOffset
-	 *            The offset within the {@link BucketPage} of the buddy hash
-	 *            bucket to be searched.
 	 * 
 	 * @return An iterator which will visit each tuple in the buddy hash table
 	 *         for the specified key and never <code>null</code>.
@@ -463,9 +461,12 @@ class BucketPage extends AbstractPage implements ILeafData {
 	 *         TODO Specify the contract for concurrent modification both here
 	 *         and on the {@link HTree#lookupAll(byte[])} methods.
 	 */
-	final ITupleIterator lookupAll(final byte[] key, final int buddyOffset) {
+//	 * @param buddyOffset
+//	 *            The offset within the {@link BucketPage} of the buddy hash
+//	 *            bucket to be searched.
+	final ITupleIterator lookupAll(final byte[] key) {// final int buddyOffset) {
 
-		return new BuddyBucketTupleIterator(key, this, buddyOffset);
+		return new BuddyBucketTupleIterator(key, this);//, buddyOffset);
 
 	}
 
@@ -1331,6 +1332,12 @@ class BucketPage extends AbstractPage implements ILeafData {
 		return a;
 
     }
+
+	final public ByteBuffer readRawRecord(long addr) {
+		
+		return htree.readRawRecord(addr);
+
+	}
 
 	/*
 	 * TODO When writing a method to remove a key/value, the following logic
