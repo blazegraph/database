@@ -386,28 +386,8 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
 
 						} else {
 
-							if(!(leaf instanceof Leaf)) {
-								
-								/*
-								 * TODO Raw record support for the HTree will
-								 * require an API shared by Leaf and BucketPage
-								 * which reaches back to the owning index and
-								 * its readRawRecord() method.  When doing this,
-								 * it would be best if there were a common base
-								 * or interface for the HTree buckets and BTree
-								 * leaves such that no casts are required, but
-								 * that is not essential. [The argument to the
-								 * method used to be Leaf, not ILeafData, but
-								 * that means that we could not invoke this
-								 * method for a BucketPage.]
-								 */
-
-								throw new UnsupportedOperationException();
-								
-							}
-							
 							// materialize from the backing store.
-							final ByteBuffer tmp = ((Leaf)leaf).btree
+							final ByteBuffer tmp = ((IRawRecordAccess) leaf)
 									.readRawRecord(addr);
 
 							// and copy into the value buffer.

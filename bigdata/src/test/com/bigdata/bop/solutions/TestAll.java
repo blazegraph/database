@@ -72,8 +72,11 @@ public class TestAll extends TestCase {
          * Distinct
          */
         
-        // test distinct operator for binding sets.
+        // test distinct operator for binding sets using ConcurrentHashMap
         suite.addTestSuite(TestDistinctBindingSets.class);
+
+        // test distinct operator for binding sets using HTree.
+        suite.addTestSuite(TestDistinctBindingSetsWithHTree.class);
 
         /*
          * Sorting

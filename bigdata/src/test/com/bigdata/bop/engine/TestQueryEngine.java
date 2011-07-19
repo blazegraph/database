@@ -2253,9 +2253,18 @@ public class TestQueryEngine extends TestCase2 {
     static public void assertSameSolutionsAnyOrder(final String msg,
             final IBindingSet[] expected, final IRunningQuery runningQuery) {
 
-        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery
-                .iterator();
+		final IAsynchronousIterator<IBindingSet[]> itr = runningQuery
+				.iterator();
+
+		assertSameSolutionsAnyOrder(msg, expected, itr, runningQuery/* future */);
         
+    }
+    
+	static public void assertSameSolutionsAnyOrder(final String msg,
+			final IBindingSet[] expected,
+			final IAsynchronousIterator<IBindingSet[]> itr,
+			final Future<?> runningQuery) {
+
         try {
 
             final Iterator<IBindingSet> actual = new Dechunkerator<IBindingSet>(
