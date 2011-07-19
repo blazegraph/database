@@ -760,18 +760,19 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
             final AbstractPage child = childRefs[i] == null ? null
                     : childRefs[i].get();
 
-            /*
-             * Note: Both child.identity and triggeredByChildId will always be
-             * 0L for a transient B+Tree since we never assign persistent
-             * identity to the nodes and leaves. Therefore [child.identity !=
-             * triggeredByChildId] will fail for ALL children, including the
-             * trigger, and therefore fail to set the parent on any of them. The
-             * [btree.store==null] test handles this condition and always steals
-             * the child, setting its parent to this new node.
-             * 
-             * FIXME It is clear that testing on child.identity is broken in
-             * some other places for the transient store.
-             */
+			/*
+			 * Note: Both child.identity and triggeredByChildId will always be
+			 * 0L for a transient B+Tree since we never assign persistent
+			 * identity to the nodes and leaves. Therefore [child.identity !=
+			 * triggeredByChildId] will fail for ALL children, including the
+			 * trigger, and therefore fail to set the parent on any of them. The
+			 * [btree.store==null] test handles this condition and always steals
+			 * the child, setting its parent to this new node.
+			 * 
+			 * FIXME It is clear that testing on child.identity is broken in
+			 * some other places for the transient store. [This comment is
+			 * carried over from the B+Tree code.]
+			 */
             if (child != null
                     && (htree.store == null || child.getIdentity() != triggeredByChildId)) {
 

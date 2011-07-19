@@ -40,6 +40,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IBloomFilter;
@@ -63,7 +64,6 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-
 
 /**
  * An mutable persistence capable extensible hash tree.
@@ -89,6 +89,9 @@ import com.bigdata.rawstore.IRawStore;
  *          TODO The keys should be declared as a computed key based on the data
  *          fields in the record. The {@link HTree} supports arbitrary bit
  *          length keys, but can be optimized for int32 keys easily enough.
+ * 
+ *          TODO Instrument performance counters for structural modifications,
+ *          insert, remove, etc. per {@link BTreeCounters}.
  */
 public class HTree extends AbstractHTree 
 	implements 
@@ -3917,16 +3920,23 @@ public class HTree extends AbstractHTree
 	 * 
 	 * @see #load(IRawStore, long)
 	 * 
-	 * @exception IllegalStateException
-	 *                If you attempt to create two {@link HTree} objects from
-	 *                the same metadata record since the metadata address will
-	 *                have already been noted on the {@link IndexMetadata}
-	 *                object. You can use {@link IndexMetadata#clone()} to
-	 *                obtain a new copy of the metadata object with the metadata
-	 *                address set to <code>0L</code>.
+	 * @throws IllegalStateException
+	 *             If you attempt to create two {@link HTree} objects from the
+	 *             same metadata record since the metadata address will have
+	 *             already been noted on the {@link IndexMetadata} object. You
+	 *             can use {@link IndexMetadata#clone()} to obtain a new copy of
+	 *             the metadata object with the metadata address set to
+	 *             <code>0L</code>.
 	 */
     public static HTree create(final IRawStore store, final IndexMetadata metadata) {
-        
+
+    	if(store == null) {
+    	
+    		// Create an htree which is NOT backed by a persistence store.
+    		return createTransient(metadata);
+
+    	}
+    	
         if (metadata.getMetadataAddr() != 0L) {
 
             throw new IllegalStateException("Metadata record already in use");

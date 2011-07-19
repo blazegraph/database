@@ -11,7 +11,15 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
- * Stress test for insert.
+ * A stress test which inserts a series of integer keys and then verifies the
+ * state of the index.
+ * 
+ * TODO Test with int32 keys (versus single byte keys).
+ * 
+ * TODO Stress test with random integers.
+ * 
+ * TODO Stress test with sequential negative numbers and a sequence of
+ * alternating negative and positive integers.
  * 
  * @author thompsonbry@users.sourceforge.net
  * @author martyncutcher@users.sourceforge.net
@@ -27,25 +35,6 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 		super(name);
 	}
 
-    /**
-     * FIXME Write a stress test which inserts a series of integer keys and then
-     * verifies the state of the index. Any consistency problems should be
-     * worked out in depth with an extension of the unit test for the insert
-     * sequence (1,2,3,4,5).
-     * 
-     * TODO Test with int32 keys (versus single byte keys).
-     * 
-     * TODO This could be parameterized for the #of address bits, the #of keys
-     * to insert, etc. [Test w/ 1 address bit (fan-out := 2). Test w/ 1024
-     * address bits.  Use the stress test with the nominal fan out to look at
-     * hot spots in the code.  Instrument counters for structural and other
-     * modifications.]
-     * 
-     * TODO Stress test with random integers.
-     * 
-     * TODO Stress test with sequential negative numbers and a sequence of
-     * alternating negative and positive integers.
-     */
     public void test_stressInsert_noEviction_addressBits1() {
 
 		doStressTest(10000/* limit */, 1/* addressBits */);
