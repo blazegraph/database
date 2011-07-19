@@ -12,6 +12,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class AST2BOpContext {
 
+	public final QueryRoot query;
+	
 	public final AtomicInteger idFactory;
 	
 	public final AbstractTripleStore db;
@@ -20,10 +22,11 @@ public class AST2BOpContext {
 	
 	public final Properties queryHints;
 	
-	public AST2BOpContext(
+	public AST2BOpContext(final QueryRoot query,
 			final AtomicInteger idFactory, final AbstractTripleStore db,
     		final QueryEngine queryEngine, final Properties queryHints) {
 		
+		this.query = query;
 		this.idFactory = idFactory;
 		this.db = db;
 		this.queryEngine = queryEngine;

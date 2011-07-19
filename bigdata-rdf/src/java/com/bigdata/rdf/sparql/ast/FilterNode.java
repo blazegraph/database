@@ -15,7 +15,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 public class FilterNode extends QueryNodeBase
 		implements IQueryNode {
 
-	private final IValueExpression<? extends IV> ve;
+	private final IValueExpressionNode ve;
 	
 	private final Set<IVariable<?>> consumedVars;
 	
@@ -23,22 +23,28 @@ public class FilterNode extends QueryNodeBase
 	
 	private final Set<IVariable<IV>> varsToMaterialize;
 
-	public FilterNode(final IValueExpression<? extends IV> ve) {
+	public FilterNode(final IValueExpressionNode ve) {
 		
 		this.ve = ve;
 
 		consumedVars = new LinkedHashSet<IVariable<?>>();
-		final Iterator<IVariable<?>> it = BOpUtility.getSpannedVariables(ve);
+		final Iterator<IVariable<?>> it = 
+			BOpUtility.getSpannedVariables(ve.getValueExpression());
 		while (it.hasNext()) {
 			consumedVars.add(it.next());
 		}
 		
 		varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
-		materializationRequirement = gatherVarsToMaterialize(ve, varsToMaterialize);
+		materializationRequirement = 
+			gatherVarsToMaterialize(ve.getValueExpression(), varsToMaterialize);
 		
 	}
 	
 	public IValueExpression<? extends IV> getValueExpression() {
+		return ve.getValueExpression();
+	}
+	
+	public IValueExpressionNode getValueExpressionNode() {
 		return ve;
 	}
 	

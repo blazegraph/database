@@ -130,7 +130,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
      * identify a graph which does not exist, in which case an access path will
      * be created for that {@link URI}s but will no visit any data.
      */
-    private final Iterable<? extends URI> defaultGraphs;
+    private final Iterable<IV> defaultGraphs;
 
     /**
      * The #of source graphs in {@link #defaultGraphs} whose term identifier is
@@ -174,7 +174,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
     /**
      * Return an iterator which will visit the source graphs.
      */
-    public Iterator<? extends URI> getGraphs() {
+    public Iterator<IV> getGraphs() {
         
         return defaultGraphs.iterator();
         
@@ -197,7 +197,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
      *            the RDF merge of ALL graphs in the quad store.
      */
     public DefaultGraphSolutionExpander(
-            final Iterable<? extends URI> defaultGraphs) {
+            final Iterable<IV> defaultGraphs) {
         
         this.defaultGraphs = defaultGraphs;
         
@@ -213,7 +213,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
             
         }
 
-        final Iterator<? extends URI> itr = defaultGraphs.iterator();
+        final Iterator<IV> itr = defaultGraphs.iterator();
 
         IV firstContextLocal = null;
         
@@ -221,13 +221,13 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 
         while (itr.hasNext()) {
 
-            final BigdataURI uri = (BigdataURI) itr.next();
+            final IV iv = itr.next();
 
-            if (uri.getIV() != null) {
+            if (iv != null) {
 
                 if (++nknownLocal == 1) {
 
-                    firstContextLocal = uri.getIV();
+                    firstContextLocal = iv;
 
                 }
 
@@ -686,9 +686,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
                 
                 int i = 0;
                 
-                for (URI g : defaultGraphs) {
-
-                    final IV termId = ((BigdataURI)g).getIV();
+                for (IV termId : defaultGraphs) {
 
                     if (termId == null) {
 
@@ -867,9 +865,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
              
                 final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
                 
-                for(URI g : defaultGraphs) {
-
-                    final IV termId = ((BigdataURI)g).getIV();
+                for(IV termId : defaultGraphs) {
 
                     if (termId == null) {
                         

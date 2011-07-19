@@ -34,7 +34,7 @@ public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
      *            The set of acceptable graph identifiers.
      */
     public InGraphHashSetFilter(final int initialCapacity,
-            final Iterable<? extends URI> graphs) {
+            final Iterable<IV> graphs) {
 
         /*
          * Create a sorted array of term identifiers for the set of contexts
@@ -43,10 +43,8 @@ public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
 
         contextSet = new HashSet<IV>(initialCapacity);
         
-        for (URI uri : graphs) {
+        for (IV termId : graphs) {
         
-            final IV termId = ((BigdataURI) uri).getIV();
-            
             if (termId != null) {
 
                 contextSet.add(termId);

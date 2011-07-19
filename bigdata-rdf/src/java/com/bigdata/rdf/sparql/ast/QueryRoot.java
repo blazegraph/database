@@ -16,6 +16,8 @@ public class QueryRoot {
 
 	private final IGroupNode root;
 	
+	private DatasetNode dataset;
+	
 	private final List<OrderByNode> orderBy;
 	
 	private boolean distinct = false;
@@ -27,7 +29,7 @@ public class QueryRoot {
 	private long limit = Long.MAX_VALUE;
 	
 	public QueryRoot(final IGroupNode root) {
-		
+
 		this.root = root;
 		
 		this.orderBy = new LinkedList<OrderByNode>();
@@ -36,8 +38,8 @@ public class QueryRoot {
 		
 	}
 
-	public void addProjectionVar(final IVariable<?> var) {
-		projection.add(var);
+	public void addProjectionVar(final VarNode var) {
+		projection.add(var.getVar());
 	}
 	
 	public IVariable<?>[] getProjection() {
@@ -46,6 +48,14 @@ public class QueryRoot {
 	
 	public IGroupNode getRoot() {
 		return root;
+	}
+	
+	public void setDataset(final DatasetNode dataset) {
+		this.dataset = dataset;
+	}
+	
+	public DatasetNode getDataset() {
+		return dataset;
 	}
 
 	public void addOrderBy(final OrderByNode orderBy) {
