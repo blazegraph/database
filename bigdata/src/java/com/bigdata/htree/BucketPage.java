@@ -619,11 +619,13 @@ class BucketPage extends AbstractPage implements ILeafData {
 		 * Since the page is full, we need to grow the page (or chain an
 		 * overflow page) rather than splitting the page.
 		 * 
-		 * TODO Maybe the easiest thing to do is just double the target #of
-		 * slots on the page. We would rely on keys.capacity() in this case
-		 * rather than #slots. In fact, we could just reenter the method above
-		 * after doubling as long as we rely on keys.capacity() in the case
-		 * where nbuddies==1. [Unit test for this case.]
+		 * FIXME [Chain overflow buckets. This is much faster when we have a lot
+		 * of duplicate keys, which will be the case for some GROUP BY queries.]
+		 * Maybe the easiest thing to do is just double the target #of slots on
+		 * the page. We would rely on keys.capacity() in this case rather than
+		 * #slots. In fact, we could just reenter the method above after
+		 * doubling as long as we rely on keys.capacity() in the case where
+		 * nbuddies==1. [Unit test for this case.]
 		 */
 
 		throw new UnsupportedOperationException(
@@ -802,11 +804,13 @@ class BucketPage extends AbstractPage implements ILeafData {
 		 * Since the page is full, we need to grow the page (or chain an
 		 * overflow page) rather than splitting the page.
 		 * 
-		 * TODO Maybe the easiest thing to do is just double the target #of
-		 * slots on the page. We would rely on keys.capacity() in this case
-		 * rather than #slots. In fact, we could just reenter the method above
-		 * after doubling as long as we rely on keys.capacity() in the case
-		 * where nbuddies==1. [Unit test for this case.]
+		 * FIXME [Chain overflow buckets. This is much faster when we have a lot
+		 * of duplicate keys, which will be the case for some GROUP BY queries.]
+		 * Maybe the easiest thing to do is just double the target #of slots on
+		 * the page. We would rely on keys.capacity() in this case rather than
+		 * #slots. In fact, we could just reenter the method above after
+		 * doubling as long as we rely on keys.capacity() in the case where
+		 * nbuddies==1. [Unit test for this case.]
 		 */
 
 		throw new UnsupportedOperationException(

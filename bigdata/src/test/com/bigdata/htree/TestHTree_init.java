@@ -21,8 +21,6 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 
 	/**
 	 * Test initialization of an {@link HTree}.
-	 * 
-	 * TODO Add test with store := null (this is now the transient mode).
 	 */
 	public void test_init_min_addressBits() {
 
@@ -67,7 +65,7 @@ public class TestHTree_init extends AbstractHTreeTestCase {
 			store.destroy();
 		}
 
-	}	
+	}
 
 	/**
      * Basic test for correct construction of the initial state of an
@@ -94,6 +92,26 @@ public class TestHTree_init extends AbstractHTreeTestCase {
             store.destroy();
             
         }
+
+    }
+
+	/**
+     * Basic test for correct construction of the initial state of an
+     * {@link HTree} when used without a backing {@link IRawStore}.
+     */
+    public void test_ctor_transient() {
+
+        final int addressBits = 10; // implies ~ 4k page size.
+        
+		final IRawStore store = null;
+
+		final HTree htree = getHTree(store, addressBits);
+
+		assertTrue("store", store == htree.getStore());
+		assertEquals("addressBits", addressBits, htree.getAddressBits());
+		assertEquals("nnodes", 1, htree.getNodeCount());
+		assertEquals("nleaves", 1, htree.getLeafCount());
+		assertEquals("nentries", 0, htree.getEntryCount());
 
     }
 
