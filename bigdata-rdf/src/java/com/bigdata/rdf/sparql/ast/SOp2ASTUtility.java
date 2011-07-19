@@ -1,9 +1,13 @@
 package com.bigdata.rdf.sparql.ast;
 
 import org.apache.log4j.Logger;
+import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
@@ -65,7 +69,17 @@ public class SOp2ASTUtility {
 					
 					final Predicate pred = (Predicate) bop;
 					
-					astGroup.addChild(new StatementPatternNode(pred));
+					final StatementPattern sp = (StatementPattern) sop.getOperator();
+					
+					final TermNode s = toTermNode(pred, 0);
+					final TermNode p = toTermNode(pred, 1);
+					final TermNode o = toTermNode(pred, 2);
+					final TermNode c = toTermNode(pred, 3);
+
+					final Scope scope = sp.getScope();
+					
+					astGroup.addChild(new StatementPatternNode(s, p, o, c, scope));
+					
 					
 				} else {
 					
@@ -74,7 +88,7 @@ public class SOp2ASTUtility {
 					final IValueExpression<? extends IV> ve = 
 						constraint.getValueExpression();
 					
-					astGroup.addChild(new FilterNode(ve));
+					astGroup.addChild(new FilterNode(new ValueExpressionNode(ve)));
 					
 				}
 				
@@ -97,6 +111,26 @@ public class SOp2ASTUtility {
 		}
 		
 		return astGroup;
+		
+	}
+	
+	private static final TermNode toTermNode(final Predicate pred, final int i) {
+		
+		if (i >= pred.arity()) {
+			return null;
+		}
+		
+		final BOp bop = pred.get(i);
+		
+		if (bop instanceof IVariable) {
+			return new VarNode(((IVariable) bop).getName());
+		} else {
+			final IV iv = ((IConstant<IV>) bop).get();
+			if (iv.isNullIV()) {
+				return new DummyConstantNode(iv.getValue());
+			}
+			return new ConstantNode(iv);
+		}
 		
 	}
 	

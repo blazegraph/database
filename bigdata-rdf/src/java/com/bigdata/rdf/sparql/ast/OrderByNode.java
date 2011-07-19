@@ -1,23 +1,27 @@
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 
 public class OrderByNode {
 
-	private final IVariable<IV> var;
+	private final IValueExpressionNode ve;
 	
 	private final boolean ascending;
 	
-	public OrderByNode(final IVariable<IV> var, final boolean ascending) {
+	public OrderByNode(final IValueExpressionNode ve, final boolean ascending) {
 		
-		this.var = var;
+		this.ve = ve;
 		this.ascending = ascending;
 		
 	}
 	
-	public IVariable<IV> getVar() {
-		return var;
+	public IValueExpressionNode getValueExpressionNode() {
+		return ve;
+	}
+
+	public IValueExpression<? extends IV> getValueExpression() {
+		return ve.getValueExpression();
 	}
 
 	public boolean isAscending() {
@@ -32,7 +36,7 @@ public class OrderByNode {
 			sb.append("desc(");
 		}
 		
-		sb.append("?").append(var.getName());
+		sb.append("?").append(ve.toString());
 		
 		if (!ascending) {
 			sb.append(")");

@@ -33,6 +33,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -140,7 +141,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
                 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] {}/* defaultGraphs */));
+                                .asList(new IV[] {}/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(SPOKeyOrder.SPOC);
@@ -174,7 +175,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
                 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(SPOKeyOrder.SPOC);
@@ -209,7 +210,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(SPOKeyOrder.SPOC);
@@ -246,7 +247,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(john, null, null, (Resource) null);
@@ -281,7 +282,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(mary, null, null, (Resource) null);
@@ -316,7 +317,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(null, null, mary, (Resource) null);
@@ -352,7 +353,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 final DefaultGraphSolutionExpander expander = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final SPOAccessPath baseAccessPath = (SPOAccessPath) store
                         .getAccessPath(john, null, paul, (Resource) null);
@@ -420,7 +421,7 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
                 
                 final DefaultGraphSolutionExpander expected = new DefaultGraphSolutionExpander(
                         Arrays
-                                .asList(new BigdataURI[] { c1, c2 }/* defaultGraphs */));
+                                .asList(new IV[] { c1.getIV(), c2.getIV() }/* defaultGraphs */));
 
                 final DefaultGraphSolutionExpander actual = (DefaultGraphSolutionExpander) SerializerUtil
                         .deserialize(SerializerUtil.serialize(expected));

@@ -12,6 +12,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+import org.openrdf.model.Value;
+import org.openrdf.query.Dataset;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.Var;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
@@ -22,6 +27,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -43,6 +49,7 @@ import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.bop.solutions.SparqlBindingSetComparatorOp;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
@@ -53,8 +60,19 @@ import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.lexicon.LexPredicate;
+import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
+import com.bigdata.rdf.spo.ExplicitSPOFilter;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
+import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.striterator.IKeyOrder;
@@ -67,10 +85,11 @@ public class AST2BOpUtility {
 	/**
 	 * Convert an AST query plan into a set of executable pipeline operators.
 	 */
-	public static PipelineOp convert(final QueryRoot query,
-			final AST2BOpContext ctx) {
+	public static PipelineOp convert(final AST2BOpContext ctx) {
 		
-		final IGroupNode root = query.getRoot();
+		final QueryRoot query = ctx.query;
+		
+		final IGroupNode root = ctx.query.getRoot();
 
 		PipelineOp left = convert(root, ctx);
 		
@@ -331,7 +350,7 @@ public class AST2BOpUtility {
     	final List<IPredicate> preds = new LinkedList<IPredicate>();
     	
     	for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
-    		preds.add(sp.getPredicate());
+    		preds.add(toPredicate(sp, ctx));
     	}
 
     	// sometimes we get empty groups
@@ -370,10 +389,10 @@ public class AST2BOpUtility {
     }
     
     private static final PipelineOp addJoin(PipelineOp left,
-    		final StatementPatternNode sp, final Collection<FilterNode> filters,
+    		final Predicate pred, final Collection<FilterNode> filters,
     		final AST2BOpContext ctx) {
     	
-    	final Predicate pred = sp.getPredicate();
+//    	final Predicate pred = toPredicate(sp);
     	
     	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
     	
@@ -448,12 +467,12 @@ public class AST2BOpUtility {
     			
     			final Collection<FilterNode> filters = subJoinGroup.getFilters();
     			
-    			final Predicate pred = (Predicate) sp.getPredicate().setProperty(
+    			final Predicate pred = (Predicate) toPredicate(sp, ctx).setProperty(
 						IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
     			
-    			final StatementPatternNode sp2 = new StatementPatternNode(pred);
+//    			final StatementPatternNode sp2 = new StatementPatternNode(pred);
     			
-    			left = addJoin(left, sp2, filters, ctx);
+    			left = addJoin(left, pred, filters, ctx);
     			
     		} else {
     		
@@ -556,7 +575,7 @@ public class AST2BOpUtility {
 			
     		final OrderByNode orderBy = it.next();
     		
-    		final IVariable<IV> var = orderBy.getVar();
+    		final IVariable<IV> var = (IVariable<IV>) orderBy.getValueExpression();
     		
     		final boolean ascending = orderBy.isAscending();
     		
@@ -936,5 +955,244 @@ public class AST2BOpUtility {
 
     }
 
+    private static final Predicate toPredicate(
+    		final StatementPatternNode sp, final AST2BOpContext ctx) {
+    	
+    	final AbstractTripleStore database = ctx.db;
+    	
+    	final DatasetNode dataset = ctx.query.getDataset();
+    	
+        // create a solution expander for free text search if necessary
+        IAccessPathExpander<ISPO> expander = null;
+        
+        final Value predValue = sp.p().getValue();
+        if (log.isDebugEnabled()) {
+            log.debug(predValue);
+        }
+        if (predValue != null && BD.SEARCH.equals(predValue)) {
+            final Value objValue = sp.o().getValue();
+            if (log.isDebugEnabled()) {
+                log.debug(objValue);
+            }
+            if (objValue != null && objValue instanceof Literal) {
+                expander = new FreeTextSearchExpander(database,
+                        (Literal) objValue);
+            }
+        }
+        
+        // @todo why is [s] handled differently?
+        // because [s] is the variable in free text searches, no need to test
+        // to see if the free text search expander is in place
+        final IVariableOrConstant<IV> s = sp.s().getValueExpression();
+        if (s == null) {
+            return null;
+        }
+        
+        final IVariableOrConstant<IV> p;
+        if (expander == null) {
+            p = sp.p().getValueExpression();
+        } else {
+            p = new Constant(TermId.mockIV(VTE.BNODE));
+        }
+        if (p == null) {
+            return null;
+        }
+        
+        final IVariableOrConstant<IV> o;
+        if (expander == null) {
+            o = sp.o().getValueExpression();
+        } else {
+            o = new Constant(TermId.mockIV(VTE.BNODE));
+        }
+        if (o == null) {
+            return null;
+        }
+        
+        // The annotations for the predicate.
+        final List<NV> anns = new LinkedList<NV>();
+        
+        final IVariableOrConstant<IV> c;
+        if (!database.isQuads()) {
+            /*
+             * Either triple store mode or provenance mode.
+             */
+            final TermNode cTerm = sp.c();
+            if (cTerm == null) {
+                // context position is not used.
+                c = null;
+            } else {
+                final Value val = cTerm.getValue();
+                if (val != null && database.isStatementIdentifiers()) {
+                    /*
+                     * Note: The context position is used as a statement
+                     * identifier (SID). SIDs may be used to retrieve provenance
+                     * statements (statements about statement) using high-level
+                     * query. SIDs are represented as blank nodes and is not
+                     * possible to have them bound in the original query. They
+                     * only become bound during query evaluation.
+                     */
+                    throw new IllegalArgumentException(
+                            "Context position is a statement identifier and may not be bound in the original query: "
+                                    + sp);
+                }
+                c = ((VarNode) cTerm).getVar();
+            }
+        } else {
+            /*
+             * Quad store mode.
+             */
+            if (expander != null) {
+                /*
+                 * This code path occurs when we are doing a free text search
+                 * for this access path using the FreeTestSearchExpander. There
+                 * is no need to do any named or default graph expansion work on
+                 * a free text search access path.
+                 */
+                c = null;
+            } else {
+                // the graph variable iff specified by the query.
+                final TermNode cvar = sp.c();
+                // quads mode.
+                anns.add(new NV(Rule2BOpUtility.Annotations.QUADS, true));
+                // attach the Scope.
+                anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp
+                        .getScope()));
+                if (dataset == null) {
+                    // attach the appropriate expander : @todo drop expanders. 
+                    if (cvar == null) {
+                        /*
+                         * There is no dataset and there is no graph variable,
+                         * so the default graph will be the RDF Merge of ALL
+                         * graphs in the quad store.
+                         * 
+                         * This code path uses an "expander" which strips off
+                         * the context information and filters for the distinct
+                         * (s,p,o) triples to realize the RDF Merge of the
+                         * source graphs for the default graph.
+                         */
+                        c = null;
+                        expander = new DefaultGraphSolutionExpander(null/* ALL */);
+                    } else {
+                        /*
+                         * There is no data set and there is a graph variable,
+                         * so the query will run against all named graphs and
+                         * [cvar] will be to the context of each (s,p,o,c) in
+                         * turn. This handles constructions such as:
+                         * 
+                         * "SELECT * WHERE {graph ?g {?g :p :o } }"
+                         */
+                        expander = new NamedGraphSolutionExpander(null/* ALL */);
+                        c = cvar.getValueExpression();
+                    }
+                } else { // dataset != null
+                    // attach the DataSet.
+                    anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
+                            dataset));
+                    // attach the appropriate expander : @todo drop expanders. 
+                    switch (sp.getScope()) {
+                    case DEFAULT_CONTEXTS: {
+                        /*
+                         * Query against the RDF merge of zero or more source
+                         * graphs.
+                         */
+                        expander = new DefaultGraphSolutionExpander(dataset
+                                .getDefaultGraphs().getGraphs());
+                        /*
+                         * Note: cvar can not become bound since context is
+                         * stripped for the default graph.
+                         */
+                        if (cvar == null)
+                            c = null;
+                        else
+                            c = cvar.getValueExpression();
+                        break;
+                    }
+                    case NAMED_CONTEXTS: {
+                        /*
+                         * Query against zero or more named graphs.
+                         */
+                        expander = new NamedGraphSolutionExpander(dataset
+                                .getNamedGraphs().getGraphs());
+                        if (cvar == null) {// || !cvar.hasValue()) {
+                            c = null;
+                        } else {
+                            c = cvar.getValueExpression();
+                        }
+                        break;
+                    }
+                    default:
+                        throw new AssertionError();
+                    }
+                }
+            }
+        }
+
+//        /*
+//         * This applies a filter to the access path to remove any inferred
+//         * triples when [includeInferred] is false.
+//         * 
+//         * @todo We can now stack filters so are we missing out here by not
+//         * layering in other filters as well? [In order to rotate additional
+//         * constraints onto an access path we would need to either change
+//         * IPredicate and AbstractAccessPath to process an IConstraint[] or
+//         * write a delegation pattern that let's us wrap one filter inside of
+//         * another.]
+//         */
+//        final IElementFilter<ISPO> filter = 
+//            !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
+//                : null;
+
+        // Decide on the correct arity for the predicate.
+        final BOp[] vars;
+        if (!database.isQuads() && !database.isStatementIdentifiers()) {
+            vars = new BOp[] { s, p, o };
+        } else if (c == null) {
+            vars = new BOp[] { s, p, o, com.bigdata.bop.Var.var() };
+        } else {
+            vars = new BOp[] { s, p, o, c };
+        }
+
+        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
+                new String[] { database.getSPORelation().getNamespace() }));//
+        
+//        // filter on elements visited by the access path.
+//        if (filter != null)
+//            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+//                    ElementFilter.newInstance(filter)));
+
+        // free text search expander or named graphs expander
+        if (expander != null)
+            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER, expander));
+
+        // timestamp
+        anns.add(new NV(Annotations.TIMESTAMP, database
+                .getSPORelation().getTimestamp()));
+
+        /*
+         * Explicitly set the access path / iterator flags.
+         * 
+         * Note: High level query generally permits iterator level parallelism.
+         * We set the PARALLEL flag here so it can be used if a global index
+         * view is chosen for the access path.
+         * 
+         * Note: High level query for SPARQL always uses read-only access paths.
+         * If you are working with a SPARQL extension with UPDATE or INSERT INTO
+         * semantics then you will need to remote the READONLY flag for the
+         * mutable access paths.
+         */
+        anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
+                | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
+        
+        return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
+//        return new SPOPredicate(
+//                new String[] { database.getSPORelation().getNamespace() },
+//                -1, // partitionId
+//                s, p, o, c,
+//                optional, // optional
+//                filter, // filter on elements visited by the access path.
+//                expander // free text search expander or named graphs expander
+//                );
+    	
+    }
 	
 }

@@ -88,13 +88,14 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.lexicon.LexPredicate;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -771,7 +772,7 @@ public class Rule2BOpUtility {
                 Annotations.DEFAULT_QUADS);
 
         // pull of the Sesame dataset before we strip the annotations.
-        final Dataset dataset = (Dataset) pred
+        final DatasetNode dataset = (DatasetNode) pred
                 .getProperty(Annotations.DATASET);
 
         // strip off annotations that we do not want to propagate.
@@ -1179,7 +1180,7 @@ public class Rule2BOpUtility {
     private static PipelineOp namedGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final Dataset dataset, final Properties queryHints) {
+            final DatasetNode dataset, final Properties queryHints) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -1228,8 +1229,7 @@ public class Rule2BOpUtility {
          * paths, there is only one named graph collection and one default graph
          * collection within the scope of that query.
          */
-        final DataSetSummary summary = new DataSetSummary(dataset
-                .getNamedGraphs());
+        final DataSetSummary summary = dataset.getNamedGraphs();
 
         anns.add(new NV(Annotations.NKNOWN, summary.nknown));
 
@@ -1387,7 +1387,7 @@ public class Rule2BOpUtility {
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
-            final Dataset dataset, final Properties queryHints) {
+            final DatasetNode dataset, final Properties queryHints) {
 
         /*
          * @todo raise this into the caller and do one per rule rather than once
@@ -1396,7 +1396,7 @@ public class Rule2BOpUtility {
          * collection within the scope of that query.
          */
         final DataSetSummary summary = dataset == null ? null
-                : new DataSetSummary(dataset.getDefaultGraphs());
+                : dataset.getDefaultGraphs();
 
         final boolean scaleOut = queryEngine.isScaleOut();
 

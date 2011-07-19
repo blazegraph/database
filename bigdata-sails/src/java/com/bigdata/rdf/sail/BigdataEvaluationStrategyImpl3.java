@@ -30,6 +30,7 @@ import org.openrdf.query.algebra.And;
 import org.openrdf.query.algebra.BNodeGenerator;
 import org.openrdf.query.algebra.Bound;
 import org.openrdf.query.algebra.Compare;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.CompareAll;
 import org.openrdf.query.algebra.CompareAny;
 import org.openrdf.query.algebra.Datatype;
@@ -63,6 +64,7 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.Regex;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.Str;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
@@ -70,8 +72,6 @@ import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.ProjectionIterator;
@@ -84,12 +84,12 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -114,6 +114,7 @@ import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.LangBOp;
 import com.bigdata.rdf.internal.constraints.LangMatchesBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -123,18 +124,18 @@ import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
+import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.SOp2ASTUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -978,11 +979,15 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			final com.bigdata.rdf.sparql.ast.QueryRoot ast = 
 					SOp2ASTUtility.convert(sopTree);
 			
+			if (dataset != null) {
+				ast.setDataset(new DatasetNode(dataset));
+			}
+			
 			if (log.isInfoEnabled())
 				log.info("\n"+ast);
 
-			query = AST2BOpUtility.convert(ast, 
-					new AST2BOpContext(idFactory, database, queryEngine, queryHints));
+			query = AST2BOpUtility.convert(new AST2BOpContext(
+					ast, idFactory, database, queryEngine, queryHints));
 
 			if (log.isInfoEnabled())
 				log.info("\n"+BOpUtility.toString2(query));
@@ -1712,7 +1717,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                 } else { // dataset != null
                     // attach the DataSet.
                     anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
-                            dataset));
+                            new DatasetNode(dataset)));
                     // attach the appropriate expander : @todo drop expanders. 
                     switch (stmtPattern.getScope()) {
                     case DEFAULT_CONTEXTS: {
@@ -1720,8 +1725,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                          * Query against the RDF merge of zero or more source
                          * graphs.
                          */
-                        expander = new DefaultGraphSolutionExpander(dataset
-                                .getDefaultGraphs());
+                        expander = new DefaultGraphSolutionExpander(
+                        		DataSetSummary.toInternalValues(dataset.getDefaultGraphs()));
                         /*
                          * Note: cvar can not become bound since context is
                          * stripped for the default graph.
@@ -1736,8 +1741,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
                         /*
                          * Query against zero or more named graphs.
                          */
-                        expander = new NamedGraphSolutionExpander(dataset
-                                .getNamedGraphs());
+                        expander = new NamedGraphSolutionExpander(
+                        		DataSetSummary.toInternalValues(dataset.getNamedGraphs()));
                         if (cvar == null) {// || !cvar.hasValue()) {
                             c = null;
                         } else {

@@ -3,9 +3,9 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import com.bigdata.bop.BOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
+
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ap.Predicate;
 
 /**
  * A node in the AST representing a statement pattern.
@@ -13,29 +13,68 @@ import com.bigdata.bop.ap.Predicate;
 public class StatementPatternNode extends QueryNodeBase
 		implements IQueryNode {
 
-	private final Predicate pred;
+	private final TermNode s, p, o, c;
+	
+	private final Scope scope;
 	
 	private final Set<IVariable<?>> producedBindings;
 	
-	public StatementPatternNode(final Predicate pred) {
+	public StatementPatternNode(
+			final TermNode s, final TermNode p, final TermNode o) {
 		
-		this.pred = pred;
+		this(s, p, o, null, null);
+		
+	}
+		
+	public StatementPatternNode(
+			final TermNode s, final TermNode p, final TermNode o, 
+			final TermNode c, final Scope scope) {
+		
+		if (s == null || p == null || o == null) {
+			throw new IllegalArgumentException();
+		}
+		
+		this.s = s;
+		this.p = p;
+		this.o = o;
+		this.c = c;
+		this.scope = scope;
 		
 		producedBindings = new LinkedHashSet<IVariable<?>>();
 		
-		for (BOp arg : pred.args()) {
-			if (arg instanceof IVariable) {
-				producedBindings.add((IVariable<?>) arg);
-			}
+		if (s instanceof VarNode) {
+			producedBindings.add(((VarNode) s).getVar());
+		}
+		if (p instanceof VarNode) {
+			producedBindings.add(((VarNode) p).getVar());
+		}
+		if (o instanceof VarNode) {
+			producedBindings.add(((VarNode) o).getVar());
+		}
+		if (c != null && c instanceof VarNode) {
+			producedBindings.add(((VarNode) c).getVar());
 		}
 		
 	}
+	
+	public TermNode s() {
+		return s;
+	}
 
-	/**
-	 * Return the bigdata predicate.
-	 */
-	public Predicate getPredicate() {
-		return pred;
+	public TermNode p() {
+		return p;
+	}
+
+	public TermNode o() {
+		return o;
+	}
+
+	public TermNode c() {
+		return c;
+	}
+	
+	public Scope getScope() {
+		return scope;
 	}
 
 	/**
@@ -71,7 +110,20 @@ public class StatementPatternNode extends QueryNodeBase
 		
 		final StringBuilder sb = new StringBuilder();
 
-		sb.append(_indent).append("sp(").append(pred).append(")");
+		sb.append(_indent).append("sp(");
+		sb.append(s).append(", ");
+		sb.append(p).append(", ");
+		sb.append(o);
+		
+		if (c != null) {
+			sb.append(", ").append(c);
+		}
+		
+		if (scope != null) {
+			sb.append(", ").append(scope);
+		}
+		
+		sb.append(")");
 		
 		return sb.toString();
 		

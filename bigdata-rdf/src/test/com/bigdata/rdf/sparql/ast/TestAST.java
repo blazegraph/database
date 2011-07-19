@@ -240,12 +240,12 @@ public class TestAST extends ProxyTestCase {
     	final QueryRoot query = new QueryRoot(root);
     	
     	query.setDistinct(true);
-    	query.addProjectionVar(Var.var("s"));
-    	query.addProjectionVar(Var.var("p"));
+    	query.addProjectionVar(new VarNode("s"));
+    	query.addProjectionVar(new VarNode("p"));
     	query.setOffset(10);
     	query.setLimit(100);
-    	query.addOrderBy(new OrderByNode(Var.var("s"), true));
-    	query.addOrderBy(new OrderByNode(Var.var("p"), false));
+    	query.addOrderBy(new OrderByNode(new VarNode("s"), true));
+    	query.addOrderBy(new OrderByNode(new VarNode("p"), false));
     	
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -253,11 +253,11 @@ public class TestAST extends ProxyTestCase {
     }
 
     public StatementPatternNode sp(final int id) {
-    	return new StatementPatternNode(pred(id));
+    	return null;
     }
     
     public FilterNode filter(final int id) {
-    	return new FilterNode(ve(id));
+    	return null;
     }
     
     public Predicate pred(final int id) {

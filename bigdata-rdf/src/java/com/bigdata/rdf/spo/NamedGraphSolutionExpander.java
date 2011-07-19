@@ -88,7 +88,7 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
      * which does not exist, in which case an access path will be created for
      * that {@link URI}s but will no visit any data.
      */
-    private final Iterable<? extends URI> namedGraphs;
+    private final Iterable<IV> namedGraphs;
 
     /**
      * The #of source graphs in {@link #namedGraphs} whose term identifier is
@@ -131,7 +131,7 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
      *            <code>null</code>, then the set of named graphs is understood
      *            to be ALL graphs in the quad store.
      */
-    public NamedGraphSolutionExpander(final Iterable<? extends URI> namedGraphs) {
+    public NamedGraphSolutionExpander(final Iterable<IV> namedGraphs) {
 
         this.namedGraphs = namedGraphs;
 
@@ -143,19 +143,19 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
             
         } else {
 
-            final Iterator<? extends URI> itr = namedGraphs.iterator();
+            final Iterator<IV> itr = namedGraphs.iterator();
 
             int nknown = 0;
 
             while (itr.hasNext()) {
 
-                final BigdataURI uri = (BigdataURI) itr.next();
+                final IV iv = itr.next();
 
-                if (uri.getIV() != null) {
+                if (iv != null) {
 
                     if (++nknown == 1) {
 
-                        firstContext = uri.getIV();
+                        firstContext = iv;
 
                     }
 
@@ -603,9 +603,7 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 
                         final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
 
-                        for (URI g : namedGraphs) {
-
-                            final IV termId = ((BigdataURI)g).getIV();
+                        for (IV termId : namedGraphs) {
 
                             if (termId == null) {
 
@@ -710,9 +708,7 @@ public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 
             final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
 
-            for (URI g : namedGraphs) {
-
-                final IV termId = ((BigdataURI) g).getIV();
+            for (IV termId : namedGraphs) {
 
                 if (termId == null) {
 
