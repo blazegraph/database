@@ -85,6 +85,10 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 							+ getEvaluationContext());
 		}
 
+		if (getMaxParallel() != 1)
+			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+					+ "=" + getMaxParallel());
+
 		// shared state is used to share the hash table.
 		if (!isSharedState()) {
 			throw new UnsupportedOperationException(Annotations.SHARED_STATE
