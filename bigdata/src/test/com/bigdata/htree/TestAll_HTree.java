@@ -93,11 +93,11 @@ public class TestAll_HTree extends TestCase {
         
         // test iterator semantics for visiting only "dirty" nodes or leaves.
         suite.addTestSuite(TestDirtyIterators.class);
-//
-//        // test incremental write of leaves and nodes.
-//        suite.addTestSuite(TestIncrementalWrite.class);
-//        // test copy-on-write scenarios.
-//        suite.addTestSuite(TestCopyOnWrite.class);
+
+        // test incremental write of leaves and nodes.
+        suite.addTestSuite(TestIncrementalWrite.class);
+        // test copy-on-write scenarios.
+        suite.addTestSuite(TestCopyOnWrite.class);
 
         /*
          * test persistence protocols. 
@@ -111,17 +111,17 @@ public class TestAll_HTree extends TestCase {
         // test of storing null values under a key with persistence.
         suite.addTestSuite(TestNullValues.class);
 
-//        /*
-//         * test of transient HTree's (no backing store).
-//         */
-//        suite.addTestSuite(TestTransientHTree.class);
+        /*
+         * test of transient HTree's (no backing store).
+         */
+        suite.addTestSuite(TestTransientHTree.class);
 
         /*
          * test index with raw record support enabled.
          */
         suite.addTestSuite(TestRawRecords.class);
 
-//        /* TODO Support blooom filters?
+//        /* TODO Support bloom filters?
 //        
 //         * Test bloom filters for a BTree (vs an IndexSegment, which is handled
 //         * in the IndexSegment test suite).
