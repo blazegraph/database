@@ -11,6 +11,12 @@ import com.bigdata.rdf.internal.IV;
  */
 public class VarNode extends TermNode {
 
+	public VarNode(final IVariable<IV> var) {
+		
+		super(var);
+		
+	}
+	
 	public VarNode(final String var) {
 		
 		super(Var.var(var));
