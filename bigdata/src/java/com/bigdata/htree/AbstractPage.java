@@ -475,7 +475,11 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	/** Pretty print the tree from this level on down. */
 	abstract void PP(StringBuilder sb);
 
-	/** Return a very short id used by {@link #PP()}. */
+	/**
+	 * Return a very short id used by {@link #PP()}. The prefix "B" or "D"
+	 * indicates whether the page is a {@link BucketPage} or a
+	 * {@link DirectoryPage}. The suffix "*" indicates a dirty page.
+	 */
 	protected String PPID() {
 
 		final int hash = hashCode() % 100;
@@ -483,7 +487,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 		// Note: fixes up the string if hash is only one digit.
 		final String hashStr = "#" + (hash < 10 ? "0" : "") + hash;
 
-		return (isLeaf() ? "B" : "D") + hashStr;
+		return (isLeaf() ? "B" : "D") + hashStr + (isDirty() ? "*" : " ");
 
 	}
 
@@ -605,7 +609,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
         }
 
         if (log.isInfoEnabled()) {
-            log.info("this=" + this + ", trigger=" + triggeredByChildId);
+            log.info("this=" + toShortString() + ", trigger=" + triggeredByChildId);
         }
 
         // cast to mutable implementation class.
