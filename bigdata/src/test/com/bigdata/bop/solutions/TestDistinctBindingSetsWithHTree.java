@@ -178,6 +178,8 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,
                             true),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
+                            1),//
                 }));
         fail("Expecting: "+IllegalArgumentException.class);
         } catch(IllegalArgumentException ex) {
@@ -195,6 +197,8 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
 //                            BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,
                             true),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
+                            1),//
                 }));
         fail("Expecting: "+UnsupportedOperationException.class);
         } catch(UnsupportedOperationException ex) {
@@ -212,6 +216,27 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
 //                    new NV(PipelineOp.Annotations.SHARED_STATE,
 //                            true),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
+                            1),//
+                }));
+        fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+        	if(log.isInfoEnabled())
+        		log.info("Ignoring expected exception: "+ex);
+        }
+
+        // w/o maxParallel := 1.
+        try {
+        new DistinctBindingSetsWithHTreeOp(new BOp[]{},
+                NV.asMap(new NV[]{//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,
+                            true),//
+//                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
+//                            1),//
                 }));
         fail("Expecting: "+UnsupportedOperationException.class);
         } catch(UnsupportedOperationException ex) {
@@ -241,8 +266,8 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                     new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,
-                            true),//
+					new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+					new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 }));
         
         // the expected solutions
