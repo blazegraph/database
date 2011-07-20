@@ -241,8 +241,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
              * for this case.
              */
 
-            return _getChild(index, null/* req */);
+            final AbstractPage child = _getChild(index, null/* req */);
 
+    		htree.touch(child);
+    		
+            return child;
+            
         }
 
         /*
@@ -270,6 +274,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
             if (child != null) {
 
                 // Already materialized.
+        		htree.touch(child);
+        		
                 return child;
 
             }
@@ -343,6 +349,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
             if (child != null) {
 
                 // Already materialized.
+        		htree.touch(child);
+        		
                 return child;
 
             }
@@ -494,6 +502,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
         }
 
+		htree.touch(child);
+		
         return child;
 
     }
