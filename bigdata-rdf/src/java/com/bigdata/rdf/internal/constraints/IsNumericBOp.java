@@ -33,16 +33,16 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Imposes the constraint <code>isBNode(x)</code>.
+ * Imposes the constraint <code>isLiteral(x)</code>.
  */
-public class IsBNodeBOp extends XSDBooleanIVValueExpression {
+public class IsNumericBOp extends XSDBooleanIVValueExpression {
 
     /**
 	 * 
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsBNodeBOp(final IValueExpression<? extends IV> x) {
+    public IsNumericBOp(final IValueExpression<? extends IV> x) {
         
         this(new BOp[] { x }, null/*annocations*/);
         
@@ -51,7 +51,7 @@ public class IsBNodeBOp extends XSDBooleanIVValueExpression {
     /**
      * Required shallow copy constructor.
      */
-    public IsBNodeBOp(final BOp[] args, final Map<String, Object> anns) {
+    public IsNumericBOp(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);
     	
@@ -63,7 +63,7 @@ public class IsBNodeBOp extends XSDBooleanIVValueExpression {
     /**
      * Required deep copy constructor.
      */
-    public IsBNodeBOp(final IsBNodeBOp op) {
+    public IsNumericBOp(final IsNumericBOp op) {
         super(op);
     }
 
@@ -73,9 +73,9 @@ public class IsBNodeBOp extends XSDBooleanIVValueExpression {
         
         // not yet bound
         if (iv == null)
-        	throw new SparqlTypeErrorException();
+            throw new SparqlTypeErrorException.UnboundVarException();
 
-    	return iv.isBNode(); 
+    	return iv.isNumeric();
 
     }
     

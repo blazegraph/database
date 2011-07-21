@@ -33,12 +33,12 @@ import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.WrappedIV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -63,7 +63,7 @@ public class StrBOp extends IVValueExpression<IV>
 
     }
 	
-    public StrBOp(final IVariable<IV> x, final String lex) {
+    public StrBOp(final IValueExpression<? extends IV> x, final String lex) {
         
         this(new BOp[] { x }, 
         		NV.asMap(new NV(Annotations.NAMESPACE, lex)));

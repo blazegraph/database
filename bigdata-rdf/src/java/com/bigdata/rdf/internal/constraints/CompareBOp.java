@@ -106,25 +106,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	return (CompareOp) getRequiredProperty(Annotations.OP);
     }
 
-    public boolean accept(final IBindingSet s) {
-        
-    	final IV left = get(0).get(s);
-    	final IV right = get(1).get(s);
-    	
-        // not yet bound
-    	if (left == null || right == null)
-        	throw new SparqlTypeErrorException();
-    	
-    	if (log.isDebugEnabled()) {
-    		log.debug("left: " + left);
-    		log.debug("right: " + right);
-    		
-    		log.debug("left value: " + (left.hasValue() ? left.getValue() : null));
-    		log.debug("right value: " + (right.hasValue() ? right.getValue() : null));
-    	}
-
-    	final CompareOp op = op();
-    	
+    public static boolean compare(CompareOp op,IV left, IV right){
     	if (left.isStatement() || right.isStatement()) {
     		
     		throw new SparqlTypeErrorException();
@@ -153,7 +135,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	// handle inlines: booleans, numerics, and dateTimes (if inline) 
     	if (IVUtility.canNumericalCompare(left, right)) {
     		
-    		return _accept(IVUtility.numericalCompare(left, right));
+            return _accept(op,IVUtility.numericalCompare(left, right));
     		
     	}
 
@@ -183,12 +165,29 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		throw new SparqlTypeErrorException();
     		
     	}
+    }
+    public boolean accept(final IBindingSet s) {
+        
+    	final IV left = get(0).get(s);
+    	final IV right = get(1).get(s);
     	
+        // not yet bound
+    	if (left == null || right == null)
+        	throw new SparqlTypeErrorException();
+    	
+    	if (log.isDebugEnabled()) {
+    		log.debug("left: " + left);
+    		log.debug("right: " + right);
+    		
+    		log.debug("left value: " + (left.hasValue() ? left.getValue() : null));
+    		log.debug("right value: " + (right.hasValue() ? right.getValue() : null));
     }
     
-    protected boolean _accept(final int compare) {
+    	final CompareOp op = op();
+    	return compare(op,left,right);
+    }
     	
-    	final CompareOp op = (CompareOp) getProperty(Annotations.OP);
+    static protected boolean _accept(final CompareOp op,final int compare) {
     	
     	switch(op) {
     	case EQ:

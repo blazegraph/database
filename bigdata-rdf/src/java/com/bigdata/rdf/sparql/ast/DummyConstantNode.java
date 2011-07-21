@@ -17,7 +17,7 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public class DummyConstantNode extends TermNode {
 
-	private static final IV dummyIV(final BigdataValue val) {
+	public static final IV dummyIV(final BigdataValue val) {
 		
 		final IV dummy = TermId.mockIV(VTE.valueOf(val));
 		

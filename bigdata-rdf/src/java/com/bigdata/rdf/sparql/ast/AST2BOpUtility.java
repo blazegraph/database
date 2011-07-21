@@ -1012,6 +1012,7 @@ public class AST2BOpUtility {
         final List<NV> anns = new LinkedList<NV>();
         
         final IVariableOrConstant<IV> c;
+        
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
@@ -1091,12 +1092,17 @@ public class AST2BOpUtility {
                     // attach the appropriate expander : @todo drop expanders. 
                     switch (sp.getScope()) {
                     case DEFAULT_CONTEXTS: {
+                        if(dataset.getDefaultGraphs()!=null){
                         /*
                          * Query against the RDF merge of zero or more source
                          * graphs.
                          */
                         expander = new DefaultGraphSolutionExpander(dataset
                                 .getDefaultGraphs().getGraphs());
+                        }else if(dataset.getDefaultGraphFilter()!=null){
+                            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                    ElementFilter.newInstance(dataset.getDefaultGraphFilter())));
+                        }
                         /*
                          * Note: cvar can not become bound since context is
                          * stripped for the default graph.
@@ -1108,11 +1114,16 @@ public class AST2BOpUtility {
                         break;
                     }
                     case NAMED_CONTEXTS: {
+                        if(dataset.getNamedGraphs()!=null){
                         /*
                          * Query against zero or more named graphs.
                          */
                         expander = new NamedGraphSolutionExpander(dataset
                                 .getNamedGraphs().getGraphs());
+                        }else if(dataset.getNamedGraphFilter()!=null){
+                            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                    ElementFilter.newInstance(dataset.getNamedGraphFilter())));
+                        }
                         if (cvar == null) {// || !cvar.hasValue()) {
                             c = null;
                         } else {

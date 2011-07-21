@@ -9,30 +9,48 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.ComputedIN;
 import com.bigdata.rdf.internal.constraints.DatatypeBOp;
+import com.bigdata.rdf.internal.constraints.DateBOp;
+import com.bigdata.rdf.internal.constraints.DateBOp.DateOp;
+import com.bigdata.rdf.internal.constraints.DigestBOp;
+import com.bigdata.rdf.internal.constraints.DigestBOp.DigestOp;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
+import com.bigdata.rdf.internal.constraints.EncodeForURIBOp;
 import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.internal.constraints.FuncBOp;
+import com.bigdata.rdf.internal.constraints.InHashBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
+import com.bigdata.rdf.internal.constraints.IsNumericBOp;
 import com.bigdata.rdf.internal.constraints.IsURIBOp;
 import com.bigdata.rdf.internal.constraints.LangBOp;
 import com.bigdata.rdf.internal.constraints.LangMatchesBOp;
+import com.bigdata.rdf.internal.constraints.LcaseBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.NumericBOp;
+import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
+import com.bigdata.rdf.internal.constraints.RandBOp;
 import com.bigdata.rdf.internal.constraints.RegexBOp;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.StrdtBOp;
+import com.bigdata.rdf.internal.constraints.StrlangBOp;
+import com.bigdata.rdf.internal.constraints.StrlenBOp;
+import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
+import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 
 public class FunctionRegistry {
@@ -40,12 +58,15 @@ public class FunctionRegistry {
 	private static Map<URI, Factory> factories = new LinkedHashMap<URI, Factory>();
 	
 	private static final String SPARQL_FUNCTIONS = "http://www.w3.org/2006/sparql-functions#";
-	private static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions";
+	private static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions#";
 	
     public static final URI BOUND = new URIImpl(SPARQL_FUNCTIONS+"bound");       
     public static final URI IS_LITERAL = new URIImpl(SPARQL_FUNCTIONS+"isLiteral");
     public static final URI IS_BLANK = new URIImpl(SPARQL_FUNCTIONS+"isBlank");
     public static final URI IS_URI = new URIImpl(SPARQL_FUNCTIONS+"isURI");
+    public static final URI IS_IRI = new URIImpl(SPARQL_FUNCTIONS+"isIRI");
+    public static final URI IS_NUMERIC = new URIImpl(SPARQL_FUNCTIONS+"isNumeric");
+    
     public static final URI STR = new URIImpl(SPARQL_FUNCTIONS+"str");
     public static final URI LANG = new URIImpl(SPARQL_FUNCTIONS+"lang");
     public static final URI DATATYPE = new URIImpl(SPARQL_FUNCTIONS+"datatype");
@@ -56,17 +77,51 @@ public class FunctionRegistry {
     public static final URI NOT = new URIImpl(XPATH_FUNCTIONS+"not");
     public static final URI SAME_TERM = new URIImpl(SPARQL_FUNCTIONS+"sameTerm");
     
-    public static final URI EQ = new URIImpl(XPATH_FUNCTIONS+"equal");
-    public static final URI NE = new URIImpl(XPATH_FUNCTIONS+"not-equal");
+    public static final URI IN = new URIImpl(SPARQL_FUNCTIONS+"in");
+    public static final URI NOT_IN = new URIImpl(SPARQL_FUNCTIONS+"notIn");
+    
+    public static final URI NOW = new URIImpl(SPARQL_FUNCTIONS+"now");
+    public static final URI YEAR = new URIImpl(SPARQL_FUNCTIONS+"year-from-dateTime");
+    public static final URI MONTH = new URIImpl(SPARQL_FUNCTIONS+"month-from-dateTime");
+    public static final URI DAY = new URIImpl(SPARQL_FUNCTIONS+"day-from-dateTime");
+    public static final URI HOURS = new URIImpl(SPARQL_FUNCTIONS+"hours-from-dateTime");
+    public static final URI MINUTES = new URIImpl(SPARQL_FUNCTIONS+"minutes-from-dateTime");
+    public static final URI SECONDS = new URIImpl(SPARQL_FUNCTIONS+"seconds-from-dateTime");
+    public static final URI TIMEZONE = new URIImpl(SPARQL_FUNCTIONS+"tz");
+
+    public static final URI MD5 = new URIImpl(SPARQL_FUNCTIONS+"md5");
+    public static final URI SHA1 = new URIImpl(SPARQL_FUNCTIONS+"sha1");
+    public static final URI SHA224 = new URIImpl(SPARQL_FUNCTIONS+"sha224");
+    public static final URI SHA256 = new URIImpl(SPARQL_FUNCTIONS+"sha256");
+    public static final URI SHA384 = new URIImpl(SPARQL_FUNCTIONS+"sha384");
+    public static final URI SHA512 = new URIImpl(SPARQL_FUNCTIONS+"sha512");
+    
+    public static final URI STR_DT = new URIImpl(SPARQL_FUNCTIONS+"strdt");
+    public static final URI STR_LANG = new URIImpl(SPARQL_FUNCTIONS+"strlang");
+    public static final URI LCASE = new URIImpl(SPARQL_FUNCTIONS+"lcase");
+    public static final URI UCASE = new URIImpl(SPARQL_FUNCTIONS+"ucase");
+    public static final URI ENCODE_FOR_URI = new URIImpl(SPARQL_FUNCTIONS+"encodeForUri");
+    public static final URI STR_LEN = new URIImpl(SPARQL_FUNCTIONS+"strlen");
+    public static final URI SUBSTR = new URIImpl(SPARQL_FUNCTIONS+"substr");
+
+    public static final URI EQ = new URIImpl(XPATH_FUNCTIONS+"equal-to");
+    public static final URI NE = new URIImpl(XPATH_FUNCTIONS+"not-equal-to");
     public static final URI GT = new URIImpl(XPATH_FUNCTIONS+"greater-than");
-    public static final URI GE = new URIImpl(XPATH_FUNCTIONS+"greater-than-or-equal");
+    public static final URI GE = new URIImpl(XPATH_FUNCTIONS+"greater-than-or-equal-to");   
     public static final URI LT = new URIImpl(XPATH_FUNCTIONS+"less-than");
-    public static final URI LE = new URIImpl(XPATH_FUNCTIONS+"less-than-or-equal");
+    public static final URI LE = new URIImpl(XPATH_FUNCTIONS+"less-than-or-equal-to");
 
     public static final URI ADD = new URIImpl(XPATH_FUNCTIONS+"numeric-add");
     public static final URI SUBTRACT = new URIImpl(XPATH_FUNCTIONS+"numeric-subtract");
     public static final URI MULTIPLY = new URIImpl(XPATH_FUNCTIONS+"numeric-multiply");
     public static final URI DIVIDE = new URIImpl(XPATH_FUNCTIONS+"numeric-divide");
+
+    public static final URI ABS= new URIImpl(SPARQL_FUNCTIONS+"numeric-abs");
+    public static final URI ROUND= new URIImpl(SPARQL_FUNCTIONS+"numeric-round");
+    public static final URI CEIL = new URIImpl(SPARQL_FUNCTIONS+"numeric-ceil");
+    public static final URI FLOOR = new URIImpl(SPARQL_FUNCTIONS+"numeric-floor");
+    public static final URI RAND = new URIImpl(SPARQL_FUNCTIONS+"numeric-rand");
+
 
     public static final URI XSD_BOOL = XMLSchema.BOOLEAN;
     public static final URI XSD_DT = XMLSchema.DATETIME;
@@ -96,9 +151,9 @@ public class FunctionRegistry {
 			public IValueExpression<? extends IV> create(final String lex, 
 					final ValueExpressionNode... args) {
 				
-				checkArgs(args, VarNode.class);
+				checkArgs(args, ValueExpressionNode.class);
 				
-				final IVariable<IV> var = ((VarNode)args[0]).getVar();
+				final IValueExpression<? extends IV> var = args[0].getValueExpression();
 				return new IsLiteralBOp(var);
 				
 			}
@@ -108,9 +163,9 @@ public class FunctionRegistry {
 			public IValueExpression<? extends IV> create(final String lex, 
 					final ValueExpressionNode... args) {
 				
-				checkArgs(args, VarNode.class);
+				checkArgs(args, ValueExpressionNode.class);
 				
-				final IVariable<IV> var = ((VarNode)args[0]).getVar();
+				final IValueExpression<? extends IV> var = args[0].getValueExpression();
 				return new IsBNodeBOp(var);
 				
 			}
@@ -120,26 +175,131 @@ public class FunctionRegistry {
 			public IValueExpression<? extends IV> create(final String lex, 
 					final ValueExpressionNode... args) {
 				
-				checkArgs(args, VarNode.class);
+				checkArgs(args, ValueExpressionNode.class);
 				
-				final IVariable<IV> var = ((VarNode)args[0]).getVar();
+				final IValueExpression<? extends IV> var = args[0].getValueExpression();
 				return new IsURIBOp(var);
 				
 			}
 		});
+		add(IS_IRI, new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+				
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+				return new IsURIBOp(var);
+				
+			}
+		});
+		add(IS_NUMERIC, new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                return new IsNumericBOp(var);
+                
+            }
+        });
 		
 		add(STR, new Factory() {
 			public IValueExpression<? extends IV> create(final String lex, 
 					final ValueExpressionNode... args) {
 				
-				checkArgs(args, VarNode.class);
+				checkArgs(args, ValueExpressionNode.class);
 				
-				final IVariable<IV> var = ((VarNode)args[0]).getVar();
+				final IValueExpression<? extends IV> var = args[0].getValueExpression();
 				return new StrBOp(var, lex);
 				
 			}
 		});
 		
+		add(ENCODE_FOR_URI,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                return new EncodeForURIBOp(var, lex);
+                
+            }
+        });
+		
+		add(LCASE,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                return new LcaseBOp(var, lex);
+                
+            }
+        });
+		
+		add(UCASE,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                return new UcaseBOp(var, lex);
+                
+            }
+        });
+		add(STR_DT,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression<? extends IV> type = args[1].getValueExpression();
+                return new StrdtBOp(var,type ,lex);
+                
+            }
+        });
+		add(STR_LANG,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression<? extends IV> lang = args[1].getValueExpression();
+                return new StrlangBOp(var,lang ,lex);
+                
+            }
+        });
+		add(STR_LEN,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                return new StrlenBOp(var,lex);
+                
+            }
+        });
+		add(SUBSTR,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                
+                checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+                
+                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression<? extends IV> start = args[1].getValueExpression();
+                final IValueExpression<? extends IV> length = args.length>2?args[2].getValueExpression():null;
+                return new SubstrBOp(var,start ,length,lex);
+                
+            }
+        });
 		add(LANG, new Factory() {
 			public IValueExpression<? extends IV> create(final String lex, 
 					final ValueExpressionNode... args) {
@@ -165,6 +325,17 @@ public class FunctionRegistry {
 				
 			}
 		});
+		
+		add(RAND,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex, 
+                    final ValueExpressionNode... args) {
+                if(args!=null&&args.length>0){
+                    throw new IllegalArgumentException("wrong # of args");
+                }
+                return new RandBOp();
+                
+            }
+        });
 		
 		add(LANG_MATCHES, new Factory() {
 			public IValueExpression<? extends IV> create(final String lex, 
@@ -273,6 +444,66 @@ public class FunctionRegistry {
 			}
 		});
 		
+		  add(IN, new Factory() {
+	            public IValueExpression<? extends IV> create(final String lex, 
+	                    final ValueExpressionNode... args) {
+	                
+	                try{
+	                    checkArgs(args, VarNode.class,ConstantNode.class);
+	                    IValueExpression<? extends IV> arg = 
+	                            args[0].getValueExpression();
+	                        
+	                    IConstant<? extends IV> set[]=new IConstant[args.length-1];
+	                    for(int i=1;i<args.length;i++){
+	                            set[i-1]=((ConstantNode)args[i]).getVal();
+	                    }
+	                        
+	                    return new InHashBOp(false,arg, set);
+	                }catch(IllegalArgumentException iae){
+	                    checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+                             
+                        IValueExpression<? extends IV> set[]=new IValueExpression[args.length];
+                        for(int i=0;i<args.length;i++){
+                                set[i]=((ValueExpressionNode)args[i]).getValueExpression();
+                        }
+                            
+                        return new ComputedIN(false,set);
+	                }
+	                
+	                
+	                
+	            }
+	        });
+		  add(NOT_IN, new Factory() {
+              public IValueExpression<? extends IV> create(final String lex, 
+                      final ValueExpressionNode... args) {
+                  
+                  try{
+                      checkArgs(args, VarNode.class,ConstantNode.class);
+                      IValueExpression<? extends IV> arg = 
+                              args[0].getValueExpression();
+                          
+                      IConstant<? extends IV> set[]=new IConstant[args.length-1];
+                      for(int i=1;i<args.length;i++){
+                              set[i-1]=((ConstantNode)args[i]).getVal();
+                      }
+                          
+                      return new InHashBOp(true,arg, set);
+                  }catch(IllegalArgumentException iae){
+                      checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+                           
+                      IValueExpression<? extends IV> set[]=new IValueExpression[args.length];
+                      for(int i=0;i<args.length;i++){
+                              set[i]=((ValueExpressionNode)args[i]).getValueExpression();
+                      }
+                          
+                      return new ComputedIN(true,set);
+                  }
+                  
+                  
+                  
+              }
+          });
 		add(SAME_TERM, new SameTermFactory());
 		
 		add(EQ, new CompareFactory(CompareOp.EQ));
@@ -295,6 +526,14 @@ public class FunctionRegistry {
 		
 		add(DIVIDE, new MathFactory(MathOp.DIVIDE));
 		
+		add(ABS, new NumericFactory(NumericOp.ABS));
+		
+		add(ROUND, new NumericFactory(NumericOp.ROUND));
+		
+		add(CEIL, new NumericFactory(NumericOp.CEIL));
+		
+		add(FLOOR, new NumericFactory(NumericOp.FLOOR));
+		
 	    add(XSD_BOOL, new CastFactory(XMLSchema.BOOLEAN.toString()));
 
 	    add(XSD_DT, new CastFactory(XMLSchema.DATETIME.toString()));
@@ -309,6 +548,32 @@ public class FunctionRegistry {
 
 	    add(XSD_STR, new CastFactory(XMLSchema.STRING.toString()));
 
+	    add(YEAR,new DateFactory(DateOp.YEAR));
+	    
+	    add(MONTH,new DateFactory(DateOp.MONTH));
+	    
+	    add(DAY,new DateFactory(DateOp.DAY));
+	    
+	    add(HOURS,new DateFactory(DateOp.HOURS));
+
+	    add(MINUTES,new DateFactory(DateOp.MINUTES));
+	    
+	    add(SECONDS,new DateFactory(DateOp.SECONDS));
+	    
+	    add(TIMEZONE,new DateFactory(DateOp.TIMEZONE));
+	    
+	    add(MD5,new DigestFactory(DigestOp.MD5));
+	    
+	    add(SHA1,new DigestFactory(DigestOp.SHA1));
+	    
+	    add(SHA224,new DigestFactory(DigestOp.SHA224));
+	    
+	    add(SHA256,new DigestFactory(DigestOp.SHA256));
+	    
+	    add(SHA384,new DigestFactory(DigestOp.SHA384));
+	    
+	    add(SHA512,new DigestFactory(DigestOp.SHA512));
+
     }
     
     public static final void checkArgs(final ValueExpressionNode[] args, 
@@ -319,7 +584,7 @@ public class FunctionRegistry {
     	}
     	
     	for (int i = 0; i < args.length; i++) {
-    		if (types[i].isAssignableFrom(args[i].getClass())) {
+    		if (!types[i>=types.length?types.length-1:i].isAssignableFrom(args[i].getClass())) {
     			throw new IllegalArgumentException(
     					"wrong type for arg# " + i + ": " + args[i].getClass());
     		}
@@ -611,6 +876,74 @@ public class FunctionRegistry {
 		}
 		
 	}
+	
+	public static class NumericFactory implements Factory {
+        
+        private final NumericOp op;
+        
+        public NumericFactory(final NumericOp op) {
+            this.op = op;
+        }
+        
+        public IValueExpression<? extends IV> create(
+                final String lex, final ValueExpressionNode... args) {
+            
+            checkArgs(args, 
+                    ValueExpressionNode.class);
+            
+            final IValueExpression<? extends IV> left = 
+                args[0].getValueExpression();
+            
+            return new NumericBOp(left,  op);
+            
+        }
+        
+    }
+	public static class DigestFactory implements Factory {
+        
+        private final DigestOp op;
+        
+        public DigestFactory(final DigestOp op) {
+            this.op = op;
+        }
+        
+        public IValueExpression<? extends IV> create(
+                final String lex, final ValueExpressionNode... args) {
+            
+            checkArgs(args, 
+                    ValueExpressionNode.class);
+            
+            final IValueExpression<? extends IV> left = 
+                args[0].getValueExpression();
+            
+            return new DigestBOp(left,  op, lex);
+            
+        }
+        
+    }
+	
+	public static class DateFactory implements Factory {
+        
+        private final DateOp op;
+        
+        public DateFactory(final DateOp op) {
+            this.op = op;
+        }
+        
+        public IValueExpression<? extends IV> create(
+                final String lex, final ValueExpressionNode... args) {
+            
+            checkArgs(args, 
+                    ValueExpressionNode.class);
+            
+            final IValueExpression<? extends IV> left = 
+                args[0].getValueExpression();
+            
+            return new DateBOp(left,  op);
+            
+        }
+        
+    }
 	
 	public static class CastFactory implements Factory {
 		

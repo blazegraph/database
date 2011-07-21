@@ -1,17 +1,18 @@
-Private-Package: 
+Private-Package: cutthecrap.*
 Import-Package:  com.bigdata*;version="${osgi.version}",\
  org.semanticweb.*;version="2010.6.22",\
  cern.colt.*;version="1.2.0" ,\
- com.ibm.icu.*;version="3.6" ,\
- cutthecrap.utils.striterators;version= "5.4.2005",\
  info.aduna.*;version="2.0" ,\
- it.unimi.dsi.fastutil.bytes.custom;version="1.0.6",\
- it.unimi.dsi.*;version="5.1.5" ,\
  it.unimi.dsi.bits;version="1.0.6",\
  it.unimi.dsi.compression;version="1.0.6",\
+ it.unimi.dsi.fastutil.booleans;version="5.1.5",\
+ it.unimi.dsi.fastutil.bytes;version="5.1.5",\
+ it.unimi.dsi.fastutil.bytes.custom;version="1.0.6",\
+ it.unimi.dsi.fastutil.ints;version="5.1.5",\
+ it.unimi.dsi.fastutil.io;version="5.1.5",\
+ it.unimi.dsi.fastutil.objects;version="5.1.5",\
  it.unimi.dsi.io;version="1.0.6",\
  it.unimi.dsi.util;version="1.0.6",\
- org.CognitiveWeb.extser;version="0.1.2" ,\
  org.apache.commons.httpclient;version="3.1",\
  org.apache.log4j.jmx;resolution:=optional,\
  org.apache.log4j.* ,\
