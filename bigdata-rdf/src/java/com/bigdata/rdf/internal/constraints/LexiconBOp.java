@@ -92,7 +92,7 @@ public abstract class LexiconBOp extends IVValueExpression<IV> implements INeeds
 
     }
 
-    abstract IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException;
+    protected abstract IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException;
 
     volatile transient Set<IVariable<IV>> terms;
 
