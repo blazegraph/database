@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.LinkedList;
 import java.util.List;
@@ -50,6 +51,7 @@ import com.bigdata.io.compression.NoCompressor;
 import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -366,6 +368,127 @@ public class IVUtility {
 //        		return numericalMath(num1.longValue(), num2.longValue(), op);
 //        }
         
+    }
+    
+    public static final IV numericalFunc(final IV iv1, final NumericOp op) {
+
+        if (!iv1.isInline())
+            throw new IllegalArgumentException(
+                    "left term is not inline: left=" + iv1 );
+
+
+        if (!iv1.isLiteral())
+            throw new IllegalArgumentException(
+                    "left term is not literal: left=" + iv1 );
+
+
+        final DTE dte1 = iv1.getDTE();
+
+        if (!dte1.isNumeric())
+            throw new IllegalArgumentException(
+                    "left term is not numeric: left=" + iv1 );
+
+        final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1;
+
+
+        // if one's a BigDecimal we should use the BigDecimal comparator for both
+        if (dte1 == DTE.XSDDecimal) {
+            return numericalFunc(num1.decimalValue(),op);
+        }else if (dte1 == DTE.XSDInteger) {
+           return numericalFunc(num1.integerValue(),op);
+        }else if (dte1.isFloatingPointNumeric() ) {
+            return numericalFunc(num1.floatValue(),op);
+        }else if (dte1.equals(DTE.XSDInt)){
+            return numericalFunc(num1.intValue(),op);
+        }else if (dte1.equals(DTE.XSDDouble)){
+            return numericalFunc(num1.doubleValue(),op);
+        }else{
+            return numericalFunc(num1.longValue(),op);
+        }
+    }
+    private static final IV numericalFunc(final BigDecimal left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDDecimalIV(left.abs());
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left.doubleValue()));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left.doubleValue()));
+        case ROUND:
+            return new XSDDecimalIV(left.round(MathContext.UNLIMITED));
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    private static final IV numericalFunc(final BigInteger left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDIntegerIV(left.abs());
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left.doubleValue()));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left.doubleValue()));
+        case ROUND:
+            return new XSDDoubleIV(Math.round(left.doubleValue()));
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    private static final IV numericalFunc(final float left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDFloatIV(Math.abs(left));
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left));
+        case ROUND:
+            return new XSDFloatIV(Math.round(left));
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    private static final IV numericalFunc(final int left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDIntIV(Math.abs(left));
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left));
+        case ROUND:
+            return new XSDIntIV(Math.round(left));
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    private static final IV numericalFunc(final long left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDLongIV(Math.abs(left));
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left));
+        case ROUND:
+            return new XSDLongIV(Math.round(left));
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    private static final IV numericalFunc(final double left, final NumericOp op) {
+        switch(op) {
+        case ABS:
+            return new XSDDoubleIV(Math.abs(left));
+        case CEIL:
+            return new XSDDoubleIV(Math.ceil(left));
+        case FLOOR:
+            return new XSDDoubleIV(Math.floor(left));
+        case ROUND:
+            return new XSDDoubleIV(Math.round(left));
+        default:
+            throw new UnsupportedOperationException();
+        }
     }
     
     public static final IV numericalMath(final BigDecimal left, 

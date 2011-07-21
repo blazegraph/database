@@ -1196,7 +1196,7 @@ public class Rule2BOpUtility {
                     BOpEvaluationContext.ANY));
         }
 
-        if (dataset == null) {
+        if (dataset == null || dataset.getNamedGraphs()==null) {
 
             /*
              * The dataset is all graphs. C is left unbound and the unmodified
@@ -1252,7 +1252,7 @@ public class Rule2BOpUtility {
 
         }
 
-        if (summary.nknown == 1) {
+        if (summary.nknown == -1) {
 
             /*
              * The dataset contains exactly one graph. Bind C.
@@ -1400,7 +1400,18 @@ public class Rule2BOpUtility {
 
         final boolean scaleOut = queryEngine.isScaleOut();
 
-        if (dataset != null && summary.nknown == 0) {
+        if(dataset != null && summary==null){
+            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
+            // Filter for distinct SPOs.
+            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+                    .toArray(new NV[anns.size()])), queryHints);
+        }
+        
+        if (summary != null && summary.nknown == 0) {
 
             /*
              * The data set is empty (no graphs). Return a join backed by an
@@ -1419,7 +1430,7 @@ public class Rule2BOpUtility {
 
         }
         
-        if (dataset != null && summary.nknown == 1) {
+        if (summary != null && summary.nknown == 1) {
 
             /*
              * The dataset contains exactly one graph. Bind C. Add a filter to

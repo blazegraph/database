@@ -21,6 +21,15 @@ public class DatasetNode {
 		
 	}
 	
+	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs,
+	        final IElementFilter<ISPO> defaultGraphFilter, 
+            final IElementFilter<ISPO> namedGraphFilter) {
+        
+        this(defaultGraphs!=null?new DataSetSummary(defaultGraphs):null,namedGraphs!=null? new DataSetSummary(namedGraphs):null,
+                defaultGraphFilter,namedGraphFilter);
+        
+    }
+	
 	public DatasetNode(
 			final DataSetSummary defaultGraphs, final DataSetSummary namedGraphs) {
 		
@@ -40,14 +49,16 @@ public class DatasetNode {
 	}
 	
 	public DatasetNode(
+	        final DataSetSummary defaultGraphs, 
+	        final DataSetSummary namedGraphs,
 			final IElementFilter<ISPO> defaultGraphFilter, 
 			final IElementFilter<ISPO> namedGraphFilter) {
 		
 		this.defaultGraphFilter = defaultGraphFilter;
 		this.namedGraphFilter = namedGraphFilter;
 		
-		this.defaultGraphs = null;
-		this.namedGraphs = null;
+		this.defaultGraphs = defaultGraphs;
+		this.namedGraphs = namedGraphs;
 		
 	}
 	

@@ -28,7 +28,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -42,7 +42,7 @@ public class IsURIBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 
-    public IsURIBOp(final IVariable<IV> x) {
+    public IsURIBOp(final IValueExpression<? extends IV> x) {
         
         this(new BOp[] { x }, null/*annocations*/);
         
