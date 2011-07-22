@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -218,6 +219,23 @@ public class JoinGroupNode extends GroupNodeBase
 		return filters;
 		
 	}
+	
+	public List<AssignmentNode> getAssignments(){
+		
+		final List<AssignmentNode> assignments = new ArrayList<AssignmentNode>();
+		
+		for (IQueryNode node : this) {
+			
+			if (node instanceof AssignmentNode) {
+				
+				assignments.add((AssignmentNode) node);
+				
+			}
+			
+		}
+		
+		return assignments;
+	}
 
 	/**
 	 * Helper method to determine the set of filters that will be fully bound
@@ -393,6 +411,13 @@ public class JoinGroupNode extends GroupNodeBase
 				continue;
 			}
 			sb.append(((JoinGroupNode)n).toString(indent+2)).append("\n");
+		}
+		
+		for (IQueryNode n : this) {
+			if (!(n instanceof AssignmentNode)) {
+				continue;
+			}
+			sb.append(((AssignmentNode)n).toString(indent+2)).append("\n");
 		}
 		
 		sb.append(_indent).append("}");

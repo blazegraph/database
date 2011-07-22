@@ -22,6 +22,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -55,6 +56,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
@@ -263,6 +265,12 @@ public class AST2BOpUtility {
         left = addSubqueries(left, joinGroup, ctx);
         
         /*
+         * Add the LET assignments to the pipeline.
+         */
+        left = addAssignments(left, joinGroup.getAssignments(), ctx);
+        
+        
+        /*
          * Add the post-conditionals to the pipeline.
          */
         left = addConditionals(left, joinGroup.getPostFilters(), ctx);
@@ -290,6 +298,61 @@ public class AST2BOpUtility {
         return start;
         
 	}
+	
+	private static final PipelineOp addAssignments(PipelineOp left,    		
+    		final List<AssignmentNode> assignments,
+            final AST2BOpContext ctx) {
+		final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
+
+		for (AssignmentNode assignmentNode : assignments) {
+
+			final IValueExpression ve = assignmentNode.getValueExpression();
+			
+			final IVariable<IV>	var = assignmentNode.getVar();
+			
+			final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
+			
+			/*
+			 * Get the vars this filter needs materialized.
+			 */
+			vars.addAll(assignmentNode.getVarsToMaterialize());
+			
+			/*
+			 * Remove the ones we've already done.
+			 */
+			vars.removeAll(done);
+			
+			final int bopId = ctx.idFactory.incrementAndGet();
+
+			/*
+			 * We might have already materialized everything we need for this filter.
+			 */
+			if (vars.size() > 0) {
+				
+				left = addMaterializationSteps(left, bopId, ve, vars, ctx);
+			
+				/*
+				 * All the newly materialized vars to the set we've already done.
+				 */
+				done.addAll(vars);
+				
+			}
+		
+			final Bind b = new Bind(assignmentNode.getVar(),assignmentNode.getValueExpression());
+			final IConstraint c = new BindingConstraint(b);
+			
+			left = applyQueryHints(
+              	    new ConditionalRoutingOp(new BOp[]{ left },
+                        NV.asMap(new NV[]{//
+                            new NV(BOp.Annotations.BOP_ID, bopId),
+                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
+                        })), ctx.queryHints);
+			
+		}
+		
+		return left;
+    	
+    }
 	
     private static final PipelineOp addConditionals(PipelineOp left,    		
     		final Collection<FilterNode> filters,
