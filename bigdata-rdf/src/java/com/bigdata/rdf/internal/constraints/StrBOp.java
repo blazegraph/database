@@ -38,10 +38,10 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.WrappedIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Convert the {@link IV} to a <code>xsd:string</code>.
@@ -115,7 +115,7 @@ public class StrBOp extends IVValueExpression<IV>
         	// return new simple literal using URI label
         	final URI uri = (URI) iv.getValue();
         	final BigdataLiteral str = vf.createLiteral(uri.toString());
-        	return new WrappedIV(iv, str);
+        	return DummyConstantNode.dummyIV(str);
         } else if (iv.isLiteral()) {
         	final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
         	if (lit.getDatatype() == null && lit.getLanguage() == null) {
@@ -125,7 +125,7 @@ public class StrBOp extends IVValueExpression<IV>
         	else {
             	// else return new simple literal using Literal.getLabel
             	final BigdataLiteral str = vf.createLiteral(lit.getLabel());
-            	return new WrappedIV(iv, str);
+            	return DummyConstantNode.dummyIV(str);
         	}
         } else {
         	throw new SparqlTypeErrorException();
