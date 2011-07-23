@@ -92,7 +92,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * read operations as long as there is no writer.
  */
 class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
-
+	static int createdPages = 0;
+	
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
 	 * operations. {@link ReadOnlyLeafData} is used when the {@link BucketPage}
@@ -212,6 +213,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				htree.rawRecords//
 		);
 
+		createdPages++;
 	}
 
 	/**
@@ -228,6 +230,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 		this.data = data;
 
+		createdPages++;
 	}
 
     /**
@@ -242,6 +245,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
         super(src);
 
+		createdPages++;
+
         assert !src.isDirty();
         assert src.isReadOnly();
 //        assert src.isPersistent();
@@ -251,7 +256,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				src.data) : src.data;
 
         // clear reference on source.
-        src.data = null;
+		// MGC - not sure this is correct since it is caled from copyOnWrite to ensure src is not modified
+        // src.data = null;
 
 //        /*
 //         * Steal/copy the keys.
@@ -382,8 +388,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * @return number of slots available in this BucketPage
 	 */
 	final int slotsOnPage() {
-		// return 16;
-		return 1 << htree.addressBits;
+		return 64;
+		// return 1 << htree.addressBits;
 	}
 
 	/**
@@ -1167,7 +1173,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * @see com.bigdata.htree.AbstractPage#insertRawTuple(byte[], byte[], int)
 	 */
 	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
-		final int slotsPerBuddy = (1 << htree.addressBits);
+		final int slotsPerBuddy = slotsOnPage(); // (1 << htree.addressBits);
 		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
 		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
 
@@ -1208,7 +1214,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		}
 
 		// unable to insert
-		if (globalDepth == htree.addressBits) {
+		if (false || globalDepth == htree.addressBits) {
 			// max depth so add level
 			DirectoryPage np = ((HTree) htree).addLevel2(this);
 
@@ -1337,6 +1343,14 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		
 		return htree.readRawRecord(addr);
 
+	}
+
+	int activeBucketPages() {
+		return 1;
+	}
+
+	int activeDirectoryPages() {
+		return 0;
 	}
 
 	/*

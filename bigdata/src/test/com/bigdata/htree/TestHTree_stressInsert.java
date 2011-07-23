@@ -37,19 +37,19 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 
     public void test_stressInsert_noEviction_addressBits1() {
 
-		doStressTest(10000/* limit */, 1/* addressBits */);
+		doStressTest(500/* limit */, 1/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits2() {
 
-		doStressTest(10000/* limit */, 2/* addressBits */);
+		doStressTest(500/* limit */, 2/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits3() {
 
-		doStressTest(10000/* limit */, 3/* addressBits */);
+		doStressTest(1000/* limit */, 3/* addressBits */);
        
    }
 
@@ -61,23 +61,30 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 
     public void test_stressInsert_noEviction_addressBits6() {
 
-		doStressTest(10000/* limit */, 6/* addressBits */);
+		doStressTest(1000/* limit */, 6/* addressBits */);
         
     }
 
     public void test_stressInsert_noEviction_addressBits8() {
 
-		doStressTest(10000/* limit */, 8/* addressBits */);
+		doStressTest(1000/* limit */, 8/* addressBits */);
         
     }
 
     public void test_stressInsert_noEviction_addressBits10() {
 
-		doStressTest(10000/* limit */, 10/* addressBits */);
+		doStressTest(1000/* limit */, 10/* addressBits */);
+        
+    }
+    public void test_stressInsert_noEviction_addressBitsMAX() {
+
+		doStressTest(1000/* limit */, 16/* addressBits */);
         
     }
 
     private void doStressTest(final int limit, final int addressBits) {
+        BucketPage.createdPages = 0;
+        DirectoryPage.createdPages = 0;
         
         final IRawStore store = new SimpleMemoryRawStore();
 
@@ -146,9 +153,15 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
             // Verify the iterator visits all of the tuples.
             assertSameIteratorAnyOrder(keys, htree.values());
             
-            } catch (Throwable t) {
+        	log.info(htree.getPageInfo());
 
-            	log.error("Pretty Print of error state:\n" + htree.PP(), t);
+            } catch (Throwable t) {
+            	try {
+                	log.error(htree.getPageInfo(), t);
+                	log.error("Pretty Print of error state:\n" + htree.PP());
+            	} catch (Throwable et) {
+            		log.error("Problem with PP", et);
+            	}
             	
             	throw new RuntimeException(t);
             

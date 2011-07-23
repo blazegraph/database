@@ -1103,12 +1103,21 @@ public class BytesUtil {
 	 * @return The integer extracted from the specified bit range.
 	 */
 	public static int getBits(final byte[] a, final int off, final int len) {
-
+		final int maxbits = a.length * 8;
+		
 		if (a == null || off < 0 || len < 0 || len > 32)
 			throw new IllegalArgumentException();
-
-		if (off + len > a.length * 8)
-			throw new IllegalArgumentException("off: " + off + ", len: " + len + ", a.length: " + a.length);
+		
+		// handle request for bits from offset > than available by returning zero
+		if (off >= maxbits)
+			return 0;
+		
+		// if bitrange outside available then adjust appropriately
+		if (off + len > maxbits)
+			return getBits(a, off, maxbits - off);
+			
+//		if (off + len > maxbits)
+//			throw new IllegalArgumentException("off: " + off + ", len: " + len + ", a.length: " + a.length);
 
 		if (len == 0) // zero length is always a zero.
 			return 0;

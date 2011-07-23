@@ -64,25 +64,25 @@ public class TestHTreeWithMemStore extends TestCase {
 
     public void test_stressInsert_noEviction_addressBits1() {
 
-		doStressTest(10000/* limit */, 1/* addressBits */);
+		doStressTest(1000/* limit */, 1/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits2() {
 
-		doStressTest(10000/* limit */, 2/* addressBits */);
+		doStressTest(1000/* limit */, 2/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits3() {
 
-		doStressTest(10000/* limit */, 3/* addressBits */);
+		doStressTest(1000/* limit */, 3/* addressBits */);
        
    }
 
     public void test_stressInsert_noEviction_addressBits4() {
 
-		doStressTest(10000/* limit */, 4/* addressBits */);
+		doStressTest(1000/* limit */, 4/* addressBits */);
         
     }
 
@@ -202,7 +202,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
 			} catch (Throwable t) {
 
-				log.error(t, t);
+				log.error(t);
 
 				try {
 					log.error("Pretty Print of error state:\n" + htree.PP());

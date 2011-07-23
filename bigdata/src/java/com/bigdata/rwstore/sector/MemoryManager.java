@@ -67,7 +67,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * The set of direct {@link ByteBuffer} which are currently being managed by
 	 * this {@link MemoryManager} instance.
 	 */
-    private final IBufferAccess[] m_resources;
+    private final ArrayList<IBufferAccess> m_resources;
 	
 	/**
 	 * The lock used to serialize all allocation/deallocation requests. This is
@@ -84,6 +84,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * The size of a backing buffer.
 	 */
     private final int m_sectorSize;
+    
+    private final int m_maxSectors;
 	
 	private final ArrayList<SectorAllocator> m_sectors = new ArrayList<SectorAllocator>();
 	
@@ -161,7 +163,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		m_pool = pool;
 		
-		m_resources = new IBufferAccess[sectors];
+		m_maxSectors = sectors;
+		
+		m_resources = new ArrayList<IBufferAccess>();
 		
 		m_sectorSize = pool.getBufferCapacity();
 		
@@ -182,25 +186,26 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 */
 	private void releaseDirectBuffers() {
 		// release to pool.
-		for (int i = 0; i < m_resources.length; i++) {
-			final IBufferAccess buf = m_resources[i];
+		for (int i = 0; i < m_resources.size(); i++) {
+			final IBufferAccess buf = m_resources.get(i);
 			if (buf != null) {
 				try {
 					buf.release();
 				} catch (InterruptedException e) {
 					log.error("Unable to release direct buffers", e);
 				} finally {
-					m_resources[i] = null;
+					m_resources.set(i, null);
 				}
 			}
 		}
+		m_resources.clear();
 	}
 
 	/**
 	 * Return the maximum #of sectors which may be allocated.
 	 */
 	public int getMaxSectors() {
-		return m_resources.length;
+		return m_maxSectors;
 	}
 	
 	/**
@@ -230,7 +235,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 */
 	public long getMaxMemoryCapacity() {
 
-		return m_sectorSize * (long) m_resources.length;
+		return m_sectorSize * (long) m_resources.size();
 		
 	}
 	
@@ -320,7 +325,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		
 		while(m_free.isEmpty()) {
 
-			if (m_sectors.size() < m_resources.length) {
+			if (m_sectors.size() < m_maxSectors) {
 
 				SectorAllocator sector = scanForSectorWithFreeSpace(nbytes);
 
@@ -349,7 +354,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 					throw new RuntimeException(ex);
 				}
 
-				m_resources[m_sectors.size()] = nbuf;
+				m_resources.add(nbuf);
 
 				// Wrap buffer as a new sector.
 				sector = new SectorAllocator(this, null);
@@ -630,7 +635,11 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 		final long paddr = sector.getPhysicalAddress(offset);
 		
 		// Duplicate the buffer to avoid side effects to position and limit.
-		final ByteBuffer ret = m_resources[sector.m_index].buffer().duplicate();
+		final IBufferAccess ba = m_resources.get(sector.m_index);
+		if (ba == null) {
+			throw new IllegalArgumentException();
+		}
+		final ByteBuffer ret = ba.buffer().duplicate();
 		
 		final int bufferAddr = (int) (paddr - (sector.m_index * m_sectorSize));
 		
@@ -820,7 +829,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 */
 	public long getCapacity() {
 
-		return m_pool.getBufferCapacity() * (long) m_resources.length;
+		return m_pool.getBufferCapacity() * (long) m_resources.size();
 
 	}
 	
@@ -850,7 +859,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 
 		// maximum #of buffers which may be allocated.
 		root.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
-				m_resources.length));
+				m_maxSectors));
 
 		// current #of buffers which are allocated.
 		root.addCounter("bufferCount", new OneShotInstrument<Integer>(
@@ -883,7 +892,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	}
 
 	/*
-	 * FIXME The constructor must be able to accept nsectors :=
+	 * DONE: The constructor must be able to accept nsectors :=
 	 * Integer.MAX_VALUE in order to indicate that the #of backing buffers is
 	 * (conceptually) unbounded. This will require m_resources to be a data
 	 * structure other than a simple array.
