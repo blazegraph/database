@@ -1810,7 +1810,7 @@ public class RWStore implements IStore, IBufferedWriter {
 	
 	public int alloc(final int size, final IAllocationContext context) {
 		if (size > m_maxFixedAlloc) {
-			throw new IllegalArgumentException("Allocation size to big: " + size);
+			throw new IllegalArgumentException("Allocation size to big: " + size + " > " + m_maxFixedAlloc);
 		}
 		
 		m_allocationLock.lock();

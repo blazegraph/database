@@ -694,5 +694,9 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
         return newNode;
 
     }
+    
+    abstract int activeBucketPages();
+    
+    abstract int activeDirectoryPages();
 
 }

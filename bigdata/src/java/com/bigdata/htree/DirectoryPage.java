@@ -33,7 +33,8 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link DirectoryPage#getNumBuddies()}.
  */
 class DirectoryPage extends AbstractPage implements IDirectoryData {
-
+	static int createdPages = 0;
+	
 	/**
 	 * Transient references to the children.
 	 */
@@ -196,6 +197,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		}
 
 		final int slotsPerPage = 1 << htree.addressBits;
+		
+		if (childRefs == null)
+			throw new IllegalStateException("childRefs must not be NULL");
 
 		for (int i = 0; i < slotsPerPage; i++) {
 
@@ -679,6 +683,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		data = new MutableDirectoryPageData(htree.addressBits,
 				htree.versionTimestamps);
 
+		createdPages++;
+
 	}
 
 	/**
@@ -698,6 +704,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		this.data = data;
 
         childRefs = new Reference[(1 << htree.addressBits)];
+
+		createdPages++;
 
 	}
 
@@ -732,6 +740,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
         super(src);
 
+		createdPages++;
+
         assert !src.isDirty();
 
         assert src.isReadOnly();
@@ -752,7 +762,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         assert this.data != null;
 
         // clear reference on source.
-        src.data = null;
+        // not sure this is right since called from copyOnWrite
+        // src.data = null;
 
         /*
          * Steal strongly reachable unmodified children by setting their parent
@@ -760,13 +771,19 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
          * used by its previous ancestor (our source node for this copy).
          */
 
-        childRefs = src.childRefs;
-        src.childRefs = null;
+        
+        // MGC - shouldn't this really be a clone of the childRefs?
+        // We are copying on write to avoid updating the src
+        // childRefs = src.childRefs;
+        // src.childRefs = null;
+        childRefs = new Reference[slotsOnPage];
+        
 
         // childLocks = src.childLocks; src.childLocks = null;
 
         for (int i = 0; i < slotsOnPage; i++) {
-
+        	childRefs[i] = src.childRefs[i];
+        	
             final AbstractPage child = childRefs[i] == null ? null
                     : childRefs[i].get();
 
@@ -1498,7 +1515,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		final int pl = getPrefixLength();
 		final int hbits = BytesUtil.getBits(key, pl, htree.addressBits);
-		AbstractPage cp = getChild(hbits);
+		AbstractPage cp = getChild(hbits).copyOnWrite();
 
 		cp.insertRawTuple(key, val, getChildBuddy(hbits));
 	}
@@ -1553,8 +1570,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
             if (data.childAddr[i] == oldChildAddr) {
 
-                // Clear the old key.
-                data.childAddr[i] = NULL;
 
                 // remove from cache and free the oldChildAddr if the Strategy
                 // supports it.
@@ -1564,8 +1579,13 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 //					htree.storeCache.remove(oldChildAddr);
 //				}
                 // free the oldChildAddr if the Strategy supports it
-                htree.deleteNodeOrLeaf(oldChildAddr);
+            	// - and only if not already deleted!
+            	if (npointers == 0)
+            		htree.deleteNodeOrLeaf(oldChildAddr);
                 // System.out.println("Deleting " + oldChildAddr);
+
+                // Clear the old key.
+                data.childAddr[i] = NULL;
 
                 // Stash reference to the new child.
                 // childRefs[i] = btree.newRef(newChild);
@@ -1588,5 +1608,23 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 					+ oldChildAddr);
 
     }
+
+	int activeBucketPages() {
+		int ret = 0;
+		Iterator<AbstractPage> children = childIterator();
+		while (children.hasNext()) {
+			ret += children.next().activeBucketPages();
+		}
+		return ret;
+	}
+
+	int activeDirectoryPages() {
+		int ret = 1;
+		Iterator<AbstractPage> children = childIterator();
+		while (children.hasNext()) {
+			ret += children.next().activeDirectoryPages();
+		}
+		return ret;
+	}
 
 }

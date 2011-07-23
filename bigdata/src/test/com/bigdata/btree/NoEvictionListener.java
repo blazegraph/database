@@ -47,10 +47,10 @@ public class NoEvictionListener implements
 
         assert ref instanceof Leaf;
         
-        if( ref.isDirty() ) {
-
-            throw new UnsupportedOperationException(
-                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
+        if( ref.isDirty()) {
+        	if (true)
+	            throw new UnsupportedOperationException(
+	                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
             
         }
 
