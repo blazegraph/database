@@ -74,9 +74,9 @@ public class StrlangBOp extends LexiconBOp {
         if (!lang.isInline() && !lang.hasValue())
             throw new NotMaterializedException();
 
-        BigdataLiteral l = (BigdataLiteral)lang.getValue();
+        BigdataLiteral l = literalValue(lang);
 
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         String langLit = l.getLabel();
         final BigdataLiteral str = vf.createLiteral(label, langLit);

@@ -145,7 +145,10 @@ public class AssignmentNode extends QueryNodeBase implements IQueryNode {
         }
 
         final StringBuilder sb = new StringBuilder(indent);
-
+        if(ve==var){
+            sb.append("?");
+            sb.append(var.getVar().toString());
+        }else{
         sb.append("(LET ");
 
         sb.append("?").append(getVar().toString());
@@ -155,7 +158,7 @@ public class AssignmentNode extends QueryNodeBase implements IQueryNode {
         sb.append(ve.toString());
 
         sb.append(")");
-
+        }
         return sb.toString();
 
     }

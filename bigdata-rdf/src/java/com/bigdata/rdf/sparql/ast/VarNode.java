@@ -29,4 +29,13 @@ public class VarNode extends TermNode {
 		
 	}
 	
+	@Override
+	public boolean equals(Object obj) {
+	    if(obj==this)return true;
+	    else if(obj instanceof VarNode){
+	        return getVar().equals(((VarNode)obj).getVar());
+	    }
+	    return false;
+	}
+	
 }

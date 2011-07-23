@@ -26,7 +26,6 @@ package com.bigdata.rdf.internal.constraints;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.Bind;
 import com.bigdata.bop.IBindingSet;
 
 public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
@@ -38,13 +37,13 @@ public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
         super(op);
     }
 
-    public BindingConstraint(Bind bind) {
+    public BindingConstraint(ConditionalBind bind) {
         super(new BOp[]{bind}, null);
     }
 
     @Override
     public boolean accept(IBindingSet bindingSet) {
-       Object result=((Bind)get(0)).get(bindingSet);
+        Object result = ((ConditionalBind) get(0)).get(bindingSet);
        return result!=null;
     }
 

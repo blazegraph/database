@@ -50,8 +50,8 @@ public class DigestBOp extends LexiconBOp {
     public interface Annotations extends ImmutableBOp.Annotations {
 
         /**
-         * The operation to be applied to the left and right operands (required). The value of this annotation is a {@link DigestOp}, such as
-         * {@link DigestOp#MD5}.
+         * The operation to be applied to the left operand (required). The value of this annotation is a
+         * {@link DigestOp}, such as {@link DigestOp#MD5}.
          *
          * @see DigestOp
          */
@@ -125,14 +125,13 @@ public class DigestBOp extends LexiconBOp {
 
     @Override
     public Requirement getRequirement() {
-        return Requirement.ALWAYS;
+        return Requirement.SOMETIMES;
     }
     
     protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        if (iv.isLiteral()) {
             //Recreate since they are not thread safe
             MessageDigest md = null;
-            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
             if (lit.getLanguage() != null || lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
                 try {
                     String label = lit.getLabel();
@@ -166,8 +165,6 @@ public class DigestBOp extends LexiconBOp {
                 } catch (Exception e) {
                     throw new SparqlTypeErrorException();
                 }
-            }
-
         }
         throw new SparqlTypeErrorException();
     }

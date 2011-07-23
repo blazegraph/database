@@ -59,7 +59,7 @@ public class StrlenBOp extends LexiconBOp {
     }
 
     protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         int length = label.length();
         return new XSDIntIV(length);

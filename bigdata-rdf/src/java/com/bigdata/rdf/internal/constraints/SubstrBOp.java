@@ -72,14 +72,14 @@ public class SubstrBOp extends LexiconBOp {
                 throw new SparqlTypeErrorException();
         }
 
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
         String lang = lit.getLanguage();
         BigdataURI dt = lit.getDatatype();
         String label = lit.getLabel();
 
-        int s = ((BigdataLiteral) start.getValue()).intValue();
+        int s = literalValue(start).intValue();
         if (length != null) {
-            int l = ((BigdataLiteral) length.getValue()).intValue();
+            int l = literalValue(length).intValue();
             label = label.substring(s, l);
         } else {
             label = label.substring(s);

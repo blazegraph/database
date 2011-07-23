@@ -60,7 +60,7 @@ public class UcaseBOp extends LexiconBOp {
     }
 
     protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
 
         if (lit.getLanguage() != null) {
             final BigdataLiteral str = vf.createLiteral(lit.getLabel().toUpperCase(), lit.getLanguage());

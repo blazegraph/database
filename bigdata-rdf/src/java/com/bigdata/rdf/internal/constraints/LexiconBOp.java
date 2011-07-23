@@ -35,14 +35,20 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.AbstractInlineIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 public abstract class LexiconBOp extends IVValueExpression<IV> implements INeedsMaterialization {
     private static final long serialVersionUID = 5379172979357494107L;
     static final transient Logger log = Logger.getLogger(LexiconBOp.class);
+    
+    private transient BigdataValueFactory vf;
+    
     public interface Annotations extends BOp.Annotations {
 
         String NAMESPACE = (LexiconBOp.class.getName() + ".namespace").intern();
@@ -75,11 +81,17 @@ public abstract class LexiconBOp extends IVValueExpression<IV> implements INeeds
         // not yet bound
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-
+        if(vf==null){
+            synchronized(this){
+                if(vf==null){
         final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
 
         // use to create my simple literals
-        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(namespace);
+                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+
+                }
+            }
+        }
 
         if(!iv.isLiteral())
             throw new SparqlTypeErrorException();
@@ -92,6 +104,26 @@ public abstract class LexiconBOp extends IVValueExpression<IV> implements INeeds
 
     }
 
+    protected BigdataLiteral literalValue(IV iv) {
+       
+        if (iv.isInline()) {
+         
+            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
+         
+            return vf.createLiteral( (( AbstractInlineIV)iv).stringValue(),datatype);
+       
+        } else if (iv.hasValue()) {
+      
+            return ((BigdataLiteral) iv.getValue());
+      
+        } else {
+      
+            throw new NotMaterializedException();
+      
+        }
+        
+    }
+    
     protected abstract IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException;
 
     volatile transient Set<IVariable<IV>> terms;
