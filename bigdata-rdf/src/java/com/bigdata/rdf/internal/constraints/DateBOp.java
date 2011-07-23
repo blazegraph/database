@@ -138,7 +138,7 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
         
         
         if (left.isLiteral()) {
-            if(!left.isInline()&&!left.hasValue()){
+            if(!left.hasValue()){
                 throw new NotMaterializedException();
             }
                 

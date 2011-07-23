@@ -69,8 +69,8 @@ public class StrendsBOp extends LexiconBooleanBOp {
             throw new NotMaterializedException();
 
         if(compare.isLiteral()){
-            String v=((BigdataLiteral)value.getValue()).getLabel();
-            String c=((BigdataLiteral)compare.getValue()).getLabel();
+            String v=literalValue(value).getLabel();
+            String c=literalValue(compare).getLabel();
             return v.endsWith(c);
         }
         throw new SparqlTypeErrorException();

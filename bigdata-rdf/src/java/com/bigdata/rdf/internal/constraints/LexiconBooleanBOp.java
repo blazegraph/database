@@ -33,14 +33,20 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.AbstractInlineIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 public abstract class LexiconBooleanBOp extends XSDBooleanIVValueExpression implements INeedsMaterialization {
     private static final long serialVersionUID = 6222270137598546840L;
     static final transient Logger log = Logger.getLogger(LexiconBooleanBOp.class);
+
+    
+    private transient BigdataValueFactory vf;
 
     public interface Annotations extends BOp.Annotations {
         String NAMESPACE = (LexiconBooleanBOp.class.getName() + ".namespace").intern();
@@ -67,9 +73,17 @@ public abstract class LexiconBooleanBOp extends XSDBooleanIVValueExpression impl
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
+        if(vf==null){
+            synchronized(this){
+                if(vf==null){
         final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
 
-        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance(namespace);
+                    // use to create my simple literals
+                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+
+                }
+            }
+        }
 
         if(!iv.isLiteral())
             throw new SparqlTypeErrorException();
@@ -82,6 +96,26 @@ public abstract class LexiconBooleanBOp extends XSDBooleanIVValueExpression impl
 
     }
 
+    protected BigdataLiteral literalValue(IV iv) {
+        
+        if (iv.isInline()) {
+         
+            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
+         
+            return vf.createLiteral( (( AbstractInlineIV)iv).stringValue(),datatype);
+       
+        } else if (iv.hasValue()) {
+      
+            return ((BigdataLiteral) iv.getValue());
+      
+        } else {
+      
+            throw new NotMaterializedException();
+      
+        }
+        
+    }
+    
     abstract boolean _accept(final BigdataValueFactory vf, final IV iv,final IBindingSet bs) throws SparqlTypeErrorException;
 
     volatile transient Set<IVariable<IV>> terms;
@@ -104,6 +138,8 @@ public abstract class LexiconBooleanBOp extends XSDBooleanIVValueExpression impl
         return terms;
 
     }
+    
+    
 
 
 }

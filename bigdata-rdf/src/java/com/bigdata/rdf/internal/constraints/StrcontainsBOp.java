@@ -70,8 +70,8 @@ public class StrcontainsBOp extends LexiconBooleanBOp {
         if (!compare.isInline() && !compare.hasValue())
             throw new NotMaterializedException();
 
-        String v = ((BigdataLiteral) value.getValue()).getLabel();
-        String c = ((BigdataLiteral) compare.getValue()).getLabel();
+        String v = literalValue(value).getLabel();
+        String c = literalValue(compare).getLabel();
         return v.contains(c);
 
     }

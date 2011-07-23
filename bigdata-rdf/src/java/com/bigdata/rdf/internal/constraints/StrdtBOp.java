@@ -82,7 +82,7 @@ public class StrdtBOp extends LexiconBOp {
             throw new NotMaterializedException();
 
         final BigdataURI dt = (BigdataURI) datatype.getValue();
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         final BigdataLiteral str = vf.createLiteral(label, dt);
         return DummyConstantNode.dummyIV(str);

@@ -14,15 +14,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
-import org.openrdf.query.Dataset;
-import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.Var;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -57,15 +53,17 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
+import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
+import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
-import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -73,7 +71,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.ElementFilter;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
@@ -96,6 +93,14 @@ public class AST2BOpUtility {
 		PipelineOp left = convert(root, ctx);
 		
 		/*
+		 * Add any evaluated projections
+		 */
+		if(query.getAssignmentProjections().size()>0){
+		    
+	        left = addProjectedAssigments(left, query.getAssignmentProjections(), ctx);
+	        
+		}
+		/*
 		 * distinct first, then order by, then limit/offset
 		 * 
 		 * none of these have been tested yet
@@ -103,7 +108,7 @@ public class AST2BOpUtility {
 		
 		if (query.isDistinct()) {
 			
-			left = addDistinct(left, query.getProjection(), ctx);
+		    left = addDistinct(left, query.getProjectionVars(), ctx);
 			
 		}
 		
@@ -267,7 +272,7 @@ public class AST2BOpUtility {
         /*
          * Add the LET assignments to the pipeline.
          */
-        left = addAssignments(left, joinGroup.getAssignments(), ctx);
+        left = addAssignments(left, joinGroup.getAssignments(), ctx, false);
         
         
         /*
@@ -299,16 +304,35 @@ public class AST2BOpUtility {
         
 	}
 	
+	private static final PipelineOp addProjectedAssigments(PipelineOp left,
+	        final List<AssignmentNode> assignments,
+	        final AST2BOpContext ctx){
+	    
+	    PipelineOp subq=left;
+        
+        left=addStartOp(ctx);
+        
+        left = new SubqueryOp(new BOp[]{left}, 
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
+                new NV(SubqueryOp.Annotations.SUBQUERY, subq),
+                new NV(SubqueryOp.Annotations.OPTIONAL, false));
+   
+        left = addAssignments(left, assignments, ctx,true);
+        
+        left = addEndOp(left, ctx);
+        
+        return left;
+	}
+	
 	private static final PipelineOp addAssignments(PipelineOp left,    		
     		final List<AssignmentNode> assignments,
-            final AST2BOpContext ctx) {
+            final AST2BOpContext ctx,
+            final boolean projection) {
 		final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
 		for (AssignmentNode assignmentNode : assignments) {
 
 			final IValueExpression ve = assignmentNode.getValueExpression();
-			
-			final IVariable<IV>	var = assignmentNode.getVar();
 			
 			final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 			
@@ -324,6 +348,10 @@ public class AST2BOpUtility {
 			
 			final int bopId = ctx.idFactory.incrementAndGet();
 
+			final ConditionalBind b = new ConditionalBind(assignmentNode.getVar(),assignmentNode.getValueExpression());
+			
+            IConstraint c = projection?new ProjectedConstraint(b):new BindingConstraint(b);
+            
 			/*
 			 * We might have already materialized everything we need for this filter.
 			 */
@@ -336,11 +364,9 @@ public class AST2BOpUtility {
 				 */
 				done.addAll(vars);
 				
+				c=new TryBeforeMaterializationConstraint(c);
 			}
 		
-			final Bind b = new Bind(assignmentNode.getVar(),assignmentNode.getValueExpression());
-			final IConstraint c = new BindingConstraint(b);
-			
 			left = applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{ left },
                         NV.asMap(new NV[]{//

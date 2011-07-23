@@ -62,7 +62,7 @@ public class EncodeForURIBOp extends LexiconBOp {
 
     protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
 
-        final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+        final BigdataLiteral lit =literalValue(iv);
         try {
             final BigdataLiteral str = vf.createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8"));
             return DummyConstantNode.dummyIV(str);

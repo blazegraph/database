@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -7,6 +8,8 @@ import java.util.List;
 import java.util.Set;
 
 import com.bigdata.bop.IVariable;
+
+import com.bigdata.rdf.internal.IV;
 
 /**
  * Contains the operator tree and query metadata (distinct, order by, slice,
@@ -22,7 +25,7 @@ public class QueryRoot {
 	
 	private boolean distinct = false;
 	
-	private final Set<IVariable<?>> projection;
+	private final List<AssignmentNode> projection;
 	
 	private long offset = 0;
 	
@@ -34,16 +37,38 @@ public class QueryRoot {
 		
 		this.orderBy = new LinkedList<OrderByNode>();
 		
-		this.projection = new LinkedHashSet<IVariable<?>>();
+		this.projection = new ArrayList<AssignmentNode>();
 		
 	}
 
 	public void addProjectionVar(final VarNode var) {
-		projection.add(var.getVar());
+		projection.add(new AssignmentNode(var,var));
 	}
 	
-	public IVariable<?>[] getProjection() {
-		return (IVariable<?>[]) projection.toArray(new IVariable[projection.size()]);
+	public void addProjectionExpression(final AssignmentNode assignment) {
+	    projection.add(assignment);
+	}
+	
+	public List<AssignmentNode> getProjection() {
+		return projection;
+	}
+	
+	public List<AssignmentNode> getAssignmentProjections(){
+	    ArrayList<AssignmentNode> assignments=new ArrayList<AssignmentNode>();
+	    for(AssignmentNode n:projection){
+	        if(n.getValueExpressionNode().equals(n.getVarNode()))
+	            continue;
+	        assignments.add(n);
+	    }
+	    return assignments;
+	}
+	
+	public IVariable[] getProjectionVars() {
+	    ArrayList<IVariable< IV>> vars=new ArrayList<IVariable<IV>>(projection.size());
+	    for(AssignmentNode n:projection){
+	       vars.add(n.getVar());
+	    }
+        return (IVariable[]) vars.toArray(new IVariable[vars.size()]);
 	}
 	
 	public IGroupNode getRoot() {
@@ -119,8 +144,8 @@ public class QueryRoot {
 		}
 		
 		if (projection.size() > 0) {
-			for (IVariable v : projection) {
-				sb.append(" ?").append(v);
+			for (AssignmentNode v : projection) {
+				sb.append(v);
 			}
 		} else {
 			sb.append(" *");
