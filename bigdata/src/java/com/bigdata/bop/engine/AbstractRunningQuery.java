@@ -649,8 +649,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
-    		if(log.isInfoEnabled())//FIXME TRACE
-    			log.info(msg.toString());
+    		if(log.isTraceEnabled())
+    			log.trace(msg.toString());
     		
             if (runState.startOp(msg)) {
 
@@ -709,8 +709,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         try {
 
-    		if(log.isInfoEnabled())//FIXME TRACE
-    			log.info(msg.toString());
+    		if(log.isTraceEnabled())
+    			log.trace(msg.toString());
 
             // update per-operator statistics.
             final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
