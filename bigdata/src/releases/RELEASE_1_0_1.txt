@@ -31,25 +31,34 @@ https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_0_1
 
 Bug fixes:
 
- - https://sourceforge.net/apps/trac/bigdata/ticket/349 (TermIdEncoder limits
-   Journal to 2B distinct RDF Values per triple/quad store instance).
-   
+ - https://sourceforge.net/apps/trac/bigdata/ticket/107 (Unicode clean schema
+   names in the sparse row store).
+
  - https://sourceforge.net/apps/trac/bigdata/ticket/124 (TermIdEncoder should
    use more bits for scale-out).     
 
- - https://sourceforge.net/apps/trac/bigdata/ticket/107 (Unicode clean schema
-   names in the sparse row store).
+ - https://sourceforge.net/apps/trac/bigdata/ticket/225 (OSX requires specialized
+   performance counter collection classes).
 
  - https://sourceforge.net/apps/trac/bigdata/ticket/348 (BigdataValueFactory.asValue()
    must return new instance when DummyIV is used).
 
- - https://sourceforge.net/apps/trac/bigdata/ticket/351 (SPOs not serializable
-   in scale-out).
+ - https://sourceforge.net/apps/trac/bigdata/ticket/349 (TermIdEncoder limits
+   Journal to 2B distinct RDF Values per triple/quad store instance).
+   
+ - https://sourceforge.net/apps/trac/bigdata/ticket/351 (SPO not Serializable
+   exception in SIDS mode (scale-out)).
+ 
+ - https://sourceforge.net/apps/trac/bigdata/ticket/352 (ClassCastException when
+   querying with binding-values that are not known to the database).
 
- - https://sourceforge.net/apps/trac/bigdata/ticket/225 (OSX requires specialized
-   performance counter collection classes
+ - https://sourceforge.net/apps/trac/bigdata/ticket/353 (UnsupportedOperatorException
+   for some SPARQL queries).
 
-New features in 1.0.x release:
+ - https://sourceforge.net/apps/trac/bigdata/ticket/355 (Query failure when
+   comparing with non materialized value).
+
+New features:
 
 - Single machine data storage to ~50B triples/quads (RWStore);
 - Simple embedded and/or webapp deployment (NanoSparqlServer);
@@ -81,9 +90,9 @@ For more information, please see the following links:
 
 About bigdata: 
 
-Bigdata(R) is a horizontally-scaled, general purpose storage and computing fabric
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
 for ordered data (B+Trees), designed to operate on either a single server or a
-cluster of commodity hardware. Bigdata(R) uses dynamically partitioned key-range
+cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
 shards in order to remove any realistic scaling limits - in principle, bigdata®
 may be deployed on 10s, 100s, or even thousands of machines and new capacity may
 be added incrementally without requiring the full reload of all data. The bigdata®
