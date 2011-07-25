@@ -54,7 +54,6 @@ public class RandBOp extends IVValueExpression<IV> {
         super(op);
     }
 
-    @Override
     public IV get(IBindingSet bindingSet) {
         return new XSDDoubleIV(rand.nextDouble());
     }

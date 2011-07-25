@@ -56,7 +56,6 @@ public class StrcontainsBOp extends LexiconBooleanBOp {
         super(op);
     }
 
-    @Override
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }

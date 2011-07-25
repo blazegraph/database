@@ -108,7 +108,6 @@ public class NumericBOp extends IVValueExpression<IV>  {
         return (NumericOp) getRequiredProperty(Annotations.OP);
     }
 
-    @Override
     public IV get(IBindingSet bindingSet) {
         IV iv=get(0).get(bindingSet);
 

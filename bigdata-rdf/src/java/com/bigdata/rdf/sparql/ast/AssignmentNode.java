@@ -127,7 +127,6 @@ public class AssignmentNode extends QueryNodeBase implements IQueryNode {
         return toString(0);
     }
 
-    @Override
     public String toString(int indent) {
         final String _indent;
         if (indent <= 0) {

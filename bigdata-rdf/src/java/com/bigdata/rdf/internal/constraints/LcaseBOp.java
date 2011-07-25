@@ -55,7 +55,6 @@ public class LcaseBOp extends LexiconBOp {
         super(op);
     }
 
-    @Override
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
