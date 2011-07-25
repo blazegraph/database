@@ -252,6 +252,12 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
 
         }
 
+        public int getRank() {
+        	
+        	return 0;
+        	
+        }
+        
         public double getCosine() {
 
             return cosine;

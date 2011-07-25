@@ -1174,7 +1174,7 @@ public class BigdataSail extends SailBase implements Sail {
      * deletes the KB instance and destroys the backing database instance. It is
      * used to help tear down unit tests.
      */
-    void __tearDownUnitTest() {
+    public void __tearDownUnitTest() {
         
         closeOnShutdown = false;
         

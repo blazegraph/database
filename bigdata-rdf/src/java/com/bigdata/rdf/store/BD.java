@@ -158,6 +158,22 @@ public interface BD {
      * <p>
      * <pre>
      * 
+     * select ?s ?rank
+     * where {
+     *   ?s bd:search &quot;scale-out RDF triplestore&quot; .
+     *   ?s bd:rank ?rank .
+     * }
+     * 
+     * </pre>
+     */
+    final URI RANK = new URIImpl(SEARCH_NAMESPACE+"rank");
+    
+    /**
+     * Magic predicate used to query for free text search metadata.  Use 
+     * in conjunction with {@link #SEARCH} as follows:
+     * <p>
+     * <pre>
+     * 
      * select ?s
      * where {
      *   ?s bd:search &quot;scale-out RDF triplestore&quot; .

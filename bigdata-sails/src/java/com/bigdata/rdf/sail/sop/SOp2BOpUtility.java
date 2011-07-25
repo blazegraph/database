@@ -967,7 +967,8 @@ public class SOp2BOpUtility {
                         QueryHints.DEFAULT_HASH_JOIN)); 
     	if (log.isInfoEnabled()) {
     		log.info(queryHints);
-    		log.info(queryHints.getProperty(QueryHints.HASH_JOIN));
+    		if (queryHints != null)
+    			log.info(queryHints.getProperty(QueryHints.HASH_JOIN));
     		log.info("use hash join = " + hashJoin);
     	}
     	return hashJoin;

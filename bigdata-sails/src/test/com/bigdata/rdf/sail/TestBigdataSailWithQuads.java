@@ -121,6 +121,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket276.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket348.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket352.class);
+        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket353.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket355.class);
 
         suite.addTestSuite(com.bigdata.rdf.sail.DavidsTestBOps.class);

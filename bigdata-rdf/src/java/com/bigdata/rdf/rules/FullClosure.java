@@ -1,6 +1,9 @@
 package com.bigdata.rdf.rules;
 
+import java.util.List;
+
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.rule.Rule;
 
 /**
  * A program that uses the fix point of the configured rules to compute the
@@ -135,6 +138,12 @@ public class FullClosure extends BaseClosure {
 
                 program.addStep(new RuleOwlEquivalentClass(db,vocab));
 
+            }
+
+            // add the custom rules
+            final List<Rule> custom = getCustomRules(db);
+            for (Rule r : custom) {
+            	program.addStep(r);
             }
 
         }

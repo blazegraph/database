@@ -228,6 +228,9 @@ public class FastClosure extends BaseClosure {
                     tmp.add(new RuleOwlHasValue(db, vocab));
     
                 }
+                
+                // add the custom rules
+                tmp.addAll(getCustomRules(db));
     
                 if (!tmp.isEmpty()) {
     

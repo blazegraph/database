@@ -206,17 +206,46 @@ public class BigdataOpenRDFBindingSetsResolverator
 
             assert outVal != null;
 
-            final Constant<?> c;
-            
+			/*
+			 * This pattern is no good. What is happening here is that we
+			 * have an unknown term in the query or in the incoming binding
+			 * sets. This is ok. What we need to do in this case is stamp a
+			 * fresh dummy internal value, set this as the IV on the unknown
+			 * BigdataValue, and most importantly cache the unknown
+			 * BigdataValue on the dummy IV so that a) it can be accessed
+			 * and used in the query and b) we don't try to re-materialize
+			 * it later (and fail).
+			 */
+//            
+//            final Constant<?> c;
+//            
+//            if (outVal.getIV() == null) {
+//
+//                c = new Constant(TermId.mockIV(VTE.valueOf(value)));
+//                
+//            } else {
+//                
+//                c = new Constant(outVal.getIV());
+//                
+//            }
+
             if (outVal.getIV() == null) {
 
-                c = new Constant(TermId.mockIV(VTE.valueOf(value)));
-                
-            } else {
-                
-                c = new Constant(outVal.getIV());
-                
+               	final IV dummy = TermId.mockIV(VTE.valueOf(outVal));
+            	
+            	outVal.setIV(dummy);
+            	
             }
+
+            final IV iv = outVal.getIV();
+
+            /*
+             * We might as well always cache the materialized value on the IV 
+             * now, this will save time during materialization steps later.
+             */
+            iv.setValue(outVal);
+            
+            final Constant<?> c = new Constant(iv);
             
             out.set(Var.var(name), c);
 

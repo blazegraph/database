@@ -205,34 +205,44 @@ public class BigdataValueReplacer {
          */
         {
              
-             final BigdataValue[] terms = values.values().toArray(
-                    new BigdataValue[] {});
+			final BigdataValue[] terms = values.values().toArray(
+					new BigdataValue[] {});
 
-             database.getLexiconRelation().addTerms(terms, terms.length,
-                     true/* readOnly */);
-             
-             // cache the BigdataValues on the IVs for later
-             for (BigdataValue term : terms) {
-            	 
-            	 final IV iv = term.getIV();
-            	 
-                 if (iv == null) {
+			database.getLexiconRelation()
+					.addTerms(terms, terms.length, true/* readOnly */);
 
-                     /*
-                      * Since the term identifier is NULL this value is
-                      * not known to the kb.
-                      */
-                     
-                     if(log.isInfoEnabled())
-                         log.info("Not in knowledge base: " + term);
-                     
-                 } else {
-                 
-                	 iv.setValue(term);
-                	 
-                 }
-            	 
-             }
+			// cache the BigdataValues on the IVs for later
+			for (BigdataValue term : terms) {
+
+				final IV iv = term.getIV();
+
+				if (iv == null) {
+
+					/*
+					 * Since the term identifier is NULL this value is not known
+					 * to the kb.
+					 */
+
+					if (log.isInfoEnabled())
+						log.info("Not in knowledge base: " + term);
+
+					/*
+					 * Create a dummy iv and cache the unknown value on it so
+					 * that it can be used during query evalution.
+					 */
+					final IV dummy = TermId.mockIV(VTE.valueOf(term));
+
+					term.setIV(dummy);
+
+					dummy.setValue(term);
+
+				} else {
+
+					iv.setValue(term);
+
+				}
+
+			}
 
         }
         
@@ -365,16 +375,21 @@ public class BigdataValueReplacer {
 //                        log.info("Not in knowledge base: " + val2);
 //
 //                }
-                                
-                if(val2.getIV() == null) {
-                    /*
-                     * The Value is not in the database, so assign it a mock IV.
-                     * This IV will not match anything during query. However, we
-                     * can not simply fail the query since an OPTIONAL or UNION
-                     * might have solutions even though this Value is not known.
-                     */
-                    val2.setIV(TermId.mockIV(VTE.valueOf(val)));
-                }
+
+				/*
+				 * This is no good. We need to create a mock IV and also cache
+				 * the unknown value on it so that it can be used in filter
+				 * evaluation. I took care of this above.
+				 */
+//                if(val2.getIV() == null) {
+//                    /*
+//                     * The Value is not in the database, so assign it a mock IV.
+//                     * This IV will not match anything during query. However, we
+//                     * can not simply fail the query since an OPTIONAL or UNION
+//                     * might have solutions even though this Value is not known.
+//                     */
+//                    val2.setIV(TermId.mockIV(VTE.valueOf(val)));
+//                }
                 
                 // rewrite the constant in the query.
                 bindings2.addBinding(binding.getName(), val2);

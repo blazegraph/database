@@ -209,13 +209,13 @@ public class SOpTreeBuilder {
     	
     	if (left instanceof Union) {
     		collectSOps(sops, (Union) left, rslj, g, pg);
-    	} else {
+    	} else if (!(left instanceof SingletonSet)) {
     		collectSOps(sops, left, rslj, groupId.incrementAndGet(), g);
     	}
     	
     	if (right instanceof Union) {
     		collectSOps(sops, (Union) right, rslj, g, pg);
-    	} else {
+    	} else if (!(right instanceof SingletonSet)) {
     		collectSOps(sops, right, rslj, groupId.incrementAndGet(), g);
     	}
     }

@@ -15,6 +15,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
@@ -339,8 +340,8 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
             final ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
                 final IV s = (IV) hits[i].getDocId();
-                final IV p = new XSDDoubleIV(hits[i].getCosine());
-                final IV o = null; // reserved
+                final IV p = new XSDDoubleIV(hits[i].getCosine()); // cosine
+                final IV o = new XSDIntIV(hits[i].getRank()); // rank
                 final IV c = null; // reserved
                 spos[i] = new SPO(s, p, o, c);
                 if (log.isInfoEnabled())
@@ -356,7 +357,7 @@ public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
                 final IV s = (IV)hit.getDocId();
                 if (s == boundVal) {
                     final IV p = new XSDDoubleIV(hit.getCosine());
-                    final IV o = null; // reserved
+                    final IV o = new XSDIntIV(hit.getRank()); // rank
                     final IV c = null; // reserved
                     result = new ISPO[] { new SPO(s, p, o, c) };
                     break;

@@ -49,4 +49,9 @@ public interface IHit<V extends Comparable<V>> {
      */
     public V getDocId();
 
+    /**
+     * The rank of this hit within the context of the search.
+     */
+    public int getRank();
+
 }
