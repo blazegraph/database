@@ -37,19 +37,17 @@ import com.bigdata.cache.IHardReferenceQueue;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see SimpleEntry#NoSerializer
  */
 public class NoEvictionListener implements
         IEvictionListener {
 
-    public void evicted(IHardReferenceQueue<PO> cache, PO ref) {
+    public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         assert ref instanceof Leaf;
         
         if( ref.isDirty()) {
-        	if (true)
-	            throw new UnsupportedOperationException(
+
+            throw new UnsupportedOperationException(
 	                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
             
         }
