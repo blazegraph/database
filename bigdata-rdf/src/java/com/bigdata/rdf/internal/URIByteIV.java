@@ -29,6 +29,7 @@ package com.bigdata.rdf.internal;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -98,7 +99,21 @@ public class URIByteIV<V extends BigdataURI> extends AbstractInlineIV<V, Byte> {
 	public V asValue(final LexiconRelation lex)
 			throws UnsupportedOperationException {
 
-		return (V) lex.getContainer().getVocabulary().asValue(this);
+    	V v = getValueCache();
+		
+    	if (v == null) {
+    		
+			final BigdataValueFactory f = lex.getValueFactory();
+			
+			v = (V) lex.getContainer().getVocabulary().asValue(this);
+			
+			v.setIV(this);
+			
+			setValue(v);
+			
+		}
+
+    	return v;
 		
 	}
 
