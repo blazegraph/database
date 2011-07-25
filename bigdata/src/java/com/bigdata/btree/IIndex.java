@@ -62,7 +62,6 @@ public interface IIndex extends ISimpleBTree, IAutoboxBTree, IRangeQuery, IIndex
      * <p>
      * Interesting performance counters and other statistics about the index.
      */
-    @Override
     public CounterSet getCounters();
     
     /**
