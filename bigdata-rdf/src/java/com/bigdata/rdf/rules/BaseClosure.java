@@ -1,8 +1,12 @@
 package com.bigdata.rdf.rules;
 
+import java.util.Collections;
+import java.util.List;
+
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.relation.rule.Rule;
 
 /**
  * Base class for classes that provide closure programs.
@@ -101,5 +105,14 @@ abstract public class BaseClosure {
      *       focusStore (or for the database if no focusStore is used).
      */
     abstract public MappedProgram getProgram(String database, String focusStore);
+    
+    /**
+     * Allow subclasses of the fast and full closure programs to provide a set
+     * of custom rules that will be run towards the end of the standard closure
+     * program.
+     */
+    protected List<Rule> getCustomRules(final String database) {
+    	return Collections.EMPTY_LIST;
+    }
     
 }

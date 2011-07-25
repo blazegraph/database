@@ -62,6 +62,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
@@ -353,7 +354,31 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
                 + ".analyzerFactoryClass";
 
         String DEFAULT_ANALYZER_FACTORY_CLASS = DefaultAnalyzerFactory.class.getName();
-
+        
+        /**
+        * We keep a small hit cache based on search parameters: search string +
+        * prefixMatch + matchAllTerms.  This defines the size of that cache.
+        * The value should remain small.
+        */
+        String HIT_CACHE_SIZE = FullTextIndex.class.getName()
+        		+ ".hitCacheSize";
+        
+        String DEFAULT_HIT_CACHE_SIZE = "10";
+        
+       /**
+        * We keep a small hit cache based on search parameters: search string +
+        * prefixMatch + matchAllTerms. This defines the timeout for values in
+        * that cache (in milliseconds). The value should remain small.
+        */
+        String HIT_CACHE_TIMEOUT_MILLIS = FullTextIndex.class.getName()
+                + ".hitCacheTimeoutMillis";
+        
+        /**
+         * Default is 1 minute.
+         */
+        String DEFAULT_HIT_CACHE_TIMEOUT_MILLIS =
+               String.valueOf(TimeUnit.MINUTES.toMillis(1));
+        
     }
     
     /**
@@ -400,6 +425,21 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      */
     private final IAnalyzerFactory analyzerFactory;
     
+    /**
+     * See {@link Options#HIT_CACHE_SIZE}.
+     */
+    private final int hitCacheSize;
+
+    /**
+     * See {@link Options#HIT_CACHE_TIMEOUT_MILLIS}.
+     */
+    private final long hitCacheTimeoutMillis;
+
+    /**
+     * See {@link Options#HIT_CACHE_SIZE}.
+     */
+    private final ConcurrentWeakValueCacheWithTimeout<FullTextSearchQuery, Hit<V>[]> cache;
+
 //    /**
 //     * @see Options#DOCID_FACTORY_CLASS
 //     */
@@ -500,6 +540,31 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 //                log.info(Options.DOUBLE_PRECISION + "=" + doublePrecision);
 //
 //        }
+
+        {
+
+            hitCacheSize = Integer.parseInt(properties.getProperty(
+                    Options.HIT_CACHE_SIZE, Options.DEFAULT_HIT_CACHE_SIZE));
+
+            if (log.isInfoEnabled())
+                log.info(Options.HIT_CACHE_SIZE + "=" + hitCacheSize);
+
+        }
+
+        {
+
+            hitCacheTimeoutMillis = Long.parseLong(properties.getProperty(
+                    Options.HIT_CACHE_TIMEOUT_MILLIS,
+                    Options.DEFAULT_HIT_CACHE_TIMEOUT_MILLIS));
+
+            if (log.isInfoEnabled())
+                log.info(Options.HIT_CACHE_TIMEOUT_MILLIS + "=" + hitCacheTimeoutMillis);
+
+        }
+
+        this.cache =
+               new ConcurrentWeakValueCacheWithTimeout<FullTextSearchQuery, Hit<V>[]>(
+                               hitCacheSize, hitCacheTimeoutMillis);
 
         {
 
@@ -999,162 +1064,196 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             
         }
         
-        // tokenize the query.
-        final TermFrequencyData<V> qdata;
-        {
-            
-            final TokenBuffer<V> buffer = new TokenBuffer<V>(1, this);
-
-            /*
-             * If we are using prefix match ('*' operator) then we don't want to
-             * filter stopwords from the search query.
-             */
-            final boolean filterStopwords = !prefixMatch;
-
-            index(buffer, //
-                    null, // docId // was Long.MIN_VALUE
-                    Integer.MIN_VALUE, // fieldId
-                    languageCode,//
-                    new StringReader(query), //
-                    filterStopwords//
-            );
-
-            if (buffer.size() == 0) {
-
-                /*
-                 * There were no terms after stopword extration.
-                 */
-
-                log.warn("No terms after stopword extraction: query=" + query);
-
-                return new Hit[] {};
-
-            }
-            
-            qdata = buffer.get(0);
-            
-            qdata.normalize();
-            
-        }
-
-        final ConcurrentHashMap<V/* docId */, Hit<V>> hits;
-        {
-
-			/*
-			 * Note: Initial capacity COULD be set based on the max across the
-			 * range counts of the different search terms. However, it can not
-			 * be usefully set to the min(maxRank,10000) as we will buffer ALL
-			 * hits in this map before pruning those selected by min/max rank.
-			 */
-			final int initialCapacity = 256;//Math.min(maxRank,10000);
-            
-			/*
-			 * Note: The actual concurrency will be the #of distinct query
-			 * tokens.
-			 */
-        	final int concurrencyLevel = qdata.distinctTermCount();
-
-			hits = new ConcurrentHashMap<V, Hit<V>>(initialCapacity,
-					.75f/* loadFactor */, concurrencyLevel);
-
-        }
-
-        // run the queries.
-        {
-
-            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
-                    qdata.distinctTermCount());
-
-            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
-
-                final String termText = e.getKey();
-
-                final ITermMetadata md = e.getValue();
-
-                tasks.add(new ReadIndexTask<V>(termText, prefixMatch, md
-                        .getLocalTermWeight(), this, hits));
-
-            }
-
-            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
-                    getExecutorService(), timeout, unit);
-
-            try {
-
-                executionHelper.submitTasks(tasks);
-                
-            } catch (InterruptedException ex) {
-
-                // TODO Should we wrap and toss this interrupt instead?
-                log.warn("Interrupted - only partial results will be returned.");
-                
-            } catch (ExecutionException ex) {
-
-                throw new RuntimeException(ex);
-                
-            }
-
-        }
-
-        /*
-         * If match all is specified, remove any hits with a term count less
-         * than the number of search tokens.
-         */
-        if (matchAllTerms) {
+        final FullTextSearchQuery cacheKey = new FullTextSearchQuery(
+        		query, matchAllTerms, prefixMatch
+        		);
+        
+        Hit<V>[] a;
+        
+        if (cache.containsKey(cacheKey)) {
         	
-	        final int nterms = qdata.terms.size();
-	        
-	        if (log.isInfoEnabled())
-	        	log.info("matchAll=true, nterms=" + nterms);
-	        
-	        final Iterator<Map.Entry<V,Hit<V>>> it = hits.entrySet().iterator();
-	        
-	        while (it.hasNext()) {
+        	if (log.isDebugEnabled())
+        		log.debug("found hits in cache");
+        	
+        	a = cache.get(cacheKey);
+        	
+        } else {
+        	
+        	if (log.isDebugEnabled())
+        		log.debug("did not find hits in cache");
+        	
+	        // tokenize the query.
+	        final TermFrequencyData<V> qdata;
+	        {
+	            
+	            final TokenBuffer<V> buffer = new TokenBuffer<V>(1, this);
+	
+	            /*
+	             * If we are using prefix match ('*' operator) then we don't want to
+	             * filter stopwords from the search query.
+	             */
+	            final boolean filterStopwords = !prefixMatch;
+	
+	            index(buffer, //
+	                    null, // docId // was Long.MIN_VALUE
+	                    Integer.MIN_VALUE, // fieldId
+	                    languageCode,//
+	                    new StringReader(query), //
+	                    filterStopwords//
+	            );
+	
+	            if (buffer.size() == 0) {
+	
+	                /*
+	                 * There were no terms after stopword extration.
+	                 */
+	
+	                log.warn("No terms after stopword extraction: query=" + query);
+	
+	                a = new Hit[] {};
+	                
+	                cache.put(cacheKey, a);
+	                
+	                return a; 
+	
+	            }
+	            
+	            qdata = buffer.get(0);
+	            
+	            qdata.normalize();
+	            
+	        }
+	
+	        final ConcurrentHashMap<V/* docId */, Hit<V>> hits;
+	        {
+	
+				/*
+				 * Note: Initial capacity COULD be set based on the max across the
+				 * range counts of the different search terms. However, it can not
+				 * be usefully set to the min(maxRank,10000) as we will buffer ALL
+				 * hits in this map before pruning those selected by min/max rank.
+				 */
+				final int initialCapacity = 256;//Math.min(maxRank,10000);
+	            
+				/*
+				 * Note: The actual concurrency will be the #of distinct query
+				 * tokens.
+				 */
+	        	final int concurrencyLevel = qdata.distinctTermCount();
+	
+				hits = new ConcurrentHashMap<V, Hit<V>>(initialCapacity,
+						.75f/* loadFactor */, concurrencyLevel);
+	
+	        }
+	
+	        // run the queries.
+	        {
+	
+	            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
+	                    qdata.distinctTermCount());
+	
+	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
+	
+	                final String termText = e.getKey();
+	
+	                final ITermMetadata md = e.getValue();
+	
+	                tasks.add(new ReadIndexTask<V>(termText, prefixMatch, md
+	                        .getLocalTermWeight(), this, hits));
+	
+	            }
+	
+	            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
+	                    getExecutorService(), timeout, unit);
+	
+	            try {
+	
+	                executionHelper.submitTasks(tasks);
+	                
+	            } catch (InterruptedException ex) {
+	
+	                // TODO Should we wrap and toss this interrupt instead?
+	                log.warn("Interrupted - only partial results will be returned.");
+	                
+	            } catch (ExecutionException ex) {
+	
+	                throw new RuntimeException(ex);
+	                
+	            }
+	
+	        }
+	
+	        /*
+	         * If match all is specified, remove any hits with a term count less
+	         * than the number of search tokens.
+	         */
+	        if (matchAllTerms) {
 	        	
-	        	final Hit<V> hit = it.next().getValue();
-
-	        	// Note: log test in loop shows up in profiler.
-//		        if (log.isInfoEnabled()) {
-//		        	log.info("hit terms: " + hit.getTermCount());
-//		        }
+		        final int nterms = qdata.terms.size();
 		        
-	        	if (hit.getTermCount() != nterms) {
-	        		it.remove();
-	        	}
-	        	
+		        if (log.isInfoEnabled())
+		        	log.info("matchAll=true, nterms=" + nterms);
+		        
+		        final Iterator<Map.Entry<V,Hit<V>>> it = hits.entrySet().iterator();
+		        
+		        while (it.hasNext()) {
+		        	
+		        	final Hit<V> hit = it.next().getValue();
+	
+		        	// Note: log test in loop shows up in profiler.
+	//		        if (log.isInfoEnabled()) {
+	//		        	log.info("hit terms: " + hit.getTermCount());
+	//		        }
+			        
+		        	if (hit.getTermCount() != nterms) {
+		        		it.remove();
+		        	}
+		        	
+		        }
+		        
 	        }
 	        
+	        // #of hits.
+	        final int nhits = hits.size();
+	        
+	        if (nhits == 0) {
+	
+	            log.warn("No hits: languageCode=[" + languageCode + "], query=["
+	                    + query + "]");
+	            
+	            a = new Hit[] {};
+	            
+	            cache.put(cacheKey, a);
+	            
+	            return a; 
+	            
+	        }
+	        
+	        /*
+	         * Rank order the hits by relevance.
+	         * 
+	         * @todo consider moving documents through a succession of N pools where
+	         * N is the #of distinct terms in the query. The read tasks would halt
+	         * if the size of the pool for N terms reached maxRank. This might (or
+	         * might not) help with triage since we could process hits by pool and
+	         * only compute the cosines for one pool at a time until we had enough
+	         * hits.
+	         */
+	        
+	        if (log.isInfoEnabled())
+	            log.info("Rank ordering "+nhits+" hits by relevance");
+	        
+	        a = hits.values().toArray(new Hit[nhits]);
+	        
+	        Arrays.sort(a);
+	        
+	        for (int i = 0; i < a.length; i++) {
+	        	a[i].setRank(i+1);
+	        }
+	        
+	        cache.put(cacheKey, a);
+        
         }
-        
-        // #of hits.
-        final int nhits = hits.size();
-        
-        if (nhits == 0) {
-
-            log.warn("No hits: languageCode=[" + languageCode + "], query=["
-                    + query + "]");
-            
-            return new Hit[] {};
-            
-        }
-        
-        /*
-         * Rank order the hits by relevance.
-         * 
-         * @todo consider moving documents through a succession of N pools where
-         * N is the #of distinct terms in the query. The read tasks would halt
-         * if the size of the pool for N terms reached maxRank. This might (or
-         * might not) help with triage since we could process hits by pool and
-         * only compute the cosines for one pool at a time until we had enough
-         * hits.
-         */
-        
-        if (log.isInfoEnabled())
-            log.info("Rank ordering "+nhits+" hits by relevance");
-        
-        Hit<V>[] a = hits.values().toArray(new Hit[nhits]);
-        
-        Arrays.sort(a);
         
         if (log.isDebugEnabled()) {
         	log.debug("before min/max cosine/rank pruning:");
@@ -1222,6 +1321,23 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         	
         }
 
+        // exactly one hit
+        if (minRank > 0 && minRank == maxRank) {
+        	
+        	if (minRank > a.length) {
+        		
+            	// out of range
+        		return new Hit[] {};
+        		
+        	} else {
+
+        		// in range
+        		return new Hit[] { a[minRank-1] };
+	        	
+        	}
+        	
+        }
+        
         /*
          * If minRank is specified, prune the hits that rank higher than the min
          */
@@ -1311,4 +1427,71 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
+    private static final class FullTextSearchQuery {
+    	
+		private final String search;
+    	private final boolean matchAllTerms;
+    	private final boolean prefixMatch;
+    	
+    	public FullTextSearchQuery(
+    	    	final String search,
+    	    	final boolean matchAllTerms,
+    	    	final boolean prefixMatch) {
+    		
+    		this.search = search;
+    		this.matchAllTerms = matchAllTerms;
+    		this.prefixMatch = prefixMatch;
+    		
+    	}
+    	
+    	public String getSearch() {
+			return search;
+		}
+
+		public boolean isMatchAllTerms() {
+			return matchAllTerms;
+		}
+
+		public boolean isPrefixMatch() {
+			return prefixMatch;
+		}
+		
+		/**
+		 * Generated by Eclipse.
+		 */
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + (matchAllTerms ? 1231 : 1237);
+			result = prime * result + (prefixMatch ? 1231 : 1237);
+			result = prime * result
+					+ ((search == null) ? 0 : search.hashCode());
+			return result;
+		}
+
+		/**
+		 * Generated by Eclipse.
+		 */
+		public boolean equals(final Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			FullTextSearchQuery other = (FullTextSearchQuery) obj;
+			if (matchAllTerms != other.matchAllTerms)
+				return false;
+			if (prefixMatch != other.prefixMatch)
+				return false;
+			if (search == null) {
+				if (other.search != null)
+					return false;
+			} else if (!search.equals(other.search))
+				return false;
+			return true;
+		}
+		
+    }
+    
 }

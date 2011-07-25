@@ -1,9 +1,9 @@
 package com.bigdata.rdf.sail;
 
 import java.io.IOException;
+
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailRepository;
-import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.store.AbstractTripleStore;

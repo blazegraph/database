@@ -23,7 +23,10 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
     
     /** Net cosine for the reporting terms. */
     private double cosine;
-    
+
+    /** Rank order for this hit */
+    private int rank;
+
     /**
      * Ctor used in conjunction with a {@link ConcurrentHashMap} to insert
      * objects into the result set.
@@ -45,6 +48,12 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     }
 
+    synchronized void setRank(final int rank) {
+        
+        this.rank = rank;
+
+    }
+    
     /**
      * The #of terms for which a hit was reported for this document.
      */
@@ -60,6 +69,12 @@ public class Hit<V extends Comparable<V>> implements IHit<V>,
 
     }
 
+    synchronized public int getRank() {
+        
+        return rank;
+
+    }
+    
     synchronized public V getDocId() {
      
         return docId;

@@ -775,6 +775,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	        	final Value p = sp.getPredicateVar().getValue();
 	        	if (s == null && p != null && 
 	        			(BD.RELEVANCE.equals(p) || 
+        					BD.RANK.equals(p) ||
         					BD.MIN_RANK.equals(p) ||
         					BD.MAX_RANK.equals(p) ||
 	        				BD.MIN_RELEVANCE.equals(p) || 
@@ -1850,6 +1851,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         	com.bigdata.bop.Var.var(subjVar.getName());
         
         IVariableOrConstant<IV> relevance = new Constant(TermId.mockIV(VTE.BNODE));
+        IVariableOrConstant<IV> rank = new Constant(TermId.mockIV(VTE.BNODE));
         Literal minRank = null;
         Literal maxRank = null;
         Literal minRelevance = null;
@@ -1871,6 +1873,11 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             		throw new IllegalArgumentException("illegal metadata: " + meta);
         		}
         		relevance = com.bigdata.bop.Var.var(oVar.getName());
+        	} else if (BD.RANK.equals(pVal)) {
+        		if (oVar.hasValue()) {
+            		throw new IllegalArgumentException("illegal metadata: " + meta);
+        		}
+        		rank = com.bigdata.bop.Var.var(oVar.getName());
         	} else if (BD.MIN_RANK.equals(pVal)) {
         		if (oVal == null || !(oVal instanceof Literal)) {
         			throw new IllegalArgumentException("illegal metadata: " + meta);
@@ -1907,7 +1914,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         final BOp[] vars = new BOp[] {
 	        search, // s = searchVar
 	        relevance, // p = relevanceVar
-	        new Constant(TermId.mockIV(VTE.BNODE)), // o = reserved
+	        rank, // o = rankVar
 	        new Constant(TermId.mockIV(VTE.BNODE)), // c = reserved
         };
         
