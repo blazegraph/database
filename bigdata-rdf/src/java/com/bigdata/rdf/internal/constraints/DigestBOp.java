@@ -123,7 +123,6 @@ public class DigestBOp extends LexiconBOp {
         return strBuf.toString();
     }
 
-    @Override
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
