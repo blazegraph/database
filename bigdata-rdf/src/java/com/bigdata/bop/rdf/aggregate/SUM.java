@@ -114,6 +114,14 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
                 } else {
 
+                    /*
+                     * FIXME For this code path, write a version of
+                     * IVUtility.numericalMath() which accepts one inline
+                     * numeric IV and one BigdataLiteral (materialized value)
+                     * and then does the type promotion. Because the type
+                     * promotion rules are so simple, we will always wind up
+                     * with an inline numeric IV.
+                     */
                     final BigdataValue val1 = iv.getValue();
 
                     final BigdataValue val2 = aggregated.getValue();
@@ -155,20 +163,12 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 	}
 
     /**
-     * FIXME {@link SUM} can work on inline numerics. It is only when the
+     * Note: {@link SUM} can work on inline numerics. It is only when the
      * operands evaluate to non-inline numerics that this bop needs
-     * materialization. However, this implies that {@link #aggregated} will need
-     * to become a {@link BigdataLiteral} rather than an {@link IV}. Also, I am
-     * not sure how this would work if type promotion caused things to be
-     * unsigned. Right now we start out with a signed xsd:int, so that can't
-     * happen. I guess that means that {@link #aggregated} will always be some
-     * kind of signed {@link IV} and hence always inline as well. But I don't
-     * know how to get a {@link BigdataLiteral} for the {@link #aggregated} in
-     * order to be able to use LiteralMath. It would seem that the right thing
-     * to do is to apply type promotion to the {@link Literal} in the context of
-     * the {@link IV}. Since the {@link IV} is signed and inline, the result of
-     * type promotion will always be something that is signed and inline. Do we
-     * have a method for this?
+     * materialization, and that can only happen (today) with an xsd unsigned
+     * datatype (we would reject non-numeric datatypes with a type error).
+     * 
+     * FIXME MikeP: What is the right return value here?
      * 
      * TODO Write unit tests for SUM for xsd inline {@link IV}s as well as
      * materialized {@link BigdataLiteral}s.

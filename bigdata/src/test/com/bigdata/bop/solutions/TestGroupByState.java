@@ -39,11 +39,15 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.bop.rdf.aggregate.MIN;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 
@@ -52,8 +56,6 @@ import com.bigdata.rdf.internal.constraints.UcaseBOp;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * TODO Write test for isAnyDistinct and other optimizer hints.
  */
 public class TestGroupByState extends TestCase2 {
 
@@ -169,7 +171,8 @@ public class TestGroupByState extends TestCase2 {
      * simple variable also appearing as the sole value expression in the
      * GROUP_BY clause.
      * <pre>
-     * SELECT ?org GROUP BY ?org
+     * SELECT ?org
+     * GROUP BY ?org
      * </pre>
      */
     public void test_aggregateExpr_01() {
@@ -202,10 +205,11 @@ public class TestGroupByState extends TestCase2 {
      * Unit test with simple aggregate function in SELECT clause.
      * <pre>
      * SELECT ?org, SUM(?lprice) AS ?totalPrice
+     * GROUP BY ?org
      * </pre>
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void test_aggregateExpr_02() {
+    public void test_simpleAggregate() {
         
         final IVariable<?> org = Var.var("org");
         final IVariable<?> lprice = Var.var("lprice");
@@ -239,9 +243,50 @@ public class TestGroupByState extends TestCase2 {
     }
 
     /**
+     * Unit test with simple aggregate function in SELECT clause and no GROUP BY
+     * clause (the aggregation is taken across all solutions as if they were a
+     * single group).
+     * 
+     * <pre>
+     * SELECT SUM(?lprice) AS ?totalPrice
+     * </pre>
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_simpleAggregate_noGroupBy() {
+        
+        final IVariable<?> lprice = Var.var("lprice");
+        final IVariable<?> totalPrice = Var.var("totalPrice");
+        
+        final IValueExpression<?> totalPriceExpr = new /* Conditional */Bind(
+                totalPrice, new SUM(false/* distinct */,
+                        (IValueExpression<IV>) lprice));
+        
+        final IValueExpression<?>[] select = new IValueExpression[] { totalPriceExpr };
+
+        final IValueExpression<?>[] groupBy = null;
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(totalPrice);
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having,
+                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+        
+    }
+
+    /**
      * Unit test for references to aggregate declared in GROUP_BY with AS.
      * <pre>
-     * SELECT ?org2 GROUP BY UCASE(?org) as ?org2
+     * SELECT ?org2
+     * GROUP BY UCASE(?org) as ?org2
      * </pre>
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -364,14 +409,100 @@ public class TestGroupByState extends TestCase2 {
 
     }
 
+    /**
+     * <pre>
+     * SELECT SUM(?x+MIN(?y)) as ?z
+     * GROUP BY ?a
+     * </pre>
+     * 
+     * TODO The {@link IGroupByState} interface should probably report this case
+     * as !isSimpleSelect(). A select without nested aggregates is one of the
+     * criteria for a "sweet" evaluation (the other is that each of the
+     * aggregation functions can be decomposed, so no AVERAGE).
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test_compositionOfAggregates() {
-        // SELECT SUM(?x+AVG(?y)) as ?z ...
-        fail("write test");
+
+        final IVariable<IV> a = Var.var("a");
+
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> zExpr = new /* Conditional */Bind(z,
+                new MathBOp(//
+                        new SUM(false/* distinct */, (IValueExpression<IV>) x),
+                        new MIN(false/* distinct */, (IValueExpression<IV>) y),
+                        MathOp.PLUS));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { zExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { a };
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(a);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(z);
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having,
+                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
     }
 
+    /**
+     * Verify that a reference to a variable defined by a previous select
+     * expression is allowed and that the select dependency is recognized.
+     * 
+     * <pre>
+     * SELECT SUM(?y) as ?z, SUM(?x)+?z as ?a 
+     * GROUP BY ?b
+     * </pre>
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test_reverseReference_allowed() {
-        // SELECT SUM(?y) as ?z, SUM(?x)+?z as ?a ... (backward reference to z).
-        fail("write test");
+
+        final IVariable<IV> a = Var.var("a");
+        final IVariable<IV> b = Var.var("b");
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> zExpr = new /* Conditional */Bind(z,
+                new SUM(false/* distinct */, (IValueExpression<IV>) y));
+
+        final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
+                new MathBOp(new SUM(false/* distinct */,
+                        (IValueExpression<IV>) x), z, MathOp.PLUS));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { zExpr, aExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { b };
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(b);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(z);
+        selectVars.add(a);
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having,
+                false/* anyDistinct */, true/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
     }
 
     /**
@@ -381,16 +512,170 @@ public class TestGroupByState extends TestCase2 {
      * SELECT SUM(?x)+?z as ?a, SUM(?y) as ?z ... (forward reference to z)
      * </pre>
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void test_forwardReference_not_allowed() {
-        fail("write test");
+        final IVariable<IV> a = Var.var("a");
+        final IVariable<IV> b = Var.var("b");
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> zExpr = new /* Conditional */Bind(z,
+                new SUM(false/* distinct */, (IValueExpression<IV>) y));
+
+        final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
+                new MathBOp(new SUM(false/* distinct */,
+                        (IValueExpression<IV>) x), z, MathOp.PLUS));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { aExpr, zExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { b };
+
+        final IConstraint[] having = null;
+
+        try {
+            new GroupByState(select, groupBy, having);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex,ex);
+        }
+
+    }
+    
+    /**
+     * Unit test for {@link IGroupByState#isAnyDistinct()) where the DISTINCT
+     * keyword appears within an {@link IAggregate} in the SELECT clause.
+     * <pre>
+     * SELECT SUM(DISTINCT ?y) as ?x
+     * GROUP BY ?z
+     * HAVING ?x > 10
+     * </pre>
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_isAnyDistinct_select() {
+        
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> xExpr = new /* Conditional */Bind(x, new SUM(
+                true/* distinct */, (IValueExpression<IV>) y));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { z };
+
+        final IConstraint[] having = new IConstraint[] {//
+        new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
+                new Constant<XSDIntIV>(new XSDIntIV(10)), CompareOp.LT))//
+            };
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(z);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(x);
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having,
+                true/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
     }
 
-    /*
-     * TODO Test for bad arguments, including nulls when not allowed and also
-     * the more complex cases where something is/is not an aggregate.
+    /**
+     * Unit test for {@link IGroupByState#isAnyDistinct()) where the DISTINCT
+     * keyword appears within an {@link IAggregate} in the SELECT clause.
+     * <pre>
+     * SELECT SUM(?y) as ?x
+     * GROUP BY ?z
+     * HAVING SUM(DISTINCT ?y) > 10
+     * </pre>
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_isAnyDistinct_having() {
+        
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> xExpr = new /* Conditional */Bind(x, new SUM(
+                false/* distinct */, (IValueExpression<IV>) y));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { z };
+
+        final IConstraint[] having = new IConstraint[] {//
+        new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
+                new /* Conditional */Bind(x, new SUM(true/* distinct */,
+                        (IValueExpression<IV>) y)), new Constant<XSDIntIV>(
+                        new XSDIntIV(10)), CompareOp.LT)) //
+        };
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(z);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(x);
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having,
+                true/* anyDistinct */, false/* selectDependency */, false/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
+    }
+    
+    /**
+     * Unit test for bad arguments.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test_correctRejection() {
-        fail("write test");
+
+        final IVariable<IV> y = Var.var("y");
+        final IVariable<IV> x = Var.var("x");
+        final IVariable<IV> z = Var.var("z");
+
+        final IValueExpression<IV> xExpr = new /* Conditional */Bind(x,
+                new SUM(false/* distinct */, (IValueExpression<IV>) y));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
+
+        final IValueExpression<IV>[] groupBy = new IValueExpression[] { z };
+
+        final IConstraint[] having = new IConstraint[] {//
+        new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
+                new /* Conditional */Bind(x, new SUM(true/* distinct */,
+                        (IValueExpression<IV>) y)), new Constant<XSDIntIV>(
+                        new XSDIntIV(10)), CompareOp.LT)) //
+        };
+
+        // SELECT may not be null.
+        try {
+            new GroupByState(null/* select */, groupBy, having);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex, ex);
+        }
+
+        // SELECT may not be empty.
+        try {
+            new GroupByState(new IValueExpression[] {}/* select */, groupBy,
+                    having);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex, ex);
+        }
+        
     }
 
 }
