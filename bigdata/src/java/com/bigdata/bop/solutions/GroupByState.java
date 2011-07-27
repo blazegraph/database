@@ -390,9 +390,22 @@ public class GroupByState implements IGroupByState {
                     isAggregate = true;
                     continue;
                 }
-                if(isSelectClause)
+                if(isSelectClause) {
+                    /*
+                     * Note: This is also thrown when there is a forward
+                     * reference to a variable in the select expression which we
+                     * have not yet seen.
+                     * 
+                     * Note: This situation does not arise for the GROUP_BY
+                     * clause because it may only reference non-aggregate
+                     * variables.
+                     * 
+                     * Note: This situation does not arise for the HAVING clause
+                     * because it can not define new variables using "AS".
+                     */
                     throw new IllegalArgumentException(
                         "Non-aggregate variable in select expression: " + v);
+                }
             }
             // recursion through child value expression.
             isAggregate |= isAggregate(t, isSelectClause, isSelectDependency,
