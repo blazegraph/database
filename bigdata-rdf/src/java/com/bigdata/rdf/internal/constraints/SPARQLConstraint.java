@@ -40,7 +40,8 @@ import com.bigdata.util.InnerCause;
  * BOpConstraint that wraps a {@link EBVBOp}, which itself computes the 
  * effective boolean value of an IValueExpression.
  */
-public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
+public class SPARQLConstraint<X extends XSDBooleanIV> extends
+        com.bigdata.bop.constraint.Constraint<X> {
 
 	/**
 	 * 
@@ -99,9 +100,9 @@ public class SPARQLConstraint extends com.bigdata.bop.constraint.Constraint {
     	return (IValueExpression<? extends XSDBooleanIV>) super.get(i);
     }
     
-	public IValueExpression<? extends XSDBooleanIV> getValueExpression() {
-		return get(0);
-	}
+//    public IValueExpression<X> getValueExpression() {
+//        return (IValueExpression<X>) get(0);
+//    }
     	
 	public boolean accept(final IBindingSet bs) {
 

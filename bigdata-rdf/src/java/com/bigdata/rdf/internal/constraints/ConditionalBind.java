@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -16,14 +17,14 @@ import com.bigdata.rdf.internal.IV;
  * 
  * @author thompsonbry
  */
-public class ConditionalBind extends ImmutableBOp implements IValueExpression<IV> {
+public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValueExpression<E>, IBind<E> {
 
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Required deep copy constructor.
 	 */
-	public ConditionalBind(ConditionalBind op) {
+	public ConditionalBind(ConditionalBind<E> op) {
 		super(op);
 	}
 
@@ -34,7 +35,7 @@ public class ConditionalBind extends ImmutableBOp implements IValueExpression<IV
 	 * @param expr
 	 *            The {@link IValueExpression} to be evaluated.
 	 */
-	public ConditionalBind(IVariable<? extends IV> var, IValueExpression<? extends IV> expr) {
+	public ConditionalBind(IVariable<E> var, IValueExpression<E> expr) {
 
 		this(new BOp[] { var, expr }, null/* annotations */);
 		
@@ -54,9 +55,9 @@ public class ConditionalBind extends ImmutableBOp implements IValueExpression<IV
 	 * associated value expression.
 	 */
 	@SuppressWarnings("unchecked")
-	public IVariable<? extends IV> getVar() {
+	public IVariable<E> getVar() {
 
-		return (IVariable<? extends IV>) get(0);
+		return (IVariable<E>) get(0);
 
 	}
 
@@ -64,33 +65,36 @@ public class ConditionalBind extends ImmutableBOp implements IValueExpression<IV
 	 * Return the value expression.
 	 */
 	@SuppressWarnings("unchecked")
-	public IValueExpression<? extends IV> getExpr() {
+	public IValueExpression<E> getExpr() {
 
-		return (IValueExpression<? extends IV>) get(1);
+		return (IValueExpression<E>) get(1);
 
 	}
 
-	public IV get(final IBindingSet bindingSet) {
+	public E get(final IBindingSet bindingSet) {
 
-		final IVariable<? extends IV> var = getVar();
+		final IVariable<E> var = getVar();
 
-		final IValueExpression<? extends IV> expr = getExpr();
+		final IValueExpression<E> expr = getExpr();
 
 		// evaluate the value expression.
-		IV val = expr.get(bindingSet);
+		final E val = expr.get(bindingSet);
 		
-		IV existing = var.get(bindingSet);
-		if(existing==null){
+		final E existing = var.get(bindingSet);
+		
+        if (existing == null) {
 
 		    // bind the variable as a side-effect.
-		    bindingSet.set(var, new Constant<IV>(val));
+		    bindingSet.set(var, new Constant<E>(val));
 		
-		      // return the evaluated value
-	        return val;
-		}else{
-		    return (val.equals(existing))?val:null;
-		}
+            // return the evaluated value
+            return val;
 
+        } else {
+            
+            return (val.equals(existing)) ? val : null;
+
+        }
 
 	}
 

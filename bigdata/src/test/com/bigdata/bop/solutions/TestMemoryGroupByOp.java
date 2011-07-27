@@ -23,16 +23,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.solutions;
 
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -41,14 +40,17 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.rdf.aggregate.SUM;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -58,20 +60,23 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @author thompsonbry
  * 
- * @todo correct rejection tests for various kinds of illegal expressions, such
- *       as having forward references to variables which have not been computed.
- *       There are actually several different ways in which this rule can be
- *       violated, including having forward references within the SELECT (or our
- *       COMPUTE).
+ * @todo [No. I am going to put the burden on the query planner for most of
+ *       this.] correct rejection tests for various kinds of illegal
+ *       expressions, such as having forward references to variables which have
+ *       not been computed. There are actually several different ways in which
+ *       this rule can be violated, including having forward references within
+ *       the SELECT (or our COMPUTE).
  * 
- * @todo correct rejection tests when the SELECT or HAVING clause references a
- *       variable not defined in the aggregated solution groups and not wrapped
- *       by an aggregate function.
+ * @todo [No. I am going to put the burden on the query planner for most of
+ *       this.] correct rejection tests when the SELECT or HAVING clause
+ *       references a variable not defined in the aggregated solution groups and
+ *       not wrapped by an aggregate function.
  * 
- * @todo test to verify that the evaluation of the aggregate functions within
- *       each group are independent (they have internal state to track the
- *       running value of the aggregate, but that state can not be shared across
- *       groups).
+ * @todo [This only applies to the case where we have optimized by using
+ *       per-group counters.] Test to verify that the evaluation of the
+ *       aggregate functions within each group are independent (they have
+ *       internal state to track the running value of the aggregate, but that
+ *       state can not be shared across groups).
  * 
  * @todo test with various kinds of type errors.
  * 
@@ -91,25 +96,14 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @todo Is it possible to test these aggregation operators without testing at
  *       the SPARQL level?
- * 
- * @todo Benchmark against the Barton library data set and queries per <a
- *       href="http://cs-www.cs.yale.edu/homes/dna/abadirdf.pdf">the original
- *       vertical partitioning for RDF paper</a>, <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.140.6138&rep=rep1&type=pdf"
- *       >the not all swans are black</a> paper, and <a
- *       href="http://simile.mit.edu/rdf-test-data/barton/">the data set</a>.
  */
 public class TestMemoryGroupByOp extends TestCase2 {
-
+    
 	public TestMemoryGroupByOp() {
 	}
 
 	public TestMemoryGroupByOp(String name) {
 		super(name);
-	}
-
-	/** TODO Write tests. */
-	public void test_something() {
-//		fail("write tests");
 	}
 
 	/**
@@ -170,10 +164,10 @@ public class TestMemoryGroupByOp extends TestCase2 {
 	 */
 	public void test_something_simpleGroupBy() {
 
-	    if(true) {
-	        log.error("test is disabled.");
-	        return;
-	    }
+//	    if(true) {
+//	        log.error("test is disabled.");
+//	        return;
+//	    }
 	    
 		final IVariable<?> org = Var.var("org");
 		final IVariable<?> auth = Var.var("auth");
@@ -190,53 +184,97 @@ public class TestMemoryGroupByOp extends TestCase2 {
 		final IConstant<String> book2 = new Constant<String>("book2");
 		final IConstant<String> book3 = new Constant<String>("book3");
 		final IConstant<String> book4 = new Constant<String>("book4");
-		final IConstant<Integer> price5 = new Constant<Integer>(5);
-		final IConstant<Integer> price7 = new Constant<Integer>(7);
-		final IConstant<Integer> price9 = new Constant<Integer>(9);
-		final IConstant<Integer> price21 = new Constant<Integer>(21);
+        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(5));
+        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(7));
+        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDIntIV<BigdataLiteral>> price21 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(21));
 
     	final int groupById = 1;
     	
-		final GroupByOp query = new MemoryGroupByOp(new BOp[] {}, NV
+        final IValueExpression<?> totalPriceExpr = new Bind(totalPrice,
+                new SUM(false/* distinct */, (IValueExpression<IV>) lprice));
+
+    	final GroupByOp query = new MemoryGroupByOp(new BOp[] {}, NV
 				.asMap(new NV[] {//
 						new NV(BOp.Annotations.BOP_ID, groupById),//
 						new NV(BOp.Annotations.EVALUATION_CONTEXT,
 								BOpEvaluationContext.CONTROLLER),//
 						new NV(PipelineOp.Annotations.PIPELINED, true),//
 						new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-//						new NV(GroupByOp.Annotations.SELECT, //
-//								new IValueExpression[] { org, new SUMInt(
-//										false/* distinct */,
-//										(IValueExpression) lprice)}), //
-//						new NV(GroupByOp.Annotations.GROUP_BY,//
-//								new IValueExpression[] { org }) //
-//						new NV(GroupByOp.Annotations.COMPUTE,//
-//								new IValueExpression[] { new SUMInt(
-//										false/* distinct */,
-//										(IValueExpression) lprice) }), //
-				}));
+                        new NV(GroupByOp.Annotations.SELECT, //
+                                new IValueExpression[] { org, totalPriceExpr }), //
+                        new NV(GroupByOp.Annotations.GROUP_BY,//
+                                new IValueExpression[] { org }) //
+                }));
 
-        /* the test data:
+        /**
+         * The test data:
          * 
-		 * ?org  ?auth  ?book  ?lprice
-		 * org1  auth1  book1  9
-		 * org1  auth1  book3  5
-		 * org1  auth2  book3  7
-		 * org2  auth3  book4  7
+         * <pre>
+         * ?org  ?auth  ?book  ?lprice
+         * org1  auth1  book1  9
+         * org1  auth1  book3  5
+         * org1  auth2  book3  7
+         * org2  auth3  book4  7
+         * </pre>
+         * 
+         * FIXME These solutions SHOULD NOT need to be mutable. The attempt to
+         * bind the aggregate function output on the solution sets is arising
+         * from a mix up of the different ways in which we can evaluate the
+         * aggregation operation.
+         * 
+         * 1. There are several optimizations, but the basic approach is to
+         * GROUP each incoming solution, appending it to the multiset of
+         * solutions for its computed GROUP BY key. Then, for each GROUP and
+         * each SELECTed value expression, compute the aggregate function over
+         * that group and set it on an output solution. Emit an output solution
+         * each time we finish with the value expressions in a GROUP. If the
+         * aggregate function uses distinct:=true, e.g., AVG(DISTINCT X), then
+         * we have to collect the DISTINCT values of X, where X may be a value
+         * expression and not just a simple variable, and compute the aggregate
+         * function over those DISTINCT values (value set). Otherwise we compute
+         * the aggregate function over all values for the value expression in
+         * the group.
+         * 
+         * 2. One optimizations applies when distinct:=false for all SELECTed
+         * value expressions. In this case we can proceed GROUP by GROUP,
+         * evaluating each aggregation function incrementally as we visit the
+         * each solution in the current group.
+         * 
+         * 3. Another optimization applies when the aggregation functions can be
+         * computed solution by solution. Rather than storing the solution
+         * multisets for each group, we can have one "counter" for each
+         * aggregate function in an aggregate solution set for a given group.
+         * For each solution which is assigned to a given group, we compute the
+         * inner value expression for the aggregate function and then present
+         * that value to the aggregate function (alternatively, we evaluate the
+         * aggregation function within the context of its group-local state).
+         * 
+         * Do we need a distinct API for each of these optimizations?
+         * 
+         * Are there aggregation functions which can be optimized by (2) but not
+         * by (3)?
          */
     	final IBindingSet data [] = new IBindingSet []
         {
-            new ArrayBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+    	    new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
 
-        /* the expected solutions:
+        /**
+         * The expected solutions:
          * 
+         * <pre>
          * ?org  ?totalPrice
-		 * org1  21
-		 * org2   7
+         * org1  21
+         * org2   7
+         * </pre>
          */
     	final IBindingSet expected [] = new IBindingSet []
         {
@@ -246,12 +284,14 @@ public class TestMemoryGroupByOp extends TestCase2 {
 
         final BOpStats stats = query.newStats () ;
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]> ( new IBindingSet [][] { data } ) ;
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
 
-        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
 
-		final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
-		, null/* indexManager */
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
 		);
 		final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
 				runningQuery, -1/* partitionId */
@@ -272,17 +312,9 @@ public class TestMemoryGroupByOp extends TestCase2 {
 			t.start();
 		}
 
-		try {
-			// Check the solutions.
-			TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-		} finally {
-			/* Always wait for the future afterwards and test it for errors. */
-			try {
-				ft.get();
-			} catch (Throwable ex) {
-				log.error("Evaluation failed: " + ex, ex);
-			}
-		}
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
 
 		assertEquals(1, stats.chunksIn.get());
 		assertEquals(4, stats.unitsIn.get());
@@ -290,62 +322,5 @@ public class TestMemoryGroupByOp extends TestCase2 {
 		assertEquals(1, stats.chunksOut.get());
 
 	}
-
-//	/**
-//	 * 
-//	 * @deprecated I am not convinced that a concrete operator can be
-//	 *             implemented in this manner rather than by a tight integration
-//	 *             with the GROUP_BY operator implementation.
-//	 */
-//	private static class SUMInt extends AggregateBase<Integer> implements IAggregate<Integer> {
-//
-//		/**
-//		 * 
-//		 */
-//		private static final long serialVersionUID = 1L;
-//
-//		public SUMInt(BOpBase op) {
-//			super(op);
-//		}
-//
-//		public SUMInt(BOp[] args, Map<String, Object> annotations) {
-//			super(args, annotations);
-//		}
-//
-//		public SUMInt(boolean distinct, IValueExpression<Integer> expr) {
-//			super(distinct, expr);
-//		}
-//
-//		/**
-//		 * The running aggregate value.
-//		 * <p>
-//		 * Note: SUM() returns ZERO if there are no non-error solutions
-//		 * presented.
-//		 * <p>
-//		 * Note: This field is guarded by the monitor on the {@link SUMInt}
-//		 * instance.
-//		 */
-//		private transient int aggregated = 0;
-//		
-//		@Override
-//		synchronized
-//		public Integer get(final IBindingSet bindingSet) {
-//
-//			final IValueExpression<Integer> var = (IValueExpression<Integer>) get(0);
-//
-//			final Integer val = (Integer) var.get(bindingSet);
-//
-//			if (val != null) {
-//
-//				// aggregate non-null values.
-//				aggregated += val;
-//
-//			}
-//
-//			return Integer.valueOf(aggregated);
-//
-//		}
-//
-//	}
 
 }

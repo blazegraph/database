@@ -51,9 +51,20 @@ public abstract class LexiconBOp extends IVValueExpression<IV> implements INeeds
     
     public interface Annotations extends BOp.Annotations {
 
-        String NAMESPACE = (LexiconBOp.class.getName() + ".namespace").intern();
+        /**
+         * The namespace of the lexicon relation.
+         */
+        String NAMESPACE = LexiconBOp.class.getName() + ".namespace";
 
     }
+    
+    /**
+     * 
+     * @param x
+     *            The inner value expression.
+     * @param lex
+     *            The namespace of the lexicon relation.
+     */
     public LexiconBOp(final IValueExpression<? extends IV> x, final String lex) {
 
         this(new BOp[] { x }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));

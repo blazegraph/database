@@ -24,10 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.solutions;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
@@ -40,6 +43,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashMapAnnotations;
+import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -71,11 +75,6 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @todo GROUP_BY implementation which depends on an ORDER_BY operator to setup
  *       the correct order and then performs the aggregations in a single pass
  *       over the ordered data.
- * 
- * @todo GROUP_BY implementation using an HTree suitable for use when the #of
- *       groups is very large. The HTree would be associated with the allocation
- *       context for the (queryId,bopId(,shardId))). (The shardId would be used
- *       iff the GROUP_BY operator was hash partitioned across the nodes.)
  * 
  * @todo In scale-out, we can hash partition the GROUP_BY operator over the
  *       nodes as long as all of the aggregation functions can be combined from
@@ -304,29 +303,31 @@ public class MemoryGroupByOp extends GroupByOp {
             return true;
         }
 
-		/**
-		 * Apply the {@link IValueExpression}s to compute the updated variable
-		 * bindings in the {@link SolutionGroup}.
-		 * 
-		 * @param bset
-		 *            An input solution.
-		 * @param compute
-		 *            The ordered array of {@link IValueExpression}s which
-		 *            define the aggregated variables.
-		 */
-		public void aggregate(final IBindingSet bset,
-				final IValueExpression<?>[] compute) {
+        /**
+         * Apply the {@link IValueExpression}s to compute the updated variable
+         * bindings in the {@link SolutionGroup}.
+         * 
+         * @param bset
+         *            An input solution.
+         * @param select
+         *            The ordered array of {@link IValueExpression}s to be
+         *            projected out of the query.
+         */
+        public void aggregate(final IBindingSet bset,
+                final IValueExpression<?>[] select) {
 
-			/*
-			 * FIXME The aggregate functions have side-effects so we need to use
-			 * a distinct instance of each function for each group.
-			 */
+            /*
+             * FIXME The aggregate functions have side-effects so we need to use
+             * a distinct instance of each function for each group.
+             */
 
-			// synchronize for visibility.
-			synchronized(this) {
-				for(IValueExpression<?> expr : compute) {
-					System.err.println(expr.get(bset));
-				}
+            // synchronize for visibility.
+            synchronized (this) {
+                for (IValueExpression<?> expr : select) {
+                    final Object result = expr.get(bset);
+                    if (log.isTraceEnabled())
+                        log.trace("expr: " + expr + "=>" + result);
+                }
 			}
 
         }
@@ -386,84 +387,209 @@ public class MemoryGroupByOp extends GroupByOp {
         private final ConcurrentHashMap<SolutionGroup, SolutionGroup> map;
 
         /**
+         * The value expressions to be projected out of the GROUP_BY operator.
+         */
+        private final IValueExpression<?>[] select;
+
+        /**
          * The ordered array of variables which define the distinct groups to
          * be aggregated.
          */
         private final IValueExpression<?>[] groupBy;
 
-//		/**
-//		 * The {@link IValueExpression}s used to compute each of the variables
-//		 * in the aggregated solutions.
-//		 */
-//        private final IValueExpression<?>[] compute;
-        
         /**
          * Optional constraints applied to the aggregated solutions.
          */
         private final IConstraint[] having;
+
+        /**
+         * <code>true</code> iff any aggregate functions will be applied to the
+         * DISTINCT values arising from their inner value expression.
+         */
+        private final boolean anyDistinct;
         
-		/**
-		 * Optional set of variables to be projected out of the GROUP_BY
-		 * operator. When <code>null</code>, all variables will be projected
-		 * out.
-		 */
-		private final IVariable<?>[] select;
-        
+        /**
+         * <code>true</code> iff any aggregate expression uses a reference to
+         * another aggregate expression in the select clause.
+         */
+        private final boolean selectDependency;
+
         GroupByTask(final MemoryGroupByOp op,
                 final BOpContext<IBindingSet> context) {
         	
             this.context = context;
 
-            // must be non-null, and non-empty array w/o dups.
-			this.groupBy = (IValueExpression<?>[]) op
-					.getRequiredProperty(GroupByOp.Annotations.GROUP_BY);
+            /*
+             * Validate GROUP_BY value expressions.
+             * 
+             * Note: The GROUP BY clause may include bare variables such as
+             * "?x", non-aggregate expressions such as "STR(?x)" and
+             * declarations of variables for non-aggregate expressions such as
+             * "STR(?x) as strX". However, only bare variables or variables
+             * declared using "AS" may appear in the SELECT clause.  Those
+             * variables are collected in [groupByVars].
+             * 
+             * Note: Aggregate functions MAY NOT appear in the GROUP_BY clause.
+             */
+            // The top-level variables in the GROUP_BY clause.
+            final Set<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+            {
+                // must be non-null, non-empty array w/o aggregate functions.
+                this.groupBy = (IValueExpression<?>[]) op
+                        .getRequiredProperty(GroupByOp.Annotations.GROUP_BY);
 
-            if (groupBy == null)
-                throw new IllegalArgumentException();
+                if (groupBy == null)
+                    throw new IllegalArgumentException();
 
-            if (groupBy.length == 0)
-                throw new IllegalArgumentException();
+                if (groupBy.length == 0)
+                    throw new IllegalArgumentException();
 
-//			/*
-//			 * Must be non-null, and non-empty array. Any variables in the
-//			 * source solutions may only appear within aggregation operators
-//			 * such as SUM, COUNT, etc. Variables declared in [compute] may be
-//			 * referenced inside the value expressions as long as they do not
-//			 * appear within an aggregation function, but they they must be
-//			 * defined earlier in the ordered compute[]. The value expressions
-//			 * must include an assignment to the appropriate aggregate variable.
-//			 * 
-//			 * FIXME This must include a LET or BIND to assign the computed
-//			 * value to the appropriate variable.
-//			 * 
-//			 * FIXME verify references to unaggregated and aggregated variables.
-//			 */
-//			this.compute = (IValueExpression<?>[]) op
-//					.getRequiredProperty(GroupByOp.Annotations.COMPUTE);
-//
-//            if (compute == null)
-//                throw new IllegalArgumentException();
-//
-//            if (compute.length == 0)
-//                throw new IllegalArgumentException();
+                // Collect top-level variables from GROUP_BY value exprs.
+                for(IValueExpression<?> expr : groupBy) {
+                    if (expr instanceof IVariable<?>) {
+                        groupByVars.add((IVariable<?>) expr);
+                    } else if (expr instanceof IBind<?>) {
+                        final IBind<?> bindExpr = (IBind<?>) expr;
+                        if (bindExpr.getExpr() instanceof IAggregate<?>) {
+                            throw new IllegalArgumentException(
+                                    "Aggregate expression not allowed in GROUP_BY");
+                        }
+                        groupByVars.add(bindExpr.getVar());
+                    }
+                }
+                
+            }
 
-            // may be null or empty[].
+            /*
+             * Validate SELECT value expressions.
+             * 
+             * Note: SELECT value expressions must be either variables appearing
+             * in the top-level of the GROUP BY value expressions -or- a IBind
+             * wrapping an aggregate function.
+             * 
+             * Note: Certain optimizations are possible when none of the SELECT
+             * value expressions use DISTINCT.
+             * 
+             * Note: Certain optimizations are possible when all of the SELECT
+             * value expressions may be computed based on per-group counters.
+             * 
+             * TODO detect case with per-group counters and support
+             * optimizations for that case.
+             */
+            // The top-level variables in the SELECT clause.
+            final Set<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+            {
+                // must be non-null, non-empty array.
+                this.select = (IValueExpression[]) op
+                        .getRequiredProperty(GroupByOp.Annotations.SELECT);
+
+                if (/*select != null && */select.length == 0)
+                    throw new IllegalArgumentException();
+
+                // true iff any aggregate expression uses DISTINCT.
+                boolean anyDistinct = false;
+                // true iff any aggregate expression uses a reference to another
+                // aggregate expression in the select clause.
+                boolean selectDependency = false;
+                for (IValueExpression<?> varOrBindExpr : select) {
+                    /*
+                     * Each SELECT value expression must be either a top-level
+                     * IVariable in the GROUP BY clause or an IBind wrapping a
+                     * value expression consisting solely of aggregates (which
+                     * may of course wrap bare variables) and constants.
+                     */
+                    if (varOrBindExpr instanceof IVariable<?>) {
+                        final IVariable<?> var = (IVariable<?>) varOrBindExpr;
+                        if (!groupByVars.contains(var)) {
+                            throw new IllegalArgumentException(
+                                    "Bare variable not declared by GROUP_BY clause: "
+                                            + var);
+                        }
+                        selectVars.add(var);
+                    } else if (varOrBindExpr instanceof IBind<?>) {
+                        /*
+                         * Child of IBind must be a valid aggregate expression
+                         * consisting solely of aggregates (which may wrap bare
+                         * variables declared in the GROUP_BY clause) and
+                         * constants.
+                         * 
+                         * Note: Top-level variables already declared in a
+                         * SELECT clause MAY appear within other value
+                         * expressions in the SELECT clause. [TODO is this
+                         * restricted to forward references? If not, then we
+                         * need to figure out the dependency graph for the
+                         * SELECT expressions]. When such dependencies exist
+                         * certain optimizations are not possible (we have to
+                         * compute each select expression in turn for a given
+                         * group rather than computing them in parallel).
+                         * 
+                         * Note: If any aggregate in the expression uses
+                         * DISTINCT then we make a note of that as certain
+                         * optimizations are not possible when DISTINCT is used
+                         * within an aggregate expression.
+                         */
+                        final IBind<?> bindExpr = (IBind<?>) varOrBindExpr;
+                        final IValueExpression<?> aggExpr = (IValueExpression<?>) bindExpr
+                                .getExpr();
+                        final Iterator<BOp> itr = BOpUtility.preOrderIterator(aggExpr);
+                        while(itr.hasNext()) {
+                            final IValueExpression<?> t = (IValueExpression<?>) itr
+                                    .next();
+                            if (t instanceof IConstant)
+                                continue;
+                            if (t instanceof IVariable<?>) {
+                                final IVariable<?> v = (IVariable<?>) t;
+                                if (groupByVars.contains(v))
+                                    continue;
+                                if (selectVars.contains(v)) {
+                                    selectDependency = true;
+                                    continue;
+                                }
+                                throw new IllegalArgumentException(
+                                        "Non-aggregate variable in select expression: "
+                                                + v);
+                            }
+                            if (t instanceof IAggregate<?>) {
+                                /*
+                                 * FIXME Must use stateful visitation or
+                                 * recursion pattern so we can accept the
+                                 * presence of non-aggregate variables within
+                                 * the scope of an IAggregate.
+                                 * 
+                                 * TODO Can an IAggregate have another
+                                 * IAggregate as part of its value expression? I
+                                 * think so, either as a dependency on a
+                                 * previously computed variable in the select
+                                 * clause or as an anonymous aggregate
+                                 * expression such as SUM(?x+sum(?y)).
+                                 */
+                                final IAggregate<?> u = (IAggregate<?>) aggExpr;
+                                if (u.isDistinct()) {
+                                    anyDistinct = true;
+                                }
+                            }
+                        }
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Top-level of SELECT expression must be IVariable or IBind: "
+                                        + varOrBindExpr);
+                    }
+                }
+                this.anyDistinct = anyDistinct;
+                this.selectDependency = selectDependency;
+            }
+
+            /*
+             * HAVING clause.
+             * 
+             * The having[] may be null or an empty[]. However, any value
+             * expressions must be aggregates (as defined for SELECT
+             * expressions) or variables declared in the groupBy or select
+             * clauses.
+             */
             this.having = (IConstraint[]) op
-					.getProperty(GroupByOp.Annotations.HAVING);
-
-			/*
-			 * The variables to project out of the GROUP_BY operator. This may
-			 * be null, but not empty[].
-			 * 
-			 * TODO Variables may only appear once and must be distinct from the
-			 * source variables.
-			 */
-			this.select = (IVariable[]) op
-					.getRequiredProperty(GroupByOp.Annotations.SELECT);
-
-			if (select != null && select.length == 0)
-				throw new IllegalArgumentException();
-
+                    .getProperty(GroupByOp.Annotations.HAVING);
+            
 			// The map is shared state across invocations of this operator task.
 			this.map = ((GroupByStats) context.getStats()).map;
 
@@ -533,7 +659,7 @@ public class MemoryGroupByOp extends GroupByOp {
 						final SolutionGroup solutionGroup = accept(bset);
 
 						// aggregate the bindings
-						solutionGroup.aggregate(bset, null/*FIXME compute*/);
+						solutionGroup.aggregate(bset, select);
 
 					}
 
@@ -566,17 +692,17 @@ public class MemoryGroupByOp extends GroupByOp {
 								
 							}
 
-							/*
-							 * We will accept this solution group, so filter out
-							 * any variables which are not being projected out
-							 * of this operator.
-							 */
+//							/*
+//							 * We will accept this solution group, so filter out
+//							 * any variables which are not being projected out
+//							 * of this operator.
+//							 */
 							if (log.isDebugEnabled())
 								log.debug("accepted: " + solutionGroup);
-
-							// optionally strip off unnecessary variables.
-							bset = select == null ? bset : bset
-									.copy(select);
+//
+//							// optionally strip off unnecessary variables.
+//							bset = select == null ? bset : bset
+//									.copy(select);
 
                             accepted.add(bset);
 

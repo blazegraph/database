@@ -47,6 +47,8 @@ import com.bigdata.bop.aggregate.IAggregate;
  * will be projected out of the GROUP BY operator.
  * 
  * @author thompsonbry
+ * 
+ * @deprecated by {@link IGroupByState} and {@link GroupByState}.
  */
 public class GroupByUtility {
 
@@ -182,25 +184,25 @@ public class GroupByUtility {
 	public GroupByUtility(final IValueExpression<?>[] select,
 			final IValueExpression<?>[] groupBy, final IConstraint[] having) {
 
-		/*
-		 * The IValueExpressions to be SELECTed.
-		 */
-		
-		if (select == null)
-			throw new IllegalArgumentException();
-		
-		if (select.length == 0)
-			throw new IllegalArgumentException();
+        /*
+         * The IValueExpressions to be SELECTed.
+         */
+        {
+            if (select == null)
+                throw new IllegalArgumentException();
 
-		for (IValueExpression<?> e : select) {
-			if (e instanceof IVariable<?>)
-				continue;
-			if (e instanceof Bind<?>)
-				continue;
-			throw new IllegalArgumentException(
-					"SELECT: Must be variable or (expr as var): " + e);
-		}
+            if (select.length == 0)
+                throw new IllegalArgumentException();
 
+            for (IValueExpression<?> e : select) {
+                if (e instanceof IVariable<?>)
+                    continue;
+                if (e instanceof Bind<?>)
+                    continue;
+                throw new IllegalArgumentException(
+                        "SELECT: Must be variable or (expr as var): " + e);
+            }
+        }
 		/*
 		 * The IValueExpressions defining the groups. This must be non-null, and
 		 * non-empty array w/o dups.

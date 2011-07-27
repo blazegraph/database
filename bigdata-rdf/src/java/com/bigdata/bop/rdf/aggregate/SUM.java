@@ -23,91 +23,179 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.rdf.aggregate;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.util.InnerCause;
 
 /**
  * Operator computes the running sum over the presented binding sets for the
  * given variable. A missing value does not contribute towards the sum.
  * 
  * @author thompsonbry
- * 
- *         FIXME This must handle non-inline IVs as type errors and just skip
- *         over them (but the operator can only handle KBs where we are inlining
- *         the numeric values - perhaps we should just get rid of the option to
- *         not inline and require people to export/import for an upgrade).
- * 
- * @deprecated I am not convinced that a concrete operator can be implemented in
- *             this manner rather than by a tight integration with the GROUP_BY
- *             operator implementation.
  */
-public class SUM extends AggregateBase<IV> implements IAggregate<IV> {
+public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
+        INeedsMaterialization {
 
-	/**
+    private static final transient Logger log = Logger.getLogger(SUM.class);
+
+    /**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public SUM(BOpBase op) {
-		super(op);
-	}
+    public SUM(BOpBase op) {
+        super(op);
+    }
 
-	public SUM(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
+    public SUM(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
+    }
 
-	public SUM(boolean distinct, IValueExpression<IV> expr) {
-		super(FunctionCode.SUM,distinct, expr);
-	}
-	
-	/**
-	 * The running aggregate value.
-	 * <p>
-	 * Note: SUM() returns ZERO if there are no non-error solutions presented.
-	 * This assumes that the ZERO will be xsd:long, but we could as easily
-	 * return an xsd:int ZERO.
-	 * <p>
-	 * Note: This field is guarded by the monitor on the {@link SUM} instance.
-	 */
-	private transient IV aggregated = new XSDLongIV<BigdataLiteral>(0L);
+    public SUM(boolean distinct, IValueExpression<IV> expr) {
+        super(FunctionCode.SUM, distinct, expr);
+    }
+
+    /**
+     * The running aggregate value.
+     * <p>
+     * Note: SUM() returns ZERO if there are no non-error solutions presented.
+     * This assumes that the ZERO will be an xsd:int ZERO.
+     * <p>
+     * Note: This field is guarded by the monitor on the {@link SUM} instance.
+     */
+	private transient IV aggregated = new XSDIntIV<BigdataLiteral>(0);
 	
 	synchronized
 	public IV get(final IBindingSet bindingSet) {
 
 		final IVariable<IV> var = (IVariable<IV>) get(0);
 
-		final IV val = (IV) bindingSet.get(var);
+		final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
-		if (val != null) {
+        try {
 
-			/*
-			 * aggregate non-null values.
-			 * 
-			 * FIXME We need a distinguished exception for type conversion
-			 * errors. Such errors should cause the aggregate to not update, but
-			 * should not cause the aggregate to throw out an exception. The
-			 * other way to handle type conversion errors is to return an IV for
-			 * [err], perhaps using the last of the inline data types (or a
-			 * null).
-			 */
-			aggregated = IVUtility.numericalMath(val, aggregated, MathOp.PLUS);
+            if (val != null) {
 
-		}
+                /*
+                 * Aggregate non-null values.
+                 */
 
-		return aggregated;
+                final IV iv = val.get(bindingSet);
+
+                if (iv == null)
+                    throw new SparqlTypeErrorException.UnboundVarException();
+
+                if (iv.isInline()) {
+
+                    aggregated = IVUtility.numericalMath(iv, aggregated,
+                            MathOp.PLUS);
+
+                } else {
+
+                    final BigdataValue val1 = iv.getValue();
+
+                    final BigdataValue val2 = aggregated.getValue();
+
+                    if (val1 == null || val2 == null)
+                        throw new NotMaterializedException();
+
+                    if (!(val1 instanceof Literal)
+                            || !(val2 instanceof Literal)) {
+                        throw new SparqlTypeErrorException();
+                    }
+
+                    aggregated = IVUtility.literalMath((Literal) val1,
+                            (Literal) val2, MathOp.PLUS);
+
+                }
+
+            }
+            
+            return aggregated;
+
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+
+                // trap the type error and filter out the solution
+                if (log.isInfoEnabled())
+                    log.info("discarding solution due to type error: "
+                            + bindingSet + " : " + t);
+
+                return aggregated;
+
+            }
+
+            throw new RuntimeException(t);
+
+        }
 
 	}
+
+    /**
+     * FIXME {@link SUM} can work on inline numerics. It is only when the
+     * operands evaluate to non-inline numerics that this bop needs
+     * materialization. However, this implies that {@link #aggregated} will need
+     * to become a {@link BigdataLiteral} rather than an {@link IV}. Also, I am
+     * not sure how this would work if type promotion caused things to be
+     * unsigned. Right now we start out with a signed xsd:int, so that can't
+     * happen. I guess that means that {@link #aggregated} will always be some
+     * kind of signed {@link IV} and hence always inline as well. But I don't
+     * know how to get a {@link BigdataLiteral} for the {@link #aggregated} in
+     * order to be able to use LiteralMath. It would seem that the right thing
+     * to do is to apply type promotion to the {@link Literal} in the context of
+     * the {@link IV}. Since the {@link IV} is signed and inline, the result of
+     * type promotion will always be something that is signed and inline. Do we
+     * have a method for this?
+     * 
+     * TODO Write unit tests for SUM for xsd inline {@link IV}s as well as
+     * materialized {@link BigdataLiteral}s.
+     */
+    public Requirement getRequirement() {
+        
+        return INeedsMaterialization.Requirement.ALWAYS;
+        
+    }
+    
+    private volatile transient Set<IVariable<IV>> terms;
+    
+    public Set<IVariable<IV>> getTermsToMaterialize() {
+    
+        if (terms == null) {
+
+            final IValueExpression<IV> e = getExpression();
+
+            if (e instanceof IVariable<?>)
+                terms = Collections.singleton((IVariable<IV>) e);
+            else
+                terms = Collections.emptySet();
+
+        }
+
+        return terms;
+
+    }
 
 }

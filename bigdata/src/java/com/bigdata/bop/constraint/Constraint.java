@@ -32,12 +32,15 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IValueExpressionConstraint;
 
 /**
  * BOpConstraint that wraps a {@link BooleanValueExpression}.
  */
-public class Constraint extends BOpBase implements IConstraint {
-	
+public class Constraint<X> extends BOpBase implements
+        IValueExpressionConstraint<X> {
+
 	/**
 	 * 
 	 */
@@ -55,7 +58,7 @@ public class Constraint extends BOpBase implements IConstraint {
 	
 	public Constraint(final BooleanValueExpression x) {
 		
-        this(new BOp[] { x }, null/*annocations*/);
+        this(new BOp[] { x }, null/*annotations*/);
 
     }
 
@@ -77,6 +80,12 @@ public class Constraint extends BOpBase implements IConstraint {
      */
     public Constraint(final Constraint op) {
         super(op);
+    }
+
+    public IValueExpression<X> getValueExpression() {
+     
+        return (IValueExpression<X>) get(0);
+        
     }
 
     public boolean accept(final IBindingSet bs) {

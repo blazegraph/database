@@ -173,11 +173,11 @@ public class ListBindingSet implements IBindingSet {
 	}
 	
     /**
-     * Package private constructor used by the unit tests.
+     * Constructor used by unit tests.
      * @param vars
      * @param vals
      */
-    ListBindingSet(final IVariable[] vars, final IConstant[] vals) {
+    public ListBindingSet(final IVariable[] vars, final IConstant[] vals) {
 
         this();
 
