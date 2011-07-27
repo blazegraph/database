@@ -8,7 +8,7 @@ import java.util.Map;
  * 
  * @author thompsonbry
  */
-public class Bind<E> extends ImmutableBOp implements IValueExpression<E> {
+public class Bind<E> extends ImmutableBOp implements IValueExpression<E>, IBind<E> {
 
 	/**
 	 * 
@@ -49,9 +49,9 @@ public class Bind<E> extends ImmutableBOp implements IValueExpression<E> {
 	 * associated value expression.
 	 */
 	@SuppressWarnings("unchecked")
-	public IVariable<E> getVar() {
+    public IVariable<? extends E> getVar() {
 
-		return (IVariable<E>) get(0);
+        return (IVariable<? extends E>) get(0);
 
 	}
 
@@ -67,7 +67,7 @@ public class Bind<E> extends ImmutableBOp implements IValueExpression<E> {
 
 	public E get(final IBindingSet bindingSet) {
 
-		final IVariable<E> var = getVar();
+		final IVariable<? extends E> var = getVar();
 
 		final IValueExpression<E> expr = getExpr();
 

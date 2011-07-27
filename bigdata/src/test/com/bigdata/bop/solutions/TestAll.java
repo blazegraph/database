@@ -92,6 +92,9 @@ public class TestAll extends TestCase {
          * Aggregation
          */
         
+        // Validation logic for aggregation operators.
+        suite.addTestSuite(TestGroupByState.class);
+        
         // in-memory GROUP_BY
         suite.addTestSuite(TestMemoryGroupByOp.class);
 

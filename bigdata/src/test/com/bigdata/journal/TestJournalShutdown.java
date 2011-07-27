@@ -29,10 +29,13 @@ package com.bigdata.journal;
 
 import java.lang.ref.WeakReference;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -57,6 +60,68 @@ public class TestJournalShutdown extends TestCase2 {
         super(name);
     }
 
+    private int startupActiveThreads = 0;
+    
+    public void setUp() throws Exception {
+
+        super.setUp();
+        
+        startupActiveThreads = Thread.currentThread().getThreadGroup().activeCount();
+        
+    }
+
+    private static boolean s_checkThreads = true;
+    
+    public void tearDown() throws Exception {
+
+        TestHelper.checkJournalsClosed(this);
+        
+        if (s_checkThreads) {
+
+            final ThreadGroup grp = Thread.currentThread().getThreadGroup();
+            final int tearDownActiveThreads = grp.activeCount();
+            if (startupActiveThreads != tearDownActiveThreads) {
+                final Thread[] threads = new Thread[tearDownActiveThreads];
+                grp.enumerate(threads);
+                final StringBuilder info = new StringBuilder();
+                boolean first = true;
+                for (Thread t : threads) {
+                    if (t == null)
+                        continue;
+                    if(!first)
+                        info.append(',');
+                    info.append("[" + t.getName() + "]");
+                    first = false;
+                }
+                
+                final String failMessage = "Threads left active after task"
+                        +": test=" + getName()//
+//                        + ", delegate="+getOurDelegate().getClass().getName()
+                        + ", startupCount=" + startupActiveThreads
+                        + ", teardownCount=" + tearDownActiveThreads
+                        + ", thisThread="+Thread.currentThread().getName()
+                        + ", threads: " + info;
+                
+                if (grp.activeCount() != startupActiveThreads)
+                    log.error(failMessage);  
+
+                /*
+                 * Wait up to 2 seconds for threads to die off so the next test
+                 * will run more cleanly.
+                 */
+                for (int i = 0; i < 20; i++) {
+                    Thread.sleep(100);
+                    if (grp.activeCount() != startupActiveThreads)
+                        break;
+                }
+
+            }
+            
+        }
+        
+        super.tearDown();
+    }
+    
     /**
      * Look for a memory leak when the test calls {@link Journal#close()}
      * explicitly.
@@ -157,6 +222,16 @@ public class TestJournalShutdown extends TestCase2 {
                     nunfinalized.incrementAndGet();
                     ncreated.incrementAndGet();
 
+                    // force the use of the LockManager.
+                    try {
+                        jnl.getConcurrencyManager().submit(
+                                new RegisterIndexTask(jnl.getConcurrencyManager(),
+                                        "name", new IndexMetadata("name", UUID
+                                                .randomUUID()))).get();
+                    } catch (ExecutionException e) {
+                        log.error("Problem registering index: " + e, e);
+                    }
+                    
                     if (closeJournal) {
                         /*
                          * Exercise each of the ways in which we can close the

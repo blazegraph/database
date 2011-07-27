@@ -2260,7 +2260,16 @@ public class TestQueryEngine extends TestCase2 {
         
     }
     
-	static public void assertSameSolutionsAnyOrder(final String msg,
+    static public void assertSameSolutionsAnyOrder(
+            final IBindingSet[] expected,
+            final IAsynchronousIterator<IBindingSet[]> itr,
+            final Future<?> future) {
+
+        assertSameSolutionsAnyOrder("", expected, itr, future);
+        
+    }
+    
+    static public void assertSameSolutionsAnyOrder(final String msg,
 			final IBindingSet[] expected,
 			final IAsynchronousIterator<IBindingSet[]> itr,
 			final Future<?> runningQuery) {
@@ -2302,10 +2311,10 @@ public class TestQueryEngine extends TestCase2 {
 
             for (int j = 0; j < nrange; j++) {
 
-                if(runningQuery.isDone()) runningQuery.get();
-                
                 if (!actual.hasNext()) {
 
+                    if(runningQuery.isDone()) runningQuery.get();
+                    
                     fail(msg
                             + ": Iterator exhausted while expecting more object(s)"
                             + ": index=" + j);
