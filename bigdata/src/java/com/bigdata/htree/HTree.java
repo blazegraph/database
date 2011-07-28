@@ -1286,18 +1286,16 @@ public class HTree extends AbstractHTree
 					if (current.globalDepth == child.globalDepth) {
 
                         /*
-                         * There is only one buddy hash bucket on the page.
-                         * Either we can split a directory page which is a
-                         * parent of that bucket or we have to add a new level
-                         * below the root on the path to that bucket.
+                         * The child is at the same depth as the parent. Either
+                         * we can split a directory page which is a parent of
+                         * that bucket or we have to add a new level below the
+                         * root on the path to that bucket.
                          */
 
                         if (child.globalDepth == addressBits) {
 
                         	addLevel2(bucketPage);
                         	
-                        	return insert(key,value);
-
                         } else {
 
                             splitDirectoryPage(
@@ -1306,15 +1304,15 @@ public class HTree extends AbstractHTree
                             
                         }
 
-					}
+                    } else {
 
-					// globalDepth >= localDepth
-					// splitBucketsOnPage(current, buddyOffset, bucketPage);
-					bucketPage.split();
-					
-					// Try again. The children have changed.
-					continue;
+                        // globalDepth >= localDepth
+                        bucketPage.split();
+
+                    }
 		
+                    return insert(key,value);
+
 				}
 				
 				return null; // TODO should be Void return? or depends on enum controlling dups behavior?
@@ -1397,23 +1395,20 @@ public class HTree extends AbstractHTree
 			    final BucketPage bucketPage = (BucketPage) child;
 				
 				// Attempt to insert the tuple into the bucket.
-				if (!bucketPage.insertRawTuple(src, slot, key)) {//, buddyOffset)) {
+                if (!bucketPage.insertRawTuple(src, slot, key)) {
 
-				    if (current.globalDepth == child.globalDepth) {
+                    if (current.globalDepth == child.globalDepth) {
 
                         /*
-                         * There is only one buddy hash bucket on the page.
-                         * Either we can split a directory page which is a
-                         * parent of that bucket or we have to add a new level
-                         * below the root on the path to that bucket.
+                         * The child is at the same depth as the parent. Either
+                         * we can split a directory page which is a parent of
+                         * that bucket or we have to add a new level below the
+                         * root on the path to that bucket.
                          */
 
                         if (child.globalDepth == addressBits) {
 
                             addLevel2(bucketPage);
-                            
-                            insertRawTuple(src, slot);
-                            return;
 
                         } else {
 
@@ -1423,15 +1418,16 @@ public class HTree extends AbstractHTree
 
                         }
 
+                    } else {
+
+                        // globalDepth >= localDepth
+                        bucketPage.split();
+
                     }
 
-                    // globalDepth >= localDepth
-                    // splitBucketsOnPage(current, buddyOffset, bucketPage);
-                    bucketPage.split();
-                    
-                    // Try again. The children have changed.
-                    continue;
-		
+                    insertRawTuple(src, slot);
+                    return;
+
 				}
 				
 				return;

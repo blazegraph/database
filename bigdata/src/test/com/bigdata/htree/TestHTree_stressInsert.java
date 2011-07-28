@@ -37,19 +37,19 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
 
     public void test_stressInsert_noEviction_addressBits1() {
 
-		doStressTest(100/* limit */, 1/* addressBits */);
+		doStressTest(50/* limit */, 1/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits2() {
 
-		doStressTest(250/* limit */, 2/* addressBits */);
+		doStressTest(100/* limit */, 2/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits3() {
 
-		doStressTest(1000/* limit */, 3/* addressBits */);
+		doStressTest(500/* limit */, 3/* addressBits */);
        
    }
 
