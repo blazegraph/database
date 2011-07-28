@@ -64,43 +64,43 @@ public class TestHTreeWithMemStore extends TestCase {
 
     public void test_stressInsert_noEviction_addressBits1() {
 
-		doStressTest(1000/* limit */, 1/* addressBits */);
+		doStressTest(1/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits2() {
 
-		doStressTest(1000/* limit */, 2/* addressBits */);
+		doStressTest(2/* addressBits */);
         
     }
 
    public void test_stressInsert_noEviction_addressBits3() {
 
-		doStressTest(1000/* limit */, 3/* addressBits */);
+		doStressTest(3/* addressBits */);
        
    }
 
     public void test_stressInsert_noEviction_addressBits4() {
 
-		doStressTest(1000/* limit */, 4/* addressBits */);
+		doStressTest(4/* addressBits */);
         
     }
 
     public void test_stressInsert_noEviction_addressBits6() {
 
-		doStressTest(10000/* limit */, 6/* addressBits */);
+		doStressTest(6/* addressBits */);
         
     }
 
     public void test_stressInsert_noEviction_addressBits8() {
 
-		doStressTest(10000/* limit */, 8/* addressBits */);
+		doStressTest(8/* addressBits */);
         
     }
 
     public void test_stressInsert_noEviction_addressBits10() {
 
-		doStressTest(10000/* limit */, 10/* addressBits */);
+		doStressTest(10/* addressBits */);
 
 	}
 
@@ -146,7 +146,9 @@ public class TestHTreeWithMemStore extends TestCase {
 
 	}
     
-    private void doStressTest(final int limit, final int addressBits) {
+	final int s_limit = 1000;
+	
+    private void doStressTest(final int addressBits) {
 
 		/*
 		 * FIXME We can not yet specify an unbounded pool size for the MemStore,
@@ -167,9 +169,9 @@ public class TestHTreeWithMemStore extends TestCase {
 
 				final IKeyBuilder keyBuilder = new KeyBuilder();
 
-				final byte[][] keys = new byte[limit][];
+				final byte[][] keys = new byte[s_limit][];
 
-				for (int i = 0; i < limit; i++) {
+				for (int i = 0; i < s_limit; i++) {
 
 					final byte[] key = keyBuilder.reset().append(i).getKey();
 
@@ -180,10 +182,10 @@ public class TestHTreeWithMemStore extends TestCase {
 
 				}
 
-				assertEquals(limit, htree.getEntryCount());
+				assertEquals(s_limit, htree.getEntryCount());
 
 				// Verify all tuples are found.
-				for (int i = 0; i < limit; i++) {
+				for (int i = 0; i < s_limit; i++) {
 
 					final byte[] key = keys[i];
 
@@ -205,7 +207,7 @@ public class TestHTreeWithMemStore extends TestCase {
 				log.error(t);
 
 				try {
-					log.error("Pretty Print of error state:\n" + htree.PP());
+					log.error("Pretty Print of error state:\n" + htree.PP(), t);
 				} catch (Throwable t2) {
 					log.error("Problem in pretty print: t2", t2);
 				}
