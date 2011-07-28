@@ -632,6 +632,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
         
         // identify of the node that is being copied and deleted.
         final long oldId = this.identity;
+        assert oldId != NULL;
 
         // parent of the node that is being cloned (null iff it is the root).
         DirectoryPage parent = this.getParentDirectory();
@@ -710,8 +711,9 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
     }
     
+    /** @deprecated Move to a test helper based on a striterator pattern. */
     abstract int activeBucketPages();
-    
+    /** @deprecated Move to a test helper based on a striterator pattern. */
     abstract int activeDirectoryPages();
 
 }

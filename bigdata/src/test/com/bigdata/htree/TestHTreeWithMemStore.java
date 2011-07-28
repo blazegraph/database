@@ -110,11 +110,11 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
 
-    public void test_stressInsert_addressBitsMAX() {
-
-        doStressTest(16/* addressBits */);
-
-    }
+//    public void test_stressInsert_addressBitsMAX() {
+//
+//        doStressTest(16/* addressBits */);
+//
+//    }
 
 	private HTree getHTree(final IRawStore store, final int addressBits,
 			final boolean rawRecords) {

@@ -402,10 +402,10 @@ abstract public class AbstractHTree implements ICounterSetAccess {
     /**
      * A {@link Memoizer} subclass which exposes an additional method to remove
      * a {@link FutureTask} from the internal cache. This is used as part of an
-     * explicit protocol in {@link DirectoryPage#_getChild(int)} to clear out cache
-     * entries once the child reference has been set on {@link Node#childRefs}.
-     * This is package private since it must be visible to
-     * {@link DirectoryPage#_getChild(int)}.
+     * explicit protocol in {@link DirectoryPage#_getChild(int)} to clear out
+     * cache entries once the child reference has been set on
+     * {@link DirectoryPage#childRefs}. This is package private since it must be
+     * visible to {@link DirectoryPage#_getChild(int)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -433,15 +433,15 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 //            
 //        }
 
-		/**
-		 * Called by the thread which atomically sets the
-		 * {@link DirectoryPage#childRefs} element to the computed
-		 * {@link AbstractPage}. At that point a reference exists to the child
-		 * on the parent.
-		 * 
-		 * @param req
-		 *            The request.
-		 */
+        /**
+         * Called by the thread which atomically sets the
+         * {@link DirectoryPage#childRefs} element to the computed
+         * {@link AbstractPage}. At that point a reference exists to the child
+         * on the parent.
+         * 
+         * @param req
+         *            The request.
+         */
         void removeFromCache(final LoadChildRequest req) {
 
             if (cache.remove(req) == null) {

@@ -1848,32 +1848,39 @@ public class HTree extends AbstractHTree
 //
 //	}
 
-	/**
-	 * Adds a new level above a full {@link BucketPage}. The {@link BucketPage}
-	 * must be at depth==addressBits (i.e., one buddy bucket on the page and one
-	 * pointer from the parent into the {@link BucketPage}). Two new
-	 * {@link BucketPage}s and a new {@link DirectoryPage} are recruited. The
-	 * new {@link DirectoryPage} is initialized with pointers to the two
-	 * {@link BucketPage}s and linked into the parent of the original
-	 * {@link BucketPage}. The new {@link DirectoryPage} will be at maximum
-	 * depth since it takes the place of the old {@link BucketPage} which was
-	 * already at maximum depth. The tuples from the old {@link BucketPage} are
-	 * reindexed, which distributes them between the two new {@link BucketPage}
-	 * s.
-	 * 
-	 * @param oldPage
-	 *            The full {@link BucketPage}.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if any argument is <code>null</code>.
-	 * @throws IllegalStateException
-	 *             if the <i>oldPage</i> is not at maximum depth.
-	 * @throws IllegalStateException
-	 *             if the parent of the <i>oldPage</i> is not mutable.
-	 * 
-	 *             TODO This should really be moved onto BucketPage so the
-	 *             copy-on-write pattern can be maintained.
-	 */
+	    /**
+     * Adds a new level above a full {@link BucketPage}. The {@link BucketPage}
+     * must be at depth==addressBits (i.e., one buddy bucket on the page and one
+     * pointer from the parent into the {@link BucketPage}). Two new
+     * {@link BucketPage}s and a new {@link DirectoryPage} are recruited. The
+     * new {@link DirectoryPage} is initialized with pointers to the two
+     * {@link BucketPage}s and linked into the parent of the original
+     * {@link BucketPage}. The new {@link DirectoryPage} will be at maximum
+     * depth since it takes the place of the old {@link BucketPage} which was
+     * already at maximum depth. The tuples from the old {@link BucketPage} are
+     * reindexed, which distributes them between the two new {@link BucketPage}
+     * s.
+     * 
+     * @param oldPage
+     *            The full {@link BucketPage}.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the <i>oldPage</i> is not at maximum depth.
+     * @throws IllegalStateException
+     *             if the parent of the <i>oldPage</i> is not mutable.
+     * 
+     *             TODO This should really be moved onto BucketPage so the
+     *             copy-on-write pattern can be maintained.
+     *             <p>
+     *             We could pass in the buddy offset on the directory, which
+     *             would reduce the amount that we need to scan when locating
+     *             the pointer to [oldPage].
+     *             <p>
+     *             We do not need to be doing copy-on-write on [oldPage]. It is
+     *             only [oldPage.parent] which needs to be mutable.
+     */
 	DirectoryPage addLevel2(final BucketPage oldPage) {
 		
 		if (oldPage == null)
@@ -1948,7 +1955,6 @@ public class HTree extends AbstractHTree
 			 * directory page.
 			 */
 			{
-				boolean found = false;
 				final long oldAddr = oldPage.isPersistent() ? oldPage
 						.getIdentity() : 0L;
 				if (!pp.isDirty()) { 
@@ -1960,21 +1966,30 @@ public class HTree extends AbstractHTree
 					throw new IllegalStateException(); // parent must be mutable.
 				}
 				final MutableDirectoryPageData data = (MutableDirectoryPageData) pp.data;
-				for (int i = 0; i < dirSlotsPerPage && !found; i++) {
+                boolean found = false;
+                int np = 0;
+				for (int i = 0; i < dirSlotsPerPage; i++) {
+				    boolean isPtr = false;
 					if (oldPage.isPersistent()) {
 						if (data.childAddr[i] == oldAddr)
-							found = true; // same address
+							isPtr = true; // same address
 					} else {
 						if (pp.childRefs[i] == oldPage.self)
-							found = true; // same reference
+							isPtr = true; // same reference
 					}
-					if (found) {
+					if (isPtr) {
 						pp.childRefs[i] = (Reference) newParent.self; // set ref
 						data.childAddr[i] = 0L; // clear addr.
+						np++;
+						found = true;
+					} else if(found) {
+					    break;
 					}
 				}
 				if (!found)
-					throw new AssertionError();
+                    throw new AssertionError();
+                if (np != 1)
+                    throw new AssertionError("Found np="+np+", but expecting only one.");
 			}
 
 			// Set the parent references on the new pages.
