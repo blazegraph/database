@@ -506,8 +506,8 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 	}
 
-	abstract void insertRawTuple(final byte[] key, final byte[] val,
-			final int buddy);
+//	abstract void insertRawTuple(final byte[] key, final byte[] val,
+//			final int buddy);
 
 	final public Iterator<AbstractPage> postOrderNodeIterator() {
 
