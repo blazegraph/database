@@ -61,18 +61,20 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	/**
 	 * The {@link UUID} for the store.
 	 */
-	private final UUID m_uuid;
+    private final UUID m_uuid;
 
-	/**
-	 * Create a new instance.
-	 * 
-	 * @param pool
-	 *            The pool from which the backing direct {@link ByteBuffer}s
-	 *            will be allocated.
-	 * @param bufferCapacity
-	 *            The maximum #of buffers which may be allocated by this
-	 *            {@link MemStore} from that pool.
-	 */
+    /**
+     * Create a new instance.
+     * 
+     * @param pool
+     *            The pool from which the backing direct {@link ByteBuffer}s
+     *            will be allocated.
+     * @param bufferCapacity
+     *            The maximum #of buffers which may be allocated by this
+     *            {@link MemStore} from that pool. This may be
+     *            {@link Integer#MAX_VALUE} for an effectively unlimited
+     *            capacity.
+     */
 	public MemStore(final DirectBufferPool pool, final int bufferCapacity) {
 
 		if (pool == null)

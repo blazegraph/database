@@ -997,6 +997,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         if (root == null)
             reopen();
 
+        touch(root);
+        
         return root;
 
     }

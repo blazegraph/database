@@ -74,16 +74,22 @@ public class TestHTreeWithMemStore extends TestCase {
         
     }
 
-   public void test_stressInsert_addressBits3() {
+    public void test_stressInsert_addressBits3() {
 
-		doStressTest(3/* addressBits */);
-       
-   }
+        doStressTest(3/* addressBits */);
+
+    }
 
     public void test_stressInsert_addressBits4() {
 
-		doStressTest(4/* addressBits */);
-        
+        doStressTest(4/* addressBits */);
+
+    }
+
+    public void test_stressInsert_addressBits5() {
+
+        doStressTest(5/* addressBits */);
+
     }
 
     public void test_stressInsert_addressBits6() {
@@ -152,16 +158,12 @@ public class TestHTreeWithMemStore extends TestCase {
 
 	}
     
-	final int s_limit = 1000;
+	private static final int s_limit = 100000;
 	
     private void doStressTest(final int addressBits) {
 
-		/*
-		 * FIXME We can not yet specify an unbounded pool size for the MemStore,
-		 * so this is just specifying a relatively big value but then it is
-		 * possible for the unit test to overflow the available memory.
-		 */
-		final IRawStore store = new MemStore(DirectBufferPool.INSTANCE, 100);
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
+                Integer.MAX_VALUE);
 
 		try {
 
