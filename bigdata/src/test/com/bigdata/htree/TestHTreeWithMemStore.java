@@ -62,47 +62,53 @@ public class TestHTreeWithMemStore extends TestCase {
 		super(name);
 	}
 
-    public void test_stressInsert_noEviction_addressBits1() {
+    public void test_stressInsert_addressBits1() {
 
 		doStressTest(1/* addressBits */);
         
     }
 
-   public void test_stressInsert_noEviction_addressBits2() {
+   public void test_stressInsert_addressBits2() {
 
 		doStressTest(2/* addressBits */);
         
     }
 
-   public void test_stressInsert_noEviction_addressBits3() {
+   public void test_stressInsert_addressBits3() {
 
 		doStressTest(3/* addressBits */);
        
    }
 
-    public void test_stressInsert_noEviction_addressBits4() {
+    public void test_stressInsert_addressBits4() {
 
 		doStressTest(4/* addressBits */);
         
     }
 
-    public void test_stressInsert_noEviction_addressBits6() {
+    public void test_stressInsert_addressBits6() {
 
 		doStressTest(6/* addressBits */);
         
     }
 
-    public void test_stressInsert_noEviction_addressBits8() {
+    public void test_stressInsert_addressBits8() {
 
 		doStressTest(8/* addressBits */);
         
     }
 
-    public void test_stressInsert_noEviction_addressBits10() {
+    public void test_stressInsert_addressBits10() {
 
-		doStressTest(10/* addressBits */);
+        doStressTest(10/* addressBits */);
 
-	}
+    }
+
+    public void test_stressInsert_addressBitsMAX() {
+
+        doStressTest(16/* addressBits */);
+
+    }
 
 	private HTree getHTree(final IRawStore store, final int addressBits,
 			final boolean rawRecords) {

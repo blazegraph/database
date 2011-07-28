@@ -551,10 +551,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 * mutable buckets?) we will have to scan the entire buddy bucket to
 		 * find an open slot (or just to count the #of slots which are currently
 		 * in use).
-		 * 
-		 * TODO Cache the location of the last known empty slot. If it is in the
-		 * same buddy bucket then we can use it immediately. Otherwise we can
-		 * scan for the first empty slot in the given buddy bucket.
 		 */
 		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
 		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
@@ -572,36 +568,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				return true;
 			}
 		}
-
-		/*
-		 * Any buddy bucket which is full is split unless it is the sole buddy
-		 * in the page since a split doubles the size of the buddy bucket
-		 * (unless it is the only buddy on the page) and the tuple can therefore
-		 * be inserted after a split. [This rule is not perfect if we allow
-		 * splits to be driven by the bytes on a page, but it should still be
-		 * Ok.]
-		 * 
-		 * Before we can split the sole buddy bucket in a page, we need to know
-		 * whether or not the keys are identical. If they are then we let the
-		 * page grow rather than splitting it. This can be handled insert of
-		 * bucketPage.insert(). It can have a boolean which is set false as soon
-		 * as it sees a key which is not the equals() to the probe key (in all
-		 * bits).
-		 * 
-		 * Note that an allowed split always leaves enough room for another
-		 * tuple (when considering only the #of tuples and not their bytes on
-		 * the page). We can still be "out of space" in terms of bytes on the
-		 * page, even for a single tuple. In this edge case, the tuple should
-		 * really be a raw record. That is easily controlled by having a maximum
-		 * inline value byte[] length for a page - probably on the order of
-		 * pageSize/16 which works out to 256 bytes for a 4k page.
-		 */
-		// if (nbuddies != 1) {
-		/*
-		 * Force a split since there is more than one buddy on the page.
-		 */
-		// return false;
-		// }
 
 		/*
 		 * There is only one buddy on the page. Now we have to figure out
@@ -676,26 +642,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		if (key == null)
 			throw new IllegalArgumentException();
 
-		if (parent == null)
-			throw new IllegalArgumentException();
-
-		// #of slots on the page.
-		final int slotsOnPage = slotsOnPage();
-
-		// #of address slots in each buddy hash table.
-		final int slotsPerBuddy = (1 << globalDepth);
-
-		// #of buddy tables on a page.
-		final int nbuddies = slotsOnPage / slotsPerBuddy;
-
-		final int buddyOffset = 0; // always zero for a bucket page.
-		
-		final int lastSlot = buddyOffset + slotsPerBuddy;
-
-		// range check buddyOffset.
-		if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-			throw new IndexOutOfBoundsException();
-
         /*
          * Note: This is one of the few gateways for mutation of a leaf via the
          * main btree API (insert, lookup, delete). By ensuring that we have a
@@ -706,94 +652,49 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
         if (copy != this) {
 
-			/*
-			 * This leaf has been copied so delegate the operation to the new
-			 * leaf.
-			 * 
-			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
-			 * leaf listeners before it clears the [leafListeners] reference so
-			 * not only don't we have to do that here, but we can't since the
-			 * listeners would be cleared before we could fire off the event
-			 * ourselves.
-			 */
+            /*
+             * This leaf has been copied so delegate the operation to the new
+             * leaf.
+             * 
+             * Note: copy-on-write deletes [this] leaf and delete() notifies any
+             * leaf listeners before it clears the [leafListeners] reference so
+             * not only don't we have to do that here, but we can't since the
+             * listeners would be cleared before we could fire off the event
+             * ourselves.
+             */
 
-			return copy.insertRawTuple(srcPage, srcSlot, key);//, buddyOffset);
+            return copy.insertRawTuple(srcPage, srcSlot, key);//, buddyOffset);
 
-		}
+        }
         
-		/*
-		 * Locate the first unassigned tuple in the buddy bucket.
-		 * 
-		 * Note: Given the IRaba data structure, this will require us to examine
-		 * the keys for a null. The "keys" rabas do not allow nulls, so we will
-		 * need to use a "values" raba (nulls allowed) for the bucket keys.
-		 * Unless we keep the entries in a buddy bucket dense (maybe making them
-		 * dense when they are persisted for faster scans, but why bother for
-		 * mutable buckets?) we will have to scan the entire buddy bucket to
-		 * find an open slot (or just to count the #of slots which are currently
-		 * in use).
-		 * 
-		 * TODO Cache the location of the last known empty slot. If it is in the
-		 * same buddy bucket then we can use it immediately. Otherwise we can
-		 * scan for the first empty slot in the given buddy bucket.
-		 */
-		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
-		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
+        // just fit somewhere in page
+		final int slotsOnPage = slotsOnPage();
+        final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
+        final MutableValueBuffer vals = (MutableValueBuffer) getValues();
+        for (int i = 0; i < slotsOnPage; i++) {
+            if (keys.isNull(i)) {
+                keys.nkeys++;
+                keys.keys[i] = key;
+                vals.nvalues++;
+                // Note: DOES NOT Materialize a raw record!!!!
+                vals.values[i] = srcPage.getValues().get(srcSlot);
+                // TODO deleteMarker:=false
+                // TODO versionTimestamp:=...
+                // do not increment on raw insert, since this is only ever
+                // (for now) a re-organisation
+                // ((HTree)htree).nentries++;
+                // insert Ok.
+                return true;
+            }
 
-		for (int i = buddyOffset; i < lastSlot; i++) {
-			if (keys.isNull(i)) {
-				keys.nkeys++;
-				keys.keys[i] = key;
-				vals.nvalues++;
-				vals.values[i] = srcPage.getValues().get(srcSlot); // Note: DOES
-																	// NOT
-																	// Materialize
-																	// a raw
-																	// record!!!!
-				// TODO deleteMarker:=false
-				// TODO versionTimestamp:=...
-				// ((HTree)htree).nentries++; // DO NOT increment nentries!!!!
-				// insert Ok.
-				return true;
-			}
-		}
+        } // next slot on page
 
-		/*
-		 * Any buddy bucket which is full is split unless it is the sole buddy
-		 * in the page since a split doubles the size of the buddy bucket
-		 * (unless it is the only buddy on the page) and the tuple can therefore
-		 * be inserted after a split. [This rule is not perfect if we allow
-		 * splits to be driven by the bytes on a page, but it should still be
-		 * Ok.]
-		 * 
-		 * Before we can split the sole buddy bucket in a page, we need to know
-		 * whether or not the keys are identical. If they are then we let the
-		 * page grow rather than splitting it. This can be handled insert of
-		 * bucketPage.insert(). It can have a boolean which is set false as soon
-		 * as it sees a key which is not the equals() to the probe key (in all
-		 * bits).
-		 * 
-		 * Note that an allowed split always leaves enough room for another
-		 * tuple (when considering only the #of tuples and not their bytes on
-		 * the page). We can still be "out of space" in terms of bytes on the
-		 * page, even for a single tuple. In this edge case, the tuple should
-		 * really be a raw record. That is easily controlled by having a maximum
-		 * inline value byte[] length for a page - probably on the order of
-		 * pageSize/16 which works out to 256 bytes for a 4k page.
-		 */
-		if (nbuddies != 1) {
-			/*
-			 * Force a split since there is more than one buddy on the page.
-			 */
-			return false;
-		}
-
-		/*
-		 * There is only one buddy on the page. Now we have to figure out
-		 * whether or not all keys are duplicates.
-		 */
+        /*
+         * The page is full. Now we have to figure out whether or not all keys
+         * are duplicates.
+         */
 		boolean identicalKeys = true;
-		for (int i = buddyOffset; i < buddyOffset + slotsPerBuddy; i++) {
+		for (int i = 0; i < slotsOnPage; i++) {
 			if (!BytesUtil.bytesEqual(key, keys.get(i))) {
 				identicalKeys = false;
 				break;
@@ -1166,67 +1067,67 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		return -1;
 	}
 
-	/**
-	 * To insert in a BucketPage must handle split
-	 * 
-	 * @see com.bigdata.htree.AbstractPage#insertRawTuple(byte[], byte[], int)
-	 */
-	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
-		final int slotsPerBuddy = slotsOnPage(); // (1 << htree.addressBits);
-		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
-		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
-
-		if (true) {
-			// just fit somewhere in page
-			for (int i = 0; i < slotsPerBuddy; i++) {
-				if (keys.isNull(i)) {
-					keys.nkeys++;
-					keys.keys[i] = key;
-					vals.nvalues++;
-					vals.values[i] = val;
-					// TODO deleteMarker:=false
-					// TODO versionTimestamp:=...
-					// do not increment on raw insert, since this is only ever
-					// (for now) a re-organisation
-					// ((HTree)htree).nentries++;
-					// insert Ok.
-					return;
-				}
-			}
-		} else { // if mapping buddy explicitly
-			final int buddyStart = buddy * slotsPerBuddy;
-			final int lastSlot = buddyStart + slotsPerBuddy;
-
-			for (int i = buddyStart; i < lastSlot; i++) {
-				if (keys.isNull(i)) {
-					keys.nkeys++;
-					keys.keys[i] = key;
-					vals.nvalues++;
-					setValue(i, val);
-					// TODO deleteMarker:=false
-					// TODO versionTimestamp:=...
-					((HTree) htree).nentries++;
-					// insert Ok.
-					return;
-				}
-			}
-		}
-
-		// unable to insert
-		final DirectoryPage np;
-		if (globalDepth == htree.addressBits) {
-			// max depth so add level
-			np = ((HTree) htree).addLevel2(this);
-		} else {
-			// otherwise split page by asking parent to split and re-inserting
-			// values
-
-			np = getParentDirectory();
-			np.split(this); // will re-insert tuples from original page
-		}
-		
-		np.insertRawTuple(key, val, 0);
-	}
+//	/**
+//	 * To insert in a BucketPage must handle split
+//	 * 
+//	 * @see com.bigdata.htree.AbstractPage#insertRawTuple(byte[], byte[], int)
+//	 */
+//	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
+//		final int slotsPerBuddy = slotsOnPage(); // (1 << htree.addressBits);
+//		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
+//		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
+//
+//		if (true) {
+//			// just fit somewhere in page
+//			for (int i = 0; i < slotsPerBuddy; i++) {
+//				if (keys.isNull(i)) {
+//					keys.nkeys++;
+//					keys.keys[i] = key;
+//					vals.nvalues++;
+//					vals.values[i] = val;
+//					// TODO deleteMarker:=false
+//					// TODO versionTimestamp:=...
+//					// do not increment on raw insert, since this is only ever
+//					// (for now) a re-organisation
+//					// ((HTree)htree).nentries++;
+//					// insert Ok.
+//					return;
+//				}
+//			}
+//		} else { // if mapping buddy explicitly
+//			final int buddyStart = buddy * slotsPerBuddy;
+//			final int lastSlot = buddyStart + slotsPerBuddy;
+//
+//			for (int i = buddyStart; i < lastSlot; i++) {
+//				if (keys.isNull(i)) {
+//					keys.nkeys++;
+//					keys.keys[i] = key;
+//					vals.nvalues++;
+//					setValue(i, val);
+//					// TODO deleteMarker:=false
+//					// TODO versionTimestamp:=...
+//					((HTree) htree).nentries++;
+//					// insert Ok.
+//					return;
+//				}
+//			}
+//		}
+//
+//		// unable to insert
+//		final DirectoryPage np;
+//		if (globalDepth == htree.addressBits) {
+//			// max depth so add level
+//			np = ((HTree) htree).addLevel2(this);
+//		} else {
+//			// otherwise split page by asking parent to split and re-inserting
+//			// values
+//
+//			np = getParentDirectory();
+//			np.split(this); // will re-insert tuples from original page
+//		}
+//		
+//		np.insertRawTuple(key, val, 0);
+//	}
 
 	private void setValue(final int entryIndex, final byte[] newval) {
 
@@ -1380,5 +1281,50 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 //		}
 //
 //	}
+
+    /**
+     * Split the bucket page into two, updating the pointers in the parent
+     * accordingly.
+     */
+	void split() {
+	    
+        /*
+         * Note: This is one of the few gateways for mutation of a BucketPage
+         * via the main htree API (insert, lookup, delete). By ensuring that we
+         * have a mutable directory here, we can assert that the directory must
+         * be mutable in other methods.
+         */
+        final BucketPage copy = (BucketPage) copyOnWrite();
+
+        if (copy != this) {
+
+            /*
+             * This leaf has been copied so delegate the operation to the new
+             * leaf.
+             * 
+             * Note: copy-on-write deletes [this] leaf and delete() notifies any
+             * leaf listeners before it clears the [leafListeners] reference so
+             * not only don't we have to do that here, but we can't since the
+             * listeners would be cleared before we could fire off the event
+             * ourselves.
+             */
+
+            copy.split();
+            return;
+            
+        }
+
+        /*
+         * DO THE WORK HERE
+         * 
+         * FIXME We are doing too much work here since the BucketPage which is
+         * being split does NOT need to be made mutable. However, this follows
+         * the established copy-on-write pattern by starting from the leaf.
+         * Revisit and optimize this once we have a stable eviction pattern for
+         * the HTree.
+         */
+        getParentDirectory()._splitBucketPage(this);
+        
+	}
 	
 }

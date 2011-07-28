@@ -79,38 +79,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	}
 
 	/**
-	 * Locate original references, halving number of references to new pages
-	 * 
-	 * @param bucketPage
-	 *            - original bucket
+	 * Split the child {@link BucketPage}.
 	 */
-	public void split(final BucketPage bucketPage) {
-
-		/*
-		 * Note: This is one of the few gateways for mutation of a directory via
-		 * the main htree API (insert, lookup, delete). By ensuring that we have
-		 * a mutable directory here, we can assert that the directory must be
-		 * mutable in other methods.
-		 */
-        final DirectoryPage copy = (DirectoryPage) copyOnWrite();
-
-        if (copy != this) {
-
-			/*
-			 * This leaf has been copied so delegate the operation to the new
-			 * leaf.
-			 * 
-			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
-			 * leaf listeners before it clears the [leafListeners] reference so
-			 * not only don't we have to do that here, but we can't since the
-			 * listeners would be cleared before we could fire off the event
-			 * ourselves.
-			 */
-
-			copy.split(bucketPage);
-			return;
-			
-		}
+	void _splitBucketPage(final BucketPage bucketPage) {
 
         // Note: this.getChildCount() is less direct.
 		final int slotsOnPage = 1 << htree.addressBits;
@@ -150,11 +121,16 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		}
 
 		// Now insert raw values from original page
-		final ITupleIterator tuples = bucketPage.tuples();
-		while (tuples.hasNext()) {
-			final ITuple tuple = tuples.next();
-			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
-		}
+//		final ITupleIterator tuples = bucketPage.tuples();
+//		while (tuples.hasNext()) {
+//			final ITuple tuple = tuples.next();
+//			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
+//		}
+        final int bucketSlotsPerPage = bucketPage.slotsOnPage();
+        for (int i = 0; i < bucketSlotsPerPage; i++) {
+            ((HTree) htree).insertRawTuple(bucketPage, i);
+        }
+	        
 	}
 
 	/**
@@ -1494,32 +1470,29 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 
-	/*
-	 * All directories are at max depth, so we just need to determine prefix and
-	 * test key to locate child page o accept value
-	 */
-	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
+//	@Override
+//	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
+//
+//		assert buddy == 0;
+//
+//		final int pl = getPrefixLength();
+//		final int hbits = getLocalHashCode(key, pl);
+//		final AbstractPage cp = getChild(hbits); // removed eager copyOnWrite()
+//
+//		cp.insertRawTuple(key, val, getChildBuddy(hbits));
+//	}
 
-		assert buddy == 0;
-
-		final int pl = getPrefixLength();
-		final int hbits = getLocalHashCode(key, pl);
-		AbstractPage cp = getChild(hbits); // removed eager copyOnWrite()
-
-		cp.insertRawTuple(key, val, getChildBuddy(hbits));
-	}
-
-	/*
-	 * Checks child buddies, looking for previous references and incrementing
-	 */
-	private int getChildBuddy(int hbits) {
-		int cbuddy = 0;
-		final AbstractPage cp = getChild(hbits);
-		while (hbits > 0 && cp == getChild(--hbits))
-			cbuddy++;
-
-		return cbuddy;
-	}
+//	/*
+//	 * Checks child buddies, looking for previous references and incrementing
+//	 */
+//	private int getChildBuddy(int hbits) {
+//		int cbuddy = 0;
+//		final AbstractPage cp = getChild(hbits);
+//		while (hbits > 0 && cp == getChild(--hbits))
+//			cbuddy++;
+//
+//		return cbuddy;
+//	}
 
     /**
      * Invoked by {@link #copyOnWrite()} to clear the persistent address for a
