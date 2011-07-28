@@ -769,8 +769,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         childRefs = src.childRefs;
         src.childRefs = null;
         
-        // childRefs = new Reference[slotsOnPage];
-        
         // childLocks = src.childLocks; src.childLocks = null;
 
         for (int i = 0; i < slotsOnPage; i++) {
