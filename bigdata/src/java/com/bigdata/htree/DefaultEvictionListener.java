@@ -28,8 +28,6 @@ package com.bigdata.htree;
 
 import org.apache.log4j.Logger;
 
-import sun.util.logging.resources.logging;
-
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.cache.IHardReferenceQueue;

@@ -10,9 +10,6 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
 import com.bigdata.htree.AbstractHTree.ChildMemoizer;
 import com.bigdata.htree.AbstractHTree.LoadChildRequest;
@@ -87,25 +84,25 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final int slotsOnPage = 1 << htree.addressBits;
 		int start = 0;
 		for (int s = 0; s < slotsOnPage; s++) {
-			if (bucketPage == getChild(s)) {
+			if (bucketPage.self == childRefs[s]) {
 				start = s;
 				break;
 			}
 		}
 		int last = start;
 		for (int s = start + 1; s < slotsOnPage; s++) {
-			if (bucketPage == getChild(s)) {
+            if (bucketPage.self == childRefs[s]) {
 				last++;
 			} else {
 				break;
 			}
 		}
-		final int orig = last - start + 1;
+		final int npointers = last - start + 1;
 
-		assert orig > 1;
-		assert orig % 2 == 0;
+		assert npointers > 1;
+		assert npointers % 2 == 0;
 
-		final int crefs = orig >> 1; // half references for each new child
+		final int crefs = npointers >> 1; // half references for each new child
 
 		final BucketPage a = new BucketPage((HTree) htree,
 				bucketPage.globalDepth + 1);
@@ -116,7 +113,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final BucketPage b = new BucketPage((HTree) htree,
 				bucketPage.globalDepth + 1);
 		b.parent = (Reference<DirectoryPage>) self;
-		for (int s = start + crefs; s < start + orig; s++) {
+		for (int s = start + crefs; s <= last; s++) {
 			childRefs[s] = (Reference<AbstractPage>) b.self;
 		}
 
@@ -177,6 +174,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		if (childRefs == null)
 			throw new IllegalStateException("childRefs must not be NULL");
 
+		boolean found = false;
 		for (int i = 0; i < slotsPerPage; i++) {
 
 			if (childRefs[i] == child.self) {
@@ -184,7 +182,14 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 				((MutableDirectoryPageData) data).childAddr[i] = child
 						.getIdentity();
 
-			}
+                found = true;
+
+            } else if (found) {
+
+                // no more pointers to that child.
+                break;
+                
+            }
 
 		}
 
@@ -240,8 +245,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
              * synchronization will never be contended for the mutable B+Tree.
              */
 
-			if (index >= childRefs.length) // TODO debug point - remove.
-				throw new IndexOutOfBoundsException();
+//			if (index >= childRefs.length) // TODO debug point - remove.
+//				throw new IndexOutOfBoundsException();
         	
             final Reference<AbstractPage> childRef = childRefs[index];
 
@@ -626,6 +631,13 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		return data.isLeaf();
 	}
 
+    /**
+     * The result depends on the backing {@link IDirectoryData} implementation.
+     * The {@link DirectoryPage} will be mutable when it is first created and is
+     * made immutable when it is persisted. If there is a mutation operation,
+     * the backing {@link IDirectoryData} is automatically converted into a
+     * mutable instance.
+     */
 	public boolean isReadOnly() {
 		return data.isReadOnly();
 	}
@@ -1528,10 +1540,13 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		// Scan for location in weak references.
 		int npointers = 0;
+		boolean found = false;
 		for (int i = 0; i < slotsOnPage; i++) {
 
             if (data.childAddr[i] == oldChildAddr) {
 
+                found = true;
+                
                 // remove from cache and free the oldChildAddr if the Strategy
                 // supports it.
                 // TODO keep this in case we add in the store cache again.
@@ -1560,6 +1575,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
                 newChild.parent = (Reference) this.self;
 
                 npointers++;
+                
+            } else if (found) {
+
+                // No more pointers to that child.
+                break;
+                
             }
 
         }
