@@ -105,12 +105,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 */
 	ILeafData data;
 
-	/**
-	 * Field enabling a BucketPage to store a different number of slots than
-	 * a DirectoryPage.
-	 */
-	int m_slotsOnPage;
-
 	public AbstractFixedByteArrayBuffer data() {
 		return data.data();
 	}
@@ -262,8 +256,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				src.data) : src.data;
 
         // clear reference on source.
-		// MGC - not sure this is correct since it is caled from copyOnWrite to ensure src is not modified
-        // src.data = null;
+        src.data = null;
 
 //        /*
 //         * Steal/copy the keys.
