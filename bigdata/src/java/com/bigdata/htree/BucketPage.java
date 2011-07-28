@@ -1345,10 +1345,12 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 	}
 
+	@Override
 	int activeBucketPages() {
 		return 1;
 	}
 
+	@Override
 	int activeDirectoryPages() {
 		return 0;
 	}

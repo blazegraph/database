@@ -460,8 +460,6 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 		}
 
-		// remove from eviction list
-		
 		deleted = true;
 
 	}
