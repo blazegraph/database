@@ -758,8 +758,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         assert this.data != null;
 
         // clear reference on source.
-        // not sure this is right since called from copyOnWrite
-        // src.data = null;
+        src.data = null;
 
         /*
          * Steal strongly reachable unmodified children by setting their parent
@@ -767,19 +766,14 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
          * used by its previous ancestor (our source node for this copy).
          */
 
-        
-        // MGC - shouldn't this really be a clone of the childRefs?
-        // We are copying on write to avoid updating the src
         childRefs = src.childRefs;
         src.childRefs = null;
         
         // childRefs = new Reference[slotsOnPage];
         
-
         // childLocks = src.childLocks; src.childLocks = null;
 
         for (int i = 0; i < slotsOnPage; i++) {
-        	// childRefs[i] = src.childRefs[i];
         	
             final AbstractPage child = childRefs[i] == null ? null
                     : childRefs[i].get();
@@ -1512,7 +1506,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		final int pl = getPrefixLength();
 		final int hbits = getLocalHashCode(key, pl);
-		AbstractPage cp = getChild(hbits).copyOnWrite();
+		AbstractPage cp = getChild(hbits); // removed eager copyOnWrite()
 
 		cp.insertRawTuple(key, val, getChildBuddy(hbits));
 	}
@@ -1566,7 +1560,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		for (int i = 0; i < slotsOnPage; i++) {
 
             if (data.childAddr[i] == oldChildAddr) {
-
 
                 // remove from cache and free the oldChildAddr if the Strategy
                 // supports it.
