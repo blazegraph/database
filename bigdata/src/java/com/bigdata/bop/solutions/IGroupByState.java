@@ -78,6 +78,24 @@ public interface IGroupByState {
     public IConstraint[] getHavingClause();
 
     /**
+     * Variables for which we will need column projections. For example, given
+     * <code>SELECT SUM(DISTINCT ?x), SUM(?y)</code>, this would report
+     * <code>{?x,?y}</code>. The variables will be reported in the order they
+     * were encountered during a left-to-right scan of the SELECT expressions
+     * followed by a left-to-right scan of the HAVING constraints.
+     */
+    public LinkedHashSet<IVariable<?>> getColumnVars();
+
+//    /**
+//     * Variables for which we will need column projections of the distinct
+//     * values. For example, given <code>SELECT SUM(DISTINCT ?x), SUM(?y)</code>,
+//     * this would report <code>{?x}</code>. The variables will be reported in
+//     * the order they were encountered during a left-to-right scan of the SELECT
+//     * expressions followed by a left-to-right scan of the HAVING constraints.
+//     */
+//    public LinkedHashSet<IVariable<?>> getDistinctColumnVars();
+
+    /**
      * <code>true</code> iff any aggregate functions will be applied to the
      * DISTINCT values arising from their inner value expression in either the
      * SELECT or HAVING clause. When <code>false</code> certain optimizations

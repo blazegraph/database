@@ -42,7 +42,6 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -64,7 +63,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
         /**
          * The compare operator, which is a {@link CompareOp} enum value.
          */
-        String OP = (CompareBOp.class.getName() + ".op").intern();
+        String OP = CompareBOp.class.getName() + ".op";
 
     }
 
@@ -106,8 +105,10 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	return (CompareOp) getRequiredProperty(Annotations.OP);
     }
 
-    public static boolean compare(CompareOp op,IV left, IV right){
-    	if (left.isStatement() || right.isStatement()) {
+    public static boolean compare(final CompareOp op, final IV left,
+            final IV right) {
+
+        if (left.isStatement() || right.isStatement()) {
     		
     		throw new SparqlTypeErrorException();
     		

@@ -28,12 +28,15 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
  * Operator computes the number of non-null values over the presented binding
@@ -41,12 +44,9 @@ import com.bigdata.rdf.internal.XSDLongIV;
  * 
  * @author thompsonbry
  * 
- *         FIXME The application of COUNT(*) must explicitly recognize the
- *         special variable <code>*</code>
- * 
- * @deprecated I am not convinced that a concrete operator can be implemented in
- *             this manner rather than by a tight integration with the GROUP_BY
- *             operator implementation.
+ *         FIXME COUNT(*) is a special case. Per SPARQL 1.1, <i>when COUNT is
+ *         used with the expression the value of F will be the cardinality of
+ *         the group solution sequence</i>.
  */
 public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
@@ -72,40 +72,59 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 	 * <p>
 	 * Note: This field is guarded by the monitor on the {@link COUNT} instance.
 	 */
-	private transient long aggregated = 0L;
+    private transient long aggregated = 0L;
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * Note: COUNT() returns ZERO if there are no non-error solutions presented.
-	 * This assumes that the ZERO will be an xsd:long.
-	 */
-	synchronized
-	public IV get(final IBindingSet bindingSet) {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: COUNT() returns ZERO if there are no non-error solutions presented.
+     * This assumes that the ZERO will be an xsd:long.
+     */
+    synchronized public IV get(final IBindingSet bindingSet) {
 
-		final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IVariable<IV> var = (IVariable<IV>) get(0);
 
-		final IV val = (IV) bindingSet.get(var);
+        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
-		if (val != null) {
+        if (val != null) {
 
-			// aggregate non-null values.
-			aggregated++;
+            // aggregate non-null values.
+            aggregated++;
 
-		}
+        }
 
-		return new XSDLongIV(aggregated);
+        // No intermediate value is returned to minimize churn.
+        return null;
 
-	}
+    }
 
-//	/**
-//	 * Overridden to allow <code>COUNT(*)</code>. 
-//	 */
-//	@Override
-//	final public boolean isWildcardAllowed() {
-//
-//		return true;
-//		
-//	}
+    synchronized public void reset() {
+        aggregated = 0L;
+    }
+
+    synchronized public IV done() {
+        return new XSDLongIV(aggregated);
+    }
+
+    /**
+     * COUNT does not need to actually see the materialized values, or even the
+     * IVs. COUNT(DISTINCT) does need to see the IVs, but they still do not need
+     * to be materialized.
+     */
+    public Requirement getRequirement() {
+
+        return INeedsMaterialization.Requirement.NEVER;
+
+    }
+
+    // /**
+    // * Overridden to allow <code>COUNT(*)</code>.
+    // */
+    // @Override
+    // final public boolean isWildcardAllowed() {
+    //
+    // return true;
+    //
+    // }
 
 }

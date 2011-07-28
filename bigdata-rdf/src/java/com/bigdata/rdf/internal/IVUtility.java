@@ -291,6 +291,53 @@ public class IVUtility {
 		
 	}
     
+    public static final IV numericalMath(final Literal l1, final IV iv2, 
+            final MathOp op) {
+        
+        final URI dt1 = l1.getDatatype();
+    
+        // Only numeric value can be used in math expressions
+        if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1)) {
+            throw new IllegalArgumentException("Not a number: " + l1);
+        }
+    
+        if (!iv2.isInline())
+            throw new IllegalArgumentException(
+                    "right term is not inline: left=" + l1 + ", right=" + iv2);
+        
+        if (!iv2.isLiteral())
+            throw new IllegalArgumentException(
+                    "right term is not literal: left=" + l1 + ", right=" + iv2);
+
+        final DTE dte2 = iv2.getDTE();
+
+        if (!dte2.isNumeric())
+            throw new IllegalArgumentException(
+                    "right term is not numeric: left=" + l1 + ", right=" + iv2);
+
+        final AbstractLiteralIV<BigdataLiteral, ?> num2 = (AbstractLiteralIV<BigdataLiteral, ?>) iv2;
+        
+        // Determine most specific datatype that the arguments have in common,
+        // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
+        // per the SPARQL/XPATH spec
+
+        if (dte2 == DTE.XSDDouble || dt1.equals(XMLSchema.DOUBLE)) {
+            return numericalMath(l1.doubleValue(), num2.doubleValue(), op);
+        } else if (dte2 == DTE.XSDFloat || dt1.equals(XMLSchema.FLOAT)) {
+            return numericalMath(l1.floatValue(), num2.floatValue(), op);
+        } else if (dte2 == DTE.XSDDecimal || dt1.equals(XMLSchema.DECIMAL)) {
+            return numericalMath(l1.decimalValue(), num2.decimalValue(), op);
+        } else if (op == MathOp.DIVIDE) {
+            // Result of integer divide is decimal and requires the arguments to
+            // be handled as such, see for details:
+            // http://www.w3.org/TR/xpath-functions/#func-numeric-divide
+            return numericalMath(l1.decimalValue(), num2.decimalValue(), op);
+        } else {
+            return numericalMath(l1.integerValue(), num2.integerValue(), op);
+        }
+
+    }
+    
     public static final IV numericalMath(final IV iv1, final IV iv2, 
     		final MathOp op) {
     	

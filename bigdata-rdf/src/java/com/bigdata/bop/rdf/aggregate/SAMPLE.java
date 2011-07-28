@@ -32,8 +32,9 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.bop.aggregate.AggregateBase.FunctionCode;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
  * Operator reports an arbitrary value from presented binding sets for the given
@@ -41,52 +42,65 @@ import com.bigdata.rdf.internal.IV;
  * available.
  * 
  * @author thompsonbry
- * 
- * @deprecated I am not convinced that a concrete operator can be implemented in
- *             this manner rather than by a tight integration with the GROUP_BY
- *             operator implementation.
  */
 public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 
-	/**
+    /**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public SAMPLE(BOpBase op) {
-		super(op);
-	}
+    public SAMPLE(BOpBase op) {
+        super(op);
+    }
 
-	public SAMPLE(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
+    public SAMPLE(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
+    }
 
-	public SAMPLE(boolean distinct, IValueExpression<IV> expr) {
-		super(FunctionCode.SAMPLE,distinct, expr);
-	}
-	
-	/**
-	 * The sampled value and initially <code>null</code>.
-	 * <p>
-	 * Note: This field is guarded by the monitor on the {@link SAMPLE} instance.
-	 */
-	private transient IV sample = null;
-	
-	synchronized
-	public IV get(final IBindingSet bindingSet) {
+    public SAMPLE(boolean distinct, IValueExpression<IV> expr) {
+        super(FunctionCode.SAMPLE, distinct, expr);
+    }
 
-		final IVariable<IV> var = (IVariable<IV>) get(0);
+    /**
+     * The sampled value and initially <code>null</code>.
+     * <p>
+     * Note: This field is guarded by the monitor on the {@link SAMPLE}
+     * instance.
+     */
+    private transient IV sample = null;
 
-		final IV val = (IV) bindingSet.get(var);
+    synchronized public IV get(final IBindingSet bindingSet) {
 
-		if (val != null) {
+        final IVariable<IV> var = (IVariable<IV>) get(0);
 
-			sample = val;
+        final IV val = (IV) bindingSet.get(var);
 
-		}
+        if (val != null) {
 
-		return sample;
+            sample = val;
 
-	}
+        }
+
+        return sample;
+
+    }
+
+    synchronized public void reset() {
+        sample = null;
+    }
+
+    synchronized public IV done() {
+        return sample;
+    }
+
+    /**
+     * We can take a sample without materializing anything.
+     */
+    public Requirement getRequirement() {
+
+        return INeedsMaterialization.Requirement.NEVER;
+
+    }
 
 }

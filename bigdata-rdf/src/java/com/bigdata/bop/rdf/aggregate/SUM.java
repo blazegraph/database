@@ -23,12 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.rdf.aggregate;
 
-import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
@@ -42,10 +42,8 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.util.InnerCause;
 
@@ -85,14 +83,21 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
      * <p>
      * Note: This field is guarded by the monitor on the {@link SUM} instance.
      */
-	private transient IV aggregated = new XSDIntIV<BigdataLiteral>(0);
-	
-	synchronized
-	public IV get(final IBindingSet bindingSet) {
+    private transient IV aggregated = ZERO;
 
-		final IVariable<IV> var = (IVariable<IV>) get(0);
+    synchronized public void reset() {
+        aggregated = ZERO;
+    }
 
-		final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
+    synchronized public IV done() {
+        return aggregated;
+    }
+
+    synchronized public IV get(final IBindingSet bindingSet) {
+
+        final IVariable<IV> var = (IVariable<IV>) get(0);
+
+        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
         try {
 
@@ -109,38 +114,33 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
                 if (iv.isInline()) {
 
+                    // Two IVs.
                     aggregated = IVUtility.numericalMath(iv, aggregated,
                             MathOp.PLUS);
 
                 } else {
 
-                    /*
-                     * FIXME For this code path, write a version of
-                     * IVUtility.numericalMath() which accepts one inline
-                     * numeric IV and one BigdataLiteral (materialized value)
-                     * and then does the type promotion. Because the type
-                     * promotion rules are so simple, we will always wind up
-                     * with an inline numeric IV.
-                     */
+                    // One IV and one Literal.
                     final BigdataValue val1 = iv.getValue();
 
-                    final BigdataValue val2 = aggregated.getValue();
-
-                    if (val1 == null || val2 == null)
+                    if (val1 == null)
                         throw new NotMaterializedException();
 
-                    if (!(val1 instanceof Literal)
-                            || !(val2 instanceof Literal)) {
+                    if (!(val1 instanceof Literal))
                         throw new SparqlTypeErrorException();
-                    }
 
-                    aggregated = IVUtility.literalMath((Literal) val1,
-                            (Literal) val2, MathOp.PLUS);
+                    // Only numeric value can be used in math expressions
+                    final URI dt1 = ((Literal)val1).getDatatype();
+                    if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
+                        throw new SparqlTypeErrorException();
+
+                    aggregated = IVUtility.numericalMath((Literal) val1,
+                            aggregated, MathOp.PLUS);
 
                 }
 
             }
-            
+
             return aggregated;
 
         } catch (Throwable t) {
@@ -160,41 +160,19 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
         }
 
-	}
+    }
 
     /**
-     * Note: {@link SUM} can work on inline numerics. It is only when the
-     * operands evaluate to non-inline numerics that this bop needs
-     * materialization, and that can only happen (today) with an xsd unsigned
-     * datatype (we would reject non-numeric datatypes with a type error).
+     * Note: {@link SUM} only works on numerics. If they are inline, then that
+     * is great. Otherwise it will handle a materialized numeric literal and do
+     * type promotion, which always results in a signed inline number IV and
+     * then operate on that.
      * 
      * FIXME MikeP: What is the right return value here?
-     * 
-     * TODO Write unit tests for SUM for xsd inline {@link IV}s as well as
-     * materialized {@link BigdataLiteral}s.
      */
     public Requirement getRequirement() {
-        
+
         return INeedsMaterialization.Requirement.ALWAYS;
-        
-    }
-    
-    private volatile transient Set<IVariable<IV>> terms;
-    
-    public Set<IVariable<IV>> getTermsToMaterialize() {
-    
-        if (terms == null) {
-
-            final IValueExpression<IV> e = getExpression();
-
-            if (e instanceof IVariable<?>)
-                terms = Collections.singleton((IVariable<IV>) e);
-            else
-                terms = Collections.emptySet();
-
-        }
-
-        return terms;
 
     }
 

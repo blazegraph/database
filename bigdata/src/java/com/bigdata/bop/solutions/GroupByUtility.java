@@ -48,7 +48,8 @@ import com.bigdata.bop.aggregate.IAggregate;
  * 
  * @author thompsonbry
  * 
- * @deprecated by {@link IGroupByState} and {@link GroupByState}.
+ * @deprecated by {@link IGroupByState} and {@link GroupByState} BUT the rewrite
+ *             logic in this class should probably be preserved.
  */
 public class GroupByUtility {
 
