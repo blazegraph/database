@@ -105,6 +105,12 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 */
 	ILeafData data;
 
+	/**
+	 * Field enabling a BucketPage to store a different number of slots than
+	 * a DirectoryPage.
+	 */
+	int m_slotsOnPage;
+
 	public AbstractFixedByteArrayBuffer data() {
 		return data.data();
 	}
@@ -205,9 +211,9 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	BucketPage(final HTree htree, final int globalDepth) {
 
 		super(htree, true/* dirty */, globalDepth);
-
+		
 		data = new MutableBucketData(//
-				slotsOnPage(), // fan-out
+				htree.bucketSlots, // fan-out
 				htree.versionTimestamps,//
 				htree.deleteMarkers,//
 				htree.rawRecords//
@@ -388,7 +394,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * @return number of slots available in this BucketPage
 	 */
 	final int slotsOnPage() {
-		return 64;
+		return htree.bucketSlots;
 		// return 1 << htree.addressBits;
 	}
 
@@ -746,7 +752,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				keys.nkeys++;
 				keys.keys[i] = key;
 				vals.nvalues++;
-				vals.values[i] = srcPage.getKeys().get(srcSlot); // Note: DOES
+				vals.values[i] = srcPage.getValues().get(srcSlot); // Note: DOES
 																	// NOT
 																	// Materialize
 																	// a raw
@@ -1214,18 +1220,19 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		}
 
 		// unable to insert
-		if (false || globalDepth == htree.addressBits) {
+		final DirectoryPage np;
+		if (globalDepth == htree.addressBits) {
 			// max depth so add level
-			DirectoryPage np = ((HTree) htree).addLevel2(this);
-
-			np.insertRawTuple(key, val, 0);
+			np = ((HTree) htree).addLevel2(this);
 		} else {
 			// otherwise split page by asking parent to split and re-inserting
 			// values
 
-			final DirectoryPage parent = getParentDirectory();
-			parent.split(this);
+			np = getParentDirectory();
+			np.split(this); // will re-insert tuples from original page
 		}
+		
+		np.insertRawTuple(key, val, 0);
 	}
 
 	private void setValue(final int entryIndex, final byte[] newval) {
