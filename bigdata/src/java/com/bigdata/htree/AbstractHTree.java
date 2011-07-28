@@ -299,6 +299,14 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 	 * divided up among one or more buddy hash tables on that page.
 	 */
     protected final int addressBits;
+    
+    /**
+     * The #of bucket slots in a bucket page. There is a case for allowing the number of
+     * bucket slots to be different than the number of directory page slots (as determined
+     * by the number of addressBits) since the storage requirements for bucket 
+     * values/keys is not set.
+     */
+    protected final int bucketSlots;
 
 //	/**
 //	 * The #of entries in a directory bucket, which is 2^{@link #addressBits}
@@ -1094,6 +1102,11 @@ abstract public class AbstractHTree implements ICounterSetAccess {
              */
             throw new IllegalArgumentException();
         }
+        
+        /**
+         * FIXME: add bucketSlots to IndexMataData
+         */
+        this.bucketSlots = 1 << addressBits;
 
 //        /*
 //         * The Memoizer is not used by the mutable B+Tree since it is not safe

@@ -1357,6 +1357,125 @@ public class HTree extends AbstractHTree
 
 	} // insert()
 	
+	/**
+	 * Insert a tuple into the hash tree. Tuples with duplicate keys and even
+	 * tuples with duplicate keys and values are allowed and will result in
+	 * multiple tuples.
+	 * 
+	 * @param src
+	 *            The source {@link BucketPage} src
+	 * @param slot
+	 *            The slot in the source {@link BucketPage} whose tuple will be
+	 *            inserted (really copied).
+	 */
+	private void insertRawTuple(final BucketPage src, final int slot) {
+
+		if (src == null)
+			throw new IllegalArgumentException();
+
+		if (slot < 0 || slot >= (1 << addressBits)) // [0:slotsPerPage].
+			throw new IllegalArgumentException();
+
+		// the key to insert
+		final byte[] key = src.getKeys().get(slot);
+		
+		if (key == null)
+			throw new IllegalArgumentException();
+		
+		if (log.isInfoEnabled())
+			log.info("key=" + BytesUtil.toString(key));
+
+		// the current directory page.
+		DirectoryPage current = getRoot(); // start at the root.
+		
+		// #of prefix bits already consumed.
+		int prefixLength = 0;// prefix length of the root is always zero.
+		
+		// buddyOffset into [current].
+		int buddyOffset = 0; // buddyOffset of the root is always zero.
+		
+		while (true) {
+
+			// skip prefixLength bits and then extract globalDepth bits. 
+		    final int hashBits = current.getLocalHashCode(key, prefixLength);
+			
+			// find the child directory page or bucket page.
+			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+			
+			if (child.isLeaf()) {
+
+				/*
+				 * Found the bucket page, update it.
+				 */
+
+			    final BucketPage bucketPage = (BucketPage) child;
+				
+				// Attempt to insert the tuple into the bucket.
+				if (!bucketPage.insertRawTuple(src, slot, key)) {//, buddyOffset)) {
+
+					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
+					
+					if (current.globalDepth == child.globalDepth) {
+
+                        /*
+                         * There is only one buddy hash bucket on the page.
+                         * Either we can split a directory page which is a
+                         * parent of that bucket or we have to add a new level
+                         * below the root on the path to that bucket.
+                         */
+
+						if (child.globalDepth == addressBits) {
+
+							addLevel2(bucketPage); // add a level.
+
+							insertRawTuple(src, slot); // try again
+							return;
+
+                        } else {
+
+                            splitDirectoryPage(
+                                    current.getParentDirectory()/* parent */,
+                                    buddyOffset, current/* oldChild */);
+                            throw new UnsupportedOperationException();
+
+					    }
+
+					}
+
+					// globalDepth >= localDepth
+					splitBucketsOnPage(current, buddyOffset, bucketPage);
+					
+					// Try again. The children have changed.
+					continue;
+		
+				}
+				
+				return;
+				
+			}
+
+			/*
+			 * Recursive descent into a child directory page. We have to update
+			 * the prefixLength and compute the offset of the buddy hash table
+			 * within the child before descending into the child.
+			 */
+			
+			// increase prefix length by the #of address bits consumed by the
+			// buddy hash table in the current directory page as we descend.
+			prefixLength = prefixLength + current.globalDepth;
+			
+			// find the offset of the buddy hash table in the child.
+			buddyOffset = HTreeUtil
+					.getBuddyOffset(hashBits, current.globalDepth,
+							child.globalDepth/* localDepthOfChild */);
+			
+			// update current so we can search in the child.
+			current = (DirectoryPage) child;
+			
+		}
+
+	} // insertRawTuple()
+
 	public byte[] remove(final byte[] key) {
 		// TODO Remove 1st match, returning value.
 		throw new UnsupportedOperationException();
@@ -1907,8 +2026,8 @@ public class HTree extends AbstractHTree
 		 * keys).
 		 */
 		// reindexTuples(oldPage, a, b);
-		final IRaba okeys = oldPage.getKeys();
-		final IRaba ovals = oldPage.getValues();
+		//final IRaba okeys = oldPage.getKeys();
+		//final IRaba ovals = oldPage.getValues();
 		for (int i = 0; i < bucketSlotsPerPage; i++) {
 
 			/*
@@ -1919,7 +2038,10 @@ public class HTree extends AbstractHTree
 			 * (heap churn).
 			 */
 //			if (okeys.get(i) != null)
-				newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
+			
+			// FIXME MGC ensure meta-data copied
+			insertRawTuple(oldPage, i);
+			//newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
 
 		}
 		

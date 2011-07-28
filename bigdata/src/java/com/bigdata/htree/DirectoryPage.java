@@ -245,11 +245,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
              * for this case.
              */
 
-            final AbstractPage child = _getChild(index, null/* req */);
-
-    		htree.touch(child);
-    		
-            return child;
+            return _getChild(index, null/* req */);
             
         }
 
@@ -774,15 +770,16 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         
         // MGC - shouldn't this really be a clone of the childRefs?
         // We are copying on write to avoid updating the src
-        // childRefs = src.childRefs;
-        // src.childRefs = null;
-        childRefs = new Reference[slotsOnPage];
+        childRefs = src.childRefs;
+        src.childRefs = null;
+        
+        // childRefs = new Reference[slotsOnPage];
         
 
         // childLocks = src.childLocks; src.childLocks = null;
 
         for (int i = 0; i < slotsOnPage; i++) {
-        	childRefs[i] = src.childRefs[i];
+        	// childRefs[i] = src.childRefs[i];
         	
             final AbstractPage child = childRefs[i] == null ? null
                     : childRefs[i].get();
@@ -1514,7 +1511,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		assert buddy == 0;
 
 		final int pl = getPrefixLength();
-		final int hbits = BytesUtil.getBits(key, pl, htree.addressBits);
+		final int hbits = getLocalHashCode(key, pl);
 		AbstractPage cp = getChild(hbits).copyOnWrite();
 
 		cp.insertRawTuple(key, val, getChildBuddy(hbits));

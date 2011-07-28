@@ -197,6 +197,9 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	 * <i>prefixLength</i> to be ignored, the <i>globalDepth</i> of this
 	 * directory page, and the key.
 	 * 
+	 * If the key does not have enough bits (to retrieve globalDepth bits at
+	 * prefixLength) then assume the equivalent of a zero-filled extension.
+	 * 
 	 * @param key
 	 *            The key.
 	 * @param prefixLength
@@ -210,8 +213,20 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 	 * @return The int32 value containing the relevant bits from the key.
 	 */
 	public int getLocalHashCode(final byte[] key, final int prefixLength) {
+		if (key == null)
+			throw new IllegalArgumentException("Key cannot be null");
+		
+		// handle request for bits from offset > than available by returning zero
+		final int maxbits = key.length * 8;
 
-		return BytesUtil.getBits(key, prefixLength, globalDepth);
+		if (prefixLength >= maxbits)
+			return 0;
+		
+		// if bit range outside available then adjust appropriately
+		if (prefixLength + globalDepth > maxbits)
+			return BytesUtil.getBits(key, prefixLength, maxbits - prefixLength);
+		else	
+			return BytesUtil.getBits(key, prefixLength, globalDepth);
 
 	}
 
@@ -445,6 +460,8 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 		}
 
+		// remove from eviction list
+		
 		deleted = true;
 
 	}
