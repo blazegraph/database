@@ -64,11 +64,10 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates;
+import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
@@ -380,13 +379,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //        }
 
         /**
-         * Called by the thread which atomically sets the
-         * {@link AbstractNode#childRefs} element to the computed
-         * {@link AbstractNode}. At that point a reference exists to the child
-         * on the parent.
+         * Called by the thread which atomically sets the {@link Node#childRefs}
+         * element to the computed {@link AbstractNode}. At that point a
+         * reference exists to the child on the parent.
          * 
          * @param req
-         *            The requst.
+         *            The request.
          */
         void removeFromCache(final LoadChildRequest req) {
 
