@@ -37,6 +37,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
  * Operator combines the string values over the presented binding sets for the
@@ -44,81 +46,137 @@ import com.bigdata.bop.aggregate.IAggregate;
  * plain literal.
  * 
  * @author thompsonbry
- * 
- *         FIXME This must only operate on variables which are known to be
- *         materialized RDF Values.
- * 
- * @deprecated I am not convinced that a concrete operator can be implemented in
- *             this manner rather than by a tight integration with the GROUP_BY
- *             operator implementation.
  */
-public class GROUP_CONCAT extends AggregateBase<Literal> implements IAggregate<Literal> {
+public class GROUP_CONCAT extends AggregateBase<Literal> implements
+        IAggregate<Literal> {
 
-	/**
+    /**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public interface Annotations extends AggregateBase.Annotations {
+    public interface Annotations extends AggregateBase.Annotations {
 
-		/**
-		 * Required string property provides the separator used when combining
-		 * the {@link IValueExpression} computed for each solution within the
-		 * group.
-		 */
-		String SEPARATOR = (AggregateBase.class.getName()+".separator").intern();
+        /**
+         * Required string property provides the separator used when combining
+         * the {@link IValueExpression} computed for each solution within the
+         * group.
+         */
+        String SEPARATOR = GROUP_CONCAT.class.getName() + ".separator";
 
-	}
-	
-	public GROUP_CONCAT(BOpBase op) {
-		super(op);
-	}
+        /**
+         * The maximum #of values to concatenate.
+         */
+        String LIMIT = GROUP_CONCAT.class.getName() + ".limit";
 
-	public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
+    }
 
-	/**
-	 * 
-	 * @param var
-	 *            The variable whose values will be combined.
-	 * @param sep
-	 *            The separator string.
-	 */
-	public GROUP_CONCAT(final boolean distinct,
-			final IValueExpression<Literal> expr, final IConstant<String> sep) {
-		this(new BOp[] { expr }, NV.asMap(//
-				new NV(Annotations.FUNCTION_CODE,FunctionCode.GROUP_CONCAT),//
-				new NV(Annotations.DISTINCT, distinct),//
-				new NV(Annotations.SEPARATOR, sep)//
-				));
-	}
-	
-	/**
-	 * The running concatenation of observed bound values.
-	 * <p>
-	 * Note: This field is guarded by the monitor on the {@link GROUP_CONCAT}
-	 * instance.
-	 */
-	private transient Literal aggregated = new LiteralImpl("");
-	
-	synchronized public Literal get(final IBindingSet bindingSet) {
+    public GROUP_CONCAT(BOpBase op) {
+        super(op);
+    }
 
-		final IVariable<Literal> var = (IVariable<Literal>) get(0);
+    public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
+    }
 
-		final Literal val = (Literal) bindingSet.get(var);
+    /**
+     * 
+     * @param var
+     *            The variable whose values will be combined.
+     * @param sep
+     *            The separator string.
+     */
+    public GROUP_CONCAT(final boolean distinct,
+            final IValueExpression<Literal> expr, final IConstant<String> sep) {
+        this(new BOp[] { expr }, NV.asMap(//
+                new NV(Annotations.FUNCTION_CODE, FunctionCode.GROUP_CONCAT),//
+                new NV(Annotations.DISTINCT, distinct),//
+                new NV(Annotations.SEPARATOR, sep)//
+                ));
+    }
 
-		if (val != null) {
+    private String sep() {
+        if (sep == null) {
+            sep = (String) getRequiredProperty(Annotations.SEPARATOR);
+        }
+        return sep;
+    }
 
-			final IConstant<String> sep = (IConstant<String>) get(1);
+    private transient String sep;
 
-			aggregated = new LiteralImpl(aggregated.getLabel() + sep.get()
-					+ val.stringValue());
+    private long limit() {
+        if (limit == 0) {
+            limit = getProperty(Annotations.LIMIT, Long.MAX_VALUE);
+        }
+        return limit;
+    }
 
-		}
+    private transient long limit;
 
-		return aggregated;
+    /**
+     * The running concatenation of observed bound values.
+     * <p>
+     * Note: This field is guarded by the monitor on the {@link GROUP_CONCAT}
+     * instance.
+     */
+    private transient StringBuilder aggregated = null;
 
-	}
+    /**
+     * The #of values in {@link #aggregated}.
+     * <p>
+     * Note: This field is guarded by the monitor on the {@link GROUP_CONCAT}
+     * instance.
+     */
+    private transient long nvalues = 0;
+
+    synchronized public void reset() {
+
+        aggregated = null;
+
+        nvalues = 0;
+
+    }
+
+    synchronized public Literal done() {
+
+        if (aggregated == null)
+            return EMPTY_LITERAL;
+
+        return new LiteralImpl(aggregated.toString());
+
+    }
+
+    synchronized public Literal get(final IBindingSet bindingSet) {
+
+        final IVariable<Literal> var = (IVariable<Literal>) get(0);
+
+        final Literal val = (Literal) bindingSet.get(var);
+
+        if (val != null && nvalues < limit()) {
+
+            if (aggregated == null)
+                aggregated = new StringBuilder(val.stringValue());
+            else {
+                aggregated.append(sep());
+                aggregated.append(val.stringValue());
+            }
+
+            nvalues++;
+
+        }
+
+        // Note: Nothing returned until done().
+        return null;
+
+    }
+
+    /**
+     * We always need to have the materialized values.
+     */
+    public Requirement getRequirement() {
+
+        return INeedsMaterialization.Requirement.ALWAYS;
+
+    }
 
 }

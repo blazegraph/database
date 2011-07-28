@@ -62,6 +62,8 @@ public class GroupByState implements IGroupByState {
     private final IConstraint[] having;
     private final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
     private final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+    private final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+//    private final LinkedHashSet<IVariable<?>> distinctColumnVars = new LinkedHashSet<IVariable<?>>();
     final private boolean anyDistinct;
     final private boolean selectDependency;
     final private boolean simpleHaving;
@@ -85,6 +87,14 @@ public class GroupByState implements IGroupByState {
     public IConstraint[] getHavingClause() {
         return having;
     }
+
+    public LinkedHashSet<IVariable<?>> getColumnVars() {
+        return columnVars;
+    }
+
+//    public LinkedHashSet<IVariable<?>> getDistinctColumnVars() {
+//        return distinctColumnVars;
+//    }
 
     public boolean isAnyDistinct() {
         return anyDistinct;
@@ -377,9 +387,21 @@ public class GroupByState implements IGroupByState {
             if (t instanceof IConstant)
                 continue;
             if (t instanceof IVariable<?>) {
-                if(aggregationContext)
-                    continue;
                 final IVariable<?> v = (IVariable<?>) t;
+                if (aggregationContext) {
+                    /*
+                     * Decide if a variable appearing in within an aggregation
+                     * context is a reference to a previously observed
+                     * aggregate. If not, then we presume it to be a variable in
+                     * the detail records and aggregation will (at least logically)
+                     * form a column projection of that variable for each group.
+                     */
+                    if (!groupByVars.contains(v) && !selectVars.contains(v)) {
+                        columnVars.add(v);
+                        continue;
+                    }
+                    continue;
+                }
                 if (groupByVars.contains(v)) {
                     isAggregate = true;
                     continue;

@@ -1,14 +1,23 @@
 package com.bigdata.bop.aggregate;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+
+import org.openrdf.model.Literal;
+import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Abstract base class for aggregate functions.
@@ -17,7 +26,7 @@ import com.bigdata.bop.Var;
  *
  * @param <E>
  */
-public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
+abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
 
 	/**
 	 * 
@@ -99,18 +108,18 @@ public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
 	
 	public interface Annotations extends ImmutableBOp.Annotations {
 
-		/**
-		 * The aggregate function identifier ({@link FunctionCode#COUNT},
-		 * {@link FunctionCode#SUM}, etc).
-		 */
-		String FUNCTION_CODE = (AggregateBase.class.getName() + ".functionCode").intern();
-		
-		/**
-		 * Optional boolean property indicates whether the aggregate applies to
-		 * the distinct within group solutions (default
-		 * {@value #DEFAULT_DISTINCT}).
-		 */
-		String DISTINCT = (AggregateBase.class.getName() + ".distinct").intern();
+        /**
+         * The aggregate function identifier ({@link FunctionCode#COUNT},
+         * {@link FunctionCode#SUM}, etc).
+         */
+        String FUNCTION_CODE = AggregateBase.class.getName() + ".functionCode";
+
+        /**
+         * Optional boolean property indicates whether the aggregate applies to
+         * the distinct within group solutions (default
+         * {@value #DEFAULT_DISTINCT}).
+         */
+        String DISTINCT = AggregateBase.class.getName() + ".distinct";
 
 		boolean DEFAULT_DISTINCT = false;
 		
@@ -168,20 +177,25 @@ public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
 
 		return (IValueExpression<E>) get(0);
 
-	}
+    }
 
-	public boolean isWildcard() {
+    public boolean isWildcard() {
 
-		return get(0).equals(Var.var("*"));
-		
-	}
+        return get(0).equals(Var.var("*"));
 
-	/**
-	 * Operation is not implemented by this class and must be overridden if the
-	 * {@link AggregateBase} is to be directly evaluated. However, note that the
-	 * computation of aggregate functions is often based on hard coded
-	 * recognition of the appropriate function code.
-	 */
+    }
+
+    /**
+     * Operation is not implemented by this class and must be overridden if the
+     * {@link AggregateBase} is to be directly evaluated. However, note that the
+     * computation of aggregate functions is often based on hard coded
+     * recognition of the appropriate function code.
+     * <p>
+     * Note: DISTINCT is merely carried as a marker on COUNT (and the other
+     * aggregate functions). The application of DISTINCT to the inner expression
+     * to form a column projection is handled by the driving evaluation logic
+     * rather than by {@link #get(IBindingSet)}.
+     */
 	public E get(IBindingSet bset) {
 		throw new UnsupportedOperationException();
 	}
@@ -198,5 +212,30 @@ public class AggregateBase<E> extends ImmutableBOp implements IAggregate<E> {
 		return tmp;
 
 	}
+
+    private volatile transient Set<IVariable<E>> terms;
+
+    final public Set<IVariable<E>> getTermsToMaterialize() {
+
+        if (terms == null) {
+
+            final IValueExpression<E> e = getExpression();
+
+            if (e instanceof IVariable<?>)
+                terms = Collections.singleton((IVariable<E>) e);
+            else
+                terms = Collections.emptySet();
+
+        }
+
+        return terms;
+
+    }
+
+    /** A ZERO. */
+    protected static final transient IV ZERO = new XSDIntIV<BigdataLiteral>(0);
+
+    /** An empty string. */
+    protected static final transient Literal EMPTY_LITERAL = new LiteralImpl("");
 
 }

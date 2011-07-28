@@ -31,7 +31,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.rdf.aggregate.SUM;
 
 /**
  * Unit tests for {@link GroupByUtility}.
@@ -172,8 +172,7 @@ public class TestGroupByUtility extends TestCase2 {
 		 */
 		final IValueExpression<?>[] select = new IValueExpression[] { //
 		new Bind(Var.var("sumi"), //
-				new AggregateBase(AggregateBase.FunctionCode.SUM,
-						false/* distinct */, Var.var("i"))) //
+                new SUM(false/* distinct */, Var.var("i"))) //
 		};
 
 		final IValueExpression<?>[] groupBy = new IValueExpression[] { //
@@ -192,8 +191,7 @@ public class TestGroupByUtility extends TestCase2 {
 		// The aggregate functions computed over the solution groups.
 		expected.aggregateExprs = new IValueExpression[] { //
 				new Bind(Var.var("sumi"), //
-						new AggregateBase(AggregateBase.FunctionCode.SUM,
-								false/* distinct */, Var.var("i"))) //
+                new SUM(false/* distinct */, Var.var("i"))) //
 				};
 		// The variables defining the solution groups.
 		expected.groupByVars = new IVariable[] { Var.var("x") };

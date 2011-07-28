@@ -25,94 +25,143 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.bop.aggregate.AggregateBase.FunctionCode;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.util.InnerCause;
 
 /**
  * Operator reports the minimum observed value over the presented binding sets
  * for the given variable using SPARQL ORDER_BY semantics. Missing values are
  * ignored.
+ * <p>
+ * Note: MIN (and MAX) are defined in terms of the ORDER_BY semantics for
+ * SPARQL. Therefore, this must handle comparisons when the value is not an IV,
+ * e.g., using {@link ValueComparator}.
  * 
  * @author thompsonbry
  * 
- * @todo What is reported if there are no non-null observations?
- * 
- *       FIXME MIN (and MAX) are defined in terms of the ORDER_BY semantics for
- *       SPARQL. Therefore, this must handle comparisons when the value is not
- *       an IV, e.g., using {@link ValueComparator}.
- * 
- * @deprecated I am not convinced that a concrete operator can be implemented in
- *             this manner rather than by a tight integration with the GROUP_BY
- *             operator implementation.
+ *         TODO What is reported if there are no non-null observations?
  */
 public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
-	/**
+    private static final transient Logger log = Logger.getLogger(MIN.class);
+    
+    /**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public MIN(BOpBase op) {
-		super(op);
-	}
+    public MIN(BOpBase op) {
+        super(op);
+    }
 
-	public MIN(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
+    public MIN(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
+    }
 
-	public MIN(boolean distinct, IValueExpression<IV> expr) {
-		super(FunctionCode.MIN,distinct, expr);
-	}
-	
-	/**
-	 * The minimum observed value and initially <code>null</code>.
-	 * <p>
-	 * Note: This field is guarded by the monitor on the {@link MIN} instance.
-	 */
-	private transient IV min = null;
-	
-//	/**
-//	 * The RDF Value comparator.
-//	 */
-//	private final ValueComparator vc = new ValueComparator();
-	
-	synchronized
-	public IV get(final IBindingSet bindingSet) {
+    public MIN(boolean distinct, IValueExpression<IV> expr) {
+        super(FunctionCode.MIN, distinct, expr);
+    }
 
-		final IVariable<IV> var = (IVariable<IV>) get(0);
+    /**
+     * The minimum observed value and initially <code>null</code>.
+     * <p>
+     * Note: This field is guarded by the monitor on the {@link MIN} instance.
+     */
+    private transient IV min = null;
 
-		final IV val = (IV) bindingSet.get(var);
+    synchronized public IV get(final IBindingSet bindingSet) {
 
-		if (val != null) {
+        final IVariable<IV> var = (IVariable<IV>) get(0);
 
-			if(min == null) {
-			
-				min = val;
-				
-			} else {
+        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
-				if (IVUtility.compare(min, val) < 0) {
+        try {
 
-					min = val;
+            if (val != null) {
 
-				}
+                /*
+                 * Aggregate non-null values.
+                 */
 
-			}
+                final IV iv = val.get(bindingSet);
 
-		}
+                if (iv == null)
+                    throw new SparqlTypeErrorException.UnboundVarException();
 
-		return min;
+                if (min == null) {
 
-	}
+                    min = iv;
+
+                } else {
+
+                    if (CompareBOp.compare(CompareOp.LT, iv, min)) {
+
+                        min = iv;
+
+                    }
+
+                }
+                
+            }
+
+            return min;
+
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+
+                // trap the type error and filter out the solution
+                if (log.isInfoEnabled())
+                    log.info("discarding solution due to type error: "
+                            + bindingSet + " : " + t);
+
+                return min;
+
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    synchronized public void reset() {
+        min = null;
+    }
+
+    synchronized public IV done() {
+        return min;
+    }
+
+    /**
+     * Note: {@link MIN} only works on pretty much anything and uses the same
+     * semantics as {@link CompareBOp} (it is essentially the transitive closure
+     * of LT over the column projection of the inner expression). This probably
+     * means that we always need to materialize something unless it is an inline
+     * numeric IV.
+     * 
+     * FIXME MikeP: What is the right return value here?
+     */
+    public Requirement getRequirement() {
+
+        return INeedsMaterialization.Requirement.ALWAYS;
+
+    }
 
 }

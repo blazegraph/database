@@ -79,6 +79,8 @@ public class TestGroupByState extends TestCase2 {
         final IValueExpression<?>[] select;
         final LinkedHashSet<IVariable<?>> selectVars;
         final IConstraint[] having;
+        final LinkedHashSet<IVariable<?>> columnVars;
+//        final LinkedHashSet<IVariable<?>> distinctColumnVars;
         final boolean anyDistinct;
         final boolean selectDependency;
         final boolean simpleHaving;
@@ -89,6 +91,8 @@ public class TestGroupByState extends TestCase2 {
                 final IValueExpression<?>[] select,
                 final LinkedHashSet<IVariable<?>> selectVars,
                 final IConstraint[] having,//
+                final LinkedHashSet<IVariable<?>> columnVars,//
+//                final LinkedHashSet<IVariable<?>> distinctColumnVars,//
                 final boolean anyDistinct,//
                 final boolean selectDependency,//
                 final boolean simpleHaving//
@@ -98,6 +102,8 @@ public class TestGroupByState extends TestCase2 {
             this.select = select;
             this.selectVars = selectVars;
             this.having = having;
+            this.columnVars = columnVars;
+//            this.distinctColumnVars = distinctColumnVars;
             this.anyDistinct = anyDistinct;
             this.selectDependency = selectDependency;
             this.simpleHaving = simpleHaving;
@@ -123,6 +129,14 @@ public class TestGroupByState extends TestCase2 {
             return having;
         }
 
+        public LinkedHashSet<IVariable<?>> getColumnVars() {
+            return columnVars;
+        }
+        
+//        public LinkedHashSet<IVariable<?>> getDistinctColumnVars() {
+//            return distinctColumnVars;
+//        }
+        
         public boolean isAnyDistinct() {
             return anyDistinct;
         }
@@ -154,6 +168,12 @@ public class TestGroupByState extends TestCase2 {
 
         assertEquals("havingClause", expected.getHavingClause(),
                 actual.getHavingClause());
+
+        assertEquals("columnVars", expected.getColumnVars(),
+                actual.getColumnVars());
+
+//        assertEquals("distinctColumnVars", expected.getDistinctColumnVars(),
+//                actual.getDistinctColumnVars());
 
         assertEquals("anyDistinct", expected.isAnyDistinct(),
                 actual.isAnyDistinct());
@@ -191,8 +211,10 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(org);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -232,8 +254,11 @@ public class TestGroupByState extends TestCase2 {
         selectVars.add(org);
         selectVars.add(totalPrice);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(lprice);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -272,8 +297,11 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(totalPrice);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(lprice);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -314,8 +342,10 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(org2);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -356,8 +386,11 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(x);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(y);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -399,8 +432,11 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(x);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(y);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, false/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -447,8 +483,12 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(z);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(x);
+        columnVars.add(y);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -495,8 +535,12 @@ public class TestGroupByState extends TestCase2 {
         selectVars.add(z);
         selectVars.add(a);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(y);
+        columnVars.add(x);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 false/* anyDistinct */, true/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -577,8 +621,11 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(x);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(y);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 true/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
@@ -623,8 +670,11 @@ public class TestGroupByState extends TestCase2 {
         final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
         selectVars.add(x);
 
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+        columnVars.add(y);
+
         final MockGroupByState expected = new MockGroupByState(groupBy,
-                groupByVars, select, selectVars, having,
+                groupByVars, select, selectVars, having, columnVars,
                 true/* anyDistinct */, false/* selectDependency */, false/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
