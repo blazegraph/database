@@ -1278,24 +1278,11 @@ public class HTree extends AbstractHTree
 				/*
 				 * Found the bucket page, update it.
 				 */
-
-				// ensure is writeable!
-			    final BucketPage bucketPage = (BucketPage) child.copyOnWrite();
+			    final BucketPage bucketPage = (BucketPage) child;
 			    
-			    if (bucketPage.isDeleted())
-			    	throw new IllegalStateException();
-				
-			    if (bucketPage.isReadOnly())
-			    	throw new IllegalStateException();
-				
 				// Attempt to insert the tuple into the bucket.
 				if (!bucketPage.insert(key, value)) {
 
-				    if (bucketPage.isDeleted())
-				    	throw new IllegalStateException();
-					
-					// TODO if(parent.isReadOnly()) parent = copyOnWrite();
-					
 					if (current.globalDepth == child.globalDepth) {
 
                         /*
@@ -2039,7 +2026,6 @@ public class HTree extends AbstractHTree
 			 */
 //			if (okeys.get(i) != null)
 			
-			// FIXME MGC ensure meta-data copied
 			insertRawTuple(oldPage, i);
 			//newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
 
