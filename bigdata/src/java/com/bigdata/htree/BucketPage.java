@@ -229,6 +229,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		super(htree, false/* dirty */, 0/*unknownGlobalDepth*/);
 
 		this.data = data;
+		
+        setIdentity(addr);
 
 		createdPages++;
 	}
