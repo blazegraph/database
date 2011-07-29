@@ -268,7 +268,7 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
 
         final PipelineOp bop = (PipelineOp) op;
 
-		if (!bop.isPipelined()) {
+		if (!bop.isPipelinedEvaluation()) {
 			/*
 			 * The standalone chained running query does not support "at-once"
 			 * evaluation semantics (it might be possible to support them in the

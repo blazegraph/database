@@ -60,42 +60,15 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @author thompsonbry
  * 
- * @todo [No. I am going to put the burden on the query planner for most of
- *       this.] correct rejection tests for various kinds of illegal
- *       expressions, such as having forward references to variables which have
- *       not been computed. There are actually several different ways in which
- *       this rule can be violated, including having forward references within
- *       the SELECT (or our COMPUTE).
- * 
- * @todo [No. I am going to put the burden on the query planner for most of
- *       this.] correct rejection tests when the SELECT or HAVING clause
- *       references a variable not defined in the aggregated solution groups and
- *       not wrapped by an aggregate function.
- * 
- * @todo [This only applies to the case where we have optimized by using
- *       per-group counters.] Test to verify that the evaluation of the
- *       aggregate functions within each group are independent (they have
- *       internal state to track the running value of the aggregate, but that
- *       state can not be shared across groups).
- * 
- * @todo test with various kinds of type errors.
- * 
- * @todo test with DISTINCT used within aggregate functions (this forces us to
+ * @todo test w/ and w/o DISTINCT within aggregate functions (this forces us to
  *       consider the distinct solutions within groups for those aggregate
  *       functions which make use of the DISTINCT keyword).
  * 
- * @todo test COUNT(*) and COUNT(DISTINCT *) semantics.
+ * TODO test COUNT(*) and COUNT(DISTINCT *) semantics.
  * 
- * @todo test when some aggregate functions in a GROUP_BY use the DISTINCT
- *       keyword while others in the same GROUP_BY do not.
+ * TODO test with HAVING constraints.
  * 
- * @todo test with HAVING constraints.
- * 
- * @todo test with multiple invocations of the operator (or do this in the
- *       integration stress test).
- * 
- * @todo Is it possible to test these aggregation operators without testing at
- *       the SPARQL level?
+ * TODO Unit test w/o GROUP_BY clause (just select with aggregate expressions).
  */
 public class TestMemoryGroupByOp extends TestCase2 {
     
@@ -106,7 +79,218 @@ public class TestMemoryGroupByOp extends TestCase2 {
 		super(name);
 	}
 
-	/**
+    /**
+     * Unit test of SELECT expression which projects a variable projected by a
+     * GROUP_BY expression.
+     * 
+     * <pre>
+     * SELECT ?org GROUP BY ?org
+     * </pre>
+     */
+    public void test_groupBy_01() {
+
+        final IVariable<?> org = Var.var("org");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+
+        final int groupById = 1;
+        
+        final GroupByOp query = new MemoryGroupByOp(new BOp[] {}, NV
+                .asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, groupById),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.PIPELINED, false),//
+                        new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                        new NV(GroupByOp.Annotations.SELECT, //
+                                new IValueExpression[] { org }), //
+                        new NV(GroupByOp.Annotations.GROUP_BY,//
+                                new IValueExpression[] { org }) //
+                }));
+
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org
+         * org1
+         * org1
+         * org1
+         * org2
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
+        };
+
+        /**
+         * The expected solutions:
+         * 
+         * <pre>
+         * ?org
+         * org1
+         * org2
+         * </pre>
+         */
+        final IBindingSet expected [] = new IBindingSet []
+        {
+              new ArrayBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org1 } )
+            , new ArrayBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org2 } )
+        } ;
+
+        final BOpStats stats = query.newStats () ;
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
+        );
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, source, sink, null/* sink2 */
+        );
+        // Force the solutions to be emitted.
+        context.setLastInvocation();
+
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(2, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
+
+    }
+
+    /**
+     * Unit test of SELECT expression which projects a variable projected by a
+     * GROUP_BY expression.
+     * 
+     * <pre>
+     * SELECT ?org as ?newVar GROUP BY ?org
+     * </pre>
+     */
+    public void test_groupBy_02() {
+
+        final IVariable<?> org = Var.var("org");
+        final IVariable<?> newVar = Var.var("newVar");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+
+        final int groupById = 1;
+        
+        final GroupByOp query = new MemoryGroupByOp(new BOp[] {}, NV
+                .asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, groupById),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.PIPELINED, false),//
+                        new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                        new NV(GroupByOp.Annotations.SELECT, //
+                                new IValueExpression[] { new Bind(newVar,org) }), //
+                        new NV(GroupByOp.Annotations.GROUP_BY,//
+                                new IValueExpression[] { org }) //
+                }));
+
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org
+         * org1
+         * org1
+         * org1
+         * org2
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
+        };
+
+        /**
+         * The expected solutions:
+         * 
+         * <pre>
+         * ?newVar
+         * org1
+         * org2
+         * </pre>
+         */
+        final IBindingSet expected [] = new IBindingSet []
+        {
+              new ArrayBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org1 } )
+            , new ArrayBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org2 } )
+        } ;
+
+        final BOpStats stats = query.newStats () ;
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
+        );
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, source, sink, null/* sink2 */
+        );
+        // Force the solutions to be emitted.
+        context.setLastInvocation();
+
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(2, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
+
+    }
+
+    /**
 	 * Based on an example in the SPARQL 1.1 Working Draft.
 	 * 
 	 * <pre>
@@ -164,11 +348,6 @@ public class TestMemoryGroupByOp extends TestCase2 {
 	 */
 	public void test_something_simpleGroupBy() {
 
-//	    if(true) {
-//	        log.error("test is disabled.");
-//	        return;
-//	    }
-	    
 		final IVariable<?> org = Var.var("org");
 		final IVariable<?> auth = Var.var("auth");
 		final IVariable<?> book = Var.var("book");
@@ -203,8 +382,8 @@ public class TestMemoryGroupByOp extends TestCase2 {
 						new NV(BOp.Annotations.BOP_ID, groupById),//
 						new NV(BOp.Annotations.EVALUATION_CONTEXT,
 								BOpEvaluationContext.CONTROLLER),//
-						new NV(PipelineOp.Annotations.PIPELINED, true),//
-						new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+						new NV(PipelineOp.Annotations.PIPELINED, false),//
+						new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
                         new NV(GroupByOp.Annotations.SELECT, //
                                 new IValueExpression[] { org, totalPriceExpr }), //
                         new NV(GroupByOp.Annotations.GROUP_BY,//

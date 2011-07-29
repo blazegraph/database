@@ -25,6 +25,7 @@ package com.bigdata.bop.solutions;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -37,106 +38,44 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashMapAnnotations;
+import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.htree.HTree;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * An in-memory GROUP_BY for binding sets.
- * <p>
- * Note: This implementation is a pipelined operator which aggregates each chunk
- * of solutions as they arrive and outputs empty messages (containing no
- * solutions) until the last chunk is consumed. This operator relies on
- * {@link BOpContext#isLastInvocation()} in order to decide when to write its
- * output solutions, which requires the operator to (a) be evaluated on the
- * controller and (b) declare itself as NOT thread-safe. In addition, the
- * operator must be marked as SHARED_STATE := true such that the hash table
- * associated with the {@link BOpStats} is shared across multiple invocations of
- * this operator for a given query.
+ * An in-memory at-once generalized aggregation operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  * 
- * @todo GROUP_BY implementation which depends on an ORDER_BY operator to setup
- *       the correct order and then performs the aggregations in a single pass
- *       over the ordered data.
- * 
- * @todo In scale-out, we can hash partition the GROUP_BY operator over the
- *       nodes as long as all of the aggregation functions can be combined from
- *       the partitions. If AVG is used, then it needs to be replaced by SUM and
- *       COUNT in the GROUP_BY operator and the use of the AVG in the SELECT
- *       needs to be rewritten as (SUM(v)/COUNT(v)).
- * 
- * @todo As a special twist, there can also be memory burdens, even with a small
- *       #of groups, when the aggregated solution data is very large and a
- *       GROUP_CONCAT function is specified such that it combines a large #of
- *       input solution bindings into a big string.
- * 
- *       FIXME How should we handle nulls (unbound variables) and type errors
- *       during aggregation? (LeeF suggests that they cause type errors which
- *       are propagated such that the aggregated value winds up unbound but I
- *       can not reconcile this with the language in the W3C draft which would
- *       appear to suggest that detail records are ignored if they result in
- *       type errors when computing the aggregate).
- * 
- *       FIXME All of the {@link IAggregate} operators have a side-effect. In
- *       order for them to have isolated side-effects for distinct groups, they
- *       would have to either internalize a value map for the group or each
- *       group would have to use a distinct instance. If the latter, then
- *       provide for this on the operator, e.g., newInstance(), and document
- *       why.
- * 
- *       FIXME Review all syntax/semantic:
- * 
- *       <pre>
- * [17]  	SolutionModifier  ::=  	GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
- * [18]  	GroupClause	      ::=  	'GROUP' 'BY' GroupCondition+
- * [19]  	GroupCondition	  ::=  	( BuiltInCall | FunctionCall | '(' Expression ( 'AS' Var )? ')' | Var )
- * [20]  	HavingClause	  ::=  	'HAVING' HavingCondition+
- * [21]  	HavingCondition	  ::=  	Constraint
- * [61]  	FunctionCall	  ::=  	IRIref ArgList
- * [62]  	ArgList	          ::=  	( NIL | '(' 'DISTINCT'? Expression ( ',' Expression )* ')' )
- * [106]  	BuiltInCall	      ::=  	'STR' '(' Expression ')' ....
- * </pre>
- * 
- *       FIXME The aggregate functions can have the optional keyword DISTINCT.
- *       When present, the aggregation function needs to operate over the
- *       distinct computed values for its value expression within each solution
- *       group. Thus, the DISTINCT keyword within the aggregate function makes
- *       it impossible to undertake certain optimizations where the aggregate
- *       can be computed without first materializing the computed values for its
- *       value expressions.
- *       <p>
- *       The other exception is COUNT(DISTINCT *), where the DISTINCT is applied
- *       to the solutions in the group rather than to the column (this is not
- *       supported by MySQL and might not be valid SQL).
- *       <p>
- *       So, if we always materialize the grouped value expressions, we can then
- *       run the aggregate functions afterwards. In fact, the approach could be
- *       broken down into distinct stages which: (a) compute value expressions;
- *       (b) group solutions; (c) compute aggregates. This staging also works
- *       when the GROUPs are themselves computed expressions. (This might even
- *       be inherently more parallelizable, e.g., on a GPU. Also, a column
- *       projection would be a natural fit when computing the aggregates.)
- *       <p>
- *       It is possible to roll all of these stages together and do less work.
- *       The savings from computing all stages at once would be one pass over
- *       the solutions, directly generating the aggregated grouped solutions
- *       versus three passes. We can still do this if the keyword DISTINCT is
- *       used by any of the aggregate functions if we use a pipelined hash table
- *       as a distinct filter on the computed value expressions. So, this
- *       suggests two implementations: a three-stage operator and a single stage
- *       operator which optionally uses embedded pipelined DISTINCT filters.
+ *          TODO Nearly the same approach could be applied with pipelined
+ *          evaluation. During each evaluation pass, any new input solutions
+ *          would be pushed into the {@link HTree} used to group the solutions.
+ *          On the last evaluation pass we would then scan each group in turn,
+ *          computing the aggregation function. This provides a means to
+ *          incrementally transfer data from the Java heap to the native heap.
+ *          However, that same purpose might be served by writing an "at-once"
+ *          operator whose inputs are buffered on the native heap. We just need
+ *          to specify how the aggregation operator will gain access to the
+ *          input solutions without copying them (alternatively, the input
+ *          solutions could be buffered by an {@link HTree} which is already
+ *          imposing the GROUP_BY constraint.) This is in turn very similar to
+ *          breaking down the generalized aggregation operator into a GROUP_BY
+ *          operator and an aggregation operator running over the {@link HTree}
+ *          (and set of groups) generated by the GROUP_BY operator.
  */
 public class MemoryGroupByOp extends GroupByOp {
 
@@ -148,9 +87,9 @@ public class MemoryGroupByOp extends GroupByOp {
 	private static final transient Logger log = Logger
 			.getLogger(MemoryGroupByOp.class);
     
-	public interface Annotations extends GroupByOp.Annotations,
-			ConcurrentHashMapAnnotations {
-	
+    public interface Annotations extends GroupByOp.Annotations,
+            HashMapAnnotations {
+
 	}
 
     /**
@@ -177,24 +116,8 @@ public class MemoryGroupByOp extends GroupByOp {
 							+ getEvaluationContext());
 		}
 
-		// shared state is used to share the hash table.
-		if (isSharedState()) {
-			throw new UnsupportedOperationException(Annotations.SHARED_STATE
-					+ "=" + isSharedState());
-		}
-
-		// single threaded required for pipelining w/ isLastInvocation() hook.
-		if (getMaxParallel() != 1) {
-			throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-					+ "=" + getMaxParallel());
-		}
-
-		// operator is pipelined, but relies on isLastEvaluation() hook.
-		if (!isPipelined()) {
-			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
-					+ isPipelined());
-		}
-
+        assertAtOnceJavaHeapOp();
+        
 	}
     
     /**
@@ -217,22 +140,6 @@ public class MemoryGroupByOp extends GroupByOp {
 
     }
 
-    /**
-     * @see Annotations#CONCURRENCY_LEVEL
-     */
-    public int getConcurrencyLevel() {
-
-        return getProperty(Annotations.CONCURRENCY_LEVEL,
-                Annotations.DEFAULT_CONCURRENCY_LEVEL);
-
-    }
-    
-    public BOpStats newStats() {
-    	
-    	return new GroupByStats(this);
-    	
-    }
-
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new GroupByTask(this, context));
@@ -244,33 +151,63 @@ public class MemoryGroupByOp extends GroupByOp {
      */
     private static class SolutionGroup {
 
-		/** The precomputed hash code for {@link #vals}. */
+		/** The hash code for {@link #vals}. */
 		private final int hash;
 
-		/** The values for the groupBy variables which define a distinct group. */
-		private final IConstant<?>[] vals;
-
-		/**
-		 * The values for the variables which are being computed by the
-		 * aggregation. The binding set is when the {@link SolutionGroup} is
-		 * first constructed.
-		 * <p>
-		 * Note: Updates to this binding set MUST be protected by synchronizing
-		 * on {@link SolutionGroup}.
-		 */
-		private final IBindingSet aggregatedBSet;
+        /**
+         * The computed values for the groupBy value expressions in the order in
+         * which they were declared.
+         */
+        private final IConstant<?>[] vals;
 
 		public String toString() {
 			return super.toString() + //
 					"{group=" + Arrays.toString(vals) + //
-					",solution=" + aggregatedBSet + //
 					"}";
 		}
-		
-        public SolutionGroup(final IConstant<?>[] vals) {
+
+        /**
+         * Return a new {@link SolutionGroup} given the value expressions and
+         * the binding set.
+         * 
+         * @param groupBy
+         *            The value expressions to be computed.
+         * @param bset
+         *            The binding set.
+         * 
+         * @return The new {@link SolutionGroup} -or- <code>null</code> if any
+         *         of the value expressions evaluates or a <code>null</code>
+         *         -OR- throws a {@link SparqlTypeErrorException}.
+         */
+        static SolutionGroup newInstance(final IValueExpression<?>[] groupBy,
+                final IBindingSet bset) {
+
+            final IConstant<?>[] r = new IConstant<?>[groupBy.length];
+
+            for (int i = 0; i < groupBy.length; i++) {
+
+                final Object asBound;
+                try {
+                    asBound = groupBy[i].get(bset);
+                } catch (SparqlTypeErrorException ex) {
+                    // Drop solution.
+                    return null;
+                }
+                if (asBound == null) {
+                    // Drop solution.
+                    return null;
+                }
+                @SuppressWarnings({ "rawtypes", "unchecked" })
+                final IConstant<?> x = new Constant(asBound);
+                r[i] = x;
+
+            }
+            return new SolutionGroup(r);
+        }
+
+        private SolutionGroup(final IConstant<?>[] vals) {
             this.vals = vals;
             this.hash = java.util.Arrays.hashCode(vals);
-            this.aggregatedBSet = new ListBindingSet();
         }
 
         public int hashCode() {
@@ -287,7 +224,6 @@ public class MemoryGroupByOp extends GroupByOp {
             if (vals.length != t.vals.length)
                 return false;
             for (int i = 0; i < vals.length; i++) {
-                // @todo verify that this allows for nulls with a unit test.
                 if (vals[i] == t.vals[i])
                     continue;
                 if (vals[i] == null)
@@ -298,70 +234,24 @@ public class MemoryGroupByOp extends GroupByOp {
             return true;
         }
 
-        /**
-         * Apply the {@link IValueExpression}s to compute the updated variable
-         * bindings in the {@link SolutionGroup}.
-         * 
-         * @param bset
-         *            An input solution.
-         * @param select
-         *            The ordered array of {@link IValueExpression}s to be
-         *            projected out of the query.
-         */
-        public void aggregate(final IBindingSet bset,
-                final IValueExpression<?>[] select) {
-
-            /*
-             * FIXME The aggregate functions have side-effects so we need to use
-             * a distinct instance of each function for each group.
-             */
-
-            // synchronize for visibility.
-            synchronized (this) {
-                for (IValueExpression<?> expr : select) {
-                    final Object result = expr.get(bset);
-                    if (log.isTraceEnabled())
-                        log.trace("expr: " + expr + "=>" + result);
-                }
-			}
-
-        }
-        
     } // SolutionGroup
 
-	/**
-	 * Extends {@link BOpStats} to provide the shared state for the solution
-	 * groups across multiple invocations of the GROUP_BY operator.
-	 */
-    private static class GroupByStats extends BOpStats {
+    /**
+     * A multiset of solutions associated with a {@link SolutionGroup}.
+     */
+    private static class SolutionMultiSet {
 
-        /**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
+        private List<IBindingSet> solutions = new LinkedList<IBindingSet>();
 
-		/**
-		 * A concurrent map whose keys are the bindings on the specified
-		 * variables (the keys and the values are the same since the map
-		 * implementation does not allow <code>null</code> values).
-		 * <p>
-		 * Note: The map is shared state and can not be discarded or cleared
-		 * until the last invocation!!!
-		 * 
-		 * @todo The operator is single threaded so use a {@link LinkedHashMap}
-		 *       and the {@link HashMapAnnotations} rather than the
-		 *       {@link ConcurrentHashMapAnnotations}
-		 */
-        private /*final*/ ConcurrentHashMap<SolutionGroup, SolutionGroup> map;
+        public void add(final IBindingSet bset) {
 
-    	public GroupByStats(final MemoryGroupByOp op) {
-    		
-            this.map = new ConcurrentHashMap<SolutionGroup, SolutionGroup>(
-                    op.getInitialCapacity(), op.getLoadFactor(),
-                    op.getConcurrencyLevel());
+            if(bset == null)
+                throw new IllegalArgumentException();
+            
+            solutions.add(bset);
+            
+        }
 
-    	}
-    	
     }
     
     /**
@@ -371,17 +261,20 @@ public class MemoryGroupByOp extends GroupByOp {
 
         private final BOpContext<IBindingSet> context;
 
-        /**
-         * A concurrent map whose keys are the bindings on the specified
-         * variables (the keys and the values are the same since the map
-         * implementation does not allow <code>null</code> values).
-		 * <p>
-		 * Note: The map is shared state and can not be discarded or cleared
-		 * until the last invocation!!!
-         */
-        private final ConcurrentHashMap<SolutionGroup, SolutionGroup> map;
-
         private final IGroupByState groupByState;
+
+        /**
+         * A map whose keys are the computed bindings on the GROUP_BY
+         * expressions and whose values are the solution multisets which fall
+         * into a given group.
+         */
+        private final LinkedHashMap<SolutionGroup, SolutionMultiSet> map;
+
+        private final IValueExpression<?>[] groupBy;
+
+        private final IValueExpression<?>[] select;
+
+        private final IConstraint[] having;
 
         GroupByTask(final MemoryGroupByOp op,
                 final BOpContext<IBindingSet> context) {
@@ -393,57 +286,68 @@ public class MemoryGroupByOp extends GroupByOp {
                     (IValueExpression<?>[]) op.getProperty(GroupByOp.Annotations.GROUP_BY), //
                     (IConstraint[]) op.getProperty(GroupByOp.Annotations.HAVING)//
             );
+
+            this.groupBy = groupByState.getGroupByClause();
+
+            this.select = groupByState.getSelectClause();
             
-			// The map is shared state across invocations of this operator task.
-			this.map = ((GroupByStats) context.getStats()).map;
+            this.having = groupByState.getHavingClause();
+
+            // The map is only defined if a GROUP_BY clause was used.
+            this.map = groupBy == null ? null
+                    : new LinkedHashMap<SolutionGroup, SolutionMultiSet>(
+                            op.getInitialCapacity(), op.getLoadFactor());
 
         }
 
-		/**
-		 * Return the "row" for the groupBy variables.
-		 * 
-		 * @param bset
-		 *            The binding set to be filtered.
-		 * 
-		 * @return The distinct as bound values -or- <code>null</code> if the
-		 *         binding set duplicates a solution which was already accepted.
-		 */
-        private SolutionGroup accept(final IBindingSet bset) {
+        /**
+         * Add the solution to the multiset for the appropriate group. If we can
+         * not compute the GROUP_BY value expressions for a solution, then the
+         * solution is dropped.
+         * 
+         * @param bset
+         *            The solution.
+         */
+        private void accept(final IBindingSet bset) {
 
-            final IValueExpression<?>[] groupBy = groupByState
-                    .getGroupByClause();
+            if (groupBy == null || groupBy.length == 0)
+                throw new IllegalArgumentException();
 
-            final IConstant<?>[] r = new IConstant<?>[groupBy.length];
+            if (bset == null)
+                throw new IllegalArgumentException();
 
-            for (int i = 0; i < groupBy.length; i++) {
+            final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset);
 
-                /*
-                 * Note: This allows null's.
-                 * 
-                 * @todo write a unit test when some variables are not bound.
-                 */
-                // r[i] = bset.get(groupBy[i]);
-                r[i] = new Constant(groupBy[i].get(bset));
+            if (s == null) {
+
+                // Drop the solution.
+
+                if (log.isDebugEnabled())
+                    log.debug("Dropping solution: " + bset);
+
+                return;
 
             }
 
-            final SolutionGroup s = new SolutionGroup(r);
-            
-            map.putIfAbsent(s, s);
+            SolutionMultiSet m = map.get(s);
 
-			return s;
+            if (m == null) {
 
-		}
+                map.put(s, m = new SolutionMultiSet());
 
-		public Void call() throws Exception {
+            }
 
-            final IValueExpression<?>[] select = groupByState.getSelectClause();
+            // Accept the solution.
+            if (log.isTraceEnabled())
+                log.trace("Accepting solution: " + bset);
 
-            final IConstraint[] having = groupByState.getHavingClause();
+            m.add(bset);
+
+        }
+
+        public Void call() throws Exception {
 
 			final BOpStats stats = context.getStats();
-
-			final boolean isLastInvocation = context.isLastInvocation();
 
 			final IAsynchronousIterator<IBindingSet[]> itr = context
 					.getSource();
@@ -452,109 +356,277 @@ public class MemoryGroupByOp extends GroupByOp {
 
 			try {
 
-				/*
-				 * Present each source solution in turn, identifying the group
-				 * into which it falls and then applying the value expressions
-				 * to update the aggregated variable bindings for that group.
-				 */
-				while (itr.hasNext()) {
+                final List<IBindingSet> accepted = new LinkedList<IBindingSet>();
 
-					final IBindingSet[] a = itr.next();
+                int naccepted = 0;
 
-					stats.chunksIn.increment();
-					stats.unitsIn.add(a.length);
+                if (groupBy == null) {
 
-					for (IBindingSet bset : a) {
+                    /*
+                     * Combine all solutions into a single multiset.
+                     */
+                    final SolutionMultiSet m = new SolutionMultiSet();
+                    
+                    while (itr.hasNext()) {
 
-						// identify the solution group.
-						final SolutionGroup solutionGroup = accept(bset);
+                        final IBindingSet[] a = itr.next();
 
-						// aggregate the bindings
-						solutionGroup.aggregate(bset, select);
+                        stats.chunksIn.increment();
+                        stats.unitsIn.add(a.length);
 
-					}
+                        for (IBindingSet bset : a) {
 
-				}
+                            m.add(bset);
 
-				if (isLastInvocation) {
+                        }                    
+                        
+                    }
+                    
+                    // Compute the aggregate for that group.
+                    final IBindingSet bset = aggregate(m.solutions);
 
-					/*
-					 * Write aggregated solutions on the sink, applying the
-					 * [having] filter to remove any solutions which do not
-					 * satisfy its constraints.
-					 */
+                    if (bset != null) {
 
-                  final List<IBindingSet> accepted = new LinkedList<IBindingSet>();
-					
-                  int naccepted = 0;
+                        if (log.isDebugEnabled())
+                            log.debug("output: solution=" + bset);
 
-                  for(SolutionGroup solutionGroup: map.values()) {
-						
-						synchronized(solutionGroup) {
+                        accepted.add(bset);
 
-							IBindingSet bset = solutionGroup.aggregatedBSet;
-							
-							// verify optional constraint(s)
-							if (having != null
-									&& !BOpUtility.isConsistent(having, bset)) {
+                        naccepted++;
 
-								// skip this group.
-								continue;
-								
-							}
+                    } else {
 
-//							/*
-//							 * We will accept this solution group, so filter out
-//							 * any variables which are not being projected out
-//							 * of this operator.
-//							 */
-							if (log.isDebugEnabled())
-								log.debug("accepted: " + solutionGroup);
-//
-//							// optionally strip off unnecessary variables.
-//							bset = select == null ? bset : bset
-//									.copy(select);
+                        if (log.isDebugEnabled())
+                            log.debug("output : no solution.");
+                        
+                    }
+
+                } else {
+
+                    /*
+                     * Group the solutions.
+                     */
+                    
+                    while (itr.hasNext()) {
+
+                        final IBindingSet[] a = itr.next();
+
+                        stats.chunksIn.increment();
+                        stats.unitsIn.add(a.length);
+
+                        for (IBindingSet bset : a) {
+
+                            accept(bset);
+
+                        }
+
+                    }
+
+                    for (Map.Entry<SolutionGroup, SolutionMultiSet> e : map
+                            .entrySet()) {
+
+                        final SolutionMultiSet m = e.getValue();
+
+                        // Compute the aggregate for that group.
+                        final IBindingSet bset = aggregate(m.solutions);
+
+                        if (bset != null) {
+                            
+                            if (log.isDebugEnabled())
+                                log.debug("output: groupBy=" + e.getKey()
+                                        + ", solution=" + bset);
 
                             accepted.add(bset);
 
                             naccepted++;
+                            
+                        } else {
+                            
+                            if (log.isDebugEnabled())
+                                log.debug("output: groupBy=" + e.getKey()
+                                        + " : dropped.");
+                            
+                        }
 
-						}
-						
-					}
-					
-					/*
-					 * Output the aggregated bindings for the accepted
-					 * solutions.
-					 */
-					if (naccepted > 0) {
+                    }
 
-						final IBindingSet[] b = accepted
-								.toArray(new IBindingSet[naccepted]);
+                    // discard the map.
+                    map.clear();
 
-						sink.add(b);
+                }
 
-						// flush the output.
-						sink.flush();
+                /*
+                 * Output the aggregated bindings for the accepted solutions.
+                 */
+                if (naccepted > 0) {
 
-						// discard the map.
-						map.clear();
-						
-					}
+                    final IBindingSet[] b = accepted
+                            .toArray(new IBindingSet[naccepted]);
 
-				}
+                    sink.add(b);
 
-				// done.
-				return null;
+                    // flush the output.
+                    sink.flush();
 
-			} finally {
+                }
 
-				sink.close();
+                // done.
+                return null;
 
-			}
+            } finally {
 
-		} // call()
+                sink.close();
 
-	} // GroupByTask
-    
+            }
+
+        } // call()
+
+        /**
+         * Compute the aggregate solution for a solution multiset (aka a group).
+         * <ol>
+         * <li>
+         * 1.x Bind any values for GROUP_BY variables which will be projected
+         * out by the SELECT expression on a new binding set which will
+         * represent the aggregate for the group.</li>
+         * <li>
+         * 1.2 For each select expression in order (left-to-right), compute the
+         * select expression using the appropriate column projections. (This
+         * will involve a reset(), presentation of each solution for a column
+         * we...</li>
+         * </ol>
+         * 
+         * @param exprs
+         *            The ordered array of {@link IValueExpression}s to be
+         *            projected out of the query.
+         * 
+         * @return The aggregate solution -or- <code>null</code> if the solution
+         *         for the group was dropped (type error or violated HAVING
+         *         constraint).
+         * 
+         *         FIXME Javadoc edit.
+         * 
+         *         FIXME This needs to apply the reset()/{get(bset)},done()
+         *         pattern. This needs to be done for each {@link IAggregate}
+         *         function encountered during a traversal of the value
+         *         expression to be computed. Only the final result reported by
+         *         done() can be passed up to the parent operator and used as an
+         *         input to scalar operator evaluation. The top-level expr
+         *         should be a bind() to bind the result on an output solution,
+         *         so this needs access to the output solution. Also, scalar
+         *         variables (those declared by the GROUP_BY clause) should be
+         *         directly bound on the output solution rather than scanning
+         *         over all solutions within a group!
+         * 
+         *         FIXME We also need to handle HAVING expressions, which
+         *         involve aggregates within constraints.
+         * 
+         *         FIXME This does not handle agg(DISTINCT) semantics.
+         * 
+         *         FIXME This does not handle the special COUNT(DISTINCT *)
+         *         semantics.
+         * 
+         *         TODO Unit test with empty group (this can occur only for a
+         *         query without a GROUP BY clause if there are no input
+         *         solutions).
+         */
+        public IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
+
+            if (solutions == null) {
+                // Drop empty group.
+                return null;
+            }
+            
+            /*
+             * New binding set for the aggregate solution.
+             */
+            final IBindingSet agg = new ListBindingSet();
+
+            /*
+             * If a groupBy clause was used, bind each SELECT expression which
+             * is either a bare reference to a variable declared in the GROUP_BY
+             * clause or a BIND() of a reference to a variable declared in the
+             * GROUP_BY clause onto a new variable name.
+             * 
+             * TODO Unit test [SELECT ?x AS ?y GROUP BY ?x] (rename of a
+             * GROUP_BY variable).
+             */
+            if (groupBy != null) {
+                // The first solution in the group.
+                final IBindingSet aSolution = solutions.iterator().next();
+                // Declared variables projected by the GROUP_BY clause (if any).
+                final LinkedHashSet<IVariable<?>> groupByVars = groupByState
+                        .getGroupByVars();
+                // The projected SELECT expressions.
+                for (IValueExpression<?> expr : select) {
+                    if(expr instanceof IVariable<?>) {
+                        /*
+                         * SELECT ?x GROUP BY ?x
+                         */
+                        final IVariable<?> var = (IVariable<?>) expr;
+                        // Bare variable MUST be projected by GROUP_BY clause.
+                        if (!groupByVars.contains(var))
+                            throw new AssertionError();
+                        // Note: MUST be a binding for each groupBy var.
+                        @SuppressWarnings({ "rawtypes", "unchecked" })
+                        final Constant<?> val = new Constant(var.get(aSolution));
+                        // Bind on solution.
+                        agg.set(var, val);
+                    } else if (expr instanceof IBind<?>) {
+                        final IBind<?> bindExpr = (IBind<?>) expr;
+                        if (bindExpr.getExpr() instanceof IVariable<?>) {
+                            /*
+                             * SELECT ?x AS ?y GROUP BY ?x
+                             */
+                            // reference to a groupBy variable.
+                            final IVariable<?> gvar = (IVariable<?>) bindExpr
+                                    .getExpr();
+                            // Bare variable MUST be projected by GROUP_BY
+                            // clause.
+                            if (!groupByVars.contains(gvar))
+                                throw new AssertionError();
+                            // Note: MUST be binding for each groupBy var.
+                            @SuppressWarnings({ "rawtypes", "unchecked" })
+                            final Constant<?> val = new Constant(
+                                    gvar.get(aSolution));
+                            // variable to be projected out by SELECT.
+                            final IVariable<?> ovar = ((IBind<?>) expr)
+                                    .getVar();
+                            // Bind on solution under projected var name.
+                            agg.set(ovar, val);
+                        }
+                    }
+                }
+            }
+
+            /*
+             * Project SELECT expressions which are not bare references to a
+             * variable projected by the GROUP_BY clause.
+             */
+            for (IValueExpression<?> expr : select) {
+                if (expr instanceof IVariable<?>) {
+                    // Variable projected by the GROUP_BY clause.
+                    continue;
+                }
+                if (expr instanceof IBind<?>
+                        && ((IBind<?>) expr).getExpr() instanceof IVariable<?>) {
+                    // Bind to a variable projected by the GROUP_BY clause.
+                    continue;
+                }
+                for (IBindingSet bset : solutions) {
+                    final Object result = expr.get(bset);
+                    if (log.isTraceEnabled())
+                        log.trace("expr: " + expr + "=>" + result);
+                }
+            }
+            // verify optional constraint(s) : FIXME Must compute aggregate
+            // expressions in HAVING clause as well.
+            if (having != null && !BOpUtility.isConsistent(having, agg)) {
+                // drop this solution.
+                return null;
+            }
+            return agg;
+        }
+
+    } // GroupByTask
+
 }
