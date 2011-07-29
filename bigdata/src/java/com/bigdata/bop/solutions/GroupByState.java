@@ -368,24 +368,10 @@ public class GroupByState implements IGroupByState {
         final boolean aggregationContext = withinAggregateFunction
                 || op instanceof IAggregate<?>;
         boolean isAggregate = aggregationContext;
-        final Iterator<BOp> itr = op.argIterator();
-        while (itr.hasNext()) {
-            final BOp arg = itr.next();
-            if(!(arg instanceof IValueExpression<?>)) {
-                // skip non-value expression arguments.
-                continue;
-            }
-            if (log.isTraceEnabled())
-                log.trace("op=" + op.getClass() + ", isSelectClause="
-                        + isSelectClause + ", isSelectDependency="
-                        + isSelectDependency + ", isAnyDistinct="
-                        + isAnyDistinct + ", withinAggregateFunction="
-                        + withinAggregateFunction + ", aggregationContext="
-                        + aggregationContext + ", groupByVars=" + groupByVars
-                        + ", selectVars=" + selectVars + ", arg=" + arg);
-            final IValueExpression<?> t = (IValueExpression<?>) arg;
+        {
+            final BOp t = op;
             if (t instanceof IConstant)
-                continue;
+                return false;
             if (t instanceof IVariable<?>) {
                 final IVariable<?> v = (IVariable<?>) t;
                 if (aggregationContext) {
@@ -398,19 +384,18 @@ public class GroupByState implements IGroupByState {
                      */
                     if (!groupByVars.contains(v) && !selectVars.contains(v)) {
                         columnVars.add(v);
-                        continue;
                     }
-                    continue;
+                    return false;
                 }
                 if (groupByVars.contains(v)) {
                     isAggregate = true;
-                    continue;
+                    return true;
                 }
                 if (selectVars.contains(v)) {
                     if (isSelectClause)
                         isSelectDependency.set(true);
                     isAggregate = true;
-                    continue;
+                    return true;
                 }
                 if(isSelectClause) {
                     /*
@@ -429,8 +414,24 @@ public class GroupByState implements IGroupByState {
                         "Non-aggregate variable in select expression: " + v);
                 }
             }
+        }
+        final Iterator<BOp> itr = op.argIterator();
+        while (itr.hasNext()) {
+            final BOp arg = itr.next();
+            if(!(arg instanceof IValueExpression<?>)) {
+                // skip non-value expression arguments.
+                continue;
+            }
+            if (log.isTraceEnabled())
+                log.trace("op=" + op.getClass() + ", isSelectClause="
+                        + isSelectClause + ", isSelectDependency="
+                        + isSelectDependency + ", isAnyDistinct="
+                        + isAnyDistinct + ", withinAggregateFunction="
+                        + withinAggregateFunction + ", aggregationContext="
+                        + aggregationContext + ", groupByVars=" + groupByVars
+                        + ", selectVars=" + selectVars + ", arg=" + arg);
             // recursion through child value expression.
-            isAggregate |= isAggregate(t, isSelectClause, isSelectDependency,
+            isAggregate |= isAggregate(arg, isSelectClause, isSelectDependency,
                     isAnyDistinct, aggregationContext/* withinAggregateFunction */);
         }
 
