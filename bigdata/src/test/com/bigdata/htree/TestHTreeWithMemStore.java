@@ -158,7 +158,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
 	}
     
-	private static final int s_limit = 100000;
+	private static final int s_limit = 10000;
 	
     private void doStressTest(final int addressBits) {
 

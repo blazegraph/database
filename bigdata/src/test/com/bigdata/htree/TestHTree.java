@@ -730,7 +730,8 @@ public class TestHTree extends AbstractHTreeTestCase {
 			// Replace the full bucket page with a new directory over two child
 			// bucket pages and redistribute the tuples between the new bucket
 			// pages.
-			htree.addLevel2(a/* oldPage */);
+			// htree.addLevel2(a/* oldPage */);
+            a.addLevel();
 
 			if (log.isInfoEnabled())
 				log.info("after addLevel(): \n" + htree.PP());

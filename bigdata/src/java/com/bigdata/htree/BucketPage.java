@@ -1327,4 +1327,17 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
         
 	}
 	
+	void addLevel() {
+		/**
+		 * Ensure parent directory is mutable - at present this requires making
+		 * a Leaf mutable
+		 */
+        final BucketPage copy = (BucketPage) copyOnWrite();
+        if (copy != this) {
+        	copy.addLevel();
+        } else {
+        	getParentDirectory()._addLevel(this);
+        }
+	}
+	
 }

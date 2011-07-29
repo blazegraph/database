@@ -1294,7 +1294,8 @@ public class HTree extends AbstractHTree
 
                         if (child.globalDepth == addressBits) {
 
-                        	addLevel2(bucketPage);
+                        	// addLevel2(bucketPage);
+                        	bucketPage.addLevel();
                         	
                         } else {
 
@@ -1408,7 +1409,8 @@ public class HTree extends AbstractHTree
 
                         if (child.globalDepth == addressBits) {
 
-                            addLevel2(bucketPage);
+                            // addLevel2(bucketPage);
+                        	bucketPage.addLevel();
 
                         } else {
 
