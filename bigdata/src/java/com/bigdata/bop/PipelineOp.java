@@ -41,13 +41,6 @@ import com.bigdata.bop.solutions.SliceOp;
 /**
  * Abstract base class for pipeline operators where the data moving along the
  * pipeline is chunks of {@link IBindingSet}s.
- * <p>
- * The top-level of a query plan is composed of a required
- * {@link Annotations#JOIN_GRAPH}s followed by a mixture of optional joins and
- * {@link Annotations#CONDITIONAL_GROUP}s. A
- * {@link Annotations#CONDITIONAL_GROUP} will have at least one required join
- * (in a {@link Annotations#JOIN_GRAPH}) followed by zero or more optional
- * joins.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -160,7 +153,7 @@ abstract public class PipelineOp extends BOpBase {
 		 * "blocked" evaluation depending on how it buffers its data for
 		 * evaluation.
 		 * 
-		 * @see PipelineOp#isPipelined()
+		 * @see PipelineOp#isPipelinedEvaluation()
 		 */
 		String PIPELINED = PipelineOp.class.getName() + ".pipelined";
 
@@ -189,7 +182,7 @@ abstract public class PipelineOp extends BOpBase {
          * Note: For a sharded operation, the value is the maximum #of bytes
          * which may be buffered per shard.
          * 
-         * @see PipelineOp#isPipelined()
+         * @see PipelineOp#isPipelinedEvaluation()
          */
 		String MAX_MEMORY = PipelineOp.class.getName() + ".maxMemory";
 
@@ -258,52 +251,172 @@ abstract public class PipelineOp extends BOpBase {
         
     }
 
-	/**
-	 * Return <code>true</code> if the operator is pipelined (versus using
-	 * "at-once" or blocked evaluation as discussed below).
-	 * <dl>
-	 * <dt>Pipelined</dt>
-	 * <dd>Pipelined operators stream chunks of intermediate results from one
-	 * operator to the next using producer / consumer pattern. Each time a set
-	 * of intermediate results is available for a pipelined operator, it is
-	 * evaluated against those inputs producing another set of intermediate
-	 * results for its target operator(s). Pipelined operators may be evaluated
-	 * many times during a given query and often have excellent parallelism due
-	 * to the concurrent evaluation of the different operators on different sets
-	 * of intermediate results.</dd>
-	 * <dt>At-Once</dt>
-	 * <dd>
-	 * An "at-once" operator will run exactly once and must wait for all of its
-	 * inputs to be assembled before it runs. There are some operations for
-	 * which "at-once" evaluation is always required, such as ORDER_BY. Other
-	 * operations MAY use operator-at-once evaluation in order to benefit from a
-	 * combination of more efficient IO patterns and simpler design. At-once
-	 * operators may either buffer their data on the Java heap (which is not
-	 * scalable due to the heap pressure exerted on the garbage collector) or
-	 * buffer their data on the native heap (which does scale).</dd>
-	 * <dt>Blocked</dt>
-	 * <dd>Blocked operators buffer large amounts of data on the native heap and
-	 * run each time they exceed some threshold #of bytes of buffered data. A
-	 * blocked operator is basically an "at-once" operator which buffers its
-	 * data on the native heap and which can be evaluated in multiple passes.
-	 * For example, a hash join could use a blocked operator design while an
-	 * ORDER_BY operator can not. By deferring their evaluation until some
-	 * threshold amount of data has been materialized, they may be evaluated
-	 * once or more than once, depending on the data scale, but still retain
-	 * many of the benefits of "at-once" evaluation in terms of IO patterns.
-	 * Whether or not an operator can be used as a "blocked" operator is a
-	 * matter of the underlying operator implementation.</dd>
-	 * </dl>
-	 * 
-	 * @see Annotations#PIPELINED
-	 * @see Annotations#MAX_MEMORY
-	 */
-    final public boolean isPipelined() {
+    /**
+     * The maximum amount of memory which may be used to buffered inputs for
+     * this operator on the native heap. When ZERO (0), the inputs will be
+     * buffered on the JVM heap. When {@link Long#MAX_VALUE}, an essentially
+     * unbounded amount of data may be buffered on the native heap. Together
+     * with {@link Annotations#PIPELINED}, {@link Annotations#MAX_MEMORY} is
+     * used to determine whether an operator uses <i>pipelined</i>,
+     * <i>at-once</i>, or <i>blocked</i> evaluation.
+     * 
+     * @see Annotations#MAX_MEMORY
+     */
+    final public long getMaxMemory() {
+
+        return getProperty(Annotations.MAX_MEMORY,
+                Annotations.DEFAULT_MAX_MEMORY);
+
+    }
+
+    /**
+     * Return <code>true</code> iff the operator uses pipelined evaluation
+     * (versus "at-once" or "blocked" evaluation as discussed below).
+     * <dl>
+     * <dt>Pipelined</dt>
+     * <dd>Pipelined operators stream chunks of intermediate results from one
+     * operator to the next using a producer / consumer pattern. Each time a set
+     * of intermediate results is available for a pipelined operator, it is
+     * evaluated against those inputs producing another set of intermediate
+     * results for its target operator(s). Pipelined operators may be evaluated
+     * many times during a given query and often have excellent parallelism due
+     * to the concurrent evaluation of the different operators on different sets
+     * of intermediate results.</dd>
+     * <dt>At-Once</dt>
+     * <dd>
+     * An "at-once" operator will run exactly once and must wait for all of its
+     * inputs to be assembled before it runs. There are some operations for
+     * which "at-once" evaluation is always required, such as ORDER_BY. Other
+     * operations MAY use operator-at-once evaluation in order to benefit from a
+     * combination of more efficient IO patterns and simpler design. At-once
+     * operators may either buffer their data on the Java heap (which is not
+     * scalable due to the heap pressure exerted on the garbage collector) or
+     * buffer their data on the native heap (which does scale).</dd>
+     * <dt>Blocked</dt>
+     * <dd>Blocked operators buffer large amounts of data on the native heap and
+     * run each time they exceed some threshold #of bytes of buffered data. A
+     * blocked operator is basically an "at-once" operator which buffers its
+     * data on the native heap and which can be evaluated in multiple passes.
+     * For example, a hash join could use a blocked operator design while an
+     * ORDER_BY operator can not. By deferring their evaluation until some
+     * threshold amount of data has been materialized, they may be evaluated
+     * once or more than once, depending on the data scale, but still retain
+     * many of the benefits of "at-once" evaluation in terms of IO patterns.
+     * Whether or not an operator can be used as a "blocked" operator is a
+     * matter of the underlying operator implementation.</dd>
+     * </dl>
+     * 
+     * @see Annotations#PIPELINED
+     * @see Annotations#MAX_MEMORY
+     */
+    final public boolean isPipelinedEvaluation() {
 		
     	return getProperty(PipelineOp.Annotations.PIPELINED,
 				PipelineOp.Annotations.DEFAULT_PIPELINED);
     	
 	}
+
+    /**
+     * <code>true</code> iff the operator will use at-once evaluation (all
+     * inputs for the operator will be buffered and the operator will run
+     * exactly once to consume those inputs).
+     * 
+     * @see Annotations#PIPELINED
+     * @see Annotations#MAX_MEMORY
+     */
+    final public boolean isAtOnceEvaluation() {
+
+        if (isPipelinedEvaluation())
+            return false;
+
+        final long maxMemory = getMaxMemory();
+        
+        if (maxMemory == 0L) {
+            /*
+             * Operator will buffer an essentially unbounded amount of data on
+             * the JVM object heap.
+             */
+            return true;
+        }
+        if(maxMemory == Long.MAX_VALUE) {
+            /*
+             * Operator will buffer an essentially unbounded amount of data on
+             * the native heap.
+             */
+            return true;
+        }
+        
+        return false;
+
+    }
+
+    /**
+     * <code>true</code> iff the operator uses blocked evaluation (it buffers
+     * data on the native heap up to a threshold and then evaluate that block of
+     * data).
+     * 
+     * @see Annotations#PIPELINED
+     * @see Annotations#MAX_MEMORY
+     */
+    final public boolean isBlockedEvaluation() {
+
+        if (isPipelinedEvaluation())
+            return false;
+
+        final long maxMemory = getMaxMemory();
+        
+        if (maxMemory > 0L && maxMemory < Long.MAX_VALUE) {
+            /*
+             * Operator will buffer data up to some maximum #of bytes on the
+             * native heap.
+             */
+            return true;
+        }
+        
+        return false;
+
+    }
+
+    /**
+     * Assert that this operator is annotated as an "at-once" operator which
+     * buffers its data on the java heap. The requirements are:
+     * 
+     * <pre>
+     * PIPELINED := false
+     * MAX_MEMORY := 0
+     * </pre>
+     * 
+     * When the operator is not pipelined then it is either "blocked" or
+     * "at-once". When MAX_MEMORY is ZERO, the operator will buffer its data on
+     * the Java heap. All operators which buffer data on the java heap will
+     * buffer an unbounded amount of data and are therefore "at-once" rather
+     * than "blocked". Operators which buffer their data on the native heap may
+     * support either "blocked" and/or "at-once" evaluation, depending on the
+     * operators. E.g., a hash join can be either "blocked" or "at-once" while
+     * an ORDER-BY is always "at-once".
+     */
+    protected void assertAtOnceJavaHeapOp() {
+
+        // operator is "at-once" (not pipelined).
+        if (isPipelinedEvaluation()) {
+            throw new UnsupportedOperationException(Annotations.PIPELINED + "="
+                    + isPipelinedEvaluation());
+        }
+
+//        // operator may not be broken into multiple tasks.
+//        if (getMaxParallel() != 1) {
+//            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+//                    + "=" + getMaxParallel());
+//        }
+
+        // operator must buffer its data on the Java heap
+        final long maxMemory = getMaxMemory();
+
+        if (maxMemory != 0L)
+            throw new UnsupportedOperationException(Annotations.MAX_MEMORY
+                    + "=" + maxMemory);
+
+    }
 
 //	/**
 //	 * Return <code>true</code> iff concurrent invocations of the operator are
@@ -443,48 +556,6 @@ abstract public class PipelineOp extends BOpBase {
     	if (log.isTraceEnabled())
     		log.trace("bopId=" + getId());
     	
-    }
-
-    /**
-     * Assert that this operator is annotated as an "at-once" operator which
-     * buffers its data on the java heap. The requirements are:
-     * 
-     * <pre>
-     * PIPELINED := false
-     * MAX_MEMORY := 0
-     * </pre>
-     * 
-     * When the operator is not pipelined then it is either "blocked" or
-     * "at-once". When MAX_MEMORY is ZERO, the operator will buffer its data on
-     * the Java heap. All operators which buffer data on the java heap will
-     * buffer an unbounded amount of data and are therefore "at-once" rather
-     * than "blocked". Operators which buffer their data on the native heap may
-     * support either "blocked" and/or "at-once" evaluation, depending on the
-     * operators. E.g., a hash join can be either "blocked" or "at-once" while
-     * an ORDER-BY is always "at-once".
-     */
-	protected void assertAtOnceJavaHeapOp() {
-
-		// operator is "at-once" (not pipelined).
-		if (isPipelined()) {
-			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
-					+ isPipelined());
-		}
-
-//        // operator may not be broken into multiple tasks.
-//        if (getMaxParallel() != 1) {
-//            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-//                    + "=" + getMaxParallel());
-//        }
-
-        // operator must buffer its data on the Java heap
-        final long maxMemory = getProperty(Annotations.MAX_MEMORY,
-                Annotations.DEFAULT_MAX_MEMORY);
-
-        if (maxMemory != 0L)
-            throw new UnsupportedOperationException(Annotations.MAX_MEMORY
-                    + "=" + maxMemory);
-
     }
 
 }

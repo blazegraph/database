@@ -224,6 +224,47 @@ public class TestGroupByState extends TestCase2 {
     }
 
     /**
+     * Unit test with SELECT clause having one value expression, which is a
+     * simple variable also appearing as the sole value expression in the
+     * GROUP_BY clause. However, in this case we rename the variable when it is
+     * projected out of the SELECT expression.
+     * 
+     * <pre>
+     * SELECT ?org as ?newVar
+     * GROUP BY ?org
+     * </pre>
+     */
+    public void test_aggregateExpr_02() {
+        
+        final IVariable<?> org = Var.var("org");
+        final IVariable<?> newVar = Var.var("newVar");
+        
+        final IValueExpression<?>[] select = new IValueExpression[] { new Bind(
+                newVar, org) };
+
+        final IValueExpression<?>[] groupBy = new IValueExpression[] { org };
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(org);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(newVar);
+
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having, columnVars,
+                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+        
+    }
+
+    /**
      * Unit test with simple aggregate function in SELECT clause.
      * <pre>
      * SELECT ?org, SUM(?lprice) AS ?totalPrice

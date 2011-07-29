@@ -237,7 +237,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             	// The target operator for this message.
             	final PipelineOp bop = (PipelineOp) getBOp(msg.getBOpId());
 				
-				final int capacity = bop.isPipelined() ? bop.getProperty(
+				final int capacity = bop.isPipelinedEvaluation() ? bop.getProperty(
 						PipelineOp.Annotations.PIPELINE_QUEUE_CAPACITY,
 						PipelineOp.Annotations.DEFAULT_PIPELINE_QUEUE_CAPACITY)
 						: Integer.MAX_VALUE;
@@ -328,7 +328,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             throw new IllegalArgumentException();
 		final PipelineOp bop = (PipelineOp) getBOp(bundle.bopId);
 		final int maxParallel = bop.getMaxParallel();
-		final boolean pipelined = bop.isPipelined();
+		final boolean pipelined = bop.isPipelinedEvaluation();
 		final int maxMessagesPerTask = bop.getProperty(
 				PipelineOp.Annotations.MAX_MESSAGES_PER_TASK,
 				PipelineOp.Annotations.DEFAULT_MAX_MESSAGES_PER_TASK);

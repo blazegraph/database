@@ -103,9 +103,9 @@ public class GroupByStagedOp extends GroupByOp {
 		}
 
 		// operator is not pipelined.
-		if (!isPipelined()) {
+		if (!isPipelinedEvaluation()) {
 			throw new UnsupportedOperationException(Annotations.PIPELINED + "="
-					+ isPipelined());
+					+ isPipelinedEvaluation());
 		}
 
 	}
