@@ -100,6 +100,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.counters.TestAll.suite() );
         suite.addTest( com.bigdata.rawstore.TestAll.suite() );
         suite.addTest( com.bigdata.btree.TestAll.suite() );
+        suite.addTest( com.bigdata.htree.TestAll.suite() );
         suite.addTest( com.bigdata.concurrent.TestAll.suite() );
         suite.addTest( com.bigdata.quorum.TestAll.suite() );
         suite.addTest( com.bigdata.ha.TestAll.suite() );
