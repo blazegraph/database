@@ -445,7 +445,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		// }
 		// }
 		// }
-		for (int i = 0; i < slotsOnPage; i++) {
+		final int nkeys = keys.size();
+		for (int i = 0; i < nkeys; i++) {
 			if (!keys.isNull(i)) {
 				if (BytesUtil.bytesEqual(key, keys.get(i))) {
 					return getValues().get(i);

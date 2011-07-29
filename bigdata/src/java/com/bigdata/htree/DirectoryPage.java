@@ -10,9 +10,6 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
 import com.bigdata.htree.AbstractHTree.ChildMemoizer;
 import com.bigdata.htree.AbstractHTree.LoadChildRequest;
@@ -130,7 +127,11 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         for (int i = 0; i < bucketSlotsPerPage; i++) {
             ((HTree) htree).insertRawTuple(bucketPage, i);
         }
-	        
+        // ...and finally delete old page
+        if (bucketPage.isPersistent()) {
+            htree.deleteNodeOrLeaf(bucketPage.getIdentity());
+        }
+        bucketPage.delete();
 	}
 
 	/**
@@ -1521,6 +1522,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
      * @param newChild
      *            The reference to the new child.
      */
+	// FIXME Reconcile two versions of replaceChildRef
+	// FIXME Reconcile pattern for deleting a persistent object (htree AND btree)
     void replaceChildRef(final long oldChildAddr, final AbstractPage newChild) {
 
         assert oldChildAddr != NULL || htree.store == null;

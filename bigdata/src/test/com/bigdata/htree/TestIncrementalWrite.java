@@ -29,6 +29,7 @@ package com.bigdata.htree;
 
 import java.util.UUID;
 
+import com.bigdata.btree.AbstractNode;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
@@ -36,7 +37,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.MyHardReferenceQueue;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Bytes;

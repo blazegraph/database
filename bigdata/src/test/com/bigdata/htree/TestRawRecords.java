@@ -1,17 +1,11 @@
 package com.bigdata.htree;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.UUID;
 
-import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.data.ILeafData;
-import com.bigdata.counters.CounterSet;
 import com.bigdata.io.TestCase3;
-import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 

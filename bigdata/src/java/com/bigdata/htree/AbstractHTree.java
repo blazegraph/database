@@ -1682,6 +1682,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         } else {
 
             // parent must be dirty if child is dirty.
+            if(!parent.isDirty()) // TODO remove (debug point). 
+                throw new AssertionError();
             assert parent.isDirty();
 
             // parent must not be persistent if it is dirty.

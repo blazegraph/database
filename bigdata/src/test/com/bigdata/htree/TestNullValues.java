@@ -29,9 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.htree;
 
 import java.io.IOException;
-import java.util.UUID;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rawstore.IRawStore;

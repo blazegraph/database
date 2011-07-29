@@ -55,10 +55,9 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 
     /**
      * Unit test which inserts <code>
-     * x10, x11, x20, x21</code> and then works through
-     * addLevel() and splitAndReindex(). For that sequence of keys, we can get
-     * by with a single addLevel() and then immediately split and reindex the
-     * full bucket page.
+     * x10, x11, x20, x21</code> and then works through addLevel() and
+     * splitAndReindex(). For that sequence of keys, we can get by with a single
+     * addLevel() and then immediately split and reindex the full bucket page.
      */
     public void test_addLevel() {
 

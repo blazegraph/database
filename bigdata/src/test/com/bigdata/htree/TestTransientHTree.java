@@ -28,23 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import java.lang.ref.WeakReference;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.UUID;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.htree.AbstractHTree.HardReference;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Unit tests for transient {@link HTree}s (no backing store).
