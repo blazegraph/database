@@ -172,7 +172,8 @@ public class TestHTree_addLevel extends AbstractHTreeTestCase {
 			 * </pre>
 			 */
 
-			htree.addLevel2(a);
+			// htree.addLevel2(a);
+            a.addLevel();
             
 			if (log.isInfoEnabled())
 				log.info("\n" + htree.PP());

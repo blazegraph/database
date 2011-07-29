@@ -10,6 +10,9 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
 import com.bigdata.htree.AbstractHTree.ChildMemoizer;
 import com.bigdata.htree.AbstractHTree.LoadChildRequest;
@@ -91,7 +94,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		}
 		int last = start;
 		for (int s = start + 1; s < slotsOnPage; s++) {
-            if (bucketPage.self == childRefs[s]) {
+			if (bucketPage.self == childRefs[s]) {
 				last++;
 			} else {
 				break;
@@ -1590,6 +1593,35 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 					+ oldChildAddr);
 
     }
+    
+    void replaceChildRef(Reference oldRef, AbstractPage newChild) {
+		final int slotsOnPage = 1 << htree.addressBits;
+
+		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
+		
+		// Scan for location in weak references.
+		int npointers = 0;
+		for (int i = 0; i < slotsOnPage; i++) {
+
+            if (childRefs[i] == oldRef) {
+
+                // Clear the old key.
+                data.childAddr[i] = NULL;
+
+                // Stash reference to the new child.
+                // childRefs[i] = btree.newRef(newChild);
+                childRefs[i] = (Reference) newChild.self;
+
+                newChild.parent = (Reference) this.self;
+
+                npointers++;
+            }
+
+        }
+		
+		assert npointers > 0;
+    	
+    }
 
 	int activeBucketPages() {
 		int ret = 0;
@@ -1607,6 +1639,53 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			ret += children.next().activeDirectoryPages();
 		}
 		return ret;
+	}
+
+	void _addLevel(final BucketPage bucketPage) {
+		assert !isReadOnly();
+
+		/**
+		 * TBD: Since for _addLevel to be called there should only be a single reference to
+		 * bucketPage, this directory MUST be at global depth.  BUT, rather than
+		 * replacing the only the old bucket page with the reference to the new
+		 * directory, we should/could create a directory of half this directory's depth
+		 * and insert the requisite references
+		 */
+		
+		// Create new directory to insert
+		DirectoryPage ndir = new DirectoryPage((HTree) htree, htree.addressBits/* globalDepth */);
+		
+		((HTree) htree).nnodes++;
+
+		// And new bucket pages for the new directory
+		final BucketPage a = new BucketPage((HTree) htree, 1);
+		final BucketPage b = new BucketPage((HTree) htree, 1);
+		
+		((HTree) htree).nleaves++; // Note: only +1 since we will delete the oldPage.
+		
+		// Link the new bucket pages into the new parent directory page.
+		a.parent = (Reference<DirectoryPage>) ndir.self;
+		b.parent = (Reference<DirectoryPage>) ndir.self;
+		final int bucketRefs = (1 << htree.addressBits) >> 1; // half total number of directory slots
+		for (int i = 0; i < bucketRefs; i++) {
+			ndir.childRefs[i] = (Reference) a.self;
+			ndir.childRefs[i+bucketRefs] = (Reference) b.self;
+		}
+		
+		// now replace the reference to the old bucket page with the new directory
+		replaceChildRef(bucketPage.self, ndir);
+		
+		// insert old tuples
+		final int bucketSlotsPerPage = bucketPage.slotsOnPage();
+		for (int i = 0; i < bucketSlotsPerPage; i++) {
+			((HTree) htree).insertRawTuple(bucketPage, i);
+		}
+
+		// ...and finally delete old page
+		if (bucketPage.isPersistent()) {
+			htree.deleteNodeOrLeaf(bucketPage.getIdentity());
+		}
+		bucketPage.delete();
 	}
 
 }
