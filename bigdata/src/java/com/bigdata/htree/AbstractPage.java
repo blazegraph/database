@@ -655,6 +655,9 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 		}
         
+        // delete this node now that it has been cloned.
+        this.delete();
+        
         if (htree.root == this) {
 
             assert parent == null;
@@ -700,17 +703,11 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
              * navigation. It will be GCd once it falls off of the hard
              * reference queue.
              */
-            // parent.replaceChildRef(oldId, newNode);
-            parent.replaceChildRef(this.self, newNode);
+            parent.replaceChildRef(oldId, newNode);
+            // parent.replaceChildRef(this.self, newNode);
 
         }
 
-        // delete this node now that it has been cloned.
-		if (isPersistent()) {
-			htree.deleteNodeOrLeaf(getIdentity());
-		}
-        this.delete();
-        
         return newNode;
 
     }
