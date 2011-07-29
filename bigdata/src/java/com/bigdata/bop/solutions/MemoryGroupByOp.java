@@ -545,57 +545,17 @@ public class MemoryGroupByOp extends GroupByOp {
              * If a groupBy clause was used, bind each SELECT expression which
              * is either a bare reference to a variable declared in the GROUP_BY
              * clause or a BIND() of a reference to a variable declared in the
-             * GROUP_BY clause onto a new variable name.
-             * 
-             * TODO Unit test [SELECT ?x AS ?y GROUP BY ?x] (rename of a
-             * GROUP_BY variable).
+             * GROUP_BY clause onto a new variable name. This is an optimization
+             * since we do not need to traverse all the solutions for this case.
              */
             if (groupBy != null) {
+
                 // The first solution in the group.
                 final IBindingSet aSolution = solutions.iterator().next();
-                // Declared variables projected by the GROUP_BY clause (if any).
-                final LinkedHashSet<IVariable<?>> groupByVars = groupByState
-                        .getGroupByVars();
-                // The projected SELECT expressions.
-                for (IValueExpression<?> expr : select) {
-                    if(expr instanceof IVariable<?>) {
-                        /*
-                         * SELECT ?x GROUP BY ?x
-                         */
-                        final IVariable<?> var = (IVariable<?>) expr;
-                        // Bare variable MUST be projected by GROUP_BY clause.
-                        if (!groupByVars.contains(var))
-                            throw new AssertionError();
-                        // Note: MUST be a binding for each groupBy var.
-                        @SuppressWarnings({ "rawtypes", "unchecked" })
-                        final Constant<?> val = new Constant(var.get(aSolution));
-                        // Bind on solution.
-                        agg.set(var, val);
-                    } else if (expr instanceof IBind<?>) {
-                        final IBind<?> bindExpr = (IBind<?>) expr;
-                        if (bindExpr.getExpr() instanceof IVariable<?>) {
-                            /*
-                             * SELECT ?x AS ?y GROUP BY ?x
-                             */
-                            // reference to a groupBy variable.
-                            final IVariable<?> gvar = (IVariable<?>) bindExpr
-                                    .getExpr();
-                            // Bare variable MUST be projected by GROUP_BY
-                            // clause.
-                            if (!groupByVars.contains(gvar))
-                                throw new AssertionError();
-                            // Note: MUST be binding for each groupBy var.
-                            @SuppressWarnings({ "rawtypes", "unchecked" })
-                            final Constant<?> val = new Constant(
-                                    gvar.get(aSolution));
-                            // variable to be projected out by SELECT.
-                            final IVariable<?> ovar = ((IBind<?>) expr)
-                                    .getVar();
-                            // Bind on solution under projected var name.
-                            agg.set(ovar, val);
-                        }
-                    }
-                }
+
+                // Bind any SELECT expressions based solely on variables
+                // projected by the GROUP_BY clause. 
+                handleGroupBy(agg, aSolution);
             }
 
             /*
@@ -627,6 +587,92 @@ public class MemoryGroupByOp extends GroupByOp {
             return agg;
         }
 
+        /**
+         * Bind each SELECT expression which is either a bare reference to a
+         * variable declared in the GROUP_BY clause or a BIND() of a reference
+         * to a variable declared in the GROUP_BY clause onto a new variable
+         * name.
+         * 
+         * @param agg
+         *            The solution to be projected for the group.
+         * @param aSolution
+         *            Any of the input solutions for that group.
+         */
+        private void handleGroupBy(final IBindingSet agg,
+                final IBindingSet aSolution) {
+
+            if(groupBy == null) // Only permitted when GROUP_BY is used.
+                throw new AssertionError();
+
+            if (agg == null)
+                throw new IllegalArgumentException();
+
+            if (aSolution == null)
+                throw new IllegalArgumentException();
+            
+            // Declared variables projected by the GROUP_BY clause (if any).
+            final LinkedHashSet<IVariable<?>> groupByVars = groupByState
+                    .getGroupByVars();
+            
+            // The projected SELECT expressions.
+            for (IValueExpression<?> expr : select) {
+            
+                if (expr instanceof IVariable<?>) {
+                    
+                    /*
+                     * SELECT ?x GROUP BY ?x
+                     */
+                    
+                    final IVariable<?> var = (IVariable<?>) expr;
+                    
+                    // Bare variable MUST be projected by GROUP_BY clause.
+                    if (!groupByVars.contains(var))
+                        throw new AssertionError();
+                    
+                    // Note: MUST be a binding for each groupBy var.
+                    @SuppressWarnings({ "rawtypes", "unchecked" })
+                    final Constant<?> val = new Constant(var.get(aSolution));
+                    
+                    // Bind on solution.
+                    agg.set(var, val);
+                
+                } else if (expr instanceof IBind<?>) {
+                
+                    final IBind<?> bindExpr = (IBind<?>) expr;
+                    
+                    if (bindExpr.getExpr() instanceof IVariable<?>) {
+                    
+                        /*
+                         * SELECT ?x AS ?y GROUP BY ?x
+                         */
+                        
+                        // reference to a groupBy variable.
+                        final IVariable<?> gvar = (IVariable<?>) bindExpr
+                                .getExpr();
+                    
+                        // Bare variable MUST be projected by GROUP_BY clause.
+                        if (!groupByVars.contains(gvar))
+                            throw new AssertionError();
+
+                        // Note: MUST be binding for each groupBy var.
+                        @SuppressWarnings({ "rawtypes", "unchecked" })
+                        final Constant<?> val = new Constant(
+                                gvar.get(aSolution));
+                        
+                        // variable to be projected out by SELECT.
+                        final IVariable<?> ovar = ((IBind<?>) expr).getVar();
+                        
+                        // Bind on solution under projected var name.
+                        agg.set(ovar, val);
+                    
+                    }
+                    
+                }
+
+            }
+        
+        }
+        
     } // GroupByTask
 
 }
