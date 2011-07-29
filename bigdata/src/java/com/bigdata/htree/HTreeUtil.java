@@ -27,9 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import com.bigdata.btree.BytesUtil;
-
 import it.unimi.dsi.bits.Fast;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
  * Static utility methods and data for an {@link HTree}.

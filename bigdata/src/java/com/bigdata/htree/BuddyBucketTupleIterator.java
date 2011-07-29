@@ -43,23 +43,9 @@ class BuddyBucketTupleIterator<E> implements
 
 		this.key = key;
 		this.bucket = bucket;
-//			this.buddyOffset = buddyOffset;
 
-		// #of slots on the page.
-		final int slotsOnPage = bucket.slotsOnPage();
-
-//			// #of address slots in each buddy hash table.
-//			final int slotsPerBuddy = (1 << bucket.globalDepth);
-//
-//			// the index of the last slot in the buddy bucket.
-//			lastSlot = buddyOffset + slotsPerBuddy;
-//			
-//			// range check buddyOffset.
-//			if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-//				throw new IndexOutOfBoundsException();
-//
-//			// The first slot to test.
-//			index = buddyOffset;
+//		// #of slots on the page.
+//		final int slotsOnPage = bucket.slotsOnPage();
 
 		/*
 		 * The index of the last slot in the buddy bucket.
@@ -68,11 +54,11 @@ class BuddyBucketTupleIterator<E> implements
 		 * to start at the first slot (index zero) and scan until the last slot
 		 * (slotsOnPage-1).
 		 * 
-		 * TODO Optimize this if the tuples in the bucket page are known to be
+		 * Note: Optimized (assumes tuples in the bucket page are known to be
 		 * dense (no gaps), in which case we do not have to scan more than
-		 * bucket.data.getKeyCount() slots.
+		 * bucket.data.getKeyCount() slots).
 		 */
-		lastSlot = slotsOnPage;
+		lastSlot = bucket.getKeys().size();//slotsOnPage;
 
 		// The first slot to test.
 		index = 0;

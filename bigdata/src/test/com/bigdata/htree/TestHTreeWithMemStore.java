@@ -158,7 +158,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
 	}
     
-	private static final int s_limit = 10000;
+	private static final int s_limit = 100000;
 	
     private void doStressTest(final int addressBits) {
 
@@ -178,20 +178,23 @@ public class TestHTreeWithMemStore extends TestCase {
 				final IKeyBuilder keyBuilder = new KeyBuilder();
 
 				final byte[][] keys = new byte[s_limit][];
-
+                for (int i = 0; i < s_limit; i++) {
+                    keys[i] = keyBuilder.reset().append(new Integer(i).hashCode()).getKey();
+                }
+                final long begin = System.currentTimeMillis();
 				for (int i = 0; i < s_limit; i++) {
-
-					final byte[] key = keyBuilder.reset().append(i).getKey();
-
-					keys[i] = key;
+					final byte[] key = keys[i];
 					htree.insert(key, key);
 					if (log.isTraceEnabled())
 						log.trace("after key=" + i + "\n" + htree.PP());
 
 				}
 
+				final long elapsedInsertMillis = System.currentTimeMillis() - begin;
+				
 				assertEquals(s_limit, htree.getEntryCount());
-
+				
+				final long beginLookupFirst = System.currentTimeMillis();
 				// Verify all tuples are found.
 				for (int i = 0; i < s_limit; i++) {
 
@@ -206,19 +209,37 @@ public class TestHTreeWithMemStore extends TestCase {
 
 				}
 
+                final long elapsedLookupFirstTime = System.currentTimeMillis()
+                        - beginLookupFirst;
+
+                final long beginValueIterator = System.currentTimeMillis();
+                
 				// Verify the iterator visits all of the tuples.
 				AbstractHTreeTestCase.assertSameIteratorAnyOrder(keys,
 						htree.values());
+
+                final long elapsedValueIteratorTime = System
+                        .currentTimeMillis() - beginValueIterator;
+				
+                if (log.isInfoEnabled()) {
+                    log.info("Inserted: " + s_limit + " tuples in "
+                            + elapsedInsertMillis + "ms, lookupFirst(all)="
+                            + elapsedLookupFirstTime+ ", valueScan(all)="
+                            + elapsedValueIteratorTime + ", addressBits="
+                            + htree.getAddressBits() + ", nnodes="
+                            + htree.getNodeCount() + ", nleaves="
+                            + htree.getLeafCount());
+                }
 
 			} catch (Throwable t) {
 
 				log.error(t);
 
-				try {
-					log.error("Pretty Print of error state:\n" + htree.PP(), t);
-				} catch (Throwable t2) {
-					log.error("Problem in pretty print: t2", t2);
-				}
+//				try {
+//					log.error("Pretty Print of error state:\n" + htree.PP(), t);
+//				} catch (Throwable t2) {
+//					log.error("Problem in pretty print: t2", t2);
+//				}
 
 				// rethrow the original exception.
 				throw new RuntimeException(t);

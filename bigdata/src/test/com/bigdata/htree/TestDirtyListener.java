@@ -270,7 +270,7 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 
 	/**
 	 * Used to detect correct and incorrect
-	 * {@link IDirtyListener#dirtyEvent(BTree)} events.
+	 * {@link IDirtyListener#dirtyEvent(ICheckpointProtocol)} events.
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
@@ -278,12 +278,11 @@ public class TestDirtyListener extends AbstractHTreeTestCase {
 	 */
 	private static class MyDirtyListener implements IDirtyListener {
 
-		/**
-		 * Note: The flag is initially <code>false</code>. Even through a new
-		 * BTree will always generate this event, the listener is not registered
-		 * until after the {@link BTree} has been created so we never see that
-		 * event.
-		 */
+        /**
+         * Note: The flag is initially <code>false</code>. Even through a new
+         * BTree will always generate this event, the listener is not registered
+         * until after the index has been created so we never see that event.
+         */
 		private boolean expected = true;
 
 		/**

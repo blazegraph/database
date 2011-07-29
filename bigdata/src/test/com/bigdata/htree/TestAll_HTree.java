@@ -96,9 +96,7 @@ public class TestAll_HTree extends TestCase {
 
         // test incremental write of leaves and nodes.
         suite.addTestSuite(TestIncrementalWrite.class);
-        // test copy-on-write scenarios.
-        suite.addTestSuite(TestCopyOnWrite.class);
-
+        
         /*
          * test persistence protocols. 
          */
