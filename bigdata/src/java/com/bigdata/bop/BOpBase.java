@@ -340,7 +340,7 @@ public class BOpBase implements BOp {
     /**
      * Set the value of an operand.
      * <p>
-     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * Note: This is protected to facilitate copy-on-write patterns. It is not
      * public to prevent arbitrary changes to operators outside of methods which
      * clone the operator and return the modified version. This is part of the
      * effectively immutable contract for {@link BOp}s.
@@ -563,7 +563,7 @@ public class BOpBase implements BOp {
     /**
      * Set an annotation.
      * <p>
-     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * Note: This is protected to facilitate copy-on-write patterns. It is not
      * public to prevent arbitrary changes to operators outside of methods which
      * clone the operator and return the modified version. This is part of the
      * effectively immutable contract for {@link BOp}s.
@@ -584,7 +584,7 @@ public class BOpBase implements BOp {
     /**
      * Clear an annotation.
      * <p>
-     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * Note: This is protected to facilitate copy-on-write patterns. It is not
      * public to prevent arbitrary changes to operators outside of methods which
      * clone the operator and return the modified version. This is part of the
      * effectively immutable contract for {@link BOp}s.
