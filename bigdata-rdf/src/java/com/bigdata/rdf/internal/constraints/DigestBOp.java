@@ -34,7 +34,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -111,10 +110,12 @@ public class DigestBOp extends LexiconBOp {
 
     }
 
-    public static String toHexString(byte[] buf) {
-        char[] hexChar = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+    private static final char[] hexChar = { '0', '1', '2', '3', '4', '5', '6',
+            '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
-        StringBuilder strBuf = new StringBuilder(buf.length * 2);
+    public static String toHexString(byte[] buf) {
+
+        final StringBuilder strBuf = new StringBuilder(buf.length * 2);
         for (int i = 0; i < buf.length; i++) {
             strBuf.append(hexChar[(buf[i] & 0xf0) >>> 4]); // fill left with
             // zero bits
