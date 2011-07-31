@@ -45,7 +45,7 @@ public class TestGROUP_CONCAT extends TestCase2 {
 	 * @todo test w/ nulls and w/ only nulls.
 	 */
 	public void test_something() {
-//		fail("write tests");
+		fail("write tests");
 	}
 	
 }

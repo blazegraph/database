@@ -26,24 +26,25 @@ package com.bigdata.bop.rdf.aggregate;
 import junit.framework.TestCase2;
 
 /**
- * Unit tests for {@link SAMPLE}.
+ * Unit tests for {@link AVERAGE}.
  * 
  * @author thompsonbry
  */
-public class TestSAMPLE extends TestCase2 {
+public class TestAVERAGE extends TestCase2 {
 
-	public TestSAMPLE() {
+	public TestAVERAGE() {
 	}
 
-	public TestSAMPLE(String name) {
+	public TestAVERAGE(String name) {
 		super(name);
 	}
 
-    /**
-     * TODO Write tests. 
+	/**
+	 * TODO Write tests.
      * 
      * @todo test w/ nulls and w/ only nulls.
-     */
+	 * @todo test with type conversion errors.
+	 */
 	public void test_something() {
 		fail("write tests");
 	}

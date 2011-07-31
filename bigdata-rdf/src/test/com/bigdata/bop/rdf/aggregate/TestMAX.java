@@ -47,7 +47,7 @@ public class TestMAX extends TestCase2 {
 	 * @todo verify using SPARQL ORDER BY semantics.
 	 */
 	public void test_something() {
-//		fail("write tests");
+		fail("write tests");
 	}
 	
 }

@@ -63,11 +63,10 @@ public class GroupByState implements IGroupByState {
     private final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
     private final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
     private final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
-//    private final LinkedHashSet<IVariable<?>> distinctColumnVars = new LinkedHashSet<IVariable<?>>();
     final private boolean anyDistinct;
     final private boolean selectDependency;
     final private boolean simpleHaving;
-    
+
     public IValueExpression<?>[] getGroupByClause() {
         return groupBy;
     }

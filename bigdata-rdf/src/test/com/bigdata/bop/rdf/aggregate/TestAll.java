@@ -63,6 +63,7 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestCOUNT.class);
         suite.addTestSuite(TestSUM.class);
+        suite.addTestSuite(TestAVERAGE.class);
         suite.addTestSuite(TestMIN.class);
         suite.addTestSuite(TestMAX.class);
         suite.addTestSuite(TestGROUP_CONCAT.class);
