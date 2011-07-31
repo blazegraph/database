@@ -86,7 +86,6 @@ public class TestDeepCopy extends TestCase2 {
         // com.bigdata.bop
             BOp.class,//
             BOpBase.class,//
-            BOpList.class,//
             Predicate.class,//
             Constant.class,//
             Var.class,//

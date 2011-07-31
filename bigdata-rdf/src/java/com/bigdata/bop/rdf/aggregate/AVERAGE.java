@@ -41,8 +41,11 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.XSDLongIV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.util.InnerCause;
 
@@ -52,25 +55,25 @@ import com.bigdata.util.InnerCause;
  * 
  * @author thompsonbry
  */
-public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
+public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
         INeedsMaterialization {
 
-    private static final transient Logger log = Logger.getLogger(SUM.class);
+    private static final transient Logger log = Logger.getLogger(AVERAGE.class);
 
     /**
 	 * 
 	 */
     private static final long serialVersionUID = 1L;
 
-    public SUM(SUM op) {
+    public AVERAGE(AVERAGE op) {
         super(op);
     }
 
-    public SUM(BOp[] args, Map<String, Object> annotations) {
+    public AVERAGE(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
-    public SUM(boolean distinct, IValueExpression<IV> expr) {
+    public AVERAGE(boolean distinct, IValueExpression<IV> expr) {
         super(FunctionCode.SUM, distinct, expr);
     }
 
@@ -80,16 +83,29 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
      * Note: SUM() returns ZERO if there are no non-error solutions presented.
      * This assumes that the ZERO will be an xsd:int ZERO.
      * <p>
-     * Note: This field is guarded by the monitor on the {@link SUM} instance.
+     * Note: This field is guarded by the monitor on the {@link AVERAGE}
+     * instance.
      */
     private transient IV aggregated = ZERO;
 
+    /**
+     * The #of observed values.
+     */
+    private transient long n = 0;
+
     synchronized public void reset() {
         aggregated = ZERO;
+        n = 0;
     }
 
     synchronized public IV done() {
-        return aggregated;
+
+        if(n == 0)
+            return ZERO;
+        
+        return IVUtility.numericalMath(aggregated,
+                new XSDLongIV<BigdataLiteral>(n), MathBOp.MathOp.DIVIDE);
+        
     }
 
     synchronized public IV get(final IBindingSet bindingSet) {
@@ -140,6 +156,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
             }
 
+            n++;
             return aggregated;
 
         } catch (Throwable t) {
@@ -162,7 +179,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     /**
-     * Note: {@link SUM} only works on numerics. If they are inline, then that
+     * Note: {@link AVERAGE} only works on numerics. If they are inline, then that
      * is great. Otherwise it will handle a materialized numeric literal and do
      * type promotion, which always results in a signed inline number IV and
      * then operate on that.

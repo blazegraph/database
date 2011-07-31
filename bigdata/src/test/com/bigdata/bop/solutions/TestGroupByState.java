@@ -599,6 +599,7 @@ public class TestGroupByState extends TestCase2 {
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public void test_forwardReference_not_allowed() {
+
         final IVariable<IV> a = Var.var("a");
         final IVariable<IV> b = Var.var("b");
         final IVariable<IV> x = Var.var("x");
@@ -725,6 +726,16 @@ public class TestGroupByState extends TestCase2 {
     }
     
     /**
+     * TODO Unit test when projecting a constant
+     * <pre>
+     * SELECT SUM(?x) as ?y, 12.0 as ?z
+     * </pre>
+     */
+    public void test_with_constant() {
+        fail("write test");
+    }
+
+    /**
      * Unit test for bad arguments.
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -733,11 +744,6 @@ public class TestGroupByState extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
         final IVariable<IV> x = Var.var("x");
         final IVariable<IV> z = Var.var("z");
-
-        final IValueExpression<IV> xExpr = new /* Conditional */Bind(x,
-                new SUM(false/* distinct */, (IValueExpression<IV>) y));
-
-        final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
 
         final IValueExpression<IV>[] groupBy = new IValueExpression[] { z };
 
@@ -768,5 +774,5 @@ public class TestGroupByState extends TestCase2 {
         }
         
     }
-
+    
 }

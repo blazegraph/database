@@ -41,12 +41,13 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 /**
  * Operator computes the number of non-null values over the presented binding
  * sets for the given variable.
+ * <p>
+ * Note: COUNT(*) is the cardinality of the solution multiset. COUNT(DISTINCT *)
+ * is the cardinality of the distinct solutions in the solution multiset. These
+ * semantics are not directly handled by this class. It relies on the
+ * aggregation operator to compute those values.
  * 
  * @author thompsonbry
- * 
- *         FIXME COUNT(*) is a special case. Per SPARQL 1.1, <i>when COUNT is
- *         used with the expression the value of F will be the cardinality of
- *         the group solution sequence</i>.
  */
 public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
@@ -63,9 +64,9 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 		super(args, annotations);
 	}
 
-	public COUNT(final boolean distinct, IValueExpression<IV> expr) {
-		super(FunctionCode.COUNT,distinct, expr);
-	}
+    public COUNT(final boolean distinct, IValueExpression<IV> expr) {
+        super(FunctionCode.COUNT, distinct, expr);
+    }
 	
 	/**
 	 * The running aggregate value.
@@ -84,6 +85,12 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
         final IVariable<IV> var = (IVariable<IV>) get(0);
 
+        if (var.isWildcard()) {
+            // Do not attempt to evaluate "*".
+            aggregated++;
+            return null;
+        }
+        
         final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
         if (val != null) {

@@ -173,7 +173,7 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 	}
 
 	@SuppressWarnings("unchecked")
-	final public IValueExpression<E> getExpression() {
+	final public IValueExpression<E> getExpr() {
 
 		return (IValueExpression<E>) get(0);
 
@@ -200,18 +200,18 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 		throw new UnsupportedOperationException();
 	}
 
-	public AggregateBase<E> setExpression(final IValueExpression<E> newExpr) {
-
-		if (newExpr == null)
-			throw new IllegalArgumentException();
-
-		final AggregateBase<E> tmp = (AggregateBase<E>) this.clone();
-
-		tmp._set(0, newExpr);
-
-		return tmp;
-
-	}
+//	public AggregateBase<E> setExpression(final IValueExpression<E> newExpr) {
+//
+//		if (newExpr == null)
+//			throw new IllegalArgumentException();
+//
+//		final AggregateBase<E> tmp = (AggregateBase<E>) this.clone();
+//
+//		tmp._set(0, newExpr);
+//
+//		return tmp;
+//
+//	}
 
     private volatile transient Set<IVariable<E>> terms;
 
@@ -219,7 +219,7 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 
         if (terms == null) {
 
-            final IValueExpression<E> e = getExpression();
+            final IValueExpression<E> e = getExpr();
 
             if (e instanceof IVariable<?>)
                 terms = Collections.singleton((IVariable<E>) e);

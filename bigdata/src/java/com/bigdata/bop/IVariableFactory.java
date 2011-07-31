@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,44 +22,22 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 17, 2010
+ * Created on Jul 29, 2011
  */
 
 package com.bigdata.bop;
 
-import java.util.Map;
-
 /**
- * A list of {@link BOp}s.
+ * A factory for {@link IVariable}s (used to facilitate unit testing).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BOpList extends BOpBase {
+public interface IVariableFactory {
 
     /**
-     * 
+     * Return a new anonymous variable.
      */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Deep copy constructor.
-     */
-    public BOpList(final BOpList op) {
-        super(op);
-    }
-
-    /**
-     * Shallow copy constructor.
-     */
-    public BOpList(final BOp[] args, final Map<String, Object> annotations) {
-     
-        super(args, annotations);
-        
-    }
-
-//    public BOpList(final BOp[] args) {
-//        super(args);
-//    }
-
+    IVariable<?> var();
+    
 }

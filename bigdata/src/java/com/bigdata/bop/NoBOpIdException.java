@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,22 +22,21 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 5, 2010
+ * Created on Jul 30, 2011
  */
 
 package com.bigdata.bop;
 
-import java.util.Map;
-
 /**
- * Base class for immutable operators such as {@link Var} and {@link Constant}.
- * These operators do not deep copy their data and do not permit decoration with
- * annotations.
+ * This exception is throw when a bop which is required to have a bopId does not
+ * have its bopId property defined. All {@link PipelineOp}s are required to have
+ * bopIds since the bopId will be used for routing decisions and is also used to
+ * detect loops in the bop plan.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ImmutableBOp extends BOpBase {
+public class NoBOpIdException extends RuntimeException {
 
     /**
      * 
@@ -45,32 +44,16 @@ abstract public class ImmutableBOp extends BOpBase {
     private static final long serialVersionUID = 1L;
 
     /**
-     * @param op
+     * 
      */
-    public ImmutableBOp(BOpBase op) {
-        super(op);
+    public NoBOpIdException() {
     }
 
     /**
-     * @param args
-     * @param annotations
+     * @param message
      */
-    public ImmutableBOp(BOp[] args, Map<String, Object> annotations) {
-        super(args, annotations);
-    }
-    
-    /*
-     * Overrides for the copy-on-write mutation API. 
-     */
-
-    @Override
-    final protected Object _setProperty(String name,Object value) {
-        throw new UnsupportedOperationException();
-    }
-    
-    @Override
-    final protected void _clearProperty(String name) {
-        throw new UnsupportedOperationException();
+    public NoBOpIdException(String message) {
+        super(message);
     }
 
 }

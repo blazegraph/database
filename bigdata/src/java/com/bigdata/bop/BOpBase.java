@@ -359,7 +359,32 @@ public class BOpBase implements BOp {
         this.args[index] = op;
         
     }
-    
+
+    /**
+     * Return a new {@link BOpBase} in which the child operand has been replaced
+     * by the given expression.
+     * 
+     * @param index
+     *            The index of the child expression to be replaced.
+     * @param newArg
+     *            The new child expression.
+     * 
+     * @return A copy of this {@link BOpBase} in which the child operand has
+     *         been replaced.
+     */
+    public BOpBase setArg(final int index, final BOp newArg) {
+
+        if (newArg == null)
+            throw new IllegalArgumentException();
+
+        final BOpBase tmp = (BOpBase) this.clone();
+
+        tmp._set(index, newArg);
+
+        return tmp;
+
+    }
+
     public int arity() {
         
         return args.length;
@@ -756,87 +781,87 @@ public class BOpBase implements BOp {
      * Note: Both Var and Constant override hashCode() and equals().
      */
     
-//    /**
-//     * <code>true</code> if all arguments and annotations are the same.
-//     */
-//    public boolean equals(final Object other) {
-//
-//        if (this == other)
-//            return true;
-//
-//        if (!(other instanceof BOp))
-//            return false;
-//
-//        final BOp o = (BOp) other;
-//
-//        final int arity = arity();
-//
-//        if (arity != o.arity())
-//            return false;
-//
-//        for (int i = 0; i < arity; i++) {
-//
-//            final BOp x = get(i);
-//
-//            final BOp y = o.get(i);
-//
-//            /*
-//             *    X      Y
-//             * same   same : continue (includes null == null);
-//             * null  other : return false;
-//             * !null other : if(!x.equals(y)) return false.
-//             */
-//            if (x != y || x == null || !(x.equals(y))) { 
-////                    && (//
-////                    (x != null && !(x.equals(y))) || //
-////                    (y != null && !(y.equals(x))))//
-////            ) {
-//
-//                return false;
-//
-//            }
-//
-//        }
-//
-//        return annotations.equals(o.annotations());
-//
-//    }
-//
-//    /**
-//     * The hash code is based on the hash of the operands plus the optional
-//     * {@link BOp.Annotations#BOP_ID}.  It is cached.
-//     */
-//    public int hashCode() {
-//
-//        int h = hash;
-//
-//        if (h == 0) {
-//
-//            final int n = arity();
-//
-//            for (int i = 0; i < n; i++) {
-//
-//                h = 31 * h + get(i).hashCode();
-//
-//            }
-//
-//            Integer id = (Integer) getProperty(Annotations.BOP_ID);
-//
-//            if (id != null)
-//                h = 31 * h + id.intValue();
-//
-//            hash = h;
-//
-//        }
-//
-//        return h;
-//
-//    }
-//
-//    /**
-//     * Caches the hash code.
-//     */
-//    private int hash = 0;
+    /**
+     * <code>true</code> if all arguments and annotations are the same.
+     */
+    public boolean equals(final Object other) {
+
+        if (this == other)
+            return true;
+
+        if (!(other instanceof BOp))
+            return false;
+
+        final BOp o = (BOp) other;
+
+        final int arity = arity();
+
+        if (arity != o.arity())
+            return false;
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp x = get(i);
+
+            final BOp y = o.get(i);
+
+            /*
+             *    X      Y
+             * same   same : continue (includes null == null);
+             * null  other : return false;
+             * !null other : if(!x.equals(y)) return false.
+             */
+            if (x != y && x != null && !(x.equals(y))) { 
+//                    && (//
+//                    (x != null && !(x.equals(y))) || //
+//                    (y != null && !(y.equals(x))))//
+//            ) {
+
+                return false;
+
+            }
+
+        }
+
+        return annotations.equals(o.annotations());
+
+    }
+
+    /**
+     * The hash code is based on the hash of the operands plus the optional
+     * {@link BOp.Annotations#BOP_ID}.  It is cached.
+     */
+    public int hashCode() {
+
+        int h = hash;
+
+        if (h == 0) {
+
+            final int n = arity();
+
+            for (int i = 0; i < n; i++) {
+
+                h = 31 * h + get(i).hashCode();
+
+            }
+
+            Integer id = (Integer) getProperty(Annotations.BOP_ID);
+
+            if (id != null)
+                h = 31 * h + id.intValue();
+
+            hash = h;
+
+        }
+
+        return h;
+
+    }
+
+    /**
+     * Caches the hash code.
+     */
+    private int hash = 0;
 
 //    public boolean sameData(final BOp o) {
 //

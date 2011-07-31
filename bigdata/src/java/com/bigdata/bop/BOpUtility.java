@@ -39,7 +39,6 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
-import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -400,14 +399,13 @@ public class BOpUtility {
      *             {@link Annotations#BOP_ID}.
      * @throws BadBOpIdTypeException
      *             if the {@link Annotations#BOP_ID} is not an {@link Integer}.
-     * @throws DuplicateBOpException
-     *             if the same {@link BOp} appears more once in the operator
-     *             tree and it is neither an {@link IVariable} nor an
-     *             {@link IConstant}.
+     * @throws NoBOpIdException
+     *             if a {@link PipelineOp} does not have a
+     *             {@link Annotations#BOP_ID}.
      */
     static public Map<Integer,BOp> getIndex(final BOp op) {
         final LinkedHashMap<Integer, BOp> map = new LinkedHashMap<Integer, BOp>();
-        final LinkedHashSet<BOp> distinct = new LinkedHashSet<BOp>();
+//        final LinkedHashSet<BOp> distinct = new LinkedHashSet<BOp>();
         final Iterator<BOp> itr = preOrderIteratorWithAnnotations(op);
         while (itr.hasNext()) {
             final BOp t = itr.next();
@@ -422,19 +420,34 @@ public class BOpUtility {
                 if (conflict != null)
                     throw new DuplicateBOpIdException("duplicate id=" + id
                             + " for " + conflict + " and " + t);
+//                if (op instanceof PipelineOp && !distinct.add(op)) {
+//                    /*
+//                     * BOp appears more than once. This is not allowed for
+//                     * pipeline operators. If you are getting this exception for
+//                     * a non-pipeline operator, you should remove the bopId.
+//                     */
+//                    throw new DuplicateBOpException("dup=" + t + ", root="
+//                            + toString(op));
+//                }
+//            } else if (op instanceof PipelineOp) {
+//                /*
+//                 * Pipeline operators MUST have declared bopIds.
+//                 */
+////                throw new NoBOpIdException(op.toString());
+//                log.error("No bopId: "+op.getClass().getName());
             }
-            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)
-                    && !(t instanceof Constraint)) {
-                /*
-                 * BOp appears more than once. This is only allowed for
-                 * constants and variables to reduce the likelihood of operator
-                 * trees which describe loops. This will not detect operator
-                 * trees whose sinks target a descendant, which is another way
-                 * to create a loop.
-                 */
-                throw new DuplicateBOpException("dup=" + t + ", root="
-                        + toString(op));
-            }
+//            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)
+//                    && !(t instanceof Constraint)) {
+//                /*
+//                 * BOp appears more than once. This is only allowed for
+//                 * constants and variables to reduce the likelihood of operator
+//                 * trees which describe loops. This will not detect operator
+//                 * trees whose sinks target a descendant, which is another way
+//                 * to create a loop.
+//                 */
+//                throw new DuplicateBOpException("dup=" + t + ", root="
+//                        + toString(op));
+//            }
         }
         // wrap to ensure immutable and thread-safe.
         return Collections.unmodifiableMap(map);

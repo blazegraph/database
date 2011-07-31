@@ -95,6 +95,9 @@ public class TestAll extends TestCase {
         // Validation logic for aggregation operators.
         suite.addTestSuite(TestGroupByState.class);
         
+        // Test suite for rewrites of the SELECT and HAVING clauses.
+        suite.addTestSuite(TestGroupByRewriter.class);
+        
         // in-memory GROUP_BY
         suite.addTestSuite(TestMemoryGroupByOp.class);
 
