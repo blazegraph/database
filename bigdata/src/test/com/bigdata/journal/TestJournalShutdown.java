@@ -84,21 +84,21 @@ public class TestJournalShutdown extends TestCase2 {
                 final Thread[] threads = new Thread[tearDownActiveThreads];
                 grp.enumerate(threads);
                 final StringBuilder info = new StringBuilder();
-                boolean first = true;
+                int nactive = 0;
                 for (Thread t : threads) {
                     if (t == null)
                         continue;
-                    if(!first)
+                    if(nactive>0)
                         info.append(',');
                     info.append("[" + t.getName() + "]");
-                    first = false;
+                    nactive++;
                 }
                 
                 final String failMessage = "Threads left active after task"
                         +": test=" + getName()//
 //                        + ", delegate="+getOurDelegate().getClass().getName()
                         + ", startupCount=" + startupActiveThreads
-                        + ", teardownCount=" + tearDownActiveThreads
+                        + ", teardownCount("+nactive+")=" + tearDownActiveThreads
                         + ", thisThread="+Thread.currentThread().getName()
                         + ", threads: " + info;
                 
@@ -222,12 +222,58 @@ public class TestJournalShutdown extends TestCase2 {
                     nunfinalized.incrementAndGet();
                     ncreated.incrementAndGet();
 
+                    /**
+                     * FIXME If we submit a task which registers an index on the
+                     * new journal then we once again have a memory leak in the
+                     * condition where we do not issue an explicit close against
+                     * the Journal. [Actually, submitting a read-only task which
+                     * does not cause an index to be retained does not cause a
+                     * memory leak.]
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/196
+                     */
                     // force the use of the LockManager.
                     try {
-                        jnl.getConcurrencyManager().submit(
-                                new RegisterIndexTask(jnl.getConcurrencyManager(),
-                                        "name", new IndexMetadata("name", UUID
-                                                .randomUUID()))).get();
+                        
+                        /*
+                         * Task does not create an index, but does use the
+                         * LockManager and the WriteExecutorService.
+                         */
+                        final AbstractTask task1 = new NOpTask(
+                                jnl.getConcurrencyManager(), ITx.UNISOLATED,
+                                "name");
+
+                        /*
+                         * Task does not create an index. Since it accesses a
+                         * historical view, it does not use the LockManager or
+                         * the WriteExecutorService.
+                         * 
+                         * Note: This task may be run w/o causing Journal
+                         * references to be retained. However, [task1] and
+                         * [task2] will both cause journal references to be
+                         * retained.
+                         */
+                        final AbstractTask task1b = new NOpTask(
+                                jnl.getConcurrencyManager(), ITx.READ_COMMITTED,
+                                "name");
+
+                        /*
+                         * Task uses the LockManager and the
+                         * WriteExecutorService and creates an index. A hard
+                         * reference to that index will make it into the
+                         * journal's index cache.
+                         */
+                        final AbstractTask task2 = new RegisterIndexTask(
+                                jnl.getConcurrencyManager(), "name",
+                                new IndexMetadata("name", UUID.randomUUID()));
+
+                        /*
+                         * Submit one of the tasks and *wait* for its Future.
+                         */
+                        jnl.getConcurrencyManager().submit(task1).get();
+                        jnl.getConcurrencyManager().submit(task1b).get();
+                        jnl.getConcurrencyManager().submit(task2).get();
+                        
                     } catch (ExecutionException e) {
                         log.error("Problem registering index: " + e, e);
                     }
@@ -271,11 +317,36 @@ public class TestJournalShutdown extends TestCase2 {
 
             }
 
-            // Demand a GC.
-            System.gc();
+            /*
+             * Loop, doing GCs waiting for the journal(s) to be finalized.
+             */
+            int lastCount = nunfinalized.get();
+            
+//            // Wait for the index references to be expired from the journal caches.
+//            Thread.sleep(60000/* ms */);
 
-            // Wait for it.
-            Thread.sleep(1000/* ms */);
+            for (int i = 0; i < 20 && nunfinalized.get() > 0; i++) {
+
+                // Demand a GC.
+                System.gc();
+
+                // Wait for it.
+                Thread.sleep(500/* ms */);
+                
+                final int currentCount = nunfinalized.get();
+                
+                if (currentCount != lastCount) {
+                
+                    if (log.isInfoEnabled())
+                        log.info("npasses=" + (i + 1) + ", nfinalized="
+                                + (lastCount - currentCount) + ", unfinalized="
+                                + currentCount);
+                    
+                    lastCount = currentCount;
+                    
+                }
+                
+            }
 
             if (log.isInfoEnabled()) {
 
@@ -307,6 +378,28 @@ public class TestJournalShutdown extends TestCase2 {
 
         }
         
+    }
+
+    /**
+     * A task which does nothing, but which will wait for its locks anyway.
+     */
+    private static class NOpTask extends AbstractTask<Void> {
+
+        /**
+         * @param concurrencyManager
+         * @param timestamp
+         * @param resource
+         */
+        protected NOpTask(IConcurrencyManager concurrencyManager,
+                long timestamp, String resource) {
+            super(concurrencyManager, timestamp, resource);
+        }
+
+        @Override
+        protected Void doTask() throws Exception {
+            return null;
+        }
+
     }
 
 }

@@ -570,7 +570,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
         writeService.shutdownNow();
 
         if (sampleService != null)
-            sampleService.shutdown();
+            sampleService.shutdownNow();
 
         final long elapsed = System.currentTimeMillis() - begin;
         
