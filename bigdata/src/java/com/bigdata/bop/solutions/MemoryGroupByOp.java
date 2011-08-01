@@ -57,6 +57,7 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.util.InnerCause;
 
 /**
  * An in-memory at-once generalized aggregation operator.
@@ -235,18 +236,17 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
                 final Object asBound;
                 try {
                     /*
-                     * TODO verify side-effect for computed group by (STR(?x) as
-                     * ?y). Might not BIND() onto the right solution....
-                     * (Probably Ok as long as the solutions flowing in are
-                     * mutable, otherwise we need to copy-on-write when applying
-                     * the BINDs in the GROUP_BY to each solution.)
-                     * 
-                     * TODO Actually, it might be nicer to NOT have a side
-                     * effect on the incoming solution. That means that it can
-                     * continue to be buffered in a read-only encoding. We can
-                     * re-compute the GROUP_BY value expressions when we
-                     * actually evaluate the aggregates over the solutions in a
-                     * solution group.
+                     * TODO This has a side-effect on the solution, which means
+                     * that it needs to be mutable and we have to store the
+                     * modified solution. However, it might be nicer to NOT have
+                     * a side effect on the incoming solution. That means that
+                     * it can continue to be buffered in a read-only encoding on
+                     * the native heap and all we need to do here is associate
+                     * it with the appropriate group. We can easily re-compute
+                     * the GROUP_BY value expressions when we actually evaluate
+                     * the aggregates over the solutions in a solution group. At
+                     * that point, the solution is once again materialized in
+                     * memory on the JVM.
                      */
                     asBound = groupBy[i].get(bset);
                 } catch (SparqlTypeErrorException ex) {
@@ -559,10 +559,6 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
          *         for the group was dropped (type error or violated HAVING
          *         constraint).
          * 
-         *         TODO Unit test with empty group (this can occur only for a
-         *         query without a GROUP BY clause if there are no input
-         *         solutions).
-         * 
          *         TODO Unit test w/ errors in aggregates or in the value
          *         expressions using those aggregates. Make sure that we do not
          *         drop the group (or fail the query) just because there is an
@@ -670,9 +666,12 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
                         .getAggExpr().entrySet().iterator();
                 while (itr.hasNext()) {
                     final Map.Entry<IAggregate<?>, IVariable<?>> e = itr.next();
-                    // Aggregate and bind the result.
-                    aggregates.set(e.getValue(),
-                            doAggregate(e.getKey(), solutions));
+                    // Aggregate.
+                    final IConstant<?> c = doAggregate(e.getKey(), solutions);
+                    if (c != null) {
+                        // bind the result.
+                        aggregates.set(e.getValue(), c);
+                    }
                 }
                 if (log.isTraceEnabled())
                     log.trace("aggregates: " + aggregates);
@@ -682,7 +681,21 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
             // Evaluate SELECT expressions.
             for (IValueExpression<?> expr : rewrite.getSelect2()) {
 
-                expr.get(aggregates);
+                /*
+                 * FIXME This is really quite a hack, turning an
+                 * IllegalArgumentException which we presume is coming out of
+                 * new Constant(null) into an (implicit) SPARQL type error so we
+                 * can drop the binding for this SELECT expression. (Note that
+                 * we are not trying to drop the entire group!)
+                 */
+                try {
+                    expr.get(aggregates);
+                } catch (IllegalArgumentException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("will not bind solution for aggregate due to error: expr="
+                                + expr + ", cause=" + ex);
+                    continue;
+                }
 
             }
 
@@ -734,49 +747,67 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
     private static IConstant<?> doAggregate(final IAggregate<?> a,
             final Iterable<IBindingSet> solutions) {
 
-        final IConstant<?> ret;
-        if (a.isWildcard() && a.isDistinct()) {
-            /*
-             * For a wildcard we basically need to operate on solution
-             * multisets. For example, COUNT(*) is the size of the solution
-             * multiset (aka group).
-             */
-            // Set used to impose DISTINCT on the solution multiset.
-            final LinkedHashSet<IBindingSet> set = new LinkedHashSet<IBindingSet>();
-            a.reset();
-            for (IBindingSet bset : solutions) {
-                if (set.add(bset)) {
-                    // aggregate iff this is a new result.
+        try {
+
+            final IConstant<?> ret;
+            if (a.isWildcard() && a.isDistinct()) {
+                /*
+                 * For a wildcard we basically need to operate on solution
+                 * multisets. For example, COUNT(*) is the size of the solution
+                 * multiset (aka group).
+                 */
+                // Set used to impose DISTINCT on the solution multiset.
+                final LinkedHashSet<IBindingSet> set = new LinkedHashSet<IBindingSet>();
+                a.reset();
+                for (IBindingSet bset : solutions) {
+                    if (set.add(bset)) {
+                        // aggregate iff this is a new result.
+                        a.get(bset);
+                    }
+                }
+                ret = new Constant(a.done());
+            } else if (a.isDistinct()) {
+                /*
+                 * Apply aggregate function only to the distinct values which
+                 * it's inner value expression takes on.
+                 */
+                // Set used to impose "DISTINCT".
+                final Set<Object> set = new LinkedHashSet<Object>();
+                // The inner value expression.
+                final IValueExpression<?> innerExpr = a.getExpr();
+                a.reset();
+                for (IBindingSet bset : solutions) {
+                    final Object val = innerExpr.get(bset);
+                    if (set.add(val)) {
+                        // aggregate iff this is a new result.
+                        a.get(bset);
+                    }
+                }
+                ret = new Constant(a.done());
+            } else {
+                a.reset();
+                for (IBindingSet bset : solutions) {
                     a.get(bset);
                 }
+                ret = new Constant(a.done());
             }
-            ret = new Constant(a.done());
-        } else if (a.isDistinct()) {
-            /*
-             * Apply aggregate function only to the distinct values which it's
-             * inner value expression takes on.
-             */
-            // Set used to impose "DISTINCT".
-            final Set<Object> set = new LinkedHashSet<Object>();
-            // The inner value expression.
-            final IValueExpression<?> innerExpr = a.getExpr();
-            a.reset();
-            for (IBindingSet bset : solutions) {
-                final Object val = innerExpr.get(bset);
-                if (set.add(val)) {
-                    // aggregate iff this is a new result.
-                    a.get(bset);
-                }
+            return ret;
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+
+                // trap the type error and filter out the solution
+                if (log.isInfoEnabled())
+                    log.info("discarding solution due to type error: " + t);
+
+                // No binding.
+                return null;
+
             }
-            ret = new Constant(a.done());
-        } else {
-            a.reset();
-            for (IBindingSet bset : solutions) {
-                a.get(bset);
-            }
-            ret = new Constant(a.done());
+
+            throw new RuntimeException(t);
+
         }
-        return ret;
 
     }
 

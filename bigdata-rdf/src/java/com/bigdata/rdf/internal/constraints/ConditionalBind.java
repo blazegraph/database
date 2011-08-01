@@ -13,11 +13,13 @@ import com.bigdata.rdf.internal.IV;
 
 /**
  * Operator causes a variable to be bound to the result of its evaluation as a
- * side-effect.
+ * side-effect unless the variable is already bound and the as-bound value does
+ * not compare as equals.
  * 
- * @author thompsonbry
+ * @author mroycsi
  */
-public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValueExpression<E>, IBind<E> {
+public class ConditionalBind<E extends IV> extends ImmutableBOp implements
+        IValueExpression<E>, IBind<E> {
 
 	private static final long serialVersionUID = 1L;
 

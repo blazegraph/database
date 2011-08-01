@@ -98,7 +98,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
         final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
 
-        try {
+//        try {
 
             if (val != null) {
 
@@ -142,22 +142,22 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
 
             return aggregated;
 
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
-
-                // trap the type error and filter out the solution
-                if (log.isInfoEnabled())
-                    log.info("discarding solution due to type error: "
-                            + bindingSet + " : " + t);
-
-                return aggregated;
-
-            }
-
-            throw new RuntimeException(t);
-
-        }
+//        } catch (Throwable t) {
+//
+//            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
+//
+//                // trap the type error and filter out the solution
+//                if (log.isInfoEnabled())
+//                    log.info("discarding solution due to type error: "
+//                            + bindingSet + " : " + t);
+//
+//                return aggregated;
+//
+//            }
+//
+//            throw new RuntimeException(t);
+//
+//        }
 
     }
 
