@@ -33,6 +33,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
@@ -215,11 +216,23 @@ public class TestSUM extends TestCase2 {
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
-        op.reset();
-        for (IBindingSet bs : data) {
-            op.get(bs);
+        try {
+            op.reset();
+            for (IBindingSet bs : data) {
+                op.get(bs);
+            }
+            fail("Expecting: " + SparqlTypeErrorException.class);
+        } catch (SparqlTypeErrorException ex) {
+            if (log.isInfoEnabled()) {
+                log.info("Ignoring expected exception: " + ex);
+            }
         }
-        assertEquals(new XSDIntegerIV(BigInteger.valueOf(9 + 5 /*+ 7*/ + 7)), op.done());
+        
+//        /*
+//         * Note: There is really no reason to check the SUM after we have
+//         * observed an error during the evaluation of the aggregate.
+//         */
+//        assertEquals(new XSDIntegerIV(BigInteger.valueOf(9 + 5 /*+ 7*/ + 7)), op.done());
 
     }
 
