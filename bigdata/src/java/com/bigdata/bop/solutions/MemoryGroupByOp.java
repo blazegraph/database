@@ -113,6 +113,13 @@ import com.bigdata.util.InnerCause;
  * 
  *          Are there aggregation functions which can be optimized by (2) but
  *          not by (3)?
+ * 
+ *          TODO Modify to rewrite AVERAGE as SUM()/COUNT() in preparation for a
+ *          more optimal evaluation when we the aggregate does not use DISTINCT
+ *          and when there are no dependencies among the aggregate expressions
+ *          (e.g., SUM(x)+1 is fine, as is SUM(x)+SUM(y), but SUM(x+AVG(x))
+ *          introduces a dependency which prevents us from optimizing the
+ *          aggregation using per-group incremental pipelined evaluation).
  */
 public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
 

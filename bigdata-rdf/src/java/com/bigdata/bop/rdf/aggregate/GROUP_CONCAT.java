@@ -31,12 +31,11 @@ import org.openrdf.model.impl.LiteralImpl;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
@@ -65,10 +64,30 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
         String SEPARATOR = GROUP_CONCAT.class.getName() + ".separator";
 
         /**
-         * The maximum #of values to concatenate.
+         * The maximum #of values to concatenate (positive integer and
+         * <code>-1</code> to indicate no bound) (default
+         * {@value #DEFAULT_VALUE_LIMIT})
          */
-        String LIMIT = GROUP_CONCAT.class.getName() + ".limit";
+        String VALUE_LIMIT = GROUP_CONCAT.class.getName() + ".valueLimit";
 
+        /**
+         * The default indicates no limit.
+         */
+        final int DEFAULT_VALUE_LIMIT = -1;
+
+        /**
+         * The maximum #of characters permitted in the generated value (positive
+         * integer and <code>-1</code> to indicate no bound) (default
+         * {@value #DEFAULT_CHARACTER_LIMIT}).
+         */
+        String CHARACTER_LIMIT = GROUP_CONCAT.class.getName()
+                + ".characterLimit";
+
+        /**
+         * The default indicates no limit.
+         */
+        final int DEFAULT_CHARACTER_LIMIT = -1;
+        
     }
 
     public GROUP_CONCAT(BOpBase op) {
@@ -84,15 +103,18 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
      * @param var
      *            The variable whose values will be combined.
      * @param sep
-     *            The separator string.
+     *            The separator string (note that a space (0x20) is the default
+     *            in the SPARQL recommendation).
      */
     public GROUP_CONCAT(final boolean distinct,
-            final IValueExpression<Literal> expr, final IConstant<String> sep) {
+            final IValueExpression<IV> expr, final String sep) {
+
         this(new BOp[] { expr }, NV.asMap(//
                 new NV(Annotations.FUNCTION_CODE, FunctionCode.GROUP_CONCAT),//
                 new NV(Annotations.DISTINCT, distinct),//
                 new NV(Annotations.SEPARATOR, sep)//
                 ));
+        
     }
 
     private String sep() {
@@ -104,14 +126,25 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     private transient String sep;
 
-    private long limit() {
-        if (limit == 0) {
-            limit = getProperty(Annotations.LIMIT, Long.MAX_VALUE);
+    private int valueLimit() {
+        if (valueLimit == 0) {
+            valueLimit = getProperty(Annotations.VALUE_LIMIT,
+                    Annotations.DEFAULT_VALUE_LIMIT);
         }
-        return limit;
+        return valueLimit;
     }
 
-    private transient long limit;
+    private transient int valueLimit;
+
+    private int characterLimit() {
+        if (characterLimit == 0) {
+            characterLimit = getProperty(Annotations.CHARACTER_LIMIT, 
+                    Annotations.DEFAULT_CHARACTER_LIMIT);
+        }
+        return characterLimit;
+    }
+
+    private transient int characterLimit;
 
     /**
      * The running concatenation of observed bound values.
@@ -128,12 +161,25 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
      * instance.
      */
     private transient long nvalues = 0;
+    
+    /**
+     * <code>false</code> unless either the value limit and/or the character
+     * length limit has been exceeded.
+     */
+    private transient boolean done = false;
 
     synchronized public void reset() {
 
         aggregated = null;
 
         nvalues = 0;
+
+        done = false;
+
+        // cache stuff.
+        sep();
+        valueLimit();
+        characterLimit();
 
     }
 
@@ -148,20 +194,31 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     synchronized public Literal get(final IBindingSet bindingSet) {
 
-        final IVariable<Literal> var = (IVariable<Literal>) get(0);
+        final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
-        final Literal val = (Literal) bindingSet.get(var);
+        final IV<?, ?> iv = expr.get(bindingSet);
 
-        if (val != null && nvalues < limit()) {
+        if (iv != null && !done) {
+
+            final String str = iv.getValue().stringValue();
 
             if (aggregated == null)
-                aggregated = new StringBuilder(val.stringValue());
+                aggregated = new StringBuilder(str);
             else {
-                aggregated.append(sep());
-                aggregated.append(val.stringValue());
+                aggregated.append(sep);
+                aggregated.append(str);
             }
 
             nvalues++;
+
+            if (characterLimit != -1 && aggregated.length() >= characterLimit) {
+                // Exceeded the character length limit.
+                aggregated.setLength(characterLimit()); // truncate.
+                done = true;
+            } else if (valueLimit != -1 && nvalues >= valueLimit) {
+                // Exceeded the value limit.
+                done = true;
+            }
 
         }
 

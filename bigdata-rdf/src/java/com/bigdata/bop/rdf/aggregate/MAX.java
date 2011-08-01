@@ -32,17 +32,13 @@ import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.util.InnerCause;
 
 /**
  * Operator reports the minimum observed value over the presented binding sets
@@ -87,57 +83,41 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
 
     synchronized public IV get(final IBindingSet bindingSet) {
 
-        final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
-        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
+        final IV<?, ?> iv = expr.get(bindingSet);
 
-        try {
+        if (iv != null) {
 
-            if (val != null) {
+            /*
+             * Aggregate non-null values.
+             */
 
-                /*
-                 * Aggregate non-null values.
+            if (max == null) {
+
+                max = iv;
+
+            } else {
+
+                /**
+                 * FIXME This needs to use the ordering define by ORDER_BY. The
+                 * CompareBOp imposes the ordering defined for the "<" operator
+                 * which is less robust and will throw a type exception if you
+                 * attempt to compare unlike Values.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
-
-                final IV iv = val.get(bindingSet);
-
-                if (iv == null)
-                    throw new SparqlTypeErrorException.UnboundVarException();
-
-                if (max == null) {
+                if (CompareBOp.compare(CompareOp.GT, iv, max)) {
 
                     max = iv;
 
-                } else {
-
-                    if (CompareBOp.compare(CompareOp.GT, iv, max)) {
-
-                        max = iv;
-
-                    }
-
                 }
-                
-            }
-
-            return max;
-
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
-
-                // trap the type error and filter out the solution
-                if (log.isInfoEnabled())
-                    log.info("discarding solution due to type error: "
-                            + bindingSet + " : " + t);
-
-                return max;
 
             }
-
-            throw new RuntimeException(t);
 
         }
+
+        return max;
 
     }
 

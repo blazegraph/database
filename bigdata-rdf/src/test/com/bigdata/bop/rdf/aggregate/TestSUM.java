@@ -39,6 +39,7 @@ import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.XSDIntegerIV;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -112,7 +113,7 @@ public class TestSUM extends TestCase2 {
 
     }
 
-    public void test_sum_with_null() {
+    public void test_sum_with_complex_inner_value_expression() {
         
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
@@ -142,6 +143,64 @@ public class TestSUM extends TestCase2 {
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
          * org1  auth1  book3  5
+         * org1  auth2  book3  7
+         * org2  auth3  book4  7
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+        };
+
+        // SUM(lprice+1)
+        final SUM op = new SUM(false/* distinct */, new MathBOp(lprice,
+                new Constant<IV>(new XSDIntIV(1)), MathBOp.MathOp.PLUS));
+        assertFalse(op.isDistinct());
+        assertFalse(op.isWildcard());
+
+        op.reset();
+        for (IBindingSet bs : data) {
+            op.get(bs);
+        }
+        assertEquals(
+                new XSDIntegerIV(BigInteger.valueOf(9 + 1 + 5 + 1 + 7 + 1 + 7
+                        + 1)), op.done());
+
+    }
+
+    public void test_sum_with_null() {
+        
+        final IVariable<IV> org = Var.var("org");
+        final IVariable<IV> auth = Var.var("auth");
+        final IVariable<IV> book = Var.var("book");
+        final IVariable<IV> lprice = Var.var("lprice");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+        final IConstant<String> auth1 = new Constant<String>("auth1");
+        final IConstant<String> auth2 = new Constant<String>("auth2");
+        final IConstant<String> auth3 = new Constant<String>("auth3");
+        final IConstant<String> book1 = new Constant<String>("book1");
+        final IConstant<String> book2 = new Constant<String>("book2");
+        final IConstant<String> book3 = new Constant<String>("book3");
+        final IConstant<String> book4 = new Constant<String>("book4");
+        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(5));
+        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(7));
+        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(9));
+
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org  ?auth  ?book  ?lprice
+         * org1  auth1  book1  9
+         * org1  auth1  book3  NULL
          * org1  auth2  book3  7
          * org2  auth3  book4  7
          * </pre>

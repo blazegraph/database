@@ -88,7 +88,15 @@ public class SparqlBindingSetComparatorOp extends ComparatorOp {
             final ISortOrder<?> o = order[i];
 
             final IVariable<?> v = o.getVariable();
-
+            /*
+             * FIXME This wind up invoking the comparison on IVs. We need to
+             * either wrap the ValueComparator with one that is IV aware or we
+             * need to replace it with one that is IV aware. As a desirable
+             * optimization, it should handle comparisons between IVs and
+             * materialized Values so we do not need to materialize inline IVs.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
+             */
             int ret = vc.compare(bs1.get(v).get(), bs2.get(v).get());
 
             if (!o.isAscending())
