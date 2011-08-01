@@ -38,6 +38,7 @@ import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Operator combines the string values over the presented binding sets for the
@@ -200,7 +201,12 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
         if (iv != null && !done) {
 
-            final String str = iv.getValue().stringValue();
+            final String str;
+            if (iv.isInline() && !iv.isExtension()) {
+                str = iv.getInlineValue().toString();
+            } else {
+                str = iv.getValue().stringValue();
+            }
 
             if (aggregated == null)
                 aggregated = new StringBuilder(str);
