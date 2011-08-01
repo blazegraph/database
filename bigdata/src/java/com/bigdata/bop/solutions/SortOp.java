@@ -37,8 +37,6 @@ import com.bigdata.bop.PipelineOp;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Define a distributed (external) merge sort operator.
  */
 abstract public class SortOp extends PipelineOp {
 
@@ -55,7 +53,7 @@ abstract public class SortOp extends PipelineOp {
          * 
          * @see ComparatorOp
          */
-        String COMPARATOR = (MemorySortOp.class.getName() + ".comparator").intern();
+        String COMPARATOR = MemorySortOp.class.getName() + ".comparator";
 
     }
 

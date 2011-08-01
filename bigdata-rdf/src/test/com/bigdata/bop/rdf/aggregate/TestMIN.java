@@ -37,6 +37,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -223,15 +224,6 @@ public class TestMIN extends TestCase2 {
 
     }
 
-    /**
-     * FIXME This test is failing with a NotMaterializedException when it
-     * attempts to compare "auth2" with 5^^xsd:int. Both MIN and MAX need to
-     * use the ordering define by ORDER_BY. The CompareBOp imposes the
-     * ordering defined for the "<" operator which is less robust and will
-     * throw a type exception if you attempt to compare unlike Values.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
-     */
     public void test_min_with_errors() {
         
         final BigdataValueFactory f = BigdataValueFactoryImpl.getInstance(getName());
@@ -278,13 +270,13 @@ public class TestMIN extends TestCase2 {
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
 
-//        /*
-//         * Note: We have to materialize the IVs since we will be comparing
-//         * against a materialized IV once we observe [auth2].
-//         */
-////      price9.get().setValue(f.createLiteral("9", XSD.INT));
-//        price5.get().setValue(f.createLiteral("5", XSD.INT));
-//        price7.get().setValue(f.createLiteral("7", XSD.INT));
+        /*
+         * Note: We have to materialize the IVs since we will be comparing
+         * against a materialized IV once we observe [auth2].
+         */
+        price9.get().setValue(f.createLiteral("9", XSD.INT));
+        price5.get().setValue(f.createLiteral("5", XSD.INT));
+        price7.get().setValue(f.createLiteral("7", XSD.INT));
 
         final MIN op = new MIN(false/* distinct */, lprice);
         assertFalse(op.isDistinct());
