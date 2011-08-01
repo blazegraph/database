@@ -59,7 +59,7 @@ public class StrBOp extends IVValueExpression<IV>
 
 	public interface Annotations extends BOp.Annotations {
 
-		String NAMESPACE = (StrBOp.class.getName() + ".namespace").intern();
+		String NAMESPACE = StrBOp.class.getName() + ".namespace";
 
     }
 	
@@ -110,6 +110,11 @@ public class StrBOp extends IVValueExpression<IV>
         // use to create my simple literals
         final BigdataValueFactory vf = 
         	BigdataValueFactoryImpl.getInstance(namespace);
+        
+        if (iv.isInline() && !iv.isExtension()) {
+            return DummyConstantNode.dummyIV(vf.createLiteral(iv
+                    .getInlineValue().toString()));
+        }
         
         if (iv.isURI()) {
         	// return new simple literal using URI label

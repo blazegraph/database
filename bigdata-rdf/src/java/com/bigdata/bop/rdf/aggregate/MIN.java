@@ -32,17 +32,13 @@ import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.util.InnerCause;
 
 /**
  * Operator reports the minimum observed value over the presented binding sets
@@ -54,8 +50,8 @@ import com.bigdata.util.InnerCause;
  * e.g., using {@link ValueComparator}.
  * 
  * @author thompsonbry
- * 
- *         TODO What is reported if there are no non-null observations?
+ *
+ * TODO What is reported if there are no non-null observations?
  */
 public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
