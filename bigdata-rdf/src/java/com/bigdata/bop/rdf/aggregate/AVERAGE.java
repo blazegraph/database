@@ -32,9 +32,7 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
@@ -47,7 +45,6 @@ import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.util.InnerCause;
 
 /**
  * Operator computes the running sum over the presented binding sets for the
@@ -110,71 +107,48 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
 
     synchronized public IV get(final IBindingSet bindingSet) {
 
-        final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
-        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
+        final IV<?,?> iv = expr.get(bindingSet);
 
-        try {
+        if (iv != null) {
 
-            if (val != null) {
+            /*
+             * Aggregate non-null values.
+             */
 
-                /*
-                 * Aggregate non-null values.
-                 */
+            if (iv.isInline()) {
 
-                final IV iv = val.get(bindingSet);
+                // Two IVs.
+                aggregated = IVUtility.numericalMath(iv, aggregated,
+                        MathOp.PLUS);
 
-                if (iv == null)
-                    throw new SparqlTypeErrorException.UnboundVarException();
+            } else {
 
-                if (iv.isInline()) {
+                // One IV and one Literal.
+                final BigdataValue val1 = iv.getValue();
 
-                    // Two IVs.
-                    aggregated = IVUtility.numericalMath(iv, aggregated,
-                            MathOp.PLUS);
+                if (val1 == null)
+                    throw new NotMaterializedException();
 
-                } else {
+                if (!(val1 instanceof Literal))
+                    throw new SparqlTypeErrorException();
 
-                    // One IV and one Literal.
-                    final BigdataValue val1 = iv.getValue();
+                // Only numeric value can be used in math expressions
+                final URI dt1 = ((Literal)val1).getDatatype();
+                if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
+                    throw new SparqlTypeErrorException();
 
-                    if (val1 == null)
-                        throw new NotMaterializedException();
-
-                    if (!(val1 instanceof Literal))
-                        throw new SparqlTypeErrorException();
-
-                    // Only numeric value can be used in math expressions
-                    final URI dt1 = ((Literal)val1).getDatatype();
-                    if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
-                        throw new SparqlTypeErrorException();
-
-                    aggregated = IVUtility.numericalMath((Literal) val1,
-                            aggregated, MathOp.PLUS);
-
-                }
+                aggregated = IVUtility.numericalMath((Literal) val1,
+                        aggregated, MathOp.PLUS);
 
             }
 
             n++;
-            return aggregated;
-
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
-
-                // trap the type error and filter out the solution
-                if (log.isInfoEnabled())
-                    log.info("discarding solution due to type error: "
-                            + bindingSet + " : " + t);
-
-                return aggregated;
-
-            }
-
-            throw new RuntimeException(t);
 
         }
+
+        return aggregated;
 
     }
 

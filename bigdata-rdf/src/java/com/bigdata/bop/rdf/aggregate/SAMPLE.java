@@ -29,7 +29,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
@@ -72,13 +71,14 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 
     synchronized public IV get(final IBindingSet bindingSet) {
 
-        final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
-        final IV val = (IV) bindingSet.get(var);
+        final IV<?, ?> iv = expr.get(bindingSet);
 
-        if (val != null) {
+        if (iv != null && sample == null) {
 
-            sample = val;
+            // Take the first non-null observed value.
+            sample = iv;
 
         }
 

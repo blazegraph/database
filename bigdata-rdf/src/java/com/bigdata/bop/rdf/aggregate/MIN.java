@@ -87,57 +87,41 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
     synchronized public IV get(final IBindingSet bindingSet) {
 
-        final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
-        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
+        final IV iv = expr.get(bindingSet);
 
-        try {
+        if (iv != null) {
 
-            if (val != null) {
+            /*
+             * Aggregate non-null values.
+             */
 
-                /*
-                 * Aggregate non-null values.
+            if (min == null) {
+
+                min = iv;
+
+            } else {
+
+                /**
+                 * FIXME This needs to use the ordering define by ORDER_BY. The
+                 * CompareBOp imposes the ordering defined for the "<" operator
+                 * which is less robust and will throw a type exception if you
+                 * attempt to compare unlike Values.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
-
-                final IV iv = val.get(bindingSet);
-
-                if (iv == null)
-                    throw new SparqlTypeErrorException.UnboundVarException();
-
-                if (min == null) {
+                if (CompareBOp.compare(CompareOp.LT, iv, min)) {
 
                     min = iv;
 
-                } else {
-
-                    if (CompareBOp.compare(CompareOp.LT, iv, min)) {
-
-                        min = iv;
-
-                    }
-
                 }
-                
-            }
-
-            return min;
-
-        } catch (Throwable t) {
-
-            if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
-
-                // trap the type error and filter out the solution
-                if (log.isInfoEnabled())
-                    log.info("discarding solution due to type error: "
-                            + bindingSet + " : " + t);
-
-                return min;
 
             }
-
-            throw new RuntimeException(t);
 
         }
+
+        return min;
 
     }
 

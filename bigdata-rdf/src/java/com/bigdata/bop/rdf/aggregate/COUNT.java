@@ -28,7 +28,6 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
@@ -37,6 +36,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSDLongIV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Operator computes the number of non-null values over the presented binding
@@ -83,15 +83,16 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
      */
     synchronized public IV get(final IBindingSet bindingSet) {
 
-        final IVariable<IV> var = (IVariable<IV>) get(0);
+        final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
-        if (var.isWildcard()) {
+        if (expr instanceof IVariable<?> && ((IVariable<?>) expr).isWildcard()) {
             // Do not attempt to evaluate "*".
             aggregated++;
             return null;
         }
-        
-        final IConstant<IV> val = (IConstant<IV>) bindingSet.get(var);
+
+        // evaluate the expression (typically just a variable, but who knows).
+        final IV<?,?> val = expr.get(bindingSet);
 
         if (val != null) {
 
@@ -110,7 +111,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     synchronized public IV done() {
-        return new XSDLongIV(aggregated);
+        return new XSDLongIV<BigdataLiteral>(aggregated);
     }
 
     /**
