@@ -208,8 +208,6 @@ public class FixedAllocator implements Allocator {
 		
 		assert checkBits();
 		
-		// assert m_freeTransients == 0;
-
 	}
 
 	/**
@@ -230,8 +228,6 @@ public class FixedAllocator implements Allocator {
 			
 			// Reset freebits
 			m_freeBits = calcFreeBits();
-			
-			assert m_freeTransients == 0;
 			
 			m_context = context;
 		} else {
