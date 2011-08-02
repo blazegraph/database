@@ -39,12 +39,6 @@ import com.bigdata.bop.aggregate.IAggregate;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO Expand the interface to allow us to detect when the aggregation
- *          query can be executed using one counter per group and select
- *          expression rather than by materializing the solution sets for all
- *          the groups. This pipelined aggregation will be much more time and
- *          space efficient. E.g., isSweet()
  */
 public interface IGroupByState {
 
@@ -105,8 +99,9 @@ public interface IGroupByState {
 
     /**
      * <code>true</code> iff any aggregate expression uses a reference to
-     * another aggregate expression in the select clause. When <code>false</code>
-     * certain optimizations are possible.
+     * another aggregate expression in the select clause. When
+     * <code>false</code> certain optimizations are possible (parallel
+     * evaluation of the aggregates across the column projections).
      */
     public boolean isSelectDependency();
 

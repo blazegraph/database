@@ -561,7 +561,7 @@ public class TestGroupByState extends TestCase2 {
      * </pre>
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void test_reverseReference_allowed() {
+    public void test_reverseReference_allowed_aka_select_dependency() {
 
         final IVariable<IV> a = Var.var("a");
         final IVariable<IV> b = Var.var("b");
@@ -742,7 +742,7 @@ public class TestGroupByState extends TestCase2 {
     }
     
     /**
-     * TODO Unit test when projecting a constant
+     * Unit test when projecting a constant
      * <pre>
      * SELECT 12 as ?x
      * </pre>

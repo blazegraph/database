@@ -2211,12 +2211,17 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
                 new XSDIntIV<BigdataLiteral>(9));
 
+        // SUM(?lprice)
+        final IValueExpression<IV> sumLPrice = new SUM(false/* distinct */,
+                (IValueExpression<IV>) lprice);
+        
+        // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
+        final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS));
+
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
-                new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) lprice), new SUM(
-                        false/* distinct */, (IValueExpression<IV>) lprice),
-                        MathBOp.MathOp.PLUS));
+                nestedExpr);
 
         final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
                 new CompareBOp(
@@ -2284,26 +2289,41 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Force the solutions to be emitted.
         context.setLastInvocation();
 
-        final FutureTask<Void> ft = query.eval(context);
-        // Run the query.
-        {
-            final Thread t = new Thread() {
-                public void run() {
-                    ft.run();
-                }
-            };
-            t.setDaemon(true);
-            t.start();
+        try {
+            
+            final FutureTask<Void> ft = query.eval(context);
+            // Run the query.
+            {
+                final Thread t = new Thread() {
+                    public void run() {
+                        ft.run();
+                    }
+                };
+                t.setDaemon(true);
+                t.start();
+            }
+
+            // Check the solutions.
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                    sink.iterator(), ft);
+
+            if (isPipelinedAggregationOp())
+                fail("Expecting " + UnsupportedOperationException.class);
+
+            assertEquals(1, stats.chunksIn.get());
+            assertEquals(4, stats.unitsIn.get());
+            assertEquals(1, stats.unitsOut.get());
+            assertEquals(1, stats.chunksOut.get());
+
+        } catch (UnsupportedOperationException ex) {
+            if (isPipelinedAggregationOp()) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+                return;
+            } else {
+                throw ex;
+            }
         }
-
-        // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
-                ft);
-
-        assertEquals(1, stats.chunksIn.get());
-        assertEquals(4, stats.unitsIn.get());
-        assertEquals(1, stats.unitsOut.get());
-        assertEquals(1, stats.chunksOut.get());
 
     }
 
@@ -2332,6 +2352,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
      *   ?auth :writesBook ?book .
      *   ?book :price ?lprice .
      * }
+     * GROUP BY ?org
      * </pre>
      * 
      * The inputs are:
@@ -2379,12 +2400,17 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
                 new XSDIntIV<BigdataLiteral>(9));
 
+        // SUM(?lprice)
+        final IValueExpression<IV> sumLPrice = new SUM(false/* distinct */,
+                (IValueExpression<IV>) lprice);
+        
+        // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
+        final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS));
+
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
-                new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) lprice), new SUM(
-                        false/* distinct */, (IValueExpression<IV>) lprice),
-                        MathBOp.MathOp.PLUS));
+                nestedExpr);
 
         final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
                 new CompareBOp(
@@ -2393,8 +2419,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                         CompareOp.GT));
         
         final GroupByOp query = newFixture(//
-                    new IValueExpression[] { totalPriceExpr }, // select
-                    null, // groupBy
+                    new IValueExpression[] { org, totalPriceExpr }, // select
+                    new IValueExpression[] { org }, // groupBy
                     new IConstraint[] { totalPriceConstraint } // having
             );
 
@@ -2456,6 +2482,201 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Force the solutions to be emitted.
         context.setLastInvocation();
 
+        try {
+            
+            final FutureTask<Void> ft = query.eval(context);
+            // Run the query.
+            {
+                final Thread t = new Thread() {
+                    public void run() {
+                        ft.run();
+                    }
+                };
+                t.setDaemon(true);
+                t.start();
+            }
+
+            // Check the solutions.
+            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                    sink.iterator(), ft);
+
+            if (isPipelinedAggregationOp())
+                fail("Expecting " + UnsupportedOperationException.class);
+
+            assertEquals(1, stats.chunksIn.get());
+            assertEquals(4, stats.unitsIn.get());
+            assertEquals(2, stats.unitsOut.get());
+            assertEquals(1, stats.chunksOut.get());
+
+        } catch (UnsupportedOperationException ex) {
+            if (isPipelinedAggregationOp()) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+                return;
+            } else {
+                throw ex;
+            }
+        }
+
+    }
+
+    /**
+     * A test in which there is a select dependency without there also being
+     * nested aggregates. This test will detect a failure to propagate bindings
+     * from eacn computed aggregate such that they are visible to the rest of
+     * the aggregates to be computed. [The dependency MUST NOT be created
+     * through the nesting of aggregates, which is already tested above. For
+     * this test case we are concerned with aggregates which CAN be evaluated
+     * using a pipelined aggregation operator.]
+     * <p>
+     * Based on an example in the SPARQL 1.1 Working Draft.
+     * 
+     * <pre>
+     * @prefix : <http://books.example/> .
+     * 
+     * :org1 :affiliates :auth1, :auth2 .
+     * :auth1 :writesBook :book1, :book2 .
+     * :book1 :price 9 .
+     * :book2 :price 5 .
+     * :auth2 :writesBook :book3 .
+     * :book3 :price 7 .
+     * :org2 :affiliates :auth3 .
+     * :auth3 :writesBook :book4 .
+     * :book4 :price 7 .
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX : <http://books.example/>
+     * SELECT (SUM(?lprice) AS ?totalPrice), (?totalPrice*2) as ?inflatedPrice
+     * WHERE {
+     *   ?org :affiliates ?auth .
+     *   ?auth :writesBook ?book .
+     *   ?book :price ?lprice .
+     * }
+     * </pre>
+     * 
+     * The inputs are:
+     * 
+     * <pre>
+     * ?org  ?auth  ?book  ?lprice
+     * org1  auth1  book1  9
+     * org1  auth1  book3  5
+     * org1  auth2  book3  7
+     * org2  auth3  book4  7
+     * </pre>
+     * 
+     * The solutions are:
+     * 
+     * <pre>
+     * ?totalPrice ?inflatedPrice
+     * 28          56
+     * </pre>
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_aggregation_withoutGroupBy_withSelectDependency() {
+
+        final IVariable<IV> org = Var.var("org");
+        final IVariable<IV> auth = Var.var("auth");
+        final IVariable<IV> book = Var.var("book");
+        final IVariable<IV> lprice = Var.var("lprice");
+        final IVariable<IV> totalPrice = Var.var("totalPrice");
+        final IVariable<IV> inflatedPrice = Var.var("inflatedPrice");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+        final IConstant<String> auth1 = new Constant<String>("auth1");
+        final IConstant<String> auth2 = new Constant<String>("auth2");
+        final IConstant<String> auth3 = new Constant<String>("auth3");
+        final IConstant<String> book1 = new Constant<String>("book1");
+        final IConstant<String> book2 = new Constant<String>("book2");
+        final IConstant<String> book3 = new Constant<String>("book3");
+        final IConstant<String> book4 = new Constant<String>("book4");
+        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(5));
+        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(7));
+        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(9));
+
+        // SUM(?lprice)
+        final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
+                new SUM(false/* distinct */, (IValueExpression<IV>) lprice));
+
+        // Note: This has a dependency on SUM(?lprice)
+        final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
+                new MathBOp(totalPrice, new Constant(new XSDIntIV(2)),
+                        MathBOp.MathOp.MULTIPLY));
+
+        final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
+                new CompareBOp(
+                        totalPrice,
+                        new Constant<XSDIntIV<BigdataLiteral>>(new XSDIntIV(10)),
+                        CompareOp.GT));
+        
+        final GroupByOp query = newFixture(//
+                    new IValueExpression[] { totalPriceExpr, inflatedPriceExpr }, // select
+                    null, // groupBy
+                    new IConstraint[] { totalPriceConstraint } // having
+            );
+        
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org  ?auth  ?book  ?lprice
+         * org1  auth1  book1  9
+         * org1  auth1  book3  5
+         * org1  auth2  book3  7
+         * org2  auth3  book4  7
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+        };
+
+        /**
+         * The expected solutions:
+         * 
+         * <pre>
+         * ?totalPrice ?inflatedPrice
+         * 28          56
+         * </pre>
+         */
+        
+        // Note: The aggregates will have gone through type promotion.
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price28 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(28)));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price56 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(56)));
+        final IBindingSet expected[] = new IBindingSet[]
+        {
+              new ArrayBindingSet ( new IVariable<?> [] { totalPrice, inflatedPrice },  new IConstant [] { _price28, _price56 } )
+        } ;
+
+        final BOpStats stats = query.newStats () ;
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
+        );
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, source, sink, null/* sink2 */
+        );
+        // Force the solutions to be emitted.
+        context.setLastInvocation();
+
         final FutureTask<Void> ft = query.eval(context);
         // Run the query.
         {
@@ -2475,6 +2696,194 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         assertEquals(1, stats.chunksIn.get());
         assertEquals(4, stats.unitsIn.get());
         assertEquals(1, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
+
+    }
+
+    /**
+     * A test in which there is a select dependency without there also being
+     * nested aggregates. This test will detect a failure to propagate bindings
+     * from eacn computed aggregate such that they are visible to the rest of
+     * the aggregates to be computed. [The dependency MUST NOT be created
+     * through the nesting of aggregates, which is already tested above. For
+     * this test case we are concerned with aggregates which CAN be evaluated
+     * using a pipelined aggregation operator.]
+     * <p>
+     * Based on an example in the SPARQL 1.1 Working Draft.
+     * 
+     * <pre>
+     * @prefix : <http://books.example/> .
+     * 
+     * :org1 :affiliates :auth1, :auth2 .
+     * :auth1 :writesBook :book1, :book2 .
+     * :book1 :price 9 .
+     * :book2 :price 5 .
+     * :auth2 :writesBook :book3 .
+     * :book3 :price 7 .
+     * :org2 :affiliates :auth3 .
+     * :auth3 :writesBook :book4 .
+     * :book4 :price 7 .
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX : <http://books.example/>
+     * SELECT ?org, (SUM(?lprice) AS ?totalPrice), (?totalPrice*2) as ?inflatedPrice
+     * WHERE {
+     *   ?org :affiliates ?auth .
+     *   ?auth :writesBook ?book .
+     *   ?book :price ?lprice .
+     * }
+     * GROUP BY ?org
+     * </pre>
+     * 
+     * The inputs are:
+     * 
+     * <pre>
+     * ?org  ?auth  ?book  ?lprice
+     * org1  auth1  book1  9
+     * org1  auth1  book3  5
+     * org1  auth2  book3  7
+     * org2  auth3  book4  7
+     * </pre>
+     * 
+     * The solutions are:
+     * 
+     * <pre>
+     * ?org ?totalPrice ?inflatedPrice
+     * org1 21          42
+     * org2 7           14
+     * </pre>
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_aggregation_withGroupBy_withSelectDependency() {
+
+        final IVariable<IV> org = Var.var("org");
+        final IVariable<IV> auth = Var.var("auth");
+        final IVariable<IV> book = Var.var("book");
+        final IVariable<IV> lprice = Var.var("lprice");
+        final IVariable<IV> totalPrice = Var.var("totalPrice");
+        final IVariable<IV> inflatedPrice = Var.var("inflatedPrice");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+        final IConstant<String> auth1 = new Constant<String>("auth1");
+        final IConstant<String> auth2 = new Constant<String>("auth2");
+        final IConstant<String> auth3 = new Constant<String>("auth3");
+        final IConstant<String> book1 = new Constant<String>("book1");
+        final IConstant<String> book2 = new Constant<String>("book2");
+        final IConstant<String> book3 = new Constant<String>("book3");
+        final IConstant<String> book4 = new Constant<String>("book4");
+        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(5));
+        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(7));
+        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(9));
+
+        // SUM(?lprice)
+        final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
+                new SUM(false/* distinct */, (IValueExpression<IV>) lprice));
+
+        // Note: This has a dependency on SUM(?lprice)
+        final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
+                new MathBOp(totalPrice, new Constant(new XSDIntIV(2)),
+                        MathBOp.MathOp.MULTIPLY));
+
+//        final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
+//                new CompareBOp(
+//                        totalPrice,
+//                        new Constant<XSDIntIV<BigdataLiteral>>(new XSDIntIV(10)),
+//                        CompareOp.GT));
+        
+        final GroupByOp query = newFixture(//
+                    new IValueExpression[] { org, totalPriceExpr, inflatedPriceExpr }, // select
+                    new IValueExpression[] { org }, // groupBy
+                    null // having
+            );
+        
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org  ?auth  ?book  ?lprice
+         * org1  auth1  book1  9
+         * org1  auth1  book3  5
+         * org1  auth2  book3  7
+         * org2  auth3  book4  7
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+        };
+
+        /**
+         * The expected solutions:
+         * 
+         * <pre>
+         * ?org ?totalPrice ?inflatedPrice
+         * org1 21          42
+         * org2 7           14
+         * </pre>
+         */
+        
+        // Note: The aggregates will have gone through type promotion.
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price7 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(7)));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price14 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(14)));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price21 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price42 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(42)));
+        final IBindingSet expected[] = new IBindingSet[]
+        {
+                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org1, _price21, _price42 } ),
+                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org2, _price7,  _price14 } )
+        } ;
+
+        final BOpStats stats = query.newStats () ;
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
+        );
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, source, sink, null/* sink2 */
+        );
+        // Force the solutions to be emitted.
+        context.setLastInvocation();
+
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(2, stats.unitsOut.get());
         assertEquals(1, stats.chunksOut.get());
 
     }
