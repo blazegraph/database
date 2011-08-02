@@ -370,7 +370,7 @@ public class GroupByState implements IGroupByState {
         {
             final BOp t = op;
             if (t instanceof IConstant)
-                return false;
+                return true;
             if (t instanceof IVariable<?>) {
                 final IVariable<?> v = (IVariable<?>) t;
                 if (aggregationContext) {
