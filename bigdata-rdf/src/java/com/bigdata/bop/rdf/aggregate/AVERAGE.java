@@ -25,7 +25,6 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
@@ -55,7 +54,7 @@ import com.bigdata.rdf.model.BigdataValue;
 public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
         INeedsMaterialization {
 
-    private static final transient Logger log = Logger.getLogger(AVERAGE.class);
+//    private static final transient Logger log = Logger.getLogger(AVERAGE.class);
 
     /**
 	 * 
@@ -71,7 +70,7 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     public AVERAGE(boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.SUM, distinct, expr);
+        super(/*FunctionCode.SUM,*/ distinct, expr);
     }
 
     /**
@@ -90,12 +89,28 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
      */
     private transient long n = 0;
 
+    /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
+
     synchronized public void reset() {
+
         aggregated = ZERO;
+        
         n = 0;
+        
+        firstCause = null;
+        
     }
 
     synchronized public IV done() {
+
+        if (firstCause != null) {
+        
+            throw new RuntimeException(firstCause);
+            
+        }
 
         if(n == 0)
             return ZERO;
@@ -106,6 +121,26 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     synchronized public IV get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 

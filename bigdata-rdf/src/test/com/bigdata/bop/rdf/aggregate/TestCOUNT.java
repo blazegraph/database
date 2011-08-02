@@ -43,17 +43,12 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.util.InnerCause;
 
 /**
  * Unit tests for {@link COUNT}.
  * 
  * @author thompsonbry
- * 
- *         TODO Unit test for COUNT(?foo), which should count any non-null
- *         binding for ?foo.
- * 
- *         TODO Unit test for COUNT(value-expression), which should count any
- *         non-error result for that value expression.
  */
 public class TestCOUNT extends TestCase2 {
 
@@ -290,17 +285,37 @@ public class TestCOUNT extends TestCase2 {
                 op.get(bs);
             }
             fail("Expecting: " + SparqlTypeErrorException.class);
-        } catch (SparqlTypeErrorException ex) {
-            if (log.isInfoEnabled()) {
-                log.info("Ignoring expected exception: " + ex);
+        } catch (RuntimeException ex) {
+            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
+                if (log.isInfoEnabled()) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+            } else {
+                fail("Expecting: " + SparqlTypeErrorException.class, ex);
             }
         }
-        
-//        /*
-//         * Note: There is really no reason to check the SUM after we have
-//         * observed an error during the evaluation of the aggregate.
-//         */
-//        assertEquals(new XSDIntegerIV(BigInteger.valueOf(9 + 5 /*+ 7*/ + 7)), op.done());
+
+        /*
+         * Now verify that the error is sticky.
+         */
+        try {
+            op.done();
+            fail("Expecting: " + SparqlTypeErrorException.class);
+        } catch (RuntimeException ex) {
+            if (InnerCause.isInnerCause(ex, SparqlTypeErrorException.class)) {
+                if (log.isInfoEnabled()) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+            } else {
+                fail("Expecting: " + SparqlTypeErrorException.class, ex);
+            }
+        }
+
+        /*
+         * Now verify that reset() clears the error.
+         */
+        op.reset();
+        op.done();
 
     }
 

@@ -47,11 +47,19 @@ import com.bigdata.bop.aggregate.IAggregate;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Modify to rewrite AVERAGE as SUM()/COUNT() in preparation for a
+ *          more distributed / parallel evaluation when the aggregate does not
+ *          use DISTINCT and when there are no dependencies among the aggregate
+ *          expressions (e.g., SUM(x)+1 is fine, as is SUM(x)+SUM(y), but
+ *          SUM(x+AVG(x)) introduces a dependency which prevents us from
+ *          optimizing the aggregation using per-group incremental pipelined
+ *          evaluation).
  */
 public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory {
 
     private final LinkedHashMap<IAggregate<?>,IVariable<?>> aggExpr;
-    private final LinkedHashMap<IValueExpression<?>,ProjectionType> columnProjections;
+//    private final LinkedHashMap<IValueExpression<?>,ProjectionType> columnProjections;
     private final IValueExpression<?>[] select2;
     private final IConstraint[] having2;
     
@@ -85,87 +93,79 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory {
         return having2;
     }
     
-    /**
-     * Metadata flags reporting whether the column projection of a value
-     * expression will include all values or only the distinct values. If both
-     * flags are set, then both the projection of all values and the projection
-     * of all distinct values are required.
-     */
-    public static class ProjectionType {
-
-        /**
-         * The column projection of the all observed values is required.
-         */
-        static final int AllValues = 1 << 0;
-
-        /**
-         * The column projection of the observed distinct values is required.
-         */
-        static final int DistinctValues = 1 << 1;
-
-        private int state = 0;
-
-        public ProjectionType() {
-
-        }
-
-        public boolean isAllValues() {
-            return (state & AllValues) != 0;
-        }
-
-        public boolean isDistinctValues() {
-            return (state & DistinctValues) != 0;
-        }
-
-        public void setAllValues() {
-            state |= AllValues;
-        }
-
-        public void setDistinctValues() {
-            state |= DistinctValues;
-        }
-        
-        public Object getColumnProjection() {
-            return proj;
-        }
-        
-        public void setColumnProjection(Object proj) {
-            this.proj = proj;
-        }
-        
-        private Object proj;
-        
-    }
-    
-    /**
-     * The distinct {@link IValueExpression}s whose column projections are used
-     * by the {@link #getAggExpr() aggregate expressions}. The variables appear
-     * in the order in which they are first used by the aggregate expressions.
-     * For example, given
-     * 
-     * <pre>
-     * SELECT SUM(x), SUM(y), SUM(x+y), AVG(x+y), SUM(DISTINCT z)
-     * </pre>
-     * 
-     * this would return <code>[x,y,x+y]</code>.
-     * <p>
-     * Note that the value expression <code>x+y</code> appears more than once as
-     * the inner value expression of different aggregation functions, but it is
-     * only reported once.
-     * 
-     * TODO We should really handle DISTINCT(valueExpression) as its own
-     * aggregate function. However, unlike the other aggregate functions (all of
-     * which evaluate multisets) it produces a set value as well. It is not
-     * difficult to imagine other such aggregation operations which produce sets
-     * rather than scalars and hence must be reduced to a scalar by wrapping
-     * them with another expression.
-     * 
-     * TODO Raise this onto the interface once the design solidifies a little
-     * more.
-     */
-    public LinkedHashMap<IValueExpression<?>, ProjectionType> getColumnProjections() {
-        return columnProjections;
-    }
+//    /**
+//     * Metadata flags reporting whether the column projection of a value
+//     * expression will include all values or only the distinct values. If both
+//     * flags are set, then both the projection of all values and the projection
+//     * of all distinct values are required.
+//     */
+//    public static class ProjectionType {
+//
+//        /**
+//         * The column projection of the all observed values is required.
+//         */
+//        static final int AllValues = 1 << 0;
+//
+//        /**
+//         * The column projection of the observed distinct values is required.
+//         */
+//        static final int DistinctValues = 1 << 1;
+//
+//        private int state = 0;
+//
+//        public ProjectionType() {
+//
+//        }
+//
+//        public boolean isAllValues() {
+//            return (state & AllValues) != 0;
+//        }
+//
+//        public boolean isDistinctValues() {
+//            return (state & DistinctValues) != 0;
+//        }
+//
+//        public void setAllValues() {
+//            state |= AllValues;
+//        }
+//
+//        public void setDistinctValues() {
+//            state |= DistinctValues;
+//        }
+//        
+//        public Object getColumnProjection() {
+//            return proj;
+//        }
+//        
+//        public void setColumnProjection(Object proj) {
+//            this.proj = proj;
+//        }
+//        
+//        private Object proj;
+//        
+//    }
+//    
+//    /**
+//     * The distinct {@link IValueExpression}s whose column projections are used
+//     * by the {@link #getAggExpr() aggregate expressions}. The variables appear
+//     * in the order in which they are first used by the aggregate expressions.
+//     * For example, given
+//     * 
+//     * <pre>
+//     * SELECT SUM(x), SUM(y), SUM(x+y), AVG(x+y), SUM(DISTINCT z)
+//     * </pre>
+//     * 
+//     * this would return <code>[x,y,x+y]</code>.
+//     * <p>
+//     * Note that the value expression <code>x+y</code> appears more than once as
+//     * the inner value expression of different aggregation functions, but it is
+//     * only reported once.
+//     * 
+//     * TODO This is unused and untested.
+//     */
+//    public LinkedHashMap<IValueExpression<?>, ProjectionType> getColumnProjections() {
+//        return columnProjections;
+//    }
 
     public GroupByRewriter(final IGroupByState groupByState) {
 
@@ -174,7 +174,7 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory {
 
         this.aggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
 
-        this.columnProjections = new LinkedHashMap<IValueExpression<?>, ProjectionType>();
+//        this.columnProjections = new LinkedHashMap<IValueExpression<?>, ProjectionType>();
 
         final IValueExpression<?>[] select = groupByState.getSelectClause();
 
@@ -225,23 +225,23 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory {
 
         }
 
-        /*
-         * Collect the distinct value expressions (the inner expression for the
-         * aggregates) and add some metadata about the types of column projects
-         * which we require for each such value expression.
-         */
-        for (IAggregate<?> e : aggExpr.keySet()) {
-            final IValueExpression<?> valueExpr = e.getExpr();
-            ProjectionType ptype = columnProjections.get(valueExpr);
-            if (ptype == null) {
-                ptype = new ProjectionType();
-                columnProjections.put(valueExpr, ptype);
-            }
-            if (e.isDistinct())
-                ptype.setDistinctValues();
-            else
-                ptype.setAllValues();
-        }
+//        /*
+//         * Collect the distinct value expressions (the inner expression for the
+//         * aggregates) and add some metadata about the types of column projects
+//         * which we require for each such value expression.
+//         */
+//        for (IAggregate<?> e : aggExpr.keySet()) {
+//            final IValueExpression<?> valueExpr = e.getExpr();
+//            ProjectionType ptype = columnProjections.get(valueExpr);
+//            if (ptype == null) {
+//                ptype = new ProjectionType();
+//                columnProjections.put(valueExpr, ptype);
+//            }
+//            if (e.isDistinct())
+//                ptype.setDistinctValues();
+//            else
+//                ptype.setAllValues();
+//        }
         
     }
 

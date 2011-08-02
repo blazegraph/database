@@ -469,7 +469,10 @@ public class TestGROUP_CONCAT extends TestCase2 {
         assertEquals(new LiteralImpl("9:7:7"), op.done());
 
     }
-    
+
+    /**
+     * FIXME We should test this because of the sticky errors contract.
+     */
 //    public void test_sum_with_errors() {
 //        
 //        final BigdataValueFactory f = BigdataValueFactoryImpl.getInstance(getName());

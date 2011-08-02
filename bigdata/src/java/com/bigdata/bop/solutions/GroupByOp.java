@@ -33,6 +33,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.aggregate.IAggregate;
 
 /**
  * Base class for operators which perform aggregation operations on binding
@@ -88,4 +89,15 @@ abstract public class GroupByOp extends PipelineOp {
         super(args, annotations);
     }
 
+    /**
+     * Return <code>true</code> iff this operator supports pipelined aggregation
+     * <p>
+     * Note: Pipelined aggregation is only possible when (a) DISTINCT is not
+     * used in the {@link IAggregate}s; and (b) {@link IAggregate}s are not
+     * nested within other {@link IAggregate}s. An implementation which returns
+     * <code>true</code> for this method MUST NOT be used for aggregation
+     * operations which would violate either of these constraints.
+     */
+    abstract public boolean isPipelinedAggregationOp();
+    
 }

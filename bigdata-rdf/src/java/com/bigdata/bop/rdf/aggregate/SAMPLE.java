@@ -58,7 +58,7 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     public SAMPLE(boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.SAMPLE, distinct, expr);
+        super(/*FunctionCode.SAMPLE,*/ distinct, expr);
     }
 
     /**
@@ -69,7 +69,32 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
      */
     private transient IV sample = null;
 
+    /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
+
     synchronized public IV get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
@@ -87,11 +112,23 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     synchronized public void reset() {
+
         sample = null;
+        
+        firstCause = null;
+        
     }
 
     synchronized public IV done() {
+
+        if (firstCause != null) {
+            
+            throw new RuntimeException(firstCause);
+            
+        }
+
         return sample;
+        
     }
 
     /**

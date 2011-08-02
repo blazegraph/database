@@ -83,6 +83,7 @@ public class TestGroupByState extends TestCase2 {
 //        final LinkedHashSet<IVariable<?>> distinctColumnVars;
         final boolean anyDistinct;
         final boolean selectDependency;
+        final boolean nestedAggregates;
         final boolean simpleHaving;
 
         MockGroupByState(//
@@ -95,6 +96,7 @@ public class TestGroupByState extends TestCase2 {
 //                final LinkedHashSet<IVariable<?>> distinctColumnVars,//
                 final boolean anyDistinct,//
                 final boolean selectDependency,//
+                final boolean nestedAggregates,//
                 final boolean simpleHaving//
                 ) {
             this.groupBy = groupBy;
@@ -106,6 +108,7 @@ public class TestGroupByState extends TestCase2 {
 //            this.distinctColumnVars = distinctColumnVars;
             this.anyDistinct = anyDistinct;
             this.selectDependency = selectDependency;
+            this.nestedAggregates = nestedAggregates;
             this.simpleHaving = simpleHaving;
         }
         
@@ -144,6 +147,10 @@ public class TestGroupByState extends TestCase2 {
         public boolean isSelectDependency() {
             return selectDependency;
         }
+
+        public boolean isNestedAggregates() {
+            return nestedAggregates;
+        }
         
         public boolean isSimpleHaving() {
             return simpleHaving;
@@ -181,6 +188,9 @@ public class TestGroupByState extends TestCase2 {
         assertEquals("selectDependency", expected.isSelectDependency(),
                 actual.isSelectDependency());
         
+        assertEquals("nestedAggregates", expected.isNestedAggregates(),
+                actual.isNestedAggregates());
+        
         assertEquals("simpleHaving", expected.isSimpleHaving(),
                 actual.isSimpleHaving());
         
@@ -215,7 +225,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -256,7 +267,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -300,7 +312,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -343,7 +356,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -387,7 +401,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -432,7 +447,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -478,7 +494,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, false/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, false/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -491,14 +508,9 @@ public class TestGroupByState extends TestCase2 {
      * SELECT SUM(?x+MIN(?y)) as ?z
      * GROUP BY ?a
      * </pre>
-     * 
-     * TODO The {@link IGroupByState} interface should probably report this case
-     * as !isSimpleSelect(). A select without nested aggregates is one of the
-     * criteria for a "sweet" evaluation (the other is that each of the
-     * aggregation functions can be decomposed, so no AVERAGE).
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void test_compositionOfAggregates() {
+    public void test_nestedAggregates() {
 
         final IVariable<IV> a = Var.var("a");
 
@@ -507,10 +519,10 @@ public class TestGroupByState extends TestCase2 {
         final IVariable<IV> z = Var.var("z");
 
         final IValueExpression<IV> zExpr = new /* Conditional */Bind(z,
-                new MathBOp(//
-                        new SUM(false/* distinct */, (IValueExpression<IV>) x),
-                        new MIN(false/* distinct */, (IValueExpression<IV>) y),
-                        MathOp.PLUS));
+                new SUM(false/* distinct */,
+                        (IValueExpression<IV>) new MathBOp(x, new MIN(
+                                false/* distinct */, (IValueExpression<IV>) y),
+                                MathOp.PLUS)));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { zExpr };
 
@@ -530,7 +542,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                true/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -582,7 +595,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, true/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, true/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -668,7 +682,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                true/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                true/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -717,7 +732,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                true/* anyDistinct */, false/* selectDependency */, false/* simpleHaving */);
+                true/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, false/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 
@@ -753,7 +769,8 @@ public class TestGroupByState extends TestCase2 {
 
         final MockGroupByState expected = new MockGroupByState(groupBy,
                 groupByVars, select, selectVars, having, columnVars,
-                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
 
         final IGroupByState actual = new GroupByState(select, groupBy, having);
 

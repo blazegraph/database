@@ -37,8 +37,8 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Operator combines the string values over the presented binding sets for the
@@ -46,6 +46,10 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * plain literal.
  * 
  * @author thompsonbry
+ * 
+ *         FIXME Should this be parameterized with Literal or IV? IF IV, then
+ *         the pattern is to create an appropriate mock IV and cache the Literal
+ *         on the IV. For example, see {@link StrBOp}.
  */
 public class GROUP_CONCAT extends AggregateBase<Literal> implements
         IAggregate<Literal> {
@@ -111,7 +115,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
             final IValueExpression<IV> expr, final String sep) {
 
         this(new BOp[] { expr }, NV.asMap(//
-                new NV(Annotations.FUNCTION_CODE, FunctionCode.GROUP_CONCAT),//
+//                new NV(Annotations.FUNCTION_CODE, FunctionCode.GROUP_CONCAT),//
                 new NV(Annotations.DISTINCT, distinct),//
                 new NV(Annotations.SEPARATOR, sep)//
                 ));
@@ -169,6 +173,8 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
      */
     private transient boolean done = false;
 
+    private Throwable firstCause = null;
+    
     synchronized public void reset() {
 
         aggregated = null;
@@ -177,6 +183,8 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
         done = false;
 
+        firstCause = null;
+        
         // cache stuff.
         sep();
         valueLimit();
@@ -186,6 +194,12 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     synchronized public Literal done() {
 
+        if (firstCause != null) {
+            
+            throw new RuntimeException(firstCause);
+            
+        }
+
         if (aggregated == null)
             return EMPTY_LITERAL;
 
@@ -194,6 +208,26 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
     }
 
     synchronized public Literal get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private Literal doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 

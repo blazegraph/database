@@ -111,6 +111,31 @@ public interface IGroupByState {
     public boolean isSelectDependency();
 
     /**
+     * <code>true</code> if any aggregate expression nests another aggregate
+     * expression. For example:
+     * 
+     * <pre>
+     * SUM(?x+AVG(?x))
+     * </pre>
+     * 
+     * is a nested aggregation expression but:
+     * 
+     * <pre>
+     * SUM(?x+1)
+     * </pre>
+     * 
+     * and
+     * 
+     * <pre>
+     * 1+SUM(?x)+AVG(?x)
+     * </pre>
+     * 
+     * are not nested aggregation expressions. When <code>false</code> certain
+     * optimizations may be possible.
+     */
+    public boolean isNestedAggregates();
+    
+    /**
      * <code>true</code> if none of the value expressions in the optional HAVING
      * clause use {@link IAggregate} functions. When <code>true</code> certain
      * optimizations are possible.

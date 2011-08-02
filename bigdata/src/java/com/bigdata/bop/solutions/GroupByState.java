@@ -65,6 +65,7 @@ public class GroupByState implements IGroupByState {
     private final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
     final private boolean anyDistinct;
     final private boolean selectDependency;
+    final private boolean nestedAggregates;
     final private boolean simpleHaving;
 
     public IValueExpression<?>[] getGroupByClause() {
@@ -103,6 +104,10 @@ public class GroupByState implements IGroupByState {
         return selectDependency;
     }
 
+    public boolean isNestedAggregates() {
+        return nestedAggregates;
+    }
+    
     public boolean isSimpleHaving() {
         return simpleHaving;
     }
@@ -128,6 +133,9 @@ public class GroupByState implements IGroupByState {
         // true iff any aggregate expression uses DISTINCT.
         final AtomicBoolean anyDistinct = new AtomicBoolean(false);
 
+        // true iff any aggregate expression nests another aggregate expression.
+        final AtomicBoolean nestedAggregates = new AtomicBoolean(false);
+        
         /*
          * Validate GROUP_BY value expressions.
          * 
@@ -150,7 +158,8 @@ public class GroupByState implements IGroupByState {
                     final IBind<?> bindExpr = (IBind<?>) expr;
                     final IValueExpression<?> e = bindExpr.getExpr();
                     if (isAggregate(e, false/* isSelectClause */,
-                            null/* isSelectDependency */, anyDistinct)) {
+                            null/* isSelectDependency */, nestedAggregates,
+                            anyDistinct)) {
                         throw new IllegalArgumentException(
                                 "Aggregate expression not allowed in GROUP_BY: "
                                         + expr);
@@ -214,7 +223,7 @@ public class GroupByState implements IGroupByState {
                     final IBind<?> bindExpr = (IBind<?>) expr;
                     final IValueExpression<?> e = bindExpr.getExpr();
                     if (!isAggregate(e, true/* isSelectClause */,
-                            selectDependency, anyDistinct))
+                            selectDependency, nestedAggregates, anyDistinct))
                         throw new IllegalArgumentException("Not an aggregate: "
                                 + bindExpr);
                     selectVars.add(bindExpr.getVar());
@@ -255,9 +264,10 @@ public class GroupByState implements IGroupByState {
                  * possible when DISTINCT is used within an aggregate expression
                  * (this is done by isAggregate()).
                  */
-                
+
                 if (!isAggregate(c, false/* isSelectClause */,
-                        null/* isSelectDependency */, anyDistinct))
+                        null/* isSelectDependency */, nestedAggregates,
+                        anyDistinct))
                     throw new IllegalArgumentException("Not an aggregate: " + c);
 
                 if (simpleHaving) {
@@ -283,6 +293,10 @@ public class GroupByState implements IGroupByState {
             }
         }
         this.simpleHaving = simpleHaving;
+
+        // true iff any aggregate function nests another aggregate function
+        // within it.
+        this.nestedAggregates = nestedAggregates.get();
         
         // true iff DISTINCT used w/in aggregate function in SELECT or HAVING.
         this.anyDistinct = anyDistinct.get();
@@ -333,33 +347,42 @@ public class GroupByState implements IGroupByState {
      *            {@link IVariable} declared in the GROUP_BY clause or earlier
      *            in the SELECT clause. This argument is optional unless
      *            <i>isSelectClause</i> is <code>true</code>.
+     * @param isNestedAggregates
+     *            Set as a side-effect when an {@link IValueExpression}
+     *            containing an {@link IAggregate} nests another
+     *            {@link IAggregate} within it.
      * @param isAnyDistinct
      *            Set as a side-effect if an {@link IAggregate} function is
      *            encountered which reports <code>true</code> for
      *            {@link IAggregate#isDistinct()}.
-     *            
+     * 
      * @return <code>true</code> iff the operator is an aggregate.
      */
     protected boolean isAggregate(final BOp op,
             final boolean isSelectClause,
             final AtomicBoolean isSelectDependency,
+            final AtomicBoolean isNestedAggregates,
             final AtomicBoolean isAnyDistinct) {
 
         if (op == null)
             throw new IllegalArgumentException();
 
         return isAggregate(op, isSelectClause, isSelectDependency,
-                isAnyDistinct, false/* withinAggregateFunction */);
+                isNestedAggregates, isAnyDistinct, false/* withinAggregateFunction */);
 
     }
 
     private boolean isAggregate(final BOp op,
             final boolean isSelectClause,
             final AtomicBoolean isSelectDependency,
+            final AtomicBoolean isNestedAggregates,
             final AtomicBoolean isAnyDistinct,
             final boolean withinAggregateFunction) {
 
         if (op instanceof IAggregate<?>) {
+            if(withinAggregateFunction) {
+                isNestedAggregates.set(true);
+            }
             if (((IAggregate<?>) op).isDistinct()) {
                 isAnyDistinct.set(true);
             }
@@ -422,16 +445,26 @@ public class GroupByState implements IGroupByState {
                 continue;
             }
             if (log.isTraceEnabled())
-                log.trace("op=" + op.getClass() + ", isSelectClause="
-                        + isSelectClause + ", isSelectDependency="
-                        + isSelectDependency + ", isAnyDistinct="
-                        + isAnyDistinct + ", withinAggregateFunction="
-                        + withinAggregateFunction + ", aggregationContext="
-                        + aggregationContext + ", groupByVars=" + groupByVars
-                        + ", selectVars=" + selectVars + ", arg=" + arg);
+                log.trace("op=" + op.getClass()
+                        + //
+                        ", isSelectClause="
+                        + isSelectClause //
+                        + ", isSelectDependency="
+                        + isSelectDependency //
+                        + ", isNestedAggregates="
+                        + isNestedAggregates//
+                        + ", isAnyDistinct="
+                        + isAnyDistinct //
+                        + ", withinAggregateFunction="
+                        + withinAggregateFunction //
+                        + ", aggregationContext=" + aggregationContext //
+                        + ", groupByVars=" + groupByVars//
+                        + ", selectVars=" + selectVars //
+                        + ", arg=" + arg//
+                );
             // recursion through child value expression.
             isAggregate |= isAggregate(arg, isSelectClause, isSelectDependency,
-                    isAnyDistinct, aggregationContext/* withinAggregateFunction */);
+                    isNestedAggregates, isAnyDistinct, aggregationContext/* withinAggregateFunction */);
         }
 
         return isAggregate;

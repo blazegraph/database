@@ -52,7 +52,7 @@ import com.bigdata.rdf.model.BigdataValue;
 public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
         INeedsMaterialization {
 
-    private static final transient Logger log = Logger.getLogger(SUM.class);
+//    private static final transient Logger log = Logger.getLogger(SUM.class);
 
     /**
 	 * 
@@ -68,7 +68,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     public SUM(boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.SUM, distinct, expr);
+        super(/*FunctionCode.SUM, */distinct, expr);
     }
 
     /**
@@ -80,17 +80,54 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
      * Note: This field is guarded by the monitor on the {@link SUM} instance.
      */
     private transient IV aggregated = ZERO;
+    
+    /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
 
     synchronized public void reset() {
+
         aggregated = ZERO;
+        
+        firstCause = null;
+        
     }
 
     synchronized public IV done() {
+
+        if (firstCause != null) {
+        
+            throw new RuntimeException(firstCause);
+            
+        }
+
         return aggregated;
+        
     }
 
     synchronized public IV get(final IBindingSet bindingSet) {
 
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
+        
         final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
         final IV iv = expr.get(bindingSet);
