@@ -176,6 +176,9 @@ public class FixedAllocator implements Allocator {
 		if (m_pendingContextCommit) {
 			throw new IllegalStateException("Already pending commit");
 		}
+		
+		assert checkBits();
+
 		if (context == null && m_context != null) {
 			// restore commit bits in AllocBlocks
 			for (AllocBlock allocBlock : m_allocBlocks) {
@@ -202,6 +205,11 @@ public class FixedAllocator implements Allocator {
 		} else {
 			m_contextThread = null;
 		}
+		
+		assert checkBits();
+		
+		// assert m_freeTransients == 0;
+
 	}
 
 	/**
@@ -219,6 +227,12 @@ public class FixedAllocator implements Allocator {
 			for (AllocBlock allocBlock : m_allocBlocks) {
 				allocBlock.abortshadow(writeCacheService);
 			}
+			
+			// Reset freebits
+			m_freeBits = calcFreeBits();
+			
+			assert m_freeTransients == 0;
+			
 			m_context = context;
 		} else {
 			throw new IllegalArgumentException();
@@ -233,17 +247,17 @@ public class FixedAllocator implements Allocator {
 	 */
 	public byte[] write() {
 		try {
+			
 			final AllocBlock fb = m_allocBlocks.get(0);
 			if (log.isTraceEnabled())
 				log.trace("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_live[0]);
 			final byte[] buf = new byte[1024];
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			final boolean protectTransients = m_sessionActive || m_store.isSessionProtected();
 			try {
                 str.writeInt(m_size);
                 
                 assert m_sessionActive || m_freeTransients == transientbits();
-
-    			boolean protectTransients = m_sessionActive || m_store.isSessionProtected();
     			
                 final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
                 while (iter.hasNext()) {
@@ -302,7 +316,7 @@ public class FixedAllocator implements Allocator {
 				}
 			}
 			
-			if (!this.m_sessionActive) {
+			if (!protectTransients /*!this.m_sessionActive*/) {
 				m_freeBits += m_freeTransients;
 	
 				// Handle re-addition to free list once transient frees are
@@ -313,12 +327,54 @@ public class FixedAllocator implements Allocator {
 				}
 	
 				m_freeTransients = 0;
+				
 			}
-
+			
+			assert checkBits();
+			
 			return buf;
 		} catch (IOException e) {
 			throw new StorageTerminalError("Error on write", e);
 		}
+	}
+
+	private int calcFreeBits() {
+		int freeBits = 0;
+		
+		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+		final int blockSize = m_bitSize * 32 * m_size;
+		while (iter.hasNext()) {
+			final AllocBlock block = iter.next();
+			for (int i = 0; i < m_bitSize; i++) {
+				freeBits += 32 - Integer.bitCount(block.m_transients[i]);
+			}
+		}
+		
+		return freeBits;
+	}
+
+	private int calcLiveFreeBits() {
+		int freeBits = 0;
+		
+		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+		final int blockSize = m_bitSize * 32 * m_size;
+		while (iter.hasNext()) {
+			final AllocBlock block = iter.next();
+			for (int i = 0; i < m_bitSize; i++) {
+				freeBits += 32 - Integer.bitCount(block.m_live[i]);
+			}
+		}
+		
+		return freeBits;
+	}
+	
+	private boolean checkBits() {
+		final int calcFree = calcFreeBits();
+		final int calcLiveFree = calcLiveFreeBits();
+		
+		return m_freeBits == calcFree
+			&& (m_freeBits + m_freeTransients) == calcLiveFree;
+		
 	}
 
 	// read does not read in m_size since this is read to determine the class of
@@ -345,12 +401,14 @@ public class FixedAllocator implements Allocator {
 						m_freeBits += 32;
 					} else if (block.m_live[i] != 0xFFFFFFFF) { // not full
 						final int anInt = block.m_live[i];
-						for (int bit = 0; bit < 32; bit++) {
-							if ((anInt & (1 << bit)) == 0) {
-								m_freeBits++;
-							}
-						}
-					}
+//						for (int bit = 0; bit < 32; bit++) {
+//							if ((anInt & (1 << bit)) == 0) {
+//								m_freeBits++;
+//							}
+//						}
+						
+						m_freeBits += 32 - Integer.bitCount(anInt);
+					} // else full so no freebits
 				}
 
 				block.m_transients = (int[]) block.m_live.clone();
@@ -587,6 +645,7 @@ public class FixedAllocator implements Allocator {
 			if (tmp && !m_sessionActive) throw new AssertionError();
 			
 			try {
+				assert checkBits();
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
@@ -594,10 +653,12 @@ public class FixedAllocator implements Allocator {
 						throw new IllegalStateException("Check thread context");
 					
 					m_freeBits++;
+
 					checkFreeList();
+
 				} else {
-					
 					if (m_sessionActive) {
+						m_freeTransients++;
 						boolean assertsEnabled = false;
 						assert assertsEnabled = true;
 						if (assertsEnabled){
@@ -610,10 +671,8 @@ public class FixedAllocator implements Allocator {
 						}
 					} else {
 						m_freeTransients++;
-					}
-						
-				}
-				
+					}						
+				}				
 				
 				if (m_statsBucket != null) {
 					m_statsBucket.delete(size);
@@ -622,6 +681,8 @@ public class FixedAllocator implements Allocator {
 				// catch and rethrow with more information
 				throw new IllegalArgumentException("IAE with address: " + addr + ", size: " + size + ", context: " + (m_context == null ? -1 : m_context.hashCode()), iae);
 			}
+
+			assert checkBits();
 
 			return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
@@ -632,11 +693,15 @@ public class FixedAllocator implements Allocator {
 				if (block.free(addr, m_size)) {
 					m_freeTransients++;
 
+					assert checkBits();
+
 					return true;
 				}
 			}
 		}
 		
+		assert checkBits();
+
 		return false;
 	}
 
@@ -664,7 +729,7 @@ public class FixedAllocator implements Allocator {
 	 * must therefore handle the 
 	 */
 	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
-
+		try {
         if (size <= 0)
             throw new IllegalArgumentException(
                     "Allocate requires positive size, got: " + size);
@@ -741,6 +806,9 @@ public class FixedAllocator implements Allocator {
     		log.error(sb);
 
 			return 0;
+		}
+		} finally {
+			assert checkBits();
 		}
 	}
 
