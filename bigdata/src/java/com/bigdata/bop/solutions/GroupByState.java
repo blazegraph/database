@@ -182,9 +182,6 @@ public class GroupByState implements IGroupByState {
          * 
          * Note: Certain optimizations are possible when all of the SELECT value
          * expressions may be computed based on per-group counters.
-         * 
-         * TODO detect case with per-group counters and support optimizations
-         * for that case.
          */
         {
             // true iff any aggregate expression uses a reference to another

@@ -66,6 +66,8 @@ public class TestPipelinedAggregationOp extends AbstractAggregationTestCase {
                         new NV(GroupByOp.Annotations.GROUP_BY, groupBy), //
                         new NV(GroupByOp.Annotations.HAVING, having), //
                 })) {
+            private static final long serialVersionUID = 1L;
+
             @Override
             public IVariable<?> var() {
                 return variableFactory.var();

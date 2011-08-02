@@ -622,17 +622,21 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
              */
             {
 
+                final boolean nestedAggregates = groupByState.isNestedAggregates();
+                
                 final Iterator<Map.Entry<IAggregate<?>, IVariable<?>>> itr = rewrite
                         .getAggExpr().entrySet().iterator();
+
                 while (itr.hasNext()) {
+                
                     final Map.Entry<IAggregate<?>, IVariable<?>> e = itr.next();
+                    
                     // Aggregate.
-                    final IConstant<?> c = doAggregate(e.getKey(), solutions);
-                    if (c != null) {
-                        // bind the result.
-                        aggregates.set(e.getValue(), c);
-                    }
+                    doAggregate(e.getKey(), e.getValue(), nestedAggregates,
+                            aggregates, solutions);
+                    
                 }
+                
                 if (log.isTraceEnabled())
                     log.trace("aggregates: " + aggregates);
                 
@@ -700,44 +704,75 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
 
     /**
      * Apply the value expression to each solution in the group.
-     * <p>
-     * Note: It is possible to optimize COUNT(*) and COUNT(DISTINCT *) as the
-     * cardinality of the solution multiset / solution set respectively.
-     * However, we can not undertake this optimization when COUNT() is
-     * parameterized by an {@link IValueExpression}, even a simple
-     * {@link IVariable}, since then we need to count the solutions where the
-     * value expression is non-<code>null</code> and NOT bind the result of the
-     * COUNT() for the group if the evaluation of the value expression results
-     * in an error for any solution in that group.
+     * 
+     * @param expr
+     *            The {@link IAggregate} to be evaluated.
+     * @param var
+     *            The variable on which computed value of the {@link IAggregate}
+     *            will be bound.
+     * @param selectDependency
+     *            When <code>true</code>, some aggregates bind variables which
+     *            are relied on both other aggregates. In this case, this method
+     *            must ensure that those bindings become visible.
+     * @param aggregates
+     *            The binding set on which the results are being bound (by the
+     *            caller).
+     * @param solutions
+     *            The input solutions for a solution group across which we will
+     *            compute the aggregate.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    private static IConstant<?> doAggregate(final IAggregate<?> a,
-            final Iterable<IBindingSet> solutions) {
-
+    private static void doAggregate(//
+            final IAggregate<?> expr,//
+            final IVariable<?> var,//
+            final boolean selectDependency,//
+            final IBindingSet aggregates,//
+            final Iterable<IBindingSet> solutions//
+            ) {
+        
         try {
 
-            final IConstant<?> ret;
+            final IConstant<?> c;
 
-            if (a.isWildcard() && a.isDistinct()) {
+            if (expr.isWildcard() && expr.isDistinct()) {
             
-                /*
+                /**
                  * For a wildcard we basically need to operate on solution
                  * multisets. For example, COUNT(*) is the size of the solution
                  * multiset (aka group).
+                 * 
+                 * Note: It is possible to optimize COUNT(*) and COUNT(DISTINCT
+                 * *) as the cardinality of the solution multiset / solution set
+                 * respectively. However, we can not undertake this optimization
+                 * when COUNT() is parameterized by an {@link IValueExpression},
+                 * even a simple {@link IVariable}, since then we need to count
+                 * the solutions where the value expression is non-
+                 * <code>null</code> and NOT bind the result of the COUNT() for
+                 * the group if the evaluation of the value expression results
+                 * in an error for any solution in that group.
                  */
                 
                 // Set used to impose DISTINCT on the solution multiset.
                 final LinkedHashSet<IBindingSet> set = new LinkedHashSet<IBindingSet>();
-                a.reset();
+
+                expr.reset();
                 for (IBindingSet bset : solutions) {
+
                     if (set.add(bset)) {
+                    
+                        if (selectDependency)
+                            propagateAggregateBindings(aggregates, bset);
+                        
                         // aggregate iff this is a new result.
-                        a.get(bset);
+                        expr.get(bset);
+                        
                     }
+
                 }
-                ret = new Constant(a.done());
                 
-            } else if (a.isDistinct()) {
+                c = new Constant(expr.done());
+                
+            } else if (expr.isDistinct()) {
                 
                 /*
                  * Apply aggregate function only to the distinct values which
@@ -746,17 +781,29 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
                 
                 // Set used to impose "DISTINCT" on value expression results.
                 final Set<Object> set = new LinkedHashSet<Object>();
+                
                 // The inner value expression.
-                final IValueExpression<?> innerExpr = a.getExpr();
-                a.reset();
+                final IValueExpression<?> innerExpr = expr.getExpr();
+                
+                expr.reset();
+                
                 for (IBindingSet bset : solutions) {
+                
                     final Object val = innerExpr.get(bset);
+                    
                     if (set.add(val)) {
+                        
+                        if (selectDependency)
+                            propagateAggregateBindings(aggregates, bset);
+
                         // aggregate iff this is a new result.
-                        a.get(bset);
+                        expr.get(bset);
+                        
                     }
+
                 }
-                ret = new Constant(a.done());
+                
+                c = new Constant(expr.done());
             
             } else {
                 
@@ -764,31 +811,66 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
                  * Apply aggregate function to all solutions in the multiset.
                  */
                 
-                a.reset();
+                expr.reset();
+                
                 for (IBindingSet bset : solutions) {
-                    a.get(bset);
+                
+                    if (selectDependency)
+                        propagateAggregateBindings(aggregates, bset);
+
+                    expr.get(bset);
+                    
                 }
-                ret = new Constant(a.done());
+
+                c = new Constant(expr.done());
 
             }
 
-            return ret;
+            if (c != null) {
+                
+                // bind the result.
+                aggregates.set(var,c);
+                
+            }
             
         } catch (Throwable t) {
 
             if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
 
-                // trap the type error and filter out the solution
+                // trap the type error and filter out the binding
                 if (log.isInfoEnabled())
-                    log.info("discarding solution due to type error: " + t);
+                    log.info("will not bind aggregate: expr=" + expr + " : " + t);
 
-                // No binding.
-                return null;
-
+                return;
+                
             }
 
             throw new RuntimeException(t);
 
+        }
+
+    }
+
+    /**
+     * Propagate the bound values for any aggregates to the incoming solution in
+     * order to make those bindings available when there is a dependency among
+     * the aggregate expressions.
+     * 
+     * @param aggregates
+     * @param bset
+     */
+    private static void propagateAggregateBindings(
+            final IBindingSet aggregates, final IBindingSet bset) {
+
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = aggregates
+                .iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<IVariable, IConstant> e = itr.next();
+
+            bset.set(e.getKey(), e.getValue());
+            
         }
 
     }
