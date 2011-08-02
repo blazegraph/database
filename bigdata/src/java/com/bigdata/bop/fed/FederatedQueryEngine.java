@@ -560,15 +560,33 @@ public class FederatedQueryEngine extends QueryEngine {
                 throw new RuntimeException("No such service: " + serviceUUID);
 
             try {
+
                 proxy = dataService.getQueryEngine();
+            
             } catch (IOException e) {
+            
                 throw new RuntimeException(e);
+                
             }
 
+            if (proxy == null) {
+
+                /*
+                 * Note: Presumably this is due to the concurrent tear down of
+                 * the peer.
+                 */
+                
+                throw new RuntimeException("No query engine on service: "
+                        + serviceUUID);
+
+            }
+            
             IQueryPeer tmp = proxyMap.putIfAbsent(serviceUUID, proxy);
             
 			if (tmp != null) {
-				proxy = tmp;
+			
+			    proxy = tmp;
+			    
 			}
 
 //			if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID + ", addedToCache="
