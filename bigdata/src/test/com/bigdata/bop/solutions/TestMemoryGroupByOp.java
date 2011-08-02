@@ -210,7 +210,8 @@ public class TestMemoryGroupByOp extends TestCase2 {
      * GROUP_BY expression.
      * 
      * <pre>
-     * SELECT ?org as ?newVar GROUP BY ?org
+     * SELECT ?org as ?newVar
+     * GROUP BY ?org
      * </pre>
      */
     public void test_select_projects_group_by_value_expression_as_variable() {
@@ -490,6 +491,191 @@ public class TestMemoryGroupByOp extends TestCase2 {
 		assertEquals(1, stats.chunksOut.get());
 
 	}
+
+    /**
+     * Based on an example in the SPARQL 1.1 Working Draft.
+     * 
+     * <pre>
+     * @prefix : <http://books.example/> .
+     * 
+     * :org1 :affiliates :auth1, :auth2 .
+     * :auth1 :writesBook :book1, :book2 .
+     * :book1 :price 9 .
+     * :book2 :price 5 .
+     * :auth2 :writesBook :book3 .
+     * :book3 :price 7 .
+     * :org2 :affiliates :auth3 .
+     * :auth3 :writesBook :book4 .
+     * :book4 :price 7 .
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX : <http://books.example/>
+     * SELECT ?org, (SUM(?lprice) AS ?totalPrice), 12 as ?z
+     * WHERE {
+     *   ?org :affiliates ?auth .
+     *   ?auth :writesBook ?book .
+     *   ?book :price ?lprice .
+     * }
+     * GROUP BY ?org
+     * </pre>
+     * 
+     * The solutions input to the GROUP_BY are:
+     * 
+     * <pre>
+     * ?org  ?auth  ?book  ?lprice
+     * org1  auth1  book1  9
+     * org1  auth1  book3  5
+     * org1  auth2  book3  7
+     * org2  auth3  book4  7
+     * </pre>
+     * 
+     * The aggregated solutions groups are:
+     * 
+     * <pre>
+     * ?org  ?totalPrice  ?z
+     * org1  21           12
+     * org2   7           12
+     * </pre>
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_simple_groupBy_with_aggregate_and_projected_constant() {
+
+        final IVariable<?> org = Var.var("org");
+        final IVariable<?> auth = Var.var("auth");
+        final IVariable<?> book = Var.var("book");
+        final IVariable<?> lprice = Var.var("lprice");
+        final IVariable<?> totalPrice = Var.var("totalPrice");
+        final IVariable<?> z = Var.var("z");
+
+        final IConstant<String> org1 = new Constant<String>("org1");
+        final IConstant<String> org2 = new Constant<String>("org2");
+        final IConstant<String> auth1 = new Constant<String>("auth1");
+        final IConstant<String> auth2 = new Constant<String>("auth2");
+        final IConstant<String> auth3 = new Constant<String>("auth3");
+        final IConstant<String> book1 = new Constant<String>("book1");
+        final IConstant<String> book2 = new Constant<String>("book2");
+        final IConstant<String> book3 = new Constant<String>("book3");
+        final IConstant<String> book4 = new Constant<String>("book4");
+        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(5));
+        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(7));
+        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDIntIV<BigdataLiteral>> price12 = new Constant<XSDIntIV<BigdataLiteral>>(
+                new XSDIntIV<BigdataLiteral>(12));
+
+        final int groupById = 1;
+        
+        final IValueExpression<?> totalPriceExpr = new Bind(totalPrice,
+                new SUM(false/* distinct */, (IValueExpression<IV>) lprice));
+
+        final IValueExpression<?> zExpr = new Bind(z, price12);
+
+        final IVariableFactory variableFactory = new MockVariableFactory();
+        
+        final GroupByOp query = new MemoryGroupByOp(new BOp[] {}, NV
+                .asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, groupById),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.PIPELINED, false),//
+                        new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                        new NV(GroupByOp.Annotations.SELECT, //
+                                new IValueExpression[] { org, totalPriceExpr, zExpr }), //
+                        new NV(GroupByOp.Annotations.GROUP_BY,//
+                                new IValueExpression[] { org }) //
+                })) {
+            @Override
+            public IVariable<?> var() {
+                return variableFactory.var();
+            }
+
+        };
+
+        /**
+         * The test data:
+         * 
+         * <pre>
+         * ?org  ?auth  ?book  ?lprice
+         * org1  auth1  book1  9
+         * org1  auth1  book3  5
+         * org1  auth2  book3  7
+         * org2  auth3  book4  7
+         * </pre>
+         */
+        final IBindingSet data [] = new IBindingSet []
+        {
+            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
+          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+        };
+
+        /**
+         * The expected solutions:
+         * 
+         * <pre>
+         * ?org  ?totalPrice ?z
+         * org1  21          12
+         * org2   7          12
+         * </pre>
+         */
+        
+        // Note: The aggregates will have gone through type promotion.
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price7 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(7)));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _price21 = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
+        final IBindingSet expected[] = new IBindingSet[]
+        {
+              new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org1, _price21, price12 } )
+            , new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org2, _price7 , price12 } )
+        } ;
+
+        final BOpStats stats = query.newStats () ;
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data });
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , null/* indexManager */
+        );
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, source, sink, null/* sink2 */
+        );
+        // Force the solutions to be emitted.
+        context.setLastInvocation();
+
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
+        }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(2, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
+
+    }
 
     /**
      * Based on an example in the SPARQL 1.1 Working Draft.
