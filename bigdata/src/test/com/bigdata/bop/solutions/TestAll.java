@@ -98,8 +98,11 @@ public class TestAll extends TestCase {
         // Test suite for rewrites of the SELECT and HAVING clauses.
         suite.addTestSuite(TestGroupByRewriter.class);
         
-        // in-memory GROUP_BY
+        // In-memory generalized aggregation operator
         suite.addTestSuite(TestMemoryGroupByOp.class);
+
+        // Pipelined aggregation operator.
+        suite.addTestSuite(TestPipelinedAggregationOp.class);
 
         return suite;
         

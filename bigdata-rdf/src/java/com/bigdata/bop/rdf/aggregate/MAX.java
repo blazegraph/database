@@ -55,7 +55,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  */
 public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
 
-    private static final transient Logger log = Logger.getLogger(MAX.class);
+//    private static final transient Logger log = Logger.getLogger(MAX.class);
 
     /**
 	 * 
@@ -71,7 +71,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     public MAX(boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.MAX, distinct, expr);
+        super(/*FunctionCode.MAX,*/distinct, expr);
     }
 
     /**
@@ -81,7 +81,32 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
      */
     private transient IV max = null;
 
+    /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
+
     synchronized public IV get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
@@ -122,11 +147,23 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     synchronized public void reset() {
+
         max = null;
+        
+        firstCause = null;
+
     }
 
     synchronized public IV done() {
+
+        if (firstCause != null) {
+            
+            throw new RuntimeException(firstCause);
+            
+        }
+
         return max;
+        
     }
 
     /**

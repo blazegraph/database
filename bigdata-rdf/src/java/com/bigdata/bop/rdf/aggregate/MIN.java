@@ -55,7 +55,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  */
 public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
-    private static final transient Logger log = Logger.getLogger(MIN.class);
+//    private static final transient Logger log = Logger.getLogger(MIN.class);
     
     /**
 	 * 
@@ -71,7 +71,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     public MIN(boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.MIN, distinct, expr);
+        super(/*FunctionCode.MIN,*/ distinct, expr);
     }
 
     /**
@@ -81,7 +81,32 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
      */
     private transient IV min = null;
 
+    /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
+
     synchronized public IV get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
@@ -122,11 +147,23 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     synchronized public void reset() {
+
         min = null;
+        
+        firstCause = null;
+
     }
 
     synchronized public IV done() {
+
+        if (firstCause != null) {
+            
+            throw new RuntimeException(firstCause);
+            
+        }
+
         return min;
+        
     }
 
     /**

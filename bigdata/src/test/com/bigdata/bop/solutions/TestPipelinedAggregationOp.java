@@ -33,16 +33,16 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 
 /**
- * Unit tests for {@link MemoryGroupByOp}.
+ * Unit tests for {@link PipelinedAggregationOp}.
  * 
  * @author thompsonbry
  */
-public class TestMemoryGroupByOp extends AbstractAggregationTestCase {
+public class TestPipelinedAggregationOp extends AbstractAggregationTestCase {
     
-	public TestMemoryGroupByOp() {
+	public TestPipelinedAggregationOp() {
 	}
 
-	public TestMemoryGroupByOp(String name) {
+	public TestPipelinedAggregationOp(String name) {
 		super(name);
 	}
 
@@ -54,13 +54,14 @@ public class TestMemoryGroupByOp extends AbstractAggregationTestCase {
 
         final IVariableFactory variableFactory = new MockVariableFactory();
 
-        final GroupByOp query = new MemoryGroupByOp(new BOp[] {},
+        final GroupByOp query = new PipelinedAggregationOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, groupById),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
-                        new NV(PipelineOp.Annotations.PIPELINED, false),//
-                        new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                        new NV(PipelineOp.Annotations.PIPELINED, true),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(PipelineOp.Annotations.SHARED_STATE, true),//
                         new NV(GroupByOp.Annotations.SELECT, select), //
                         new NV(GroupByOp.Annotations.GROUP_BY, groupBy), //
                         new NV(GroupByOp.Annotations.HAVING, having), //
@@ -76,7 +77,7 @@ public class TestMemoryGroupByOp extends AbstractAggregationTestCase {
 
     @Override
     protected boolean isPipelinedAggregationOp() {
-        return false;
+        return true;
     }
 
 }

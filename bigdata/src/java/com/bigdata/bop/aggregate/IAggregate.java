@@ -54,25 +54,25 @@ public interface IAggregate<E> extends IValueExpression<E>{
     /**
      * Return the current value of the aggregate (this has a side-effect on the
      * internal state of the {@link IAggregate} operator). Functions which can
-     * not produce an intermediate result, such as AVERAGE, may return
+     * not produce an intermediate result, such as AVERAGE, MAY return
      * <code>null</code>.
+     * <p>
+     * Note: If evaluation of the {@link IAggregate} throws an error, then that
+     * error must be "sticky" and reported out by {@link #done()} as well. This
+     * contract is relied on to correctly propagate errors within a group when
+     * using incremental (pipelined) evaluation of {@link IAggregate}s. The
+     * error state is cleared by {@link #reset()}.
      */
     E get(IBindingSet bset);
 
     /**
      * Return the final value.
+     * 
+     * @throws RuntimeException
+     *             If evaluation of {@link IAggregate#get(IBindingSet)} threw an
+     *             error, then that error is "sticky" and the first such error
+     *             encountered will be thrown out of {@link #done()} as well.
      */
     E done();
-
-//    /**
-//     * Return a new {@link IAggregate} where the expression has been replaced by
-//     * the given expression (copy-on-write).
-//     * 
-//     * @param newExpr
-//     *            The new expression.
-//     * 
-//     * @return The new {@link IAggregate}.
-//     */
-//	IAggregate<E> setExpression(IValueExpression<E> newExpr);
 
 }

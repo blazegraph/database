@@ -65,7 +65,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 	}
 
     public COUNT(final boolean distinct, IValueExpression<IV> expr) {
-        super(FunctionCode.COUNT, distinct, expr);
+        super(/*FunctionCode.COUNT,*/ distinct, expr);
     }
 	
 	/**
@@ -76,12 +76,37 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
     private transient long aggregated = 0L;
 
     /**
+     * The first error encountered since the last {@link #reset()}.
+     */
+    private transient Throwable firstCause = null;
+
+    /**
      * {@inheritDoc}
      * <p>
      * Note: COUNT() returns ZERO if there are no non-error solutions presented.
      * This assumes that the ZERO will be an xsd:long.
      */
     synchronized public IV get(final IBindingSet bindingSet) {
+
+        try {
+
+            return doGet(bindingSet);
+
+        } catch (Throwable t) {
+
+            if (firstCause == null) {
+
+                firstCause = t;
+                
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
 
@@ -107,11 +132,23 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     synchronized public void reset() {
+
         aggregated = 0L;
+        
+        firstCause = null;
+        
     }
 
     synchronized public IV done() {
+        
+        if (firstCause != null) {
+            
+            throw new RuntimeException(firstCause);
+            
+        }
+
         return new XSDLongIV<BigdataLiteral>(aggregated);
+        
     }
 
     /**

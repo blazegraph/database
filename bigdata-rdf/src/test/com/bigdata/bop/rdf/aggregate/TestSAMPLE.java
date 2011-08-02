@@ -249,6 +249,8 @@ public class TestSAMPLE extends TestCase2 {
      * materialization of all the XSDIntIV values for lprice, but that is just
      * because MathBOp is persnickety. Since SAMPLE really accepts any non-null
      * value, I've left out this unit test.
+     * 
+     * FIXME We should test this because of the sticky error contract.
      */
 //    public void test_sample_with_errors() {
 //        
