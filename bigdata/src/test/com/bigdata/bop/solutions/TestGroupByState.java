@@ -728,11 +728,37 @@ public class TestGroupByState extends TestCase2 {
     /**
      * TODO Unit test when projecting a constant
      * <pre>
-     * SELECT SUM(?x) as ?y, 12.0 as ?z
+     * SELECT 12 as ?x
      * </pre>
      */
     public void test_with_constant() {
-        fail("write test");
+
+        final IVariable<IV> x = Var.var("x");
+
+        final IValueExpression<IV> xExpr = new /* Conditional */Bind(x,
+                new Constant<IV>(new XSDIntIV(12)));
+
+        final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
+
+        final IValueExpression<IV>[] groupBy = null;
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(x);
+
+        final LinkedHashSet<IVariable<?>> columnVars = new LinkedHashSet<IVariable<?>>();
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having, columnVars,
+                false/* anyDistinct */, false/* selectDependency */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
     }
 
     /**
