@@ -714,8 +714,10 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         final IVariable<IV> lprice = Var.var("lprice");
         final IVariable<IV> totalPrice = Var.var("totalPrice");
 
-        /* FIXME Should all be IVs based on TermIds with their value's cached.
-         * Also fix the other tests in this class.  See TestSUM.
+        /*
+         * TODO All of these should all be IVs based on TermIds with their
+         * value's cached (the data are not being visited which is why the tests
+         * are passing). Also fix the other tests in this class. See TestSUM.
          */
         final IConstant<String> org1 = new Constant<String>("org1");
         final IConstant<String> org2 = new Constant<String>("org2");
