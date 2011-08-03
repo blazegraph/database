@@ -828,9 +828,9 @@ public class BOpBase implements BOp {
     }
 
     /**
-     * The hash code is based on the hash of the operands plus the optional
-     * {@link BOp.Annotations#BOP_ID}.  It is cached.
+     * The hash code is based on the hash of the operands (cached).
      */
+//    plus the optional {@link BOp.Annotations#BOP_ID}.  
     public int hashCode() {
 
         int h = hash;
@@ -845,10 +845,10 @@ public class BOpBase implements BOp {
 
             }
 
-            Integer id = (Integer) getProperty(Annotations.BOP_ID);
-
-            if (id != null)
-                h = 31 * h + id.intValue();
+//            Integer id = (Integer) getProperty(Annotations.BOP_ID);
+//
+//            if (id != null)
+//                h = 31 * h + id.intValue();
 
             hash = h;
 
