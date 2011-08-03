@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
@@ -48,6 +49,8 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.SailException;
+
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -60,7 +63,7 @@ import com.bigdata.rdf.store.BD;
  */
 public class TestNamedGraphs extends QuadsTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestNamedGraphs.class);
+    private static final Logger log = Logger.getLogger(TestNamedGraphs.class);
     
     /**
      * 
@@ -78,43 +81,42 @@ public class TestNamedGraphs extends QuadsTestCase {
     /**
      * The foaf: namespace.
      */
-    final String FOAF = "http://xmlns.com/foaf/0.1/";
+    private static final String FOAF = "http://xmlns.com/foaf/0.1/";
     
     /**
      * foaf:name
      */
-    final URI FOAF_NAME = new URIImpl(FOAF+"name"); 
+    private static final URI FOAF_NAME = new URIImpl(FOAF+"name"); 
     
     /**
      * foaf:mbox
      */
-    final URI FOAF_MBOX = new URIImpl(FOAF+"mbox"); 
+    private static final URI FOAF_MBOX = new URIImpl(FOAF+"mbox"); 
     
     /**
      * foaf:nick
      */
-    final URI FOAF_NICK = new URIImpl(FOAF+"nick"); 
+    private static final URI FOAF_NICK = new URIImpl(FOAF+"nick"); 
     
     /**
      * foaf:PersonalProfileDocument
      */
-    final URI FOAF_PPD = new URIImpl(FOAF+"PersonalProfileDocument"); 
+    private static final URI FOAF_PPD = new URIImpl(FOAF+"PersonalProfileDocument"); 
     
     /**
      * foaf:knows
      */
-    final URI FOAF_KNOWS = new URIImpl(FOAF+"knows"); 
+    private static final URI FOAF_KNOWS = new URIImpl(FOAF+"knows"); 
     
     /**
      * The dc: namespace.
      */
-    final String DC = "http://purl.org/dc/elements/1.1/";
+    private static final String DC = "http://purl.org/dc/elements/1.1/";
     
     /**
      * dc:publisher
      */
-    final URI DC_PUBLISHER = new URIImpl(DC+"publisher"); 
-    
+    private static final URI DC_PUBLISHER = new URIImpl(DC+"publisher"); 
     
     /**
      * 8.2.1 Specifying the Default Graph
@@ -1709,5 +1711,108 @@ public class TestNamedGraphs extends QuadsTestCase {
         
     }
 
+    /**
+     * Unit test for case where there is a single named group which will be
+     * visited by the query. In this case, the decision tree says that we should
+     * bind the context position to the {@link IV} for that graph in order to
+     * restrict the query to exactly the desired graph (rather than using an
+     * expander pattern). However, the graph variable also needs to become bound
+     * in the query solutions. If we simply replace the graph variable with a
+     * constant, then the as-bound value of the graph variable will not be
+     * reported in the result set.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/359
+     * 
+     * @throws RepositoryException
+     * @throws SailException
+     * @throws MalformedQueryException
+     * @throws QueryEvaluationException
+     * @throws IOException
+     */
+    public void test_ticket_359() throws RepositoryException, SailException,
+            MalformedQueryException, QueryEvaluationException, IOException {
+
+        if (log.isInfoEnabled())
+            log.info("testing: range count predictes graph variable will have exactly one solution.");
+
+        final BigdataSail sail = getSail();
+        try {
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
+                    .getConnection();
+            try {
+
+                cxn.setAutoCommit(false);
+
+                final BNode a = new BNodeImpl("_:a");
+                final BNode b = new BNodeImpl("_:b");
+//                final BNode z = new BNodeImpl("_:z");
+                final URI alice = new URIImpl(
+                        "http://example.org/foaf/aliceFoaf");
+//                final URI bob = new URIImpl("http://example.org/foaf/bobFoaf");
+
+                cxn.add(a, FOAF_NAME, new LiteralImpl("Alice"), alice);
+                cxn.add(a, FOAF_MBOX, new URIImpl("mailto:alice@work.example"),
+                        alice);
+                cxn.add(a, FOAF_KNOWS, b, alice);
+                cxn.add(b, FOAF_NAME, new LiteralImpl("Bob"), alice);
+                cxn.add(b, FOAF_MBOX, new URIImpl("mailto:bob@work.example"),
+                        alice);
+                cxn.add(b, FOAF_NICK, new LiteralImpl("Bobby"), alice);
+                cxn.add(a, RDF.TYPE, FOAF_PPD, alice);
+//                cxn.add(b, RDFS.SEEALSO, bob, alice);
+//                cxn.add(bob, RDF.TYPE, FOAF_PPD, alice);
+//                cxn.add(z, FOAF_MBOX, new URIImpl("mailto:bob@work.example"),
+//                        bob);
+//                cxn.add(z, RDFS.SEEALSO, bob, bob);
+//                cxn.add(z, FOAF_NICK, new LiteralImpl("Robert"), bob);
+//                cxn.add(bob, RDF.TYPE, FOAF_PPD, bob);
+                cxn.commit();
+                if (log.isInfoEnabled()) {
+                    log.info("\n" + sail.getDatabase().dumpStore().toString());
+                }
+
+                final String query = "PREFIX  data:  <http://example.org/foaf/> "
+                        + "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/> "
+                        + "PREFIX  rdfs:  <http://www.w3.org/2000/01/rdf-schema#> "
+                        + "SELECT ?mbox ?nick ?ppd "
+                        + "FROM NAMED <http://example.org/foaf/aliceFoaf> "
+                        + "WHERE "
+                        + "{ "
+                        + "  GRAPH ?ppd "
+                        + "  { "
+                        + "    ?alice foaf:mbox <mailto:alice@work.example> ; "
+                        + "           foaf:knows ?whom . "
+                        + "    ?whom  foaf:mbox ?mbox ; "
+                        + "           foaf:nick ?nick " //
+                        + "  } " //
+                        + "}"//
+                        ;
+
+                final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                        QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                final TupleQueryResult result = tupleQuery.evaluate();
+
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(//
+                        new BindingImpl("mbox", new URIImpl(
+                                "mailto:bob@work.example")),//
+                        new BindingImpl("nick", new LiteralImpl("Bobby")),
+                        new BindingImpl("ppd", alice))//
+                );
+
+                compare(result, answer);
+
+            } finally {
+                cxn.close();
+
+            }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+
+    }
 
 }
