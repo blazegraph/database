@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.PeriodEnum;
@@ -44,6 +45,7 @@ import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.service.Event;
 import com.bigdata.service.IService;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
 
@@ -144,14 +146,33 @@ public class CounterSetHTTPDServer implements Runnable {
                     
                     System.out.println("Setting server and service log levels: "+level);
                     
-                    // set logging level on the server.
-                    CounterSetHTTPDServer.log.setLevel(level);
-                    
-                    // set logging level for the view.
-                    Logger.getLogger(XHTMLRenderer.class).setLevel(level);
+                    try {
 
-                    // set logging level on the service.
-                    Logger.getLogger(NanoHTTPD.class).setLevel(level);
+                        // set logging level on the server.
+                        CounterSetHTTPDServer.log.setLevel(level);
+                        
+                        // set logging level for the view.
+                        Logger.getLogger(XHTMLRenderer.class).setLevel(level);
+
+                        // set logging level on the service.
+                        Logger.getLogger(NanoHTTPD.class).setLevel(level);
+
+                    } catch (Throwable t) {
+                        /*
+                         * Note: The SLF4J logging bridge can cause a
+                         * NoSuchMethodException to be thrown here.
+                         * 
+                         * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
+                         */
+                        if (InnerCause.isInnerCause(t,
+                                NoSuchMethodException.class)) {
+                            log.error("Could not set log level : "
+                                    + AbstractBTree.dumpLog.getName());
+                        } else {
+                            // Some other problem.
+                            throw new RuntimeException(t);
+                        }
+                    }
                     
                 } else if (arg.equals("-events")) {
 

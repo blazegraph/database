@@ -37,6 +37,7 @@ import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.util.InnerCause;
 
 /**
  * Class has a static method which writes a copyright banner on stdout once per
@@ -90,13 +91,42 @@ public class Banner {
                 /*
                  * Since there is no default for com.bigdata, default to WARN.
                  */
+                try {
+
+                    log.setLevel(Level.WARN);
+
+                    if (!quiet)
+                        log.warn("Defaulting log level to WARN: "
+                                + log.getName());
+
+                } catch (Throwable t) {
                 
-                log.setLevel(Level.WARN);
+                    /*
+                     * Note: The SLF4J bridge can cause a NoSuchMethodException
+                     * to be thrown out of Logger.setLevel(). We trap this
+                     * exception and log a message @ ERROR. It is critical that
+                     * bigdata logging is properly configured as logging at INFO
+                     * for com.bigdata will cause a tremendous loss of
+                     * performance.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
+                     */
+                    if (InnerCause.isInnerCause(t, NoSuchMethodException.class)) {
 
-                if (!quiet)
-                    log.warn("Defaulting log level to WARN: " + log.getName());
+                        log.error("Unable to raise the default log level to WARN."
+                                + " Logging is NOT properly configured."
+                                + " Severe performance penalty will result.");
 
-            }
+                    } else {
+                        
+                        // Something else that we are not expecting.
+                        throw new RuntimeException(t);
+                        
+                    }
+                    
+                }
+
+            } // if(log.getLevel() == null)
 
             /*
              * Note: I have modified this to test for disabled registration and

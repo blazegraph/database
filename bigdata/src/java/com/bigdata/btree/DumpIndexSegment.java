@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.InnerCause;
 
 /**
  * Utility to examine the context of an {@link IndexSegmentStore}.
@@ -96,7 +97,24 @@ public class DumpIndexSegment {
                     System.out.println("Setting log level: "+level);
                     
                     // turn up the dumpLog level so that we can see the output.
-                    AbstractBTree.dumpLog.setLevel(level);
+                    try {
+                        AbstractBTree.dumpLog.setLevel(level);
+                    } catch (Throwable t) {
+                        /*
+                         * Note: The SLF4J logging bridge can cause a
+                         * NoSuchMethodException to be thrown here.
+                         * 
+                         * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
+                         */
+                        if (InnerCause.isInnerCause(t,
+                                NoSuchMethodException.class)) {
+                            log.error("Could not set log level : "
+                                    + AbstractBTree.dumpLog.getName());
+                        } else {
+                            // Some other problem.
+                            throw new RuntimeException(t);
+                        }
+                    }
                     
                 } else {
                     
