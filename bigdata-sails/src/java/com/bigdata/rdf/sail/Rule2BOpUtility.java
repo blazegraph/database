@@ -1253,9 +1253,22 @@ public class Rule2BOpUtility {
         }
 
         if (summary.nknown == -1) {
+//        if (summary.nknown == 1) {
 
             /*
              * The dataset contains exactly one graph. Bind C.
+             * 
+             * FIXME This code path has been effectively disabled per the ticket
+             * identified immediately below by comparing nknown with -1 rather
+             * than with 1. We currently lack a means to convey a binding for
+             * the graph variable without rewriting the predicate such that the
+             * graph variable is effectively removed from the query. However, I
+             * think that we might have a solution for that when we get into the
+             * RTO integration. In the meanwhile, the comparison with -1 ensures
+             * that we continue to produce the correct solutions. Enabling this
+             * code path in the future might provide a slight performance gain.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/359
              */
 
             pred = pred.asBound((IVariable<?>) pred.get(3),
