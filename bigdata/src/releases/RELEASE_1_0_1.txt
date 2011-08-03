@@ -58,6 +58,17 @@ Bug fixes:
  - https://sourceforge.net/apps/trac/bigdata/ticket/355 (Query failure when
    comparing with non materialized value).
 
+ - https://sourceforge.net/apps/trac/bigdata/ticket/357 (RWStore reports
+   "FixedAllocator returning null address, with freeBits".)
+
+ - https://sourceforge.net/apps/trac/bigdata/ticket/359 (NamedGraph pattern
+   fails to bind graph variable if only one binding exists.)
+
+ - https://sourceforge.net/apps/trac/bigdata/ticket/362 (log4j - slf4j bridge.)
+ 
+Note: Some of these bug fixes require data migration.  For details, see
+https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=DataMigration
+   
 New features:
 
 - Single machine data storage to ~50B triples/quads (RWStore);
