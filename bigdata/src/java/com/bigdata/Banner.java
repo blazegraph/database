@@ -28,9 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -48,6 +54,11 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  */
 public class Banner {
+
+    /**
+     * The logger for <em>this</em> class.
+     */
+    private static final Logger log = Logger.getLogger("com.bigdata.Banner");
 
     private final static AtomicBoolean didBanner = new AtomicBoolean(false);
 
@@ -83,51 +94,13 @@ public class Banner {
                 System.out.println(banner);
 
             }
+
+            /*
+             * If logging is not configured for [com.bigdata] then we set a
+             * default log level @ WARN.  This is critical for good performance.
+             */
+            setDefaultLogLevel(quiet);
             
-            final Logger log = Logger.getLogger("com.bigdata");
-
-            if (log.getLevel() == null) {
-
-                /*
-                 * Since there is no default for com.bigdata, default to WARN.
-                 */
-                try {
-
-                    log.setLevel(Level.WARN);
-
-                    if (!quiet)
-                        log.warn("Defaulting log level to WARN: "
-                                + log.getName());
-
-                } catch (Throwable t) {
-                
-                    /*
-                     * Note: The SLF4J bridge can cause a NoSuchMethodException
-                     * to be thrown out of Logger.setLevel(). We trap this
-                     * exception and log a message @ ERROR. It is critical that
-                     * bigdata logging is properly configured as logging at INFO
-                     * for com.bigdata will cause a tremendous loss of
-                     * performance.
-                     * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
-                     */
-                    if (InnerCause.isInnerCause(t, NoSuchMethodException.class)) {
-
-                        log.error("Unable to raise the default log level to WARN."
-                                + " Logging is NOT properly configured."
-                                + " Severe performance penalty will result.");
-
-                    } else {
-                        
-                        // Something else that we are not expecting.
-                        throw new RuntimeException(t);
-                        
-                    }
-                    
-                }
-
-            } // if(log.getLevel() == null)
-
             /*
              * Note: I have modified this to test for disabled registration and
              * to use reflection in order to decouple the JMX dependency for
@@ -159,7 +132,159 @@ public class Banner {
         }
         
     }
+    
+    /**
+     * If logging is not configured for [com.bigdata] then we set a default log
+     * level @ WARN. This is critical for good performance.
+     */
+    private static void setDefaultLogLevel(final boolean quiet) {
 
+        final Logger defaultLog = Logger.getLogger("com.bigdata");
+
+        if (defaultLog.getLevel() == null) {
+
+            /*
+             * Since there is no default for com.bigdata, default to WARN.
+             */
+            try {
+
+                defaultLog.setLevel(Level.WARN);
+
+                if (!quiet)
+                    log.warn("Defaulting log level to WARN: "
+                            + defaultLog.getName());
+
+            } catch (Throwable t) {
+
+                /*
+                 * Note: The SLF4J bridge can cause a NoSuchMethodException to
+                 * be thrown out of Logger.setLevel(). We trap this exception
+                 * and log a message @ ERROR. It is critical that bigdata
+                 * logging is properly configured as logging at INFO for
+                 * com.bigdata will cause a tremendous loss of performance.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
+                 */
+                if (InnerCause.isInnerCause(t, NoSuchMethodException.class)) {
+
+                    log.error("Unable to raise the default log level to WARN."
+                            + " Logging is NOT properly configured."
+                            + " Severe performance penalty will result.");
+
+                } else {
+
+                    // Something else that we are not expecting.
+                    throw new RuntimeException(t);
+
+                }
+
+            }
+
+        } // if(log.getLevel() == null)
+
+    }
+
+    /**
+     * Use reflection to discover and report on the bigdata build information. A
+     * <code>com.bigdata.BuildInfo</code> is built when the JAR is created.
+     * However, it may not be present when running under an IDE from the source
+     * code and, therefore, there MUST NOT be any compile time references to the
+     * <code>com.bigdata.BuildInfo</code> class. This method uses reflection to
+     * avoid a compile time dependency.
+     * <p>
+     * Note: This method works fine. However, the problem with exposing the
+     * information is that people running from an IDE can observe <em>stale</em>
+     * data from old <code>com.bigdata.BuildInfo</code> class files left from a
+     * previous build of a JAR. This makes the information good for deployed
+     * versions of the JAR but potentially misleading when people are running
+     * under an IDE.
+     * 
+     * @return Build info metadata iff available.
+     */
+    private synchronized static Map<String,String> getBuildInfo() {
+
+        if (buildInfoRef.get() == null) {
+
+            final Map<String,String> map = new LinkedHashMap<String, String>();
+            
+            try {
+            
+                final Class<?> cls = Class.forName("com.bigdata.BuildInfo");
+                
+                for (Field f : cls.getFields()) {
+
+                    final String name = f.getName();
+
+                    final int mod = f.getModifiers();
+
+                    if (!Modifier.isStatic(mod))
+                        continue;
+
+                    if (!Modifier.isPublic(mod))
+                        continue;
+
+                    if (!Modifier.isFinal(mod))
+                        continue;
+
+                    try {
+
+                        final Object obj = f.get(null/* staticField */);
+
+                        if (obj != null) {
+
+                            map.put(name, "" + obj);
+                            
+                        }
+                        
+                    } catch (IllegalArgumentException e) {
+
+                        log.warn("Field: " + name + " : " + e);
+                        
+                    } catch (IllegalAccessException e) {
+                        
+                        log.warn("Field: " + name + " : " + e);
+                        
+                    }
+
+                }
+
+            } catch (ClassNotFoundException e) {
+
+                log.warn("Not found: " + "com.bigdata.BuildInfo");
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+            }
+
+            // set at most once.
+            buildInfoRef.compareAndSet(null/* expect */,
+                    Collections.unmodifiableMap(map)/* update */);
+
+        }
+        
+        return buildInfoRef.get();
+        
+    }
+
+    private final static AtomicReference<Map<String, String>> buildInfoRef = new AtomicReference<Map<String, String>>();
+    
+    private final static String getBuildString() {
+
+        if (getBuildInfo().isEmpty())
+            return "";
+
+        final StringBuilder s = new StringBuilder();
+
+        s.append("\nbuildVersion=" + getBuildInfo().get("buildVersion"));
+
+//        s.append("\nsvnRevision =" + getBuildInfo().get("svnRevision"));
+        
+        return s.toString();
+
+    }
+    
     /**
      * Outputs the banner and exits.
      * 
@@ -188,6 +313,7 @@ public class Banner {
                 + " " + SystemUtil.architecture() + //
         "\n"+SystemUtil.cpuInfo() + " #CPU="+SystemUtil.numProcessors() +//
         "\n"+System.getProperty("java.vendor")+" "+System.getProperty("java.version")+
+        getBuildString()+ // Note: Will add its own newline if non-empty.
         "\n"
         ;
     
