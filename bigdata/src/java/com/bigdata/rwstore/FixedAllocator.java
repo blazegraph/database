@@ -151,7 +151,7 @@ public class FixedAllocator implements Allocator {
 	 */
 	private ArrayList m_freeList;
 
-	public void setFreeList(ArrayList list) {
+	public void setFreeList(final ArrayList list) {
 		m_freeList = list;
 
 		if (!m_pendingContextCommit && hasFree()) {
@@ -177,7 +177,8 @@ public class FixedAllocator implements Allocator {
 			throw new IllegalStateException("Already pending commit");
 		}
 		
-		assert checkBits();
+        if (log.isDebugEnabled())
+            checkBits();
 
 		if (context == null && m_context != null) {
 			// restore commit bits in AllocBlocks
@@ -206,8 +207,9 @@ public class FixedAllocator implements Allocator {
 			m_contextThread = null;
 		}
 		
-		assert checkBits();
-		
+        if (log.isDebugEnabled())
+            checkBits();
+
 	}
 
 	/**
@@ -326,7 +328,8 @@ public class FixedAllocator implements Allocator {
 				
 			}
 			
-			assert checkBits();
+            if (log.isDebugEnabled())
+                checkBits();
 			
 			return buf;
 		} catch (IOException e) {
@@ -338,7 +341,7 @@ public class FixedAllocator implements Allocator {
 		int freeBits = 0;
 		
 		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
-		final int blockSize = m_bitSize * 32 * m_size;
+//		final int blockSize = m_bitSize * 32 * m_size;
 		while (iter.hasNext()) {
 			final AllocBlock block = iter.next();
 			for (int i = 0; i < m_bitSize; i++) {
@@ -353,7 +356,7 @@ public class FixedAllocator implements Allocator {
 		int freeBits = 0;
 		
 		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
-		final int blockSize = m_bitSize * 32 * m_size;
+//		final int blockSize = m_bitSize * 32 * m_size;
 		while (iter.hasNext()) {
 			final AllocBlock block = iter.next();
 			for (int i = 0; i < m_bitSize; i++) {
@@ -641,7 +644,8 @@ public class FixedAllocator implements Allocator {
 			if (tmp && !m_sessionActive) throw new AssertionError();
 			
 			try {
-				assert checkBits();
+	            if (log.isDebugEnabled())
+	                checkBits();
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
@@ -678,7 +682,8 @@ public class FixedAllocator implements Allocator {
 				throw new IllegalArgumentException("IAE with address: " + addr + ", size: " + size + ", context: " + (m_context == null ? -1 : m_context.hashCode()), iae);
 			}
 
-			assert checkBits();
+            if (log.isDebugEnabled())
+                checkBits();
 
 			return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
@@ -689,14 +694,16 @@ public class FixedAllocator implements Allocator {
 				if (block.free(addr, m_size)) {
 					m_freeTransients++;
 
-					assert checkBits();
+		            if (log.isDebugEnabled())
+		                checkBits();
 
 					return true;
 				}
 			}
 		}
 		
-		assert checkBits();
+        if (log.isDebugEnabled())
+            checkBits();
 
 		return false;
 	}
@@ -804,7 +811,8 @@ public class FixedAllocator implements Allocator {
 			return 0;
 		}
 		} finally {
-			assert checkBits();
+            if (log.isDebugEnabled())
+                checkBits();
 		}
 	}
 
@@ -816,7 +824,7 @@ public class FixedAllocator implements Allocator {
 		return m_freeBits > 0;
 	}
 
-	public void addAddresses(ArrayList addrs) {
+	public void addAddresses(final ArrayList addrs) {
 		
 		final Iterator blocks = m_allocBlocks.iterator();
 
