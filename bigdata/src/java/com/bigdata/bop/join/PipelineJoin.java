@@ -48,7 +48,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -56,7 +55,6 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.ap.Predicate.HashedPredicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -1167,7 +1165,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 					 * Aggregate the source bindingSets that license the same
 					 * asBound predicate.
 					 */
-					final Map<HashedPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
+					final Map<IPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
 					/*
 					 * Generate an AccessPathTask from each distinct asBound
@@ -1236,13 +1234,13 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 *         bindingSets in the chunk from which the predicate was
 			 *         generated.
 			 */
-			protected Map<HashedPredicate<E>, Collection<IBindingSet>> combineBindingSets(
+			protected Map<IPredicate<E>, Collection<IBindingSet>> combineBindingSets(
 					final IBindingSet[] chunk) {
 
 				if (log.isDebugEnabled())
 					log.debug("chunkSize=" + chunk.length);
 
-				final Map<HashedPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<HashedPredicate<E>, Collection<IBindingSet>>(
+				final Map<IPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<E>, Collection<IBindingSet>>(
 						chunk.length);
 
 				for (IBindingSet bindingSet : chunk) {
@@ -1270,8 +1268,9 @@ public class PipelineJoin<E> extends PipelineOp implements
 					}
 
 					// lookup the asBound predicate in the map.
-					final HashedPredicate<E> hashedPred = new HashedPredicate<E>(
-							asBound);
+//					final HashedPredicate<E> hashedPred = new HashedPredicate<E>(
+//							asBound);
+					final IPredicate<E> hashedPred = asBound;
 					Collection<IBindingSet> values = map.get(hashedPred);
 
 					if (values == null) {
@@ -1326,7 +1325,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 * @throws Exception
 			 */
 			protected AccessPathTask[] getAccessPathTasks(
-					final Map<HashedPredicate<E>, Collection<IBindingSet>> map) {
+					final Map<IPredicate<E>, Collection<IBindingSet>> map) {
 
 				final int n = map.size();
 
@@ -1335,7 +1334,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				final AccessPathTask[] tasks = new JoinTask.AccessPathTask[n];
 
-				final Iterator<Map.Entry<HashedPredicate<E>, Collection<IBindingSet>>> itr = map
+				final Iterator<Map.Entry<IPredicate<E>, Collection<IBindingSet>>> itr = map
 						.entrySet().iterator();
 
 				int i = 0;
@@ -1344,10 +1343,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 					halted();
 
-					final Map.Entry<HashedPredicate<E>, Collection<IBindingSet>> entry = itr
+					final Map.Entry<IPredicate<E>, Collection<IBindingSet>> entry = itr
 							.next();
 
-					tasks[i++] = new AccessPathTask(entry.getKey().pred, entry
+					tasks[i++] = new AccessPathTask(entry.getKey(), entry
 							.getValue());
 
 				}
