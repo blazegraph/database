@@ -1055,7 +1055,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
-     * Note: The transaction service si shutdown first, then the
+     * Note: The transaction service is shutdown first, then the
      * {@link #executorService}, then the {@link IConcurrencyManager}, the
      * {@link ITransactionService} and finally the {@link IResourceLockService}.
      */
