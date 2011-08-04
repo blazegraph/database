@@ -2611,14 +2611,25 @@ public class BigdataSail extends SailBase implements Sail {
             
 //            return new CloseableIteration</*? extends*/ Resource, SailException>() {
             return new CloseableIteration<Resource, SailException>() {
-                Resource next = null;
+                private Resource next = null;
+                private boolean open = true;
 
                 public void close() throws SailException {
-                    next = null;
-                    itr2.close();
+                    if (open) {
+                        open = false;
+                        next = null;
+                        itr2.close();
+                    }
                 }
 
                 public boolean hasNext() throws SailException {
+                    if(open && _hasNext())
+                        return true;
+                    close();
+                    return false;
+                }
+
+                private boolean _hasNext() throws SailException {
                     if (next != null)
                         return true;
                     while (itr2.hasNext()) {

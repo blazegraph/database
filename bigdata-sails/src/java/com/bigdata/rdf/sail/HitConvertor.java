@@ -45,7 +45,8 @@ public class HitConvertor implements
     
     private BigdataValue next;
     
-    @SuppressWarnings("unchecked")
+    private boolean open = true;
+
     public HitConvertor(final AbstractTripleStore database,
             final Iterator<IHit> src, final Var svar, final BindingSet bindings) {
         
@@ -126,11 +127,28 @@ public class HitConvertor implements
     
     public void close() throws QueryEvaluationException {
 
-        src.close();
+        if (open) {
+
+            open = false;
+            
+            src.close();
+            
+        }
         
     }
 
     public boolean hasNext() throws QueryEvaluationException {
+
+        if (open && _hasNext())
+            return true;
+        
+        close();
+        
+        return false;
+        
+    }
+    
+    private boolean _hasNext() throws QueryEvaluationException {
 
         if (next != null)
             return true;
