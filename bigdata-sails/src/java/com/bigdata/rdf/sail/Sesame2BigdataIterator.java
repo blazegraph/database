@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.NoSuchElementException;
+
 import info.aduna.iteration.CloseableIteration;
 
 import com.bigdata.striterator.ICloseableIterator;
@@ -49,6 +51,8 @@ public class Sesame2BigdataIterator<T, E extends Exception> implements
 
     private final CloseableIteration<? extends T,E> src;
     
+    private volatile boolean open = true;
+    
     public Sesame2BigdataIterator(final CloseableIteration<? extends T,E> src) {
         
         if (src == null)
@@ -59,17 +63,23 @@ public class Sesame2BigdataIterator<T, E extends Exception> implements
     }
 
     public void close() {
-        
-        try {
-            src.close();
-        } catch(Exception e) {
-            throw new RuntimeException(e);
+
+        if (open) {
+            open = false;
+            try {
+                src.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
         
     }
 
     public boolean hasNext() {
-        
+
+        if (!open)
+            return false;
+
         try {
             return src.hasNext();
         } catch(Exception e) {
@@ -79,7 +89,11 @@ public class Sesame2BigdataIterator<T, E extends Exception> implements
     }
 
     public T next() {
-        
+
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
+
         try {
             return src.next();
         } catch(Exception e) {
@@ -89,6 +103,9 @@ public class Sesame2BigdataIterator<T, E extends Exception> implements
     }
 
     public void remove() {
+
+        if(!open)
+            throw new IllegalStateException();
 
         try {
             src.remove();

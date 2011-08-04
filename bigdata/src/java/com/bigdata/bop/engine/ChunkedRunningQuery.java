@@ -728,7 +728,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                                     ChunkedRunningQuery.this));
                 } catch (RejectedExecutionException ex) {
                     // e.g., service is shutting down.
-                    log.error("Could not send message: " + msg, ex);
+                    log.warn("Could not send message: " + msg, ex);
                 }
                 
             } catch (Throwable ex1) {
