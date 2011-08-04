@@ -45,12 +45,8 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
-    protected static transient final Logger log = Logger.getLogger(ChunkedWrappedIterator.class);
+    private static transient final Logger log = Logger.getLogger(ChunkedWrappedIterator.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     private boolean open = true;
 
     private final Class<? extends E> elementClass;
@@ -72,8 +68,8 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     
     private final IKeyOrder<E> keyOrder;
 
-    /** Optional filter applied to the source iterator. */
-    private final IElementFilter<E> filter;
+//    /** Optional filter applied to the source iterator. */
+//    private final IElementFilter<E> filter;
     
     private long nchunks = 0L;
     private long nelements = 0L;
@@ -166,7 +162,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
         this.keyOrder = keyOrder;
         
-        this.filter = filter;
+//        this.filter = filter;
         
     }
     
@@ -183,7 +179,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
             
         }
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("#chunks="+nchunks+", #elements="+nelements);
 
     }
@@ -193,9 +189,18 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      */
     public boolean hasNext() {
 
-        if(!open) return false;
+        if(open && src.hasNext())
+            return true;
+        
+        /*
+         * Explicit close() so we close the source also when this iterator is
+         * exhausted.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/361
+         */
+        close();
 
-        return src.hasNext();
+        return false;
         
     }
 
@@ -274,7 +279,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         nchunks++;
         nelements += n;
         
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("#chunks=" + nchunks + ", chunkSize=" + chunk.length
                     + ", #elements=" + nelements);
         

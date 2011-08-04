@@ -79,7 +79,12 @@ public class WrappedAsynchronousIterator<E,F> implements IAsynchronousIterator<E
 
     public boolean hasNext() {
 
-        return open && src.hasNext();
+        if (open && src.hasNext())
+            return true;
+
+        close();
+
+        return false;
 
     }
 

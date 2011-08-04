@@ -5,19 +5,15 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -44,6 +40,8 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
     
     private final BindingSet constants;
     
+    private boolean open = true;
+
     /**
      * 
      * @param src
@@ -69,7 +67,12 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
     
     public boolean hasNext() throws E {
 
-        return src.hasNext();
+        if(open && src.hasNext())
+            return true;
+        
+        close();
+        
+        return false;
         
     }
 
@@ -142,7 +145,13 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
 
     public void close() throws E {
 
-        src.close();
+        if(open) {
+
+            open = false;
+            
+            src.close();
+            
+        }
         
     }
 
