@@ -77,11 +77,15 @@ public class Sesame2BigdataIterator<T, E extends Exception> implements
 
     public boolean hasNext() {
 
-        if (!open)
-            return false;
-
         try {
-            return src.hasNext();
+
+            if (open && src.hasNext())
+                return true;
+
+            close();
+            
+            return false;
+            
         } catch(Exception e) {
             throw new RuntimeException(e);
         }

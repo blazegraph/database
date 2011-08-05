@@ -341,6 +341,12 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     public void release() {
 
+        if (chunkAccessor != null) {
+         
+            chunkAccessor.close();
+            
+        }
+        
         final List<IAllocation> tmp = materialized;
 
         if (tmp != null) {
@@ -423,9 +429,17 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     public IChunkAccessor<E> getChunkAccessor() {
 
-        return new ChunkAccessor();
-        
+        if (chunkAccessor == null) {
+
+            chunkAccessor = new ChunkAccessor();
+            
+        }
+
+        return chunkAccessor;
+    
     }
+    
+    private volatile transient ChunkAccessor chunkAccessor = null;
 
     /**
      * FIXME Provide in place decompression and read out of the binding sets.
@@ -437,15 +451,29 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     private class ChunkAccessor implements IChunkAccessor<E> {
 
-        public IAsynchronousIterator<E[]> iterator() {
-
+        private final IAsynchronousIterator<E[]> source;
+        
+        public ChunkAccessor() {
+            
             final List<IAllocation> tmp = materialized;
             
             if (tmp == null)
                 throw new UnsupportedOperationException();
 
-            return new DeserializationIterator(materialized.iterator());
+            source = new DeserializationIterator(materialized.iterator());
 
+        }
+        
+        public IAsynchronousIterator<E[]> iterator() {
+            
+            return source;
+            
+        }
+        
+        public void close() {
+
+            source.close();
+            
         }
 
     }
@@ -453,7 +481,8 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     private class DeserializationIterator implements IAsynchronousIterator<E[]> {
 
         private final Iterator<IAllocation> src;
-                
+        private volatile boolean open = true;
+        
         public DeserializationIterator(final Iterator<IAllocation> src) {
             
             this.src = src;
@@ -461,12 +490,25 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         }
 
         public void close() {
+        
+            if(open) {
+                
+                open = false;
+                
+                // TODO Anything to discard?
+                
+            }
             
         }
 
         public boolean hasNext() {
 
-            return src.hasNext();
+            if(open && src.hasNext())
+                return true;
+            
+            close();
+            
+            return false;
             
         }
 

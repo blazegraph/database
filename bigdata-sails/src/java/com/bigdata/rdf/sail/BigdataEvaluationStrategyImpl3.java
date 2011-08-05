@@ -1117,6 +1117,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				// ensure query is halted.
 				runningQuery.cancel(true/* mayInterruptIfRunning */);
 			}
+            // ensure source is closed on error path.
+            source.close();
 			/*
 			 * Note: Do not wrap as a different exception type. The caller is
 			 * looking for this.
@@ -1127,6 +1129,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				// ensure query is halted.
 				runningQuery.cancel(true/* mayInterruptIfRunning */);
 			}
+            // ensure source is closed on error path.
+            source.close();
 			throw new QueryEvaluationException(t);
 		}
     	

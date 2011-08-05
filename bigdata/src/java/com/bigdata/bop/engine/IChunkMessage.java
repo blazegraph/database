@@ -44,7 +44,9 @@ public interface IChunkMessage<E> {
     void materialize(FederatedRunningQuery runningQuery);
 
     /**
-     * Discard the materialized data.
+     * Release all resources associated with this chunk. If the source has been
+     * opened, then ensure that it is closed. If the data has been materialized,
+     * then discard the materialized data.
      */
     void release();
 

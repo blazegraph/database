@@ -78,6 +78,8 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      */
     private F[] chunk = null;
 
+    private volatile boolean open = true;
+    
 //    /**
 //     * Total elapsed time for the iterator instance.
 //     */
@@ -248,7 +250,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                 if (log.isInfoEnabled())
                     log.info("Finished: nchunks=" + nchunks + ", nelements="
                             + nelements + ", elapsed=" + elapsed
-                            + "ms, sink.open" + buffer.isOpen());
+                            + "ms, sink.open=" + buffer.isOpen());
 
                 return nelements;
                 
@@ -257,6 +259,18 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                 try {
                     src.close();
                 } finally {
+                    /*
+                     * Note: Close the buffer since nothing more will be written
+                     * on it, but DO NOT close the iterator draining the buffer
+                     * (aka [resolvedItr]) since the consumer will use that to
+                     * drain the buffer.
+                     * 
+                     * Note: Failure to close the buffer here will cause a
+                     * severe performance penalty.
+                     * 
+                     * Note: Closing the [resolvedItr] here will cause data to
+                     * be lost.
+                     */
                     buffer.close();
                 }
 
@@ -286,13 +300,24 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      */
     public boolean hasNext() {
 
+        if(open && _hasNext())
+            return true;
+        
+        close();
+     
+        return false;
+        
+    }
+        
+    private boolean _hasNext() {
+
         if (resolvedItr == null) {
             
             throw new IllegalStateException();
 
         }
         
-        if (lastIndex != -1 && chunk!=null && lastIndex + 1 < chunk.length) {
+        if (lastIndex != -1 && chunk != null && lastIndex + 1 < chunk.length) {
 
             return true;
             
@@ -310,7 +335,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
         if (!hasNext())
             throw new NoSuchElementException();
 
-        if (lastIndex == -1 || chunk!=null && lastIndex + 1 == chunk.length) {
+        if (lastIndex == -1 || chunk != null && lastIndex + 1 == chunk.length) {
 
             // get the next chunk of resolved BigdataStatements.
             chunk = resolvedItr.next();
@@ -349,28 +374,38 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
     public void close() {
 
-        if (log.isInfoEnabled())
-            log.info("lastIndex=" + lastIndex + ", chunkSize="
-                    + (chunk != null ? "" + chunk.length : "N/A"));
+        if (open) {
 
-        /*
-         * Explicitly close the source since we will not be reading anything
-         * more from it.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/361
-         */
-        src.close();
+            open = false;
 
-        /*
-         * Close the sink as well. The thread draining the sink's iterator will
-         * notice that it has been closed. It will still drain anything already
-         * buffered in the sink, but then the iterator() will report that no
-         * more data is available rather than blocking.
-         */
-        buffer.close();
+            if (log.isInfoEnabled())
+                log.info("lastIndex=" + lastIndex + ", chunkSize="
+                        + (chunk != null ? "" + chunk.length : "N/A"));
 
-        chunk = null;
-        
+            /*
+             * Explicitly close the source since we will not be reading anything
+             * more from it.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/361
+             */
+            src.close();
+
+            /*
+             * Close the sink since nothing more will be written on it. 
+             */
+            buffer.close();
+
+            /*
+             * Since the outer iterator is being closed, nothing more will be
+             * read from the buffer so we also close the iterator draining the
+             * buffer.
+             */
+            resolvedItr.close();
+            
+            chunk = null;
+
+        }
+
     }
 
 }

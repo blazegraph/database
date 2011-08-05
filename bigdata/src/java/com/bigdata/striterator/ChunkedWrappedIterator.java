@@ -47,7 +47,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
     private static transient final Logger log = Logger.getLogger(ChunkedWrappedIterator.class);
 
-    private boolean open = true;
+    private volatile boolean open = true;
 
     private final Class<? extends E> elementClass;
     
@@ -168,19 +168,20 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     
     public void close() {
 
-        if (!open)
-            return;
-        
-        open = false;
+        if (open) {
 
-        if(realSource instanceof ICloseableIterator) {
-            
-            ((ICloseableIterator<E>)realSource).close();
-            
+            open = false;
+
+            if (realSource instanceof ICloseableIterator) {
+
+                ((ICloseableIterator<E>) realSource).close();
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("#chunks=" + nchunks + ", #elements=" + nelements);
+
         }
-        
-        if(log.isInfoEnabled())
-            log.info("#chunks="+nchunks+", #elements="+nelements);
 
     }
 
@@ -199,7 +200,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/361
          */
         close();
-
+        
         return false;
         
     }

@@ -42,7 +42,10 @@ public interface ICloseableIterator<E> extends Iterator<E> {
 
     /**
      * Closes the iterator, releasing any associated resources. This method MAY
-     * be invoked safely if the iterator is already closed.
+     * be invoked safely if the iterator is already closed. Implementations of
+     * this interface MUST invoke {@link #close()} if {@link Iterator#hasNext()}
+     * method returns <code>false</code> to ensure that the iterator is closed
+     * (and its resources release) as soon as it is exhausted.
      * <p>
      * Note: Implementations that support {@link Iterator#remove()} MUST NOT
      * eagerly close the iterator when it is exhausted since that would make it

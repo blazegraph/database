@@ -96,13 +96,18 @@ public class LocalChunkMessage<E> implements IChunkMessage<E> {
     }
 
     public void release() {
-        // NOP
+        source.close();
     }
     
     public IChunkAccessor<E> getChunkAccessor() {
-        return new ChunkAccessor();
+        if (chunkAccessor == null) {
+            chunkAccessor = new ChunkAccessor();
+        }
+        return chunkAccessor;
     }
-
+    
+    private volatile transient ChunkAccessor chunkAccessor = null;
+    
     private class ChunkAccessor implements IChunkAccessor<E> {
 
         public IAsynchronousIterator<E[]> iterator() {
