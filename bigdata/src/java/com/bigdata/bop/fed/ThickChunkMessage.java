@@ -183,8 +183,11 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     }
 
     public void release() {
-        // NOP
+        if (chunkAccessor != null)
+            chunkAccessor.close();
     }
+
+    private transient volatile ChunkAccessor chunkAccessor = null;
 
     public IChunkAccessor<E> getChunkAccessor() {
 
@@ -202,10 +205,18 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
      */
     private class ChunkAccessor implements IChunkAccessor<E> {
 
+        private final IAsynchronousIterator<E[]> source;
+        
+        public ChunkAccessor() {
+            source = new DeserializationIterator();
+        }
+        
         public IAsynchronousIterator<E[]> iterator() {
-
-            return new DeserializationIterator();
-            
+            return source;
+        }
+        
+        public void close() {
+            source.close();
         }
 
     }
@@ -214,7 +225,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
         private volatile ObjectInputStream ois;
         private E[] current = null;
-                
+
         public DeserializationIterator() {
         
             try {
@@ -234,9 +245,20 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
-        @SuppressWarnings("unchecked")
         public boolean hasNext() {
 
+            if (ois != null && _hasNext())
+                return true;
+
+            close();
+
+            return false;
+
+        }
+        
+        @SuppressWarnings("unchecked")
+        private boolean _hasNext() {
+            
             if (current != null)
                 return true;
             

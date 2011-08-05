@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.impl.LiteralImpl;
@@ -45,6 +46,7 @@ import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -67,8 +69,10 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
  * to be on. If you would like to turn off inference, make sure to do so in
  * {@link #getProperties()}.
  * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:gjdev@users.sourceforge.net">Gerjon</a>
  * @version $Id$
+ * @see https://sourceforge.net/apps/trac/bigdata/ticket/361
  */
 public class TestTicket361 extends QuadsTestCase {
     
@@ -81,6 +85,11 @@ public class TestTicket361 extends QuadsTestCase {
         super(arg0);
     }
 
+    /**
+     * Test looks for the failure of the {@link IRunningQuery} to terminate.
+     * 
+     * @throws Exception
+     */
     public void testEvaluate() throws Exception {
         final BigdataSail sail = getSail();
         try {
@@ -231,6 +240,208 @@ public class TestTicket361 extends QuadsTestCase {
                 
                 log.info("Source iteration closed");
                 
+            }
+
+        }
+
+    }
+
+    /**
+     * Test variant which pushes a lot of data through and looks for the failure
+     * to close the source iterator feeding solutions into the query once the
+     * query has been cancelled.
+     * 
+     * @throws Exception
+     */
+    public void testEvaluate2() throws Exception {
+        final int COUNT = 5000;
+        final AtomicBoolean didCloseSource = new AtomicBoolean(false);
+        final BigdataSail sail = getSail();
+        try {
+            sail.initialize();
+            final BigdataSailConnection conn = sail.getConnection();
+            try {
+                /*
+                 * Populate KB.
+                 */
+                for (int i = 0; i != COUNT; ++i)
+                    conn.addStatement(new URIImpl("s:" + i), new URIImpl("p:"
+                            + i), new LiteralImpl("l" + i));
+                /*
+                 * Populate source data.
+                 */
+                final BindingSet bs[] = new BindingSet[COUNT];
+                for (int i = 0; i != COUNT; ++i)
+                    bs[i] = mb2("0", "l" + i);
+                final CloseableIteration<BindingSet, QueryEvaluationException> source = new Iter2(
+                        didCloseSource, bs);
+                /*
+                 * Run query and then immediately close() it.
+                 */
+                final CloseableIteration<? extends BindingSet, QueryEvaluationException> results;
+                results = query2(conn, COUNT, source);
+                log.info("Closing query.");
+                results.close();
+                /*
+                 * Note: The source is closed via Future.cancel(true). That does
+                 * NOT provide a synchronous guarantee so we have to spin a bit
+                 * to verify that the source is eventually closed.
+                 */
+                for (int i = 0; i < 100 && !didCloseSource.get(); i++) {
+                    if (log.isInfoEnabled())
+                        log.info("Waiting for source to be closed....");
+                    Thread.sleep(250/* ms */);
+                }
+                if (!didCloseSource.get()) {
+                    /*
+                     * The source was not closed.
+                     */
+                    final String msg = "Did not close the source binding set iteration.";
+                    log.error(msg); // log error so we can see this synchronously.
+                    fail(msg); // fail test.
+                }
+            } finally {
+                log.info("Closing connection");
+                conn.close();
+            }
+        } finally {
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getExistingQueryController(sail.getDatabase()
+                            .getIndexManager());
+            if (queryEngine != null) {
+                /*
+                 * Note: The query engine should shutdown automatically once it
+                 * is finalized. This protects against a shutdown when there are
+                 * concurrent users, e.g., different sails against the same
+                 * Journal instance. However, if there are any queries still
+                 * running on the QueryEngine when the backing IIndexManager
+                 * shuts down its ExecutorService, then a
+                 * RejectedExecutionException will be logged. In general, this
+                 * can be safely ignored.
+                 */
+                final UUID[] uuids = queryEngine.getRunningQueries();
+                assertEquals("Query not terminated: " + Arrays.toString(uuids),
+                        new UUID[0], uuids);
+                log.info("Shutting down QueryEngine");
+                queryEngine.shutdownNow();
+            }
+            log.info("Shutting down sail");
+            sail.shutDown();
+            log.info("Tear down");
+            sail.__tearDownUnitTest();
+        }
+    }
+
+    private CloseableIteration<? extends BindingSet, QueryEvaluationException> query2(
+            final BigdataSailConnection conn,
+            final int COUNT,
+            final CloseableIteration<BindingSet, QueryEvaluationException> source)
+            throws SailException, QueryEvaluationException {
+
+        final ProjectionElemList elemList = new ProjectionElemList(
+                new ProjectionElem("z"));
+
+        final TupleExpr query = new Projection(new StatementPattern(
+                new Var("s"), new Var("p"), new Var("o")), elemList);
+
+        if (log.isInfoEnabled())
+            log.info("Submitting query.");
+
+        return conn.evaluate(query, null, new QueryBindingSet(), source, false,
+                null);
+
+    }
+
+    /**
+     * Makes a binding set by taking each pair of values and using the first
+     * value as name and the second as value. Creates an URI for a value with a
+     * ':' in it, or a Literal for a value without a ':'.
+     */
+    private QueryBindingSet mb2(final String... nameValuePairs) {
+        
+        final QueryBindingSet bs = new QueryBindingSet();
+
+        for (int i = 0; i < nameValuePairs.length; i += 2)
+            bs.addBinding(nameValuePairs[i],
+                    nameValuePairs[i + 1].indexOf(':') > 0 ? new URIImpl(
+                            nameValuePairs[i + 1]) : new LiteralImpl(
+                            nameValuePairs[i + 1]));
+        
+        return bs;
+
+    }
+    
+    /**
+     * Iterates over the given bindings.
+     */
+    private static class Iter2 implements CloseableIteration<BindingSet, QueryEvaluationException> {
+
+        final private Iterator<BindingSet> iter;
+
+        final private AtomicBoolean didCloseSource;
+
+        private boolean open = true;
+
+        private Iter2(final AtomicBoolean didCloseSource,
+                final Collection<BindingSet> bindings) {
+
+            this.iter = bindings.iterator();
+
+            this.didCloseSource = didCloseSource;
+
+        }
+
+        private Iter2(final AtomicBoolean didCloseSource,
+                final BindingSet... bindings) {
+
+            this(didCloseSource, Arrays.asList(bindings));
+            
+        }
+
+        public boolean hasNext() throws QueryEvaluationException {
+
+            if(open && iter.hasNext())
+                return true;
+            
+            close();
+            
+            return false;
+            
+        }
+
+        public BindingSet next() throws QueryEvaluationException {
+
+            if(!hasNext())
+                throw new NoSuchElementException();
+            
+            final BindingSet result = iter.next();
+            
+            if (log.isDebugEnabled())
+                log.debug(result);
+            
+            return result;
+            
+        }
+
+        public void remove() throws QueryEvaluationException {
+            
+            if (!open)
+                throw new IllegalStateException();
+            
+            iter.remove();
+
+        }
+
+        public void close() throws QueryEvaluationException {
+
+            if (open) {
+            
+                open = false;
+                
+                didCloseSource.set(true);
+                
+                log.warn("*** Source iteration closed ***");
+
             }
 
         }

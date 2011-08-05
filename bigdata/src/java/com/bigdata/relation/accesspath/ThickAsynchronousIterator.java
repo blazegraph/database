@@ -91,7 +91,12 @@ public class ThickAsynchronousIterator<E> implements IAsynchronousIterator<E>,
 
     public boolean hasNext() {
         
-        return open && lastIndex + 1 < a.length;
+        if(open && lastIndex + 1 < a.length)
+            return true;
+        
+        close();
+        
+        return false;
 
     }
 

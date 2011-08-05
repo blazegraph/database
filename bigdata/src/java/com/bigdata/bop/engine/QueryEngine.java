@@ -217,16 +217,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public interface Annotations extends PipelineOp.Annotations {
 
-		/**
-		 * Annotation may be used to impose a specific {@link UUID} for a query.
-		 * This may be used by an external process such that it can then use
-		 * {@link QueryEngine#getRunningQuery(UUID)} to gain access to the
-		 * running query instance. It is an error if there is a query already
-		 * running with the same {@link UUID}.
-		 */
-		String QUERY_ID = (QueryEngine.class.getName() + ".runningQueryClass")
-				.intern();
-    	
+        /**
+         * Annotation may be used to impose a specific {@link UUID} for a query.
+         * This may be used by an external process such that it can then use
+         * {@link QueryEngine#getRunningQuery(UUID)} to gain access to the
+         * running query instance. It is an error if there is a query already
+         * running with the same {@link UUID}.
+         */
+        String QUERY_ID = (QueryEngine.class.getName() + ".runningQueryClass")
+                .intern();
+        
         /**
          * The name of the {@link IRunningQuery} implementation class which will
          * be used to evaluate a query marked by this annotation (optional). The
@@ -236,11 +236,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * <pre>
          * public MyRunningQuery(QueryEngine queryEngine, UUID queryId,
          *             boolean controller, IQueryClient clientProxy,
-         *             PipelineOp query)
+         *             PipelineOp query, IChunkMessage<IBindingSet> realSource)
          * </pre>
          * 
          * Note that classes derived from {@link QueryEngine} may override
-         * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp)}
+         * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp, IChunkMessage)}
          * in which case they might not support this option.
          */
         String RUNNING_QUERY_CLASS = (QueryEngine.class.getName()
@@ -251,76 +251,76 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
-	/**
-	 * Statistics collected for queries.
-	 * 
-	 * @author thompsonbry
-	 */
+    /**
+     * Statistics collected for queries.
+     * 
+     * @author thompsonbry
+     */
     protected static class Counters {
 
-		/**
-		 * The #of queries which have been executed (set on completion).
-		 */
-		final CAT startCount = new CAT();
-		
-		/**
-		 * The #of queries which have been executed (set on completion).
-		 */
-		final CAT doneCount = new CAT();
+        /**
+         * The #of queries which have been executed (set on completion).
+         */
+        final CAT startCount = new CAT();
+        
+        /**
+         * The #of queries which have been executed (set on completion).
+         */
+        final CAT doneCount = new CAT();
 
-		/**
-		 * The #of instances of the query which terminated abnormally.
-		 */
-		final CAT errorCount = new CAT();
+        /**
+         * The #of instances of the query which terminated abnormally.
+         */
+        final CAT errorCount = new CAT();
 
-		/**
-		 * The total elapsed time (millis) for evaluation queries. This is the
-		 * wall clock time per query. The aggregated wall clock time per query
-		 * will sum to greater than the elapsed wall clock time in any interval
-		 * where there is more than one query running concurrently.
-		 */
-		final CAT elapsedMillis = new CAT();
+        /**
+         * The total elapsed time (millis) for evaluation queries. This is the
+         * wall clock time per query. The aggregated wall clock time per query
+         * will sum to greater than the elapsed wall clock time in any interval
+         * where there is more than one query running concurrently.
+         */
+        final CAT elapsedMillis = new CAT();
 
-		public CounterSet getCounters() {
+        public CounterSet getCounters() {
 
-			final CounterSet root = new CounterSet();
+            final CounterSet root = new CounterSet();
 
-			// #of queries started on this server.
-			root.addCounter("startCount", new Instrument<Long>() {
-				public void sample() {
-					setValue(startCount.get());
-				}
-			});
+            // #of queries started on this server.
+            root.addCounter("startCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(startCount.get());
+                }
+            });
 
-			// #of queries retired on this server.
-			root.addCounter("doneCount", new Instrument<Long>() {
-				public void sample() {
-					setValue(doneCount.get());
-				}
-			});
+            // #of queries retired on this server.
+            root.addCounter("doneCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(doneCount.get());
+                }
+            });
 
-			// #of queries with abnormal termination on this server.
-			root.addCounter("errorCount", new Instrument<Long>() {
-				public void sample() {
-					setValue(errorCount.get());
-				}
-			});
+            // #of queries with abnormal termination on this server.
+            root.addCounter("errorCount", new Instrument<Long>() {
+                public void sample() {
+                    setValue(errorCount.get());
+                }
+            });
 
-			// #of queries retired per second on this server.
-			root.addCounter("queriesPerSecond", new Instrument<Double>() {
-				public void sample() {
-					final long ms = elapsedMillis.get();
-					final long n = doneCount.get();
-					// compute throughput, normalized to q/s := (q*1000)/ms.
-					final double d = ms == 0 ? 0d : ((1000d * n) / ms);
-					setValue(d);
-				}
-			});
+            // #of queries retired per second on this server.
+            root.addCounter("queriesPerSecond", new Instrument<Double>() {
+                public void sample() {
+                    final long ms = elapsedMillis.get();
+                    final long n = doneCount.get();
+                    // compute throughput, normalized to q/s := (q*1000)/ms.
+                    final double d = ms == 0 ? 0d : ((1000d * n) / ms);
+                    setValue(d);
+                }
+            });
 
-			return root;
+            return root;
 
-		}
-		
+        }
+        
     }
 
     /**
@@ -329,99 +329,99 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public CounterSet getCounters() {
 
-		final CounterSet root = new CounterSet();
+        final CounterSet root = new CounterSet();
 
-		// global counters.
+        // global counters.
         root.attach(counters.getCounters());
-		
+        
         // counters per tagged query group.
-		{
+        {
 
-			final CounterSet groups = root.makePath("groups");
+            final CounterSet groups = root.makePath("groups");
 
-			final Iterator<Map.Entry<String, Counters>> itr = groupCounters
-					.entrySet().iterator();
+            final Iterator<Map.Entry<String, Counters>> itr = groupCounters
+                    .entrySet().iterator();
 
-			while (itr.hasNext()) {
+            while (itr.hasNext()) {
 
-				final Map.Entry<String, Counters> e = itr.next();
+                final Map.Entry<String, Counters> e = itr.next();
 
-				final String tag = e.getKey();
+                final String tag = e.getKey();
 
-				final Counters counters = e.getValue();
+                final Counters counters = e.getValue();
 
-				// Note: path component may not be empty!
-				groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
-						.attach(counters.getCounters());
+                // Note: path component may not be empty!
+                groups.makePath(tag == null | tag.length() == 0 ? "None" : tag)
+                        .attach(counters.getCounters());
 
-			}
+            }
 
-		}
+        }
 
-		return root;
+        return root;
 
     }
     
     /**
      * Counters at the global level.
      */
-	final protected Counters counters = newCounters();
+    final protected Counters counters = newCounters();
 
-	/**
-	 * Statistics for queries which are "tagged" so we can recognize their
-	 * instances as members of some group.
-	 */
-	final protected ConcurrentHashMap<String/* groupId */, Counters> groupCounters = new ConcurrentHashMap<String, Counters>();
+    /**
+     * Statistics for queries which are "tagged" so we can recognize their
+     * instances as members of some group.
+     */
+    final protected ConcurrentHashMap<String/* groupId */, Counters> groupCounters = new ConcurrentHashMap<String, Counters>();
 
-	/**
-	 * Factory for {@link Counters} instances associated with a query group. A
-	 * query is marked as a member of a group using {@link QueryHints#TAG}. This
-	 * is typically used to mark queries which are instances of the same query
-	 * template.
-	 * 
-	 * @param tag
-	 *            The tag identifying a query group.
-	 * 
-	 * @return The {@link Counters} for that query group.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the argument is <code>null</code>.
-	 */
-	protected Counters getCounters(final String tag) {
+    /**
+     * Factory for {@link Counters} instances associated with a query group. A
+     * query is marked as a member of a group using {@link QueryHints#TAG}. This
+     * is typically used to mark queries which are instances of the same query
+     * template.
+     * 
+     * @param tag
+     *            The tag identifying a query group.
+     * 
+     * @return The {@link Counters} for that query group.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    protected Counters getCounters(final String tag) {
 
-		if(tag == null)
-			throw new IllegalArgumentException();
-		
-		Counters c = groupCounters.get(tag);
+        if(tag == null)
+            throw new IllegalArgumentException();
+        
+        Counters c = groupCounters.get(tag);
 
-		if (c == null) {
+        if (c == null) {
 
-			c = new Counters();
+            c = new Counters();
 
-			final Counters tmp = groupCounters.putIfAbsent(tag, c);
+            final Counters tmp = groupCounters.putIfAbsent(tag, c);
 
-			if (tmp != null) {
+            if (tmp != null) {
 
-				// someone else won the data race.
-				c = tmp;
+                // someone else won the data race.
+                c = tmp;
 
-			}
+            }
 
-		}
+        }
 
-		return c;
+        return c;
 
-	}
+    }
 
-	/**
-	 * Extension hook for new {@link Counters} instances.
-	 */
-	protected Counters newCounters() {
-		
-		return new Counters();
-		
-	}
-	
+    /**
+     * Extension hook for new {@link Counters} instances.
+     */
+    protected Counters newCounters() {
+        
+        return new Counters();
+        
+    }
+    
     /**
      * Access to the indices.
      * <p>
@@ -508,8 +508,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public IQueryClient getProxy() {
 
-    	return this;
-    	
+        return this;
+        
     }
     
     /**
@@ -537,54 +537,54 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     final private ConcurrentHashMap<UUID/* queryId */, AbstractRunningQuery> runningQueries = new ConcurrentHashMap<UUID, AbstractRunningQuery>();
 
-	/**
-	 * LRU cache used to handle problems with asynchronous termination of
-	 * running queries.
-	 * <p>
-	 * Note: Holding onto the query references here might pin memory retained by
-	 * those queries. However, all we really need is the Haltable (Future) of
-	 * that query in this map.
-	 * 
-	 * @todo This should not be much of a hot spot even though it is not thread
-	 *       safe but the synchronized() call could force cache stalls anyway. A
-	 *       concurrent hash map with an approximate LRU access policy might be
-	 *       a better choice.
-	 * 
-	 * @todo The maximum cache capacity here is a SWAG. It should be large
-	 *       enough that we can not have a false cache miss on a system which is
-	 *       heavily loaded by a bunch of light queries.
-	 */
-	private LinkedHashMap<UUID, IHaltable<Void>> doneQueries = new LinkedHashMap<UUID,IHaltable<Void>>(
-			16/* initialCapacity */, .75f/* loadFactor */, true/* accessOrder */) {
+    /**
+     * LRU cache used to handle problems with asynchronous termination of
+     * running queries.
+     * <p>
+     * Note: Holding onto the query references here might pin memory retained by
+     * those queries. However, all we really need is the Haltable (Future) of
+     * that query in this map.
+     * 
+     * @todo This should not be much of a hot spot even though it is not thread
+     *       safe but the synchronized() call could force cache stalls anyway. A
+     *       concurrent hash map with an approximate LRU access policy might be
+     *       a better choice.
+     * 
+     * @todo The maximum cache capacity here is a SWAG. It should be large
+     *       enough that we can not have a false cache miss on a system which is
+     *       heavily loaded by a bunch of light queries.
+     */
+    private LinkedHashMap<UUID, IHaltable<Void>> doneQueries = new LinkedHashMap<UUID,IHaltable<Void>>(
+            16/* initialCapacity */, .75f/* loadFactor */, true/* accessOrder */) {
 
-		private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID = 1L;
 
-		@Override
-		protected boolean removeEldestEntry(Map.Entry<UUID, IHaltable<Void>> eldest) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<UUID, IHaltable<Void>> eldest) {
 
-			return size() > 100/* maximumCacheCapacity */;
+            return size() > 100/* maximumCacheCapacity */;
 
-		}
-	};
+        }
+    };
 
-	/**
-	 * A queue of {@link ChunkedRunningQuery}s having binding set chunks available for
-	 * consumption.
-	 * 
-	 * @todo Handle priority for selective queries based on the time remaining
-	 *       until the timeout.
-	 *       <p>
-	 *       Handle priority for unselective queries based on the order in which
-	 *       they are submitted?
-	 *       <p>
-	 *       Be careful when testing out a {@link PriorityBlockingQueue} here.
-	 *       First, that collection is intrinsically bounded (it is backed by an
-	 *       array) so it will BLOCK under heavy load and could be expected to
-	 *       have some resize costs if the queue size becomes too large. Second,
-	 *       either {@link ChunkedRunningQuery} needs to implement an appropriate
-	 *       {@link Comparator} or we need to pass one into the constructor for
-	 *       the queue.
-	 */
+    /**
+     * A queue of {@link ChunkedRunningQuery}s having binding set chunks available for
+     * consumption.
+     * 
+     * @todo Handle priority for selective queries based on the time remaining
+     *       until the timeout.
+     *       <p>
+     *       Handle priority for unselective queries based on the order in which
+     *       they are submitted?
+     *       <p>
+     *       Be careful when testing out a {@link PriorityBlockingQueue} here.
+     *       First, that collection is intrinsically bounded (it is backed by an
+     *       array) so it will BLOCK under heavy load and could be expected to
+     *       have some resize costs if the queue size becomes too large. Second,
+     *       either {@link ChunkedRunningQuery} needs to implement an appropriate
+     *       {@link Comparator} or we need to pass one into the constructor for
+     *       the queue.
+     */
     final private BlockingQueue<AbstractRunningQuery> priorityQueue = new LinkedBlockingQueue<AbstractRunningQuery>();
 //    final private BlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>(
 //            );
@@ -684,7 +684,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     protected boolean isRunning() {
 
-    	return engineFuture.get() != null && !shutdown;
+        return engineFuture.get() != null && !shutdown;
 
     }
     
@@ -719,51 +719,58 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         public void run() {
             if(log.isInfoEnabled())
                 log.info("Running: " + this);
-            while (true) {
-                try {
-                    final AbstractRunningQuery q = queue.take();
-                    if (!q.isDone())
-                        q.consumeChunk();
-                } catch (InterruptedException e) {
-                    /*
-                     * Note: Uncomment the stack trace here if you want to find
-                     * where the query was interrupted.
-                     * 
-                     * Note: If you want to find out who interrupted the query,
-                     * then you can instrument BlockingBuffer#close() in
-                     * PipelineOp#newBuffer(stats).
-                     */
-                    if (log.isInfoEnabled())
-                        log.info("Interrupted."
-//                            ,e
-                            );
-                    return;
-                } catch (Throwable t) {
-                    // log and continue
-                    log.error(t, t);
-                    continue;
-                }
+            try {
+                while (true) {
+                    try {
+                        final AbstractRunningQuery q = queue.take();
+                        if (!q.isDone())
+                            q.consumeChunk();
+                    } catch (InterruptedException e) {
+                        /*
+                         * Note: Uncomment the stack trace here if you want to
+                         * find where the query was interrupted.
+                         * 
+                         * Note: If you want to find out who interrupted the
+                         * query, then you can instrument BlockingBuffer#close()
+                         * in PipelineOp#newBuffer(stats).
+                         */
+                        if (log.isInfoEnabled())
+                            log.info("Interrupted."
+    //                            ,e
+                                );
+                        return;
+                    } catch (Throwable t) {
+                        // log and continue
+                        log.error(t, t);
+                        continue;
+                    }
+                } // while(true)
+            } finally {
+                if (log.isInfoEnabled())
+                    log.info("QueryEngineTask is done.");
             }
         }
     } // QueryEngineTask
 
-	/**
-	 * Add a chunk of intermediate results for consumption by some query. The
-	 * chunk will be attached to the query and the query will be scheduled for
-	 * execution.
-	 * 
-	 * @param msg
-	 *            A chunk of intermediate results.
-	 * 
-	 * @return <code>true</code> if the chunk was accepted. This will return
-	 *         <code>false</code> if the query is done (including cancelled) or
-	 *         the query engine is shutdown.
-	 * 
-	 * @throws IllegalArgumentException
-	 *             if the chunk is <code>null</code>.
-	 * @throws IllegalStateException
-	 *             if the chunk is not materialized.
-	 */
+    /**
+     * Add a chunk of intermediate results for consumption by some query. The
+     * chunk will be attached to the query and the query will be scheduled for
+     * execution.
+     * 
+     * @param msg
+     *            A chunk of intermediate results.
+     * 
+     * @return <code>true</code> if the chunk was accepted. This will return
+     *         <code>false</code> if the query is done (including cancelled) or
+     *         the query engine is shutdown. The {@link IChunkMessage} will have
+     *         been {@link IChunkMessage#release() released} if it was not
+     *         accepted.
+     * 
+     * @throws IllegalArgumentException
+     *             if the chunk is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the chunk is not materialized.
+     */
     protected boolean acceptChunk(final IChunkMessage<IBindingSet> msg) {
         
         if (msg == null)
@@ -775,29 +782,31 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         final AbstractRunningQuery q = getRunningQuery(msg.getQueryId());
         
         if(q == null) {
-			/*
-			 * The query is not registered on this node.
-			 */
+            /*
+             * The query is not registered on this node.
+             */
             throw new IllegalStateException();
         }
         
-		// add chunk to the query's input queue on this node.
-		if (!q.acceptChunk(msg)) {
-			// query is no longer running.
-			return false;
-			
-		}
+        // add chunk to the query's input queue on this node.
+        if (!q.acceptChunk(msg)) {
+            // query is no longer running.
+            msg.release();
+            return false;
+            
+        }
 
-		if(!isRunning()) {
-			// query engine is no longer running.
-			return false;
-			
-		}
+        if(!isRunning()) {
+            // query engine is no longer running.
+            msg.release();
+            return false;
+            
+        }
 
-		// add query to the engine's task queue.
-		priorityQueue.add(q);
+        // add query to the engine's task queue.
+        priorityQueue.add(q);
 
-		return true;
+        return true;
 
     }
 
@@ -810,18 +819,18 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         // normal termination.
         shutdown = true;
 
-		lock.lock();
-		try {
-			while (!runningQueries.isEmpty()) {
-				try {
-					nothingRunning.await();
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		} finally {
-			lock.unlock();
-		}
+        lock.lock();
+        try {
+            while (!runningQueries.isEmpty()) {
+                try {
+                    nothingRunning.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
         
         // hook for subclasses.
         didShutdown();
@@ -829,12 +838,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         // stop the query engine.
         final Future<?> f = engineFuture.get();
         if (f != null) {
+            if(log.isInfoEnabled())
+                log.info("Cancelling engineFuture: "+this);
             f.cancel(true/* mayInterruptIfRunning */);
         }
 
         // stop the service on which we ran the query engine.
         final ExecutorService s = engineService.get();
         if (s != null) {
+            if(log.isInfoEnabled())
+                log.info("Terminating engineService: "+this);
             s.shutdownNow();
         }
         
@@ -861,12 +874,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
         // stop the query engine.
         final Future<?> f = engineFuture.get();
-        if (f != null)
+        if (f != null) {
+            if (log.isInfoEnabled())
+                log.info("Cancelling engineFuture: " + this);
             f.cancel(true/* mayInterruptIfRunning */);
-
+        }
+        
         // stop the service on which we ran the query engine.
         final ExecutorService s = engineService.get();
         if (s != null) {
+            if (log.isInfoEnabled())
+                log.info("Terminating engineService: "+this);
             s.shutdownNow();
         }
         
@@ -1097,7 +1115,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         final AbstractRunningQuery runningQuery = newRunningQuery(
                 /* this, */queryId, true/* controller */,
-                getProxy()/* queryController */, query);
+                getProxy()/* queryController */, query, msg/*realSource*/);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -1131,38 +1149,38 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         // verify query engine is running.
         assertRunning();
 
-		// add to running query table.
-		if (putIfAbsent(queryId, runningQuery) != runningQuery) {
+        // add to running query table.
+        if (putIfAbsent(queryId, runningQuery) != runningQuery) {
 
-			/*
-			 * UUIDs should not collide when assigned randomly. However, the
-			 * UUID may be imposed by an exterior process, such as a SPARQL end
-			 * point, so it can access metadata about the running query even
-			 * when it is not a direct client of the QueryEngine. This provides
-			 * a safety check against UUID collisions which might be non-random.
-			 */
-			throw new RuntimeException("Query exists with that UUID: uuid="
-					+ runningQuery.getQueryId());
+            /*
+             * UUIDs should not collide when assigned randomly. However, the
+             * UUID may be imposed by an exterior process, such as a SPARQL end
+             * point, so it can access metadata about the running query even
+             * when it is not a direct client of the QueryEngine. This provides
+             * a safety check against UUID collisions which might be non-random.
+             */
+            throw new RuntimeException("Query exists with that UUID: uuid="
+                    + runningQuery.getQueryId());
 
-		}
+        }
 
-		final String tag = query.getProperty(QueryHints.TAG,
-				QueryHints.DEFAULT_TAG);
+        final String tag = query.getProperty(QueryHints.TAG,
+                QueryHints.DEFAULT_TAG);
 
-		final Counters c = tag == null ? null : getCounters(tag);
+        final Counters c = tag == null ? null : getCounters(tag);
 
-		// track #of started queries.
-		counters.startCount.increment();
+        // track #of started queries.
+        counters.startCount.increment();
 
-		if (c != null)
-			c.startCount.increment();
+        if (c != null)
+            c.startCount.increment();
 
         // notify query start
         runningQuery.startQuery(msg);
         
         // tell query to consume the initial chunk.
         acceptChunk(msg);
-
+        
         return runningQuery;
 
     }
@@ -1189,81 +1207,81 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (queryId == null)
             throw new IllegalArgumentException();
 
-		if (runningQuery == null)
-			throw new IllegalArgumentException();
+        if (runningQuery == null)
+            throw new IllegalArgumentException();
 
-		// First, check [runningQueries] w/o acquiring a lock.
-		{
-			final AbstractRunningQuery tmp = runningQueries.get(queryId);
+        // First, check [runningQueries] w/o acquiring a lock.
+        {
+            final AbstractRunningQuery tmp = runningQueries.get(queryId);
 
-			if (tmp != null) {
-		
-				// Found existing query.
-				return tmp;
-				
-			}
-			
-		}
+            if (tmp != null) {
+        
+                // Found existing query.
+                return tmp;
+                
+            }
+            
+        }
 
-		/*
-		 * A lock is used to address a race condition here with the concurrent
-		 * registration and halt of a query.
-		 */
+        /*
+         * A lock is used to address a race condition here with the concurrent
+         * registration and halt of a query.
+         */
 
-		lock.lock();
-		
-		try {
-			
-			// Test for a recently terminated query.
-			final Future<Void> doneQueryFuture = doneQueries.get(queryId);
+        lock.lock();
+        
+        try {
+            
+            // Test for a recently terminated query.
+            final Future<Void> doneQueryFuture = doneQueries.get(queryId);
 
-			if (doneQueryFuture != null) {
+            if (doneQueryFuture != null) {
 
-				// Throw out an appropriate exception for a halted query.
-				handleDoneQuery(queryId, doneQueryFuture);
+                // Throw out an appropriate exception for a halted query.
+                handleDoneQuery(queryId, doneQueryFuture);
 
-				// Should never get here.
-        		throw new AssertionError();
-        		
-			}
+                // Should never get here.
+                throw new AssertionError();
+                
+            }
 
-			// Test again for an active query while holding the lock.
-			final AbstractRunningQuery tmp = runningQueries.putIfAbsent(queryId,
-					runningQuery);
-			
-			if (tmp != null) {
-				
-				// Another thread won the race.
-				return tmp;
-				
-			}
+            // Test again for an active query while holding the lock.
+            final AbstractRunningQuery tmp = runningQueries.putIfAbsent(queryId,
+                    runningQuery);
+            
+            if (tmp != null) {
+                
+                // Another thread won the race.
+                return tmp;
+                
+            }
 
-			// Query was newly registered.
-			return runningQuery;
-			
-		} finally {
+            // Query was newly registered.
+            return runningQuery;
+            
+        } finally {
 
-			lock.unlock();
-			
-		}
+            lock.unlock();
+            
+        }
 
     }
 
-	/**
-	 * Return the {@link AbstractRunningQuery} associated with that query
-	 * identifier.
-	 * 
-	 * @param queryId
-	 *            The query identifier.
-	 * 
-	 * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
-	 *         is no query associated with that query identifier.
-	 *         
-	 * @throws InterruptedException
-	 *             if the query halted normally.
-	 * @throws RuntimeException
-	 *             if the query halted with an error.
-	 */
+    /**
+     * Return the {@link AbstractRunningQuery} associated with that query
+     * identifier.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * 
+     * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
+     *         is no query associated with that query identifier.
+     *         
+     * @throws InterruptedException
+     *             if the query halted normally.
+     * @throws RuntimeException
+     *             if the query halted with an error.
+     */
     public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
         if(queryId == null)
@@ -1272,53 +1290,53 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         AbstractRunningQuery q;
 
         /*
-		 * First, test the concurrent map w/o obtaining a lock. This handles
-		 * queries which are actively running.
-		 */
-		if ((q = runningQueries.get(queryId)) != null) {
+         * First, test the concurrent map w/o obtaining a lock. This handles
+         * queries which are actively running.
+         */
+        if ((q = runningQueries.get(queryId)) != null) {
 
-			// Found running query.
-        	return q;
-        	
+            // Found running query.
+            return q;
+            
         }
 
-		/*
-		 * Since the query was not found in the set of actively running queries,
-		 * we now get the lock, re-verify that it is not an active query, and
-		 * verify that it is not a halted query.
-		 */
+        /*
+         * Since the query was not found in the set of actively running queries,
+         * we now get the lock, re-verify that it is not an active query, and
+         * verify that it is not a halted query.
+         */
         
-		lock.lock();
+        lock.lock();
         
-		try {
+        try {
 
-        	if ((q = runningQueries.get(queryId)) != null) {
-			
-        		// Unlikely concurrent register of the query.
-            	return q;
+            if ((q = runningQueries.get(queryId)) != null) {
             
-        	}
+                // Unlikely concurrent register of the query.
+                return q;
+            
+            }
 
-        	// Test to see if the query is halted.
-			final Future<Void> doneQueryFuture = doneQueries.get(queryId);
+            // Test to see if the query is halted.
+            final Future<Void> doneQueryFuture = doneQueries.get(queryId);
 
-			if (doneQueryFuture != null) {
-				
-				// Throw out an appropriate exception for a halted query.
-				handleDoneQuery(queryId, doneQueryFuture);
+            if (doneQueryFuture != null) {
+                
+                // Throw out an appropriate exception for a halted query.
+                handleDoneQuery(queryId, doneQueryFuture);
 
-				// Should never get here.
-        		throw new AssertionError();
-        		
-        	}
-			
+                // Should never get here.
+                throw new AssertionError();
+                
+            }
+            
             // Not found in done queries either.
             return null;
             
         } finally {
-        	
-        	lock.unlock();
-        	
+            
+            lock.unlock();
+            
         }
         
     }
@@ -1329,63 +1347,63 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     protected void halt(final AbstractRunningQuery q) {
 
-    	lock.lock();
+        lock.lock();
 
-    	try {
+        try {
 
-    		// insert/touch the LRU of recently finished queries.
-			doneQueries.put(q.getQueryId(), q.getFuture());
+            // insert/touch the LRU of recently finished queries.
+            doneQueries.put(q.getQueryId(), q.getFuture());
 
-			// remove from the set of running queries.
-			runningQueries.remove(q.getQueryId(), q);
+            // remove from the set of running queries.
+            runningQueries.remove(q.getQueryId(), q);
 
-			if(runningQueries.isEmpty()) {
+            if(runningQueries.isEmpty()) {
 
-				// Signal that no queries are running.
-				nothingRunning.signalAll();
-				
-			}
-			
-		} finally {
+                // Signal that no queries are running.
+                nothingRunning.signalAll();
+                
+            }
+            
+        } finally {
 
-			lock.unlock();
-			
-    	}
+            lock.unlock();
+            
+        }
 
     }
     
-	/**
-	 * Handle a recently halted query by throwing an appropriate exception.
-	 * 
-	 * @param queryId
-	 *            The query identifier.
-	 * @param doneQueryFuture
-	 *            The {@link Future} for that query from {@link #doneQueries}.
-	 * @throws InterruptedException
-	 *             if the query halted normally.
-	 * @throws RuntimeException
-	 *             if the query halted with an error.
-	 */
+    /**
+     * Handle a recently halted query by throwing an appropriate exception.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * @param doneQueryFuture
+     *            The {@link Future} for that query from {@link #doneQueries}.
+     * @throws InterruptedException
+     *             if the query halted normally.
+     * @throws RuntimeException
+     *             if the query halted with an error.
+     */
     private void handleDoneQuery(final UUID queryId,final Future<Void> doneQueryFuture) {
         try {
-        	// Check the Future.
-			doneQueryFuture.get();
-			// The query is done, so the caller can not access it any more.
-			throw new InterruptedException();
-		} catch (InterruptedException e) {
-			/*
-			 * Interrupted awaiting the future (note that the Future should be
-			 * available immediately).
-			 */
-			throw new RuntimeException(e);
-		} catch (ExecutionException e) {
-			/*
-			 * Some kind of an error when running the query (might have just
-			 * been interrupted, in which case the InterruptedException will be
-			 * wrapped here).
-			 */
-			throw new RuntimeException(e);
-		}
+            // Check the Future.
+            doneQueryFuture.get();
+            // The query is done, so the caller can not access it any more.
+            throw new InterruptedException();
+        } catch (InterruptedException e) {
+            /*
+             * Interrupted awaiting the future (note that the Future should be
+             * available immediately).
+             */
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            /*
+             * Some kind of an error when running the query (might have just
+             * been interrupted, in which case the InterruptedException will be
+             * wrapped here).
+             */
+            throw new RuntimeException(e);
+        }
     }
 
     /*
@@ -1398,10 +1416,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @see Annotations#RUNNING_QUERY_CLASS
      */
     @SuppressWarnings("unchecked")
-	protected AbstractRunningQuery newRunningQuery(
+    protected AbstractRunningQuery newRunningQuery(
             /*final QueryEngine queryEngine,*/ final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
-            final PipelineOp query) {
+            final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
 
         final String className = query.getProperty(
                 Annotations.RUNNING_QUERY_CLASS,
@@ -1426,11 +1444,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             final Constructor<? extends IRunningQuery> ctor = cls
                     .getConstructor(new Class[] { QueryEngine.class,
                             UUID.class, Boolean.TYPE, IQueryClient.class,
-                            PipelineOp.class });
+                            PipelineOp.class, IChunkMessage.class });
 
             // save reference.
             runningQuery = ctor.newInstance(new Object[] { this, queryId,
-                    controller, clientProxy, query });
+                    controller, clientProxy, query, realSource });
 
         } catch (Exception ex) {
 
@@ -1452,34 +1470,34 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
-	public UUID[] getRunningQueries() {
+    public UUID[] getRunningQueries() {
 
-		return runningQueries.keySet().toArray(new UUID[0]);
+        return runningQueries.keySet().toArray(new UUID[0]);
 
-	}
+    }
 
-//	synchronized public void addListener(final IQueryEngineListener listener) {
+//  synchronized public void addListener(final IQueryEngineListener listener) {
 //
-//		if (m_listeners == null) {
+//      if (m_listeners == null) {
 //
-//			m_listeners = new Vector<IQueryEngineListener>();
+//          m_listeners = new Vector<IQueryEngineListener>();
 //
-//			m_listeners.add(listener);
+//          m_listeners.add(listener);
 //
-//		} else {
+//      } else {
 //
-//			if (m_listeners.contains(listener)) {
+//          if (m_listeners.contains(listener)) {
 //
-//				throw new IllegalStateException("Already registered: listener="
-//						+ listener);
+//              throw new IllegalStateException("Already registered: listener="
+//                      + listener);
 //
-//			}
+//          }
 //
-//			m_listeners.add(listener);
+//          m_listeners.add(listener);
 //
-//		}
+//      }
 //
-//	}
+//  }
 //
 //    synchronized public void removeListener(IQueryEngineListener listener) {
 //
@@ -1501,10 +1519,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 //        
 //        if(m_listeners.isEmpty()) {
 //
-//			/*
-//			 * Note: We can test whether or not listeners need to be notified
-//			 * simply by testing m_listeners != null.
-//			 */
+//          /*
+//           * Note: We can test whether or not listeners need to be notified
+//           * simply by testing m_listeners != null.
+//           */
 //            
 //            m_listeners = null;
 //            
@@ -1516,30 +1534,30 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 //    // TODO Must drop and drop any errors.
 //    // TODO Optimize with CopyOnWriteArray
 //    // Note: Security hole if we allow notification for queries w/o queryId.
-//	protected void fireQueryEndedEvent(final IRunningQuery query) {
-//		
-//		if (m_listeners == null)
-//			return;
+//  protected void fireQueryEndedEvent(final IRunningQuery query) {
+//      
+//      if (m_listeners == null)
+//          return;
 //
-//		final IQueryEngineListener[] listeners = (IQueryEngineListener[]) m_listeners
-//				.toArray(new IQueryEngineListener[] {});
+//      final IQueryEngineListener[] listeners = (IQueryEngineListener[]) m_listeners
+//              .toArray(new IQueryEngineListener[] {});
 //
-//		for (int i = 0; i < listeners.length; i++) {
+//      for (int i = 0; i < listeners.length; i++) {
 //
-//			final IQueryEngineListener l = listeners[i];
+//          final IQueryEngineListener l = listeners[i];
 //
-//			l.queryEnded(query);
+//          l.queryEnded(query);
 //
-//		}
-//		
+//      }
+//      
 //    }
 //    
 //    private Vector<IQueryEngineListener> m_listeners;
 //
 //    public interface IQueryEngineListener {
 //
-//    	void queryEnded(final IRunningQuery q);
-//    	
+//      void queryEnded(final IRunningQuery q);
+//      
 //    }
 
 }

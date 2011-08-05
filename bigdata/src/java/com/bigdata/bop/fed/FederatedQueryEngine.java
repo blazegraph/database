@@ -144,9 +144,9 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     @Override
     public IQueryClient getProxy() {
-    	
-    	return clientProxy;
-    	
+        
+        return clientProxy;
+        
     }
     
     @Override
@@ -238,8 +238,8 @@ public class FederatedQueryEngine extends QueryEngine {
         } else {
         
             // E.g., an EmbeddedFederation in the test suite. 
-        	this.clientProxy = this;
-        	
+            this.clientProxy = this;
+            
         }
 
     }
@@ -331,7 +331,7 @@ public class FederatedQueryEngine extends QueryEngine {
         
         public MaterializeMessageTask(final IChunkMessage<IBindingSet> msg) {
             
-        	this.msg = msg;
+            this.msg = msg;
             
             // lookup query by id.
             q = getRunningQuery(msg.getQueryId());
@@ -348,12 +348,12 @@ public class FederatedQueryEngine extends QueryEngine {
                 if (log.isDebugEnabled())
                     log.debug("accepted: " + msg);
                 FederatedQueryEngine.this.acceptChunk(msg);
-			} catch (Throwable t) {
-				/*
-				 * Note: Since no one is watching the Future for this task, an
-				 * error here needs to cause the query to abort.
-				 */
-				q.halt(t);
+            } catch (Throwable t) {
+                /*
+                 * Note: Since no one is watching the Future for this task, an
+                 * error here needs to cause the query to abort.
+                 */
+                q.halt(t);
 //                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 //                    log.warn("Interrupted.");
 //                    return;
@@ -431,7 +431,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
             final FederatedRunningQuery q = newRunningQuery(
                     /*FederatedQueryEngine.this,*/ queryId, false/* controller */,
-                    msg.getQueryController(), query);
+                    msg.getQueryController(), query, msg);
 
             return (FederatedRunningQuery) putIfAbsent(queryId, q);
 
@@ -445,7 +445,7 @@ public class FederatedQueryEngine extends QueryEngine {
         
         final FederatedRunningQuery q = newRunningQuery(/*this, */queryId,
                 false/* controller */, queryDecl.getQueryController(),
-                queryDecl.getQuery());
+                queryDecl.getQuery(), null/*realSource*/);
         
         putIfAbsent(queryId, q);
 
@@ -522,10 +522,10 @@ public class FederatedQueryEngine extends QueryEngine {
     protected FederatedRunningQuery newRunningQuery(
             /*final QueryEngine queryEngine,*/ final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
-            final PipelineOp query) {
+            final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
 
         return new FederatedRunningQuery(this/*queryEngine*/, queryId, controller,
-                clientProxy, query);
+                clientProxy, query, realSource);
 
     }
 
@@ -543,13 +543,13 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
 
-		if (serviceUUID == null)
-			throw new IllegalArgumentException();
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
 
         IQueryPeer proxy = proxyMap.get(serviceUUID);
 
-//		if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID
-//				+ (proxy != null ? "cached=" + proxy : " not cached."));
+//      if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID
+//              + (proxy != null ? "cached=" + proxy : " not cached."));
 
         if (proxy == null) {
 
@@ -560,13 +560,9 @@ public class FederatedQueryEngine extends QueryEngine {
                 throw new RuntimeException("No such service: " + serviceUUID);
 
             try {
-
                 proxy = dataService.getQueryEngine();
-            
             } catch (IOException e) {
-            
                 throw new RuntimeException(e);
-                
             }
 
             if (proxy == null) {
@@ -580,17 +576,15 @@ public class FederatedQueryEngine extends QueryEngine {
                         + serviceUUID);
 
             }
-            
+
             IQueryPeer tmp = proxyMap.putIfAbsent(serviceUUID, proxy);
             
-			if (tmp != null) {
-			
-			    proxy = tmp;
-			    
-			}
+            if (tmp != null) {
+                proxy = tmp;
+            }
 
-//			if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID + ", addedToCache="
-//					+ (tmp == null) + ", proxy=" + proxy);
+//          if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID + ", addedToCache="
+//                  + (tmp == null) + ", proxy=" + proxy);
 
         }
 

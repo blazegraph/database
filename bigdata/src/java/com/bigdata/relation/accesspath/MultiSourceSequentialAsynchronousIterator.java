@@ -33,6 +33,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
 
 /**
  * Class allows new sources to be attached dynamically. If the existing sources
@@ -45,6 +46,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class MultiSourceSequentialAsynchronousIterator<E> implements
         IMultiSourceAsynchronousIterator<E> {
 
+    private final static Logger log = Logger.getLogger(MultiSourceSequentialAsynchronousIterator.class);
+    
     private final ReentrantLock lock = new ReentrantLock();
 
     private final Queue<IAsynchronousIterator<E>> sources = new LinkedBlockingQueue<IAsynchronousIterator<E>>();
@@ -62,7 +65,7 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
      * testing that variable.
      */
     private volatile IAsynchronousIterator<E> current;
-    
+
     public MultiSourceSequentialAsynchronousIterator(final IAsynchronousIterator<E> src) {
         current = src;
     }
@@ -70,7 +73,24 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
     public void close() {
         lock.lock();
         try {
-            current = null;
+            /*
+             * Ensure that all sources are eventually closed.
+             */
+            // close the current source (if any).
+            final IAsynchronousIterator<E> current = this.current;
+            this.current = null;
+            if (current != null) {
+                if (log.isInfoEnabled())
+                    log.info("Closing source: " + current);
+                current.close();
+            }
+            // Close any sources still in the queue.
+            for(IAsynchronousIterator<E> t : sources) {
+                if (log.isInfoEnabled())
+                    log.info("Closing source: " + t);
+                t.close();
+            }
+            // Clear the queue.
             sources.clear();
         } finally {
             lock.unlock();
@@ -110,10 +130,20 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
         // current is known to be [null].
         lock.lock();
         try {
+            /* Close iterator which has been consumed.
+             * 
+             */
+            if (log.isInfoEnabled())
+                log.info("Closing source: " + current);
+            current.close();
             // remove the head of the queue (non-blocking)
             while ((current = sources.poll()) != null) {
-                if (!current.isExhausted())
+                if (!current.isExhausted()) {
                     return current;
+                } else {
+                    // Note: should already be closed since exhausted.
+                    current.close();
+                }
             }
             // no more sources with data, close while holding lock.
             close();
@@ -155,6 +185,14 @@ public class MultiSourceSequentialAsynchronousIterator<E> implements
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This will report <code>true</code> iff all iterators currently
+     * attached have been consumed, at which point {@link #current} becomes
+     * <code>null</code> and no more iterators may be attached, hence the high
+     * level iterator is provably exhausted.
+     */
     public boolean isExhausted() {
         return nextSource() == null;
     }
