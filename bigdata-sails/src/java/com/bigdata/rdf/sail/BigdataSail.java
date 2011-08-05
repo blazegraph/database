@@ -2059,8 +2059,8 @@ public class BigdataSail extends SailBase implements Sail {
         public void addStatement(final Resource s, final URI p, final Value o,
                 final Resource... contexts) throws SailException {
 
-            if (log.isInfoEnabled())
-                log.info("s=" + s + ", p=" + p + ", o=" + o + ", contexts="
+            if (log.isDebugEnabled())
+                log.debug("s=" + s + ", p=" + p + ", o=" + o + ", contexts="
                         + Arrays.toString(contexts));
 
             OpenRDFUtil.verifyContextNotNull(contexts);
