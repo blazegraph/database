@@ -1012,24 +1012,39 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String HTREE_CLASS_NAME = HTree.class.getName()+".className";
 
-		/**
-		 * The name of an optional property whose value specifies the number of
-		 * address bits for an {@link HTree} (default
-		 * {@value #DEFAULT_HTREE_ADDRESS_BITS}).
-		 * <p>
-		 * The #of children for a directory is <code>2^addressBits</code>. For
-		 * example, a value of <code>10</code> means a <code>10</code> bit
-		 * address space in the directory. Such a directory would provide direct
-		 * addressing for <code>1024</code> child references. Given an overhead
-		 * of <code>8</code> bytes per child address, that would result in an
-		 * expected page size of 8k before compression.
-		 * 
-		 * @see #DEFAULT_HTREE_BRANCHING_FACTOR
-		 */
-		String HTREE_ADDRESS_BITS = HTree.class.getPackage().getName()
-				+ ".addressBits";
+        /**
+         * The name of an optional property whose value specifies the number of
+         * address bits for an {@link HTree} (default
+         * {@value #DEFAULT_HTREE_ADDRESS_BITS}).
+         * <p>
+         * The #of children for a directory is <code>2^addressBits</code>. For
+         * example, a value of <code>10</code> means a <code>10</code> bit
+         * address space in the directory. Such a directory would provide direct
+         * addressing for <code>1024</code> child references. Given an overhead
+         * of <code>8</code> bytes per child address, that would result in an
+         * expected page size of 8k before compression.
+         * 
+         * @see #DEFAULT_HTREE_ADDRESS_BITS
+         */
+        String HTREE_ADDRESS_BITS = HTree.class.getPackage().getName()
+                + ".addressBits";
 
-		String DEFAULT_HTREE_ADDRESS_BITS = "10";
+        String DEFAULT_HTREE_ADDRESS_BITS = "10";
+
+        /**
+         * The name of an optional property whose value specifies the fixed by
+         * length of the keys in the {@link HTree} -or- ZERO (0) if the key
+         * length is unconstrained, in which case variable length keys may be
+         * used (default {@value #DEFAULT_HTREE_KEY_LEN}). This may be used in
+         * combination with an appropriate {@link IRabaCoder} to optimize to
+         * search and encoding of int32 or int64 keys.
+         * 
+         * @see #DEFAULT_HTREE_KEY_LEN
+         */
+        String HTREE_KEY_LEN = HTree.class.getPackage().getName()
+                + ".keyLen";
+
+        String DEFAULT_HTREE_KEY_LEN = "0";
 
     }
 
@@ -1152,6 +1167,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * @see Options#HTREE_ADDRESS_BITS
      */
     private int addressBits;
+    
+    /**
+     * @see Options#HTREE_KEY_LEN
+     */
+    private int keyLen;
     
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
@@ -1916,17 +1936,29 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-	public int getAddressBits() {
+    public int getAddressBits() {
 
-		return addressBits;
+        return addressBits;
 
-	}
+    }
     
-	public void setAddressBits(final int addressBits) {
+    public void setAddressBits(final int addressBits) {
 
-		this.addressBits = addressBits;
+        this.addressBits = addressBits;
 
-	}
+    }
+    
+    public int getKeyLen() {
+
+        return keyLen;
+
+    }
+    
+    public void setKeyLen(final int keyLen) {
+
+        this.keyLen = keyLen;
+
+    }
     
     /**
      * Create an instance of a class known to implement the specified interface
@@ -2458,9 +2490,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.htreeClassName = getProperty(indexManager, properties, namespace,
                 Options.HTREE_CLASS_NAME, HTree.class.getName()).intern();
 
-		this.addressBits = Integer.parseInt(getProperty(indexManager,
-				properties, namespace, Options.HTREE_ADDRESS_BITS,
-				Options.DEFAULT_HTREE_ADDRESS_BITS));
+        this.addressBits = Integer.parseInt(getProperty(indexManager,
+                properties, namespace, Options.HTREE_ADDRESS_BITS,
+                Options.DEFAULT_HTREE_ADDRESS_BITS));
+
+        this.keyLen = Integer.parseInt(getProperty(indexManager,
+                properties, namespace, Options.HTREE_KEY_LEN,
+                Options.DEFAULT_HTREE_KEY_LEN));
 
         if (log.isInfoEnabled())
             log.info(toString());
@@ -2582,6 +2618,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // htree
         sb.append(", htreeClassName=" + htreeClassName);
         sb.append(", addressBits=" + addressBits);
+        sb.append(", keyLen=" + keyLen);
 
         return sb.toString();
         
@@ -2600,11 +2637,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 */
     private static transient final int VERSION1 = 0x1;
 
-	/**
-	 * This version adds support for {@link HTree}. This includes
-	 * {@link #addressBits} and {@link #htreeClassName}.
-	 */
+    /**
+     * This version adds support for {@link HTree}. This includes
+     * {@link #addressBits} and {@link #htreeClassName}.
+     */
     private static transient final int VERSION2 = 0x2;
+
+    /**
+     * This version adds support for a fixed length key option for the
+     * {@link HTree} using {@link #keyLen}.
+     */
+    private static transient final int VERSION3 = 0x3;
 
 //    /**
 //     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
@@ -2685,7 +2728,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION2;
+    private static transient final int CURRENT_VERSION = VERSION3;
 //    private static transient final int CURRENT_VERSION = VERSION10;
     
     /**
@@ -2700,7 +2743,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION0:
         case VERSION1:
         case VERSION2:
-//        case VERSION3:
+        case VERSION3:
 //        case VERSION4:
 //        case VERSION5:
 //        case VERSION6:
@@ -2947,6 +2990,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             
 		if (version >= VERSION2) {
 
+            if (version >= VERSION3) {
+
+                keyLen = LongPacker.unpackInt(in);
+
+            } else {
+                
+                keyLen = 0;
+                
+            }
+            
 			addressBits = LongPacker.unpackInt(in);
 		
 			htreeClassName = in.readUTF();
@@ -2956,6 +3009,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         	addressBits = 10;
         	
         	htreeClassName = HTree.class.getName();
+        	
+        	keyLen = 0;
         	
         }
         
@@ -3077,7 +3132,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
 //        }
 
-		if (version >= VERSION2) {
+        if (version >= VERSION2) {
+
+            if (version >= VERSION3) {
+
+                LongPacker.packLong(out, keyLen);
+
+            }
 
 			LongPacker.packLong(out, addressBits);
 

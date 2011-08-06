@@ -455,9 +455,9 @@ abstract public class PipelineOp extends BOpBase {
 	}
 
     /**
-     * Return <code>true</code> iff {@link #newStats()} must be shared across
-     * all invocations of {@link #eval(BOpContext)} for this operator for a
-     * given query.
+     * Return <code>true</code> iff {@link #newStats(IQueryContext)} must be
+     * shared across all invocations of {@link #eval(BOpContext)} for this
+     * operator for a given query.
      * 
      * @see Annotations#SHARED_STATE
      */
@@ -481,8 +481,11 @@ abstract public class PipelineOp extends BOpBase {
 	 * Operator life cycle events support pre-/post-operator behaviors. Such
 	 * events can be used to processed buffered solutions accumulated within
 	 * some shared state across multiple operator invocations.
+	 * 
+	 * @param queryContext
+	 *           The evaluation context for the query (not the operator). 
 	 */
-    public BOpStats newStats() {
+    public BOpStats newStats(final IQueryContext queryContext) {
 
         return new BOpStats();
 

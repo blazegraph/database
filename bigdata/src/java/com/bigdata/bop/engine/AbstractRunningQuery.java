@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -48,14 +49,19 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.QueryEngine.Counters;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.IHaltable;
@@ -85,7 +91,7 @@ import com.bigdata.util.concurrent.IHaltable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRunningQuery implements IRunningQuery {
+abstract public class AbstractRunningQuery implements IRunningQuery, IQueryContext {
 
     /**
      * Error message used when an operation which must be performed on the query
@@ -575,7 +581,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         final int bopId = bop.getId();
 
-        statsMap.put(bopId, bop.newStats());
+        statsMap.put(bopId, bop.newStats(this));
 
         if (!op.getProperty(BOp.Annotations.CONTROLLER,
                 BOp.Annotations.DEFAULT_CONTROLLER)) {
@@ -934,9 +940,91 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
             }
             
         }
+
+        releaseNativeMemoryForQuery();
         
         if (log.isTraceEnabled())
             log.trace("queryId=" + queryId);
+
+    }
+
+    /**
+     * Release native memory associated with this operator, if any.
+     * <p>
+     * Note: Operators are responsible for releasing their child
+     * {@link IMemoryManager} context, if any, when they terminate. If they do
+     * not release the {@link IMemoryManager} context then it will be released
+     * no later than the termination of the query.
+     * 
+     * @param bopId
+     * 
+     * @see #releaseNativeMemoryForQuery()
+     * 
+     *      FIXME Verify operator's Future isDone() before releasing native
+     *      memory!!!! We should know this by examining the {@link RunState} for
+     *      the operator.
+     */
+    protected void releaseNativeMemoryForOperator(final int bopId) {
+        // NOP
+    }
+    
+    /**
+     * Release native memory associated with this query, if any.
+     * 
+     * FIXME This could cause direct buffers to be released back to the pool
+     * before the operator tasks have terminated. That is NOT safe as the
+     * buffers could then be reissued to other threads while existing threads
+     * still have references to the buffers. Really, the same problem exists
+     * with the allocation contexts used for NIO transfers of IBindingSet[]s.
+     * <p>
+     * We will have to be very careful to wait until each operator's Future
+     * isDone() before calling clear() on the IMemoryManager to release the
+     * native buffers back to the pool. If we release a buffer while an operator
+     * is still running, then we will get data corruption arising from the
+     * recycling of the buffer to another native buffer user.
+     * <p>
+     * AbstractRunningQuery.cancel(...) is where we need to handle this, more
+     * specifically cancelRunningOperators(). Right now it is not waiting for
+     * those operators to terminate.
+     * <p>
+     * Making this work is tricky. AbstractRunningQuery is holding a lock. The
+     * operator tasks do not actually require that lock to terminate, but they
+     * are wrapped by a ChunkWrapperTask, which handles reporting back to the
+     * AbstractRunningQuery and *does* need the lock, and also by a
+     * ChunkFutureTask. Since we actually do do ChunkFutureTask.get(), we are
+     * going to deadlock if we invoke that while holding the
+     * AbstractRunningQuery's lock.
+     * <p>
+     * The alternative is to handle the tear down of the native buffers for a
+     * query asynchronously after the query has been cancelled, deferring the
+     * release of the native buffers back to the direct buffer pool until all
+     * tasks for the query are known to be done.
+     * 
+     * FIXME We need to have distinct events for the query evaluation life cycle
+     * and the query results life cycle. Really, this means that temporary
+     * solution sets are scoped to the iterator from which the caller is
+     * draining the solutions. This is a matter of the scope of the allocation
+     * context for the {@link DirectBufferPoolAllocator} and releasing that
+     * scope when the {@link #queryIterator} is closed. [For temporary solution
+     * sets we might need the ability to read the solution set more than once
+     * and we most definitely need the ability to buffer the solution set on the
+     * native heap and scope its life cycle to the parent query or even to a
+     * concept such as an http session, e.g., by an integration with the NSS
+     * using traditional session concepts.]
+     */
+    protected void releaseNativeMemoryForQuery() {
+        
+        assert lock.isHeldByCurrentThread();
+        
+        // clear reference, returning old value.
+        final IMemoryManager memoryManager = this.memoryManager.getAndSet(null);
+
+        if (memoryManager != null) {
+            
+            // release resources.
+            memoryManager.clear();
+            
+        }
 
     }
 
@@ -1223,6 +1311,78 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * FIXME See PipelineOp.Annotations#MAX_MEMORY.
+     * <p>
+     * It would be nice to have the concept of a limit on the amount of native
+     * memory which an operator may use. However, there is currently no way to
+     * specify this for a child allocation context on the memory manager. Also,
+     * even if we do this for the root MemoryManager, that leads to a situation
+     * in which allocations will deadlock.
+     * <p>
+     * I think that we really want one of two things. Either we want to control
+     * the amount of native memory which will be used before we begin evictions
+     * to disk or we want to have the child allocation context simply toss an
+     * error if it attempts to use too much native memory.
+     * <p>
+     * To place a limit on memory before eviction to disk (as opposed to
+     * eviction to the memory manager) we need to create a new IRawStore
+     * interface which maintains a map from an addr to the appropriate backing
+     * persistence store BUT we have to somehow mark the addresses as being on
+     * the MemoryManager or on an RWStore backed by DISK. This gets into the
+     * question of whether or not there is a bit which is clean and available
+     * for this purpose. (Consider that we also want such a bit for the HTree to
+     * mark bucket pages versus directory pages in the address).
+     * <p>
+     * If we throw out an exception from the child memory manager if the memory
+     * allocation limit is exceeded then we can bound the memory easily enough,
+     * but it could lead to an unpleasant surprise.
+     * <p>
+     * If we do NOT bound the memory, then this could lead to swapping or a
+     * kernel over commit error if the total memory burden of the native process
+     * grows too large. It could also eat into the OS memory available to buffer
+     * the disk.
+     * <p>
+     * For the moment I am NOT going to put a bound on the native memory which
+     * can be allocated by an operator or a query and rely on the maximum
+     * concurrency of the queries to have reasonable bounds on the memory
+     * demand, but we should think about our options here.
+     * <p>
+     * I guess we could try the exception and re-do the operator against disk if
+     * we have too.
+     * <p>
+     * Or if memory demand is high the query controller might throttle the start
+     * of new queries, only allowing those which are apparently selective (based
+     * on some inspection) to execute until more memory has been release...
+     * <p>
+     * But also see ChunkedRunningQuery#scheduleNext() which places bounds on
+     * how much data can be buffered for an operator before it is evaluated.
+     * That is the other way to interpret MAX_MEMORY, as a limit on the buffered
+     * IBindingSet[]s which are input to the operator (assuming that they are
+     * buffered on the native heap) rather than as a limit to the among of
+     * native memory the operator may use while it is running.
+     */
+    public IMemoryManager getMemoryManager() {
+        IMemoryManager memoryManager = this.memoryManager.get();
+        if (memoryManager == null) {
+            lock.lock();
+            try {
+                memoryManager = this.memoryManager.get();
+                if (memoryManager == null) {
+                    this.memoryManager.set(memoryManager = new MemoryManager(
+                            DirectBufferPool.INSTANCE));
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+        return memoryManager;
+    }
+
+    private final AtomicReference<IMemoryManager> memoryManager = new AtomicReference<IMemoryManager>();
+    
     /**
      * Return the textual representation of the {@link RunState} of this query.
      * <p>

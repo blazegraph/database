@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
@@ -228,7 +229,7 @@ public class SliceOp extends PipelineOp {
         
     }
     
-    public SliceStats newStats() {
+    public SliceStats newStats(final IQueryContext queryContext) {
         
         return new SliceStats();
         

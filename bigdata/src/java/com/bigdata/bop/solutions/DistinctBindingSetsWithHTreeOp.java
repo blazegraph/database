@@ -16,6 +16,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -30,17 +31,17 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * A pipelined DISTINCT operator based on the persistence capable {@link HTree}
  * suitable for very large solution sets.
  * <p>
- * Note: This implementation is a pipelined operator which inspects each chunk
- * of solutions as they arrive and those solutions which are distinct for each
- * chunk passed on.
+ * Note: This implementation is a single-threaded pipelined operator which
+ * inspects each chunk of solutions as they arrive and those solutions which are
+ * distinct for each chunk passed on.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
@@ -141,9 +142,9 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
         
     }
 
-    public BOpStats newStats() {
+    public BOpStats newStats(final IQueryContext queryContext) {
     	
-    	return new DistinctStats(this);
+    	return new DistinctStats(this,queryContext);
     	
     }
 
@@ -215,7 +216,8 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 		 */
 		private final HTree map;
 
-    	public DistinctStats(final DistinctBindingSetsWithHTreeOp op) {
+    	public DistinctStats(final DistinctBindingSetsWithHTreeOp op,
+    	        final IQueryContext queryContext) {
     		
     		/*
     		 * TODO Annotations for key and value raba coders.
@@ -228,6 +230,8 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
 			metadata.setMaxRecLen(op.getMaxRecLen());
 
+			metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
+			
 			/*
 			 * TODO This sets up a tuple serializer for a presumed case of 4
 			 * byte keys (the buffer will be resized if necessary) and
@@ -247,17 +251,14 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
 			metadata.setTupleSerializer(tupleSer);
 
-			/*
-			 * FIXME This must a child memory manager created from the
-			 * IMemoryManager which is backing the query. That means that we
-			 * need access to the IRunningQuery in newStats(). Once we do this
-			 * we can just destroy the MemStore, or its backing IMemoryManager,
-			 * when we are done with the DISTINCT operator.
-			 */
-			final IRawStore store = new SimpleMemoryRawStore();
-			
-//			final IRawStore store = new MemStore(mmgr);
-			
+            /*
+             * This wraps an efficient raw store interface around a child memory
+             * manager created from the IMemoryManager which is backing the
+             * query.
+             */
+            final IRawStore store = new MemStore(queryContext
+                    .getMemoryManager().createAllocationContext());
+
     		// Will support incremental eviction and persistence.
     		this.map = HTree.create(store, metadata);    		
 
@@ -487,15 +488,12 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 					 * Discard the map.
 					 * 
 					 * Note: The map can not be discarded (or cleared) until the
-					 * last invocation. However, we only get the benefit of the
-					 * lastInvocation signal if the operator is single threaded
-					 * and running on the query controller. That is not a
-					 * requirement for this DISTINCT implementation, so the map
-					 * is not going to be cleared until the query goes out of
-					 * scope and is swept by GC.
+					 * last invocation.
 					 */
+                    final IRawStore store = map.getStore();
                     map.close();
-
+                    store.close();
+                    
                 }
                 
                 // done.

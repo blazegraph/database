@@ -108,6 +108,47 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	/** The #of slot bytes in current allocations. */
 	private final AtomicLong m_slotBytes = new AtomicLong();
 
+    /**
+     * Create a new {@link MemoryManager}.
+     * <p>
+     * The backing {@link DirectBufferPool} may be either bounded or
+     * (effectively) unbounded. The {@link MemoryManager} will be (effectively)
+     * unbounded. If either the pool is bounded, then <em>blocking</em>
+     * allocation requests may block, otherwise allocation requests will be
+     * non-blocking.
+     * <p>
+     * The garbage collection of direct {@link ByteBuffer}s depends on a full GC
+     * pass. In an application which managers its heap pressure well, full GC
+     * passes are rare. Therefore, the best practice is to share an unbounded
+     * pool across multiple purposes. Since there are typically multiple users
+     * of the pool, the demand can not always be predicated and deadlocks can
+     * arise with a bounded pool.
+     * <p>
+     * Individual buffers will be allocated as necessary and released if they
+     * become empty. However, since allocation patterns may cause the in use
+     * data to be scattered across the allocated buffers, the backing buffers
+     * may not be returned to the backing pool until the top-level allocation
+     * context is cleared.
+     * <p>
+     * Any storage allocated by this instance will be released no later than
+     * when the instance is {@link #finalize() finalized}. Storage may be
+     * returned to the pool within the life cycle of the {@link MemoryManager}
+     * using {@link #clear()}. Nested allocation contexts may be created and
+     * managed using {@link #createAllocationContext()}.
+     * 
+     * @param pool
+     *            The pool from which the {@link MemoryManager} will allocate
+     *            its buffers (each "sector" is one buffer).
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>pool</i> is <code>null</code>.
+     */
+    public MemoryManager(final DirectBufferPool pool) {
+
+        this(pool, Integer.MAX_VALUE);
+        
+    }
+
 	/**
 	 * Create a new {@link MemoryManager}.
 	 * <p>
@@ -153,7 +194,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager,
 	 * @throws IllegalArgumentException
 	 *             if <i>sectors</i> is non-positive.
 	 */
-	public MemoryManager(final DirectBufferPool pool, final int sectors) {
+    public MemoryManager(final DirectBufferPool pool, final int sectors) {
 		
 		if (pool == null)
 			throw new IllegalArgumentException();

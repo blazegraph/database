@@ -101,6 +101,9 @@ public class TestAll extends TestCase {
         // In-memory generalized aggregation operator
         suite.addTestSuite(TestMemoryGroupByOp.class);
 
+        // FIXME Enable test for Native memory generalized aggregation operator
+//        suite.addTestSuite(TestHTreeGroupByOp.class);
+
         // Pipelined aggregation operator.
         suite.addTestSuite(TestPipelinedAggregationOp.class);
 

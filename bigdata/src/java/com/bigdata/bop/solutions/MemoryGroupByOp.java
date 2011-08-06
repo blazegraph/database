@@ -86,7 +86,7 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
      * Returns <code>false</code>. This is a generalized aggregation operator
      * and may be used to evaluate any aggregation request.
      */
-    public boolean isPipelinedAggregationOp() {
+    final public boolean isPipelinedAggregationOp() {
 
         return false;
         
