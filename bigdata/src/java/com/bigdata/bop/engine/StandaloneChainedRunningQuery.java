@@ -725,7 +725,7 @@ public class StandaloneChainedRunningQuery extends AbstractRunningQuery {
                 stats = getStats(bopId);
             } else {
                 // distinct stats objects, aggregated as each task finishes.
-                stats = op.newStats();
+                stats = op.newStats(StandaloneChainedRunningQuery.this);
             }
             assert stats != null;
 

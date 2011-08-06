@@ -41,6 +41,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableFactory;
@@ -71,6 +72,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.rwstore.sector.IMemoryManager;
 
 /**
  * Abstract base class for testing {@link GroupByOp} operator implementations.
@@ -109,6 +111,12 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
     }
 
     /**
+     * The {@link IQueryContext} - operators which require access to the
+     * {@link IMemoryManager} MUST explicitly setup and tear down this field.
+     */
+    protected IQueryContext queryContext = null;
+    
+    /**
      * Factory for {@link GroupByOp} to be tested.
      * 
      * @param select
@@ -122,7 +130,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
      */
     abstract protected GroupByOp newFixture(final IValueExpression<?>[] select,
             final IValueExpression<?>[] groupBy, final IConstraint[] having);
-
+    
     /**
      * Return <code>true</code> iff the fixture will be a pipelined aggregation
      * operator as defined by {@link GroupByOp#isPipelinedAggregationOp()}. This
@@ -187,7 +195,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org2 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -285,7 +293,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org2 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -448,7 +456,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7  } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -616,7 +624,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org2, _price7 , price12 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -786,7 +794,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price21 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -955,7 +963,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1120,7 +1128,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1284,7 +1292,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1432,7 +1440,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         
         final IBindingSet expected[] = new IBindingSet[] {};
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1593,7 +1601,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1754,7 +1762,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price21 } )
         };
 
-        final BOpStats stats = query.newStats();
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -1926,7 +1934,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -2086,7 +2094,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -2273,7 +2281,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price140 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -2466,7 +2474,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price14 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -2661,7 +2669,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice, inflatedPrice },  new IConstant [] { _price28, _price56 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -2849,7 +2857,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org2, _price7,  _price14 } )
         } ;
 
-        final BOpStats stats = query.newStats () ;
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });

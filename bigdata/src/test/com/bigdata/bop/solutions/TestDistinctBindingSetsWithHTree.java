@@ -29,6 +29,7 @@ package com.bigdata.bop.solutions;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
@@ -287,7 +288,10 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                         new IConstant[] { new Constant<String>("Leon") }//
                 ), };
 
-        final BOpStats stats = query.newStats();
+        final UUID queryId = UUID.randomUUID();
+        final MockQueryContext queryContext = new MockQueryContext(queryId);
+        try {
+        final BOpStats stats = query.newStats(queryContext);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -316,6 +320,9 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         assertEquals(6L, stats.unitsIn.get());
         assertEquals(4L, stats.unitsOut.get());
         assertEquals(1L, stats.chunksOut.get());
+        } finally {
+            queryContext.close();
+        }
 
     }
     

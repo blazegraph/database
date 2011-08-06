@@ -262,7 +262,7 @@ public class TestDistinctBindingSets extends TestCase2 {
                         new IConstant[] { new Constant<String>("Leon") }//
                 ), };
 
-        final BOpStats stats = query.newStats();
+        final BOpStats stats = query.newStats(null/* queryContext */);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });

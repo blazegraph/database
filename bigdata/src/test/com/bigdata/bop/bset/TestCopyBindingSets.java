@@ -149,7 +149,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // the expected solutions (default sink).
         final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
 
-        final BOpStats stats = query.newStats();
+        final BOpStats stats = query.newStats(null/*queryContext*/);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -197,7 +197,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // the expected solutions (default sink).
         final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
 
-        final BOpStats stats = query.newStats();
+        final BOpStats stats = query.newStats(null/*queryContext*/);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -266,7 +266,7 @@ public class TestCopyBindingSets extends TestCase2 {
             }
         }
 
-        final BOpStats stats = query.newStats();
+        final BOpStats stats = query.newStats(null/*queryContext*/);
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });

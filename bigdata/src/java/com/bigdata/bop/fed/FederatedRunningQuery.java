@@ -73,57 +73,57 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
      */
     /*private*/ final UUID queryControllerUUID;
 
-    /**
-     * A map associating resources with running queries. When a query halts, the
-     * resources listed in its resource map are released. Resources can include
-     * {@link ByteBuffer}s backing either incoming or outgoing
-     * {@link LocalChunkMessage}s, temporary files associated with the query,
-     * hash tables, etc.
-     * 
-     * @todo The {@link IAllocationContext} allows us to automatically release
-     *       native {@link ByteBuffer}s used by the query. Such buffers do not
-     *       need to be part of this map. This means that the only real use for
-     *       the map will be temporary persistent resources, such as graphs or
-     *       hash tables backed by a local file or the intermediate outputs of a
-     *       sort operator. We may be able to manage the local persistent data
-     *       structures using the {@link TemporaryStoreFactory} and manage the
-     *       life cycle of the intermediate results for sort within its operator
-     *       implementation.
-     * 
-     * @todo This map will eventually need to be moved into {@link ChunkedRunningQuery}
-     *       in order to support temporary graphs or other disk-backed resources
-     *       associated with the evaluation of a query against a standalone
-     *       database. However, the main use case are the resources associated
-     *       with query against an {@link IBigdataFederation} which it why it is
-     *       being developed in the {@link FederatedRunningQuery} class.
-     * 
-     * @todo Cache any resources materialized for the query on this node (e.g.,
-     *       temporary graphs materialized from a peer or the client). A bop
-     *       should be able to demand those data from the cache and otherwise
-     *       have them be materialized.
-     * 
-     * @todo Only use the values in the map for transient objects, such as a
-     *       hash table which is not backed by the disk. For {@link ByteBuffer}s
-     *       we want to make the references go through the
-     *       {@link ResourceService} . For files, through the
-     *       {@link ResourceManager}.
-     * 
-     * @todo We need to track the resources in use by the query so they can be
-     *       released when the query terminates. This includes: buffers; joins
-     *       for which there is a chunk of binding sets that are currently being
-     *       executed; downstream joins (they depend on the source joins to
-     *       notify them when they are complete in order to decide their own
-     *       termination condition); local hash tables which are part of a DHT
-     *       (especially when they are persistent); buffers and disk resources
-     *       allocated to N-way merge sorts, etc.
-     * 
-     * @todo The set of buffers having data which has been accepted for this
-     *       query.
-     * 
-     * @todo The set of buffers having data which has been generated for this
-     *       query.
-     */
-    private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
+//    /**
+//     * A map associating resources with running queries. When a query halts, the
+//     * resources listed in its resource map are released. Resources can include
+//     * {@link ByteBuffer}s backing either incoming or outgoing
+//     * {@link LocalChunkMessage}s, temporary files associated with the query,
+//     * hash tables, etc.
+//     * 
+//     * @todo The {@link IAllocationContext} allows us to automatically release
+//     *       native {@link ByteBuffer}s used by the query. Such buffers do not
+//     *       need to be part of this map. This means that the only real use for
+//     *       the map will be temporary persistent resources, such as graphs or
+//     *       hash tables backed by a local file or the intermediate outputs of a
+//     *       sort operator. We may be able to manage the local persistent data
+//     *       structures using the {@link TemporaryStoreFactory} and manage the
+//     *       life cycle of the intermediate results for sort within its operator
+//     *       implementation.
+//     * 
+//     * @todo This map will eventually need to be moved into {@link ChunkedRunningQuery}
+//     *       in order to support temporary graphs or other disk-backed resources
+//     *       associated with the evaluation of a query against a standalone
+//     *       database. However, the main use case are the resources associated
+//     *       with query against an {@link IBigdataFederation} which it why it is
+//     *       being developed in the {@link FederatedRunningQuery} class.
+//     * 
+//     * @todo Cache any resources materialized for the query on this node (e.g.,
+//     *       temporary graphs materialized from a peer or the client). A bop
+//     *       should be able to demand those data from the cache and otherwise
+//     *       have them be materialized.
+//     * 
+//     * @todo Only use the values in the map for transient objects, such as a
+//     *       hash table which is not backed by the disk. For {@link ByteBuffer}s
+//     *       we want to make the references go through the
+//     *       {@link ResourceService} . For files, through the
+//     *       {@link ResourceManager}.
+//     * 
+//     * @todo We need to track the resources in use by the query so they can be
+//     *       released when the query terminates. This includes: buffers; joins
+//     *       for which there is a chunk of binding sets that are currently being
+//     *       executed; downstream joins (they depend on the source joins to
+//     *       notify them when they are complete in order to decide their own
+//     *       termination condition); local hash tables which are part of a DHT
+//     *       (especially when they are persistent); buffers and disk resources
+//     *       allocated to N-way merge sorts, etc.
+//     * 
+//     * @todo The set of buffers having data which has been accepted for this
+//     *       query.
+//     * 
+//     * @todo The set of buffers having data which has been generated for this
+//     *       query.
+//     */
+//    private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
 
     /**
      * A map of all allocation contexts associated with this query.
@@ -200,35 +200,45 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
      * {@inheritDoc}
      */
     @Override
-    protected void lifeCycleTearDownOperator(final int bopId) {
+    protected void releaseNativeMemoryForOperator(final int bopId) {
+
+        super.lifeCycleTearDownOperator(bopId);
+
         final Iterator<Map.Entry<AllocationContextKey, IAllocationContext>> itr = allocationContexts
                 .entrySet().iterator();
+        
         while (itr.hasNext()) {
+        
             final Map.Entry<AllocationContextKey, IAllocationContext> e = itr
                     .next();
+            
             if (e.getKey().hasOperatorScope(bopId)) {
+            
                 e.getValue().release();
+                
             }
+            
         }
-        super.lifeCycleTearDownOperator(bopId);
-    }
 
+    }
+    
     /**
      * Extended to release all {@link IAllocationContext}s associated with the
      * query when it terminates.
      * <p>
      * {@inheritDoc}
-     * 
-     * @todo We need to have distinct events for the query evaluation life cycle
-     *       and the query results life cycle.
-     */
+    */
     @Override
-    protected void lifeCycleTearDownQuery() {
+    protected void releaseNativeMemoryForQuery() {
+
         for(IAllocationContext ctx : allocationContexts.values()) {
+
             ctx.release();
+            
         }
+        
         allocationContexts.clear();
-        super.lifeCycleTearDownQuery();
+        
     }
 
     /**

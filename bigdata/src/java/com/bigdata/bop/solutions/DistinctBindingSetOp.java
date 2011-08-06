@@ -15,6 +15,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -124,7 +125,7 @@ public class DistinctBindingSetOp extends PipelineOp {
         
     }
 
-    public BOpStats newStats() {
+    public BOpStats newStats(final IQueryContext queryContext) {
     	
     	return new DistinctStats(this);
     	
