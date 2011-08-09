@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Comparator;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
@@ -37,14 +38,13 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
-import com.bigdata.bop.solutions.ComparatorOp;
+import com.bigdata.bop.solutions.BindingSetComparator;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
@@ -217,16 +217,16 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
     	}));
 
-		final ComparatorOp compareOp = new IntegerComparatorOp(
-				new ISortOrder[] { new SortOrder(a, true/* ascending */) });
-
+        final ISortOrder[] sortOrder = new ISortOrder[] { new SortOrder(a, true/* ascending */) };
+    	
     	final PipelineOp query = new MemorySortOp(new BOp[] {startOp}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, sortId),//
-				new NV(MemorySortOp.Annotations.COMPARATOR, compareOp),//
+                new NV(MemorySortOp.Annotations.SORT_ORDER,sortOrder),//
+				new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IntegerComparator()),//
                 new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(MemorySortOp.Annotations.PIPELINED, false),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
         }));
 
         final UUID queryId = UUID.randomUUID();
@@ -242,12 +242,14 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 		IBindingSet lastSolution = null;
 		final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
 		try {
+            final BindingSetComparator<Integer> c = new BindingSetComparator<Integer>(
+                    sortOrder, new IntegerComparator());
 			while (itr.hasNext()) {
 				final IBindingSet[] chunk = itr.next();
 //				nsolutions += chunk.length;
 				for (IBindingSet thisSolution : chunk) {
 					if (lastSolution != null) {
-						if (compareOp.compare(lastSolution, thisSolution) > 0) {
+						if (c.compare(lastSolution, thisSolution) > 0) {
 							fail("Solutions out of order: nvisited="
 									+ (nsolutions + 1) + ", lastSolution:"
 									+ lastSolution + ", thisSolution="
@@ -277,58 +279,23 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
     }
 
-	/**
-	 * Helper class for comparing solution sets having variables which evaluate
-	 * to {@link Integer} values.
-	 */
-    static private class IntegerComparatorOp extends ComparatorOp
-    {
+    /**
+     * Helper class for comparing solution sets having variables which evaluate
+     * to {@link Integer} values.
+     */
+    static private class IntegerComparator implements Comparator<Integer> {
 
-    	/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-		
-		/** The sort order. */
-    	final private ISortOrder<?> [] _sors;
+        public int compare(final Integer o1, final Integer o2) {
+            if (o1.intValue() < o2.intValue())
+                return -1;
 
-        public IntegerComparatorOp ( final ISortOrder<?> sors [] )
-        {
-            super ( new BOp [] {}, NV.asMap ( new NV [] { new NV ( ComparatorOp.Annotations.ORDER, sors ) } ) ) ;
-            _sors = sors ;
+            if (o1.intValue() > o2.intValue())
+                return 1;
+
+            return 0;
+
         }
 
-        public int compare ( IBindingSet o1, IBindingSet o2 )
-        {
-            for ( ISortOrder<?> sor : _sors )
-            {
-                int ret = compare ( sor, o1, o2 ) ;
-                if ( 0 != ret )
-                    return ret ;
-            }
-            return 0 ;
-        }
-
-        private int compare ( ISortOrder<?> sor, IBindingSet lhs, IBindingSet rhs )
-        {
-            int compare = 0 ;
-
-            final IConstant<?> lhsv = lhs.get ( sor.getVariable () ) ;
-            final IConstant<?> rhsv = rhs.get ( sor.getVariable () ) ;
-
-            if ( null == lhsv && null == rhsv )
-                return 0 ;
-            else if ( null == lhsv )
-                compare = -1 ;
-            else if ( null == rhsv )
-                compare = 1 ;
-            else
-				compare = ((Integer) lhsv.get()).compareTo(((Integer) rhsv
-						.get())) ;
-
-            return compare * ( sor.isAscending () ? 1 : -1 ) ;
-        }
-        
     }
     
 }

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
-import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IValueExpression;
 
 /**
  * Default impl.
@@ -43,31 +43,31 @@ public class SortOrder<E> implements ISortOrder<E> {
      */
     private static final long serialVersionUID = -669873421670514139L;
 
-    private final IVariable<E> var;
+    private final IValueExpression<E> expr;
     private final boolean asc;
 
     /**
      * 
-     * @param var
-     *            The variable.
+     * @param expr
+     *            The value expression.
      * @param asc
      *            <code>true</code> for an ascending sort and
      *            <code>false</code> for a descending sort.
      */
-    public SortOrder(final IVariable<E> var, final boolean asc) {
+    public SortOrder(final IValueExpression<E> expr, final boolean asc) {
 
-        if (var == null)
+        if (expr == null)
             throw new IllegalArgumentException();
 
-        this.var = var;
+        this.expr = expr;
         
         this.asc = asc;
         
     }
 
-    public IVariable<E> getVariable() {
+    public IValueExpression<E> getExpr() {
         
-        return var;
+        return expr;
         
     }
 

@@ -21,6 +21,10 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/* Portions Copyright Aduna (http://www.aduna-software.com/) (c) 2007.
+ *
+ * Licensed under the Aduna BSD-style license.
+ */
 /*
  * Created on May 3, 2010
  */
@@ -106,7 +110,7 @@ public class IVUtility {
         }
     }
 	
-    public static boolean equals(IV iv1, IV iv2) {
+    public static boolean equals(final IV iv1, final IV iv2) {
         
         // same IV or both null
         if (iv1 == iv2) {
@@ -123,7 +127,14 @@ public class IVUtility {
         
     }
     
-    public static int compare(IV iv1, IV iv2) {
+    /**
+     * This provides a dumb comparison across IVs.
+     * 
+     * @deprecated This does not follow either the total ordering of the
+     *             unsigned byte[] keys or the ordering for RDF Values. As
+     *             such it can not be used reliably for much of anything.
+     */
+    public static int compare(final IV iv1, final IV iv2) {
         
         // same IV or both null
         if (iv1 == iv2)
@@ -147,10 +158,10 @@ public class IVUtility {
      * sort ordering of IVs (the natural sort ordering considers the datatype).
      * <p>
      * So for example, if we have two IVs representing 2.1d and 1l, this method
-     * will attempt to compare 2.1 to 1 ignoring the datatype. This is useful
+     * will attempt to compare 2.1 to 11 ignoring the datatype. This is useful
      * for SPARQL filters.
      */
-    public static int numericalCompare(IV iv1, IV iv2) {
+    public static int numericalCompare(final IV iv1, final IV iv2) {
 
 		if (!iv1.isInline())
 			throw new IllegalArgumentException("left term is not inline: left="
@@ -222,8 +233,265 @@ public class IVUtility {
         }
         
     }
-    
-	public static IV literalMath(final Literal l1, final Literal l2, 
+
+    /**
+     * Note: openrdf imposes the following type precedence:
+     * 
+     * <pre>
+     *              - simple literal
+     *              - numeric
+     *              - xsd:boolean
+     *              - xsd:dateTime
+     *              - xsd:string
+     *              - RDF term (equal and unequal only)
+     * </pre>
+     */
+    public static int numericalCompare(final IV iv1, final Literal lit2) {
+
+        if (!iv1.isInline())
+            throw new IllegalArgumentException("left term is not inline: left="
+                    + iv1 + ", right=" + lit2);
+
+        if (!iv1.isLiteral())
+            throw new IllegalArgumentException(
+                    "left term is not literal: left=" + iv1 + ", right=" + lit2);
+
+        final DTE dte1 = iv1.getDTE();
+//        final DTE dte2 = iv2.getDTE();
+        final URI dt2 = lit2.getDatatype();
+
+        if (dt2 == null)
+            throw new IllegalArgumentException(
+                    "right term is not datatype literal: left=" + iv1
+                            + ", right=" + lit2);
+
+        final int numBooleans = 
+                (dte1 == DTE.XSDBoolean ? 1 : 0) +
+                (dt2.equals(XSD.BOOLEAN) ? 1 : 0);
+
+        if (numBooleans == 1)
+            throw new IllegalArgumentException("only one boolean");
+
+        // we can do two numerics
+        if (numBooleans == 0)
+        if (!dte1.isNumeric() || !XMLDatatypeUtil.isNumericDatatype(dt2))
+            throw new IllegalArgumentException("not numerics");
+        
+//        // we can use the natural ordering if they have the same DTE
+//        // this will naturally take care of two booleans or two numerics of the
+//        // same datatype
+//        if (dte1 == dte2)
+//            return iv1.compareTo(iv2);
+        
+        // otherwise we need to try to convert them into comparable numbers
+        final AbstractLiteralIV<BigdataLiteral,?> num1 = (AbstractLiteralIV<BigdataLiteral,?>) iv1; 
+//        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
+
+        // we can do two booleans
+        if (numBooleans == 2) {
+              final Boolean leftBool = Boolean.valueOf(num1.booleanValue());
+              final Boolean rightBool = Boolean.valueOf(lit2.booleanValue());
+              return leftBool.compareTo(rightBool);
+        }
+
+        // if one's a BigDecimal we should use the BigDecimal comparator for both
+        if (dte1 == DTE.XSDDecimal || dt2.equals(XSD.DECIMAL)) {
+            return num1.decimalValue().compareTo(lit2.decimalValue());
+        }
+        
+        // same for BigInteger
+        if (dte1 == DTE.XSDInteger || dt2.equals(DTE.XSDInteger)) {
+            return num1.integerValue().compareTo(lit2.integerValue());
+        }
+        
+        // fixed length numerics
+        if (dte1.isFloatingPointNumeric() || XMLDatatypeUtil.isFloatingPointDatatype(dt2)) {
+            // non-BigDecimal floating points - use doubles
+            return Double.compare(num1.doubleValue(), lit2.doubleValue());
+        } else {
+            // non-BigInteger integers - use longs
+            final long a = num1.longValue();
+            final long b = lit2.longValue();
+            return a == b ? 0 : a < b ? -1 : 1;
+        }
+
+    }
+
+    /* 
+     * NB: This is the openrdf code for comparing literals from QueryEvaluationUtil.
+     * Additional logic in the openrdf ValueComparator provides for the precedence
+     * of plain literals, etc.
+     */
+//    public static boolean compareLiterals(Literal leftLit, Literal rightLit, CompareOp operator)
+//            throws ValueExprEvaluationException
+//        {
+//            // type precendence:
+//            // - simple literal
+//            // - numeric
+//            // - xsd:boolean
+//            // - xsd:dateTime
+//            // - xsd:string
+//            // - RDF term (equal and unequal only)
+//
+//            URI leftDatatype = leftLit.getDatatype();
+//            URI rightDatatype = rightLit.getDatatype();
+//
+//            Integer compareResult = null;
+//
+//            if (QueryEvaluationUtil.isStringLiteral(leftLit) && QueryEvaluationUtil.isStringLiteral(rightLit)) {
+//                compareResult = leftLit.getLabel().compareTo(rightLit.getLabel());
+//            }
+//            else if (leftDatatype != null && rightDatatype != null) {
+//                URI commonDatatype = null;
+//
+//                if (leftDatatype.equals(rightDatatype)) {
+//                    commonDatatype = leftDatatype;
+//                }
+//                else if (XMLDatatypeUtil.isNumericDatatype(leftDatatype)
+//                        && XMLDatatypeUtil.isNumericDatatype(rightDatatype))
+//                {
+//                    // left and right arguments have different datatypes, try to find a
+//                    // more general, shared datatype
+//                    if (leftDatatype.equals(XMLSchema.DOUBLE) || rightDatatype.equals(XMLSchema.DOUBLE)) {
+//                        commonDatatype = XMLSchema.DOUBLE;
+//                    }
+//                    else if (leftDatatype.equals(XMLSchema.FLOAT) || rightDatatype.equals(XMLSchema.FLOAT)) {
+//                        commonDatatype = XMLSchema.FLOAT;
+//                    }
+//                    else if (leftDatatype.equals(XMLSchema.DECIMAL) || rightDatatype.equals(XMLSchema.DECIMAL)) {
+//                        commonDatatype = XMLSchema.DECIMAL;
+//                    }
+//                    else {
+//                        commonDatatype = XMLSchema.INTEGER;
+//                    }
+//                }
+//
+//                if (commonDatatype != null) {
+//                    try {
+//                        if (commonDatatype.equals(XMLSchema.DOUBLE)) {
+//                            compareResult = Double.compare(leftLit.doubleValue(), rightLit.doubleValue());
+//                        }
+//                        else if (commonDatatype.equals(XMLSchema.FLOAT)) {
+//                            compareResult = Float.compare(leftLit.floatValue(), rightLit.floatValue());
+//                        }
+//                        else if (commonDatatype.equals(XMLSchema.DECIMAL)) {
+//                            compareResult = leftLit.decimalValue().compareTo(rightLit.decimalValue());
+//                        }
+//                        else if (XMLDatatypeUtil.isIntegerDatatype(commonDatatype)) {
+//                            compareResult = leftLit.integerValue().compareTo(rightLit.integerValue());
+//                        }
+//                        else if (commonDatatype.equals(XMLSchema.BOOLEAN)) {
+//                            Boolean leftBool = Boolean.valueOf(leftLit.booleanValue());
+//                            Boolean rightBool = Boolean.valueOf(rightLit.booleanValue());
+//                            compareResult = leftBool.compareTo(rightBool);
+//                        }
+//                        else if (XMLDatatypeUtil.isCalendarDatatype(commonDatatype)) {
+//                            XMLGregorianCalendar left = leftLit.calendarValue();
+//                            XMLGregorianCalendar right = rightLit.calendarValue();
+//
+//                            compareResult = left.compare(right);
+//
+//                            // Note: XMLGregorianCalendar.compare() returns compatible
+//                            // values
+//                            // (-1, 0, 1) but INDETERMINATE needs special treatment
+//                            if (compareResult == DatatypeConstants.INDETERMINATE) {
+//                                throw new ValueExprEvaluationException("Indeterminate result for date/time comparison");
+//                            }
+//                        }
+//                        else if (commonDatatype.equals(XMLSchema.STRING)) {
+//                            compareResult = leftLit.getLabel().compareTo(rightLit.getLabel());
+//                        }
+//                    }
+//                    catch (IllegalArgumentException e) {
+//                        // One of the basic-type method calls failed, try syntactic match
+//                        // before throwing an error
+//                        if (leftLit.equals(rightLit)) {
+//                            switch (operator) {
+//                                case EQ:
+//                                    return true;
+//                                case NE:
+//                                    return false;
+//                            }
+//                        }
+//
+//                        throw new ValueExprEvaluationException(e);
+//                    }
+//                }
+//            }
+//
+//            if (compareResult != null) {
+//                // Literals have compatible ordered datatypes
+//                switch (operator) {
+//                    case LT:
+//                        return compareResult.intValue() < 0;
+//                    case LE:
+//                        return compareResult.intValue() <= 0;
+//                    case EQ:
+//                        return compareResult.intValue() == 0;
+//                    case NE:
+//                        return compareResult.intValue() != 0;
+//                    case GE:
+//                        return compareResult.intValue() >= 0;
+//                    case GT:
+//                        return compareResult.intValue() > 0;
+//                    default:
+//                        throw new IllegalArgumentException("Unknown operator: " + operator);
+//                }
+//            }
+//            else {
+//                // All other cases, e.g. literals with languages, unequal or
+//                // unordered datatypes, etc. These arguments can only be compared
+//                // using the operators 'EQ' and 'NE'. See SPARQL's RDFterm-equal
+//                // operator
+//
+//                boolean literalsEqual = leftLit.equals(rightLit);
+//
+//                if (!literalsEqual) {
+//                    if (leftDatatype != null && rightDatatype != null && isSupportedDatatype(leftDatatype)
+//                            && isSupportedDatatype(rightDatatype))
+//                    {
+//                        // left and right arguments have incompatible but supported datatypes
+//                        
+//                        // we need to check that the lexical-to-value mapping for both datatypes succeeds
+//                        if (!XMLDatatypeUtil.isValidValue(leftLit.getLabel(), leftDatatype)) {
+//                            throw new ValueExprEvaluationException("not a valid datatype value: " + leftLit);
+//                        }
+//                        
+//                        if (!XMLDatatypeUtil.isValidValue(rightLit.getLabel(), rightDatatype)) {
+//                            throw new ValueExprEvaluationException("not a valid datatype value: " + rightLit);
+//                        }
+//                    }
+//                    else if (leftDatatype != null && rightLit.getLanguage() == null || rightDatatype != null
+//                            && leftLit.getLanguage() == null)
+//                    {
+//                        // For literals with unsupported datatypes we don't know if their
+//                        // values are equal
+//                        throw new ValueExprEvaluationException("Unable to compare literals with unsupported types");
+//                    }
+//                }
+//
+//                switch (operator) {
+//                    case EQ:
+//                        return literalsEqual;
+//                    case NE:
+//                        return !literalsEqual;
+//                    case LT:
+//                    case LE:
+//                    case GE:
+//                    case GT:
+//                        throw new ValueExprEvaluationException(
+//                                "Only literals with compatible, ordered datatypes can be compared using <, <=, > and >= operators");
+//                    default:
+//                        throw new IllegalArgumentException("Unknown operator: " + operator);
+//                }
+//            }
+//        }
+//
+//    private static boolean isSupportedDatatype(URI datatype) {
+//        return (XMLSchema.STRING.equals(datatype) || XMLDatatypeUtil.isNumericDatatype(datatype) || XMLDatatypeUtil.isCalendarDatatype(datatype));
+//    }
+
+    public static IV literalMath(final Literal l1, final Literal l2, 
 			final MathOp op)
 	{
 		final URI dt1 = l1.getDatatype();

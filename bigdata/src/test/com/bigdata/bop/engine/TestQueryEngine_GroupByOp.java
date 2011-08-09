@@ -28,27 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Properties;
-import java.util.Random;
-import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.bset.StartOp;
-import com.bigdata.bop.solutions.ComparatorOp;
-import com.bigdata.bop.solutions.ISortOrder;
-import com.bigdata.bop.solutions.MemorySortOp;
-import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;

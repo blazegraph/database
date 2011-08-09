@@ -51,6 +51,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.engine.QueryEngine.Counters;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.io.DirectBufferPool;
@@ -220,8 +221,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
      * top-level operator is not a mutation. In order to ensure that the results
      * are transferred to the query controller in scale-out, the top-level
      * operator in the query plan must specify
-     * {@link BOpEvaluationContext#CONTROLLER}. For example, {@link SliceOp}
-     * uses this {@link BOpEvaluationContext}.
+     * {@link BOpEvaluationContext#CONTROLLER}. For example, {@link SliceOp} or
+     * {@link EndOp} both require this {@link BOpEvaluationContext}.
      */
     final private IBlockingBuffer<IBindingSet[]> queryBuffer;
 

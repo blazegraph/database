@@ -543,7 +543,8 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         if (o == null) {
 			/*
 			 * TODO This is ordering NULLs last. Why is this code even seeing
-			 * null references?
+			 * null references?  Also, note that SPARQL ORDER BY orders the
+			 * nulls first.
 			 */
             return 1;
         }

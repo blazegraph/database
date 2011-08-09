@@ -71,19 +71,19 @@ abstract public class PipelineOp extends BOpBase {
          */
 		String ALT_SINK_REF = PipelineOp.class.getName() + ".altSinkRef";
 
-		/**
-		 * The value reported by {@link PipelineOp#isSharedState()} (default
-		 * {@value #DEFAULT_SHARED_STATE}). This may be overridden to
-		 * <code>true</code> to have instances operators evaluated in the same
-		 * query engine context share the same {@link BOpStats} instance.
-		 * <p>
-		 * Note: {@link BOp#getEvaluationContext()} MUST be overridden to return
-		 * {@link BOpEvaluationContext#CONTROLLER} if this annotation is
-		 * overridden to <code>true</code>.
-		 * <p>
-		 * When <code>true</code>, the {@link QueryEngine} will impose the
-		 * necessary constraints when the operator is evaluated.
-		 */
+        /**
+         * The value reported by {@link PipelineOp#isSharedState()} (default
+         * {@value #DEFAULT_SHARED_STATE}). This may be overridden to
+         * <code>true</code> to have instances of operators evaluated in the
+         * same query engine context share the same {@link BOpStats} instance.
+         * <p>
+         * Note: {@link BOp#getEvaluationContext()} MUST be overridden to return
+         * {@link BOpEvaluationContext#CONTROLLER} if this annotation is
+         * overridden to <code>true</code>.
+         * <p>
+         * When <code>true</code>, the {@link QueryEngine} will impose the
+         * necessary constraints when the operator is evaluated.
+         */
 		String SHARED_STATE = PipelineOp.class.getName() + ".sharedState";
 
 		boolean DEFAULT_SHARED_STATE = false;

@@ -2074,9 +2074,25 @@ public class TestQueryEngine extends TestCase2 {
     static public void assertSameSolutions(
             final IBindingSet[] expected,
             final IRunningQuery runningQuery) {
-        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
+        assertSameSolutions(expected, runningQuery.iterator(), runningQuery);
+    }
+
+    /**
+     * Verify the expected solutions.
+     * 
+     * @param expected
+     *            The expected solutions.
+     * @param itr
+     *            The iterator draining the query.
+     * @param ft
+     *            The future of the query.
+     */
+    static public void assertSameSolutions(
+                final IBindingSet[] expected,
+                final IAsynchronousIterator<IBindingSet[]> itr,
+                final Future<Void> ft
+            ) {
         try {
-            final Future<?> ft = runningQuery;
             int n = 0;
             if(ft!=null&&ft.isDone()) ft.get();
             while (itr.hasNext()) {
@@ -2099,6 +2115,7 @@ public class TestQueryEngine extends TestCase2 {
                     n++;
                 }
             }
+            if(ft!=null) ft.get();
             assertEquals("Wrong number of solutions", expected.length, n);
         } catch (InterruptedException ex) {
             throw new RuntimeException("Query evaluation was interrupted: "
