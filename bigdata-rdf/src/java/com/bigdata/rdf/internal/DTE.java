@@ -193,17 +193,17 @@ public enum DTE {
 
     /**
      * The "inline" value is a compressed Unicode string. This is decodable
-     * compression rather than a Unicode sort. It is suitable for representing
-     * "small" Unicode values directly within the statement indices. "Small" is
-     * configurable, but should not be overly large. The tradeoff is the growth
-     * in the B+Tree leaf size for a statement index versus the overhead
-     * required when indirecting through the {@link LexiconRelation} to
-     * materialize the RDF {@link Value}. Further, there is a practical upper
-     * bound on the size of a key in the B+Tree. Therefore, inlining of Unicode
-     * values having between 32 and 64 characters is suggested as a recommended
-     * practice. Beyond that, inlining can contribute significantly to the
-     * growth in the B+Tree leaf size and have a negative impact on join
-     * performance for the statement indices.
+     * compressed encoding rather than a Unicode sort key. It is suitable for
+     * representing "small" Unicode values directly within the statement
+     * indices. "Small" is configurable, but should not be overly large. The
+     * tradeoff is the growth in the B+Tree leaf size for a statement index
+     * versus the overhead required when indirecting through the
+     * {@link LexiconRelation} to materialize the RDF {@link Value}. Further,
+     * there is a practical upper bound on the size of a key in the B+Tree.
+     * Therefore, inlining of Unicode values having between 32 and 64 characters
+     * is suggested as a recommended practice. Beyond that, inlining can
+     * contribute significantly to the growth in the B+Tree leaf size and have a
+     * negative impact on join performance for the statement indices.
      * <p>
      * This {@link DTE} may be used in combination with {@link VTE} as follows:
      * <dl>
@@ -215,11 +215,11 @@ public enum DTE {
      * <dd>Represent a data type literal where the extension IV is the data type
      * of the literal.</dd>
      * <dt>{@link VTE#URI} plus the extension bit</dt>
-     * <dd>Represent URI where the extension IV is the namespace of the URI and
-     * the inline Unicode component is the local name of the URI. This depends
-     * on the openrdf definition of a {@link URI}'s namespace and local name
-     * (basically, everything after the last '/' in the URI path or after the
-     * '#' if there is a URI anchor).</dd>
+     * <dd>Represent a URI where the extension IV is the namespace of the URI
+     * and the inline Unicode component is the local name of the URI. This
+     * depends on the openrdf definition of a {@link URI}'s namespace and local
+     * name (basically, everything after the last '/' in the URI path or after
+     * the '#' if there is a URI anchor).</dd>
      * </dl>
      */
     XSDString((byte) 14, 0/* len */, String.class, XSD.STRING,

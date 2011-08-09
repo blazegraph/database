@@ -19,7 +19,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -30,6 +32,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
@@ -39,13 +42,12 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
-import com.bigdata.bop.solutions.ComparatorOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.ISortOrder;
+import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
-import com.bigdata.bop.solutions.SparqlBindingSetComparatorOp;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -54,6 +56,7 @@ import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
@@ -644,19 +647,21 @@ public class AST2BOpUtility {
 		
 	}
 			
-	/**
-	 * NOT YET TESTED.
-	 * 
-	 * TODO TEST
-	 */
+    /**
+     * NOT YET TESTED.
+     * 
+     * TODO TEST
+     * 
+     * TODO Minor optimization: A bare constant in the ORDER BY value expression
+     * list should be dropped. If there are no remaining value expressions, then
+     * the entire ORDER BY operation should be dropped.
+     */
 	private static final PipelineOp addOrderBy(PipelineOp left,
 			final List<OrderByNode> orderBys, final AST2BOpContext ctx) {
 		
-//		MemorySortOp
-		
 		final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 		
-		final ISortOrder[] sortOrders = new ISortOrder[orderBys.size()];
+		final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBys.size()];
 		
 		final Iterator<OrderByNode> it = orderBys.iterator();
 		
@@ -664,13 +669,30 @@ public class AST2BOpUtility {
 			
     		final OrderByNode orderBy = it.next();
     		
-    		final IVariable<IV> var = (IVariable<IV>) orderBy.getValueExpression();
+    		IValueExpression<?> expr = orderBy.getValueExpression();
     		
-    		final boolean ascending = orderBy.isAscending();
+    		if(!(expr instanceof IVariableOrConstant<?> && !(expr instanceof IBind))) {
     		
-    		vars.add(var);
+                /*
+                 * Wrap the expression with a BIND of an anonymous variable.
+                 */
+    		    
+                expr = new Bind(Var.var(), expr);
+    		    
+    		}
+    		
+    		if (expr instanceof IVariable<?>) {
 
-    		sortOrders[i++] = new SortOrder(var, ascending);
+                vars.add((IVariable<IV>) expr);
+
+            } else if (expr instanceof INeedsMaterialization) {
+
+                vars.addAll(((INeedsMaterialization) expr)
+                        .getTermsToMaterialize());
+                
+            }
+
+    		sortOrders[i++] = new SortOrder(expr, orderBy.isAscending());
     		
 		}
 		
@@ -678,15 +700,13 @@ public class AST2BOpUtility {
 		
 		left = addMaterializationSteps(left, sortId, vars, ctx);
 		
-		final ComparatorOp compareOp = 
-			new SparqlBindingSetComparatorOp(sortOrders);
-
     	left = applyQueryHints(new MemorySortOp(new BOp[] { left }, 
     			NV.asMap(new NV[] {//
 	                new NV(MemorySortOp.Annotations.BOP_ID, sortId),//
-					new NV(MemorySortOp.Annotations.COMPARATOR, compareOp),//
-	                new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
-	                        BOpEvaluationContext.CONTROLLER),//
+                    new NV(MemorySortOp.Annotations.SORT_ORDER, sortOrders),//
+                    new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IVComparator()),//
+                    new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
+	                       BOpEvaluationContext.CONTROLLER),//
 	                new NV(MemorySortOp.Annotations.PIPELINED, false),//
 	                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
     			})), ctx.queryHints);

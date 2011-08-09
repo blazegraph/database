@@ -378,7 +378,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 * into the HTML document we are building for the client.
 					 */
 					QueryLog.getTableXHTML(queryStr, q, w,
-							false/* showQueryDetails */, 0/* maxBopLength */);
+							false/* summaryOnly */, 0/* maxBopLength */);
 
 //					// Add into the HTML document.
 //					statsNode.text(w.toString());

@@ -82,8 +82,8 @@ public class TestAll extends TestCase {
          * Sorting
          */
         
-        // unit test for the comparator to impose SPARQL sort order semantics.
-        suite.addTestSuite(TestSPARQLBindingSetComparatorOp.class);
+        // Test suite for comparator for IVs used in ORDER BY implementations.
+        suite.addTestSuite(TestIVComparator.class);
         
         // in-memory sort operator.
         suite.addTestSuite(TestMemorySortOp.class);

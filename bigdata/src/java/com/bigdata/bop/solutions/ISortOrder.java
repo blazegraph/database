@@ -30,31 +30,28 @@ package com.bigdata.bop.solutions;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IBind;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 
 /**
- * A variable and an order that will be imposed on the values for that variable.
+ * A value expression and a direction flag for the ordering of the computed
+ * values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface ISortOrder<E> extends Serializable {
 
-	/**
-	 * The variable whose values will be sorted.
-	 * 
-	 * FIXME ORDER_BY is defined in terms of Expressions, not just Vars. Either
-	 * this will need to be an {@link IValueExpression} which is evaluated
-	 * during the ordering or we will have to pre-compute a hidden variable
-	 * which can be ordered directly. Presumably BrackettedExpression provides a
-	 * computed RDF Value while Constraint orders based on the BEV.
-	 * 
-	 * <pre>
-	 * [23]  	OrderCondition	  ::=  	( ( 'ASC' | 'DESC' ) BrackettedExpression ) | ( Constraint | Var )
-	 * </pre>
-	 */
-    IVariable<E> getVariable();
+    /**
+     * An {@link IValueExpression} to be evaluated for each input solution. The
+     * {@link IValueExpression} should be either a bare {@link IVariable}, a
+     * {@link IConstant} or an {@link IBind} associating the computed value of
+     * an {@link IValueExpression} with an {@link IVariable} bound on the
+     * solution as a side-effect.
+     */
+    IValueExpression<E> getExpr();
 
     /**
      * <code>true</code> iff the values will be placed into an ascending sort

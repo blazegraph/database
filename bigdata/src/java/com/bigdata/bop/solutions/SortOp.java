@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.util.Comparator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.PipelineOp;
 
 /**
@@ -48,12 +50,19 @@ abstract public class SortOp extends PipelineOp {
     public interface Annotations extends PipelineOp.Annotations {
 
         /**
-         * The {@link ComparatorOp} which will impose the ordering on the
-         * binding sets.
-         * 
-         * @see ComparatorOp
+         * An {@link ISortOrder}[] specifying an ordered list of
+         * {@link IValueExpression}s on which the sort will be imposed and the
+         * order (ascending or descending) for each {@link IValueExpression}.
          */
-        String COMPARATOR = MemorySortOp.class.getName() + ".comparator";
+        String SORT_ORDER = SortOp.class.getName() + ".sortOrder";
+
+        /**
+         * The {@link Comparator} used to compare individual as-bound / computed
+         * values within binding sets. This will be wrapped up with a comparator
+         * which knows how to compare the different values within the binding
+         * sets based on the declared {@link #SORT_ORDER}.
+         */
+        String VALUE_COMPARATOR = SortOp.class.getName() + ".valueComparator";
 
     }
 
@@ -73,12 +82,21 @@ abstract public class SortOp extends PipelineOp {
     }
 
     /**
-     * @see Annotations#COMPARATOR
+     * @see Annotations#SORT_ORDER
      */
-    public ComparatorOp getComparator() {
-   
-        return (ComparatorOp) getRequiredProperty(Annotations.COMPARATOR);
-    
+    public ISortOrder[] getSortOrder() {
+
+        return (ISortOrder[]) getRequiredProperty(Annotations.SORT_ORDER);
+
     }
-    
+
+    /**
+     * @see Annotations#VALUE_COMPARATOR
+     */
+    public Comparator getValueComparator() {
+
+        return (Comparator) getRequiredProperty(Annotations.VALUE_COMPARATOR);
+
+    }
+
 }
