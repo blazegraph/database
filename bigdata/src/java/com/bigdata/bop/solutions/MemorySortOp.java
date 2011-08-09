@@ -8,7 +8,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -40,45 +39,14 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * materialization of non-inline {@link IV}s and the ability of the value
  * comparator to handle comparisons between materialized non-inline {@link IV}s
  * and inline {@link IV}s.
+ * 
+ * TODO External memory ORDER BY operator.
  * <p>
- * Note: SPARQL ORDER BY semantics are complex and evaluating a SPARQL ORDER BY
- * is further complicated by the schema flexibility of the value to be sorted.
- * In order to write a true external memory sort operator, we would have to
- * buffer and manage the paging for IVs with and without materialized RDF
- * {@link Value}s.
- * 
- * TODO Each solution can be assigned a fixed length identifier, which can be
- * its address on a raw store or its index into a (logical) array of binding
- * sets. The mapping is then between the computed value expressions and the
- * solution identifier.
- * 
- * TODO However, there is little point to buffering the data on an hash index
- * unless we can apply an order preserving hash code. One could certainly be
- * computed using a canonical huffman codec if the ordering were defined by a
- * lexiographic sort, but it is not.
- * 
- * TODO Since the ordering is partitioned based on the type of the value which
- * each value expression takes on, we could sort on column at a time and
- * partition the sort into M disjoint regions corresponding to the types of RDF
- * Values (and IVs) over which an ordering is defined. The list of disjoint
- * regions which have a defined order are:
- * 
- * <pre>
- *     (Lowest) no value assigned to the variable or expression in this solution.
- *     Blank nodes
- *     IRIs
- *     RDF literals
- * </pre>
- * 
- * Also, "A plain literal is lower than an RDF literal with type xsd:string of
- * the same lexical form." Does this imply a constraint not already imposed by
- * LT or is this just redundant with LT?
- * 
- * TODO A more scalable ORDER BY operator would put the raw solutions onto a
- * memory manager, associating each with with an int32 latched address. The sort
- * can then focus on the as bound value expressions. Of course, this
- * optimization will not help unless the solutions to be so ordered are
- * sufficiently wider than the keys on which they will be sorted.
+ * SPARQL ORDER BY semantics are complex and evaluating a SPARQL ORDER BY is
+ * further complicated by the schema flexibility of the value to be sorted. The
+ * simplest path to a true external memory sort operator would be to buffer
+ * manage paging for blocks of inline IVs without materialized RDF values s and
+ * non-inline IVs with materialized RDF values.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
