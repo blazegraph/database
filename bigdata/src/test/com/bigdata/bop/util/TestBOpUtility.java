@@ -39,12 +39,11 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BadBOpIdTypeException;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.DuplicateBOpException;
 import com.bigdata.bop.DuplicateBOpIdException;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.NotPipelineOpException;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 
@@ -440,48 +439,39 @@ public class TestBOpUtility extends TestCase2 {
      */
     public void test_getIndex() {
 
-        final BOp a1 = new BOpBase(new BOp[]{Var.var("a")},NV.asMap(new NV[]{//
-                new NV(BOp.Annotations.BOP_ID,1),//
-        }));
-        final BOp a2 = new BOpBase(new BOp[]{Var.var("b")},NV.asMap(new NV[]{//
-                new NV(BOp.Annotations.BOP_ID,2),//
-        }));
-        // Note: [a3] tests recursion (annotations of annotations).
-        final BOp a3 = new BOpBase(new BOp[] { Var.var("z") }, NV
-                .asMap(
-                        new NV[] { //
-                                new NV("baz", a2),//
-                                new NV("baz2", "skip")//
-                                }//
-                        ));
-        
-        final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, NV.asMap(new NV[]{//
-                new NV("foo1",a1),//
-                new NV("foo2",a3),//
-                new NV("foo3", "skip"),//
-                new NV(BOp.Annotations.BOP_ID,3),//
-        }));
-
-        // root
-        final BOp root = new BOpBase(new BOp[] { // root args[]
-                new Constant<String>("12"), Var.var("y"), op2 }, NV.asMap(new NV[]{//
-                        new NV(BOp.Annotations.BOP_ID,4),//
+        final BOp op1 = new MockPipelineOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 1),//
                 }));
 
+        final BOp op2 = new MockPipelineOp(new BOp[] { op1 },
+                NV.asMap(new NV[] { //
+                new NV(BOp.Annotations.BOP_ID, 2),//
+                }));
+
+        final BOp op3 = new MockPipelineOp(new BOp[] { op2 },
+                NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 3),//
+                }));
+
+        // root
+        final BOp root = new MockPipelineOp(new BOp[] { // root args[]
+                op3 }, NV.asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, 4),//
+                        }));
+
         // index the operator tree.
-        final Map<Integer,BOp> map = BOpUtility.getIndex(root);
-        
-        assertTrue(a1 == map.get(1));
-        assertTrue(a2 == map.get(2));
-        assertTrue(op2 == map.get(3));
+        final Map<Integer, BOp> map = BOpUtility.getIndex(root);
+
+        assertTrue(op1 == map.get(1));
+        assertTrue(op2 == map.get(2));
+        assertTrue(op3 == map.get(3));
         assertTrue(root == map.get(4));
         assertNull(map.get(5));
-        assertFalse(map.containsValue(a3));
         assertEquals(4, map.size());
 
         // verify map is immutable.
         try {
-            map.put(Integer.valueOf(1),a1);
+            map.put(Integer.valueOf(1),op1);
             fail("Expecting: "+UnsupportedOperationException.class);
         } catch(UnsupportedOperationException ex) {
             if(log.isInfoEnabled())
@@ -491,29 +481,57 @@ public class TestBOpUtility extends TestCase2 {
     }
 
     /**
+     * Unit test verifies that annotations are not indexed (they are outside of
+     * the pipeline).
+     */
+    public void test_getIndex_doesNotIndexAnnotations() {
+
+        // Should not be indexed since only appears as annotation.
+        final BOp a2 = new MockPipelineOp(new BOp[]{},NV.asMap(new NV[]{//
+                new NV(BOp.Annotations.BOP_ID,1),//
+        }));
+
+        // References [a2] as an annotation.
+        final BOp a3 = new MockPipelineOp(new BOp[] {}, NV.asMap(new NV[] { //
+                new NV(BOp.Annotations.BOP_ID, 2),//
+                        new NV("baz", a2),//
+                        new NV("baz2", "skip") //
+                }//
+                ));
+
+        // index the operator tree (should succeed).
+        final Map<Integer, BOp> map = BOpUtility.getIndex(a3);
+
+        assertNull(map.get(1)); // annotation was not indexed.
+        assertEquals(a3, map.get(2)); // other operators were indexed.
+        assertEquals(1, map.size()); // map contained just the indexed ops.
+
+    }
+    
+    /**
      * Unit test for {@link BOpUtility#getIndex(BOp)} in which we verify that
      * it rejects operator trees having duplicate operator ids.
      */
-    public void test_getIndex_rejectsDuplicateIds() {
+    public void test_getIndex_rejectsDuplicateBOpIds() {
 
-        final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, NV.asMap(new NV[]{//
-                new NV(BOp.Annotations.BOP_ID,4),//
-        }));
+        final BOp op2 = new MockPipelineOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 4),//
+                }));
 
         // root
-        final BOp root = new BOpBase(new BOp[] { // root args[]
-                new Constant<String>("12"), Var.var("y"), op2 }, NV.asMap(new NV[]{//
-                        new NV(BOp.Annotations.BOP_ID,4),//
-                }));
+        final BOp root = new MockPipelineOp(new BOp[] { // root args[]
+                op2 }, NV.asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, 4),//
+                        }));
 
         try {
             BOpUtility.getIndex(root);
-            fail("Expecting: "+DuplicateBOpIdException.class);
+            fail("Expecting: " + DuplicateBOpIdException.class);
         } catch (DuplicateBOpIdException ex) {
-            if(log.isInfoEnabled())
-                log.info("Ignoring expected exception: "+ex);
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
         }
-        
+
     }
 
     /**
@@ -523,10 +541,9 @@ public class TestBOpUtility extends TestCase2 {
     public void test_getIndex_rejectsNonIntegerIds() {
 
         // root
-        final BOp root = new BOpBase(new BOp[] { // root args[]
-                new Constant<String>("12"), Var.var("y") }, NV.asMap(new NV[] {//
-                        new NV(BOp.Annotations.BOP_ID, "4"),//
-                        }));
+        final BOp root = new MockPipelineOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, "4"),//
+                }));
 
         try {
             BOpUtility.getIndex(root);
@@ -538,74 +555,159 @@ public class TestBOpUtility extends TestCase2 {
 
     }
 
-    /**
-     * Unit test for {@link BOpUtility#getIndex(BOp)} in which we verify that it
-     * rejects operator trees in which the same {@link BOp} reference appears
-     * more than once but allows duplicate {@link IVariable}s and
-     * {@link IConstant}s.
+    /*
+     * Note: Since annotations are not indexed it is no longer possible to
+     * encounter the same operator more than once in the pipeline.
      */
-    public void test_getIndex_duplicateBOps() {
-
-        final IConstant<Long> c1 = new Constant<Long>(12L);
-        final IVariable<?> v1 = Var.var("y");
-
-        /*
-         * Operator tree with duplicate variable and duplicate constant refs.
-         */
-        {
-            // root
-            final BOp root = new BOpBase(new BOp[] { // root args[]
-                    c1, v1 }, NV.asMap(new NV[] {//
-                            new NV(BOp.Annotations.BOP_ID, 4),//
-                                    new NV("foo", v1), // duplicate variable.
-                                    new NV("bar", c1) // duplicate variable.
-                            }));
-
-            // should be Ok.
-            final Map<Integer, BOp> map = BOpUtility.getIndex(root);
-
-            assertTrue(root == map.get(4));
-            
-        }
-
+//    /**
+//     * Unit test for {@link BOpUtility#getIndex(BOp)} in which we verify that it
+//     * rejects operator trees in which the same {@link BOp} reference appears
+//     * more than once but allows duplicate {@link IVariable}s and
+//     * {@link IConstant}s.
+//     */
+//    public void test_getIndex_rejectsDuplicateBOps() {
+//
+//        final IConstant<Long> c1 = new Constant<Long>(12L);
+//        final IVariable<?> v1 = Var.var("y");
+//
 //        /*
-//         * Operator tree with duplicate bop which is neither a var nor or a
-//         * constant.
+//         * Operator tree with duplicate variable and duplicate constant refs.
 //         */
 //        {
-//
-//            /*
-//             * bop w/o bopId is used to verify correct detection of duplicate
-//             * references (it has to be a PipelineOp).
-//             */
-//            final BOp op2 = new PipelineOp(new BOp[]{}, null/*annotations*/) {
-//
-//                private static final long serialVersionUID = 1L;
-//
-//                @Override
-//                public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
-//                    throw new UnsupportedOperationException();
-//                }
-//                
-//            };
-//            
 //            // root
 //            final BOp root = new BOpBase(new BOp[] { // root args[]
-//                    op2, op2 }, NV.asMap(new NV[] {//
+//                    c1, v1 }, NV.asMap(new NV[] {//
 //                            new NV(BOp.Annotations.BOP_ID, 4),//
+//                                    new NV("foo", v1), // duplicate variable.
+//                                    new NV("bar", c1) // duplicate variable.
 //                            }));
 //
-//            try {
-//                BOpUtility.getIndex(root);
-//                fail("Expecting: " + DuplicateBOpException.class);
-//            } catch (DuplicateBOpException ex) {
-//                if (log.isInfoEnabled())
-//                    log.info("Ignoring expected exception: " + ex);
-//            }
+//            // should be Ok.
+//            final Map<Integer, BOp> map = BOpUtility.getIndex(root);
+//
+//            assertTrue(root == map.get(4));
+//            
 //        }
+//
+////        /*
+////         * Operator tree with duplicate bop which is neither a var nor or a
+////         * constant.
+////         */
+////        {
+////
+////            /*
+////             * bop w/o bopId is used to verify correct detection of duplicate
+////             * references (it has to be a PipelineOp).
+////             */
+////            final BOp op2 = new PipelineOp(new BOp[]{}, null/*annotations*/) {
+////
+////                private static final long serialVersionUID = 1L;
+////
+////                @Override
+////                public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+////                    throw new UnsupportedOperationException();
+////                }
+////                
+////            };
+////            
+////            // root
+////            final BOp root = new BOpBase(new BOp[] { // root args[]
+////                    op2, op2 }, NV.asMap(new NV[] {//
+////                            new NV(BOp.Annotations.BOP_ID, 4),//
+////                            }));
+////
+////            try {
+////                BOpUtility.getIndex(root);
+////                fail("Expecting: " + DuplicateBOpException.class);
+////            } catch (DuplicateBOpException ex) {
+////                if (log.isInfoEnabled())
+////                    log.info("Ignoring expected exception: " + ex);
+////            }
+////        }
+//
+//    }
+
+    /**
+     * Unit test verifies that non-pipeline operators are rejected.
+     */
+    public void test_getIndex_rejectsNonPipelineOps() {
+        
+        final BOp a1 = new BOpBase(new BOp[] { Var.var("a") },
+                NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 1),//
+                }));
+
+        final BOp a2 = new MockPipelineOp(new BOp[] { a1 }, NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 2),//
+                }));
+
+        final BOp a3 = new MockPipelineOp(new BOp[] { Var.var("a") },
+                NV.asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, 1),//
+                }));
+
+        final BOp a4 = new MockPipelineOp(
+                new BOp[] { new Constant<String>("a") }, NV.asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, 1),//
+                        }));
+
+        // non-pipeline op.
+        try {
+            BOpUtility.getIndex(a1);
+            fail("Expecting: " + NotPipelineOpException.class);
+        } catch (NotPipelineOpException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // pipeline op with non-pipeline child.
+        try {
+            BOpUtility.getIndex(a2);
+            fail("Expecting: " + NotPipelineOpException.class);
+        } catch (NotPipelineOpException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // pipeline op with non-pipeline child which is a variable.
+        try {
+            BOpUtility.getIndex(a3);
+            fail("Expecting: " + NotPipelineOpException.class);
+        } catch (NotPipelineOpException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // pipeline op with non-pipeline child which is a constant.
+        try {
+            BOpUtility.getIndex(a4);
+            fail("Expecting: " + NotPipelineOpException.class);
+        } catch (NotPipelineOpException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
 
     }
+    
+    private static class MockPipelineOp extends PipelineOp {
 
+        private static final long serialVersionUID = 1L;
+
+        public MockPipelineOp(BOp[] args, Map<String, Object> annotations) {
+            super(args, annotations);
+        }
+
+        public MockPipelineOp(MockPipelineOp op) {
+            super(op);
+        }
+
+        @Override
+        public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+            throw new UnsupportedOperationException();
+        }
+        
+    }
+    
 //    /**
 //     * A conditional join group:
 //     * 

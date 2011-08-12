@@ -46,11 +46,14 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.solutions.BindingSetComparator;
 import com.bigdata.bop.solutions.ISortOrder;
+import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
@@ -145,11 +148,11 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
 		final long timeout = 10000; // ms
 
-		final int ntrials = 10000;
+		final int ntrials = 2000;
 
 		final int poolSize = 10;
 
-		doOrderByTest(50000/* maxInt */, timeout, ntrials, poolSize);
+        doOrderByTest(50000/* maxInt */, timeout, ntrials, poolSize);
 
 	}
 
@@ -187,6 +190,10 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 	protected void doOrderByTest(final int maxInt, final long timeout,
 			final int ntrials, final int poolSize) throws Exception {
 
+        if (log.isInfoEnabled())
+            log.info("maxInt=" + maxInt + ", timeout=" + timeout + ", ntrials="
+                    + ntrials + ", poolSize=" + poolSize);
+
     	int ngiven = 0;
     	final IVariable<?> a = Var.var("a");
         final IBindingSet[][] chunks = new IBindingSet[ntrials][];
@@ -197,7 +204,9 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                 chunks[i] = new IBindingSet[r.nextInt(10) + 1];
                 for (int j = 0; j < chunks[i].length; j++) {
                     final IBindingSet bset = new ListBindingSet();
-					bset.set(a, new Constant<Integer>(r.nextInt(maxInt)));
+                    final int v = r.nextInt(maxInt);
+                    final IV<?,?> iv = new XSDIntIV(v);
+					bset.set(a, new Constant<IV>(iv));
                     chunks[i][j] = bset;
                     ngiven++;
                 }
@@ -219,14 +228,18 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
         final ISortOrder[] sortOrder = new ISortOrder[] { new SortOrder(a, true/* ascending */) };
     	
+        final Comparator<?> valueComparator = new IVComparator();
+        
     	final PipelineOp query = new MemorySortOp(new BOp[] {startOp}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, sortId),//
                 new NV(MemorySortOp.Annotations.SORT_ORDER,sortOrder),//
-				new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IntegerComparator()),//
+				new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, valueComparator),//
                 new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(MemorySortOp.Annotations.PIPELINED, true),//
+                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 10),// 
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
 
         final UUID queryId = UUID.randomUUID();
@@ -242,8 +255,8 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 		IBindingSet lastSolution = null;
 		final IAsynchronousIterator<IBindingSet[]> itr = q.iterator();
 		try {
-            final BindingSetComparator<Integer> c = new BindingSetComparator<Integer>(
-                    sortOrder, new IntegerComparator());
+            final BindingSetComparator<?> c = new BindingSetComparator(
+                    sortOrder, valueComparator);
 			while (itr.hasNext()) {
 				final IBindingSet[] chunk = itr.next();
 //				nsolutions += chunk.length;
@@ -279,23 +292,23 @@ public class TestQueryEngine_SortOp extends TestCase2 {
 
     }
 
-    /**
-     * Helper class for comparing solution sets having variables which evaluate
-     * to {@link Integer} values.
-     */
-    static private class IntegerComparator implements Comparator<Integer> {
-
-        public int compare(final Integer o1, final Integer o2) {
-            if (o1.intValue() < o2.intValue())
-                return -1;
-
-            if (o1.intValue() > o2.intValue())
-                return 1;
-
-            return 0;
-
-        }
-
-    }
+//    /**
+//     * Helper class for comparing solution sets having variables which evaluate
+//     * to {@link Integer} values.
+//     */
+//    static private class IntegerComparator implements Comparator<Integer> {
+//
+//        public int compare(final Integer o1, final Integer o2) {
+//            if (o1.intValue() < o2.intValue())
+//                return -1;
+//
+//            if (o1.intValue() > o2.intValue())
+//                return 1;
+//
+//            return 0;
+//
+//        }
+//
+//    }
     
 }

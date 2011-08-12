@@ -63,6 +63,7 @@ import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -469,7 +470,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public UUID getServiceUUID() {
 
-        return null;
+        return ((IRawStore)localIndexManager).getUUID();
+//        return null; // FIXME Cast the local index manager to an IRawStore and return its UUID?
         
     }
 

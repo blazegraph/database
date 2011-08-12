@@ -3,6 +3,8 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 import java.util.UUID;
 
+import com.bigdata.bop.BOpEvaluationContext;
+
 /**
  * A message sent to the {@link IQueryClient} when an operator begins executing
  * for some chunk of inputs (an operator on a node against a shard for some
@@ -41,14 +43,22 @@ public class StartOpMessage implements Serializable {
      */
     final public int nmessages;
 
+    final public BOpEvaluationContext evaluationContext;
+    
+    final public boolean lastPassRequested;
+    
     public StartOpMessage(final UUID queryId, final int opId,
-            final int partitionId, final UUID serviceId,
-            final int nmessages) {
+            final int partitionId, final UUID serviceId, final int nmessages,
+            final BOpEvaluationContext evaluationContext,
+            final boolean lastPassRequested) {
 
         if (queryId == null)
             throw new IllegalArgumentException();
         
         if (nmessages <= 0)
+            throw new IllegalArgumentException();
+        
+        if (evaluationContext == null)
             throw new IllegalArgumentException();
         
         this.queryId = queryId;
@@ -60,13 +70,19 @@ public class StartOpMessage implements Serializable {
         this.serviceId = serviceId;
         
         this.nmessages = nmessages;
+        
+        this.evaluationContext = evaluationContext;
+        
+        this.lastPassRequested = lastPassRequested;
     
     }
 
     public String toString() {
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
                 + ",partitionId=" + partitionId + ",serviceId=" + serviceId
-                + ",nchunks=" + nmessages + "}";
+                + ",nchunks=" + nmessages + ",evaluationContext="
+                + evaluationContext + ",lastPassRequested=" + lastPassRequested
+                + "}";
     }
 
 }

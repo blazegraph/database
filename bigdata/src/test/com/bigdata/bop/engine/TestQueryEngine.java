@@ -936,13 +936,13 @@ public class TestQueryEngine extends TestCase2 {
                  */
                 assertEquals((long) nsources, stats.chunksIn.get());
                 assertEquals((long) nsources, stats.chunksOut.get());
-            } else if (runningQuery instanceof StandaloneChainedRunningQuery) {
-                /*
-                 * The chunks will have been combined and the SliceOp will only
-                 * run once.
-                 */
-                assertEquals(1L, stats.chunksIn.get());
-                assertEquals(1L, stats.chunksOut.get());
+//            } else if (runningQuery instanceof StandaloneChainedRunningQuery) {
+//                /*
+//                 * The chunks will have been combined and the SliceOp will only
+//                 * run once.
+//                 */
+//                assertEquals(1L, stats.chunksIn.get());
+//                assertEquals(1L, stats.chunksOut.get());
             } else {
                 fail("Unknown implementation class: "
                         + runningQuery.getClass().getName());

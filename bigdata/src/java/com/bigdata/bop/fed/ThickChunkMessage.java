@@ -87,6 +87,10 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return partitionId;
     }
     
+    public boolean isLastInvocation() {
+        return false; // Never.
+    }
+
     public boolean isMaterialized() {
         return true;
     }
@@ -129,7 +133,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
         if (source == null)
             throw new IllegalArgumentException();
 
-        // do not send empty chunks.
+        // do not send empty chunks
         if (source.length == 0)
             throw new IllegalArgumentException();
 
