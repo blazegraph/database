@@ -44,9 +44,18 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * <p>
  * SPARQL ORDER BY semantics are complex and evaluating a SPARQL ORDER BY is
  * further complicated by the schema flexibility of the value to be sorted. The
- * simplest path to a true external memory sort operator would be to buffer
+ * simplest path to a true external memory sort operator would be to buffer and
  * manage paging for blocks of inline IVs without materialized RDF values s and
  * non-inline IVs with materialized RDF values.
+ * <p>
+ * An operator could also be written which buffers the solutions on the native
+ * heap but the as-bound values which will be used to order those solutions are
+ * either buffered on the JVM heap or materialized onto the JVM heap when the
+ * sort is executed. This could scale better than a pure JVM heap version, but
+ * only to the extent that the keys are smaller than the total solutions. The
+ * solutions would probably be written as serialized binding sets on the memory
+ * manager such that each solution has its own int32 address.  That address can
+ * then be paired with the as-bound key to be sorted on the JVM heap.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
@@ -85,9 +94,9 @@ public class MemorySortOp extends SortOp {
 							+ getEvaluationContext());
 		}
 
-        if (getMaxParallel() != 1)
-            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-                    + "=" + getMaxParallel());
+//        if (getMaxParallel() != 1)
+//            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
+//                    + "=" + getMaxParallel());
 
         // shared state is used to share the hash table.
         if (!isSharedState()) {
@@ -142,8 +151,9 @@ public class MemorySortOp extends SortOp {
         
         void release() {
 
-            log.error("Releasing state");
-            
+            if (log.isInfoEnabled())
+                log.info("Releasing state");
+
             solutions = null;
             
         }
@@ -183,21 +193,27 @@ public class MemorySortOp extends SortOp {
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
+            final boolean lastInvocation = context.isLastInvocation();
+            
             try {
 
                 acceptSolutions(itr);
 
-                if (context.isLastInvocation()) {
+                if (lastInvocation) {
 
                     doOrderBy(sink);
-
-                    sink.flush();
                     
                 }
+                
+            } catch(Throwable t) {
+                
+                log.error(t,t);
+                
+                throw new RuntimeException(t);
 
             } finally {
 
-                if (context.isLastInvocation()) {
+                if (lastInvocation) {
 
                     // Discard the operator's internal state.
                     stats.release();
@@ -247,9 +263,6 @@ public class MemorySortOp extends SortOp {
 
                             }
 
-                            // add to the set of solutions to be sorted.
-                            stats.solutions.add(bset);
-                            
                         } catch (SparqlTypeErrorException ex) {
 
                             if (log.isInfoEnabled())
@@ -261,7 +274,19 @@ public class MemorySortOp extends SortOp {
                         }
 
                     }
-                    
+
+                    /*
+                     * Note: By synchronizing on [stats] here we are able to run
+                     * concurrent evaluation tasks for this operator which
+                     * compute the as-bound values.
+                     */
+                    synchronized (stats) {
+                        for (IBindingSet bset : a) {
+                            // add to the set of solutions to be sorted.
+                            stats.solutions.add(bset);
+                        }
+                    }
+                        
                 }
 
             } finally {
@@ -286,10 +311,22 @@ public class MemorySortOp extends SortOp {
             @SuppressWarnings({ "rawtypes", "unchecked" })
             final Comparator<IBindingSet> c = new BindingSetComparator(
                     sortOrder, op.getValueComparator());
-            
+
             // sort.
-            Arrays.sort(all, c);
-            
+            {
+                
+                final long begin = System.currentTimeMillis();
+
+                Arrays.sort(all, c);
+
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                if (log.isInfoEnabled())
+                    log.info("Sorted " + all.length + " solutions in "
+                            + elapsed + "ms.");
+                
+            }
+
             // Drop variables for computed value expressions.
             for(IBindingSet bset : all) {
                 for(ISortOrder<?> s : sortOrder) {

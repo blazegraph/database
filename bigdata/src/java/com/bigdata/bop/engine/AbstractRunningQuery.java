@@ -30,8 +30,8 @@ package com.bigdata.bop.engine;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -53,6 +53,8 @@ import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.engine.QueryEngine.Counters;
+import com.bigdata.bop.engine.RunState.RunStateEnum;
+import com.bigdata.bop.fed.EmptyChunkMessage;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator;
@@ -251,19 +253,20 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
     final private RunState runState;
 
     /**
-     * Flag used to prevent retriggering of {@link #lifeCycleTearDownQuery()}.
+     * Flag used to prevent retriggering of query tear down activities in
+     * {@link #cancel(boolean)}.
      */
     private final AtomicBoolean didQueryTearDown = new AtomicBoolean(false);
 
-    /**
-     * A collection reporting on whether or not a given operator has been torn
-     * down. This collection is used to provide the guarantee that an operator
-     * is torn down exactly once, regardless of the #of invocations of the
-     * operator or the #of errors which might occur during query processing.
-     * 
-     * @see PipelineOp#tearDown()
-     */
-    private final Map<Integer/* bopId */, AtomicBoolean> tornDown = new LinkedHashMap<Integer, AtomicBoolean>();
+//    /**
+//     * A collection reporting on whether or not a given operator has been torn
+//     * down. This collection is used to provide the guarantee that an operator
+//     * is torn down exactly once, regardless of the #of invocations of the
+//     * operator or the #of errors which might occur during query processing.
+//     * 
+//     * @see PipelineOp#tearDown()
+//     */
+//    private final Map<Integer/* bopId */, AtomicBoolean> tornDown = new LinkedHashMap<Integer, AtomicBoolean>();
 
     /**
      * Set the query deadline. The query will be cancelled when the deadline is
@@ -636,7 +639,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
 
             runState.startQuery(msg);
 
-            lifeCycleSetUpQuery();
+//            lifeCycleSetUpQuery();
 
         } catch (TimeoutException ex) {
 
@@ -678,23 +681,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
             if(log.isTraceEnabled())
                 log.trace(msg.toString());
             
-            if (runState.startOp(msg)) {
-
-                /*
-                 * Set a flag in this collection so we will know that this
-                 * operator needs to be torn down (we do not bother to tear down
-                 * operators which have never been setup).
-                 */
-                tornDown.put(msg.bopId, new AtomicBoolean(false));
-
-                /*
-                 * TODO It is a bit dangerous to hold the lock while we do this
-                 * but this needs to be executed before any other thread can
-                 * start an evaluation task for that operator.
-                 */
-                lifeCycleSetUpOperator(msg.bopId);
-                
-            }
+            runState.startOp(msg);
 
         } catch (TimeoutException ex) {
 
@@ -720,7 +707,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
      * @throws UnsupportedOperationException
      *             If this node is not the query coordinator.
      */
-    /*final*/ protected void haltOp(final HaltOpMessage msg) {
+    protected void haltOp(final HaltOpMessage msg) {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
@@ -746,35 +733,40 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
                 tmp.add(msg.taskStats);
             }
 
-            if (runState.haltOp(msg)) {
-
-                /*
-                 * No more chunks can appear for this operator so invoke its end
-                 * of life cycle hook IFF it has not yet been invoked.
-                 */
-
-                final AtomicBoolean tornDown = AbstractRunningQuery.this.tornDown
-                        .get(msg.bopId);
-
-                if (tornDown.compareAndSet(false/* expect */, true/* update */)) {
-
-                    lifeCycleTearDownOperator(msg.bopId);
-
-                }
-
-                if (runState.isAllDone()) {
-
-                    // Normal termination.
-                    halt((Void)null);
-
-                }
-
+            switch (runState.haltOp(msg)) {
+            case Running:
+            case RunningLastPass:
+                return;
+            case StartLastPass: {
+                @SuppressWarnings("rawtypes")
+                final Set doneOn = runState.getDoneOn(msg.bopId);
+                doLastPass(msg.bopId, doneOn);
+                return;
             }
-
+            case AllDone:
+                /*
+                 * Operator is all done.
+                 */
+                triggerOperatorsAwaitingLastPass();
+                // Release any native buffers.
+                releaseNativeMemoryForOperator(msg.bopId);
+                // Check to see if the query is also all done.
+                if (runState.isAllDone()) {
+                    if (log.isInfoEnabled())
+                        log.info("Query reports all done: bopId=" + msg.bopId
+                                + ", msg=" + msg + ", runState=" + runState);
+                    // Normal termination.
+                    halt((Void) null);
+                }
+                return;
+            default:
+                throw new AssertionError();
+            }
+            
         } catch (Throwable t) {
 
             halt(t);
-
+            
         } finally {
 
             lock.unlock();
@@ -783,6 +775,109 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
 
     }
 
+    /**
+     * Method handles the case where there are downstream operators awaiting
+     * last pass evaluation is not re-triggered by the last
+     * {@link IChunkMessage} output from an upstream operator. If this situation
+     * arises the query will just sit there waiting for a trigger to kick of
+     * last pass evaluation. This method works around that by sending an empty
+     * {@link IChunkMessage} if the operator would not otherwise have been
+     * triggered.
+     * 
+     * @param msg
+     */
+    private void triggerOperatorsAwaitingLastPass() {
+
+        if (runState.getTotalLastPassRemainingCount() == 0) {
+
+            return;
+            
+        }
+        
+        // Consider the operators which require last pass evaluation.
+        for (Integer bopId : runState.getLastPassRequested()) {
+
+            if (runState.getOperatorRunState(bopId) == RunStateEnum.StartLastPass) {
+
+                @SuppressWarnings("rawtypes")
+                final Set doneOn = runState.getDoneOn(bopId);
+
+                if (log.isInfoEnabled())
+                    log.info("Triggering last pass: " + bopId);
+
+                doLastPass(bopId, doneOn);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Queue empty {@link IChunkMessage}s to trigger the last evaluation pass
+     * for an operator which can not be re-triggered by any upstream operator or
+     * by {@link IChunkMessage}s which have already been buffered.
+     * <p>
+     * Note: If the queue for accepting new chunks could block then this could
+     * deadlock. We work around that by using the same lock for the
+     * AbstractRunningQuery and the queue of accepted messages. If the queue
+     * blocks, this thread will be yield the lock and another thread may make
+     * progress.
+     * 
+     * @param msg
+     * @param doneOn
+     *            The collection of shards or services on which the operator
+     *            need to receive a last evaluation pass message.
+     */
+    @SuppressWarnings("rawtypes")
+    protected void doLastPass(final int bopId, final Set doneOn) {
+
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        if (doneOn == null) {
+            /*
+             * This operator was never started on anything and we do not need to
+             * generate any last pass messages.
+             */
+            throw new AssertionError("doneOn is null? : bopId=" + bopId
+                    + ", runState=" + runState);
+        }
+
+        if (doneOn.isEmpty()) {
+            /*
+             * The operator has received all last evaluation pass notices so
+             * this method should not have been called (RunStateEnum should be
+             * AllDone).
+             */
+            throw new AssertionError("doneOn is empty? : bopId=" + bopId
+                    + ", runState=" + runState);
+        }
+
+        if (doneOn.size() != 1) {
+            /*
+             * This base class can only handle purely local queries for which
+             * there will only be a single element in the doneOn set (either the
+             * shardId -1 or the serviceId for the query controller). This
+             * method needs to be overridden to handle doneOn in a cluster.
+             */
+            throw new AssertionError("doneOn set not single element? : bopId="
+                    + bopId + ", runState=" + runState + ", doneOn=" + doneOn);
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Triggering last pass: " + bopId);
+
+        /*
+         * Since evaluation is purely local, we specify -1 as the shardId.
+         */
+        final IChunkMessage<IBindingSet> emptyMessage = new EmptyChunkMessage<IBindingSet>(
+                getQueryController(), queryId, bopId, -1/* shardId */, true/* lastInvocation */);
+
+        acceptChunk(emptyMessage);
+
+    }
+    
     /**
      * Return <code>true</code> iff the preconditions have been satisfied for
      * the "at-once" invocation of the specified operator (no predecessors are
@@ -815,155 +910,25 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
         
     }
 
-//  /**
-//   * Return <code>true</code> iff there is already an instance of the operator
-//   * running.
-//   * 
-//   * @param bopId
-//   *            The bopId of the operator.
-//   *            
-//   * @return True iff there is at least one instance of the operator running
-//   *         (globally for this query).
-//   */
-//  public boolean isOperatorRunning(final int bopId) {
-//
-//      lock.lock();
-//
-//      try {
-//
-//          final AtomicLong nrunning = runState.runningMap.get(bopId);
-//
-//          if (nrunning == null)
-//              return false;
-//
-//          return nrunning.get() > 0;
-//          
-//      } finally {
-//          
-//          lock.unlock();
-//          
-//      }
-//      
-//    }
-
     /**
-     * Hook invoked the first time the given operator is evaluated for the
-     * query. This may be used to set up life cycle resources for the operator,
-     * such as a distributed hash table on a set of nodes identified by
-     * annotations of the operator.
-     * 
-     * @param bopId
-     *            The operator identifier.
-     */
-    protected void lifeCycleSetUpOperator(final int bopId) {
-
-        final BOp op = getBOpIndex().get(bopId);
-
-        if (op instanceof PipelineOp) {
-
-            try {
-
-                ((PipelineOp) op).setUp();
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-
-        }
-
-    }
-
-    /**
-     * Hook invoked the after the given operator has been evaluated for the
-     * query for what is known to be the last time. This may be used to tear
-     * down life cycle resources for the operator, such as a distributed hash
-     * table on a set of nodes identified by annotations of the operator.
-     * 
-     * @param bopId
-     *            The operator identifier.
-     */
-    protected void lifeCycleTearDownOperator(final int bopId) {
-
-        final BOp op = getBOpIndex().get(bopId);
-
-        if (op instanceof PipelineOp) {
-
-            try {
-                
-                ((PipelineOp) op).tearDown();
-                
-            } catch (Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-        }
-        
-    }
-
-    /**
-     * Hook invoked the before any operator is evaluated for the query. This may
-     * be used to set up life cycle resources for the query.
-     */
-    protected void lifeCycleSetUpQuery() {
-
-        if (log.isTraceEnabled())
-            log.trace("queryId=" + queryId);
-
-    }
-
-    /**
-     * Hook invoked when the query terminates. This may be used to tear down
-     * life cycle resources for the query.
-     */
-    protected void lifeCycleTearDownQuery() {
-
-        final Iterator<Map.Entry<Integer/* bopId */, AtomicBoolean/* tornDown */>> itr = tornDown
-                .entrySet().iterator();
-        
-        while(itr.hasNext()) {
-            
-            final Map.Entry<Integer/* bopId */, AtomicBoolean/* tornDown */> entry = itr
-                    .next();
-            
-            final AtomicBoolean tornDown = entry.getValue();
-
-            if (tornDown.compareAndSet(false/* expect */, true/* update */)) {
-
-                /*
-                 * Guaranteed one time tear down for this operator.
-                 */
-                lifeCycleTearDownOperator(entry.getKey()/* bopId */);
-
-            }
-            
-        }
-
-        releaseNativeMemoryForQuery();
-        
-        if (log.isTraceEnabled())
-            log.trace("queryId=" + queryId);
-
-    }
-
-    /**
-     * Release native memory associated with this operator, if any.
+     * Release native memory associated with this operator, if any (NOP, but
+     * overridden in scale-out to release NIO buffers used to move solutions
+     * around in the cluster).
      * <p>
      * Note: Operators are responsible for releasing their child
-     * {@link IMemoryManager} context, if any, when they terminate. If they do
-     * not release the {@link IMemoryManager} context then it will be released
-     * no later than the termination of the query.
+     * {@link IMemoryManager} context, if any, when they terminate and should
+     * specify the {@link PipelineOp.Annotations#LAST_PASS} annotation to
+     * receive notice in the form of a final evaluation pass over an empty
+     * {@link IChunkMessage}. If they do NOT release an {@link IMemoryManager}
+     * context which is a child of the {{@link #getMemoryManager() query's
+     * context}, then their child {@link IMemoryManager} context will be
+     * retained until the termination of the query, at which point the query's
+     * {@link IMemoryManager} context will be release, and all child contexts
+     * will be released automatically along with it.
      * 
      * @param bopId
      * 
      * @see #releaseNativeMemoryForQuery()
-     * 
-     *      FIXME Verify operator's Future isDone() before releasing native
-     *      memory!!!! We should know this by examining the {@link RunState} for
-     *      the operator.
      */
     protected void releaseNativeMemoryForOperator(final int bopId) {
         // NOP
@@ -1003,15 +968,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
      * 
      * FIXME We need to have distinct events for the query evaluation life cycle
      * and the query results life cycle. Really, this means that temporary
-     * solution sets are scoped to the iterator from which the caller is
-     * draining the solutions. This is a matter of the scope of the allocation
-     * context for the {@link DirectBufferPoolAllocator} and releasing that
-     * scope when the {@link #queryIterator} is closed. [For temporary solution
-     * sets we might need the ability to read the solution set more than once
-     * and we most definitely need the ability to buffer the solution set on the
-     * native heap and scope its life cycle to the parent query or even to a
-     * concept such as an http session, e.g., by an integration with the NSS
-     * using traditional session concepts.]
+     * solution sets are scoped to the parent query. This is a matter of the
+     * scope of the allocation context for the {@link DirectBufferPoolAllocator}
+     * and releasing that scope when the parent query is done (in cancel()).
+     * [Also consider scoping the temporary solution sets to a transaction or an
+     * HTTP session, e.g., by an integration with the NSS using traditional
+     * session concepts.]
      */
     protected void releaseNativeMemoryForQuery() {
         
@@ -1143,7 +1105,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
                 cancelled |= cancelRunningOperators(mayInterruptIfRunning);
                 if (controller) {
                     // cancel query on other peers.
-                    cancelled |= cancelQueryOnPeers(future.getCause());
+                    cancelled |= cancelQueryOnPeers(future.getCause(),
+                            runState.getServiceIds());
                 }
                 if (queryBuffer != null) {
                     /*
@@ -1153,8 +1116,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
                      */
                     queryBuffer.close();
                 }
-                // life cycle hook for the end of the query.
-                lifeCycleTearDownQuery();
+                // release native buffers.
+                releaseNativeMemoryForQuery();
                 // mark done time.
                 doneTime.set(System.currentTimeMillis());
                 // log summary statistics for the query.
@@ -1191,9 +1154,6 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
 
     /**
      * Cancel any running operators for this query on this node (internal API).
-     * <p>
-     * Note: This will wind up invoking the tear down methods for each operator
-     * which was running or which could have been re-triggered.
      * 
      * @return <code>true</code> if any operators were cancelled.
      */
@@ -1257,7 +1217,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
      * @throws UnsupportedOperationException
      *             unless this is the query controller.
      */
-    protected boolean cancelQueryOnPeers(final Throwable cause) {
+    protected boolean cancelQueryOnPeers(final Throwable cause,
+            final Set<UUID/*ServiceId*/> startedOn) {
 
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
@@ -1315,7 +1276,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
     /**
      * {@inheritDoc}
      * <p>
-     * FIXME See PipelineOp.Annotations#MAX_MEMORY.
+     * TODO See PipelineOp.Annotations#MAX_MEMORY.
      * <p>
      * It would be nice to have the concept of a limit on the amount of native
      * memory which an operator may use. However, there is currently no way to

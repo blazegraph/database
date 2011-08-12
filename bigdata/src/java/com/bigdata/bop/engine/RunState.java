@@ -32,6 +32,7 @@ import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -45,7 +46,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.NoBOpIdException;
+import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 
@@ -92,129 +96,281 @@ class RunState {
      * Message if a query deadline has been exceeded.
      */
     static private final transient String ERR_DEADLINE = "Query deadline is expired.";
+
+    /**
+     * The state of the {@link RunState} object. By factoring this into an inner
+     * class referenced by a private field we are able to write unit tests which
+     * directly manipulate the internal state of the {@link RunState} object
+     * while protecting its state from modification.
+     */
+    static class InnerState {
+
+        /**
+         * Constructor.
+         */
+        InnerState(final BOp query, final UUID queryId, final long deadline,
+                final long begin, final Map<Integer, BOp> bopIndex) {
+
+            if (query == null)
+                throw new IllegalArgumentException();
+
+            if (queryId == null)
+                throw new IllegalArgumentException();
+
+            if (deadline <= 0L)
+                throw new IllegalArgumentException();
+
+            if (begin <= 0L)
+                throw new IllegalArgumentException();
+
+            if (bopIndex == null)
+                throw new IllegalArgumentException();
+
+            this.query = query;
+
+            this.queryId = queryId;
+
+            this.deadline = deadline;
+
+            this.bopIndex = bopIndex;
+
+            this.begin = begin;
+
+        }
+
+        /**
+         * The query.
+         */
+        private final BOp query;
+        
+        /**
+         * An index from {@link BOp.Annotations#BOP_ID} to {@link BOp} for the
+         * {@link #query}.
+         */
+        final Map<Integer,BOp> bopIndex;
+
+        /**
+         * The query identifier.
+         */
+        final UUID queryId;
+
+        /**
+         * The timestamp when the {@link RunState} was created (milliseconds
+         * since the epoch).
+         */
+        final long begin;
+        
+        /**
+         * The query deadline (milliseconds since the epoch).
+         * 
+         * @see BOp.Annotations#TIMEOUT
+         * @see IRunningQuery#getDeadline()
+         */
+        final long deadline;
+
+        /**
+         * Set to <code>true</code> iff the query evaluation has begun.
+         * 
+         * @see #startQuery(IChunkMessage)
+         */
+        final AtomicBoolean started = new AtomicBoolean(false);
+        
+        /**
+         * Set to <code>true</code> iff the query evaluation is complete due to
+         * normal termination.
+         * 
+         * @see #haltOp(HaltOpMessage)
+         */
+        final AtomicBoolean allDone = new AtomicBoolean(false);
+        
+        /**
+         * The #of run state transitions which have occurred for this query.
+         */
+        final AtomicLong stepCount = new AtomicLong();
+
+        /**
+         * The #of tasks for this query which have started but not yet halted.
+         */
+        final AtomicLong totalRunningCount = new AtomicLong();
+
+        /**
+         * The #of {@link IChunkMessage} for the query which a running task has made
+         * available but which have not yet been accepted for processing by another
+         * task.
+         * <p>
+         * Note: {@link ChunkedRunningQuery} drops {@link IChunkMessage}s on the
+         * {@link QueryEngine} as soon as they are generated. A
+         * {@link IChunkMessage} MAY be taken for evaluation as soon as it is
+         * published to the {@link QueryEngine}. This means that the operator task
+         * which will consume that {@link IChunkMessage} can begin to execute
+         * <em>before</em> {@link ChunkedRunningQuery#haltOp(HaltOpMessage)} is invoked to
+         * indicate the end of the operator task which produced that
+         * {@link IChunkMessage}. Due to the potential overlap in these schedules
+         * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
+         * . This is the expected behavior.
+         */
+        final AtomicLong totalAvailableCount = new AtomicLong();
+
+        /**
+         * The #of operators which have requested last pass evaluation and whose
+         * last pass evaluation phase is not yet complete. This is incremented
+         * each time we observe a {@link StartOpMessage} for an operator not yet
+         * found in {@link #lastPassRequested}. When last pass evaluation begins
+         * for an operator, its {@link #startedOn} set is copied and set as its
+         * {@link #doneOn} set. The entries in the {@link #doneOn} set are
+         * removed as we observe {@link HaltOpMessage}s for that operator during
+         * last pass evaluation. The {@link #totalLastPassRemainingCount} is
+         * decremented each time we count the {@link #doneOn} set for an
+         * operator becomes empty.
+         */
+        final AtomicLong totalLastPassRemainingCount = new AtomicLong();
+        
+        /**
+         * A map reporting the #of {@link IChunkMessage} available for each operator
+         * in the pipeline. The total #of {@link IChunkMessage}s available across
+         * all operators in the pipeline is reported by {@link #totalAvailableCount}
+         * .
+         * <p>
+         * The movement of the intermediate binding set chunks forms an acyclic
+         * directed graph. This map is used to track the #of chunks available for
+         * each {@link BOp} in the pipeline. When a {@link BOp} has no more incoming
+         * chunks, we send an asynchronous message to all nodes on which that
+         * {@link BOp} had executed informing the {@link QueryEngine} on that node
+         * that it should immediately release all resources associated with that
+         * {@link BOp}.
+         * <p>
+         * Note: Since the map contains {@link AtomicLong}s it can not be readily
+         * exposed as {@link Map} object. If we were to expose the map, it would
+         * have to be via a get(key) style interface. Even an immutable map does
+         * not help because of the mutable {@link AtomicLong}s.
+         */
+        final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableMap = new LinkedHashMap<Integer, AtomicLong>();
+
+        /**
+         * A collection reporting on the #of instances of a given {@link BOp} which
+         * are concurrently executing. An entry in this map indicates that the
+         * operator has been evaluated at least once.
+         * <p>
+         * Note: Since the map contains {@link AtomicLong}s it can not be readily
+         * exposed as {@link Map} object. If we were to expose the map, it would
+         * have to be via a get(key) style interface. Even an immutable map does
+         * not help because of the mutable {@link AtomicLong}s.
+         */
+        final Map<Integer/* bopId */, AtomicLong/* runningCount */> runningMap = new LinkedHashMap<Integer, AtomicLong>();
+
+        /**
+         * The set of services on which this query has started an operator. This
+         * will be just the query controller for purely local evaluation. In
+         * scale-out, this will include each service on which the query has been
+         * evaluated. This collection is maintained based on the
+         * {@link #startQuery(IChunkMessage)} and {@link #startOp(StartOpMessage)}
+         * messages.
+         */
+        final Set<UUID/* serviceId */> serviceIds = new LinkedHashSet<UUID>();
+        
+        /**
+         * A map associating each operators for which evaluation has begun with the
+         * the set of distinct nodes or shards where the operator has been submitted
+         * for evaluation. The {@link Set} associated with each operator will be a
+         * <code>Set&lt;serviceId&gt;</code> or <code>Set&lt;shardId&gt;</code> (iff
+         * sharded evaluation). Whether the set stores serviceIds or shardIds
+         * depends on the {@link BOpEvaluationContext} of the operator. (For purely
+         * local invocations we will either store the {@link UUID} of the query
+         * controller service or the special shardId <code>-1</code>.)
+         * <p>
+         * If {@link #getOperatorRunState(int, boolean)} reports
+         * {@link RunStateEnum#StartLastPass}, then that a copy of that
+         * <code>Set&lt;serviceId&gt;</code> or <code>Set&lt;shardId&gt;</code> is
+         * put on {@link #doneOn}. The {@link #doneOn} set for each operator is made
+         * available to the {@link IRunningQuery} so it can send out the appropriate
+         * messages for the last evaluation pass.
+         * <p>
+         * {@link #doneOn} is used to count off lastPass() invocations for an
+         * operator which requires them. The operator is not really and truly done
+         * until doneOn.get(bopId) either returns <code>null</code> (the operator
+         * did not request lastPass() invocation) or it returns an empty set (the
+         * operator requested lastPass() invocation and we have seen the
+         * {@link HaltOpMessage} for each node or shard on which the operator ran).
+         * <p>
+         * {@link #startQuery(IChunkMessage)} and {@link #startOp(StartOpMessage)}
+         * are responsible for maintaining the {@link #startedOn} state while
+         * {@link #_haltOp(int)} is responsible for maintaining the {@link #doneOn}
+         * state.
+         * <p>
+         * {@link #getOperatorRunState(int, boolean)} considers {@link #doneSet} in
+         * addition to the other run state metadata to decide whether an upstream
+         * operator is still running. {@link RunStateEnum#StartLastPass} is
+         * recognized when {@link #doneOn} is <code>null</code> for an operator
+         * which can not be otherwise triggered and whose last evaluation pass has
+         * been requested. Once the {@link #startedOn} set has been propagated to
+         * the {@link #doneOn} set for an operator, it is recognized as being in the
+         * {@link RunStateEnum#RunningLastPass} state until its {@link #doneOn} set
+         * becomes empty.
+         */
+        final Map<Integer/* bopId */,Set<?>> startedOn = new LinkedHashMap<Integer,Set<?>>();
+
+        /**
+         * A collection for each operator which has executed at least once and for
+         * which the optional final evaluation phase was requested. Together with
+         * {@link #startedOn}, {@link #doneOn} captures the state change from when
+         * an operator can not be triggered by external inputs to when it can no
+         * longer be triggered by the final evaluation pass. The criteria for an
+         * operator being "done" therefore includes (a) it has run at least once;
+         * (b) it can not be retriggered by input from other operators; and (c) its
+         * optional last evaluation pass either has been evaluated or will not be
+         * evaluated.
+         * 
+         * @see #startedOn
+         */
+        @SuppressWarnings("rawtypes")
+        final Map<Integer/* bopId */, Set> doneOn = new LinkedHashMap<Integer, Set>();
+
+        /**
+         * The set of operators for which a last evaluation pass was requested.
+         * 
+         * @see #startOp(StartOpMessage, boolean)
+         */
+        final Set<Integer/* bopId */> lastPassRequested = new LinkedHashSet<Integer>();
+        
+        public String toString() {
+
+            return toString(new StringBuilder()).toString();
+            
+        }
+        
+        StringBuilder toString(final StringBuilder sb) {
+            sb.append("{nsteps=" + stepCount);
+            sb.append(",allDone=" + allDone);
+            sb.append(",totalRunning=" + totalRunningCount);
+            sb.append(",totalAvailable=" + totalAvailableCount);
+            sb.append(",totalLastPassRemaining=" + totalLastPassRemainingCount);
+            sb.append(",services=" + serviceIds);
+            sb.append(",startedOn=" + startedOn);
+            sb.append(",doneOn=" + doneOn);
+            sb.append(",running=" + runningMap);
+            sb.append(",available=" + availableMap);
+            sb.append(",lastPassRequested=" + lastPassRequested);
+            sb.append("}");
+            return sb;
+        }
+
+    }
+
+    // Note: This MUST be private to protect the internal run state.
+    final private InnerState innerState; 
     
-    /**
-     * The query.
-     */
-    private final BOp query;
-    
-    /**
-     * An index from {@link BOp.Annotations#BOP_ID} to {@link BOp} for the
-     * {@link #query}.
-     */
-    private final Map<Integer,BOp> bopIndex;
-
-    /**
-     * The query identifier.
-     */
-    private final UUID queryId;
-
-    /**
-     * The timestamp when the {@link RunState} was created (millseconds since
-     * the epoch).
-     */
-    private final long begin;
-    
-    /**
-     * The query deadline (milliseconds since the epoch).
-     * 
-     * @see BOp.Annotations#TIMEOUT
-     * @see IRunningQuery#getDeadline()
-     */
-    private final long deadline;
-
-    /**
-     * Set to <code>true</code> iff the query evaluation has begun.
-     * 
-     * @see #startQuery(IChunkMessage)
-     */
-    private final AtomicBoolean started = new AtomicBoolean(false);
-    
-    /**
-     * Set to <code>true</code> iff the query evaluation is complete due to
-     * normal termination.
-     * 
-     * @see #haltOp(HaltOpMessage)
-     */
-    private final AtomicBoolean allDone = new AtomicBoolean(false);
-    
-    /**
-     * The #of run state transitions which have occurred for this query.
-     */
-    private final AtomicLong nsteps = new AtomicLong();
-
-    /**
-     * The #of tasks for this query which have started but not yet halted.
-     */
-    private final AtomicLong totalRunningCount = new AtomicLong();
-
-    /**
-     * The #of {@link IChunkMessage} for the query which a running task has made
-     * available but which have not yet been accepted for processing by another
-     * task.
-     * <p>
-     * Note: {@link ChunkedRunningQuery} drops {@link IChunkMessage}s on the
-     * {@link QueryEngine} as soon as they are generated. A
-     * {@link IChunkMessage} MAY be taken for evaluation as soon as it is
-     * published to the {@link QueryEngine}. This means that the operator task
-     * which will consume that {@link IChunkMessage} can begin to execute
-     * <em>before</em> {@link ChunkedRunningQuery#haltOp(HaltOpMessage)} is invoked to
-     * indicate the end of the operator task which produced that
-     * {@link IChunkMessage}. Due to the potential overlap in these schedules
-     * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
-     * . This is the expected behavior.
-     */
-    private final AtomicLong totalAvailableCount = new AtomicLong();
-
-    /**
-     * A map reporting the #of {@link IChunkMessage} available for each operator
-     * in the pipeline. The total #of {@link IChunkMessage}s available across
-     * all operators in the pipeline is reported by {@link #totalAvailableCount}
-     * .
-     * <p>
-     * The movement of the intermediate binding set chunks forms an acyclic
-     * directed graph. This map is used to track the #of chunks available for
-     * each {@link BOp} in the pipeline. When a {@link BOp} has no more incoming
-     * chunks, we send an asynchronous message to all nodes on which that
-     * {@link BOp} had executed informing the {@link QueryEngine} on that node
-     * that it should immediately release all resources associated with that
-     * {@link BOp}.
-     * <p>
-     * Note: This collection is package private in order to expose its state to
-     * the unit tests. Since the map contains {@link AtomicLong}s it can not be
-     * readily exposed as {@link Map} object. If we were to expose the map, it
-     * would have to be via a get(key) style interface.
-     */
-    /* private */final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableMap = new LinkedHashMap<Integer, AtomicLong>();
-
-    /**
-     * A collection reporting on the #of instances of a given {@link BOp} which
-     * are concurrently executing.
-     * <p>
-     * Note: This collection is package private in order to expose its state to
-     * the unit tests. Since the map contains {@link AtomicLong}s it can not be
-     * readily exposed as {@link Map} object. If we were to expose the map, it
-     * would have to be via a get(key) style interface.
-     */
-    /* private */final Map<Integer/* bopId */, AtomicLong/* runningCount */> runningMap = new LinkedHashMap<Integer, AtomicLong>();
-
-    /**
-     * A collection of the operators which have executed at least once.
-     */
-    private final Set<Integer/* bopId */> startedSet = new LinkedHashSet<Integer>();
-
     /**
      * Return the query identifier specified to the constructor.
      */
     final public UUID getQueryId() {
-        return queryId;
+        return innerState.queryId;
     }
 
     /**
      * Return the deadline specified to the constructor.
      */
     final public long getDeadline() {
-        return deadline;
+        return innerState.deadline;
     }
 
     /**
@@ -222,7 +378,7 @@ class RunState {
      * using {@link #startQuery(IChunkMessage)}.
      */
     final public boolean isStarted() {
-        return started.get();
+        return innerState.started.get();
     }
 
     /**
@@ -230,21 +386,23 @@ class RunState {
      * the {@link #haltOp(HaltOpMessage)}.
      */
     final public boolean isAllDone() {
-        return allDone.get();
+        return innerState.allDone.get();
     }
 
     /**
      * The #of run state transitions which have occurred for this query.
      */
     final public long getStepCount() {
-        return nsteps.get();
+        return innerState.stepCount.get();
     }
 
     /**
      * The #of tasks for this query which have started but not yet halted.
      */
     final public long getTotalRunningCount() {
-        return totalRunningCount.get();
+        
+        return innerState.totalRunningCount.get();
+        
     }
 
     /**
@@ -253,53 +411,91 @@ class RunState {
      * task.
      */
     final public long getTotalAvailableCount() {
-        return totalAvailableCount.get();
+        
+        return innerState.totalAvailableCount.get();
+        
     }
 
     /**
-     * Return an unmodifiable set containing the {@link BOp.Annotations#BOP_ID}
-     * for each operator which has been started at least once as indicated by a
-     * {@link #startQuery(IChunkMessage)} message or a
-     * {@link #startOp(StartOpMessage)} message.
+     * The number of operators which have requested last pass evaluation and
+     * whose last pass evaluation phase is not yet complete.
      */
-    final public Set<Integer> getStartedSet() {
-        return Collections.unmodifiableSet(startedSet);
+    final public long getTotalLastPassRemainingCount() {
+
+        return innerState.totalLastPassRemainingCount.get();
+        
     }
 
+    /**
+     * Return an unmodifiable set containing the service UUID of each service on
+     * which the query has been started.
+     */
+    final Set<UUID/*serviceId*/> getServiceIds() {
+
+        return Collections.unmodifiableSet(innerState.serviceIds);
+
+    }
+    
+    /**
+     * Return the set of either shardIds or the set of serviceIds on which the
+     * operator had been started and has not yet received its last pass
+     * invocation. The query engine is responsible for generating the last pass
+     * messages for the operator on each of these shards or services.
+     * 
+     * @param bopId
+     *            The operator.
+     * 
+     * @return The set (either of shardIds or serviceIds, depending on the
+     *         {@link BOpEvaluationContext} of the operator) -or-
+     *         <code>null</code> if no operator having that bopId has entered
+     *         into its last pass evaluation stage.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    final Set/*shardOrServiceId*/ getDoneOn(final int bopId) {
+
+        final Set set = innerState.doneOn.get(bopId);
+        
+        if(set == null)
+            return null;
+        
+        return Collections.unmodifiableSet(set);
+        
+    }
+
+    /**
+     * Return the set of bopIds for operators which have requested last pass
+     * evaluation.
+     */
+    final Set<Integer/*bopId*/> getLastPassRequested() {
+
+        return Collections.unmodifiableSet(innerState.lastPassRequested);
+        
+    }
+    
+    /**
+     * Constructor.
+     * 
+     * @param query
+     *            The {@link IRunningQuery}.
+     */
     public RunState(final IRunningQuery query) {
 
-        this(query.getQuery(), query.getQueryId(), query.getDeadline(),
-                query.getBOpIndex());
+        this(new InnerState(query.getQuery(), query.getQueryId(),
+                query.getDeadline(), System.currentTimeMillis(),
+                query.getBOpIndex()));
 
     }
 
     /**
      * Constructor used by unit tests.
      */
-    RunState(final BOp query, final UUID queryId, final long deadline,
-            final Map<Integer, BOp> bopIndex) {
-
-        if (query == null)
+    // Note: package private to expose to the unit tests.
+    RunState(final InnerState innerState) {
+        
+        if (innerState == null)
             throw new IllegalArgumentException();
-
-        if (queryId == null)
-            throw new IllegalArgumentException();
-
-        if (deadline <= 0L)
-            throw new IllegalArgumentException();
-
-        if (bopIndex == null)
-            throw new IllegalArgumentException();
-
-        this.query = query;
-
-        this.queryId = queryId;
-
-        this.deadline = deadline;
-
-        this.bopIndex = bopIndex;
-
-        this.begin = System.currentTimeMillis();
+        
+        this.innerState = innerState;
         
     }
 
@@ -325,30 +521,32 @@ class RunState {
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (allDone.get())
+        if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (!started.compareAndSet(false/* expect */, true/* update */))
-            throw new IllegalStateException(ERR_QUERY_STARTED);
-
-        if (deadline < System.currentTimeMillis())
+        if (innerState.deadline < System.currentTimeMillis())
             throw new TimeoutException(ERR_DEADLINE);
 
-        nsteps.incrementAndGet();
+        if (!innerState.started.compareAndSet(false/* expect */, true/* update */))
+            throw new IllegalStateException(ERR_QUERY_STARTED);
+
+        innerState.stepCount.incrementAndGet();
 
         messagesProduced(msg.getBOpId(), 1/* nmessages */);
 
+        /*
+         * Note: RunState is only used by the query controller so this will not
+         * do an RMI and the RemoteException will not be thrown.
+         */
+        final UUID serviceId;
+        try {
+            serviceId = msg.getQueryController().getServiceUUID();
+        } catch (RemoteException ex) {
+            throw new AssertionError(ex);
+        }
+        innerState.serviceIds.add(serviceId);
+        
         if (TableLog.tableLog.isInfoEnabled()) {
-            /*
-             * Note: RunState is only used by the query controller so this will
-             * not do an RMI and the RemoteException will not be thrown.
-             */
-            final UUID serviceId;
-            try {
-                serviceId = msg.getQueryController().getServiceUUID();
-            } catch (RemoteException ex) {
-                throw new AssertionError(ex);
-            }
 //            TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
             
             TableLog.tableLog.info(getTableHeader());
@@ -384,18 +582,25 @@ class RunState {
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (allDone.get())
+        if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
+//                    + "  bopId="+msg.bopId+" : msg="+msg);
 
-        if (deadline < System.currentTimeMillis())
+        if (innerState.deadline < System.currentTimeMillis())
             throw new TimeoutException(ERR_DEADLINE);
 
-        nsteps.incrementAndGet();
+        innerState.stepCount.incrementAndGet();
 
-        final boolean firstTime = startOp(msg.bopId);
+        final boolean firstTime = _startOp(msg);
 
         messagesConsumed(msg.bopId, msg.nmessages);
 
+        if (msg.lastPassRequested)
+            if (innerState.lastPassRequested.add(msg.bopId))
+                innerState.totalLastPassRemainingCount.incrementAndGet();
+        
+        innerState.serviceIds.add(msg.serviceId);
+        
         if (TableLog.tableLog.isInfoEnabled()) {
             TableLog.tableLog.info(getTableRow("startOp", msg.serviceId,
                     msg.bopId, msg.partitionId, msg.nmessages/* fanIn */,
@@ -412,75 +617,44 @@ class RunState {
 
     }
 
-//    /**
-//     * Update the {@link RunState} to indicate that the data in the
-//     * {@link IChunkMessage} was attached to an already running task for the
-//     * target operator.
-//     * 
-//     * @param msg
-//     * @param runningOnServiceId
-//     * @return <code>true</code> if this is the first time we will evaluate the
-//     *         op.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if the argument is <code>null</code>.
-//     * @throws TimeoutException
-//     *             if the deadline for the query has passed.
-//     */
-//    synchronized 
-//    public void addSource(final IChunkMessage<?> msg,
-//            final UUID runningOnServiceId) throws TimeoutException {
-//
-//        if (msg == null)
-//            throw new IllegalArgumentException();
-//
-//        if (allDone.get())
-//            throw new IllegalStateException(ERR_QUERY_HALTED);
-//
-//        if (deadline < System.currentTimeMillis())
-//            throw new TimeoutException(ERR_DEADLINE);
-//
-//        nsteps.incrementAndGet();
-//
-//        final int bopId = msg.getBOpId();
-//        final int nmessages = 1;
-//
-//        if (runningMap.get(bopId) == null) {
-//            /*
-//             * Note: There is a race condition in RunningQuery such that it is
-//             * possible to add a 2nd source to an operator task before the task
-//             * has begun to execute. Since the task calls startOp() once it
-//             * begins to execute, this means that addSource() can be ordered
-//             * before startOp() for the same task. This code block explicitly
-//             * allows this condition and sets a 0L in the runningMap for the
-//             * [bopId].
-//             */
-//            AtomicLong n = runningMap.get(bopId);
-//            if (n == null)
-//                runningMap.put(bopId, n = new AtomicLong());
-////          throw new AssertionError(ERR_OP_NOT_STARTED + " msg=" + msg
-////          + ", this=" + this);
-//        }
-//
-//        messagesConsumed(bopId, nmessages);
-//
-//        if (TableLog.tableLog.isInfoEnabled()) {
-//            TableLog.tableLog.info(getTableRow("addSrc", runningOnServiceId,
-//                    bopId, msg.getPartitionId(), nmessages/* fanIn */,
-//                    null/* cause */, null/* stats */));
-//        }
-//
-//        if (log.isInfoEnabled())
-//            log.info("startOp: " + toString() + " : bop=" + bopId);
-//
-//        if (log.isTraceEnabled())
-//            log.trace(msg.toString());
-//
-//    }
-    
+    /**
+     * Type safe enumeration of the summary run state for an operator as
+     * reported in response to a {@link HaltOpMessage}.  This information
+     * is maintained by the query controller in the {@link RunState} for
+     * the {@link IRunningQuery}.
+     */
+    static enum RunStateEnum {
+
+        /**
+         * The operator can be re-triggered either by upstream operators in the
+         * pipeline which are not yet {@link #AllDone} or by
+         * buffered {@link IChunkMessage}(s).
+         */
+        Running,
+        /**
+         * No instance of the operator is running and the operator can no longer
+         * be re-triggered by upstream operators or buffered
+         * {@link IChunkMessage}(s). The optional last evaluation pass for the
+         * operator should be executed.
+         */
+        StartLastPass,
+        /**
+         * The operator awaiting last pass evaluation messages on each node or
+         * shard where it was started.
+         */
+        RunningLastPass,
+        /**
+         * No instance of the operator is running and optional last evaluation
+         * pass either has been executed or will not run. Any resources
+         * associated with that operator should be released.
+         */
+        AllDone;
+
+    } // RunStateEnum
+
     /**
      * Update the {@link RunState} to reflect the post-condition of the
-     * evaluation of an operator against one or more {@link IChunkMessage},
+     * evaluation of an operator against one or more {@link IChunkMessage}s,
      * adjusting the #of messages available for consumption by the operator
      * accordingly.
      * <p>
@@ -502,19 +676,19 @@ class RunState {
      *             if which case it wraps {@link HaltOpMessage#cause}.
      */
     synchronized
-    public boolean haltOp(final HaltOpMessage msg) throws TimeoutException,
+    public RunStateEnum haltOp(final HaltOpMessage msg) throws TimeoutException,
             ExecutionException {
 
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (allDone.get())
+        if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (deadline < System.currentTimeMillis())
+        if (innerState.deadline < System.currentTimeMillis())
             throw new TimeoutException(ERR_DEADLINE);
 
-        nsteps.incrementAndGet();
+        innerState.stepCount.incrementAndGet();
 
         if (msg.sinkId != null)
             messagesProduced(msg.sinkId.intValue(), msg.sinkMessagesOut);
@@ -522,27 +696,57 @@ class RunState {
         if (msg.altSinkId != null)
             messagesProduced(msg.altSinkId.intValue(), msg.altSinkMessagesOut);
 
-        haltOp(msg.bopId);
-
-        // true if the entire query is done.
-        final boolean isAllDone = getTotalRunningCount() == 0
-                && getTotalAvailableCount() == 0;
-
-        if (isAllDone)
-            this.allDone.set(true);
+        _haltOp(msg);
 
         /*
-         * true if this operator is done.
-         * 
-         * Note: For the StandaloneChainedRunningQuery, it is possible for the
-         * per-operator availableMap counters to have not been updated yet but
-         * [isAllDone] to be true. In order to guarantee termination, this
-         * method must return true if the operator evaluation task is done.
-         * Since it is defacto done when [isAllDone] is satisfied, this tests
-         * for that condition first and then for isOperatorDone().
+         * Figure out the current RunStateEnum for this operator.
          */
-		final boolean isOpDone = isAllDone || isOperatorDone(msg.bopId);
-        
+        final RunStateEnum state = getOperatorRunState(msg.bopId);
+
+//        if (RunStateEnum.StartLastPass == state) {
+//            // should not be triggered unless requested.
+//            assert innerState.lastPassRequested.contains(msg.bopId);
+//            if (innerState.doneOn.get(msg.bopId) == null) {
+//                /*
+//                 * When we convert into the LastPass phase for this operator we
+//                 * copy the [startedOn] set for the operator into the [doneOn]
+//                 * set and then increment [totalLastPassRemainingCount] by the
+//                 * size of the copied set. That sets up the criteria that we
+//                 * need to count off the last pass evaluations of the operator,
+//                 * which are essentially self-triggered.
+//                 * 
+//                 * Note: Both availableCount and the availableMap counter for
+//                 * this bopId have to be bumped by the #of expected messages,
+//                 * otherwise those messages will not be "expected" when they
+//                 * arrive.
+//                 */
+//                final Set<?> set = innerState.startedOn.get(msg.bopId);
+//                if (set != null) {
+//                    final int nexpected = set.size();
+//                    innerState.doneOn.put(msg.bopId, new LinkedHashSet(set)); // Copy!
+//                    innerState.totalAvailableCount.addAndGet(nexpected);
+//                    innerState.availableMap.get(msg.bopId).addAndGet(nexpected);
+//                }
+//            }
+//        }
+
+        // true iff the entire query is done.
+        final boolean isAllDone = innerState.totalRunningCount.get() == 0
+                && innerState.totalAvailableCount.get() == 0
+                && innerState.totalLastPassRemainingCount.get() == 0
+                ;
+
+        if (isAllDone)
+            innerState.allDone.set(true);
+
+        /*
+         * Note: It is possible for the per-operator availableMap counters to
+         * have not been updated yet but [isAllDone] to be true. Since the query
+         * is defacto done when [isAllDone] is satisfied, this tests for that
+         * condition first and then for isOperatorDone().
+         */
+//        final boolean isOpDone = isAllDone || state == RunStateEnum.AllDone;
+
 //        if (isAllDone && !isOpDone)
 //            throw new RuntimeException("Whoops!: "+this);
         
@@ -555,7 +759,7 @@ class RunState {
 
         if (log.isInfoEnabled())
             log.info("haltOp : " + toString() + " : bop=" + msg.bopId
-                    + ",isOpDone=" + isOpDone);
+                    + ",opRunState=" + state + ",queryAllDone=" + isAllDone);
 
         if (log.isTraceEnabled())
             log.trace(msg.toString());
@@ -571,50 +775,344 @@ class RunState {
 
         }
 
-        return isOpDone;
+        return state;
 
     }
 
-	/**
-	 * Return <code>true</code> the specified operator can no longer be
-	 * triggered by the query. The specific criteria are that no operators which
-	 * are descendants of the specified operator are running or have chunks
-	 * available against which they could run. Under those conditions it is not
-	 * possible for a chunk to show up which would cause the operator to be
-	 * executed.
-	 * <p>
-	 * Note: The caller MUST hold a lock across this operation in order for it
-	 * to be atomic with respect to the concurrent evaluation of other operators
-	 * for the same query.
-	 * 
-	 * @param bopId
-	 *            Some operator identifier.
-	 * 
-	 * @return <code>true</code> if the operator can not be triggered given the
-	 *         current query activity.
-	 */
-    private boolean isOperatorDone(final int bopId) {
+    /**
+     * Return the {@link RunStateEnum} for the operator given the
+     * {@link RunState} of the {@link IRunningQuery}.
+     * <p>
+     * The movement of the intermediate binding set chunks during query
+     * processing forms an acyclic directed graph. We can decide whether or not
+     * a {@link BOp} in the query plan can be triggered by the current activity
+     * pattern by inspecting {@link RunState} for the {@link BOp} and its
+     * operands recursively. For the purposes of this method, only
+     * {@link BOp#args() operands} are considered as descendants (this is the
+     * query pipeline).
+     * <p>
+     * Operators which specify the {@link PipelineOp.Annotations#LAST_PASS}
+     * annotation will self-trigger once per service or shard on which they were
+     * evaluated. This self-triggering phase provides the last pass evaluation
+     * semantics.
+     * <p>
+     * Note: The caller MUST hold a lock across this operation in order for it
+     * to be atomic with respect to the concurrent evaluation of other operators
+     * for the same query.
+     * <p>
+     * Note: While could also report whether or not the operator has ever
+     * started here, this method is only invoked when processing a
+     * {@link HaltOpMessage} and we already know in that context (and can
+     * readily verify) that the operator had started evaluation.
+     * 
+     * @param bopId
+     *            The identifier for an operator which appears in the query
+     *            plan.
+     * 
+     * @return The current {@link RunStateEnum} for the operator.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws NoSuchBOpException
+     *             if <i>bopId</i> is not found in the query index.
+     */
+    RunStateEnum getOperatorRunState(final int bopId) {
 
-        return PipelineUtility.isDone(bopId, query, bopIndex, runningMap,
-                availableMap);
+        final BOp op = innerState.bopIndex.get(bopId);
+
+        if (op == null)
+            throw new NoSuchBOpException(bopId);
+
+        final Iterator<BOp> itr = BOpUtility.preOrderIterator(op);
+
+        while (itr.hasNext()) {
+
+            final BOp t = itr.next();
+
+            final Integer id = (Integer) t.getProperty(BOp.Annotations.BOP_ID);
+
+            if (id == null)
+                throw new NoBOpIdException(t.toString());
+
+            {
+
+                /*
+                 * If the operator is running then it is, defacto, "not done."
+                 * 
+                 * If any descendants of the operator are running, then they
+                 * could cause the operator to be re-triggered and it is "not
+                 * done."
+                 */
+
+                final AtomicLong runningCount = innerState.runningMap.get(id);
+
+                if (runningCount != null && runningCount.get() != 0) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Operator can be triggered: op=" + op
+                                + ", possible trigger=" + t + " is running.");
+
+                    return RunStateEnum.Running;
+
+                }
+
+            }
+
+            {
+
+                /*
+                 * Any chunks available for the operator in question or any of
+                 * its descendants could cause that operator to be triggered.
+                 */
+
+                final AtomicLong availableChunkCount = innerState.availableMap
+                        .get(id);
+
+                if (availableChunkCount != null
+                        && availableChunkCount.get() != 0) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Operator can be triggered: op=" + op
+                                + ", possible trigger=" + t + " has "
+                                + availableChunkCount + " chunks available.");
+
+                    return RunStateEnum.Running;
+
+                }
+
+            }
+
+            if (bopId != id.intValue() && innerState.lastPassRequested.contains(id)) {
+
+                /*
+                 * Any predecessor of the operator (but not the operator itself)
+                 * requested a last pass evaluation phase and that last pass
+                 * evaluation phase is still in progress (as recognized by a
+                 * non-null entry in [doneOn] for that operator).
+                 */
+
+                // Examine the doneSet for this operator.
+                final Set doneSet = innerState.doneOn.get(id);
+
+                // If null, then has not started lastPass evaluation.
+                if (doneSet == null) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Operator can be triggered: op=" + op
+                                + ", possible trigger=" + t
+                                + " has not started last pass evaluation.");
+
+                    return RunStateEnum.Running;
+
+                }
+
+                // If non-empty, then has not finished lastPass evaluation.
+                if (!doneSet.isEmpty()) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Operator can be triggered: op=" + op
+                                + ", possible trigger=" + t
+                                + " awaiting last pass evaluation for doneSet="
+                                + doneSet);
+
+                    return RunStateEnum.Running;
+
+                }
+
+            }
+
+        }
+
+        /*
+         * The operator can not be triggered by upstream operators or messages
+         * already generated by upstream operators.
+         */
+        
+        if (innerState.lastPassRequested.contains(bopId)
+                && innerState.runningMap.containsKey(bopId)) {
+
+            /*
+             * The operator has requested last pass evaluation and has in fact
+             * been evaluated (the running count map has an entry for this
+             * operator).
+             * 
+             * Now we need to determine whether or not the operator should start
+             * its last pass evaluation phase or if it is waiting for the last
+             * pass evaluation phase to terminate.
+             */
+            
+            // Examine the doneSet for this operator.
+            final Set doneSet = innerState.doneOn.get(bopId);
+
+            // If null, then has not started lastPass eval.
+            if (doneSet == null) {
+
+                if (log.isDebugEnabled())
+                    log.debug("Operator will self-trigger last pass evaluation: op="
+                            + op);
+
+                /*
+                 * When we convert into the LastPass phase for this operator we
+                 * copy the [startedOn] set for the operator into the [doneOn]
+                 * set and then increment [totalLastPassRemainingCount] by the
+                 * size of the copied set. That sets up the criteria that we
+                 * need to count off the last pass evaluations of the operator,
+                 * which are essentially self-triggered.
+                 * 
+                 * Note: Both availableCount and the availableMap counter for
+                 * this bopId have to be bumped by the #of expected messages,
+                 * otherwise those messages will not be "expected" when they
+                 * arrive.
+                 */
+                final Set<?> set = innerState.startedOn.get(bopId);
+                if (set != null) {
+                    final int nexpected = set.size();
+                    innerState.doneOn.put(bopId, new LinkedHashSet(set)); // Copy!
+                    innerState.totalAvailableCount.addAndGet(nexpected);
+                    innerState.availableMap.get(bopId).addAndGet(nexpected);
+                }
+
+                return RunStateEnum.StartLastPass;
+
+            }
+
+            // If non-empty, then has not finished lastPass eval.
+            if (!doneSet.isEmpty()) {
+
+                if (log.isDebugEnabled())
+                    log.debug("Operator will self-trigger last pass evaluation: op="
+                            + op
+                            + ", awaiting last pass evaluation for doneSet="
+                            + doneSet);
+
+                return RunStateEnum.RunningLastPass;
+
+            }
+            
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("Operator can not be triggered: op=" + op);
+
+        return RunStateEnum.AllDone;
 
     }
 
-	/**
-	 * Return <code>true</code> iff the preconditions have been satisfied for
-	 * the "at-once" invocation of the specified operator (no predecessors are
-	 * running or could be triggered and the operator has not been evaluated).
-	 * 
-	 * @param bopId
-	 *            Some operator identifier.
-	 * 
-	 * @return <code>true</code> iff the "at-once" evaluation of the operator
-	 *         may proceed.
-	 */
+    /**
+     * Return <code>true</code> iff the running query state is such that the
+     * "at-once" evaluation of the specified operator may proceed (no
+     * predecessors are running or could be triggered and the operator has not
+     * been evaluated).
+     * <p>
+     * Note: The specific requirements are: (a) the operator is not running and
+     * has not been started; (b) no predecessor in the pipeline is running; and
+     * (c) no predecessor in the pipeline can be triggered.
+     * 
+     * @param bopId
+     *            The identifier for an operator which appears in the query
+     *            plan.
+     * 
+     * @return <code>true</code> iff the "at-once" evaluation of the operator
+     *         may proceed.
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws NoSuchBOpException
+     *             if <i>bopId</i> is not found in the query index.
+     */
     boolean isAtOnceReady(final int bopId) {
 
-		return PipelineUtility.isAtOnceReady(bopId, query, bopIndex,
-				runningMap, availableMap);
+        final BOp op = innerState.bopIndex.get(bopId);
+
+        if (op == null)
+            throw new NoSuchBOpException(bopId);
+
+        final boolean didStart = innerState.runningMap.get(bopId) != null;
+        
+        if(didStart) {
+            
+            // Evaluation has already run (or begun) for this operator.
+            if (log.isInfoEnabled())
+                log.info("Already ran/running: " + bopId);
+            
+            return false;
+            
+        }
+
+        final Iterator<BOp> itr = BOpUtility.preOrderIterator(op);
+
+        while (itr.hasNext()) {
+
+            final BOp t = itr.next();
+
+            final Integer id = (Integer) t.getProperty(BOp.Annotations.BOP_ID);
+
+            if (id == null)
+                throw new NoBOpIdException(t.toString());
+
+            if(bopId == id.intValue()) {
+
+                // Ignore self.
+                continue;
+                
+            }
+            
+            {
+
+                /*
+                 * If any descendants (aka predecessors) of the operator are
+                 * running, then they could cause produce additional solutions
+                 * so the operator is not ready for "at-once" evaluation.
+                 */
+
+                final AtomicLong runningCount = innerState.runningMap.get(id);
+
+                if (runningCount != null && runningCount.get() != 0) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Predecessor running: predecessorId=" + id
+                                + ", predecessorRunningCount=" + runningCount);
+
+                    return false;
+
+                }
+
+            }
+
+            {
+
+                /*
+                 * Any chunks available for a descendant (aka predecessor) of
+                 * the operator could produce additional solutions as inputs to
+                 * the operator so it is not ready for "at-once" evaluation.
+                 */
+
+                final AtomicLong availableChunkCount = innerState.availableMap
+                        .get(id);
+
+                if (availableChunkCount != null
+                        && availableChunkCount.get() != 0) {
+                    /*
+                     * We are looking at some other predecessor of the specified
+                     * operator.
+                     */
+                    if (log.isDebugEnabled())
+                        log.debug("Predecessor can be triggered: predecessorId="
+                                + id + " has " + availableChunkCount
+                                + " chunks available.");
+
+                    return false;
+                }
+
+            }
+
+        }
+
+        // Success.
+        if (log.isInfoEnabled())
+            log.info("Ready for 'at-once' evaluation: " + bopId);
+
+        return true;
 
     }
 
@@ -629,26 +1127,46 @@ class RunState {
      *         being evaluated within the context of this query {@link RunState}
      *         .
      */
-    private boolean startOp(final int bopId) {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private boolean _startOp(final StartOpMessage msg) {
 
-        final long running = totalRunningCount.incrementAndGet();
+        final long running = innerState.totalRunningCount.incrementAndGet();
 
         assert running >= 1 : "running=" + running + " :: runState=" + this;
 
         final boolean firstTime;
         {
 
-            AtomicLong n = runningMap.get(bopId);
+            final Integer bopId = msg.bopId;
+            
+            AtomicLong n = innerState.runningMap.get(bopId);
 
             if (n == null)
-                runningMap.put(bopId, n = new AtomicLong());
+                innerState.runningMap.put(bopId, n = new AtomicLong());
 
             final long tmp = n.incrementAndGet();
 
             assert tmp >= 0 : "runningCount=" + tmp + " for bopId=" + bopId
                     + " :: runState=" + this;
 
-            firstTime = startedSet.add(bopId);
+            Set set = innerState.startedOn.get(bopId);
+            if (set == null) {
+                set = new LinkedHashSet();
+                innerState.startedOn.put(bopId, set);
+                firstTime = true;
+            } else {
+                firstTime = false;
+            }
+            switch (msg.evaluationContext) {
+            case ANY:
+            case CONTROLLER:
+            case HASHED:
+                set.add(msg.serviceId);
+                break;
+            case SHARDED:
+                set.add(Integer.valueOf(msg.partitionId));
+                break;
+            }
 
         }
 
@@ -660,19 +1178,20 @@ class RunState {
      * Update the {@link RunState} to reflect the fact that an operator
      * execution phase is finished.
      * 
-     * @param bopId
-     *            The operator identifier.
+     * @param msg
      */
-    private void haltOp(final int bopId) {
+    private void _haltOp(final HaltOpMessage msg) {
 
+        final Integer bopId = msg.bopId;
+        
         // one less task is running.
-        final long running = totalRunningCount.decrementAndGet();
+        final long running = innerState.totalRunningCount.decrementAndGet();
 
         assert running >= 0 : "running=" + running + " :: runState=" + this;
 
         {
 
-            final AtomicLong n = runningMap.get(bopId);
+            final AtomicLong n = innerState.runningMap.get(bopId);
 
             if (n == null)
                 throw new IllegalArgumentException(ERR_OP_NOT_STARTED);
@@ -684,6 +1203,39 @@ class RunState {
 
         }
 
+        /*
+         * If we are processing our doneSet, then handle that first so the
+         * changes will be reflected when we decide the new run state for the
+         * operator.
+         */
+        {
+
+            final Set<?> set = innerState.doneOn.get(bopId);
+
+            if (set != null) {
+
+                /*
+                 * Remove the shardId or serviceId from our doneSet.
+                 */
+
+                if (!set.remove(msg.partitionId) && !set.remove(msg.serviceId)) {
+
+                    throw new RuntimeException("Not in doneSet: msg=" + msg
+                            + ", doneSet=" + set);
+
+                }
+
+                if (set.isEmpty()) {
+
+                    // End of last pass evaluation for this operator.
+                    innerState.totalLastPassRemainingCount.decrementAndGet();
+
+                }
+                
+            }
+
+        }
+        
     }
 
     /**
@@ -697,12 +1249,12 @@ class RunState {
      */
     private void messagesConsumed(final int bopId, final int nmessages) {
 
-        totalAvailableCount.addAndGet(-nmessages);
+        innerState.totalAvailableCount.addAndGet(-nmessages);
 
-        AtomicLong n = availableMap.get(bopId);
+        AtomicLong n = innerState.availableMap.get(bopId);
 
         if (n == null)
-            availableMap.put(bopId, n = new AtomicLong());
+            innerState.availableMap.put(bopId, n = new AtomicLong());
 
         n.addAndGet(-nmessages);
 
@@ -721,12 +1273,12 @@ class RunState {
      */
     private void messagesProduced(final int targetId, final int nmessages) {
 
-        totalAvailableCount.addAndGet(nmessages);
+        innerState.totalAvailableCount.addAndGet(nmessages);
 
-        AtomicLong n = availableMap.get(targetId);
+        AtomicLong n = innerState.availableMap.get(targetId);
 
         if (n == null)
-            availableMap.put(targetId, n = new AtomicLong());
+            innerState.availableMap.put(targetId, n = new AtomicLong());
 
         n.addAndGet(nmessages);
 
@@ -747,15 +1299,9 @@ class RunState {
         final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getName());
-        sb.append("{nsteps=" + nsteps);
-        sb.append(",allDone=" + allDone);
-        sb.append(",totalRunning=" + totalRunningCount);
-        sb.append(",totalAvailable=" + totalAvailableCount);
-        sb.append(",started=" + startedSet);
-        sb.append(",running=" + runningMap);
-        sb.append(",available=" + availableMap);
-        sb.append("}");
-
+        
+        innerState.toString(sb);
+        
         return sb.toString();
 
     }
@@ -764,7 +1310,7 @@ class RunState {
 
         final StringBuilder sb = new StringBuilder();
 
-        final Integer[] bopIds = bopIndex.keySet().toArray(new Integer[0]);
+        final Integer[] bopIds = innerState.bopIndex.keySet().toArray(new Integer[0]);
 
         Arrays.sort(bopIds);
 
@@ -781,15 +1327,17 @@ class RunState {
         sb.append("\tbop");
         sb.append("\tshardId");
         sb.append("\tfanIO");
+        sb.append("\tnservices");
         sb.append("\tnavail(query)");
         sb.append("\tnrun(query)");
+        sb.append("\tnlastPassRemaining");
         sb.append("\tallDone");
 
         for (int i = 0; i < bopIds.length; i++) {
 
             final Integer id = bopIds[i];
 
-        	final BOp bop = bopIndex.get(id);
+        	final BOp bop = innerState.bopIndex.get(id);
         	
         	if(!(bop instanceof PipelineOp)) 
     			continue; // skip non-pipeline operators.
@@ -797,6 +1345,10 @@ class RunState {
         	sb.append("\tnavail(id=" + id + ")");
 
             sb.append("\tnrun(id=" + id + ")");
+
+            sb.append("\tnstartedOn(id=" + id + ")");
+
+            sb.append("\tndoneOn(id=" + id + ")");
 
         }
 
@@ -820,9 +1372,9 @@ class RunState {
 
     /**
      * Return a tabular representation of the query {@link RunState}.
-     *<p>
+     * <p>
      * Note: You must holding the lock guarding the {@link RunState} to
-     * guarantee that will return a consistent representation.
+     * guarantee this method will return a consistent representation.
      * 
      * @param label
      *            The state change level (startQ, startOp, haltOp).
@@ -835,7 +1387,11 @@ class RunState {
      *            <code>-1</code> if the operator was not evaluated against a
      *            specific index partition.
      * @param fanIO
-     *            The fanIn (startQ,startOp) or fanOut (haltOp).
+     *            This is the #of {@link IChunkMessage}s accepted by the
+     *            operator ("fanIn" for startQ,startOp) or output by the
+     *            operator ("fanOut" for haltOp). (Termination is decided by
+     *            counting {@link IChunkMessage}s rather than by counting
+     *            solutions or chunks of solutions.)
      * @param cause
      *            The {@link Throwable} in a {@link HaltOpMessage} and
      *            <code>null</code> for other messages or if the
@@ -854,15 +1410,15 @@ class RunState {
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
                 DateFormat.FULL, DateFormat.FULL);
         
-        final long elapsed = System.currentTimeMillis() - begin;
+        final long elapsed = System.currentTimeMillis() - innerState.begin;
         
-        sb.append(queryId);
+        sb.append(innerState.queryId);
         sb.append('\t');
-        sb.append(dateFormat.format(new Date(begin)));
+        sb.append(dateFormat.format(new Date(innerState.begin)));
         sb.append('\t');
         sb.append(elapsed);
         sb.append('\t');
-        sb.append(Long.toString(nsteps.get()));
+        sb.append(Long.toString(innerState.stepCount.get()));
         sb.append('\t');
         sb.append(label);
 
@@ -874,7 +1430,7 @@ class RunState {
         sb.append(serviceId == null ? "N/A" : serviceId.toString());
 
 		{
-			final BOp bop = bopIndex.get(bopId);
+			final BOp bop = innerState.bopIndex.get(bopId);
 			sb.append('\t');
 			sb.append(bop.getEvaluationContext());
 			sb.append('\t');
@@ -889,17 +1445,17 @@ class RunState {
 
 		// the operator.
 		sb.append('\t');
-		if (nsteps.get() == 1) {
+		if (innerState.stepCount.get() == 1) {
 			/*
 			 * For the startQ row @ nsteps==1, show the entire query. This is
 			 * the only way people will be able to see the detailed annotations
 			 * on predicates used in joins. New line characters are translated
 			 * out to keep things in the table format.
 			 */
-			sb.append(BOpUtility.toString(query).replace('\n', ' '));
+			sb.append(BOpUtility.toString(innerState.query).replace('\n', ' '));
         } else {
         	// Otherwise how just this bop.
-            sb.append(bopIndex.get(bopId).toString());
+            sb.append(innerState.bopIndex.get(bopId).toString());
         }
 
         sb.append('\t');
@@ -907,13 +1463,17 @@ class RunState {
         sb.append('\t');
         sb.append(Integer.toString(fanIO));
         sb.append('\t');
-        sb.append(Long.toString(totalAvailableCount.get()));
+        sb.append(innerState.serviceIds.size());
         sb.append('\t');
-        sb.append(Long.toString(totalRunningCount.get()));
+        sb.append(Long.toString(innerState.totalAvailableCount.get()));
         sb.append('\t');
-        sb.append(allDone.get());
+        sb.append(Long.toString(innerState.totalRunningCount.get()));
+        sb.append('\t');
+        sb.append(Long.toString(innerState.totalLastPassRemainingCount.get()));
+        sb.append('\t');
+        sb.append(innerState.allDone.get());
 
-        final Integer[] bopIds = bopIndex.keySet().toArray(new Integer[0]);
+        final Integer[] bopIds = innerState.bopIndex.keySet().toArray(new Integer[0]);
 
         Arrays.sort(bopIds);
 
@@ -921,18 +1481,26 @@ class RunState {
 
             final Integer id = bopIds[i];
 
-        	final BOp bop = bopIndex.get(id);
+        	final BOp bop = innerState.bopIndex.get(id);
         	
         	if(!(bop instanceof PipelineOp)) 
     			continue; // skip non-pipeline operators.
         	
-            final AtomicLong nrunning = runningMap.get(id);
+            final AtomicLong nrunning = innerState.runningMap.get(id);
 
-            final AtomicLong navailable = availableMap.get(id);
+            final AtomicLong navailable = innerState.availableMap.get(id);
 
+            final Set<?> startedSet = innerState.startedOn.get(id);
+
+            final Set<?> doneSet = innerState.doneOn.get(id);
+            
             sb.append("\t" + (navailable == null ? "N/A" : navailable.get()));
 
             sb.append("\t" + (nrunning == null ? "N/A" : nrunning.get()));
+
+            sb.append("\t" + (startedSet == null ? "N/A" : startedSet.size()));
+
+            sb.append("\t" + (doneSet == null ? "N/A" : doneSet.size()));
 
         }
 

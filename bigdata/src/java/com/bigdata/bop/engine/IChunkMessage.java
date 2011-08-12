@@ -3,6 +3,8 @@ package com.bigdata.bop.engine;
 import java.util.UUID;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.fed.FederatedRunningQuery;
 import com.bigdata.service.ResourceService;
 
@@ -30,6 +32,19 @@ public interface IChunkMessage<E> {
     /** The identifier for the target index partition. */
     int getPartitionId();
 
+    /**
+     * Return true iff the {@link IChunkMessage} is for the last evaluation pass
+     * of an operator. The last evaluation pass for an operator must be
+     * requested using an annotation. When it is requested, the operator will be
+     * invoked one more time for each node or shard on which it was run
+     * (depending on the {@link BOpEvaluationContext}). When so invoked, the
+     * {@link IChunkMessage} will be associated with an empty source and this
+     * flag will be set.
+     * 
+     * @see PipelineOp.Annotations#LAST_PASS
+     */
+    boolean isLastInvocation();
+    
     /**
      * Return <code>true</code> if the chunk is materialized on the receiver.
      */

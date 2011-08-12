@@ -55,6 +55,10 @@ public class LocalChunkMessage<E> implements IChunkMessage<E> {
         return partitionId;
     }
 
+    public boolean isLastInvocation() {
+        return false; // Never.
+    }
+
     public boolean isMaterialized() {
         return true;
     }

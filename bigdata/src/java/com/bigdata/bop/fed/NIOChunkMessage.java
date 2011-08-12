@@ -105,6 +105,10 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return partitionId;
     }
 
+    public boolean isLastInvocation() {
+        return false; // Never.
+    }
+
     /**
      * The #of elements in this chunk.
      * 

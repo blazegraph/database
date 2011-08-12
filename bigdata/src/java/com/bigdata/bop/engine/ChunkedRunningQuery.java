@@ -44,7 +44,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
@@ -54,6 +53,7 @@ import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.BufferClosedException;
+import com.bigdata.relation.accesspath.DelegateBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IMultiSourceAsynchronousIterator;
@@ -62,6 +62,7 @@ import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.Memoizer;
+import com.sun.jini.thread.Executor;
 
 /**
  * {@link IRunningQuery} implementation based on the assignment of
@@ -82,9 +83,6 @@ import com.bigdata.util.concurrent.Memoizer;
  * using modified version of the JSR 166 classes. For high volume operator at
  * once evaluation, we need to buffer the data on the native process heap using
  * the {@link IMemoryManager}.
- * 
- * @todo {@link IMemoryManager} integration and support
- *       {@link PipelineOp.Annotations#MAX_MEMORY}.
  */
 public class ChunkedRunningQuery extends AbstractRunningQuery {
 
@@ -138,6 +136,23 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      */
     static private final boolean removeMapOperatorQueueEntries = false;
 
+    /**
+     * When <code>true</code> the {@link HaltOpMessage} is queued on an
+     * {@link Executor} and will be delivered asynchronously to the query
+     * controller. When <code>false</code> the message is delivered in the same
+     * thread that ran the {@link ChunkTask}. This has implications for the
+     * relative timing of changes to the {@link RunState} of the
+     * {@link IRunningQuery}.
+     * <p>
+     * Note: it appears to be valid to use either synchronous or asynchronous
+     * messaging for the {@link HaltOpMessage}s. However, this can always be
+     * changes to <code>true</code> in order to rule out the asynchronous
+     * arrival of the {@link HaltOpMessage} as a source of concurrency issues.
+     * 
+     * TODO Test the performance impact of this option, e.g., on BSBM.
+     */
+    static private final boolean asynchronousHaltMessage = true;
+    
 //    /**
 //     * The chunks available for immediate processing (they must have been
 //     * materialized).
@@ -317,7 +332,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * Examine the input queue for the (bopId,partitionId). If there is work
      * available, then drain the work queue and submit a task to consume that
      * work. This handles {@link PipelineOp.Annotations#MAX_PARALLEL},
-     * {@link PipelineOp.Annotations#PIPELINED}, and {@link PipelineOp.Annotations#MAX_MESSAGES_PER_TASK} as special cases.
+     * {@link PipelineOp.Annotations#PIPELINED}, and
+     * {@link PipelineOp.Annotations#MAX_MESSAGES_PER_TASK} as special cases.
      * 
      * @param bundle
      *            The (bopId,partitionId).
@@ -339,10 +355,6 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //      final long maxMemory = bop.getProperty(
 //              PipelineOp.Annotations.MAX_MEMORY,
 //              PipelineOp.Annotations.DEFAULT_MAX_MEMORY);
-        // See BOpContext#isLastInvocation()
-        final boolean isLastInvocation = pipelined
-                && maxParallel == 1
-                && bop.getEvaluationContext() == BOpEvaluationContext.CONTROLLER;
         lock.lock();
         try {
             // Make sure the query is still running.
@@ -376,7 +388,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 if (log.isDebugEnabled())
                     log.debug("Deferring next execution: " + bundle
                             + ", #running=" + nrunning + ", maxParallel="
-                            + maxParallel+", runState="+runStateString());
+                            + maxParallel + ", runState=" + runStateString());
                 return false;
             }
 //          {
@@ -555,9 +567,17 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
              */
             int nassigned = 1;
             final Iterator<IChunkMessage<IBindingSet>> mitr = accepted.iterator();
+            final IChunkMessage<IBindingSet> firstChunk = mitr.next();
+            // See BOpContext#isLastInvocation()
+            final boolean isLastInvocation = pipelined
+//                    && nremaining == 0
+//                    && maxParallel == 1
+//                    && isOperatorDone(bundle.bopId)
+                    && firstChunk.isLastInvocation()
+                    ;
             final IMultiSourceAsynchronousIterator<IBindingSet[]> source = new MultiSourceSequentialAsynchronousIterator<IBindingSet[]>(//
 //                  accepted.remove(0).getChunkAccessor().iterator()//
-                    mitr.next().getChunkAccessor().iterator()//
+                    firstChunk.getChunkAccessor().iterator()//
                     );
 //            for (IChunkMessage<IBindingSet> msg : accepted) {
 //          source.add(msg.getChunkAccessor().iterator());
@@ -717,8 +737,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * the latency for that RMI from the thread which submits tasks
                  * to consume chunks.
                  */
-                getQueryController().startOp(new StartOpMessage(getQueryId(), t.bopId,
-                        t.partitionId, serviceId, t.messagesIn));
+
+                final boolean lastPassRequested = ((PipelineOp) (t.bop))
+                        .isLastPassRequested();
+
+                getQueryController().startOp(
+                        new StartOpMessage(getQueryId(), t.bopId,
+                                t.partitionId, serviceId, t.messagesIn, t.bop
+                                        .getEvaluationContext(),
+                                lastPassRequested));
 
                 /*
                  * Run the operator task.
@@ -738,22 +765,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                             - begin);
                 }
 
-                /*
-                 * Queue task to notify the query controller that operator task
-                 * did run (async notification).
-                 */
-                final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
-                        t.partitionId, serviceId, null/* cause */, t.sinkId,
-                        t.sinkMessagesOut.get(), t.altSinkId,
-                        t.altSinkMessagesOut.get(), t.context.getStats());
-                try {
-                    t.context.getExecutorService().execute(
-                            new SendHaltMessageTask(getQueryController(), msg,
-                                    ChunkedRunningQuery.this));
-                } catch (RejectedExecutionException ex) {
-                    // e.g., service is shutting down.
-                    log.warn("Could not send message: " + msg, ex);
-                }
+                // Notify query controller that operator task did run.
+                sendHaltMessage(serviceId, t, null/* firstCause */);
                 
             } catch (Throwable ex1) {
 
@@ -777,27 +790,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
                 }
                 
-                final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
-                        t.partitionId, serviceId, getCause()/*firstCauseIfError*/, t.sinkId,
-                        t.sinkMessagesOut.get(), t.altSinkId,
-                        t.altSinkMessagesOut.get(), t.context.getStats());
-                try {
-                    /*
-                     * Queue a task to send the halt message to the query
-                     * controller (async notification).
-                     */
-                    t.context.getExecutorService().execute(
-                            new SendHaltMessageTask(getQueryController(), msg,
-                                    ChunkedRunningQuery.this));
-                } catch (RejectedExecutionException ex) {
-                    // e.g., service is shutting down.
-                    if (log.isInfoEnabled())
-                        log.info("Could not send message: " + msg, ex);
-                } catch (Throwable ex) {
-                    log
-                            .error("Could not send message: " + msg + " : "
-                                    + ex, ex);
-                }
+                // Notify query controller that operator task did run.
+                sendHaltMessage(serviceId, t, getCause()/* firstCauseIfError */);
 
             }
         
@@ -805,6 +799,61 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         
     }
 
+    /**
+     * Send a {@link HaltOpMessage}. Whether the delivery is synchronous or not
+     * depends on {@link #asynchronousHaltMessage}. If this is the controller
+     * and we are using synchronous message delivery, then the message is
+     * delivered directly to {@link AbstractRunningQuery#haltOp(HaltOpMessage)}.
+     * Otherwise it will pass through {@link IQueryClient#haltOp(HaltOpMessage)}
+     * .
+     * 
+     * @param serviceId
+     *            The service to be notified.
+     * @param t
+     *            The {@link ChunkTask}.
+     * @param cause
+     *            The first cause (or <code>null</code> if the task did not end
+     *            with an error).
+     */
+    private final void sendHaltMessage(final UUID serviceId, final ChunkTask t,
+            final Throwable cause) {
+
+        final HaltOpMessage msg = new HaltOpMessage(getQueryId(), t.bopId,
+                t.partitionId, serviceId, cause, t.sinkId,
+                t.sinkMessagesOut.get(), t.altSinkId,
+                t.altSinkMessagesOut.get(), t.context.getStats());
+
+        if (asynchronousHaltMessage) {
+            try {
+                /*
+                 * Queue a task to send the halt message to the query controller
+                 * (asynchronous notification).
+                 */
+                final SendHaltMessageTask sendTask = new SendHaltMessageTask(
+                        getQueryController(), msg, ChunkedRunningQuery.this);
+                // submit task (asynchronous execution).
+                t.context.getExecutorService().execute(sendTask);
+            } catch (RejectedExecutionException ex) {
+                // e.g., service is shutting down.
+                if (log.isInfoEnabled())
+                    log.info("Could not send message: " + msg, ex);
+            } catch (Throwable ex) {
+                log.error("Could not send message: " + msg + " : " + ex, ex);
+            }
+        } else {
+            /*
+             * Synchronous delivery (local).
+             */
+            if (isController()) {
+                haltOp(msg);
+            } else {
+                new SendHaltMessageTask(getQueryController(), msg,
+                        ChunkedRunningQuery.this).run();
+            }
+        }
+
+    }
+    
     /**
      * Runnable evaluates an operator for some chunk of inputs. In scale-out,
      * the operator may be evaluated against some partition of a scale-out
@@ -1021,7 +1070,15 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //                    .getProperty(PipelineOp.Annotations.CONDITIONAL_GROUP);
 
             if (p == null) {
-                sink = getQueryBuffer();
+                /*
+                 * Note: Operators MUST NOT close the query buffer since they do
+                 * not have enough context to decide when the query is done. The
+                 * query buffer will be closed when the query is cancelled.
+                 * Closing it prematurely will cause the query to fail if any
+                 * other operator evaluation pass attempts to write on the query
+                 * buffer.
+                 */
+                sink = new NoCloseBuffer<IBindingSet[]>(getQueryBuffer());
             } else {
 //                final BOp targetOp = getBOpIndex().get(sinkId);
 //                final Integer toGroupId = (Integer) targetOp
@@ -1153,6 +1210,26 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
     } // class ChunkTask
     
+    /**
+     * A delegation pattern which does not pass on the {@link #close()} method.
+     * This is used to prevent a {@link PipelineOp} from accidentally closing
+     * the query buffer.
+     */
+    private static class NoCloseBuffer<E> extends DelegateBuffer<E> {
+
+        public NoCloseBuffer(final IBlockingBuffer<E> delegate) {
+
+            super(delegate);
+            
+        }
+
+        @Override
+        public void close() {
+            // NOP
+        }
+
+    }
+
     /**
      * Class traps {@link #add(IBindingSet[])} to handle the IBindingSet[]
      * chunks as they are generated by the running operator task, invoking
@@ -1344,8 +1421,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 //            outputChunk(chunk);
 //            chunkSize = 0;
 //            chunk = null;
-            if (smallChunks == null || chunkSize == 0)
+            if (smallChunks == null || chunkSize == 0) {
                 return;
+            }
             if (smallChunks.size() == 1) {
                 // directly output a single small chunk.
                 outputChunk(smallChunks.get(0));

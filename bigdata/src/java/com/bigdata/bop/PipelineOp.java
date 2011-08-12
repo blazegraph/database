@@ -83,6 +83,8 @@ abstract public class PipelineOp extends BOpBase {
          * <p>
          * When <code>true</code>, the {@link QueryEngine} will impose the
          * necessary constraints when the operator is evaluated.
+         * 
+         * @see IQueryContext
          */
 		String SHARED_STATE = PipelineOp.class.getName() + ".sharedState";
 
@@ -191,6 +193,17 @@ abstract public class PipelineOp extends BOpBase {
 		 */
 		long DEFAULT_MAX_MEMORY = 0L;
 		
+        /**
+         * When <code>true</code> a final evaluation pass will be invoked once
+         * it is know that the operator can not be re-triggered by another
+         * {@link IChunkMessage}. The final evaluation pass will be associated
+         * with an empty {@link IChunkMessage} as its source and
+         * {@link BOpContext#isLastInvocation()} will report <code>true</code>.
+         */
+        String LAST_PASS = PipelineOp.class.getName() + ".lastPass";
+
+		boolean DEFAULT_LAST_PASS = false;
+		
     }
 
     /**
@@ -217,8 +230,6 @@ abstract public class PipelineOp extends BOpBase {
 			throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
 					+ getMaxParallel());
         
-		// @todo range check the rest of the annotations.
-		
     }
 
     /**
@@ -455,6 +466,21 @@ abstract public class PipelineOp extends BOpBase {
 	}
 
     /**
+     * Return <code>true</code> iff a final evaluation pass is requested by the
+     * operator. The final evaluation pass will be invoked once for each node or
+     * shard on which the operator was evaluated once it has consumed all inputs
+     * from upstream operators.
+     * 
+     * @see Annotations#LAST_PASS
+     */
+    final public boolean isLastPassRequested() {
+
+        return getProperty(Annotations.LAST_PASS,
+                Annotations.DEFAULT_LAST_PASS);
+        
+    }
+
+    /**
      * Return <code>true</code> iff {@link #newStats(IQueryContext)} must be
      * shared across all invocations of {@link #eval(BOpContext)} for this
      * operator for a given query.
@@ -535,30 +561,30 @@ abstract public class PipelineOp extends BOpBase {
      */
     abstract public FutureTask<Void> eval(BOpContext<IBindingSet> context);
 
-	/**
-	 * Hook to setup any resources associated with the operator (temporary
-	 * files, memory manager allocation contexts, etc.). This hook is invoked
-	 * exactly once and before any instance task for the operator is evaluated.
-	 */
-    public void setUp() throws Exception {
+//	/**
+//	 * Hook to setup any resources associated with the operator (temporary
+//	 * files, memory manager allocation contexts, etc.). This hook is invoked
+//	 * exactly once and before any instance task for the operator is evaluated.
+//	 */
+//    public void setUp() throws Exception {
+//
+//    	if (log.isTraceEnabled())
+//			log.trace("bopId=" + getId());
+//
+//    }
 
-    	if (log.isTraceEnabled())
-			log.trace("bopId=" + getId());
-
-    }
-
-	/**
-	 * Hook to tear down any resources associated with the operator (temporary
-	 * files, memory manager allocation contexts, etc.). This hook is invoked
-	 * exactly once no later than when the query is cancelled. If the operator
-	 * is known to be done executing, then this hook will be invoked at that
-	 * time.
-	 */
-    public void tearDown() throws Exception {
-
-    	if (log.isTraceEnabled())
-    		log.trace("bopId=" + getId());
-    	
-    }
+//	/**
+//	 * Hook to tear down any resources associated with the operator (temporary
+//	 * files, memory manager allocation contexts, etc.). This hook is invoked
+//	 * exactly once no later than when the query is cancelled. If the operator
+//	 * is known to be done executing, then this hook will be invoked at that
+//	 * time.
+//	 */
+//    public void tearDown() throws Exception {
+//
+//    	if (log.isTraceEnabled())
+//    		log.trace("bopId=" + getId());
+//    	
+//    }
 
 }

@@ -40,7 +40,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.btree.AbstractNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -78,7 +77,7 @@ public class BOpUtility {
      * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
-	static private Iterator<AbstractNode> preOrderIterator2(final int depth, final BOp op) {
+	static private Iterator<BOp> preOrderIterator2(final int depth, final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -117,8 +116,8 @@ public class BOpUtility {
                     final Striterator itr = new Striterator(
                             new SingleValueIterator(child));
 
-					// append this node in post-order position.
-					itr.append(preOrderIterator2(depth+1,child));
+                    // append this node in post-order position.
+                    itr.append(preOrderIterator2(depth + 1, child));
 
                     return itr;
 
@@ -157,7 +156,7 @@ public class BOpUtility {
      * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
-    static private Iterator<AbstractNode> postOrderIterator2(final BOp op) {
+    static private Iterator<BOp> postOrderIterator2(final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -380,8 +379,9 @@ public class BOpUtility {
 
     /**
      * Return an index from the {@link BOp.Annotations#BOP_ID} to the
-     * {@link BOp} for each spanned {@link BOp} (including annotations).
-     * {@link BOp}s without identifiers are not indexed.
+     * {@link BOp} for each spanned {@link PipelineOp}. {@link BOp}s without
+     * identifiers are not indexed. It is an error a non-{@link PipelineOp} is
+     * encountered.
      * <p>
      * {@link BOp}s should form directed acyclic graphs, but this is not
      * strictly enforced. The recursive traversal iterators declared by this
@@ -402,24 +402,39 @@ public class BOpUtility {
      * @throws NoBOpIdException
      *             if a {@link PipelineOp} does not have a
      *             {@link Annotations#BOP_ID}.
+     * @throws NotPipelineOpException
+     *             if <i>op</i> or any of its arguments visited during recursive
+     *             traversal are not a {@link PipelineOp}.
      */
     static public Map<Integer,BOp> getIndex(final BOp op) {
+        if(op == null)
+            throw new IllegalArgumentException();
         final LinkedHashMap<Integer, BOp> map = new LinkedHashMap<Integer, BOp>();
 //        final LinkedHashSet<BOp> distinct = new LinkedHashSet<BOp>();
-        final Iterator<BOp> itr = preOrderIteratorWithAnnotations(op);
+        final Iterator<BOp> itr = preOrderIterator(op);//WithAnnotations(op);
         while (itr.hasNext()) {
             final BOp t = itr.next();
+            if(!(t instanceof PipelineOp))
+                throw new NotPipelineOpException(t.toString());
             final Object x = t.getProperty(Annotations.BOP_ID);
-            if (x != null) {
-                if (!(x instanceof Integer)) {
-                    throw new BadBOpIdTypeException("Must be Integer, not: "
-                            + x.getClass() + ": " + Annotations.BOP_ID);
-                }
-                final Integer id = (Integer) t.getProperty(Annotations.BOP_ID);
-                final BOp conflict = map.put(id, t);
-                if (conflict != null)
-                    throw new DuplicateBOpIdException("duplicate id=" + id
-                            + " for " + conflict + " and " + t);
+            if (x == null) {
+                throw new NoBOpIdException(t.toString());
+            }
+            if (!(x instanceof Integer)) {
+                throw new BadBOpIdTypeException("Must be Integer, not: "
+                        + x.getClass() + ": " + Annotations.BOP_ID);
+            }
+            final Integer id = (Integer) t.getProperty(Annotations.BOP_ID);
+            final BOp conflict = map.put(id, t);
+            if (conflict != null) {
+                /*
+                 * BOp appears more than once. This is not allowed for
+                 * pipeline operators. If you are getting this exception for
+                 * a non-pipeline operator, you should remove the bopId.
+                 */
+                throw new DuplicateBOpIdException("duplicate id=" + id
+                        + " for " + conflict + " and " + t);
+            }
 //                if (op instanceof PipelineOp && !distinct.add(op)) {
 //                    /*
 //                     * BOp appears more than once. This is not allowed for
@@ -429,13 +444,6 @@ public class BOpUtility {
 //                    throw new DuplicateBOpException("dup=" + t + ", root="
 //                            + toString(op));
 //                }
-//            } else if (op instanceof PipelineOp) {
-//                /*
-//                 * Pipeline operators MUST have declared bopIds.
-//                 */
-////                throw new NoBOpIdException(op.toString());
-//                log.error("No bopId: "+op.getClass().getName());
-            }
 //            if (!distinct.add(t) && !(t instanceof IValueExpression<?>)
 //                    && !(t instanceof Constraint)) {
 //                /*
