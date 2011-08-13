@@ -82,11 +82,15 @@ public class HitConvertor implements
 
                                 final IHit<?> hit = (IHit<?>) arg0;
 
-								/*
-								 * The hit gives us the IV (or a byte[] for that
-								 * IV). We just need to return that IV here.
-								 */
-                                return (IV<?,?>) hit.getDocId();
+                                /*
+                                 * The hit gives us the IV. We just need to
+                                 * return that IV here.
+                                 * 
+                                 * Note: casting to IV<?,?> produces a compiler
+                                 * error on some platforms (Windows XP, JDK
+                                 * 1.6.0_16)
+                                 */
+                                return (IV/*<?,?>*/) hit.getDocId();
 //                                return new TermId(VTE.LITERAL, hit.getDocId());
                             }
 
