@@ -48,13 +48,11 @@ import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
-import com.bigdata.counters.CAT;
+import com.bigdata.bop.join.BaseJoinStats;
+import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -90,15 +88,15 @@ public class SubqueryHashJoinOp extends PipelineOp {
     static private final transient Logger log = Logger
             .getLogger(SubqueryHashJoinOp.class);
 
-    public interface Annotations extends SubqueryJoinAnnotations {
+    public interface Annotations extends SubqueryJoinAnnotations, HashJoinAnnotations {
 
-    	/**
-    	 * The join variables (required). This is an {@link IVariable}[] with
-    	 * at least one variable. The order of the entries is used when forming
-    	 * the as-bound keys for the hash table.  Duplicate elements and null
-    	 * elements are not permitted.
-    	 */
-    	String JOIN_VARS = SubqueryHashJoinOp.class.getName() + ".joinVars";
+//    	/**
+//    	 * The join variables (required). This is an {@link IVariable}[] with
+//    	 * at least one variable. The order of the entries is used when forming
+//    	 * the as-bound keys for the hash table.  Duplicate elements and null
+//    	 * elements are not permitted.
+//    	 */
+//    	String JOIN_VARS = SubqueryHashJoinOp.class.getName() + ".joinVars";
 
 //        /**
 //         * The subquery to be evaluated (required). This should be a
@@ -188,142 +186,124 @@ public class SubqueryHashJoinOp extends PipelineOp {
     }
 
     @Override
-    public HashJoinStats newStats(final IQueryContext queryContext) {
+    public BaseJoinStats newStats(final IQueryContext queryContext) {
 
-        return new HashJoinStats();
-
-    }
-
-    /**
-     * Extended statistics for the join operator.
-     * 
-     * TODO Make use of additional stats, verify in unit tests, and then trim
-     * the unused stats.
-     */
-    public static class HashJoinStats extends BOpStats {
-
-        private static final long serialVersionUID = 1L;
-
-        /**
-         * The running sum of the range counts of the accepted as-bound access
-         * paths.
-         */
-        public final CAT accessPathRangeCount = new CAT();
-
-        /**
-         * The #of input solutions consumed (not just accepted).
-         * <p>
-         * This counter is highly correlated with {@link BOpStats#unitsIn} but
-         * is incremented only when we begin evaluation of the
-         * {@link IAccessPath} associated with a specific input solution.
-         * <p>
-         * When {@link Annotations#COALESCE_DUPLICATE_ACCESS_PATHS} is
-         * <code>true</code>, multiple input binding sets can be mapped onto the
-         * same {@link IAccessPath} and this counter will be incremented by the
-         * #of such input binding sets.
-         */
-        public final CAT inputSolutions = new CAT();
-
-        /**
-         * The #of output solutions generated. This is incremented as soon as
-         * the solution is produced and is used by {@link #getJoinHitRatio()}.
-         * Of necessity, updates to {@link #inputSolutions} slightly lead
-         * updates to {@link #inputSolutions}.
-         */
-        public final CAT outputSolutions = new CAT();
-
-        /**
-         * The estimated join hit ratio. This is computed as
-         * 
-         * <pre>
-         * outputSolutions / inputSolutions
-         * </pre>
-         * 
-         * It is ZERO (0) when {@link #inputSolutions} is ZERO (0).
-         * <p>
-         * The join hit ratio is always accurate when the join is fully
-         * executed. However, when a cutoff join is used to estimate the join
-         * hit ratio a measurement error can be introduced into the join hit
-         * ratio unless {@link Annotations#COALESCE_DUPLICATE_ACCESS_PATHS} is
-         * <code>false</code>, {@link Annotations#MAX_PARALLEL} is GT ONE (1),
-         * or {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ZERO (0).
-         * <p>
-         * When access paths are coalesced because there is an inner loop over
-         * the input solutions mapped onto the same access path. This inner loop
-         * the causes {@link PipelineJoinStats#inputSolutions} to be incremented
-         * by the #of coalesced access paths <em>before</em> any
-         * {@link #outputSolutions} are counted. Coalescing access paths
-         * therefore can cause the join hit ratio to be underestimated as there
-         * may appear to be more input solutions consumed than were actually
-         * applied to produce output solutions if the join was cutoff while
-         * processing a set of input solutions which were identified as using
-         * the same as-bound access path.
-         * <p>
-         * The worst case can introduce substantial error into the estimated
-         * join hit ratio. Consider a cutoff of <code>100</code>. If one input
-         * solution generates 100 output solutions and two input solutions are
-         * mapped onto the same access path, then the input count will be 2 and
-         * the output count will be 100, which gives a reported join hit ration
-         * of <code>100/2</code> when the actual join hit ratio is
-         * <code>100/1</code>.
-         * <p>
-         * A similar problem can occur if {@link Annotations#MAX_PARALLEL} or
-         * {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ONE (1) since input
-         * count can be incremented by the #of threads before any output
-         * solutions are generated. Estimation error can also occur if multiple
-         * join tasks are run in parallel for different chunks of input
-         * solutions.
-         */
-        public double getJoinHitRatio() {
-            final long in = inputSolutions.get();
-            final long out = outputSolutions.get();
-            if (in == 0)
-                return 0;
-            return ((double) out) / in;
-        }
-
-        /**
-         * The #of chunks read from an {@link IAccessPath}.
-         */
-        public final CAT accessPathChunksIn = new CAT();
-
-        /**
-         * The #of elements read from an {@link IAccessPath}.
-         */
-        public final CAT accessPathUnitsIn = new CAT();
-
-        public void add(final BOpStats o) {
-
-            super.add(o);
-
-            if (o instanceof HashJoinStats) {
-
-                final HashJoinStats t = (HashJoinStats) o;
-
-                accessPathRangeCount.add(t.accessPathRangeCount.get());
-
-                accessPathChunksIn.add(t.accessPathChunksIn.get());
-
-                accessPathUnitsIn.add(t.accessPathUnitsIn.get());
-
-                inputSolutions.add(t.inputSolutions.get());
-
-                outputSolutions.add(t.outputSolutions.get());
-            }
-
-        }
-
-        @Override
-        protected void toString(final StringBuilder sb) {
-            sb.append(",accessPathRangeCount=" + accessPathRangeCount.get());
-            sb.append(",accessPathChunksIn=" + accessPathChunksIn.get());
-            sb.append(",accessPathUnitsIn=" + accessPathUnitsIn.get());
-            sb.append(",inputSolutions=" + inputSolutions.get());
-            sb.append(",outputSolutions=" + outputSolutions.get());
-            sb.append(",joinHitRatio=" + getJoinHitRatio());
-        }
+        return new BaseJoinStats();
 
     }
+
+//    /**
+//     * Extended statistics for the join operator.
+//     * 
+//     * TODO Make use of additional stats, verify in unit tests, and then trim
+//     * the unused stats.
+//     */
+//    public static class HashJoinStats extends BaseJoinStats {
+//
+//        private static final long serialVersionUID = 1L;
+//
+//        /**
+//         * The #of input solutions consumed (not just accepted).
+//         * <p>
+//         * This counter is highly correlated with {@link BOpStats#unitsIn} but
+//         * is incremented only when we begin evaluation of the
+//         * {@link IAccessPath} associated with a specific input solution.
+//         * <p>
+//         * When {@link Annotations#COALESCE_DUPLICATE_ACCESS_PATHS} is
+//         * <code>true</code>, multiple input binding sets can be mapped onto the
+//         * same {@link IAccessPath} and this counter will be incremented by the
+//         * #of such input binding sets.
+//         * 
+//         * FIXME {@link #inputSolutions} is not used by this operator. This
+//         * counter is only used to support cutoff join evaluation. It should
+//         * probably be moved into a class which extends
+//         * {@link BaseJoinStats} for joins which support cutoff evaluation
+//         * (currently, just the {@link PipelineJoin}).
+//         */
+//        public final CAT inputSolutions = new CAT();
+//
+//        /**
+//         * The #of output solutions generated. This is incremented as soon as
+//         * the solution is produced and is used by {@link #getJoinHitRatio()}.
+//         * Of necessity, updates to {@link #inputSolutions} slightly lead
+//         * updates to {@link #inputSolutions}.
+//         */
+//        public final CAT outputSolutions = new CAT();
+//
+//        /**
+//         * The estimated join hit ratio. This is computed as
+//         * 
+//         * <pre>
+//         * outputSolutions / inputSolutions
+//         * </pre>
+//         * 
+//         * It is ZERO (0) when {@link #inputSolutions} is ZERO (0).
+//         * <p>
+//         * The join hit ratio is always accurate when the join is fully
+//         * executed. However, when a cutoff join is used to estimate the join
+//         * hit ratio a measurement error can be introduced into the join hit
+//         * ratio unless {@link Annotations#COALESCE_DUPLICATE_ACCESS_PATHS} is
+//         * <code>false</code>, {@link Annotations#MAX_PARALLEL} is GT ONE (1),
+//         * or {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ZERO (0).
+//         * <p>
+//         * When access paths are coalesced because there is an inner loop over
+//         * the input solutions mapped onto the same access path. This inner loop
+//         * the causes {@link PipelineJoinStats#inputSolutions} to be incremented
+//         * by the #of coalesced access paths <em>before</em> any
+//         * {@link #outputSolutions} are counted. Coalescing access paths
+//         * therefore can cause the join hit ratio to be underestimated as there
+//         * may appear to be more input solutions consumed than were actually
+//         * applied to produce output solutions if the join was cutoff while
+//         * processing a set of input solutions which were identified as using
+//         * the same as-bound access path.
+//         * <p>
+//         * The worst case can introduce substantial error into the estimated
+//         * join hit ratio. Consider a cutoff of <code>100</code>. If one input
+//         * solution generates 100 output solutions and two input solutions are
+//         * mapped onto the same access path, then the input count will be 2 and
+//         * the output count will be 100, which gives a reported join hit ration
+//         * of <code>100/2</code> when the actual join hit ratio is
+//         * <code>100/1</code>.
+//         * <p>
+//         * A similar problem can occur if {@link Annotations#MAX_PARALLEL} or
+//         * {@link Annotations#MAX_PARALLEL_CHUNKS} is GT ONE (1) since input
+//         * count can be incremented by the #of threads before any output
+//         * solutions are generated. Estimation error can also occur if multiple
+//         * join tasks are run in parallel for different chunks of input
+//         * solutions.
+//         */
+//        public double getJoinHitRatio() {
+//            final long in = inputSolutions.get();
+//            final long out = outputSolutions.get();
+//            if (in == 0)
+//                return 0;
+//            return ((double) out) / in;
+//        }
+//
+//        public void add(final BOpStats o) {
+//
+//            super.add(o);
+//
+//            if (o instanceof HashJoinStats) {
+//
+//                final HashJoinStats t = (HashJoinStats) o;
+//
+//                inputSolutions.add(t.inputSolutions.get());
+//
+//                outputSolutions.add(t.outputSolutions.get());
+//                
+//            }
+//
+//        }
+//
+//        @Override
+//        protected void toString(final StringBuilder sb) {
+//            sb.append(",inputSolutions=" + inputSolutions.get());
+//            sb.append(",outputSolutions=" + outputSolutions.get());
+//            sb.append(",joinHitRatio=" + getJoinHitRatio());
+//        }
+//
+//    }
 
     /**
      * Evaluation task.
@@ -435,7 +415,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
             if (log.isDebugEnabled())
                 log.debug("Evaluating subquery hash join: " + joinOp);
 
-            final HashJoinStats stats = (HashJoinStats) context.getStats();
+            final BaseJoinStats stats = (BaseJoinStats) context.getStats();
 
             final QueryEngine queryEngine = context.getRunningQuery()
                     .getQueryEngine();
@@ -605,8 +585,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                 // Accept this binding set.
                                 unsyncBuffer.add(bset);
 
-                                // #of output solutions generated.
-                                stats.outputSolutions.increment();
+//                                // #of output solutions generated.
+//                                stats.outputSolutions.increment();
 
                             }
 
@@ -620,8 +600,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                          * Note: when NO subquery solutions joined for a given
                          * source binding set AND the subquery is OPTIONAL then
                          * we output the _original_ binding set to the sink join
-                         * task(s), but the original binding set still must pass
-                         * any constraint on the join.
+                         * task(s) and DO NOT apply the CONSTRAINT(s).
                          */
 
                         for(Bucket b : map.values()) {
@@ -662,7 +641,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                     unsyncBuffer2.add(bs);
                                 }
 
-                                stats.outputSolutions.increment();
+//                                stats.outputSolutions.increment();
 
                             }
                             

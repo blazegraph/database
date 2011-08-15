@@ -52,10 +52,8 @@ public interface SubqueryJoinAnnotations extends JoinAnnotations {
      * When <code>true</code> the subquery has optional semantics (if the
      * subquery fails, the original binding set will be passed along to the
      * downstream sink anyway) (default {@value #DEFAULT_OPTIONAL}).
-     * 
-     * @todo This is somewhat in conflict with how we mark optional predicates
-     *       to support the RTO. The OPTIONAL marker might need to be moved onto
-     *       the subquery.
+     * <p>
+     * Note: Constraints on the subquery ARE NOT applied on the optional path.
      */
     String OPTIONAL = SubqueryOp.class.getName() + ".optional";
 

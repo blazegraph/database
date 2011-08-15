@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.fed.EmptyChunkMessage;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**

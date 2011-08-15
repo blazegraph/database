@@ -40,17 +40,16 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
-import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
@@ -64,7 +63,6 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Unit tests for the {@link PipelineJoin} operator.
@@ -177,20 +175,22 @@ public class TestPipelineJoin extends TestCase2 {
     }
 
     /**
-     * Unit test for a pipeline join.
+     * Unit test for a pipeline join without shared variables and fed by a
+     * single empty binding set.
      * 
-     * @throws ExecutionException 
-     * @throws InterruptedException 
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
-    public void test_join() throws InterruptedException, ExecutionException {
+    public void test_join_noSharedVariables_emptySourceSolution()
+            throws InterruptedException, ExecutionException {
 
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
         
-        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, startId),//
-				}));
+//        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, startId),//
+//				}));
 
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), Var.var("x") }, NV
@@ -203,7 +203,7 @@ public class TestPipelineJoin extends TestCase2 {
 				}));
 
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] {},// args
 				new NV(Predicate.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
 
@@ -237,7 +237,8 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -250,27 +251,29 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
     }
 
     /**
-     * Unit test for a join without shared variables.
+     * Unit test for a join without shared variables with multiple source
+     * solutions.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void test_join_noSharedVariables() throws InterruptedException, ExecutionException {
+    public void test_join_noSharedVariables_multipleSourceSolutions()
+            throws InterruptedException, ExecutionException {
 
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
         
-		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, startId),//
-				}));
+//		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, startId),//
+//				}));
 
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), Var.var("x") }, NV
@@ -283,7 +286,7 @@ public class TestPipelineJoin extends TestCase2 {
 				}));
 
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] { },// args
 				new NV(Predicate.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp)//
 //				new NV(PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS, false)//
@@ -338,8 +341,8 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-		TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-				new Dechunkerator<IBindingSet>(sink.iterator()));
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -352,10 +355,100 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
+    }
+
+    /**
+     * Unit test for a join with shared variables with multiple source solutions
+     * (the source solutions already have a bound value for the shared variable
+     * so the join turns into a point test).
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_join_sharedVariables_multipleSourceSolutions()
+            throws InterruptedException, ExecutionException {
+
+        final int joinId = 2;
+        final int predId = 3;
+
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                new Constant<String>("Mary"), Var.var("x") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        final PipelineJoin<E> query = new PipelineJoin<E>(
+                new BOp[] { },// args
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp)//
+                );
+
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("y") },//
+                        new IConstant[] { new Constant<String>("John"), new Constant<String>("Jack") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("z") },//
+                        new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jill") }//
+                ),//
+        };
+
+        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+
+        final IAsynchronousIterator<IBindingSet[]> source;
+        {
+
+            final IBindingSet bset1 = new HashBindingSet();
+            final IBindingSet bset2 = new HashBindingSet();
+
+            bset1.set(Var.var("x"), new Constant<String>("John"));
+            bset1.set(Var.var("y"), new Constant<String>("Jack"));
+
+            bset2.set(Var.var("x"), new Constant<String>("Paul"));
+            bset2.set(Var.var("z"), new Constant<String>("Jill"));
+                
+            source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] { new IBindingSet[] { bset1, bset2 } });
+
+        }
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, stats,
+                source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+        
+        // execute task.
+        jnl.getExecutorService().execute(ft);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        // join task
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(2L, stats.unitsIn.get());
+        assertEquals(2L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+        // access path
+        assertEquals(0L, stats.accessPathDups.get());
+        assertEquals(2L, stats.accessPathCount.get());
+        assertEquals(2L, stats.accessPathChunksIn.get());
+        assertEquals(2L, stats.accessPathUnitsIn.get());
+        
     }
 
     /**
@@ -365,15 +458,16 @@ public class TestPipelineJoin extends TestCase2 {
      * @throws ExecutionException 
      * @throws InterruptedException 
      */
-    public void test_join_duplicateElimination() throws InterruptedException, ExecutionException {
+    public void test_join_duplicateElimination() throws InterruptedException,
+            ExecutionException {
 
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
         
-        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, startId),//
-				}));
+//        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, startId),//
+//				}));
 
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), Var.var("x") }, NV
@@ -386,7 +480,7 @@ public class TestPipelineJoin extends TestCase2 {
 				}));
 
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] { },// args
 				new NV(Predicate.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp));
 
@@ -429,13 +523,14 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        ft.get();// wait for completion (before showing stats), then look for errors.
-
-        // show stats.
-        System.err.println("stats: "+stats);
+//        ft.get();// wait for completion (before showing stats), then look for errors.
+//
+//        // show stats.
+//        System.err.println("stats: "+stats);
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(sink.iterator()));
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
         
         // verify stats.
         
@@ -450,9 +545,9 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
     }
 
@@ -472,15 +567,15 @@ public class TestPipelineJoin extends TestCase2 {
                 new Constant<String>("John"),//
         };
         
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
 
-		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(BOpBase.Annotations.BOP_ID, startId),//
-				})); 
+//		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(BOpBase.Annotations.BOP_ID, startId),//
+//				})); 
         
-		final Predicate<E> predOp =                 new Predicate<E>(
+        final Predicate<E> predOp = new Predicate<E>(
                 new IVariableOrConstant[] { new Constant<String>("Mary"), y },//
                 NV.asMap(new NV[] {//
                                 new NV(
@@ -492,7 +587,7 @@ public class TestPipelineJoin extends TestCase2 {
                         })); 
 		
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] { },// args
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
 				new NV(PipelineJoin.Annotations.CONSTRAINTS,
@@ -522,7 +617,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -535,9 +630,9 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
     }
 
@@ -627,7 +722,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -640,9 +735,9 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(5L, stats.accessPathUnitsIn.get());
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
         
     }
 
@@ -660,13 +755,13 @@ public class TestPipelineJoin extends TestCase2 {
 
         final Var<?> x = Var.var("x");
         
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
 
-		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, startId),//
-				}));
+//		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, startId),//
+//				}));
 
 		final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), x }, NV.asMap(new NV[] {//
@@ -679,7 +774,7 @@ public class TestPipelineJoin extends TestCase2 {
 				})); 
 		
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp }, //
+				new BOp[] { }, // args
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred)//
 //				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE)
@@ -734,7 +829,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -747,9 +842,9 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
     }
 
@@ -765,13 +860,13 @@ public class TestPipelineJoin extends TestCase2 {
         
         final Var<?> x = Var.var("x");
         
-        final int startId = 1;
+//        final int startId = 1;
         final int joinId = 2;
 		final int predId = 3;
 
-		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, startId),//
-				}));
+//		final BOp startOp = new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, startId),//
+//				}));
 
 		final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), x }, NV.asMap(new NV[] {//
@@ -784,7 +879,7 @@ public class TestPipelineJoin extends TestCase2 {
 				}));
 
 		final PipelineJoin<E> query = new PipelineJoin<E>(
-				new BOp[] { startOp },//
+				new BOp[] { },// args
 				new NV(BOpBase.Annotations.BOP_ID, joinId),//
 				new NV(PipelineJoin.Annotations.PREDICATE, pred)//
 //				new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE)
@@ -845,8 +940,8 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator(), ft);
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -859,9 +954,9 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathChunksIn.get());
         assertEquals(2L, stats.accessPathUnitsIn.get());
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
         
     }
 

@@ -334,6 +334,70 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
+     * Copy the as-bound values for the named variables out of the
+     * {@link IElement} and into the caller's array.
+     * 
+     * @return The caller's array. If a variable was resolved to a bound value,
+     *         then it was set on the corresponding index of the array. If not,
+     *         then that index of the array was cleared to <code>null</code>.
+     * 
+     * @param e
+     *            The element.
+     * @param pred
+     *            The predicate.
+     * @param vars
+     *            The variables whose values are desired. They are located
+     *            within the element by examining the arguments of the
+     *            predicate.
+     * @param out
+     *            The array into which the values are copied.
+     *            
+     *            TODO Unit tests.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    static public void copyValues(final IElement e, final IPredicate<?> pred,
+            final IVariable<?>[] vars, final IConstant<?>[] out) {
+
+        final int arity = pred.arity();
+
+        for (int i = 0; i < vars.length; i++) {
+            
+            out[i] = null; // clear old value (if any).
+
+            boolean found = false;
+            for (int j = 0; j < arity && !found; j++) {
+
+                final IVariableOrConstant<?> t = pred.get(j);
+
+                if (t.isVar()) {
+
+                    final IVariable<?> var = (IVariable<?>) t;
+
+                    if (var.equals(vars[i])) {
+
+                        // the as-bound value of the predicate given that
+                        // element.
+                        final Object val = e.get(j);
+
+                        if (val != null) {
+
+                            out[i] = new Constant(val);
+
+                            found = true;
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    /**
      * Copy the values for variables in the predicate from the element, applying
      * them to the caller's {@link IBindingSet}.
      * 
