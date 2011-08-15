@@ -188,14 +188,33 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         		log.info("Ignoring expected exception: "+ex);
         }
 
-        // w/o evaluation on the query controller.
+        // w/ illegal evaluation context.
         try {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
-//                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.ANY),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,
+                            true),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
+                            1),//
+                }));
+        fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
+        // w/ illegal evaluation context.
+        try {
+        new DistinctBindingSetsWithHTreeOp(new BOp[]{},
+                NV.asMap(new NV[]{//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.SHARDED),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,
                             true),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL,
@@ -291,39 +310,44 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
-        final BOpStats stats = query.newStats(queryContext);
+            
+            final BOpStats stats = query.newStats(queryContext);
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+            final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
-        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+            final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                    query, stats);
 
-        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, null/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */, null/* indexManager */),
+                    -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
-        // get task.
-        final FutureTask<Void> ft = query.eval(context);
-        
-        // execute task.
-//        jnl.getExecutorService().execute(ft);
-        ft.run();
+            // get task.
+            final FutureTask<Void> ft = query.eval(context);
 
-		TestQueryEngine.assertSameSolutionsAnyOrder("", expected,
-				sink.iterator(), ft);
+            // execute task.
+            // jnl.getExecutorService().execute(ft);
+            ft.run();
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+            TestQueryEngine.assertSameSolutionsAnyOrder("", expected,
+                    sink.iterator(), ft);
 
-        assertEquals(1L, stats.chunksIn.get());
-        assertEquals(6L, stats.unitsIn.get());
-        assertEquals(4L, stats.unitsOut.get());
-        assertEquals(1L, stats.chunksOut.get());
+            // assertTrue(ft.isDone());
+            // assertFalse(ft.isCancelled());
+            // ft.get(); // verify nothing thrown.
+
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(6L, stats.unitsIn.get());
+            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+
         } finally {
+        
             queryContext.close();
+            
         }
 
     }
-    
+
 }

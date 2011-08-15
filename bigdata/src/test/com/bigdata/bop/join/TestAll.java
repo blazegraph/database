@@ -64,6 +64,8 @@ public class TestAll extends TestCase {
         // @todo test each kind of join operator against a standalone db.
         suite.addTestSuite(TestPipelineJoin.class);
 
+        suite.addTestSuite(TestHTreeHashJoin.class);
+
         return suite;
         
     }

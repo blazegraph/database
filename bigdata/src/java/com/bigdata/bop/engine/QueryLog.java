@@ -50,7 +50,7 @@ import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Class defines the log on which summary operator execution statistics are
- * written..
+ * written.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: RuleLog.java 3448 2010-08-18 20:55:58Z thompsonbry $

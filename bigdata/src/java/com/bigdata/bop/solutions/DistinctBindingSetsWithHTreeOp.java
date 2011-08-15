@@ -78,8 +78,9 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 		super(args, annotations);
 
 		switch (getEvaluationContext()) {
-		case CONTROLLER:
-			break;
+        case CONTROLLER:
+        case HASHED:
+            break;
 		default:
 			throw new UnsupportedOperationException(
 					Annotations.EVALUATION_CONTEXT + "="
@@ -155,23 +156,46 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
     }
 
     /**
-     * Wrapper used for the as bound solutions in the {@link HTree}.
+     * Wrapper used for as bound solutions in the {@link HTree}.
+     * <p>
+     * Note: A similar class appears in different operators which use the
+     * {@link HTree}. However, these classes differ in what bindings are
+     * conceptually part of the key in the {@link HTree}, in how they compute
+     * the hash code under which the solution will be indexed, and in how they
+     * compare the solutions for equality.
+     * <p>
+     * This implementation relies on an ordered {@link IVariable}[] which
+     * defines the bindings that are part of the key and permits a simpler
+     * {@link #equals(Object)}s method that would be used if an entire
+     * {@link IBindingSet} was being tested for equality (binding sets do not
+     * consider order of the bindings when testing for equality).
      */
     private static class Solution implements Serializable {
-    	
-		private static final long serialVersionUID = 1L;
+        
+        private static final long serialVersionUID = 1L;
 
-		private final int hash;
+        private final int hash;
 
         private final IConstant<?>[] vals;
 
+        /**
+         * Solution whose hash code is the hash code of the {@link IConstant}[].
+         * 
+         * @param vals
+         *            The values.
+         */
         public Solution(final IConstant<?>[] vals) {
+
             this.vals = vals;
+            
             this.hash = java.util.Arrays.hashCode(vals);
+            
         }
 
         public int hashCode() {
+
             return hash;
+            
         }
 
         public boolean equals(final Object o) {
@@ -194,9 +218,10 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
             }
             return true;
         }
-    }
 
-	/**
+    } // class Solution
+
+    /**
 	 * Extends {@link BOpStats} to provide the shared state for the distinct
 	 * solution groups across multiple invocations of the DISTINCT operator.
 	 */
@@ -261,6 +286,22 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
     		// Will support incremental eviction and persistence.
     		this.map = HTree.create(store, metadata);    		
+
+    	}
+    	
+        /**
+         * Discard the map.
+         * <p>
+         * Note: The map can not be discarded (or cleared) until the last
+         * invocation.
+         */
+    	private void release() {
+
+    	    final IRawStore store = map.getStore();
+            
+    	    map.close();
+    	    
+            store.close();
 
     	}
     	
@@ -401,7 +442,7 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-            final BOpStats stats = context.getStats();
+            final DistinctStats stats = (DistinctStats) context.getStats();
 
             final IAsynchronousIterator<IBindingSet[]> itr = context
                     .getSource();
@@ -482,25 +523,17 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
                 sink.flush();
 
-                if(context.isLastInvocation()) {
-
-					/*
-					 * Discard the map.
-					 * 
-					 * Note: The map can not be discarded (or cleared) until the
-					 * last invocation.
-					 */
-                    final IRawStore store = map.getStore();
-                    map.close();
-                    store.close();
-                    
-                }
-                
                 // done.
                 return null;
                 
             } finally {
 
+                if(context.isLastInvocation()) {
+
+                    stats.release();
+                    
+                }
+                
                 sink.close();
 
             }

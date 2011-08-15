@@ -422,22 +422,19 @@ public class SubqueryOp extends PipelineOp {
 
                         /*
                          * Since there were no solutions for the subquery, copy
-                         * the original binding set to the default sink.
-                         * 
-                         * @todo If we add a CONSTRAINTS annotation to the
-                         * SubqueryOp then we need to make sure that it is
-                         * applied to all solutions copied out of the subquery.
+                         * the original binding set to the default sink and do
+                         * NOT apply the constraints.
                          */
 
-                        if (constraints == null
-                                || BOpUtility.isConsistent(constraints, bset)) {
+//                        if (constraints == null
+//                                || BOpUtility.isConsistent(constraints, bset)) {
 
                             final IBindingSet tmp = selectVars == null ? bset
                                     : bset.copy(selectVars);
                             
                             parentContext.getSink().add(new IBindingSet[]{tmp});
                             
-                        }
+//                        }
                         
                     }
                     

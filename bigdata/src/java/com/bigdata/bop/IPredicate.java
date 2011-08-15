@@ -99,6 +99,16 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         /**
          * <code>true</code> iff the predicate has SPARQL optional semantics
          * (default {@value #DEFAULT_OPTIONAL}).
+         * <p>
+         * Note: When a JOIN is associated with an optional predicate and there
+         * are {@link IConstraint}s attached to that join, the constraints are
+         * evaluated only for solutions which join. Solutions which do not join
+         * (or which join but fail the constraints) are output without testing
+         * the constraints a second time.
+         * <p>
+         * Note: JOIN and SUBQUERY operators will route optional solutions to
+         * the altSink if the altSink is specified and to the default sink
+         * otherwise.
          */
         String OPTIONAL = IPredicate.class.getName() + ".optional";
 

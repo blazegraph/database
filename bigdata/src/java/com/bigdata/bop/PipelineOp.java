@@ -68,6 +68,10 @@ abstract public class PipelineOp extends BOpBase {
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
          * the ancestor in the operator tree which serves as the alternative
          * sink for binding sets (default is no alternative sink).
+         * <p>
+         * Note: JOIN and SUBQUERY operators will route optional solutions to
+         * the altSink if the altSink is specified and to the default sink
+         * otherwise.
          */
 		String ALT_SINK_REF = PipelineOp.class.getName() + ".altSinkRef";
 
@@ -517,31 +521,6 @@ abstract public class PipelineOp extends BOpBase {
 
     }
 
-//    /**
-//     * Instantiate a buffer suitable as a sink for this operator. The buffer
-//     * will be provisioned based on the operator annotations.
-//     * <p>
-//     * Note: if the operation swallows binding sets from the pipeline (such as
-//     * operators which write on the database) then the operator MAY return an
-//     * immutable empty buffer.
-//     * 
-//     * @param stats
-//     *            The statistics on this object will automatically be updated as
-//     *            elements and chunks are output onto the returned buffer.
-//     * 
-//     * @return The buffer.
-//     */
-//    public IBlockingBuffer<IBindingSet[]> newBuffer(final BOpStats stats) {
-//
-//        if (stats == null)
-//            throw new IllegalArgumentException();
-//        
-//        return new BlockingBufferWithStats<IBindingSet[]>(
-//                getChunkOfChunksCapacity(), getChunkCapacity(),
-//                getChunkTimeout(), Annotations.chunkTimeoutUnit, stats);
-//
-//    }
-    
     /**
      * Return a {@link FutureTask} which computes the operator against the
      * evaluation context. The caller is responsible for executing the
@@ -560,31 +539,5 @@ abstract public class PipelineOp extends BOpBase {
      *       return the ForkJoinTask.
      */
     abstract public FutureTask<Void> eval(BOpContext<IBindingSet> context);
-
-//	/**
-//	 * Hook to setup any resources associated with the operator (temporary
-//	 * files, memory manager allocation contexts, etc.). This hook is invoked
-//	 * exactly once and before any instance task for the operator is evaluated.
-//	 */
-//    public void setUp() throws Exception {
-//
-//    	if (log.isTraceEnabled())
-//			log.trace("bopId=" + getId());
-//
-//    }
-
-//	/**
-//	 * Hook to tear down any resources associated with the operator (temporary
-//	 * files, memory manager allocation contexts, etc.). This hook is invoked
-//	 * exactly once no later than when the query is cancelled. If the operator
-//	 * is known to be done executing, then this hook will be invoked at that
-//	 * time.
-//	 */
-//    public void tearDown() throws Exception {
-//
-//    	if (log.isTraceEnabled())
-//    		log.trace("bopId=" + getId());
-//    	
-//    }
 
 }
