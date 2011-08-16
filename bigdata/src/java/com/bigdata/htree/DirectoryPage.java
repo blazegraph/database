@@ -10,6 +10,8 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
 import com.bigdata.htree.AbstractHTree.ChildMemoizer;
 import com.bigdata.htree.AbstractHTree.LoadChildRequest;
@@ -31,6 +33,15 @@ import cutthecrap.utils.striterators.Striterator;
  */
 class DirectoryPage extends AbstractPage implements IDirectoryData {
 	static int createdPages = 0;
+	
+    /**
+     * The depth of a bucket page which overflows is always <i>addressBits</i>.
+     */
+    final int getOverflowPageDepth() {
+     
+        return htree.addressBits;
+        
+    }
 	
 	/**
 	 * Transient references to the children.
@@ -248,10 +259,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
              * different threads for different operations. However, this
              * synchronization will never be contended for the mutable B+Tree.
              */
-
-//			if (index >= childRefs.length) // TODO debug point - remove.
-//				throw new IndexOutOfBoundsException();
-        	
+      	
             final Reference<AbstractPage> childRef = childRefs[index];
 
             final AbstractPage child = childRef == null ? null : childRef.get();
@@ -400,12 +408,15 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		}
 
-		/*
-		 * Find the local depth of the child within this node. this becomes the
-		 * global depth of the child.
-		 */
-		final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
-				globalDepth, npointers);
+		        /*
+         * Find the local depth of the child within this node. this becomes the
+         * global depth of the child.
+         * 
+         * Note: This winds up being invoked to compute the depth of an overflow
+         * directory page when we first descend from a normal directory page.
+         */
+        final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
+                globalDepth, npointers);
 
         /*
          * Read the child from the backing store (potentially reads through to
@@ -423,8 +434,17 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		child = htree.readNodeOrLeaf(addr);
 		
-		// set the depth on the child.
-		child.globalDepth = localDepth;
+        // set the depth on the child.
+        if (!child.isLeaf() && ((DirectoryPage) child).isOverflowDirectory()) {
+            /*
+             * Note: The global depth of an overflow page is always set to this
+             * constant. It should be ignored for code paths which maintain the
+             * overflow directory and overflow bucket pages.
+             */
+            child.globalDepth = getOverflowPageDepth();
+        } else {
+            child.globalDepth = localDepth;
+        }
 
 		/*
 		 * Set the reference for each slot in the buddy bucket which pointed at
@@ -646,29 +666,32 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		return data.isReadOnly();
 	}
 
-	/**
-	 * @param htree
-	 *            The owning hash tree.
-	 * @param globalDepth
-	 *            The size of the address space (in bits) for each buddy hash
-	 *            table on a directory page. The global depth of a node is
-	 *            defined recursively as the local depth of that node within its
-	 *            parent. The global/local depth are not stored explicitly.
-	 *            Instead, the local depth is computed dynamically when the
-	 *            child will be materialized by counting the #of pointers to the
-	 *            the child in the appropriate buddy hash table in the parent.
-	 *            This local depth value is passed into the constructor when the
-	 *            child is materialized and set as the global depth of the
-	 *            child.
-	 */
+    /**
+     * @param htree
+     *            The owning hash tree.
+     * @param overflowDirectory
+     *            <code>true</code> iff this is an overflow directory page.
+     * @param globalDepth
+     *            The size of the address space (in bits) for each buddy hash
+     *            table on a directory page. The global depth of a node is
+     *            defined recursively as the local depth of that node within its
+     *            parent. The global/local depth are not stored explicitly.
+     *            Instead, the local depth is computed dynamically when the
+     *            child will be materialized by counting the #of pointers to the
+     *            the child in the appropriate buddy hash table in the parent.
+     *            This local depth value is passed into the constructor when the
+     *            child is materialized and set as the global depth of the
+     *            child.
+     */
 	@SuppressWarnings("unchecked")
-	public DirectoryPage(final HTree htree, final int globalDepth) {
+    public DirectoryPage(final HTree htree, final boolean overflowDirectory,
+            final int globalDepth) {
 
 		super(htree, true/* dirty */, globalDepth);
 
 		childRefs = new Reference[(1 << htree.addressBits)];
 
-		data = new MutableDirectoryPageData(htree.addressBits,
+		data = new MutableDirectoryPageData(overflowDirectory, htree.addressBits,
 				htree.versionTimestamps);
 
 		createdPages++;
@@ -919,7 +942,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 */
 	private class ChildIterator implements Iterator<AbstractPage> {
 
-		final private int slotsPerPage = 1 << globalDepth;
+		final private int slotsPerPage = 1 << htree.addressBits;
 		private int slot = 0;
 		private AbstractPage child = null;
 
@@ -927,17 +950,28 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			nextChild(); // materialize the first child.
 		}
 
-		/**
-		 * Advance to the next distinct child. The first time, this will always
-		 * return the child in slot zero on the page. Thereafter, it will skip
-		 * over pointers to the same child and return the next distinct child.
-		 * 
-		 * @return <code>true</code> iff there is another distinct child
-		 *         reference.
-		 */
+        /**
+         * Advance to the next distinct child, materializing it if necessary.
+         * The first time, this will always return the child in slot zero on the
+         * page. Thereafter, it will skip over pointers to the same child and
+         * return the next distinct child.
+         * <p>
+         * Note: For the special case of an overflow directory we allow a
+         * <code>null</code> pointer for a child at a given index.
+         * 
+         * @return <code>true</code> iff there is another distinct child
+         *         reference.
+         */
 		private boolean nextChild() {
+		    final boolean isOverflowDirectory = isOverflowDirectory();
 			for (; slot < slotsPerPage; slot++) {
-				final AbstractPage tmp = getChild(slot);
+			    AbstractPage tmp = deref(slot);
+                if (isOverflowDirectory && tmp == null
+                        && data.getChildAddr(slot) == NULL) {
+			        // Null pointers allowed in an overflow directory page.
+			        continue;
+			    }
+                tmp = tmp == null ? getChild(slot) : tmp;
 				if (tmp != child) {
 					child = tmp;
 					return true;
@@ -1542,7 +1576,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
 
-		final int slotsOnPage = 1 << globalDepth;
+		final int slotsOnPage = 1 << htree.addressBits;
 
 		// Scan for location in weak references.
 		int npointers = 0;
@@ -1597,8 +1631,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
     }
     
-    void replaceChildRef(Reference oldRef, AbstractPage newChild) {
-		final int slotsOnPage = 1 << htree.addressBits;
+    void replaceChildRef(final Reference<?> oldRef, final AbstractPage newChild) {
+
+        final int slotsOnPage = 1 << htree.addressBits;
 
 		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
 		
@@ -1646,6 +1681,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	void _addLevel(final BucketPage bucketPage) {
 		assert !isReadOnly();
+		assert !isOverflowDirectory();
 
 		/**
 		 * TBD: Since for _addLevel to be called there should only be a single reference to
@@ -1655,10 +1691,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		 * and insert the requisite references
 		 */
 		
-		// Create new directory to insert
-		DirectoryPage ndir = new DirectoryPage((HTree) htree, htree.addressBits/* globalDepth */);
-		
-		((HTree) htree).nnodes++;
+        // Create new directory to insert
+        final DirectoryPage ndir = new DirectoryPage((HTree) htree,
+                false, // overflowDirectory
+                htree.addressBits/* globalDepth */);
+
+        ((HTree) htree).nnodes++;
 
 		// And new bucket pages for the new directory
 		final BucketPage a = new BucketPage((HTree) htree, 1);
@@ -1691,4 +1729,137 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		bucketPage.delete();
 	}
 
+	/**
+	 * This method should only be called when using a DirectoryPage as a BucketPage
+	 * Blob.  The final child in the blob is used for insert by default.
+	 * 
+	 * @param child - the child to be added
+	 */
+	void _addChild(final AbstractPage child) {
+		assert isOverflowDirectory();
+		assert !isReadOnly();
+		
+		// find available slot
+		final MutableDirectoryPageData pdata = (MutableDirectoryPageData) data;
+		
+		for (int i = 0; i < pdata.childAddr.length; i++) {
+
+		    final AbstractPage aChild = childRefs[i] == null ? null
+                    : childRefs[i].get();
+            
+		    if (aChild == null && pdata.childAddr[i] == NULL) {
+
+				childRefs[i] = (Reference<AbstractPage>) child.self;
+				
+				child.parent = (Reference<DirectoryPage>) self;
+				
+				return;
+			
+		    }
+		    
+		}
+		
+		// else insert new level above this one and add child to that
+		final DirectoryPage pd = getParentDirectory();
+		if (pd.isOverflowDirectory()) { // already handles blobs
+			assert false; // unsure for now
+		} else {
+            final DirectoryPage blob = new DirectoryPage((HTree) htree,
+                    true/*overflowDirectory*/,
+                    getOverflowPageDepth());
+			blob._addChild(this);
+			blob._addChild(child);
+			
+			pd.replaceChildRef(this.self, blob);
+		}
+	}
+
+    /**
+     * Return the last non-<code>null</code> child of an overflow directory
+     * page.
+     */
+	AbstractPage lastChild() {
+        assert isOverflowDirectory();
+        for (int i = data.getChildCount() - 1; i >= 0; i--) {
+            final AbstractPage aChild = deref(i);
+            if (aChild != null) {
+                htree.touch(aChild);
+                return aChild;
+            }
+            if (data.getChildAddr(i) != NULL)
+                return getChild(i);
+        }
+		
+		throw new AssertionError();
+	}
+
+    /**
+     * Double indirection dereference for the specified index. If the
+     * {@link Reference} is <code>null</code>, returns <code>null</code>.
+     * Otherwise returns {@link Reference#get()}.
+     */
+	private AbstractPage deref(final int index) {
+
+	    return childRefs[index] == null ? null  : childRefs[index].get();
+
+	}
+	
+	public boolean isOverflowDirectory() {
+	    
+	    return data.isOverflowDirectory();
+	    
+	}
+	
+	/**
+	 * Use Striterator Expander to optimize iteration
+	 */
+	public ITupleIterator getTuples() {
+		// start with child nodes
+		final Striterator tups = new Striterator(childIterator());
+		
+		// expand child contents
+		tups.addFilter(new Expander() {
+
+			protected Iterator expand(Object obj) {
+				if (obj instanceof BucketPage) {
+					return ((BucketPage) obj).tuples();
+				} else {
+					return ((DirectoryPage) obj).getTuples();
+				}					
+			}
+			
+		});
+		
+		// wrap striterator for return type
+		return new ITupleIterator() {
+			
+			public ITuple next() {
+				return (ITuple) tups.next();
+			}
+
+			public boolean hasNext() {
+				return tups.hasNext();
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+			
+		};
+		
+	}
+
+	@Override
+	boolean isClean() {
+		for (int i = 0; i < childRefs.length; i++) {
+			if (childRefs[i] != null) {
+				final AbstractPage node = childRefs[i].get();
+				if (node != null && !node.isClean()) {
+					return false;
+				}
+			}
+		}
+		
+		return !isDirty();
+	}
 }

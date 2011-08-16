@@ -1196,6 +1196,10 @@ abstract public class AbstractHTree implements ICounterSetAccess {
     /**
      * Note: Method is package private since it must be overridden for some unit
      * tests.
+     * <p>
+     * Note: If the retention queue is less than the maximum depth of the HTree
+     * then we can encounter a copy-on-write problem where the parent directory
+     * becomes immutable during a mutation on the child.
      */
     IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
 
@@ -1574,6 +1578,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
             // write the dirty node on the store.
             writeNodeOrLeaf(t);
+            
+            assert t.isClean();
 
             ndirty++;
             
@@ -1682,8 +1688,9 @@ abstract public class AbstractHTree implements ICounterSetAccess {
         } else {
 
             // parent must be dirty if child is dirty.
-            if(!parent.isDirty()) // TODO remove (debug point). 
+            if(!parent.isDirty()) { // TODO remove (debug point).
                 throw new AssertionError();
+            }
             assert parent.isDirty();
 
             // parent must not be persistent if it is dirty.

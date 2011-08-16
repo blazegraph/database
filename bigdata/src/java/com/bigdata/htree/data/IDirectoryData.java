@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.htree.data;
 
-import com.bigdata.btree.data.IChildData;
 import com.bigdata.btree.data.ITreeNodeData;
 import com.bigdata.rawstore.IRawStore;
 
@@ -71,4 +70,14 @@ import com.bigdata.rawstore.IRawStore;
  */
 public interface IDirectoryData extends ITreeNodeData {
 
+    /**
+     * <code>true</code> iff this is an overflow directory page. An overflow
+     * directory page is created when a bucket page overflows as the parent of
+     * that bucket page. The children of the overflow directory page may be
+     * other overflow directory pages or bucket pages. All bucket pages below an
+     * overflow directory page will have the same key. That key is recorded once
+     * in each overflow bucket page.
+     */
+    public boolean isOverflowDirectory();
+    
 }

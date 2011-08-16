@@ -1,6 +1,8 @@
 package com.bigdata.htree;
 
 import java.io.PrintStream;
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -104,7 +106,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * Note: This is package private in order to expose it to {@link HTree}.
 	 */
 	ILeafData data;
-
+	
 	public AbstractFixedByteArrayBuffer data() {
 		return data.data();
 	}
@@ -526,7 +528,9 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
          */
         final BucketPage copy = (BucketPage) copyOnWrite();
 
-        if (copy != this) {
+		// assert copy.dirtyHierarchy();
+
+		if (copy != this) {
 
 			/*
 			 * This leaf has been copied so delegate the operation to the new
@@ -589,23 +593,40 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			 */
 			return false;
 		}
-
+		
 		/*
-		 * Since the page is full, we need to grow the page (or chain an
-		 * overflow page) rather than splitting the page.
-		 * 
-		 * FIXME [Chain overflow buckets. This is much faster when we have a lot
-		 * of duplicate keys, which will be the case for some GROUP BY queries.]
-		 * Maybe the easiest thing to do is just double the target #of slots on
-		 * the page. We would rely on keys.capacity() in this case rather than
-		 * #slots. In fact, we could just reenter the method above after
-		 * doubling as long as we rely on keys.capacity() in the case where
-		 * nbuddies==1. [Unit test for this case.]
+		 * Rather than overflow a BucketPage by some chaining structure it
+		 * turns out to be a lot simpler to introduce a new DirectoryPage
+		 * for this bucketPage since the serialization and dirty protocols
+		 * need not change at all. 
 		 */
+		
+		/**
+		 * In any event:
+		 * 		create new bucket page and insert key/value
+		 */
+		final BucketPage newPage = new BucketPage((HTree) htree, globalDepth);			
 
-		throw new UnsupportedOperationException(
-				"Must overflow since all keys on full buddy bucket are duplicates.");
+		final DirectoryPage pd = getParentDirectory();
+		if (pd.isOverflowDirectory()) { // already handles blobs
+			pd._addChild(newPage); // may result in extra level insertion
+		} else {
+            final DirectoryPage blob = new DirectoryPage((HTree) htree,
+                    true,// overflowDirectory
+                    pd.getOverflowPageDepth());
+			// now add in blob
+			pd.replaceChildRef(this.self, blob);
 
+			blob._addChild(this);
+			blob._addChild(newPage); // Directories MUST have at least 2 slots!
+			
+		}
+		
+		newPage.insert(key, val);
+		
+		assert dirtyHierarchy();
+
+		return true;
 	}
 
 	/**
@@ -1338,9 +1359,14 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
         final BucketPage copy = (BucketPage) copyOnWrite();
         if (copy != this) {
         	copy.addLevel();
-        } else {
-        	getParentDirectory()._addLevel(this);
+        	return;
         }
+    	getParentDirectory()._addLevel(this);
 	}
-	
+
+	@Override
+	boolean isClean() {
+		return !isDirty();
+	}
+
 }
