@@ -48,8 +48,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.DefaultQueryAttributes;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IQueryContext;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.engine.QueryEngine.Counters;
@@ -94,7 +95,7 @@ import com.bigdata.util.concurrent.IHaltable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRunningQuery implements IRunningQuery, IQueryContext {
+abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /**
      * Error message used when an operation which must be performed on the query
@@ -585,7 +586,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
 
         final int bopId = bop.getId();
 
-        statsMap.put(bopId, bop.newStats(this));
+        statsMap.put(bopId, bop.newStats());
 
         if (!op.getProperty(BOp.Annotations.CONTROLLER,
                 BOp.Annotations.DEFAULT_CONTROLLER)) {
@@ -1345,6 +1346,14 @@ abstract public class AbstractRunningQuery implements IRunningQuery, IQueryConte
 
     private final AtomicReference<IMemoryManager> memoryManager = new AtomicReference<IMemoryManager>();
     
+    final public IQueryAttributes getAttributes() {
+        
+        return queryAttributes;
+        
+    }
+
+    private final IQueryAttributes queryAttributes = new DefaultQueryAttributes();
+
     /**
      * Return the textual representation of the {@link RunState} of this query.
      * <p>

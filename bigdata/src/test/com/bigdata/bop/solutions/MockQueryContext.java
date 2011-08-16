@@ -29,6 +29,8 @@ package com.bigdata.bop.solutions;
 
 import java.util.UUID;
 
+import com.bigdata.bop.DefaultQueryAttributes;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IQueryContext;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -43,6 +45,8 @@ public class MockQueryContext implements IQueryContext {
     private final UUID queryId;
 
     private volatile IMemoryManager memoryManager;
+
+    private final IQueryAttributes queryAttributes = new DefaultQueryAttributes();
 
     public MockQueryContext(final UUID queryId) {
 
@@ -60,6 +64,10 @@ public class MockQueryContext implements IQueryContext {
         return memoryManager;
     }
 
+    public IQueryAttributes getAttributes() {
+        return queryAttributes;
+    }
+    
     synchronized public void close() {
 
         final IMemoryManager memoryManager = this.memoryManager;

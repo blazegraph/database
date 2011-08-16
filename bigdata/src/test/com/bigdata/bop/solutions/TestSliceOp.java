@@ -217,7 +217,7 @@ public class TestSliceOp extends TestCase2 {
 //                ),ne
         };
 
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -312,7 +312,7 @@ public class TestSliceOp extends TestCase2 {
                                 new Constant<String>("Leon") }//
                 ), };
 
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -376,7 +376,7 @@ public class TestSliceOp extends TestCase2 {
         // the expected solutions (none)
         final IBindingSet[] expected = new IBindingSet[0];
         
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -471,7 +471,7 @@ public class TestSliceOp extends TestCase2 {
                 ),//
         };
 
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -537,7 +537,7 @@ public class TestSliceOp extends TestCase2 {
         // the expected solutions
         final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
 
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -594,7 +594,7 @@ public class TestSliceOp extends TestCase2 {
 
         assertEquals("limit", 3L, query.getLimit());
 
-        final BOpStats stats = query.newStats(null/* queryContext */);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -634,7 +634,7 @@ public class TestSliceOp extends TestCase2 {
 
         assertEquals("limit", 0L, query.getLimit());
 
-        final BOpStats stats = query.newStats(null/* queryContext */);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -705,7 +705,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
                 }));
 
-        final SliceStats stats = query.newStats(null/* queryContext */);
+        final SliceStats stats = query.newStats();
 
         // start time in nanos.
         final long begin = System.nanoTime();

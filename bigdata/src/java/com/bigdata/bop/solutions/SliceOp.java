@@ -36,9 +36,8 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.IQueryContext;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -229,7 +228,8 @@ public class SliceOp extends PipelineOp {
         
     }
     
-    public SliceStats newStats(final IQueryContext queryContext) {
+    @Override
+    public SliceStats newStats() {
         
         return new SliceStats();
         

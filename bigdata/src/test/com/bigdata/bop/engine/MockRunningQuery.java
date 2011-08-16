@@ -37,8 +37,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -55,6 +58,8 @@ public class MockRunningQuery implements IRunningQuery {
 
     private final IIndexManager indexManager;
 
+    private final IQueryContext queryContext;
+    
     /**
      * Note: This constructor DOES NOT check its arguments so unit tests may be
      * written with the minimum dependencies
@@ -66,9 +71,15 @@ public class MockRunningQuery implements IRunningQuery {
      */
     public MockRunningQuery(final IBigdataFederation<?> fed,
             final IIndexManager indexManager) {
+        this(fed, indexManager, null/* queryContext */);
+    }
+
+    public MockRunningQuery(final IBigdataFederation<?> fed,
+            final IIndexManager indexManager, final IQueryContext queryContext) {
 
         this.fed = fed;
         this.indexManager = indexManager;
+        this.queryContext = queryContext;
 
     }
 
@@ -173,6 +184,18 @@ public class MockRunningQuery implements IRunningQuery {
 
     public IQueryClient getQueryController() {
         throw new UnsupportedOperationException();
+    }
+
+    public IMemoryManager getMemoryManager() {
+        
+        return queryContext.getMemoryManager();
+        
+    }
+
+    public IQueryAttributes getAttributes() {
+
+        return queryContext.getAttributes();
+        
     }
 
 }

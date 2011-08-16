@@ -166,7 +166,7 @@ public class TestMemorySortOp extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
         } ;
 
-        final BOpStats stats = query.newStats (null/*queryContext*/) ;
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -274,7 +274,7 @@ public class TestMemorySortOp extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
         } ;
 
-        final BOpStats stats = query.newStats (null/*queryContext*/) ;
+        final BOpStats stats = query.newStats () ;
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });
@@ -386,7 +386,7 @@ public class TestMemorySortOp extends TestCase2 {
             , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _1 } )
         } ;
 
-        final BOpStats stats = query.newStats (null/*queryContext*/) ;
+        final BOpStats stats = query.newStats () ;
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data });

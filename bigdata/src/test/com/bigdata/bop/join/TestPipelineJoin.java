@@ -207,7 +207,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} });
@@ -300,7 +300,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source;
         {
@@ -391,7 +391,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source;
         {
@@ -492,7 +492,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         // submit TWO (2) empty binding sets in ONE (1) chunk.
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
@@ -588,7 +588,7 @@ public class TestPipelineJoin extends TestCase2 {
                 new IConstant[] { new Constant<String>("John") }//
         ) };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
@@ -693,7 +693,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),
                 };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
@@ -803,7 +803,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -912,7 +912,7 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);
@@ -1047,7 +1047,7 @@ public class TestPipelineJoin extends TestCase2 {
               ),//
         };
 
-        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+        final PipelineJoinStats stats = query.newStats();
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);

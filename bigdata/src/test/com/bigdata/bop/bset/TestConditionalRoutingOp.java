@@ -181,7 +181,7 @@ public class TestConditionalRoutingOp extends TestCase2 {
                         new IConstant[] { new Constant<String>("Leon") }//
                 ), };
 
-        final BOpStats stats = query.newStats(null/*queryContext*/);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -201,12 +201,12 @@ public class TestConditionalRoutingOp extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator(), ft);
         
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());

@@ -437,8 +437,7 @@ public class TestHTreeHashJoin extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
-            final BaseJoinStats stats = (BaseJoinStats) query
-                    .newStats(queryContext);
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
 
             final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                     new IBindingSet[][] { initialBindingSets });
@@ -447,8 +446,9 @@ public class TestHTreeHashJoin extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                    ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
 
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
@@ -554,8 +554,7 @@ public class TestHTreeHashJoin extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
-            final BaseJoinStats stats = (BaseJoinStats) query
-                    .newStats(queryContext);
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
 
             final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                     new IBindingSet[][] { initialBindingSets });
@@ -564,8 +563,9 @@ public class TestHTreeHashJoin extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                    ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
 
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
@@ -671,8 +671,7 @@ public class TestHTreeHashJoin extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
-            final BaseJoinStats stats = (BaseJoinStats) query
-                    .newStats(queryContext);
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
 
             final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                     new IBindingSet[][] { initialBindingSets });
@@ -681,8 +680,9 @@ public class TestHTreeHashJoin extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */
-                    ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
 
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
@@ -833,15 +833,15 @@ public class TestHTreeHashJoin extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
 
-            final BaseJoinStats stats = (BaseJoinStats) query
-                    .newStats(queryContext);
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
 
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                    -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
 
             /*
              * Note: Since the operator relies on the isLastInvocation() test to
@@ -1008,8 +1008,7 @@ public class TestHTreeHashJoin extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
 
-            final BaseJoinStats stats = (BaseJoinStats) query
-                    .newStats(queryContext);
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
 
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);
@@ -1018,8 +1017,9 @@ public class TestHTreeHashJoin extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */),
-                    -1/* partitionId */, stats, source, sink, sink2);
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, sink2);
 
             /*
              * Note: Since the operator relies on the isLastInvocation() test to

@@ -19,7 +19,6 @@ import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableFactory;
@@ -150,7 +149,8 @@ public class PipelinedAggregationOp extends GroupByOp implements
 
     }
     
-    public BOpStats newStats(final IQueryContext queryContext) {
+    @Override
+    public BOpStats newStats() {
     	
     	return new AggregateStats(this);
     	

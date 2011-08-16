@@ -149,7 +149,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // the expected solutions (default sink).
         final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
 
-        final BOpStats stats = query.newStats(null/*queryContext*/);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -166,11 +166,11 @@ public class TestCopyBindingSets extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
@@ -197,7 +197,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // the expected solutions (default sink).
         final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
 
-        final BOpStats stats = query.newStats(null/*queryContext*/);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -215,12 +215,12 @@ public class TestCopyBindingSets extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSameSolutions(expected, altSink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        TestQueryEngine.assertSameSolutions(expected, altSink.iterator(), ft);
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
@@ -266,7 +266,7 @@ public class TestCopyBindingSets extends TestCase2 {
             }
         }
 
-        final BOpStats stats = query.newStats(null/*queryContext*/);
+        final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -284,11 +284,11 @@ public class TestCopyBindingSets extends TestCase2 {
         ft.run();
 
         TestQueryEngine.assertSameSolutions(expected
-                .toArray(new IBindingSet[] {}), sink.iterator());
+                .toArray(new IBindingSet[] {}), sink.iterator(), ft);
 
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());

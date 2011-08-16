@@ -125,7 +125,8 @@ public class DistinctBindingSetOp extends PipelineOp {
         
     }
 
-    public BOpStats newStats(final IQueryContext queryContext) {
+    @Override
+    public BOpStats newStats() {
     	
     	return new DistinctStats(this);
     	

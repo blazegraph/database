@@ -311,7 +311,7 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
-            final BOpStats stats = query.newStats(queryContext);
+            final BOpStats stats = query.newStats();
 
             final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                     new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
@@ -320,7 +320,8 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, null/* indexManager */),
+                    new MockRunningQuery(null/* fed */, null/* indexManager */,
+                            queryContext),
                     -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
             // get task.
