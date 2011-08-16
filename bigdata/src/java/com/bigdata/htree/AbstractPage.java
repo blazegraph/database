@@ -710,10 +710,31 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
         return newNode;
 
     }
+
+    /**
+     * Return <code>true</code> iff self and all parents are dirty.
+     */
+	final boolean dirtyHierarchy() {
+		AbstractPage tmp = this;
+		while (tmp != null) {
+			if (!tmp.isDirty())
+				return false;
+			
+			tmp = tmp.parent == null ? null : tmp.parent.get();
+		}	
+		return true;
+	}
+
+    /**
+     * Return <code>true</code> iff self and all materialized children are
+     * clean.
+     */
+	abstract boolean isClean();
     
     /** @deprecated Move to a test helper based on a striterator pattern. */
     abstract int activeBucketPages();
     /** @deprecated Move to a test helper based on a striterator pattern. */
     abstract int activeDirectoryPages();
+
 
 }

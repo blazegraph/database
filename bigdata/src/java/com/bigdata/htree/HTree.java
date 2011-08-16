@@ -640,6 +640,7 @@ public class HTree extends AbstractHTree
 		// Initial root.
 		final DirectoryPage r = new DirectoryPage(//
 				this,// the owning htree instance
+				false, // overflowDirectory
 				addressBits // the global depth of the root.
 		);
 		nnodes++;
@@ -1203,6 +1204,8 @@ public class HTree extends AbstractHTree
 				 */
 				final BucketPage bucketPage = (BucketPage) child;
 				return bucketPage.lookupAll(key);//, buddyOffset);
+			} else if (((DirectoryPage)child).isOverflowDirectory()) {
+				return ((DirectoryPage) child).getTuples();
 			}
 			/*
 			 * Recursive descent into a child directory page. We have to update
@@ -1264,9 +1267,14 @@ public class HTree extends AbstractHTree
 
 			// skip prefixLength bits and then extract globalDepth bits. 
 		    final int hashBits = current.getLocalHashCode(key, prefixLength);
-			
-			// find the child directory page or bucket page.
-			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+
+		    // find the child directory page or bucket page.
+			final AbstractPage child;
+			if (current.isOverflowDirectory()) {
+				child = current.lastChild();
+			} else {				
+				child = current.getChild(hashBits, buddyOffset);
+			}
 			
 			if (child.isLeaf()) {
 
@@ -1845,200 +1853,200 @@ public class HTree extends AbstractHTree
 //
 //	}
 
-	    /**
-     * Adds a new level above a full {@link BucketPage}. The {@link BucketPage}
-     * must be at depth==addressBits (i.e., one buddy bucket on the page and one
-     * pointer from the parent into the {@link BucketPage}). Two new
-     * {@link BucketPage}s and a new {@link DirectoryPage} are recruited. The
-     * new {@link DirectoryPage} is initialized with pointers to the two
-     * {@link BucketPage}s and linked into the parent of the original
-     * {@link BucketPage}. The new {@link DirectoryPage} will be at maximum
-     * depth since it takes the place of the old {@link BucketPage} which was
-     * already at maximum depth. The tuples from the old {@link BucketPage} are
-     * reindexed, which distributes them between the two new {@link BucketPage}
-     * s.
-     * 
-     * @param oldPage
-     *            The full {@link BucketPage}.
-     * 
-     * @throws IllegalArgumentException
-     *             if any argument is <code>null</code>.
-     * @throws IllegalStateException
-     *             if the <i>oldPage</i> is not at maximum depth.
-     * @throws IllegalStateException
-     *             if the parent of the <i>oldPage</i> is not mutable.
-     * 
-     *             TODO This should really be moved onto BucketPage so the
-     *             copy-on-write pattern can be maintained.
-     *             <p>
-     *             We could pass in the buddy offset on the directory, which
-     *             would reduce the amount that we need to scan when locating
-     *             the pointer to [oldPage].
-     *             <p>
-     *             We do not need to be doing copy-on-write on [oldPage]. It is
-     *             only [oldPage.parent] which needs to be mutable.
-     */
-	DirectoryPage addLevel2(final BucketPage oldPage) {
-		
-		if (oldPage == null)
-			throw new IllegalArgumentException();
-
-		if (oldPage.globalDepth != addressBits)
-			throw new IllegalStateException();
-
-		if (oldPage.isDeleted())
-			throw new IllegalStateException();
-
-        /*
-         * Note: This is one of the few gateways for mutation of a leaf via the
-         * main btree API (insert, lookup, delete). By ensuring that we have a
-         * mutable leaf here, we can assert that the leaf must be mutable in
-         * other methods.
-         */
-        final BucketPage copy = (BucketPage) oldPage.copyOnWrite();
-
-        if (copy != oldPage) {
-
-			/*
-			 * This leaf has been copied so delegate the operation to the new
-			 * leaf.
-			 * 
-			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
-			 * leaf listeners before it clears the [leafListeners] reference so
-			 * not only don't we have to do that here, but we can't since the
-			 * listeners would be cleared before we could fire off the event
-			 * ourselves.
-			 */
-
-			return addLevel2(copy);
-			
-		}
-
-        // The parent directory page above the old bucket page.
-		final DirectoryPage pp = (DirectoryPage) oldPage.getParentDirectory();
-
-		if (pp.isReadOnly())
-			throw new IllegalStateException(); // parent must be mutable.
-		if(!(pp.data instanceof MutableDirectoryPageData))
-			throw new IllegalStateException(); // parent must be mutable (should follow automatically if parent is dirty).
-
-		if (log.isInfoEnabled())
-			log.info("bucketPage=" + oldPage.toShortString());
-		
-		// #of slots on a page.
-        final int bucketSlotsPerPage = oldPage.slotsOnPage();
-        final int dirSlotsPerPage =  1 << this.addressBits;
-
-		// allocate new nodes and relink the tree.
-		final DirectoryPage newParent;
-		{
-
-			// 1/2 of the slots will point to each of the new bucket pages.
-			final int npointers = dirSlotsPerPage >> 1;
-
-			// The local depth of the new bucket pages.
-			final int localDepth = HTreeUtil.getLocalDepth(addressBits,
-					addressBits/* globalDepth(newParent) */, npointers);
-
-			newParent = new DirectoryPage(this, addressBits/* globalDepth */);
-			nnodes++;
-
-			final BucketPage a = new BucketPage(this, localDepth);
-			final BucketPage b = new BucketPage(this, localDepth);
-			nleaves++; // Note: only +1 since we will delete the oldPage.
-
-			/*
-			 * Replace the pointer to the oldPage in the parent with the new
-			 * directory page.
-			 */
-			{
-				final long oldAddr = oldPage.isPersistent() ? oldPage
-						.getIdentity() : 0L;
-				if (!pp.isDirty()) { 
-					/*
-					 * Note: I have seen the parent go from mutable to immutable
-					 * during an addLevel(). This is presumably because I was
-					 * using a small retention queue (10) in a stress test.
-					 */
-					throw new IllegalStateException(); // parent must be mutable.
-				}
-				final MutableDirectoryPageData data = (MutableDirectoryPageData) pp.data;
-                boolean found = false;
-                int np = 0;
-				for (int i = 0; i < dirSlotsPerPage; i++) {
-				    boolean isPtr = false;
-					if (oldPage.isPersistent()) {
-						if (data.childAddr[i] == oldAddr)
-							isPtr = true; // same address
-					} else {
-						if (pp.childRefs[i] == oldPage.self)
-							isPtr = true; // same reference
-					}
-					if (isPtr) {
-						pp.childRefs[i] = (Reference) newParent.self; // set ref
-						data.childAddr[i] = 0L; // clear addr.
-						np++;
-						found = true;
-					} else if(found) {
-					    break;
-					}
-				}
-				if (!found)
-                    throw new AssertionError();
-                if (np != 1)
-                    throw new AssertionError("Found np="+np+", but expecting only one.");
-			}
-
-			// Set the parent references on the new pages.
-			newParent.parent = (Reference) pp.self;
-			a.parent = (Reference) newParent.self;
-			b.parent = (Reference) newParent.self;
-
-			// Link the new bucket pages into the new parent directory page.
-			for (int i = 0; i < dirSlotsPerPage; i++) {
-				newParent.childRefs[i] = (Reference) (i < npointers ? a.self
-						: b.self);
-			}
-
-			if (oldPage.isPersistent()) {
-				// delete oldPage.
-				store.delete(oldPage.getIdentity());
-			}
-
-		}
-
-		/*
-		 * Reindex the tuples in the old bucket page
-		 * 
-		 * Note: This MUST be done as a low level operation in order to avoid
-		 * duplicating raw records and in order to preserve per-tuple metadata,
-		 * including version timestamps and deleted tuple markers.
-		 * 
-		 * Note: the page is full. there should be no empty slots (no null
-		 * keys).
-		 */
-		// reindexTuples(oldPage, a, b);
-		//final IRaba okeys = oldPage.getKeys();
-		//final IRaba ovals = oldPage.getValues();
-		for (int i = 0; i < bucketSlotsPerPage; i++) {
-
-			/*
-			 * Note: All keys should be non-null.
-			 * 
-			 * Note: Use okeys.isNull() to do a fast check for a null key, not
-			 * okeys.get(i) != null which forces the key to be materialized
-			 * (heap churn).
-			 */
-//			if (okeys.get(i) != null)
-			
-			insertRawTuple(oldPage, i);
-			//newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
-
-		}
-		
-		return newParent;
-
-	}
+//    /**
+//     * Adds a new level above a full {@link BucketPage}. The {@link BucketPage}
+//     * must be at depth==addressBits (i.e., one buddy bucket on the page and one
+//     * pointer from the parent into the {@link BucketPage}). Two new
+//     * {@link BucketPage}s and a new {@link DirectoryPage} are recruited. The
+//     * new {@link DirectoryPage} is initialized with pointers to the two
+//     * {@link BucketPage}s and linked into the parent of the original
+//     * {@link BucketPage}. The new {@link DirectoryPage} will be at maximum
+//     * depth since it takes the place of the old {@link BucketPage} which was
+//     * already at maximum depth. The tuples from the old {@link BucketPage} are
+//     * reindexed, which distributes them between the two new {@link BucketPage}
+//     * s.
+//     * 
+//     * @param oldPage
+//     *            The full {@link BucketPage}.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if any argument is <code>null</code>.
+//     * @throws IllegalStateException
+//     *             if the <i>oldPage</i> is not at maximum depth.
+//     * @throws IllegalStateException
+//     *             if the parent of the <i>oldPage</i> is not mutable.
+//     * 
+//     *             TODO This should really be moved onto BucketPage so the
+//     *             copy-on-write pattern can be maintained.
+//     *             <p>
+//     *             We could pass in the buddy offset on the directory, which
+//     *             would reduce the amount that we need to scan when locating
+//     *             the pointer to [oldPage].
+//     *             <p>
+//     *             We do not need to be doing copy-on-write on [oldPage]. It is
+//     *             only [oldPage.parent] which needs to be mutable.
+//     */
+//	DirectoryPage addLevel2(final BucketPage oldPage) {
+//		
+//		if (oldPage == null)
+//			throw new IllegalArgumentException();
+//
+//		if (oldPage.globalDepth != addressBits)
+//			throw new IllegalStateException();
+//
+//		if (oldPage.isDeleted())
+//			throw new IllegalStateException();
+//
+//        /*
+//         * Note: This is one of the few gateways for mutation of a leaf via the
+//         * main btree API (insert, lookup, delete). By ensuring that we have a
+//         * mutable leaf here, we can assert that the leaf must be mutable in
+//         * other methods.
+//         */
+//        final BucketPage copy = (BucketPage) oldPage.copyOnWrite();
+//
+//        if (copy != oldPage) {
+//
+//			/*
+//			 * This leaf has been copied so delegate the operation to the new
+//			 * leaf.
+//			 * 
+//			 * Note: copy-on-write deletes [this] leaf and delete() notifies any
+//			 * leaf listeners before it clears the [leafListeners] reference so
+//			 * not only don't we have to do that here, but we can't since the
+//			 * listeners would be cleared before we could fire off the event
+//			 * ourselves.
+//			 */
+//
+//			return addLevel2(copy);
+//			
+//		}
+//
+//        // The parent directory page above the old bucket page.
+//		final DirectoryPage pp = (DirectoryPage) oldPage.getParentDirectory();
+//
+//		if (pp.isReadOnly())
+//			throw new IllegalStateException(); // parent must be mutable.
+//		if(!(pp.data instanceof MutableDirectoryPageData))
+//			throw new IllegalStateException(); // parent must be mutable (should follow automatically if parent is dirty).
+//
+//		if (log.isInfoEnabled())
+//			log.info("bucketPage=" + oldPage.toShortString());
+//		
+//		// #of slots on a page.
+//        final int bucketSlotsPerPage = oldPage.slotsOnPage();
+//        final int dirSlotsPerPage =  1 << this.addressBits;
+//
+//		// allocate new nodes and relink the tree.
+//		final DirectoryPage newParent;
+//		{
+//
+//			// 1/2 of the slots will point to each of the new bucket pages.
+//			final int npointers = dirSlotsPerPage >> 1;
+//
+//			// The local depth of the new bucket pages.
+//			final int localDepth = HTreeUtil.getLocalDepth(addressBits,
+//					addressBits/* globalDepth(newParent) */, npointers);
+//
+//			newParent = new DirectoryPage(this, addressBits/* globalDepth */);
+//			nnodes++;
+//
+//			final BucketPage a = new BucketPage(this, localDepth);
+//			final BucketPage b = new BucketPage(this, localDepth);
+//			nleaves++; // Note: only +1 since we will delete the oldPage.
+//
+//			/*
+//			 * Replace the pointer to the oldPage in the parent with the new
+//			 * directory page.
+//			 */
+//			{
+//				final long oldAddr = oldPage.isPersistent() ? oldPage
+//						.getIdentity() : 0L;
+//				if (!pp.isDirty()) { 
+//					/*
+//					 * Note: I have seen the parent go from mutable to immutable
+//					 * during an addLevel(). This is presumably because I was
+//					 * using a small retention queue (10) in a stress test.
+//					 */
+//					throw new IllegalStateException(); // parent must be mutable.
+//				}
+//				final MutableDirectoryPageData data = (MutableDirectoryPageData) pp.data;
+//                boolean found = false;
+//                int np = 0;
+//				for (int i = 0; i < dirSlotsPerPage; i++) {
+//				    boolean isPtr = false;
+//					if (oldPage.isPersistent()) {
+//						if (data.childAddr[i] == oldAddr)
+//							isPtr = true; // same address
+//					} else {
+//						if (pp.childRefs[i] == oldPage.self)
+//							isPtr = true; // same reference
+//					}
+//					if (isPtr) {
+//						pp.childRefs[i] = (Reference) newParent.self; // set ref
+//						data.childAddr[i] = 0L; // clear addr.
+//						np++;
+//						found = true;
+//					} else if(found) {
+//					    break;
+//					}
+//				}
+//				if (!found)
+//                    throw new AssertionError();
+//                if (np != 1)
+//                    throw new AssertionError("Found np="+np+", but expecting only one.");
+//			}
+//
+//			// Set the parent references on the new pages.
+//			newParent.parent = (Reference) pp.self;
+//			a.parent = (Reference) newParent.self;
+//			b.parent = (Reference) newParent.self;
+//
+//			// Link the new bucket pages into the new parent directory page.
+//			for (int i = 0; i < dirSlotsPerPage; i++) {
+//				newParent.childRefs[i] = (Reference) (i < npointers ? a.self
+//						: b.self);
+//			}
+//
+//			if (oldPage.isPersistent()) {
+//				// delete oldPage.
+//				store.delete(oldPage.getIdentity());
+//			}
+//
+//		}
+//
+//		/*
+//		 * Reindex the tuples in the old bucket page
+//		 * 
+//		 * Note: This MUST be done as a low level operation in order to avoid
+//		 * duplicating raw records and in order to preserve per-tuple metadata,
+//		 * including version timestamps and deleted tuple markers.
+//		 * 
+//		 * Note: the page is full. there should be no empty slots (no null
+//		 * keys).
+//		 */
+//		// reindexTuples(oldPage, a, b);
+//		//final IRaba okeys = oldPage.getKeys();
+//		//final IRaba ovals = oldPage.getValues();
+//		for (int i = 0; i < bucketSlotsPerPage; i++) {
+//
+//			/*
+//			 * Note: All keys should be non-null.
+//			 * 
+//			 * Note: Use okeys.isNull() to do a fast check for a null key, not
+//			 * okeys.get(i) != null which forces the key to be materialized
+//			 * (heap churn).
+//			 */
+////			if (okeys.get(i) != null)
+//			
+//			insertRawTuple(oldPage, i);
+//			//newParent.insertRawTuple(okeys.get(i), ovals.get(i), 0);
+//
+//		}
+//		
+//		return newParent;
+//
+//	}
 
 	/**
 	 * Handle split if localDepth LT globalDepth (so there is more than one
@@ -2131,7 +2139,10 @@ public class HTree extends AbstractHTree
         final int newDepth = oldDepth + 1;
 
         // Allocate a new bucket page (globalDepth is increased by one).
-        final DirectoryPage newChild = new DirectoryPage(this, newDepth);
+        final DirectoryPage newChild = new DirectoryPage(this,
+                false, // overflowDirectory
+                newDepth//
+                );
 
         assert newChild.isDirty();
         

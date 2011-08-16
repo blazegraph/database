@@ -159,6 +159,11 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
 	 */
     public static final short FLAG_RWSTORE_ADDRS = 1 << 2;
 
+    /**
+     * Marks a directory page as an overflow directory page (HTree).
+     */
+    public static final short FLAG_OVERFLOW_DIRECTORY = 1 << 3;
+
 //    /**
 //     * Bit flag indicating that the tuple revision timestamps have been written
 //     * out using an array n-bit deltas computed as

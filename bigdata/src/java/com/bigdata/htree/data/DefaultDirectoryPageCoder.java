@@ -45,6 +45,8 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id: DefaultNodeCoder.java 4585 2011-06-01 13:42:56Z thompsonbry $
  * 
  * TODO Support RWStore 4 byte native addrs.
+ * 
+ * TODO Explicit test suite based on the B+Tree test suites.
  */
 public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirectoryData>,
         Externalizable {
@@ -130,6 +132,9 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
 		if (hasVersionTimestamps) {
 			flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
 			throw new UnsupportedOperationException();
+		}
+		if(node.isOverflowDirectory()) {
+		    flags |= AbstractReadOnlyNodeData.FLAG_OVERFLOW_DIRECTORY;
 		}
         buf.putShort(flags);
         
@@ -269,6 +274,12 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
             
         }
 
+        final public boolean isOverflowDirectory() {
+            
+            return ((flags & FLAG_OVERFLOW_DIRECTORY) != 0);
+                        
+        }
+        
         /**
          * Always returns <code>false</code>.
          */

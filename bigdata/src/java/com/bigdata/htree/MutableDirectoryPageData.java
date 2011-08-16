@@ -20,6 +20,8 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class MutableDirectoryPageData implements IDirectoryData {
 
+    final boolean overflowDirectory;
+    
 	/**
 	 * The persistent address of each child page (each child may be either a
 	 * {@link DirectoryPage} or a {@link BucketPage}). The capacity of this
@@ -91,11 +93,14 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	 *            <code>true</code> iff the HTree is maintaining per tuple
 	 *            version timestamps.
 	 */
-	public MutableDirectoryPageData(final int addressBits, 
+	public MutableDirectoryPageData(final boolean overflowDirectory,
+	        final int addressBits, 
 			final boolean hasVersionTimestamps) {
 
 //		nentries = 0;
 
+	    this.overflowDirectory = overflowDirectory;
+	    
 		childAddr = new long[1 << addressBits];
 
 //		childEntryCounts = new int[branchingFactor + 1];
@@ -120,6 +125,8 @@ public class MutableDirectoryPageData implements IDirectoryData {
 		if (src == null)
 			throw new IllegalArgumentException();
 
+		this.overflowDirectory = src.isOverflowDirectory();
+		
 //		nentries = src.getSpannedTupleCount();
 
 		childAddr = new long[1 << addressBits];
@@ -169,6 +176,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	 * @param childEntryCounts
 	 */
 	public MutableDirectoryPageData(//final int nentries, final IRaba keys,
+	        final boolean overflowDirectory,//
 			final long[] childAddr, //final int[] childEntryCounts,
 			final boolean hasVersionTimestamps,
 			final long minimumVersionTimestamp,
@@ -179,6 +187,8 @@ public class MutableDirectoryPageData implements IDirectoryData {
 //		assert keys.capacity() + 1 == childAddr.length;
 //		assert childAddr.length == childEntryCounts.length;
 
+		this.overflowDirectory = overflowDirectory;
+		
 //		this.nentries = nentries;
 
 		this.childAddr = childAddr;
@@ -234,6 +244,12 @@ public class MutableDirectoryPageData implements IDirectoryData {
 
 	}
 
+	final public boolean isOverflowDirectory() {
+	    
+	    return overflowDirectory;
+	    
+	}
+	
 	final public boolean isLeaf() {
 
 		return false;
