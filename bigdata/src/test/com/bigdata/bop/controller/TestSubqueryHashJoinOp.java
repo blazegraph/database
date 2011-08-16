@@ -71,13 +71,6 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * Unit tests for {@link SubqueryHashJoinOp}.
  * 
  * @author thompsonbry
- * 
- *         TODO There should be a standard join test case (w/o optional) for
- *         both {@link SubqueryHashJoinOp} and {@link SubqueryOp}.
- * 
- *         TODO There should be a test case using SELECT to drop variables which
- *         are not required in the generated binding sets (and that feature
- *         should be part of the {@link SubqueryOp} as well).
  */
 public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
@@ -589,7 +582,9 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
     /**
      * Unit test for optional join group. Three joins are used and target a
      * {@link SliceOp}. The 2nd and 3rd joins are embedded in an
-     * {@link SubqueryOp}.
+     * {@link SubqueryHashJoinOp}. The join variable is <code>b</code>, which
+     * is bound in the parent query by the first predicate and in all solutions
+     * which survive the optional join group.
      * <P>
      * The optional join group takes the form:
      * 
@@ -820,8 +815,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         }
 
-        // Wait until the query is done.
-        runningQuery.get();
+//        // Wait until the query is done.
+//        runningQuery.get();
         final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
@@ -836,7 +831,9 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
     /**
      * Unit test for optional join group with a filter. Three joins are used and
      * target a {@link SliceOp}. The 2nd and 3rd joins are embedded in an
-     * optional join group. The optional join group contains a filter.
+     * optional join group which is modeled by a {@link SubqueryHashJoinOp}. The
+     * join variable is <code>b</code>. The optional join group contains a
+     * filter.
      * <p>
      * The optional join group takes the form:
      * 
@@ -873,14 +870,13 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
      * tail will fail since fred and leon don't know anyone else. At this point,
      * the ?c binding must be removed from the solution.
      * <p>
-     * The filter (d != Leon) will prune the two solutions:
+     * The filter <code>(d != Leon)</code< pruned two solutions since
+     * <code>d</code> was bound to <code>Leon</code> in those cases:
      * 
      * <pre>
      * (paul mary brad leon)
      * (john mary brad leon)
      * </pre>
-     * 
-     * since ?d is bound to Leon in those cases.
      */
     public void test_query_optionals_filter() throws Exception {
 
@@ -1061,8 +1057,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 
         }
 
-        // Wait until the query is done.
-        runningQuery.get();
+//        // Wait until the query is done.
+//        runningQuery.get();
         final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
@@ -1077,9 +1073,9 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
     /**
      * Unit test for optional join group with a filter on a variable outside the
      * optional join group. Three joins are used and target a {@link SliceOp}.
-     * The 2nd and 3rd joins are in embedded an {@link SubqueryOp}. The
-     * optional join group contains a filter that uses a variable outside the
-     * optional join group.
+     * The 2nd and 3rd joins are in embedded an {@link SubqueryHashJoinOp}. The
+     * join variable is <code>b</code>. The optional join group contains a
+     * filter that uses a variable outside the optional join group.
      * <P>
      * The query takes the form:
      * 
@@ -1322,8 +1318,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
         
         }
 
-        // Wait until the query is done.
-        runningQuery.get();
+//        // Wait until the query is done.
+//        runningQuery.get();
         final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
