@@ -52,6 +52,7 @@ import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
+import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
@@ -71,19 +72,6 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME This test suite does not fully test the FILTER semantics for
- *          SPARQL joins. In particular, (a) optional join solutions are counted
- *          as successful <em>before</em> the FILTER is applied; and (b) if no
- *          optional join solutions exist (before filtering) for a given source
- *          binding set, then the FILTER is applied to the source binding set to
- *          decide whether or not the source solutions should be passed along.
- *          That is, the behavior is the same in both cases as if the FILTER as
- *          applied after the optional join. However, in fact, we apply it as
- *          part of the join operator in order to keep things simpler for the
- *          runtime query optimizer, which needs to be able to perform cutoff
- *          joins and which also needs to be able to reorder the predicates,
- *          creating the appropriate join operators as it does so.
  */
 public class TestPipelineJoin extends TestCase2 {
 
@@ -926,9 +914,11 @@ public class TestPipelineJoin extends TestCase2 {
 
         final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
 
-        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
 
-        final IBlockingBuffer<IBindingSet[]> sink2 = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
+        final IBlockingBuffer<IBindingSet[]> sink2 = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
@@ -941,6 +931,7 @@ public class TestPipelineJoin extends TestCase2 {
         jnl.getExecutorService().execute(ft);
 
         TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+
         TestQueryEngine.assertSameSolutions(expected2, sink2.iterator(), ft);
 
         // join task
@@ -958,6 +949,136 @@ public class TestPipelineJoin extends TestCase2 {
 //        assertFalse(ft.isCancelled());
 //        ft.get(); // verify nothing thrown.
         
+    }
+
+    /**
+     * Unit tests for optional joins with a constraint. The constraint is
+     * applied to test each solution which joins. Solutions which do not join,
+     * or which join but fail the constraint, are passed along as "optional"
+     * solutions.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_optionalJoin_withConstraint() throws InterruptedException,
+            ExecutionException {
+
+        final Var<?> x = Var.var("x");
+        
+        final int joinId = 2;
+        final int predId = 3;
+
+        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+                new Constant<String>("Mary"), x }, NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.TRUE),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                })); 
+        
+        final PipelineJoin<E> query = new PipelineJoin<E>(
+                new BOp[] { }, // args
+                new NV(BOpBase.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, pred),//
+                // constraint d != Paul
+                new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                        new IConstraint[] { Constraint.wrap(new NEConstant(x, new Constant<String>("Paul"))) })
+                );
+
+        /*
+         * Setup the source with three source binding sets.
+         * 
+         * The first source solution joins with (Mary,x:=John) and
+         * (Mary,x:=Paul). However, the join with (Mary,x:=Paul) is failed by
+         * the constraint. Since we were joining with bset1 and since we also
+         * have the (Mary,x:=John) solution for bset1, bset1 is NOT passed along
+         * as an "optional" join.
+         * 
+         * The next source solution has x:=Luke which does not join. However,
+         * this is an optional join so x:=Luke is output anyway.
+         * 
+         * The last source solution has x:=Paul. This will fail the constraint
+         * in the join (x!=Paul). However, since nothing joins for this source
+         * solution, the source solution is passed along as an optional
+         * solution. Note that the constraint does NOT filter the optional
+         * solution.
+         */
+        final IAsynchronousIterator<IBindingSet[]> source;
+        {
+            
+            final IBindingSet bset1 = new HashBindingSet();
+            
+            final IBindingSet bset2 = new HashBindingSet();
+            {
+             
+                bset2.set(x, new Constant<String>("Luke"));
+                
+            }
+            
+            final IBindingSet bset3 = new HashBindingSet();
+            {
+             
+                bset3.set(x, new Constant<String>("Paul"));
+                
+            }
+            
+            source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] { new IBindingSet[] { bset1, bset2,
+                            bset3 } });
+        }
+
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                // bset1 : one join passes the constraint, so no optionals.
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("John") }//
+                ),//
+                // bset2 : join fails, but bset2 is output anyway as "optional".
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Luke") }//
+                ),//
+              // bset3: join fails, but bset3 is  output anyway as "optional".
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Paul") }//
+              ),//
+        };
+
+        final PipelineJoinStats stats = query.newStats(null/*queryContext*/);
+
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                query, stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */),
+                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+        
+        // execute task.
+        jnl.getExecutorService().execute(ft);
+
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(), ft);
+
+        // join task
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(3L, stats.unitsIn.get());
+        assertEquals(3L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+        // access path
+        assertEquals(0L, stats.accessPathDups.get());
+        assertEquals(3L, stats.accessPathCount.get());
+        assertEquals(2L, stats.accessPathChunksIn.get());
+        assertEquals(3L, stats.accessPathUnitsIn.get());
+        
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
+
     }
 
 }

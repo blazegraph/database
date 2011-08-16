@@ -368,8 +368,8 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             this.sourceSolutions = HTree.create(store, metadata);           
 
             // Used to handle optionals.
-            this.joinSet = op.isOptional() ? HTree.create(store, metadata)
-                    : null;
+            this.joinSet = op.isOptional() ? HTree.create(store,
+                    metadata.clone()) : null;
 
         }
 
@@ -579,6 +579,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                 
                 sink.close();
 
+                if (sink2 != null)
+                    sink2.close();
+                
             }
 
         }
@@ -758,7 +761,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             if(optional) {
                 
                 // where to write the optional solutions. 
-                final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? null
+                final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
                 
@@ -794,7 +797,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 }
 
-                unsyncBuffer.flush();
+                unsyncBuffer2.flush();
                 if (sink2 != null)
                     sink2.flush();
 

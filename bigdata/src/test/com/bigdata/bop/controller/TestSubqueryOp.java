@@ -722,8 +722,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         
         }
 
-        // Wait until the query is done.
-        runningQuery.get();
+//        // Wait until the query is done.
+//        runningQuery.get();
         final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
@@ -1234,8 +1234,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 
         }
 
-        // Wait until the query is done.
-        runningQuery.get();
+//        // Wait until the query is done.
+//        runningQuery.get();
         final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
