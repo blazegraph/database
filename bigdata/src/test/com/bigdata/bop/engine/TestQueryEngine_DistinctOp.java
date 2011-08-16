@@ -47,6 +47,11 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * @version $Id: TestQueryEngine2.java 3489 2010-09-01 18:27:35Z thompsonbry $
  * 
  * @todo Test each DISTINCT implementation here.
+ * 
+ *       FIXME Finish this stress test. We can allocate an array of known
+ *       distinct solutions and then randomly sample from the array to create
+ *       redundancy. Correct operation can be easily verified by checking that
+ *       the reported solutions are those in the array.
  */
 public class TestQueryEngine_DistinctOp extends TestCase2 {
 
