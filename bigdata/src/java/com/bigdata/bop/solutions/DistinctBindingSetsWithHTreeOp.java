@@ -16,7 +16,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IQueryContext;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -143,11 +143,11 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
         
     }
 
-    public BOpStats newStats(final IQueryContext queryContext) {
-    	
-    	return new DistinctStats(this,queryContext);
-    	
-    }
+//    public BOpStats newStats(final IQueryContext queryContext) {
+//    	
+//    	return new DistinctStats(this,queryContext);
+//    	
+//    }
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -208,7 +208,6 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
             if (vals.length != t.vals.length)
                 return false;
             for (int i = 0; i < vals.length; i++) {
-                // @todo verify that this allows for nulls with a unit test.
                 if (vals[i] == t.vals[i])
                     continue;
                 if (vals[i] == null)
@@ -221,91 +220,75 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
     } // class Solution
 
-    /**
-	 * Extends {@link BOpStats} to provide the shared state for the distinct
-	 * solution groups across multiple invocations of the DISTINCT operator.
-	 */
-    private static class DistinctStats extends BOpStats {
-
-        /**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * A map whose keys are the bindings on the specified variables. The
-		 * values in the map are <code>null</code>s.
-		 * <p>
-		 * Note: The map is shared state and can not be discarded or cleared
-		 * until the last invocation!!!
-		 */
-		private final HTree map;
-
-    	public DistinctStats(final DistinctBindingSetsWithHTreeOp op,
-    	        final IQueryContext queryContext) {
-    		
-    		/*
-    		 * TODO Annotations for key and value raba coders.
-    		 */
-    		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-			metadata.setAddressBits(op.getAddressBits());
-
-			metadata.setRawRecords(op.getRawRecords());
-
-			metadata.setMaxRecLen(op.getMaxRecLen());
-
-			metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
-			
-			/*
-			 * TODO This sets up a tuple serializer for a presumed case of 4
-			 * byte keys (the buffer will be resized if necessary) and
-			 * explicitly chooses the SimpleRabaCoder as a workaround since the
-			 * keys IRaba for the HTree does not report true for isKeys(). Once
-			 * we work through an optimized bucket page design we can revisit
-			 * this as the FrontCodedRabaCoder should be a good choice, but it
-			 * currently requires isKeys() to return true.
-			 */
-			final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-					new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-					// new FrontCodedRabaCoder(),// Note: reports true for
-					// isKeys()!
-					new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-					new SimpleRabaCoder() // vals
-			);
-
-			metadata.setTupleSerializer(tupleSer);
-
-            /*
-             * This wraps an efficient raw store interface around a child memory
-             * manager created from the IMemoryManager which is backing the
-             * query.
-             */
-            final IRawStore store = new MemStore(queryContext
-                    .getMemoryManager().createAllocationContext());
-
-    		// Will support incremental eviction and persistence.
-    		this.map = HTree.create(store, metadata);    		
-
-    	}
-    	
-        /**
-         * Discard the map.
-         * <p>
-         * Note: The map can not be discarded (or cleared) until the last
-         * invocation.
-         */
-    	private void release() {
-
-    	    final IRawStore store = map.getStore();
-            
-    	    map.close();
-    	    
-            store.close();
-
-    	}
-    	
-    }
+//    /**
+//	 * Extends {@link BOpStats} to provide the shared state for the distinct
+//	 * solution groups across multiple invocations of the DISTINCT operator.
+//	 */
+//    private static class DistinctStats extends BOpStats {
+//
+//        /**
+//		 * 
+//		 */
+//		private static final long serialVersionUID = 1L;
+//
+//		/**
+//		 * A map whose keys are the bindings on the specified variables. The
+//		 * values in the map are <code>null</code>s.
+//		 * <p>
+//		 * Note: The map is shared state and can not be discarded or cleared
+//		 * until the last invocation!!!
+//		 */
+//		private final HTree map;
+//
+//    	public DistinctStats(final DistinctBindingSetsWithHTreeOp op,
+//    	        final IQueryContext queryContext) {
+//    		
+//    		/*
+//    		 * TODO Annotations for key and value raba coders.
+//    		 */
+//    		final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+//
+//			metadata.setAddressBits(op.getAddressBits());
+//
+//			metadata.setRawRecords(op.getRawRecords());
+//
+//			metadata.setMaxRecLen(op.getMaxRecLen());
+//
+//			metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
+//			
+//			/*
+//			 * TODO This sets up a tuple serializer for a presumed case of 4
+//			 * byte keys (the buffer will be resized if necessary) and
+//			 * explicitly chooses the SimpleRabaCoder as a workaround since the
+//			 * keys IRaba for the HTree does not report true for isKeys(). Once
+//			 * we work through an optimized bucket page design we can revisit
+//			 * this as the FrontCodedRabaCoder should be a good choice, but it
+//			 * currently requires isKeys() to return true.
+//			 */
+//			final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+//					new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+//					// new FrontCodedRabaCoder(),// Note: reports true for
+//					// isKeys()!
+//					new SimpleRabaCoder(),// keys : TODO Optimize for int32!
+//					new SimpleRabaCoder() // vals
+//			);
+//
+//			metadata.setTupleSerializer(tupleSer);
+//
+//            /*
+//             * This wraps an efficient raw store interface around a child memory
+//             * manager created from the IMemoryManager which is backing the
+//             * query.
+//             */
+//            final IRawStore store = new MemStore(queryContext
+//                    .getMemoryManager().createAllocationContext());
+//
+//    		// Will support incremental eviction and persistence.
+//    		this.map = HTree.create(store, metadata);    		
+//
+//    	}
+//    	
+//    }
     
     /**
      * Task executing on the node.
@@ -314,10 +297,13 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-		/**
-		 * A map whose keys are the bindings on the specified variables. The
-		 * values in the map are the serialized solutions.
-		 */
+        /**
+         * A map whose keys are the bindings on the specified variables. The
+         * values in the map are <code>null</code>s.
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         */
         private final HTree map;
 
         /**
@@ -327,7 +313,7 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
         
         DistinctTask(final DistinctBindingSetsWithHTreeOp op,
                 final BOpContext<IBindingSet> context) {
-
+            
             this.context = context;
 
             this.vars = op.getVariables();
@@ -339,10 +325,10 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
                 throw new IllegalArgumentException();
 
 			// The map is shared state across invocations of this operator task.
-			this.map = ((DistinctStats) context.getStats()).map;
+			this.map = getMap(op);
 
         }
-
+        
         /**
          * If the bindings are distinct for the configured variables then return
          * those bindings.
@@ -442,7 +428,7 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-            final DistinctStats stats = (DistinctStats) context.getStats();
+            final BOpStats stats = context.getStats();
 
             final IAsynchronousIterator<IBindingSet[]> itr = context
                     .getSource();
@@ -530,7 +516,7 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
                 if(context.isLastInvocation()) {
 
-                    stats.release();
+                    release();
                     
                 }
                 
@@ -540,6 +526,97 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
 
         }
 
-    }
+        /**
+         * Return the {@link HTree} object on which the distinct solutions are
+         * being written.
+         */
+        private HTree getMap(final DistinctBindingSetsWithHTreeOp op) {
+
+            /*
+             * First, see if the map already exists.
+             * 
+             * Note: Since the operator is not thread-safe, we do not need
+             * to use a putIfAbsent pattern here.
+             */
+            final IQueryAttributes attrs = context.getRunningQuery()
+                    .getAttributes();
+
+            final Object key = op.getId();
+            
+            HTree htree = (HTree) attrs.get(key);
+
+            if(htree != null) {
+
+                // Already exists.
+                return htree;
+                
+            }
+            
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+            metadata.setAddressBits(op.getAddressBits());
+
+            metadata.setRawRecords(op.getRawRecords());
+
+            metadata.setMaxRecLen(op.getMaxRecLen());
+
+            metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
+            
+            /*
+             * TODO This sets up a tuple serializer for a presumed case of 4
+             * byte keys (the buffer will be resized if necessary) and
+             * explicitly chooses the SimpleRabaCoder as a workaround since the
+             * keys IRaba for the HTree does not report true for isKeys(). Once
+             * we work through an optimized bucket page design we can revisit
+             * this as the FrontCodedRabaCoder should be a good choice, but it
+             * currently requires isKeys() to return true.
+             */
+            final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+                    new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+                    new SimpleRabaCoder(),// keys : TODO Optimize for int32!
+                    new SimpleRabaCoder() // vals
+            );
+
+            metadata.setTupleSerializer(tupleSer);
+
+            /*
+             * This wraps an efficient raw store interface around a child memory
+             * manager created from the IMemoryManager which is backing the
+             * query.
+             */
+            final IRawStore store = new MemStore(context.getRunningQuery()
+                    .getMemoryManager().createAllocationContext());
+
+            // Will support incremental eviction and persistence.
+            htree = HTree.create(store, metadata);
+
+            if (attrs.putIfAbsent(key, htree) != null) {
+
+                // This would indicate a concurrency problem.
+                throw new AssertionError();
+                
+            }
+            
+            return htree;
+
+        }
+        
+        /**
+         * Discard the map.
+         * <p>
+         * Note: The map can not be discarded (or cleared) until the last
+         * invocation.
+         */
+        private void release() {
+
+            final IRawStore store = map.getStore();
+            
+            map.close();
+            
+            store.close();
+
+        }
+        
+    } // class DistinctTask
 
 }

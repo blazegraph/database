@@ -449,7 +449,7 @@ public class PipelineJoin<E> extends PipelineOp implements
 	}
 
 	@Override
-	public PipelineJoinStats newStats(final IQueryContext queryContext) {
+	public PipelineJoinStats newStats() {
 
 		return new PipelineJoinStats();
 

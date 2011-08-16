@@ -186,7 +186,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
     }
 
     @Override
-    public BaseJoinStats newStats(final IQueryContext queryContext) {
+    public BaseJoinStats newStats() {
 
         return new BaseJoinStats();
 

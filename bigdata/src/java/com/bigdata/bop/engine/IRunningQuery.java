@@ -33,6 +33,7 @@ import java.util.UUID;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
@@ -48,7 +49,7 @@ import com.bigdata.util.concurrent.IHaltable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRunningQuery extends IHaltable<Void> {
+public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
     
 	/**
 	 * The query.

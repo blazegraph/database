@@ -42,7 +42,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IQueryContext;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
@@ -285,9 +285,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
     }
 
-    public BOpStats newStats(final IQueryContext queryContext) {
+    public BOpStats newStats() {
 
-        return new MyStats(this, queryContext);
+        return new MyStats();
 
     }
 
@@ -306,99 +306,10 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
         private static final long serialVersionUID = 1L;
 
-        /**
-         * A map whose keys are the bindings on the specified variables. The
-         * values in the map are <code>null</code>s.
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         */
-        private HTree sourceSolutions;
-
-        /**
-         * The set of distinct source solutions which joined. This set is
-         * maintained iff the join is optional.
-         */
-        private HTree joinSet;
-        
-        public MyStats(final HTreeHashJoinOp<?> op,
-                final IQueryContext queryContext) {
+        public MyStats() {
             
-            /*
-             * TODO Annotations for key and value raba coders.
-             */
-            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-            metadata.setAddressBits(op.getAddressBits());
-
-            metadata.setRawRecords(op.getRawRecords());
-
-            metadata.setMaxRecLen(op.getMaxRecLen());
-
-            metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
-            
-            /*
-             * TODO This sets up a tuple serializer for a presumed case of 4
-             * byte keys (the buffer will be resized if necessary) and
-             * explicitly chooses the SimpleRabaCoder as a workaround since the
-             * keys IRaba for the HTree does not report true for isKeys(). Once
-             * we work through an optimized bucket page design we can revisit
-             * this as the FrontCodedRabaCoder should be a good choice, but it
-             * currently requires isKeys() to return true.
-             */
-            final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-                    new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                    // new FrontCodedRabaCoder(),// Note: reports true for
-                    // isKeys()!
-                    new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-                    new SimpleRabaCoder() // vals
-            );
-
-            metadata.setTupleSerializer(tupleSer);
-
-            /*
-             * This wraps an efficient raw store interface around a child memory
-             * manager created from the IMemoryManager which is backing the
-             * query.
-             */
-            final IRawStore store = new MemStore(queryContext
-                    .getMemoryManager().createAllocationContext());
-
-            // Will support incremental eviction and persistence.
-            this.sourceSolutions = HTree.create(store, metadata);           
-
-            // Used to handle optionals.
-            this.joinSet = op.isOptional() ? HTree.create(store,
-                    metadata.clone()) : null;
-
         }
 
-        /**
-         * Discard the {@link HTree} data.
-         */
-        private void release() {
-
-            if (joinSet != null) {
-
-                joinSet.close();
-
-                joinSet = null;
-                
-            }
-
-            if (sourceSolutions != null) {
-
-                final IRawStore store = sourceSolutions.getStore();
-
-                sourceSolutions.close();
-                sourceSolutions = null;
-                
-                store.close();
-
-            }
-
-        }
-        
     }
 
     /**
@@ -510,8 +421,19 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
+        /**
+         * A map whose keys are the bindings on the specified variables. The
+         * values in the map are <code>null</code>s.
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         */
         private final HTree sourceSolutions;
 
+        /**
+         * The set of distinct source solutions which joined. This set is
+         * maintained iff the join is optional.
+         */
         private final HTree joinSet;
 
         @SuppressWarnings("unchecked")
@@ -535,21 +457,132 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             this.constraints = op.constraints();
 
             this.optional = op.isOptional();
-            
+
             this.sink = context.getSink();
-            
+
             this.sink2 = context.getSink2();
 
             this.op = op;
 
-            // The map is shared state across invocations of this operator task.
-            this.sourceSolutions = stats.sourceSolutions;
-            
-            // defined iff the join is optional.
-            this.joinSet = stats.joinSet;
+            {
+
+                /*
+                 * First, see if the map already exists.
+                 * 
+                 * Note: Since the operator is not thread-safe, we do not need
+                 * to use a putIfAbsent pattern here.
+                 */
+                final IQueryAttributes attrs = context.getRunningQuery()
+                        .getAttributes();
+
+                final Object sourceSolutionsKey = op.getId()
+                        + ".sourceSolutions";
+
+                final Object joinSetKey = op.getId() + ".joinSet";
+
+                HTree sourceSolutions = (HTree) attrs.get(sourceSolutionsKey);
+
+                HTree joinSet = (HTree) attrs.get(joinSetKey);
+
+                if (sourceSolutions == null) {
+
+                    /*
+                     * Create the map(s).
+                     */
+                    
+                    final IndexMetadata metadata = new IndexMetadata(
+                            UUID.randomUUID());
+
+                    metadata.setAddressBits(op.getAddressBits());
+
+                    metadata.setRawRecords(op.getRawRecords());
+
+                    metadata.setMaxRecLen(op.getMaxRecLen());
+
+                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
+                                                          // keys.
+
+                    /*
+                     * TODO This sets up a tuple serializer for a presumed case
+                     * of 4 byte keys (the buffer will be resized if necessary)
+                     * and explicitly chooses the SimpleRabaCoder as a
+                     * workaround since the keys IRaba for the HTree does not
+                     * report true for isKeys(). Once we work through an
+                     * optimized bucket page design we can revisit this as the
+                     * FrontCodedRabaCoder should be a good choice, but it
+                     * currently requires isKeys() to return true.
+                     */
+                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
+                            new SimpleRabaCoder() // vals
+                    );
+
+                    metadata.setTupleSerializer(tupleSer);
+
+                    /*
+                     * This wraps an efficient raw store interface around a
+                     * child memory manager created from the IMemoryManager
+                     * which is backing the query.
+                     */
+                    final IRawStore store = new MemStore(context
+                            .getRunningQuery().getMemoryManager()
+                            .createAllocationContext());
+
+                    // Will support incremental eviction and persistence.
+                    sourceSolutions = HTree.create(store, metadata);
+
+                    // Used to handle optionals.
+                    joinSet = op.isOptional() ? HTree.create(store,
+                            metadata.clone()) : null;
+
+                    if (attrs.putIfAbsent(sourceSolutionsKey, sourceSolutions) != null)
+                        throw new AssertionError();
+
+                    if (joinSet != null) {
+                        if (attrs.putIfAbsent(joinSetKey, joinSet) != null)
+                            throw new AssertionError();
+                    }
+                    
+                }
+
+                // The map is shared state across invocations of this operator
+                // task.
+                this.sourceSolutions = sourceSolutions;
+
+                // defined iff the join is optional.
+                this.joinSet = joinSet;
+
+            }
 
         }
 
+        /**
+         * Discard the {@link HTree} data.
+         */
+        private void release() {
+
+            if (joinSet != null) {
+
+                joinSet.close();
+
+//                joinSet = null;
+                
+            }
+
+            if (sourceSolutions != null) {
+
+                final IRawStore store = sourceSolutions.getStore();
+
+                sourceSolutions.close();
+//                sourceSolutions = null;
+                
+                store.close();
+
+            }
+
+        }
+        
         public Void call() throws Exception {
 
             try {
@@ -573,7 +606,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 if (context.isLastInvocation()) {
 
-                    stats.release();
+                    release();
 
                 }
                 

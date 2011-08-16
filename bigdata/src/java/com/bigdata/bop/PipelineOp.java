@@ -36,7 +36,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.solutions.SliceOp;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -498,24 +497,12 @@ abstract public class PipelineOp extends BOpBase {
         
     }
 
-	/**
-	 * Return a new object which can be used to collect statistics on the
-	 * operator evaluation. This may be overridden to return a more specific
-	 * class depending on the operator.
-	 * <p>
-	 * Some operators may use this to share state across multiple invocations of
-	 * the operator within a given query (e.g., {@link SliceOp}). Another
-	 * mechanism for sharing state is to use the same named allocation context
-	 * for the memory manager across the operator invocation instances.
-	 * <p>
-	 * Operator life cycle events support pre-/post-operator behaviors. Such
-	 * events can be used to processed buffered solutions accumulated within
-	 * some shared state across multiple operator invocations.
-	 * 
-	 * @param queryContext
-	 *           The evaluation context for the query (not the operator). 
-	 */
-    public BOpStats newStats(final IQueryContext queryContext) {
+    /**
+     * Return a new object which can be used to collect statistics on the
+     * operator evaluation. This may be overridden to return a more specific
+     * class depending on the operator.
+     */
+    public BOpStats newStats() {
 
         return new BOpStats();
 

@@ -13,7 +13,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.engine.BOpStats;
@@ -125,7 +124,8 @@ public class MemorySortOp extends SortOp {
         
 	}
 
-    public BOpStats newStats(final IQueryContext queryContext) {
+    @Override
+    public BOpStats newStats() {
 
         return new MyStats();
 

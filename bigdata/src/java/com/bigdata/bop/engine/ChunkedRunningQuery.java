@@ -1061,7 +1061,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 stats = getStats(bopId);
             } else {
                 // distinct stats objects, aggregated as each task finishes.
-                stats = op.newStats(ChunkedRunningQuery.this);
+                stats = op.newStats();
             }
             assert stats != null;
 
