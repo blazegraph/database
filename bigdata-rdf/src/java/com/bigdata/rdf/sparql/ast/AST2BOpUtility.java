@@ -105,33 +105,40 @@ public class AST2BOpUtility {
         /**
          * Add any evaluated projections
          */
-        final ProjectionNode projection = query.getProjection();
+        final ProjectionNode projection = query.getProjection() == null ? null
+                : query.getProjection().isEmpty() ? null : query
+                        .getProjection();
+
+        final GroupByNode groupBy = query.getGroupBy() == null ? null : query
+                .getGroupBy().isEmpty() ? null : query.getGroupBy();
+        
+        final HavingNode having = query.getHaving() == null ? null : query
+                .getHaving().isEmpty() ? null : query.getHaving();
+
+        boolean isAggregation = groupBy != null || having != null;
 
         if (projection != null) {
-           
-            if (!projection.isEmpty()) {
 
-                /*
-                 * FIXME If any of the projected value expressions is an an
-                 * aggregate then ALL must be aggregates (which includes value
-                 * expressions involving aggregate functions, bare variables
-                 * appearing on the group by clause, variables bound by the
-                 * group by clause, and constants).
-                 * 
-                 * FIXME If GROUP BY or HAVING is used then the projected value
-                 * expressions MUST be aggregates. However, if these do not
-                 * appear and any of the projected value expressions is an
-                 * aggregate then we are still going to use a GROUP BY where all
-                 * solutions form a single implicit group.
-                 * 
-                 * @see GroupByState
-                 * 
-                 * @see GroupByRewriter
-                 */
-                
-                left = addProjectedAssigments(left,
-                        projection.getAssignmentProjections(), ctx);
-            }
+            /*
+             * FIXME If any of the projected value expressions is an an
+             * aggregate then ALL must be aggregates (which includes value
+             * expressions involving aggregate functions, bare variables
+             * appearing on the group by clause, variables bound by the group by
+             * clause, and constants).
+             * 
+             * FIXME If GROUP BY or HAVING is used then the projected value
+             * expressions MUST be aggregates. However, if these do not appear
+             * and any of the projected value expressions is an aggregate then
+             * we are still going to use a GROUP BY where all solutions form a
+             * single implicit group.
+             * 
+             * @see GroupByState
+             * 
+             * @see GroupByRewriter
+             */
+
+            left = addProjectedAssigments(left,
+                    projection.getAssignmentProjections(), ctx);
 
             if (projection.isDistinct()) {
 

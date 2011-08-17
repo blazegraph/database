@@ -1,7 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -55,16 +55,24 @@ import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 
 /**
  * Registry for built-in and external SPARQL functions.
+ * <p>
+ * Note: Use an alternative namespace for functions which do not have official
+ * namespaces.
  * 
  * @author <a href="mailto:mroycsi@users.sourceforge.net">Matt Roy</a>
  * @version $Id$
+ * 
+ * @see <a href="http://www.w3.org/2005/xpath-functions/">XPath functions</a>
+ * @see <a
+ *      href="http://lists.w3.org/Archives/Public/public-rdf-dawg/2006AprJun/att-0138/sparql-function-uri.html">Sparql
+ *      functions</a>
  */
 public class FunctionRegistry {
 
-	private static Map<URI, Factory> factories = new LinkedHashMap<URI, Factory>();
+	private static ConcurrentMap<URI, Factory> factories = new ConcurrentHashMap<URI, Factory>();
 	
-	private static final String SPARQL_FUNCTIONS = "http://www.w3.org/2006/sparql-functions#";
-	private static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions#";
+	public static final String SPARQL_FUNCTIONS = "http://www.w3.org/2006/sparql-functions#";
+	public static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions#";
 	
     public static final URI BOUND = new URIImpl(SPARQL_FUNCTIONS+"bound");       
     public static final URI IS_LITERAL = new URIImpl(SPARQL_FUNCTIONS+"isLiteral");
@@ -611,10 +619,14 @@ public class FunctionRegistry {
 		return f.create(lex, args);
 		
 	}
-	
-	public static final void add(final URI functionURI, final Factory factory) {
-		
-		factories.put(functionURI, factory);
+
+    public static final void add(final URI functionURI, final Factory factory) {
+
+        if (factories.putIfAbsent(functionURI, factory) != null) {
+
+            throw new UnsupportedOperationException("Already declared.");
+
+	    }
 		
 	}
 	
