@@ -121,11 +121,12 @@ public class AST2BOpUtility {
         	
         }
 
-        if (query.hasSlice()) {
+        final SliceNode slice = query.getSlice();
 
-        	left = addSlice(
-        			left, query.getOffset(), query.getLimit(), ctx);
-        	
+        if (slice != null) {
+
+            left = addSlice(left, slice.getOffset(), slice.getLimit(), ctx);
+
         }
         
         return left;

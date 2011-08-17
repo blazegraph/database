@@ -233,14 +233,18 @@ public class TestAST extends TestCase {
     	query.setDistinct(true);
     	query.addProjectionVar(new VarNode("s"));
     	query.addProjectionVar(new VarNode("p"));
-    	query.setOffset(10);
-    	query.setLimit(100);
+    	query.setSlice(new SliceNode(10,100));
     	query.addOrderBy(new OrderByExpr(new VarNode("s"), true));
     	query.addOrderBy(new OrderByExpr(new VarNode("p"), false));
     	
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
     	
+    }
+    
+    // FIXME write unit test which uses aggregation (GROUP BY and HAVING).
+    public void testAggregation() {
+        fail("write test");
     }
 
     public StatementPatternNode sp(final int id) {
