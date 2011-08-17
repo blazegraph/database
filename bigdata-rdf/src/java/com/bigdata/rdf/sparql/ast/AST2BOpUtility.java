@@ -984,6 +984,7 @@ public class AST2BOpUtility {
 	                       BOpEvaluationContext.CONTROLLER),//
 	                new NV(MemorySortOp.Annotations.PIPELINED, false),//
 	                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+	                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
     			})), ctx.queryHints);
 
 		
