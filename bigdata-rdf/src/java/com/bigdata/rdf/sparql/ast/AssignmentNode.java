@@ -83,11 +83,6 @@ public class AssignmentNode extends ValueExpressionNodeBase {
         return varsToMaterialize;
     }
 
-    @Override
-    public String toString() {
-        return toString(0);
-    }
-
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));

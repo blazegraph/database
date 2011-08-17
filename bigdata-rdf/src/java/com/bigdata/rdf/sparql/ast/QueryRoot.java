@@ -28,7 +28,9 @@ import com.bigdata.rdf.internal.IV;
  * 
  *      FIXME ORDER BY (value expression, ASC|DSC) list
  * 
- *      FIXME offset/limit => {@link SliceNode}.
+ *      FIXME Refactor QueryRoot into a QueryNode and a QueryRoot. The QueryNode
+ *      will be used for the top-level query and for subqueries as well. The
+ *      QueryRoot will have the {@link DatasetNode}.
  */
 public class QueryRoot {
 
@@ -49,12 +51,14 @@ public class QueryRoot {
     @Deprecated
 	private final List<AssignmentNode> projection;
 	
-    @Deprecated
-	private long offset = 0;
+//    @Deprecated
+//	private long offset = 0;
+//
+//    @Deprecated
+//	private long limit = Long.MAX_VALUE;
 
-    @Deprecated
-	private long limit = Long.MAX_VALUE;
-	
+    private SliceNode slice;
+    
 	public QueryRoot(final IGroupNode root) {
 
 		this.root = root;
@@ -65,6 +69,35 @@ public class QueryRoot {
 		
 	}
 
+    /*
+     * @see ProjectionNode
+     * @see GroupByNode
+     * @see HavingNode
+     * @see OrderByNode
+     * @see SliceNode
+     */
+	
+	/**
+	 * Return the slice -or- <code>null</code> if there is no slice.
+	 */
+	public SliceNode getSlice() {
+        
+	    return slice;
+	    
+    }
+
+    /**
+     * Set or clear the slice.
+     * 
+     * @param slice
+     *            The slice (may be <code>null</code>).
+     */
+    public void setSlice(final SliceNode slice) {
+
+        this.slice = slice;
+        
+    }
+	
     @Deprecated
 	public void addProjectionVar(final VarNode var) {
 		projection.add(new AssignmentNode(var,var));
@@ -174,30 +207,30 @@ public class QueryRoot {
 		return distinct;
 	}
 
-    @Deprecated
-	public void setOffset(final long offset) {
-		this.offset = offset;
-	}
-
-    @Deprecated
-	public long getOffset() {
-		return offset;
-	}
-
-    @Deprecated
-	public void setLimit(final long limit) {
-		this.limit = limit;
-	}
-
-    @Deprecated
-	public long getLimit() {
-		return limit;
-	}
-	
-    @Deprecated
-	public boolean hasSlice() {
-		return offset > 0 || limit < Long.MAX_VALUE;
-	}
+//    @Deprecated
+//	public void setOffset(final long offset) {
+//		this.offset = offset;
+//	}
+//
+//    @Deprecated
+//	public long getOffset() {
+//		return offset;
+//	}
+//
+//    @Deprecated
+//	public void setLimit(final long limit) {
+//		this.limit = limit;
+//	}
+//
+//    @Deprecated
+//	public long getLimit() {
+//		return limit;
+//	}
+//	
+//    @Deprecated
+//	public boolean hasSlice() {
+//		return offset > 0 || limit < Long.MAX_VALUE;
+//	}
 	
 	public String toString() {
 		
@@ -220,14 +253,6 @@ public class QueryRoot {
 		sb.append("\nwhere\n");
 		sb.append(root.toString());
 		
-		if (offset > 0l) {
-			sb.append("\noffset ").append(offset);
-		}
-		
-		if (limit < Long.MAX_VALUE) {
-			sb.append("\nlimit ").append(limit);
-		}
-		
 		if (orderBy.size() > 0) {
 			sb.append("\norderBy ");
 			for (OrderByExpr o : orderBy) {
@@ -235,7 +260,11 @@ public class QueryRoot {
 			}
 			sb.setLength(sb.length()-1);
 		}
-		
+
+        if (slice != null) {
+            sb.append("\n");
+            sb.append(slice.toString());
+        }
 		
 		return sb.toString();
 		

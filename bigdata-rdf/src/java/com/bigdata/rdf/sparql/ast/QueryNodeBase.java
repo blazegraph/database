@@ -41,4 +41,11 @@ public abstract class QueryNodeBase implements IQueryNode {
 
     private static final transient String ws = "                                                                                                                                                                                                                  ";
 
+    @Override
+    public final String toString() {
+
+        return toString(0/* indent */);
+        
+    }
+    
 }

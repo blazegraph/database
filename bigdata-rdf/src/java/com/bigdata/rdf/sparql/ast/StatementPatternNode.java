@@ -99,13 +99,9 @@ public class StatementPatternNode extends QueryNodeBase {
 	 * attempt to bind when run.
 	 */
 	public Set<IVariable<?>> getProducedBindings() {
-		return producedBindings;
-	}
 
-	public String toString() {
-		
-		return toString(0);
-		
+	    return producedBindings;
+	    
 	}
 	
 	public String toString(final int indent) {

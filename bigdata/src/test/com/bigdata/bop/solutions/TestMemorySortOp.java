@@ -425,51 +425,5 @@ public class TestMemorySortOp extends TestCase2 {
         assertEquals ( 7, stats.unitsOut.get () ) ;
         assertEquals ( 1, stats.chunksOut.get () ) ;
     }
-    
-//    ///////////////////////////////////////////////////////////////////
-//    ///////////////////////////////////////////////////////////////////
-//    ///////////////////////////////////////////////////////////////////
-//    @SuppressWarnings("serial")
-//    static private class StringComparatorOp extends ComparatorOp
-//    {
-//    	
-//    	/** The sort order. */
-//        final private ISortOrder<?> [] _sors;
-//
-//        public StringComparatorOp ( final ISortOrder<?> sors [] )
-//        {
-//            super ( new BOp [] {}, NV.asMap ( new NV [] { new NV ( ComparatorOp.Annotations.ORDER, sors ) } ) ) ;
-//            _sors = sors ;
-//        }
-//
-//        public int compare(final IBindingSet o1, final IBindingSet o2) {
-//            for (ISortOrder<?> sor : _sors) {
-//                int ret = compare(sor, o1, o2);
-//                if (0 != ret)
-//                    return ret;
-//            }
-//            return 0;
-//        }
-//
-//        private int compare(final ISortOrder<?> sor, final IBindingSet lhs,
-//                final IBindingSet rhs) {
-//            int compare = 0;
-//
-//            final Object lhsv = sor.getExpr().get(lhs);
-//            final Object rhsv = sor.getExpr().get(rhs);
-//
-//            if ( null == lhsv && null == rhsv )
-//                return 0 ;
-//            else if ( null == lhsv )
-//                compare = -1 ;
-//            else if ( null == rhsv )
-//                compare = 1 ;
-//            else
-//                compare = lhsv.toString ().compareTo ( rhsv.toString () ) ;
-//
-//            return compare * ( sor.isAscending () ? 1 : -1 ) ;
-//        }
-//        
-//    }
 
 }

@@ -62,6 +62,13 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("solution modifier operators");
 
         /*
+         * Project
+         */
+        
+        // test suite for projection of value expressions (but not aggregates).
+        suite.addTestSuite(TestProjectionOp.class);
+        
+        /*
          * Slice
          */
         

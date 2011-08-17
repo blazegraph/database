@@ -48,12 +48,6 @@ public class UnionNode extends GroupNodeBase {
 		
 	}
 	
-	public String toString() {
-		
-		return toString(0);
-		
-	}
-	
 	public String toString(final int indent) {
 		
 		final String _indent = indent(indent);
