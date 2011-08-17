@@ -11,9 +11,15 @@
 		<fileset dir="${lubm.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
+		<!-- Override the ICU version. -->
+		<fileset dir="${bigdata10.build.dir}/lib">
+			<include name="icu4j-3_6.jar" />
+		</fileset>
 		<!-- The bigdata dependencies (for the nano-server and the Sesame jars). -->
 		<fileset dir="${bigdata.build.dir}/lib">
 			<include name="**/*.jar" />
+			<!-- Override the ICU version. -->
+			<exclude name="icu4j-4_8.jar"/>
 		</fileset>
 	</path>
 

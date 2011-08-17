@@ -64,6 +64,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+@Deprecated // Probably does not make sense with the materialization pipeline.
 public class TestProjectionOp extends TestCase2 {
 
     /**

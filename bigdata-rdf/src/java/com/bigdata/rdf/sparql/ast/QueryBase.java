@@ -35,33 +35,35 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class QueryBase {
 
-	private final IGroupNode root;
+	private IGroupNode root;
     private ProjectionNode projection;
     private GroupByNode groupBy;
     private HavingNode having;
     private OrderByNode orderBy;
     private SliceNode slice;
 
-    /**
-     * 
-     * @param root
-     *            The "WHERE" clause.
-     * 
-     *            TODO Why not make the WHERE clause this settable like
-     *            everything else?
-     */
-	public QueryBase(final IGroupNode root) {
+	public QueryBase() {
 
-		this.root = root;
-		
 	}
 
     /**
-     * The WHERE clause.
+     * Return the {@link IGroupNode} (corresponds to the WHERE clause).
      */
     public IGroupNode getRoot() {
 
         return root;
+        
+    }
+
+    /**
+     * Set the {@link IGroupNode}.
+     *  
+     * @param root
+     *            The "WHERE" clause.
+     */
+    public void setRoot(final IGroupNode root) {
+        
+        this.root = root;
         
     }
     
@@ -182,10 +184,14 @@ abstract public class QueryBase {
 		    sb.append(projection);
 		    
 		}
-		
-        sb.append("\nwhere\n");
 
-        sb.append(root.toString());
+        if (root != null) {
+
+            sb.append("\nwhere\n");
+
+            sb.append(root.toString());
+
+        }
 
         if (groupBy != null && !groupBy.isEmpty()) {
 

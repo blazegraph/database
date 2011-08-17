@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.IValueExpression;
+
 /**
  * AST node for a GROUP BY clause.
  * 
@@ -39,6 +41,25 @@ public class GroupByNode extends ValueExpressionListBaseNode<IValueExpressionNod
      * 
      */
     public GroupByNode() {
+    }
+
+    /**
+     * Return the {@link IValueExpression}s for this {@link GroupByNode}.
+     */
+    public IValueExpression[] getValueExpressions() {
+
+        final IValueExpression<?>[] exprs = new IValueExpression[size()];
+        
+        int i = 0;
+        
+        for(IValueExpressionNode node : this) {
+        
+            exprs[i++] = node.getValueExpression();
+            
+        }
+        
+        return exprs;
+        
     }
 
     public String toString(final int indent) {

@@ -44,7 +44,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.IAggregate;
 
 /**
- * An object which encapsulates the validate and state of an aggregation
+ * An object which encapsulates the validation and state of an aggregation
  * operation with an optional GROUP BY clause, SELECT expressions, and an
  * optional HAVING clause. The SELECT expressions MUST be aggregates (if the
  * SELECT expressions do not involve aggregates then you should not be using an
@@ -112,7 +112,7 @@ public class GroupByState implements IGroupByState {
         return simpleHaving;
     }
 
-    GroupByState(final IValueExpression<?>[] select,
+    public GroupByState(final IValueExpression<?>[] select,
             final IValueExpression<?>[] groupBy, final IConstraint[] having) {
 
         // normalize an empty[] to a null.

@@ -33,6 +33,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
@@ -43,9 +44,14 @@ import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
+import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
+import com.bigdata.bop.solutions.GroupByOp;
+import com.bigdata.bop.solutions.GroupByState;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.bop.solutions.IVComparator;
+import com.bigdata.bop.solutions.MemoryGroupByOp;
 import com.bigdata.bop.solutions.MemorySortOp;
+import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
@@ -54,6 +60,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
@@ -64,6 +71,7 @@ import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.lexicon.LexPredicate;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
@@ -100,52 +108,72 @@ public class AST2BOpUtility {
 		
 		final IGroupNode root = ctx.query.getRoot();
 
-		PipelineOp left = convert(root, ctx);
+        if (root == null)
+            throw new IllegalArgumentException("No group node");
+		
+        PipelineOp left = convert(root, ctx);
 
-        /**
-         * Add any evaluated projections
-         */
         final ProjectionNode projection = query.getProjection() == null ? null
                 : query.getProjection().isEmpty() ? null : query
                         .getProjection();
-
-        final GroupByNode groupBy = query.getGroupBy() == null ? null : query
-                .getGroupBy().isEmpty() ? null : query.getGroupBy();
         
-        final HavingNode having = query.getHaving() == null ? null : query
-                .getHaving().isEmpty() ? null : query.getHaving();
-
-        boolean isAggregation = groupBy != null || having != null;
-
         if (projection != null) {
 
-            /*
-             * FIXME If any of the projected value expressions is an an
+            /**
+             * Add any evaluated projections
+             * 
+             * Note: If any of the projected value expressions is an an
              * aggregate then ALL must be aggregates (which includes value
              * expressions involving aggregate functions, bare variables
              * appearing on the group by clause, variables bound by the group by
              * clause, and constants).
              * 
-             * FIXME If GROUP BY or HAVING is used then the projected value
+             * Note: If GROUP BY or HAVING is used then the projected value
              * expressions MUST be aggregates. However, if these do not appear
              * and any of the projected value expressions is an aggregate then
              * we are still going to use a GROUP BY where all solutions form a
              * single implicit group.
              * 
-             * @see GroupByState
-             * 
-             * @see GroupByRewriter
+             * Note: The combination of the IVs, the math and comparison
+             * operators, and the materialization pipe MUST ensure that any IVs
+             * which need to be materialized have been materialized BEFORE we
+             * run ORDER BY or GROUP BY. Because those operators must act on all
+             * solutions "at once", implementations of those operators CAN NOT
+             * use the conditional routing logic to handle IVs which are not
+             * materialized.
              */
 
-            left = addProjectedAssigments(left,
-                    projection.getAssignmentProjections(), ctx);
+            final GroupByNode groupBy = query.getGroupBy() == null ? null
+                    : query.getGroupBy().isEmpty() ? null : query.getGroupBy();
+
+            final HavingNode having = query.getHaving() == null ? null : query
+                    .getHaving().isEmpty() ? null : query.getHaving();
+
+            // true if this is an aggregation query.
+            final boolean isAggregate = isAggregate(projection, groupBy, having);
+
+            if (isAggregate) {
+
+                left = addAggregation(left, projection, groupBy, having, ctx);
+
+            } else {
+
+                /*
+                 * TODO Should we use or discard the {@link ProjectionOp} here?
+                 * Does it offer any advantage?
+                 */
+
+                left = addProjectedAssigments(left,
+                        projection.getAssignmentProjections(), ctx);
+
+            }
 
             if (projection.isDistinct()) {
 
                 left = addDistinct(left, projection.getProjectionVars(), ctx);
 
             }
-        
+
         }
         
         final OrderByNode orderBy = query.getOrderBy();
@@ -160,13 +188,89 @@ public class AST2BOpUtility {
 
         if (slice != null) {
 
-            left = addSlice(left, slice.getOffset(), slice.getLimit(), ctx);
+            left = addSlice(left, slice, ctx);
 
         }
         
         return left;
 		
 	}
+
+    /**
+     * Return <code>true</code> if any of the {@link ProjectionNode},
+     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
+     * aggregation query. All arguments are optional.
+     */
+    private static boolean isAggregate(final ProjectionNode projection,
+            final GroupByNode groupBy, final HavingNode having) {
+
+        if (groupBy != null && !groupBy.isEmpty())
+            return true;
+
+        if (having != null && !having.isEmpty())
+            return true;
+        
+        if (projection != null) {
+
+            for (IValueExpressionNode exprNode : projection) {
+
+                final IValueExpression<?> expr = exprNode.getValueExpression();
+
+                if (isObviousAggregate(expr)) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        return false;
+
+	}
+	
+    /**
+     * Return <code>true</code> iff the {@link IValueExpression} is an obvious
+     * aggregate (it uses an {@link IAggregate} somewhere within it). This is
+     * used to identify projections which are aggregates when they are used
+     * without an explicit GROUP BY or HAVING clause.
+     * <p>
+     * Note: Value expressions can be "non-obvious" aggregates when considered
+     * in the context of a GROUP BY, HAVING, or even a SELECT expression where
+     * at least one argument is a known aggregate. For example, a constant is an
+     * aggregate when it appears in a SELECT expression for a query which has a
+     * GROUP BY clause. Another example: any value expression used in a GROUP BY
+     * clause is an aggregate when the same value expression appears in the
+     * SELECT clause.
+     * <p>
+     * This method is only to find the "obvious" aggregates which signal that a
+     * bare SELECT clause is in fact an aggregation.
+     * 
+     * @param expr
+     *            The expression.
+     * 
+     * @return <code>true</code> iff it is an obvious aggregate.
+     */
+    private static boolean isObviousAggregate(final IValueExpression<?> expr) {
+
+        if(expr instanceof IAggregate<?>)
+            return true;
+        
+        final Iterator<BOp> itr = expr.argIterator();
+        
+        while (itr.hasNext()) {
+            
+            final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
+            
+            if(isObviousAggregate(arg)) // recursion.
+                return true;
+            
+        }
+        
+        return false;
+        
+    }
 	
 	private static PipelineOp convert(final IGroupNode groupNode,
 			final AST2BOpContext ctx) {
@@ -246,44 +350,46 @@ public class AST2BOpUtility {
 		
 	}
 		
-	/**
-	 * Join group consists of: statement patterns, constraints, and sub-groups
-	 * 
-	 * Sub-groups can be either join groups (optional) or unions (non-optional)
-	 * 
-	 * No such thing as a non-optional sub join group (in Sparql 1.0)
-	 * 
-	 * No such thing as an optional statement pattern, only optional sub-groups
-	 * 
-	 * Optional sub-groups with at most one statement pattern can be lifted into
-	 * this group using an optional PipelineJoin, but only if that sub-group
-	 * has no constraints that need materialized variables. 
-	 * (why? because if we put in materialization steps in between the join
-	 * and the constraint, the constraint won't have the same optional semantics
-	 * as the join and will lose its association with that join and its "optionality".)
-	 * 
-	 * 1. Partition the constraints:
-	 *    -preConditionals: all variables already bound.
-	 *    -joinConditionals: variables bound by statement patterns in this group.
-	 *    -postConditionals: variables bound by sub-groups of this group (or not at all).
-	 *    
-	 * 2. Pipeline the preConditionals. Add materialization steps as needed.
-	 * 
-	 * 3. Join the statement patterns. Use the static optimizer to attach
-	 * constraints to joins. Lots of funky stuff with materialization and
-	 * named / default graph joins.
-	 * 
-	 * 4. Pipeline the non-optional sub-groups (unions). Make sure it's not
-	 * an empty union.
-	 * 
-	 * 5. Pipeline the optional sub-groups (join groups). Lift single optional
-	 * statement patterns into this group (avoid the subquery op) per the
-	 * instructions above regarding materialization and constraints.
-	 * 
-	 * 6. Pipeline the postConditionals. Add materialization steps as needed.
-	 * 
-	 * TODO Think about how hash joins fit into this.
-	 */
+    /**
+     * Join group consists of: statement patterns, constraints, and sub-groups
+     * <p>
+     * Sub-groups can be either join groups (optional) or unions (non-optional)
+     * <p>
+     * No such thing as a non-optional sub join group (in Sparql 1.0)
+     * <p>
+     * No such thing as an optional statement pattern, only optional sub-groups
+     * <p>
+     * Optional sub-groups with at most one statement pattern can be lifted into
+     * this group using an optional PipelineJoin, but only if that sub-group has
+     * no constraints that need materialized variables. (why? because if we put
+     * in materialization steps in between the join and the constraint, the
+     * constraint won't have the same optional semantics as the join and will
+     * lose its association with that join and its "optionality".)
+     * 
+     * <pre>
+     * 1. Partition the constraints:
+     *    -preConditionals: all variables already bound.
+     *    -joinConditionals: variables bound by statement patterns in this group.
+     *    -postConditionals: variables bound by sub-groups of this group (or not at all).
+     *    
+     * 2. Pipeline the preConditionals. Add materialization steps as needed.
+     * 
+     * 3. Join the statement patterns. Use the static optimizer to attach
+     * constraints to joins. Lots of funky stuff with materialization and
+     * named / default graph joins.
+     * 
+     * 4. Pipeline the non-optional sub-groups (unions). Make sure it's not
+     * an empty union.
+     * 
+     * 5. Pipeline the optional sub-groups (join groups). Lift single optional
+     * statement patterns into this group (avoid the subquery op) per the
+     * instructions above regarding materialization and constraints.
+     * 
+     * 6. Pipeline the postConditionals. Add materialization steps as needed.
+     * </pre>
+     * 
+     * TODO Think about how hash joins fit into this.
+     */
 	private static PipelineOp convert(final JoinGroupNode joinGroup,
 			final AST2BOpContext ctx) {
 
@@ -390,27 +496,33 @@ public class AST2BOpUtility {
 			 */
 			vars.removeAll(done);
 			
-			final int bopId = ctx.idFactory.incrementAndGet();
+            final int bopId = ctx.idFactory.incrementAndGet();
 
-			final ConditionalBind b = new ConditionalBind(assignmentNode.getVar(),assignmentNode.getValueExpression());
-			
-            IConstraint c = projection?new ProjectedConstraint(b):new BindingConstraint(b);
-            
-			/*
-			 * We might have already materialized everything we need for this filter.
-			 */
-			if (vars.size() > 0) {
-				
-				left = addMaterializationSteps(left, bopId, ve, vars, ctx);
-			
-				/*
-				 * All the newly materialized vars to the set we've already done.
-				 */
-				done.addAll(vars);
-				
-				c=new TryBeforeMaterializationConstraint(c);
-			}
-		
+            final ConditionalBind b = new ConditionalBind(
+                    assignmentNode.getVar(),
+                    assignmentNode.getValueExpression());
+
+            IConstraint c = projection ? new ProjectedConstraint(b)
+                    : new BindingConstraint(b);
+
+            /*
+             * We might have already materialized everything we need for this
+             * filter.
+             */
+            if (vars.size() > 0) {
+
+                left = addMaterializationSteps(left, bopId, ve, vars, ctx);
+
+                /*
+                 * All the newly materialized vars to the set we've already
+                 * done.
+                 */
+                done.addAll(vars);
+
+                c = new TryBeforeMaterializationConstraint(c);
+
+            }
+
 			left = applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{ left },
                         NV.asMap(new NV[]{//
@@ -522,16 +634,19 @@ public class AST2BOpUtility {
     }
     
     private static final PipelineOp addJoin(PipelineOp left,
-    		final Predicate pred, final Collection<FilterNode> filters,
+    		final Predicate<?> pred, final Collection<FilterNode> filters,
     		final AST2BOpContext ctx) {
     	
 //    	final Predicate pred = toPredicate(sp);
     	
     	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
     	
-    	for (FilterNode filter : filters) {
-    		constraints.add(new SPARQLConstraint(filter.getValueExpression()));
-    	}
+        for (FilterNode filter : filters) {
+         
+            constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    filter.getValueExpression()));
+            
+        }
     	
     	// just for now
     	left = Rule2BOpUtility.join(
@@ -600,8 +715,9 @@ public class AST2BOpUtility {
     			
     			final Collection<FilterNode> filters = subJoinGroup.getFilters();
     			
-    			final Predicate pred = (Predicate) toPredicate(sp, ctx).setProperty(
-						IPredicate.Annotations.OPTIONAL, Boolean.TRUE);
+                final Predicate<?> pred = (Predicate<?>) toPredicate(sp, ctx)
+                        .setProperty(IPredicate.Annotations.OPTIONAL,
+                                Boolean.TRUE);
     			
 //    			final StatementPatternNode sp2 = new StatementPatternNode(pred);
     			
@@ -662,32 +778,150 @@ public class AST2BOpUtility {
         
 	}
 	
-	/**
-	 * NOT YET TESTED.
-	 * 
-	 * TODO TEST
-	 */
-	private static final PipelineOp addDistinct(PipelineOp left,
-			final IVariable<?>[] vars, final AST2BOpContext ctx) {
-		
-//		DistinctBindingSetOp
+    /**
+     * Add DISTINCT semantics to the pipeline.
+     * 
+     * TODO If the expected cardinality is large then prefer
+     * {@link DistinctBindingSetsWithHTreeOp} rather than
+     * {@link DistinctBindingSetOp}.
+     * 
+     * TODO Support parallel decomposition of distinct on a cluster.
+     */
+    private static final PipelineOp addDistinct(PipelineOp left,
+            final IVariable<?>[] vars, final AST2BOpContext ctx) {
 		
 		final int bopId = ctx.idFactory.incrementAndGet();
 		
-    	left = applyQueryHints(new DistinctBindingSetOp(new BOp[] { left }, 
-                NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID, bopId),
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES, vars),
-                    new NV(DistinctBindingSetOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),
-                    new NV(DistinctBindingSetOp.Annotations.SHARED_STATE,
-                            true),
-                })), ctx.queryHints);
-				
-    	return left;
+		final PipelineOp op;
+		if(true) {
+		    /*
+		     * DISTINCT on the JVM heap.
+		     */
+		    op = new DistinctBindingSetOp(//
+		            new BOp[] { left },// 
+	                NV.asMap(new NV[]{//
+	                    new NV(DistinctBindingSetOp.Annotations.BOP_ID, bopId),
+	                    new NV(DistinctBindingSetOp.Annotations.VARIABLES, vars),
+	                    new NV(DistinctBindingSetOp.Annotations.EVALUATION_CONTEXT,
+	                            BOpEvaluationContext.CONTROLLER),
+	                    new NV(DistinctBindingSetOp.Annotations.SHARED_STATE,
+	                            true),
+	                }));
+		} else {
+		    /*
+		     * DISTINCT on the native heap.
+		     */
+	        op = new DistinctBindingSetsWithHTreeOp(//
+	                new BOp[]{},//
+	                NV.asMap(new NV[]{//
+	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,bopId),//
+	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,vars),//
+	                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+	                            BOpEvaluationContext.CONTROLLER),//
+	                    new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+	                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+	                }));
+		}
 		
-	}
-			
+    	left = applyQueryHints(op, ctx.queryHints);
+				
+        return left;
+
+    }
+
+    /**
+     * Add an aggregation operator. It will handle the grouping (if any),
+     * optional having filter, and projected select expressions. A generalized
+     * aggregation operator will be used unless the aggregation corresponds to
+     * some special case.
+     * 
+     * @param left
+     *            The previous operator in the pipeline.
+     * @param projection
+     *            The projected select expressions (MUST be aggregates when
+     *            interpreted in context with groupBy and having).
+     * @param groupBy
+     *            The group by clause (optional).
+     * @param having
+     *            The having clause (optional).
+     * @param ctx
+     * 
+     * @return The left-most operator in the pipeline.
+     * 
+     * TODO Support parallel decomposition of aggregation on a cluster.
+     */
+    private static final PipelineOp addAggregation(PipelineOp left,
+            final ProjectionNode projection, final GroupByNode groupBy,
+            final HavingNode having, final AST2BOpContext ctx) {
+        
+        final IValueExpression<?>[] projectExprs = projection
+                .getValueExpressions();
+
+        final IValueExpression<?>[] groupByExprs = groupBy == null ? null
+                : groupBy.getValueExpressions();
+
+        final IConstraint[] havingExprs = having == null ? null
+                : having.getConstraints();
+
+        final GroupByState groupByState = new GroupByState(projectExprs,
+                groupByExprs, havingExprs);
+
+        final int bopId = ctx.idFactory.incrementAndGet();
+
+        final GroupByOp op;
+        
+        if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
+
+            /*
+             * Extremely efficient pipelined aggregation operator.
+             */
+
+            op = new PipelinedAggregationOp(new BOp[] {}, NV.asMap(new NV[] {//
+                    new NV(BOp.Annotations.BOP_ID, bopId),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.PIPELINED, true),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                    new NV(GroupByOp.Annotations.SELECT, projectExprs), //
+                    new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
+                    new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+            }));
+
+        } else {
+
+            /*
+             * General aggregation operator on the JVM heap.
+             * 
+             * TODO There is a sketch of a generalized aggregation operator for
+             * the native heap but it needs to be reworked (the control
+             * structure is incorrect). This generalized aggregation operator
+             * for the native heap would be a better only when the #of solutions
+             * to be grouped is large and we can not pipeline the aggregation.
+             * (The code for this is either on the CI machine or the
+             * workstation). BBT 8/17/2011.
+             */
+            
+            op = new MemoryGroupByOp(new BOp[] {}, NV.asMap(new NV[] {//
+                    new NV(BOp.Annotations.BOP_ID, bopId),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.PIPELINED, false),//
+                    new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                    new NV(GroupByOp.Annotations.SELECT, projectExprs), //
+                    new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
+                    new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+            }));
+
+        }
+        
+        left = applyQueryHints(op, ctx.queryHints);
+
+        return left;
+        
+    }
+    
+
     /**
      * NOT YET TESTED.
      * 
@@ -757,21 +991,19 @@ public class AST2BOpUtility {
 		
 	}
 			
-	/**
-	 * NOT YET TESTED.
-	 * 
-	 * TODO TEST
-	 */
-	private static final PipelineOp addSlice(PipelineOp left,
-			final long offset, final long limit, final AST2BOpContext ctx) {
-		
+    /**
+     * Impose an OFFSET and/or LIMIT on a query.
+     */
+    private static final PipelineOp addSlice(PipelineOp left,
+            final SliceNode slice, final AST2BOpContext ctx) {
+
 		final int bopId = ctx.idFactory.incrementAndGet();
 		
     	left = applyQueryHints(new SliceOp(new BOp[] { left },
     			NV.asMap(new NV[] { 
 					new NV(SliceOp.Annotations.BOP_ID, bopId),
-					new NV(SliceOp.Annotations.OFFSET, offset),
-					new NV(SliceOp.Annotations.LIMIT, limit),
+					new NV(SliceOp.Annotations.OFFSET, slice.getOffset()),
+					new NV(SliceOp.Annotations.LIMIT, slice.getLimit()),
 	                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 	                        BOpEvaluationContext.CONTROLLER),//
 	                new NV(SliceOp.Annotations.PIPELINED, false),//
@@ -798,7 +1030,9 @@ public class AST2BOpUtility {
      *       operator which are known to be annotations understood by that
      *       operator. This information is basically available from the inner
      *       Annotation interface for a given operator class, but that is not
-     *       really all that accessible.
+     *       really all that accessible. [The way it is now, the query hints get
+     *       sprayed onto every operator and that will make the query much
+     *       fatter for NIO on a cluster.]
      */
     public static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {

@@ -24,16 +24,32 @@ import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 public class SOp2ASTUtility {
 
 	private static final transient Logger log = Logger.getLogger(SOp2ASTUtility.class);
-	
-	
-	public static final QueryRoot convert(final SOpTree sopTree) {
+
+    /**
+     * Convert a Sesame operator model into a bigdata AST.
+     * 
+     * @param sopTree
+     * 
+     * @return
+     * 
+     *         FIXME This will be replaced by direct translation of the Sesame
+     *         2.4 AST into the bigdata AST.
+     */
+    public static final QueryRoot convert(final SOpTree sopTree) {
 		
 		final SOpGroup sopRoot = sopTree.getRoot();
 		
 		final IGroupNode astRoot = convert(sopRoot);
 		
-		final QueryRoot query = new QueryRoot(astRoot);
+		final QueryRoot query = new QueryRoot();
 		
+		query.setRoot(astRoot);
+		
+		/*
+		 * FIXME We need to take over the rest of the SPARQL for the Sesame
+		 * operator model.
+		 */
+
 //		query.setDistinct(false);
 //		
 //		query.setOffset(0l);

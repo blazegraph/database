@@ -40,10 +40,13 @@ import java.util.List;
 abstract public class ValueExpressionListBaseNode<E extends IValueExpressionNode>
         extends SolutionModifierBase implements Iterable<E> {
 
-    private final List<E> exprs = new LinkedList<E>();
+    protected final List<E> exprs = new LinkedList<E>();
 
     public void addExpr(final E e) {
 
+        if (e == null)
+            throw new IllegalArgumentException();
+        
         exprs.add(e);
 
     }
