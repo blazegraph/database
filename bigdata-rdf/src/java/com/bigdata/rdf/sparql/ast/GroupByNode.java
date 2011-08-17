@@ -33,7 +33,7 @@ package com.bigdata.rdf.sparql.ast;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
+public class GroupByNode extends ValueExpressionListBaseNode<IValueExpressionNode> {
 
     /**
      * 
@@ -47,8 +47,10 @@ public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
         sb.append("group by ");
 
-        for (AssignmentNode v : this) {
+        for (IValueExpressionNode v : this) {
+            
             sb.append(v);
+            
         }
 
         return sb.toString();

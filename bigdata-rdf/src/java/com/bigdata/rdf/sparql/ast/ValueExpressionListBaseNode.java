@@ -37,7 +37,7 @@ import java.util.List;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ValueExpressionListBaseNode<E extends ValueExpressionNodeBase>
+abstract public class ValueExpressionListBaseNode<E extends IValueExpressionNode>
         extends SolutionModifierBase implements Iterable<E> {
 
     private final List<E> exprs = new LinkedList<E>();
