@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Properties;
+import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
@@ -36,15 +36,13 @@ import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
-import com.bigdata.rdf.store.ProxyTestCase;
 
 /**
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  */
-public class TestAST extends ProxyTestCase {
+public class TestAST extends TestCase {
 
 	private static final Logger log = Logger.getLogger(TestAST.class);
 	
@@ -62,13 +60,6 @@ public class TestAST extends ProxyTestCase {
         super(name);
     }
     
-    @Override
-    public Properties getProperties() {
-    	final Properties props = super.getProperties();
-//    	props.setProperty(BigdataSail.Options.INLINE_DATE_TIMES, "true");
-    	return props;
-    }
-
     /**
      * select *
      * where {
@@ -244,8 +235,8 @@ public class TestAST extends ProxyTestCase {
     	query.addProjectionVar(new VarNode("p"));
     	query.setOffset(10);
     	query.setLimit(100);
-    	query.addOrderBy(new OrderByNode(new VarNode("s"), true));
-    	query.addOrderBy(new OrderByNode(new VarNode("p"), false));
+    	query.addOrderBy(new OrderByExpr(new VarNode("s"), true));
+    	query.addOrderBy(new OrderByExpr(new VarNode("p"), false));
     	
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -253,11 +244,12 @@ public class TestAST extends ProxyTestCase {
     }
 
     public StatementPatternNode sp(final int id) {
-    	return null;
+        return new StatementPatternNode(new VarNode("s"), new VarNode("p"),
+                new VarNode("o"));
     }
     
     public FilterNode filter(final int id) {
-    	return null;
+        return new FilterNode(new ValueExpressionNode(new Filter(id)));
     }
     
     public Predicate pred(final int id) {

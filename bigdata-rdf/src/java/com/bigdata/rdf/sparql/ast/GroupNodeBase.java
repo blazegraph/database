@@ -4,8 +4,10 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-public abstract class GroupNodeBase extends QueryNodeBase
-		implements IGroupNode {
+/**
+ * Base class for AST group nodes.
+ */
+public abstract class GroupNodeBase extends QueryNodeBase implements IGroupNode {
 
 	private final List<IQueryNode> children;
 	

@@ -10,22 +10,39 @@ import com.bigdata.bop.IVariable;
 /**
  * A node in the AST representing a statement pattern.
  */
-public class StatementPatternNode extends QueryNodeBase
-		implements IQueryNode {
+public class StatementPatternNode extends QueryNodeBase {
 
 	private final TermNode s, p, o, c;
 	
-	private final Scope scope;
-	
-	private final Set<IVariable<?>> producedBindings;
-	
-	public StatementPatternNode(
-			final TermNode s, final TermNode p, final TermNode o) {
-		
-		this(s, p, o, null, null);
-		
-	}
-		
+    private final Scope scope;
+
+    private final Set<IVariable<?>> producedBindings;
+
+    /**
+     * A triple pattern.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     */
+    public StatementPatternNode(final TermNode s, final TermNode p,
+            final TermNode o) {
+
+        this(s, p, o, null/* context */, null/* scope */);
+
+    }
+
+    /**
+     * A quad pattern.
+     * 
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     * @param scope
+     *            Either {@link Scope#DEFAULT_CONTEXTS} or
+     *            {@link Scope#NAMED_CONTEXTS}.
+     */
 	public StatementPatternNode(
 			final TermNode s, final TermNode p, final TermNode o, 
 			final TermNode c, final Scope scope) {
@@ -93,24 +110,9 @@ public class StatementPatternNode extends QueryNodeBase
 	
 	public String toString(final int indent) {
 		
-		final String _indent;
-		if (indent <= 0) {
-			
-			_indent = "";
-			
-		} else {
-			
-			final StringBuilder sb = new StringBuilder();
-			for (int i = 0; i < indent; i++) {
-				sb.append(" ");
-			}
-			_indent = sb.toString();
-			
-		}
-		
-		final StringBuilder sb = new StringBuilder();
+	    final StringBuilder sb = new StringBuilder(indent(indent));
 
-		sb.append(_indent).append("sp(");
+		sb.append("sp(");
 		sb.append(s).append(", ");
 		sb.append(p).append(", ");
 		sb.append(o);

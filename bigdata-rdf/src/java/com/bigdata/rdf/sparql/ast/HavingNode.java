@@ -27,53 +27,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-
 /**
- * AST node models an ORDER BY clause.
+ * AST node for a HAVING clause.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO Implement {@link IValueExpressionMetadata} so we can report the
+ *          aggregated variables across the filters which need to be
+ *          materialized?
  */
-public class OrderByNode extends SolutionModifierBase {
+public class HavingNode extends ValueExpressionListBaseNode<FilterNode> {
 
-    private final List<OrderByExpr> orderBy = new LinkedList<OrderByExpr>();
-
-    public OrderByNode() {
-    }
-
-    public void addOrderBy(final OrderByExpr orderBy) {
-        
-        if (this.orderBy.contains(orderBy)) {
-            throw new IllegalArgumentException("duplicate");
-        }
-        
-        this.orderBy.add(orderBy);
-        
-    }
-    
-    public void removeOrderBy(final OrderByExpr orderBy) {
-        this.orderBy.remove(orderBy);
-    }
-    
-    public boolean hasOrderBy() {
-        return !orderBy.isEmpty();
-    }
-    
-    public List<OrderByExpr> getOrderBy() {
-        return Collections.unmodifiableList(orderBy);
+    /**
+     * 
+     */
+    public HavingNode() {
     }
 
     public String toString(final int indent) {
+
         final StringBuilder sb = new StringBuilder(indent(indent));
-        sb.append("order by ");
-        for (OrderByExpr e : orderBy) {
-            sb.append(" ");
-            sb.append(e.toString());
+
+        sb.append("having ");
+
+        for (FilterNode v : this) {
+            sb.append(v);
         }
+
         return sb.toString();
+
     }
 
 }

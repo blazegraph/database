@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sparql.ast;
 
-
 /**
  * A type of query node that groups a set of query nodes together. This is
  * the interface used by the {@link UnionNode} and {@link JoinGroupNode} query
@@ -9,7 +8,7 @@ package com.bigdata.rdf.sparql.ast;
 public interface IGroupNode extends IQueryNode, Iterable<IQueryNode> {
 
 	/**
-	 * Add a child to this group.  Child can be a statment pattern, a filter,
+	 * Add a child to this group.  Child can be a statement pattern, a filter,
 	 * or another group.
 	 */
 	IGroupNode addChild(final IQueryNode child);
