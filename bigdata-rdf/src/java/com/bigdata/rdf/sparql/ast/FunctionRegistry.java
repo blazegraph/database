@@ -53,6 +53,12 @@ import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 
+/**
+ * Registry for built-in and external SPARQL functions.
+ * 
+ * @author <a href="mailto:mroycsi@users.sourceforge.net">Matt Roy</a>
+ * @version $Id$
+ */
 public class FunctionRegistry {
 
 	private static Map<URI, Factory> factories = new LinkedHashMap<URI, Factory>();

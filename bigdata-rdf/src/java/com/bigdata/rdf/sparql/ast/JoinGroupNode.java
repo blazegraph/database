@@ -14,8 +14,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  * An optional or non-optional collection of query nodes that run together in
  * a group.
  */
-public class JoinGroupNode extends GroupNodeBase 
-		implements IGroupNode, IQueryNode {
+public class JoinGroupNode extends GroupNodeBase {
 
 	/**
 	 * Construct a non-optional join group.
@@ -363,67 +362,57 @@ public class JoinGroupNode extends GroupNodeBase
 	
 	public String toString(final int indent) {
 		
-		final String _indent;
-		if (indent <= 0) {
-			
-			_indent = "";
-			
-		} else {
-			
-			final StringBuilder sb = new StringBuilder();
-			for (int i = 0; i < indent; i++) {
-				sb.append(" ");
-			}
-			_indent = sb.toString();
-			
-		}
+		final String _indent = indent(indent);
 		
-		final StringBuilder sb = new StringBuilder();
+		final StringBuilder sb = new StringBuilder(_indent);
 		
 		if (isOptional()) {
-			sb.append(_indent).append("optional\n");
+		
+		    sb.append(_indent).append("optional\n");
+		    
 		}
-		sb.append(_indent).append("{\n");
-		
-		for (IQueryNode n : this) {
-			if (!(n instanceof StatementPatternNode)) {
-				continue;
-			}
-			sb.append(n.toString(indent+2)).append("\n");
-		}
-		
-		for (IQueryNode n : this) {
-			if (!(n instanceof FilterNode)) {
-				continue;
-			}
-			sb.append(n.toString(indent+2)).append("\n");
-		}
-		
-		for (IQueryNode n : this) {
-			if (!(n instanceof UnionNode)) {
-				continue;
-			}
-			sb.append(((UnionNode)n).toString(indent+2)).append("\n");
-		}
-		
-		for (IQueryNode n : this) {
-			if (!(n instanceof JoinGroupNode)) {
-				continue;
-			}
-			sb.append(((JoinGroupNode)n).toString(indent+2)).append("\n");
-		}
-		
-		for (IQueryNode n : this) {
-			if (!(n instanceof AssignmentNode)) {
-				continue;
-			}
-			sb.append(((AssignmentNode)n).toString(indent+2)).append("\n");
-		}
-		
-		sb.append(_indent).append("}");
-		
-		return sb.toString();
-		
+
+        sb.append(_indent).append("{\n");
+
+        for (IQueryNode n : this) {
+            if (!(n instanceof StatementPatternNode)) {
+                continue;
+            }
+            sb.append(n.toString(indent + 1)).append("\n");
+        }
+
+        for (IQueryNode n : this) {
+            if (!(n instanceof FilterNode)) {
+                continue;
+            }
+            sb.append(n.toString(indent + 1)).append("\n");
+        }
+
+        for (IQueryNode n : this) {
+            if (!(n instanceof UnionNode)) {
+                continue;
+            }
+            sb.append(((UnionNode) n).toString(indent + 1)).append("\n");
+        }
+
+        for (IQueryNode n : this) {
+            if (!(n instanceof JoinGroupNode)) {
+                continue;
+            }
+            sb.append(((JoinGroupNode) n).toString(indent + 1)).append("\n");
+        }
+
+        for (IQueryNode n : this) {
+            if (!(n instanceof AssignmentNode)) {
+                continue;
+            }
+            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
+        }
+
+        sb.append(_indent).append("}");
+
+        return sb.toString();
+
 	}
 
 }

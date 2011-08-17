@@ -88,7 +88,7 @@ public class SliceOp extends PipelineOp {
         /**
          * The first solution to be returned to the caller (origin ZERO).
          */
-        String OFFSET = (SliceOp.class.getName() + ".offset").intern();
+        String OFFSET = SliceOp.class.getName() + ".offset";
 
         long DEFAULT_OFFSET = 0L;
 
@@ -96,7 +96,7 @@ public class SliceOp extends PipelineOp {
          * The maximum #of solutions to be returned to the caller (default is
          * all).
          */
-        String LIMIT = (SliceOp.class.getName() + ".limit").intern();
+        String LIMIT = SliceOp.class.getName() + ".limit";
 
         /**
          * A value of {@link Long#MAX_VALUE} is used to indicate that there is

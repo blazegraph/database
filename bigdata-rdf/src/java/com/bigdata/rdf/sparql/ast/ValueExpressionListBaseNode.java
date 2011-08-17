@@ -27,53 +27,43 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
- * AST node models an ORDER BY clause.
+ * Base class for AST nodes which model an ordered list of value expressions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OrderByNode extends SolutionModifierBase {
+abstract public class ValueExpressionListBaseNode<E extends ValueExpressionNodeBase>
+        extends SolutionModifierBase implements Iterable<E> {
 
-    private final List<OrderByExpr> orderBy = new LinkedList<OrderByExpr>();
+    private final List<E> exprs = new LinkedList<E>();
 
-    public OrderByNode() {
+    public void addExpr(final E e) {
+
+        exprs.add(e);
+
     }
 
-    public void addOrderBy(final OrderByExpr orderBy) {
+    public Iterator<E> iterator() {
+
+        return exprs.iterator();
+
+    }
+
+    public int size() {
+
+        return exprs.size();
         
-        if (this.orderBy.contains(orderBy)) {
-            throw new IllegalArgumentException("duplicate");
-        }
+    }
+
+    public boolean isEmpty() {
         
-        this.orderBy.add(orderBy);
+        return exprs.isEmpty();
         
     }
     
-    public void removeOrderBy(final OrderByExpr orderBy) {
-        this.orderBy.remove(orderBy);
-    }
-    
-    public boolean hasOrderBy() {
-        return !orderBy.isEmpty();
-    }
-    
-    public List<OrderByExpr> getOrderBy() {
-        return Collections.unmodifiableList(orderBy);
-    }
-
-    public String toString(final int indent) {
-        final StringBuilder sb = new StringBuilder(indent(indent));
-        sb.append("order by ");
-        for (OrderByExpr e : orderBy) {
-            sb.append(" ");
-            sb.append(e.toString());
-        }
-        return sb.toString();
-    }
-
 }

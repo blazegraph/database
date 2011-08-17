@@ -307,7 +307,11 @@ public class AST2BOpUtility {
         
 	}
 	
-	private static final PipelineOp addProjectedAssigments(PipelineOp left,
+    /**
+     *         FIXME Replace with pipelined projection operator which computes
+     *         the value expressions. We do not need to use subquery to do this.
+     */
+    private static final PipelineOp addProjectedAssigments(PipelineOp left,
 	        final List<AssignmentNode> assignments,
 	        final AST2BOpContext ctx){
 	    
@@ -657,17 +661,17 @@ public class AST2BOpUtility {
      * the entire ORDER BY operation should be dropped.
      */
 	private static final PipelineOp addOrderBy(PipelineOp left,
-			final List<OrderByNode> orderBys, final AST2BOpContext ctx) {
+			final List<OrderByExpr> orderBys, final AST2BOpContext ctx) {
 		
 		final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 		
 		final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBys.size()];
 		
-		final Iterator<OrderByNode> it = orderBys.iterator();
+		final Iterator<OrderByExpr> it = orderBys.iterator();
 		
 		for (int i = 0; it.hasNext(); i++) {
 			
-    		final OrderByNode orderBy = it.next();
+    		final OrderByExpr orderBy = it.next();
     		
     		IValueExpression<?> expr = orderBy.getValueExpression();
     		
