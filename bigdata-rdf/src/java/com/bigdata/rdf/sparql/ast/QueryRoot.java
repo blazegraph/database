@@ -37,7 +37,8 @@ package com.bigdata.rdf.sparql.ast;
  *      FIXME We will also have to support UPDATE, which is another root for a
  *      SPARQL construct.
  * 
- *      FIXME Add support for WITH {subquery} AS "name" and INCLUDE. For example
+ *      FIXME Add support for WITH {subquery} AS "name" and INCLUDE. The WITH
+ *      must be in the top-level query. For example
  * 
  *      <pre>
  * SELECT ?var1
