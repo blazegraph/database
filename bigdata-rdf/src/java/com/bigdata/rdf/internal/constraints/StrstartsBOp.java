@@ -35,7 +35,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class StrstartsBOp extends LexiconBooleanBOp {
+public class StrstartsBOp extends LiteralBooleanBOp {
 
     private static final long serialVersionUID = 7680098071087046784L;
 
@@ -50,7 +50,7 @@ public class StrstartsBOp extends LexiconBooleanBOp {
             throw new IllegalArgumentException();
     }
 
-    public StrstartsBOp(LexiconBooleanBOp op) {
+    public StrstartsBOp(LiteralBooleanBOp op) {
         super(op);
     }
 

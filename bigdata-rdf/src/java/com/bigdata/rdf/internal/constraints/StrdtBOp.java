@@ -42,11 +42,8 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class StrdtBOp extends LexiconBOp {
+public class StrdtBOp extends AbstractLiteralBOp {
 
-    /**
-     * 
-     */
     private static final long serialVersionUID = -6571446625816081957L;
 
     public StrdtBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> dt, String lex) {
@@ -68,7 +65,8 @@ public class StrdtBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
 
         final IV datatype = get(1).get(bs);
         if (datatype == null) {

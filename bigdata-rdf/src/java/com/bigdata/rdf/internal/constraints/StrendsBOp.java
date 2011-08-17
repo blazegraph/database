@@ -35,7 +35,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class StrendsBOp extends LexiconBooleanBOp {
+public class StrendsBOp extends LiteralBooleanBOp {
 
     private static final long serialVersionUID = 5466622630000019821L;
 
@@ -50,7 +50,7 @@ public class StrendsBOp extends LexiconBooleanBOp {
             throw new IllegalArgumentException();
     }
 
-    public StrendsBOp(LexiconBooleanBOp op) {
+    public StrendsBOp(LiteralBooleanBOp op) {
         super(op);
     }
 

@@ -32,7 +32,7 @@ Import-Package:  com.bigdata*;version="${osgi.version}",\
  org.xml.sax.* ,\
  sun.misc;resolution:=optional
 Export-Package: com.bigdata.*;version=${osgi.version},org.apache.system.*
-Include-Resource:   
+Include-Resource: lib/=C:/work/src/svn/TERMS_REFACTOR_BRANCH/bigdata/lib/icu/
 Bundle-Name: com.bigdata
 Bundle-Vendor: Systap
 Bundle-Version: ${osgi.version}
@@ -40,6 +40,10 @@ Bundle-SymbolicName: com.bigdata
 Bundle-DocURL: http://www.bigdata.com
 Bundle-Description: Bigdata API
 DynamicImport-Package: *
+Bundle-ClassPath: .,\
+ lib/icu4j-4_8.jar,\
+ lib/icu4j-charset-4_8.jar,\
+ lib/icu4j-localespi-4_8.jar
 -nouses: true
 -removeheaders: LUBM_CLASS_SERVER_HOSTNAME,DSTAMP,TODAY,USE_NIO,JINI_CLASS_SERVER_PORT,\
  TSTAMP,LUBM_ONTOLOGY_DIR,SYSSTAT_HOME,JAVA_HOME,LOAD_BALANCER_PORT,\

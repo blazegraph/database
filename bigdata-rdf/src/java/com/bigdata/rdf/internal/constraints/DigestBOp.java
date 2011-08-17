@@ -42,11 +42,11 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * A Digest expression involving a IValueExpression operand. The operation to be applied to the operands is specified by the {@link Digest#OP}
  * annotation.
  */
-public class DigestBOp extends LexiconBOp {
+public class DigestBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = 9136864442064392445L;
 
-    public interface Annotations extends ImmutableBOp.Annotations {
+    public interface Annotations extends AbstractLiteralBOp.Annotations {
 
         /**
          * The operation to be applied to the left operand (required). The value of this annotation is a
@@ -56,7 +56,6 @@ public class DigestBOp extends LexiconBOp {
          */
         String OP = (DigestBOp.class.getName() + ".op").intern();
 
-        String NAMESPACE = (DigestBOp.class.getName() + ".namespace").intern();
     }
 
     public enum DigestOp {
@@ -91,7 +90,7 @@ public class DigestBOp extends LexiconBOp {
 
         super(args, anns);
 
-        if (args.length != 1 || args[0] == null || getProperty(Annotations.OP) == null||getProperty(Annotations.NAMESPACE)==null) {
+        if (args.length != 1 || args[0] == null || getProperty(Annotations.OP) == null) {
 
             throw new IllegalArgumentException();
 
@@ -127,9 +126,10 @@ public class DigestBOp extends LexiconBOp {
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
-    
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-            //Recreate since they are not thread safe
+
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
+               //Recreate since they are not thread safe
             MessageDigest md = null;
         final BigdataLiteral lit = literalValue(iv);
             if (lit.getLanguage() != null || lit.getDatatype() != null && lit.getDatatype().equals(XSD.STRING)) {
@@ -169,9 +169,6 @@ public class DigestBOp extends LexiconBOp {
         throw new SparqlTypeErrorException();
     }
 
-    public IValueExpression<? extends IV> left() {
-        return get(0);
-    }
 
     public DigestOp op() {
         return (DigestOp) getRequiredProperty(Annotations.OP);
@@ -181,7 +178,7 @@ public class DigestBOp extends LexiconBOp {
 
         final StringBuilder sb = new StringBuilder();
         sb.append(op());
-        sb.append("(").append(left()).append(")");
+        sb.append("(").append(get(0)).append(")");
         return sb.toString();
 
     }

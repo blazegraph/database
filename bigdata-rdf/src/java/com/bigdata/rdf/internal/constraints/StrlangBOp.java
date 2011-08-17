@@ -38,7 +38,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class StrlangBOp extends LexiconBOp {
+public class StrlangBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = 4227610629554743647L;
 
@@ -61,17 +61,9 @@ public class StrlangBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        final IV lang = get(1).get(bs);
-
-        if(lang==null){
-            throw new SparqlTypeErrorException.UnboundVarException();
-        }
-        if (!lang.isLiteral())
-            throw new SparqlTypeErrorException();
-
-        if (!lang.isInline() && !lang.hasValue())
-            throw new NotMaterializedException();
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        final IV iv = getAndCheck(0, bs);
+        final IV lang = getAndCheck(1,bs);
 
         BigdataLiteral l = literalValue(lang);
 

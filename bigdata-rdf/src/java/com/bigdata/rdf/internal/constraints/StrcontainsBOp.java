@@ -35,7 +35,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class StrcontainsBOp extends LexiconBooleanBOp {
+public class StrcontainsBOp extends LiteralBooleanBOp {
 
     /**
      * 
@@ -52,7 +52,7 @@ public class StrcontainsBOp extends LexiconBooleanBOp {
             throw new IllegalArgumentException();
     }
 
-    public StrcontainsBOp(LexiconBooleanBOp op) {
+    public StrcontainsBOp(LiteralBooleanBOp op) {
         super(op);
     }
 

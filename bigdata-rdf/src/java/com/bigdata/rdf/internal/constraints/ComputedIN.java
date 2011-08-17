@@ -40,7 +40,7 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
 
     public interface Annotations extends BOp.Annotations {
 
-        String NOT = (LexiconBOp.class.getName() + ".not").intern();
+        String NOT = (ComputedIN.class.getName() + ".not").intern();
 
     }
 
