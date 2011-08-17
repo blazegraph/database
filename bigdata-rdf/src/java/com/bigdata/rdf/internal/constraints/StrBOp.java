@@ -50,39 +50,38 @@ public class StrBOp extends IVValueExpression<IV>
 		implements INeedsMaterialization {
 
     /**
-	 * 
+	 *
 	 */
-	private static final long serialVersionUID = 3125106876006900339L;
-	
-	private static final transient Logger log = Logger.getLogger(StrBOp.class);
-	
+    private static final long             serialVersionUID = 3125106876006900339L;
 
-	public interface Annotations extends BOp.Annotations {
+    private static final transient Logger log              = Logger.getLogger(StrBOp.class);
 
-		String NAMESPACE = StrBOp.class.getName() + ".namespace";
+    public interface Annotations extends BOp.Annotations {
+
+        String NAMESPACE = StrBOp.class.getName() + ".namespace";
 
     }
-	
+
     public StrBOp(final IValueExpression<? extends IV> x, final String lex) {
-        
+
         this(new BOp[] { x }, 
         		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
-        
+
     }
-    
+
     /**
      * Required shallow copy constructor.
      */
     public StrBOp(final BOp[] args, final Map<String, Object> anns) {
 
-    	super(args, anns);
-    	
+        super(args, anns);
+
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
-		if (getProperty(Annotations.NAMESPACE) == null)
-			throw new IllegalArgumentException();
-		
+        if (getProperty(Annotations.NAMESPACE) == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
@@ -93,73 +92,77 @@ public class StrBOp extends IVValueExpression<IV>
     }
 
     public IV get(final IBindingSet bs) {
-        
+
         final IV iv = get(0).get(bs);
-        
+
         if (log.isDebugEnabled()) {
-        	log.debug(iv);
+            log.debug(iv);
         }
 
         // not yet bound
         if (iv == null)
-        	throw new SparqlTypeErrorException();
-        
+            throw new SparqlTypeErrorException();
+
         final String namespace = (String)
         	getRequiredProperty(Annotations.NAMESPACE);
-        
+
         // use to create my simple literals
         final BigdataValueFactory vf = 
         	BigdataValueFactoryImpl.getInstance(namespace);
-        
+
         if (iv.isInline() && !iv.isExtension()) {
             return DummyConstantNode.dummyIV(vf.createLiteral(iv
                     .getInlineValue().toString()));
         }
-        
+
         if (iv.isURI()) {
-        	// return new simple literal using URI label
-        	final URI uri = (URI) iv.getValue();
-        	final BigdataLiteral str = vf.createLiteral(uri.toString());
-        	return DummyConstantNode.dummyIV(str);
+            // return new simple literal using URI label
+            final URI uri = (URI) iv.getValue();
+            final BigdataLiteral str = vf.createLiteral(uri.toString());
+            return DummyConstantNode.dummyIV(str);
         } else if (iv.isLiteral()) {
-        	final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
-        	if (lit.getDatatype() == null && lit.getLanguage() == null) {
-            	// if simple literal return it
-        		return iv;
+            final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
+            if (lit.getDatatype() == null && lit.getLanguage() == null) {
+                // if simple literal return it
+                return iv;
         	}
         	else {
-            	// else return new simple literal using Literal.getLabel
-            	final BigdataLiteral str = vf.createLiteral(lit.getLabel());
-            	return DummyConstantNode.dummyIV(str);
-        	}
+                // else return new simple literal using Literal.getLabel
+                final BigdataLiteral str = vf.createLiteral(lit.getLabel());
+                return DummyConstantNode.dummyIV(str);
+            }
         } else {
-        	throw new SparqlTypeErrorException();
+            throw new SparqlTypeErrorException();
         }
-        
+
     }
-    
+
     /**
-     * This bop can only work with materialized terms.  
+     * This bop can only work with materialized terms.
      */
     public Requirement getRequirement() {
-    	
-    	return INeedsMaterialization.Requirement.ALWAYS;
-    	
+
+        return INeedsMaterialization.Requirement.ALWAYS;
+
     }
-    
+
     private volatile transient Set<IVariable<IV>> terms;
-    
+
     public Set<IVariable<IV>> getTermsToMaterialize() {
-    
-    	if (terms == null) {
-    		
-    		terms = new LinkedHashSet<IVariable<IV>>(1);
-    		terms.add((IVariable<IV>) get(0));
-    		
-    	}
-    	
-    	return terms;
-    	
+
+        if (terms == null) {
+
+            terms = new LinkedHashSet<IVariable<IV>>(1);
+            if (get(0) instanceof IVariable) {
+
+                terms.add((IVariable<IV>) get(0));
+
+            }
+
+        }
+
+        return terms;
+
     }
-    
+
 }

@@ -51,10 +51,10 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
 
 	public interface Annotations extends BOp.Annotations {
 
-        String NOT = (LexiconBOp.class.getName() + ".not").intern();
+        String NOT = (InBOp.class.getName() + ".not").intern();
 
     }
-	
+
 	private static BOp[] mergeArguments(IValueExpression<? extends IV> var,IConstant<? extends IV>...set){
 	    BOp args[]=new BOp[1+(set!=null?set.length:0)];
 	    args[0]=var;
@@ -63,7 +63,7 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
 	    }
         return args;
 	}
-	
+
 	public InBOp(boolean not,IValueExpression<? extends IV> var,IConstant<? extends IV>...set) {
 	    this(mergeArguments(var,set),NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not) )));
 	}
@@ -82,10 +82,10 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
     public InBOp(BOp[] args, Map<String, Object> annotations) {
 
         super(args, annotations);
-        
+
         if (getProperty(Annotations.NOT) == null)
             throw new IllegalArgumentException();
-        
+
         final IValueExpression<? extends IV> var = get(0);
 
         if (var == null)

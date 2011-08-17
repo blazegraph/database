@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -24,6 +26,8 @@ public class FunctionNode extends ValueExpressionNode {
      *            and {@link LexiconRelation#getNamespace()} to get this.
      * @param functionURI
      *            the function URI. see {@link FunctionRegistry}
+     * @param scalarValues
+     *            One or more scalar values that are passed to the function
      * @param args
      *            the arguments to the function.
      * 
@@ -32,9 +36,10 @@ public class FunctionNode extends ValueExpressionNode {
      *            {@link AST2BOpContext}.
      */
 	public FunctionNode(final String lex, final URI functionURI, 
+	        final Map<String,Object> scalarValues,
 			final ValueExpressionNode... args) {
 		
-		super(FunctionRegistry.toVE(lex, functionURI, args));
+		super(FunctionRegistry.toVE(lex, functionURI, scalarValues, args));
 		
 	}
 	

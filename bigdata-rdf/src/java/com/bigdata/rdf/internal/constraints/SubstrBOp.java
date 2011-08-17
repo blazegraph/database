@@ -37,7 +37,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class SubstrBOp extends LexiconBOp {
+public class SubstrBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -7022953617164154412L;
 
@@ -60,8 +60,9 @@ public class SubstrBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        IV start = get(1).get(bs);
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
+          IV start = get(1).get(bs);
         if (!start.isFixedNumeric())
             throw new SparqlTypeErrorException();
         IV length = null;

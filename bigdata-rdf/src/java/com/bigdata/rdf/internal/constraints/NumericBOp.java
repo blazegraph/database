@@ -33,10 +33,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.LexiconBOp.Annotations;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The operation to be applied to the operands is
@@ -46,7 +42,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
 
     private static final long serialVersionUID = 9136864442064392445L;
 
-    public interface Annotations extends LexiconBOp.Annotations {
+    public interface Annotations extends ImmutableBOp.Annotations {
         String OP = (NumericBOp.class.getName() + ".op").intern();
     }
 
@@ -55,7 +51,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
     }
 
     /**
-     * 
+     *
      * @param left
      *            The left operand.
      * @param right
@@ -71,7 +67,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
 
     /**
      * Required shallow copy constructor.
-     * 
+     *
      * @param args
      *            The operands.
      * @param op
@@ -91,7 +87,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
 
     /**
      * Required deep copy constructor.
-     * 
+     *
      * @param op
      */
     public NumericBOp(final NumericBOp op) {

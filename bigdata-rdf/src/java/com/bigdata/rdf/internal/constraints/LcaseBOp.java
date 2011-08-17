@@ -37,7 +37,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class LcaseBOp extends LexiconBOp {
+public class LcaseBOp extends AbstractLiteralBOp {
     private static final long serialVersionUID = -6847688419473046477L;
 
     public LcaseBOp(IValueExpression<? extends IV> x, String lex) {
@@ -59,7 +59,8 @@ public class LcaseBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
 
         final BigdataLiteral lit = literalValue(iv);
 

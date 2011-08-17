@@ -36,37 +36,45 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp.Annotations;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
 /**
  * Operator combines the string values over the presented binding sets for the
  * given variable. Missing values are ignored. The initial value is an empty
  * plain literal.
- * 
+ *
  * @author thompsonbry
- * 
+ *
  *         FIXME Should this be parameterized with Literal or IV? IF IV, then
  *         the pattern is to create an appropriate mock IV and cache the Literal
  *         on the IV. For example, see {@link StrBOp}.
  */
-public class GROUP_CONCAT extends AggregateBase<Literal> implements
-        IAggregate<Literal> {
+public class GROUP_CONCAT extends AggregateBase<IV> implements
+        IAggregate<IV> {
 
     /**
-	 * 
+	 *
 	 */
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends AggregateBase.Annotations {
+        public String NAMESPACE = (AbstractLiteralBOp.class.getName() + ".namespace").intern();
 
         /**
          * Required string property provides the separator used when combining
          * the {@link IValueExpression} computed for each solution within the
          * group.
+         *
+         * Use basic string to match sparql scalarValues param
          */
-        String SEPARATOR = GROUP_CONCAT.class.getName() + ".separator";
+        String SEPARATOR = "separator";
 
         /**
          * The maximum #of values to concatenate (positive integer and
@@ -92,7 +100,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
          * The default indicates no limit.
          */
         final int DEFAULT_CHARACTER_LIMIT = -1;
-        
+
     }
 
     public GROUP_CONCAT(BOpBase op) {
@@ -101,10 +109,13 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
+        if (getProperty(Annotations.NAMESPACE) == null)
+            throw new IllegalArgumentException();
+
     }
 
     /**
-     * 
+     *
      * @param var
      *            The variable whose values will be combined.
      * @param sep
@@ -119,7 +130,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
                 new NV(Annotations.DISTINCT, distinct),//
                 new NV(Annotations.SEPARATOR, sep)//
                 ));
-        
+
     }
 
     private String sep() {
@@ -143,13 +154,25 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     private int characterLimit() {
         if (characterLimit == 0) {
-            characterLimit = getProperty(Annotations.CHARACTER_LIMIT, 
+            characterLimit = getProperty(Annotations.CHARACTER_LIMIT,
                     Annotations.DEFAULT_CHARACTER_LIMIT);
         }
         return characterLimit;
     }
 
     private transient int characterLimit;
+
+
+
+    private BigdataValueFactory getValueFactory(){
+        if (vf == null) {
+            final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
+            vf = BigdataValueFactoryImpl.getInstance(namespace);
+        }
+        return vf;
+    }
+
+    protected transient BigdataValueFactory vf;
 
     /**
      * The running concatenation of observed bound values.
@@ -166,7 +189,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
      * instance.
      */
     private transient long nvalues = 0;
-    
+
     /**
      * <code>false</code> unless either the value limit and/or the character
      * length limit has been exceeded.
@@ -174,7 +197,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
     private transient boolean done = false;
 
     private Throwable firstCause = null;
-    
+
     synchronized public void reset() {
 
         aggregated = null;
@@ -184,30 +207,30 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
         done = false;
 
         firstCause = null;
-        
+
         // cache stuff.
         sep();
         valueLimit();
         characterLimit();
+        getValueFactory();
 
     }
 
-    synchronized public Literal done() {
+    synchronized public IV done() {
 
         if (firstCause != null) {
-            
+
             throw new RuntimeException(firstCause);
-            
+
         }
 
         if (aggregated == null)
-            return EMPTY_LITERAL;
-
-        return new LiteralImpl(aggregated.toString());
+            return DummyConstantNode.dummyIV(vf.createLiteral(""));
+        return DummyConstantNode.dummyIV(vf.createLiteral(aggregated.toString()));
 
     }
 
-    synchronized public Literal get(final IBindingSet bindingSet) {
+    synchronized public IV get(final IBindingSet bindingSet) {
 
         try {
 
@@ -227,7 +250,7 @@ public class GROUP_CONCAT extends AggregateBase<Literal> implements
 
     }
 
-    private Literal doGet(final IBindingSet bindingSet) {
+    private IV doGet(final IBindingSet bindingSet) {
 
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 

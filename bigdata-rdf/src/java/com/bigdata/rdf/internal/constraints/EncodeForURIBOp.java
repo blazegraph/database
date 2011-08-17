@@ -37,7 +37,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class EncodeForURIBOp extends LexiconBOp {
+public class EncodeForURIBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
@@ -59,8 +59,8 @@ public class EncodeForURIBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
         final BigdataLiteral lit =literalValue(iv);
         try {
             final BigdataLiteral str = vf.createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8"));

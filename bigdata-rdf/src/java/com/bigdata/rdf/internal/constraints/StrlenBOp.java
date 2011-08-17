@@ -34,7 +34,7 @@ import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class StrlenBOp extends LexiconBOp {
+public class StrlenBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = 4176318782528605454L;
 
@@ -57,8 +57,9 @@ public class StrlenBOp extends LexiconBOp {
         return Requirement.SOMETIMES;
     }
 
-    protected IV generateIV(final BigdataValueFactory vf, final IV iv, final IBindingSet bs) throws SparqlTypeErrorException {
-        final BigdataLiteral lit = literalValue(iv);
+    public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
+        IV iv = getAndCheck(0, bs);
+         final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         int length = label.length();
         return new XSDIntIV(length);
