@@ -4,18 +4,17 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
  * AST node models the assignment of a value expression to a variable.
  */
-public class AssignmentNode extends ValueExpressionNodeBase {
+public class AssignmentNode extends ValueExpressionNodeBase implements
+        IValueExpressionNode {
 
     private final VarNode                           var;
 

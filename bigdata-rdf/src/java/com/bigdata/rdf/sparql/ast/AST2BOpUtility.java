@@ -79,11 +79,18 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.striterator.IKeyOrder;
 
+/**
+ * Query plan generator converts an AST into a query plan made up of
+ * {@link PipelineOp}s
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class AST2BOpUtility {
 
-	private static final transient Logger log = Logger.getLogger(AST2BOpUtility.class);
-	
-	
+    private static final transient Logger log = Logger
+            .getLogger(AST2BOpUtility.class);
+
 	/**
 	 * Convert an AST query plan into a set of executable pipeline operators.
 	 */
@@ -94,30 +101,51 @@ public class AST2BOpUtility {
 		final IGroupNode root = ctx.query.getRoot();
 
 		PipelineOp left = convert(root, ctx);
-		
-		/*
-		 * Add any evaluated projections
-		 */
-		if(query.getAssignmentProjections().size()>0){
-		    
-	        left = addProjectedAssigments(left, query.getAssignmentProjections(), ctx);
-	        
-		}
-		/*
-		 * distinct first, then order by, then limit/offset
-		 * 
-		 * none of these have been tested yet
-		 */
-		
-		if (query.isDistinct()) {
-			
-		    left = addDistinct(left, query.getProjectionVars(), ctx);
-			
-		}
-		
-        if (query.hasOrderBy()) {
-        	
-    		left = addOrderBy(left, query.getOrderBy(), ctx);
+
+        /**
+         * Add any evaluated projections
+         */
+        final ProjectionNode projection = query.getProjection();
+
+        if (projection != null) {
+           
+            if (!projection.isEmpty()) {
+
+                /*
+                 * FIXME If any of the projected value expressions is an an
+                 * aggregate then ALL must be aggregates (which includes value
+                 * expressions involving aggregate functions, bare variables
+                 * appearing on the group by clause, variables bound by the
+                 * group by clause, and constants).
+                 * 
+                 * FIXME If GROUP BY or HAVING is used then the projected value
+                 * expressions MUST be aggregates. However, if these do not
+                 * appear and any of the projected value expressions is an
+                 * aggregate then we are still going to use a GROUP BY where all
+                 * solutions form a single implicit group.
+                 * 
+                 * @see GroupByState
+                 * 
+                 * @see GroupByRewriter
+                 */
+                
+                left = addProjectedAssigments(left,
+                        projection.getAssignmentProjections(), ctx);
+            }
+
+            if (projection.isDistinct()) {
+
+                left = addDistinct(left, projection.getProjectionVars(), ctx);
+
+            }
+        
+        }
+        
+        final OrderByNode orderBy = query.getOrderBy();
+        
+        if (orderBy != null && ! orderBy.isEmpty()) {
+
+    		left = addOrderBy(left, orderBy, ctx);
         	
         }
 
@@ -277,8 +305,7 @@ public class AST2BOpUtility {
          * Add the LET assignments to the pipeline.
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false);
-        
-        
+                
         /*
          * Add the post-conditionals to the pipeline.
          */
@@ -311,23 +338,25 @@ public class AST2BOpUtility {
     /**
      *         FIXME Replace with pipelined projection operator which computes
      *         the value expressions. We do not need to use subquery to do this.
+     *         It will have to do the materialization pipeline dance. It will
+     *         NOT need to do a conditional bind.
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
 	        final List<AssignmentNode> assignments,
 	        final AST2BOpContext ctx){
 	    
-	    PipelineOp subq=left;
+//	    PipelineOp subq=left;
         
-        left=addStartOp(ctx);
+//        left=addStartOp(ctx);
+//        
+//        left = new SubqueryOp(new BOp[]{left}, 
+//                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
+//                new NV(SubqueryOp.Annotations.SUBQUERY, subq),
+//                new NV(SubqueryOp.Annotations.OPTIONAL, false));
+//   
+        left = addAssignments(left, assignments, ctx, true/* projection */);
         
-        left = new SubqueryOp(new BOp[]{left}, 
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
-                new NV(SubqueryOp.Annotations.SUBQUERY, subq),
-                new NV(SubqueryOp.Annotations.OPTIONAL, false));
-   
-        left = addAssignments(left, assignments, ctx,true);
-        
-        left = addEndOp(left, ctx);
+//        left = addEndOp(left, ctx);
         
         return left;
 	}
@@ -662,19 +691,19 @@ public class AST2BOpUtility {
      * the entire ORDER BY operation should be dropped.
      */
 	private static final PipelineOp addOrderBy(PipelineOp left,
-			final List<OrderByExpr> orderBys, final AST2BOpContext ctx) {
+			final OrderByNode orderBy, final AST2BOpContext ctx) {
 		
 		final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 		
-		final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBys.size()];
+		final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBy.size()];
 		
-		final Iterator<OrderByExpr> it = orderBys.iterator();
+		final Iterator<OrderByExpr> it = orderBy.iterator();
 		
 		for (int i = 0; it.hasNext(); i++) {
 			
-    		final OrderByExpr orderBy = it.next();
+    		final OrderByExpr orderByExpr = it.next();
     		
-    		IValueExpression<?> expr = orderBy.getValueExpression();
+    		IValueExpression<?> expr = orderByExpr.getValueExpression();
     		
     		if(!(expr instanceof IVariableOrConstant<?> && !(expr instanceof IBind))) {
     		
@@ -697,7 +726,7 @@ public class AST2BOpUtility {
                 
             }
 
-    		sortOrders[i++] = new SortOrder(expr, orderBy.isAscending());
+    		sortOrders[i++] = new SortOrder(expr, orderByExpr.isAscending());
     		
 		}
 		

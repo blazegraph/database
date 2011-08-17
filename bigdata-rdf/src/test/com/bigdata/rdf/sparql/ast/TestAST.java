@@ -30,13 +30,16 @@ package com.bigdata.rdf.sparql.ast;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
+import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 
 /**
@@ -229,24 +232,32 @@ public class TestAST extends TestCase {
     	root.addChild(j3);
     	
     	final QueryRoot query = new QueryRoot(root);
+
+    	final ProjectionNode project = new ProjectionNode();
+        project.setDistinct(true);
+        project.addProjectionVar(new VarNode("s"));
+        project.addProjectionVar(new VarNode("p"));
+    	query.setProjection(project);
     	
-    	query.setDistinct(true);
-    	query.addProjectionVar(new VarNode("s"));
-    	query.addProjectionVar(new VarNode("p"));
-    	query.setSlice(new SliceNode(10,100));
-    	query.addOrderBy(new OrderByExpr(new VarNode("s"), true));
-    	query.addOrderBy(new OrderByExpr(new VarNode("p"), false));
-    	
+    	final GroupByNode groupBy = new GroupByNode();
+        groupBy.addExpr(new AssignmentNode(new VarNode("s"), new VarNode("s")));
+
+        final HavingNode havingBy = new HavingNode();
+        havingBy.addExpr(new ValueExpressionNode(new CompareBOp(Var.var("x"),
+                Var.var("y"), CompareOp.GT)));
+
+    	final OrderByNode orderBy = new OrderByNode();
+    	orderBy.addExpr(new OrderByExpr(new VarNode("s"), true));
+    	orderBy.addExpr(new OrderByExpr(new VarNode("p"), false));
+    	query.setOrderBy(orderBy);
+
+        query.setSlice(new SliceNode(10,100));
+
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
     	
     }
     
-    // FIXME write unit test which uses aggregation (GROUP BY and HAVING).
-    public void testAggregation() {
-        fail("write test");
-    }
-
     public StatementPatternNode sp(final int id) {
         return new StatementPatternNode(new VarNode("s"), new VarNode("p"),
                 new VarNode("o"));

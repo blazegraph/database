@@ -218,7 +218,10 @@ public class JoinGroupNode extends GroupNodeBase {
 		return filters;
 		
 	}
-	
+
+	/**
+	 * Return any LET(x,expr) or BIND(x,expr) nodes.
+	 */
 	public List<AssignmentNode> getAssignments(){
 		
 		final List<AssignmentNode> assignments = new ArrayList<AssignmentNode>();

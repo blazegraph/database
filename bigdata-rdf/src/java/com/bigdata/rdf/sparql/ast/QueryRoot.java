@@ -1,273 +1,88 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-
-import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.IV;
-
 /**
- * Contains the operator tree and query metadata (distinct, order by, slice,
- * projection).
+ * The top-level Query.
  * 
+ * @see DatasetNode
+ * @see IGroupNode
  * @see ProjectionNode
  * @see GroupByNode
  * @see HavingNode
  * @see OrderByNode
  * @see SliceNode
  * 
- *      FIXME AssigmentNodes => PROJECT(distinct:boolean, value expression list)
- *      plus isWildcard(), isAggregate().
+ *      FIXME We will also have to support UPDATE, which is another root for a
+ *      SPARQL construct.
  * 
- *      FIXME GROUP VALUE value expression list (AST2BOp must choose the right
- *      group by operator).
+ *      FIXME Add support for WITH {subquery} AS "name" and INCLUDE. For example
  * 
- *      FIXME HAVING value expression list.
- * 
- *      FIXME ORDER BY (value expression, ASC|DSC) list
- * 
- *      FIXME Refactor QueryRoot into a QueryNode and a QueryRoot. The QueryNode
- *      will be used for the top-level query and for subqueries as well. The
- *      QueryRoot will have the {@link DatasetNode}.
+ *      <pre>
+ * SELECT ?var1
+ * WITH {
+ *         SELECT ?var9
+ *         WHERE {
+ *                 ?var9 p3:invoiceDocumentDate ?_var10.
+ *                 ?var9 p3:paymentPeriod ?_var11. 
+ *                 ?var9 rdf:type p3:Invoice
+ *                 FILTER ((?_var10 <  """2012-01-01"""^^<http://www.w3.org/2001/XMLSchema#date>))
+ *                 FILTER ((?_var11 >= """0"""^^<http://www.w3.org/2001/XMLSchema#int>))
+ *         }
+ * } AS %namedSet1
+ *  WHERE {
+ *         ?var9 p3:invoicePaymentDate ?var3.
+ *          LET (?var1 := TEXT(?var3, "yyyy-MM")).  
+ *         INCLUDE %namedSet1
+ * }
+ * </pre>
  */
-public class QueryRoot {
+public class QueryRoot extends QueryBase {
 
-	private final IGroupNode root;
-	
-    /**
-     * The data set is global to the query (it can not be overrriden in a
-     * subquery).
-     */
-	private DatasetNode dataset;
-	
-    @Deprecated
-	private final List<OrderByExpr> orderBy;
-
-	@Deprecated
-	private boolean distinct = false;
-	
-    @Deprecated
-	private final List<AssignmentNode> projection;
-	
-//    @Deprecated
-//	private long offset = 0;
-//
-//    @Deprecated
-//	private long limit = Long.MAX_VALUE;
-
-    private SliceNode slice;
-    
-	public QueryRoot(final IGroupNode root) {
-
-		this.root = root;
-		
-		this.orderBy = new LinkedList<OrderByExpr>();
-		
-		this.projection = new ArrayList<AssignmentNode>();
-		
-	}
-
-    /*
-     * @see ProjectionNode
-     * @see GroupByNode
-     * @see HavingNode
-     * @see OrderByNode
-     * @see SliceNode
-     */
-	
-	/**
-	 * Return the slice -or- <code>null</code> if there is no slice.
-	 */
-	public SliceNode getSlice() {
-        
-	    return slice;
-	    
-    }
+    private DatasetNode dataset;
 
     /**
-     * Set or clear the slice.
      * 
-     * @param slice
-     *            The slice (may be <code>null</code>).
+     * @param root
+     *            The "WHERE" clause.
      */
-    public void setSlice(final SliceNode slice) {
+    public QueryRoot(final IGroupNode root) {
 
-        this.slice = slice;
-        
+        super(root);
+
     }
-	
-    @Deprecated
-	public void addProjectionVar(final VarNode var) {
-		projection.add(new AssignmentNode(var,var));
-	}
-	
-    @Deprecated
-	public void addProjectionExpression(final AssignmentNode assignment) {
-	    projection.add(assignment);
-	}
-	
-    @Deprecated
-	public List<AssignmentNode> getProjection() {
-		return projection;
-	}
 
-    /**
-     * FIXME This should just be the ordered (and possibly immutable) list of
-     * value expressions. It is Ok if we require a BIND(var,var) so that
-     * everything in this list looks like an assignment rather than a simple
-     * variable. The caller can be responsible for extracting just the variables
-     * if that is what they need (a striterator resolver would do that nicely).
-     */
-    @Deprecated
-	public List<AssignmentNode> getAssignmentProjections(){
-        
-        final ArrayList<AssignmentNode> assignments = new ArrayList<AssignmentNode>(
-                projection.size());
+    public void setDataset(final DatasetNode dataset) {
 
-        for (AssignmentNode n : projection) {
+        this.dataset = dataset;
 
-	        if(n.getValueExpressionNode().equals(n.getVarNode()))
-	            continue;
-	        
-	        assignments.add(n);
-	        
-	    }
-	    
-	    return assignments;
-	    
-	}
-	
-    /**
-     * Return the ordered array of the variable names for the projected value
-     * expressions.
-     */
-    @Deprecated
-	public IVariable[] getProjectionVars() {
+    }
 
-        ArrayList<IVariable<IV>> vars = new ArrayList<IVariable<IV>>(
-                projection.size());
-	    
-	    for(AssignmentNode n:projection){
-	        
-	       vars.add(n.getVar());
-	    
-	    }
-        
-	    return (IVariable[]) vars.toArray(new IVariable[vars.size()]);
-	    
-	}
-	
-	public IGroupNode getRoot() {
-		return root;
-	}
-	
-	public void setDataset(final DatasetNode dataset) {
-		this.dataset = dataset;
-	}
-	
-	public DatasetNode getDataset() {
-		return dataset;
-	}
+    public DatasetNode getDataset() {
 
-    @Deprecated
-	public void addOrderBy(final OrderByExpr orderBy) {
-		
-		if (this.orderBy.contains(orderBy)) {
-			throw new IllegalArgumentException("duplicate");
-		}
-		
-		this.orderBy.add(orderBy);
-		
-	}
-	
-    @Deprecated
-	public void removeOrderBy(final OrderByExpr orderBy) {
-		this.orderBy.remove(orderBy);
-	}
-	
-    @Deprecated
-	public boolean hasOrderBy() {
-		return orderBy.size() > 0;
-	}
-	
-    @Deprecated
-	public List<OrderByExpr> getOrderBy() {
-		return Collections.unmodifiableList(orderBy);
-	}
-	
-	@Deprecated
-	public void setDistinct(final boolean distinct) {
-		this.distinct = distinct;
-	}
+        return dataset;
 
-    @Deprecated
-	public boolean isDistinct() {
-		return distinct;
-	}
-
-//    @Deprecated
-//	public void setOffset(final long offset) {
-//		this.offset = offset;
-//	}
-//
-//    @Deprecated
-//	public long getOffset() {
-//		return offset;
-//	}
-//
-//    @Deprecated
-//	public void setLimit(final long limit) {
-//		this.limit = limit;
-//	}
-//
-//    @Deprecated
-//	public long getLimit() {
-//		return limit;
-//	}
-//	
-//    @Deprecated
-//	public boolean hasSlice() {
-//		return offset > 0 || limit < Long.MAX_VALUE;
-//	}
-	
-	public String toString() {
-		
-		final StringBuilder sb = new StringBuilder();
-		
-		sb.append("select");
-		
-		if (distinct) {
-			sb.append(" distinct");
-		}
-		
-		if (projection.size() > 0) {
-			for (AssignmentNode v : projection) {
-				sb.append(v);
-			}
-		} else {
-			sb.append(" *");
-		}
-		
-		sb.append("\nwhere\n");
-		sb.append(root.toString());
-		
-		if (orderBy.size() > 0) {
-			sb.append("\norderBy ");
-			for (OrderByExpr o : orderBy) {
-				sb.append(o).append(" ");
-			}
-			sb.setLength(sb.length()-1);
-		}
-
-        if (slice != null) {
-            sb.append("\n");
-            sb.append(slice.toString());
-        }
-		
-		return sb.toString();
-		
-	}
+    }
 
 }

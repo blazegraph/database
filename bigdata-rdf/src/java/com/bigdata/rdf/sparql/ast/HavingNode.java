@@ -37,7 +37,8 @@ package com.bigdata.rdf.sparql.ast;
  *          aggregated variables across the filters which need to be
  *          materialized?
  */
-public class HavingNode extends ValueExpressionListBaseNode<FilterNode> {
+public class HavingNode extends
+        ValueExpressionListBaseNode<IValueExpressionNode> {
 
     /**
      * 
@@ -51,8 +52,10 @@ public class HavingNode extends ValueExpressionListBaseNode<FilterNode> {
 
         sb.append("having ");
 
-        for (FilterNode v : this) {
+        for (IValueExpressionNode v : this) {
+
             sb.append(v);
+            
         }
 
         return sb.toString();
