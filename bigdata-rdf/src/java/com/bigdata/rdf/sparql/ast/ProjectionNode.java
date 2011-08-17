@@ -30,18 +30,18 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 
 /**
  * AST node modeling projected value expressions.
+ * <p>
+ * Note: "*" is modeled using an explicit variable whose name is <code>*</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME This currently models "SELECT *" as an empty list of projected
- *          value expressions but I prefer to model this using a variable named
- *          "*".
  */
 public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
@@ -62,9 +62,13 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    @SuppressWarnings("unchecked")
     public boolean isWildcard() {
 
-        return isEmpty();
+        if (isEmpty())
+            return false;
+
+        return Var.var("*").equals(exprs.get(0).getVar());
 
     }
 
@@ -130,6 +134,25 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    /**
+     * Return the {@link IValueExpression}s for this {@link ProjectionNode}.
+     */
+    public IValueExpression[] getValueExpressions() {
+
+        final IValueExpression<?>[] exprs = new IValueExpression[size()];
+        
+        int i = 0;
+        
+        for(IValueExpressionNode node : this) {
+        
+            exprs[i++] = node.getValueExpression();
+            
+        }
+        
+        return exprs;
+        
+    }
+    
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
@@ -140,11 +163,17 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
             sb.append("distinct ");
 
         if (isWildcard()) {
+
             sb.append("* ");
+            
         } else {
+            
             for (AssignmentNode v : this) {
+                
                 sb.append(v);
+                
             }
+
         }
 
         return sb.toString();

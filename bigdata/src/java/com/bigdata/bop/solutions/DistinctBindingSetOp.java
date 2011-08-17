@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
@@ -15,7 +16,6 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -28,7 +28,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * <p>
  * Note: This implementation is a pipelined operator which inspects each chunk
  * of solutions as they arrive and those solutions which are distinct for each
- * chunk are passed on.
+ * chunk are passed on. If uses a {@link ConcurrentMap} and is thread-safe.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
@@ -142,6 +142,7 @@ public class DistinctBindingSetOp extends PipelineOp {
      * Wrapper used for the as bound solutions in the {@link ConcurrentHashMap}.
      */
     private static class Solution {
+
         private final int hash;
 
         private final IConstant<?>[] vals;

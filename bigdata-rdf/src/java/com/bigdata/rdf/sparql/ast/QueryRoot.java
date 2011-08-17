@@ -63,14 +63,7 @@ public class QueryRoot extends QueryBase {
 
     private DatasetNode dataset;
 
-    /**
-     * 
-     * @param root
-     *            The "WHERE" clause.
-     */
-    public QueryRoot(final IGroupNode root) {
-
-        super(root);
+    public QueryRoot() {
 
     }
 

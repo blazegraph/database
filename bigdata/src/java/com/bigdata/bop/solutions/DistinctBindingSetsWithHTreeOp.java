@@ -42,6 +42,12 @@ import com.bigdata.rwstore.sector.MemStore;
  * Note: This implementation is a single-threaded pipelined operator which
  * inspects each chunk of solutions as they arrive and those solutions which are
  * distinct for each chunk passed on.
+ * <p>
+ * Note: {@link PipelineOp.Annotations#MAX_MEMORY} is currently ignored by this
+ * operator. This value could be used to trigger the switch to an external
+ * memory DISTINCT (on a backing store) or to fail a query which attempts to put
+ * too much data into the native heap. Right now, it will just keep adding data
+ * on the native heap and eventually the machine will begin to swap.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z

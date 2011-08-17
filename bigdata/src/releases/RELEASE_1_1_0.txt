@@ -1,0 +1,56 @@
+*** DRAFT ***
+
+This is a (minor/major) version release of bigdata(R).  Bigdata is a horizontally-scaled, open-source architecture for indexed data with an emphasis on RDF.  Bigdata operates in both a single machine mode (Journal) and a cluster mode (Federation).   The single machine Journal provides fast scalable ACID indexed storage for very large data sets, up to 50 billion triples / quads.  The federation provides fast scalable shard-wise parallel indexed storage using dynamic sharding and shard-wise ACID updates, and is capable of larger data scales (with incremental cluster size growth) and higher throughput (1B triples loaded in under one hour on a 15 node cluster).  Both platforms support fully concurrent readers with snapshot isolation.
+
+Distributed processing offers greater throughput but does not reduce query or update latency.  Choose the Journal when the anticipated scale and throughput requirements permit.  Choose the Federation when the administrative and machine overhead associated with operating a cluster is an acceptable tradeoff to have essentially unlimited data scaling and throughput.
+
+See [1,2,8] for instructions on installing bigdata(R), [4] for the javadoc, and [3,5,6] for news, questions, and the latest developments. For more information about SYSTAP, LLC and bigdata, see [7].
+
+Starting with the 1.0.0 release, we offer a WAR artifact [8] for easy installation of the single machine RDF database.  For custom development and cluster installations we recommend checking out the code from SVN using the tag for this release. The code will build automatically under eclipse.  You can also build the code using the ant script.  The cluster installer requires the use of the ant script.
+
+You can checkout this release from the following URL:
+
+https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_0_1
+
+New features:
+
+- Fast, scalable native support for SPARQL 1.1 analytic queries;
+- %100 Java memory manager leverages the JVM native heap (no GC);
+- New extensible hash tree index structure;
+
+Feature summary:
+
+- Triples, quads, or triples with provenance (SIDs);
+- Fast RDFS+ inference and truth maintenance;
+- Simple embedded and/or webapp deployment (NanoSparqlServer);
+- Single machine data storage to ~50B triples/quads (RWStore);
+- Clustered data storage is essentially unlimited;
+- Fast statement level provenance mode (SIDs).
+  
+The road map [3] for the next releases includes:
+
+- High-volume analytic query and SPARQL 1.1 query, including aggregations;
+- Simplified deployment, configuration, and administration for clusters; and
+- High availability for the journal and the cluster.
+
+For more information, please see the following links:
+
+[1] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Main_Page
+[2] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=GettingStarted
+[3] https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=Roadmap
+[4] http://www.bigdata.com/bigdata/docs/api/
+[5] http://sourceforge.net/projects/bigdata/
+[6] http://www.bigdata.com/blog 
+[7] http://www.systap.com/bigdata.htm
+[8] https://sourceforge.net/projects/bigdata/files/bigdata/
+
+About bigdata: 
+
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
+for ordered data (B+Trees), designed to operate on either a single server or a
+cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
+shards in order to remove any realistic scaling limits - in principle, bigdata®
+may be deployed on 10s, 100s, or even thousands of machines and new capacity may
+be added incrementally without requiring the full reload of all data. The bigdata®
+RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL),
+and datum level provenance. 

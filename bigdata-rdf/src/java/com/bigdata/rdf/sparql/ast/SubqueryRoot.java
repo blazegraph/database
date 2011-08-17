@@ -28,14 +28,7 @@ package com.bigdata.rdf.sparql.ast;
  */
 public class SubqueryRoot extends QueryBase {
 
-    /**
-     * 
-     * @param root
-     *            The "WHERE" clause.
-     */
-    public SubqueryRoot(final IGroupNode root) {
-
-        super(root);
+    public SubqueryRoot() {
 
     }
 

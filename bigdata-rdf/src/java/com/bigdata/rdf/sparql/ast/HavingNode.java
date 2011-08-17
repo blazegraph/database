@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.IConstraint;
+import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.model.BigdataLiteral;
+
 /**
  * AST node for a HAVING clause.
  * 
@@ -45,6 +50,27 @@ public class HavingNode extends
      */
     public HavingNode() {
     }
+
+    /**
+     * Return the {@link IConstraint}s for this {@link ProjectionNode}.
+     */
+    public IConstraint[] getConstraints() {
+
+        final IConstraint[] exprs = new IConstraint[size()];
+
+        int i = 0;
+
+        for (IValueExpressionNode node : this) {
+
+            exprs[i++] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    node.getValueExpression());
+
+        }
+
+        return exprs;
+
+    }
+    
 
     public String toString(final int indent) {
 

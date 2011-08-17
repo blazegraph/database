@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.service.IBigdataFederation;
 
 /**
  * Convenience class for passing around the various pieces of context necessary
@@ -39,5 +40,23 @@ public class AST2BOpContext {
 		return idFactory.incrementAndGet();
 		
 	}
-	
+
+	/**
+	 * Return <code>true</code> if we are running on a cluster.
+	 */
+    public boolean isCluster() {
+
+        return db.getIndexManager() instanceof IBigdataFederation<?>;
+
+    }
+
+    /**
+     * Return the namespace of the lexicon relation.
+     */
+    public String getLexiconNamespace() {
+        
+        return db.getLexiconRelation().getNamespace();
+        
+    }
+    
 }

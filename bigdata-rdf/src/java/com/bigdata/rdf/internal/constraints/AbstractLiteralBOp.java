@@ -71,14 +71,12 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
     /**
      * This bop can only work with materialized terms.
      */
-    @Override
     public Requirement getRequirement() {
         return INeedsMaterialization.Requirement.SOMETIMES;
     }
 
     private volatile transient Set<IVariable<IV>> terms;
 
-    @Override
     public Set<IVariable<IV>> getTermsToMaterialize() {
 
         if (terms == null) {
@@ -96,7 +94,6 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
     }
 
-    @Override
     final public IV get(final IBindingSet bs) {
 
         if (vf == null) {
