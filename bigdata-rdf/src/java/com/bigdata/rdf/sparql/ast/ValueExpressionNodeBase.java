@@ -42,8 +42,8 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class ValueExpressionNodeBase extends QueryNodeBase implements
-        IValueExpressionMetadata {
+public abstract class ValueExpressionNodeBase extends GroupMemberNodeBase
+        implements IValueExpressionMetadata {
 
     /**
      * Static helper used to determine materialization requirements.

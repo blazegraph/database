@@ -130,6 +130,7 @@ public class TestMemorySortOp extends TestCase2 {
 						BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                new NV(MemorySortOp.Annotations.LAST_PASS, true),//
 		}));
 
         //
@@ -238,6 +239,7 @@ public class TestMemorySortOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
 
         //
@@ -350,6 +352,7 @@ public class TestMemorySortOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
 
         //

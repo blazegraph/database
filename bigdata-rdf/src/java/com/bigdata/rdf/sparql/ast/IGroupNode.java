@@ -5,18 +5,22 @@ package com.bigdata.rdf.sparql.ast;
  * the interface used by the {@link UnionNode} and {@link JoinGroupNode} query
  * nodes.
  */
-public interface IGroupNode extends IQueryNode, Iterable<IQueryNode> {
+public interface IGroupNode extends IGroupMemberNode, Iterable<IGroupMemberNode> {
 
 	/**
 	 * Add a child to this group.  Child can be a statement pattern, a filter,
 	 * or another group.
+	 * 
+	 * @return this
 	 */
-	IGroupNode addChild(final IQueryNode child);
+	IGroupNode addChild(final IGroupMemberNode child);
 	
 	/**
 	 * Remove a child from this group.
+	 * 
+	 * @return this
 	 */
-	IGroupNode removeChild(final IQueryNode child);
+	IGroupNode removeChild(final IGroupMemberNode child);
 
 	/**
 	 * Return the # of children.

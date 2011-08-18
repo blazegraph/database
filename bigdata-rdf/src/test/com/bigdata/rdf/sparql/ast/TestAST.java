@@ -290,10 +290,11 @@ public class TestAST extends TestCase {
          * }
          * </pre>
          */
-    	final SubqueriesNode subqueries = new SubqueriesNode();
+    	final NamedSubqueriesNode subqueries = new NamedSubqueriesNode();
     	{
             
-    	    final SubqueryRoot subquery = new SubqueryRoot();
+    	    final NamedSubqueryRoot subquery = new NamedSubqueryRoot();
+    	    subquery.setName("foo");
             
             final ProjectionNode projection1 = new ProjectionNode();
             projection1.addProjectionVar(new VarNode("y"));
@@ -314,7 +315,7 @@ public class TestAST extends TestCase {
             
     	}
 
-    	query.setSubqueries(subqueries);
+    	query.setNamedSubqueries(subqueries);
 
         // FIXME Add INCLUDE operator paired to a named subquery result. 
 

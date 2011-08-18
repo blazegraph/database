@@ -79,10 +79,9 @@ public class BOpContext<E> extends BOpContextBase {
 	 * <code>true</code> iff this is the last invocation of the operator. The
 	 * property is only set to <code>true</code> for operators which:
 	 * <ol>
-	 * <li>{@link BOp.Annotations#EVALUATION_CONTEXT} is
-	 * {@link BOpEvaluationContext#CONTROLLER}</li>
-	 * <li>{@link PipelineOp.Annotations#MAX_PARALLEL} is <code>1</code></li>
+     * <li>{@link PipelineOp.Annotations#LAST_PASS} is <code>true</code></li>
 	 * <li>{@link PipelineOp.Annotations#PIPELINED} is <code>true</code></li>
+     * <li>{@link PipelineOp.Annotations#MAX_PARALLEL} is <code>1</code></li>
 	 * </ol>
 	 * Under these circumstances, it is possible for the {@link IQueryClient} to
 	 * atomically decide that a specific invocation of the operator task for the
@@ -96,6 +95,8 @@ public class BOpContext<E> extends BOpContextBase {
 	 * @todo This should be a ctor parameter.  We just have to update the test
 	 * suites for the changed method signature.
 	 */
+//    * <li>{@link BOp.Annotations#EVALUATION_CONTEXT} is
+//    * {@link BOpEvaluationContext#CONTROLLER}</li>
     public boolean isLastInvocation() {
     	return lastInvocation.get();
     }

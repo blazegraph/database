@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.solutions.SortOp.Annotations;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -228,10 +229,22 @@ abstract public class PipelineOp extends BOpBase {
             final Map<String, Object> annotations) {
 
         super(args, annotations);
-        
-		if (getMaxParallel() < 1)
-			throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
-					+ getMaxParallel());
+
+        if (getMaxParallel() < 1)
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
+                    + getMaxParallel());
+
+        if (isLastPassRequested()) {
+
+            if (getMaxParallel() != 1)
+                throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
+                        + getMaxParallel());
+
+            if (!isPipelinedEvaluation())
+                throw new UnsupportedOperationException(Annotations.PIPELINED
+                        + "=" + isPipelinedEvaluation());
+
+        }
         
     }
 

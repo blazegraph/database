@@ -24,11 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 /**
- * A SPARQL 1.1 style subquery.
+ * A subquery (no dataset).
  */
-public class SubqueryRoot extends SubqueryBase implements IGroupMemberNode {
+public class SubqueryNode extends QueryBase {
 
-    public SubqueryRoot() {
+    public SubqueryNode() {
 
     }
 

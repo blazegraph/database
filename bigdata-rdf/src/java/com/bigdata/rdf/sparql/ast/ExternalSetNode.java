@@ -28,17 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 /**
- * A node whose children are a list of {@link SubqueryRoot}s.
+ * An extension point for external operators which consume and produce solution
+ * multisets.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SubqueriesNode extends QueryNodeListBaseNode<SubqueryRoot> {
-
-    /**
-     * 
-     */
-    public SubqueriesNode() {
-    }
+public class ExternalSetNode extends GroupMemberNodeBase {
 
 }

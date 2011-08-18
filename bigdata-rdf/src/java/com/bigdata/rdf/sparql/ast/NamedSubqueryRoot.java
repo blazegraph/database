@@ -24,12 +24,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 /**
- * A SPARQL 1.1 style subquery.
+ * A subquery with a named solution set which can be referenced from other parts
+ * of the query.
+ * 
+ * @see NamedSubqueryInclude
  */
-public class SubqueryRoot extends SubqueryBase implements IGroupMemberNode {
+public class NamedSubqueryRoot extends SubqueryRoot {
 
-    public SubqueryRoot() {
+    private String name;
 
+    public NamedSubqueryRoot() {
+
+    }
+
+    /**
+     * The name associated with the subquery.
+     */
+    public String getName() {
+
+        return name;
+        
+    }
+
+    /**
+     * Set the name associated with the subquery.
+     * 
+     * @param name
+     */
+    public void setName(String name) {
+     
+        this.name = name;
+        
     }
 
 }
