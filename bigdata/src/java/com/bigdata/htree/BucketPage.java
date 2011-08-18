@@ -1,8 +1,6 @@
 package com.bigdata.htree;
 
 import java.io.PrintStream;
-import java.lang.ref.Reference;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -600,31 +598,41 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 * for this bucketPage since the serialization and dirty protocols
 		 * need not change at all. 
 		 */
-		
-		/**
-		 * In any event:
-		 * 		create new bucket page and insert key/value
-		 */
-		final BucketPage newPage = new BucketPage((HTree) htree, globalDepth);			
-
-		final DirectoryPage pd = getParentDirectory();
-		if (pd.isOverflowDirectory()) { // already handles blobs
-			pd._addChild(newPage); // may result in extra level insertion
-		} else {
-            final DirectoryPage blob = new DirectoryPage((HTree) htree,
-                    true,// overflowDirectory
-                    pd.getOverflowPageDepth());
-			// now add in blob
-			pd.replaceChildRef(this.self, blob);
-
-			blob._addChild(this);
-			blob._addChild(newPage); // Directories MUST have at least 2 slots!
+		final EvictionProtection protect = new EvictionProtection(this);
+		try {
+			/**
+			 * In any event:
+			 * 		create new bucket page and insert key/value
+			 */
+			final BucketPage newPage = new BucketPage((HTree) htree, globalDepth);			
+	
+			final DirectoryPage pd = getParentDirectory();
+			if (pd.isOverflowDirectory()) { // already handles blobs
+				pd._addChild(newPage); // may result in extra level insertion
+			} else {
+				if (pd.getLevel() * htree.addressBits > key.length * 8)
+					throw new AssertionError();
+				
+				// Must ensure that there is only a single refernce to this BucketPage
+				// and that the "active" page is for the overflow key
+				pd._ensureUniqueBucketPage(key, this.self);
+	            final DirectoryPage blob = new DirectoryPage((HTree) htree,
+	                    key,// overflowKey
+	                    pd.getOverflowPageDepth());
+				// now add in blob
+				pd.replaceChildRef(this.self, blob);
+	
+				blob._addChild(this);
+				blob._addChild(newPage); // Directories MUST have at least 2 slots!
+				
+			}
 			
+			newPage.insert(key, val);
+			
+			assert dirtyHierarchy();
+		} finally {
+			protect.release();
 		}
-		
-		newPage.insert(key, val);
-		
-		assert dirtyHierarchy();
 
 		return true;
 	}
@@ -731,21 +739,16 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			return false;
 		}
 
-		/*
-		 * Since the page is full, we need to grow the page (or chain an
-		 * overflow page) rather than splitting the page.
-		 * 
-		 * FIXME [Chain overflow buckets. This is much faster when we have a lot
-		 * of duplicate keys, which will be the case for some GROUP BY queries.]
-		 * Maybe the easiest thing to do is just double the target #of slots on
-		 * the page. We would rely on keys.capacity() in this case rather than
-		 * #slots. In fact, we could just reenter the method above after
-		 * doubling as long as we rely on keys.capacity() in the case where
-		 * nbuddies==1. [Unit test for this case.]
-		 */
+        /*
+         * Note: insertRawTuple() is invoked when we split a bucket page.
+         * Therefore, it is not possible that a bucket page to which we must
+         * redistribute a tuple could be full. If it were full, then we would
+         * not split it. If we split it, then we can not wind up with more
+         * tuples in the target bucket page than were present in the original
+         * bucket page.
+         */
 
-		throw new UnsupportedOperationException(
-				"Must overflow since all keys on full buddy bucket are duplicates.");
+		throw new AssertionError();
 
 	}
 

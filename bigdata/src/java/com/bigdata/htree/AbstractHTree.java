@@ -1579,7 +1579,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
             // write the dirty node on the store.
             writeNodeOrLeaf(t);
             
-            assert t.isClean();
+//            assert t.isClean();
 
             ndirty++;
             
@@ -1683,7 +1683,7 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
         if (parent == null) {
 
-            assert node == root;
+        		assert node == root;
 
         } else {
 
