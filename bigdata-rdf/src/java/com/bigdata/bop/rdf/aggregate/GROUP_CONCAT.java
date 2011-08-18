@@ -25,9 +25,6 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.impl.LiteralImpl;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
@@ -38,8 +35,6 @@ import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.StrBOp;
-import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp.Annotations;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -51,13 +46,8 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  * plain literal.
  *
  * @author thompsonbry
- *
- *         FIXME Should this be parameterized with Literal or IV? IF IV, then
- *         the pattern is to create an appropriate mock IV and cache the Literal
- *         on the IV. For example, see {@link StrBOp}.
  */
-public class GROUP_CONCAT extends AggregateBase<IV> implements
-        IAggregate<IV> {
+public class GROUP_CONCAT extends AggregateBase<IV> implements IAggregate<IV> {
 
     /**
 	 *
@@ -65,7 +55,11 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends AggregateBase.Annotations {
-        public String NAMESPACE = (AbstractLiteralBOp.class.getName() + ".namespace").intern();
+        
+        /**
+         * The namespace of the lexicon relation.
+         */
+        public String NAMESPACE = AbstractLiteralBOp.class.getName() + ".namespace";
 
         /**
          * Required string property provides the separator used when combining
@@ -108,9 +102,12 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements
     }
 
     public GROUP_CONCAT(BOp[] args, Map<String, Object> annotations) {
+
         super(args, annotations);
-        if (getProperty(Annotations.NAMESPACE) == null)
-            throw new IllegalArgumentException();
+        
+        getRequiredProperty(Annotations.NAMESPACE);
+//        if (getProperty(Annotations.NAMESPACE) == null)
+//            throw new IllegalArgumentException();
 
     }
 
@@ -123,11 +120,13 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements
      *            in the SPARQL recommendation).
      */
     public GROUP_CONCAT(final boolean distinct,
-            final IValueExpression<IV> expr, final String sep) {
+            final IValueExpression<IV> expr, final String namespace,
+            final String sep) {
 
         this(new BOp[] { expr }, NV.asMap(//
 //                new NV(Annotations.FUNCTION_CODE, FunctionCode.GROUP_CONCAT),//
                 new NV(Annotations.DISTINCT, distinct),//
+                new NV(Annotations.NAMESPACE, namespace),//
                 new NV(Annotations.SEPARATOR, sep)//
                 ));
 
@@ -226,7 +225,9 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements
 
         if (aggregated == null)
             return DummyConstantNode.dummyIV(vf.createLiteral(""));
-        return DummyConstantNode.dummyIV(vf.createLiteral(aggregated.toString()));
+
+        return DummyConstantNode
+                .dummyIV(vf.createLiteral(aggregated.toString()));
 
     }
 
