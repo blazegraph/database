@@ -131,6 +131,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		for (int s = start + crefs; s <= last; s++) {
 			childRefs[s] = (Reference<AbstractPage>) b.self;
 		}
+		
+		((HTree) htree).nleaves +=2;
+
 
 		// Now insert raw values from original page
 //		final ITupleIterator tuples = bucketPage.tuples();
@@ -1789,7 +1792,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         for (int i = data.getChildCount() - 1; i >= 0; i--) {
             final AbstractPage aChild = deref(i);
             if (aChild != null) {
-                htree.touch(aChild);
+                // htree.touch(aChild);
                 return aChild;
             }
             if (data.getChildAddr(i) != NULL)
@@ -1958,27 +1961,50 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		}
 	}
 
-	private void _fillChildSlots(final int slot, final int i, final int length, final int depth) {
+	/**
+	 * This method distributes new BucketPages in the child slots around a specified slot
+	 * 
+	 * The purpose is to create the minimum number of pages to enable the specified slot
+	 * to have unique contents. Examples where X indicates specified slot:
+	 * 
+	 * 2bits
+	 * X211
+	 * 112X
+	 * 
+	 * 3bits
+	 * X3221111
+	 * 3X221111
+	 * 22X31111
+	 * 1111X322
+	 * 
+	 * @param slot - the slot to NOT fill
+	 * @param offset from where to fill
+	 * @param length of range
+	 * @param depth of pages
+	 */
+	private void _fillChildSlots(final int slot, final int offset, final int length, final int depth) {
 		assert !isReadOnly();
 		
-		if (slot == i && length == 1)
+		if (slot == offset && length == 1)
 			return;
 		
-		if (slot >= i && slot < (i + length)) {
+		if (slot >= offset && slot < (offset + length)) {
 			final int delta = length/2;
-			_fillChildSlots(slot, i, delta, depth+1);
-			_fillChildSlots(slot, i+delta, delta, depth+1);
+			_fillChildSlots(slot, offset, delta, depth+1);
+			_fillChildSlots(slot, offset+delta, delta, depth+1);
 		} else {
 			final BucketPage bp = new BucketPage((HTree) htree, depth);
 			bp.parent = (Reference<DirectoryPage>) self;
+			((HTree) htree).nleaves++; // Note: only +1 since we will delete the oldPage.
+
 			for (int s = 0; s < length; s++) {
 				if (isReadOnly())
 					assert !isReadOnly();
 				
-				if (childRefs[i+s] != null) // TBD: remove debug point
-					assert childRefs[i+s] == null;
+				if (childRefs[offset+s] != null) // TBD: remove debug point
+					assert childRefs[offset+s] == null;
 				
-				childRefs[i+s] = (Reference<AbstractPage>) bp.self;
+				childRefs[offset+s] = (Reference<AbstractPage>) bp.self;
 			}
 		}
 	}
@@ -2008,13 +2034,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final int prefixLength = _getPrefixLength();
 	    final int hashBits = getLocalHashCode(key, prefixLength);
 	    assert childRefs[hashBits] == bp;
-//	    for (int i = 0; i < childRefs.length; i++) {
-//	    	if (i != hashBits && childRefs[i] == bp) {
-//	    		final BucketPage nbp = new BucketPage((HTree) htree, htree.addressBits);
-//	    		childRefs[i] = (Reference<AbstractPage>) nbp.self;
-//	    		nbp.parent = (Reference<DirectoryPage>) self;
-//	    	}
-//	    }
 	    
 	    int start = -1;
 	    int refs = 0;
