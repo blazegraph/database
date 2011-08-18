@@ -58,6 +58,7 @@ import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.htree.HTree;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
@@ -231,19 +232,55 @@ public class AST2BOpUtility {
      *         join vars to use when buffering the temporary solution set. The
      *         named subquery solutions will be joined into the query by a
      *         {@link NamedSubqueryInclude} within one or more
-     *         {@link IGroupNode}s.
-     * 
-     *         TODO In fact, we can run these where the INCLUDE appears rather
-     *         than up front as long as we are careful not to project bindings
-     *         into the subquery (other than those it projects out). Whether or
-     *         not this is more efficient depends on the subquery and how it is
-     *         combined into the rest of the query. (Running it first should be
-     *         the default policy.)
+     *         {@link IGroupNode}s. The main use case for WITH AS INCLUDE is a
+     *         heavy subquery which should be run first. However, in priciple,
+     *         we could run these where the INCLUDE appears rather than up front
+     *         as long as we are careful not to project bindings into the
+     *         subquery (other than those it projects out). Whether or not this
+     *         is more efficient depends on the subquery and how it is combined
+     *         into the rest of the query. (Running it first should be the
+     *         default policy.)
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             NamedSubqueriesNode subqueries, IGroupNode root, AST2BOpContext ctx) {
 
-        log.error("SUBQUERY NOT SUPPORTED YET: " + subqueries);
+        log.error("NAMED SUBQUERY NOT SUPPORTED YET: " + subqueries);
+        
+        return left;
+        
+    }
+    
+    /**
+     * Add a join against a pre-computed temporary solution set into a join
+     * group.
+     * 
+     * FIXME This will be a hash join against the named materialized solution
+     * set (which will be on an {@link HTree}).
+     */
+    private static PipelineOp addSubqueryInclude(PipelineOp left,
+            final NamedSubqueryInclude subquery, final AST2BOpContext ctx) {
+
+        log.error("NAMED SUBQUERY NOT SUPPORTED YET: " + subquery);
+
+        return left;
+
+    }
+
+    /**
+     * Add an explicit SPARQL 1.1 subquery into a join group.
+     * 
+     * FIXME That's basically how we need to run the SPARQL 1.1 subqueries. We
+     * can handle the bottom up evaluation semantics by stripping out any
+     * bindings which are not being projected out of the subquery with the first
+     * operator in the subquery. That way the original bindings flow through the
+     * parent, the subquery runs with only those things bound which it projects,
+     * and the join happens in the parent (SubqueryOp) based on only those
+     * variables projected out of the subquery.
+     */
+    private static PipelineOp addSparqlSubquery(PipelineOp left,
+            final SubqueryRoot subquery, final AST2BOpContext ctx) {
+        
+        log.error("EXPLICIT SUBQUERY NOT SUPPORTED YET: " + subquery);
         
         return left;
         
@@ -325,6 +362,15 @@ public class AST2BOpUtility {
         
     }
 	
+    /**
+     * Generate the query plan for a join group or union. This is invoked for
+     * the top-level "WHERE" clause and may be invoked recursively for embedded
+     * join groups.
+     * 
+     * @param groupNode
+     * @param ctx
+     * @return
+     */
 	private static PipelineOp convert(final IGroupNode groupNode,
 			final AST2BOpContext ctx) {
 		
@@ -343,7 +389,14 @@ public class AST2BOpUtility {
 		}
 		
 	}
-		
+
+    /**
+     * Generate the query plan for a union.
+     * 
+     * @param unionNode
+     * @param ctx
+     * @return
+     */
 	private static PipelineOp convert(final UnionNode unionNode,
 			final AST2BOpContext ctx) {
 		
@@ -467,7 +520,25 @@ public class AST2BOpUtility {
          * Add the joins (statement patterns) and the filters on those joins.
          */
         left = addJoins(left, joinGroup, ctx);
+
+        /*
+         * Add SPARQL 1.1 style subqueries. 
+         */
+        for (IQueryNode child : joinGroup) {
+            if (child instanceof SubqueryRoot)
+                left = addSparqlSubquery(left, (SubqueryRoot) child, ctx);
+        }
         
+        /*
+         * Add joins against named solution sets from WITH AS INCLUDE style
+         * subqueries. 
+         */
+        for (IQueryNode child : joinGroup) {
+            if (child instanceof NamedSubqueryInclude)
+                left = addSubqueryInclude(left, (NamedSubqueryInclude) child,
+                        ctx);
+        }
+
         /*
          * Add the subqueries (individual optional statement patterns, optional
          * join groups, and nested union).
@@ -477,7 +548,7 @@ public class AST2BOpUtility {
         /*
          * Add the LET assignments to the pipeline.
          */
-        left = addAssignments(left, joinGroup.getAssignments(), ctx, false);
+        left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
                 
         /*
          * Add the post-conditionals to the pipeline.
