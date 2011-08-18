@@ -605,7 +605,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			 * 		create new bucket page and insert key/value
 			 */
 			final BucketPage newPage = new BucketPage((HTree) htree, globalDepth);			
-	
+			((HTree) htree).nleaves++;
+
 			final DirectoryPage pd = getParentDirectory();
 			if (pd.isOverflowDirectory()) { // already handles blobs
 				pd._addChild(newPage); // may result in extra level insertion

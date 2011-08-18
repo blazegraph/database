@@ -33,6 +33,7 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
@@ -126,9 +127,9 @@ public class TestHTreeWithMemStore extends TestCase {
 
         final int addressBits = 3; 
 
-        final int writeRetentionQueueCapacity = 30; // FIXME was 20
+        final int writeRetentionQueueCapacity = 20; // FIXME was 20
         
-        final int numOverflowPages = 1000; // FIXME was 5000
+        final int numOverflowPages = 5000; // FIXME was 5000
 
         doOverflowStressTest(addressBits, writeRetentionQueueCapacity, numOverflowPages);
         
@@ -138,7 +139,7 @@ public class TestHTreeWithMemStore extends TestCase {
     
         final int addressBits = 10; 
 
-        final int writeRetentionQueueCapacity = 100; // FIXME was 20
+        final int writeRetentionQueueCapacity = 30; // FIXME was 20
         
         final int numOverflowPages = 5000; // FIXME was 5000
 
@@ -259,10 +260,16 @@ public class TestHTreeWithMemStore extends TestCase {
             
             final long end = System.currentTimeMillis();
             
-            if (log.isInfoEnabled())
+            final BTreeCounters counters = htree.getBtreeCounters();
+            
+            if (log.isInfoEnabled()) {
+            	log.info("Htree Leaves: " + htree.nleaves + ", Evicted: " + counters.leavesWritten 
+                		+ ", Nodes: " + htree.nnodes + ", Evicted: " + counters.nodesWritten);
+
                 log.info("Load took " + (load - start) + "ms, loops for "
                         + (inserts + altInserts1 + altInserts2) + " "
                         + (end - load) + "ms");
+            }
 
             htree.flush();
             
@@ -330,7 +337,7 @@ public class TestHTreeWithMemStore extends TestCase {
          * integration.
          */
         metadata.setWriteRetentionQueueCapacity(writeRetentionQueueCapacity);
-        metadata.setWriteRetentionQueueScan(4); // Must be LTE capacity.
+        metadata.setWriteRetentionQueueScan(10); // Must be LTE capacity.
 
         return HTree.create(store, metadata);
 
