@@ -62,8 +62,10 @@ public class TestGROUP_CONCAT extends TestCase2 {
 	
     public void test_group_concat() {
 
+        final String namespace = getName();
+
         final BigdataValueFactory f = BigdataValueFactoryImpl
-                .getInstance(getName());
+                .getInstance(namespace);
 
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
@@ -108,22 +110,31 @@ public class TestGROUP_CONCAT extends TestCase2 {
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
         
-        final GROUP_CONCAT op = new GROUP_CONCAT(false/* distinct */, lprice," ");
+        final GROUP_CONCAT op = new GROUP_CONCAT(false/* distinct */, lprice,
+                namespace, " ");
+
         assertFalse(op.isDistinct());
+        
         assertFalse(op.isWildcard());
 
         op.reset();
+
         for (IBindingSet bs : data) {
+        
             op.get(bs);
+            
         }
-        assertEquals(new LiteralImpl("9 5 7 7"), op.done());
+        
+        assertEquals(new LiteralImpl("9 5 7 7"), op.done().getValue());
 
     }
 
     public void test_group_concat_with_value_limit() {
 
+        final String namespace = getName();
+
         final BigdataValueFactory f = BigdataValueFactoryImpl
-                .getInstance(getName());
+                .getInstance(namespace);
 
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
@@ -171,6 +182,7 @@ public class TestGROUP_CONCAT extends TestCase2 {
         final GROUP_CONCAT op = new GROUP_CONCAT(new BOp[]{lprice},
                 NV.asMap(new NV[]{//
                         new NV(GROUP_CONCAT.Annotations.DISTINCT,false),//
+                        new NV(GROUP_CONCAT.Annotations.NAMESPACE,namespace),//
                         new NV(GROUP_CONCAT.Annotations.SEPARATOR,"."),//
                         new NV(GROUP_CONCAT.Annotations.VALUE_LIMIT,3),//
                 }));
@@ -178,17 +190,23 @@ public class TestGROUP_CONCAT extends TestCase2 {
         assertFalse(op.isWildcard());
 
         op.reset();
+        
         for (IBindingSet bs : data) {
+        
             op.get(bs);
+            
         }
-        assertEquals(new LiteralImpl("9.5.7"), op.done());
+
+        assertEquals(new LiteralImpl("9.5.7"), op.done().getValue());
 
     }
 
     public void test_group_concat_with_character_limit() {
 
+        final String namespace = getName();
+
         final BigdataValueFactory f = BigdataValueFactoryImpl
-                .getInstance(getName());
+                .getInstance(namespace);
 
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
@@ -236,6 +254,7 @@ public class TestGROUP_CONCAT extends TestCase2 {
         final GROUP_CONCAT op = new GROUP_CONCAT(new BOp[]{lprice},
                 NV.asMap(new NV[]{//
                         new NV(GROUP_CONCAT.Annotations.DISTINCT,false),//
+                        new NV(GROUP_CONCAT.Annotations.NAMESPACE,namespace),//
                         new NV(GROUP_CONCAT.Annotations.SEPARATOR,"."),//
                         new NV(GROUP_CONCAT.Annotations.CHARACTER_LIMIT,3),//
                 }));
@@ -243,10 +262,14 @@ public class TestGROUP_CONCAT extends TestCase2 {
         assertFalse(op.isWildcard());
 
         op.reset();
+        
         for (IBindingSet bs : data) {
+            
             op.get(bs);
+            
         }
-        assertEquals(new LiteralImpl("9.5"), op.done());
+
+        assertEquals(new LiteralImpl("9.5"), op.done().getValue());
 
     }
 
@@ -305,27 +328,28 @@ public class TestGROUP_CONCAT extends TestCase2 {
         };
 
         // GROUP_CONCAT(STR(lprice+1))
-        final GROUP_CONCAT op = new GROUP_CONCAT(false/* distinct */,
+        final GROUP_CONCAT op = new GROUP_CONCAT(
+                false, // distinct
                 new StrBOp(
                         new MathBOp(lprice, new Constant<IV>(new XSDIntIV(1)),
-                                MathBOp.MathOp.PLUS)
-                        , namespace)
-        , ",");
+                                MathBOp.MathOp.PLUS), namespace), //
+                namespace,// namespace
+                ","// separator
+        );
+        
         assertFalse(op.isDistinct());
+        
         assertFalse(op.isWildcard());
 
         op.reset();
+        
         for (IBindingSet bs : data) {
-            /*
-             * FIXME This is failing because 10^^xsd:int is not materialized.
-             * That seems like a StrBOp problem, but it also suggests that we
-             * have a broader problem with our string handling pattern. For
-             * example, if we remove the STR() function, then it is GROUP_CONCAT
-             * which throws the error.
-             */
+            
             op.get(bs);  
+        
         }
-        assertEquals(new LiteralImpl("10,6,8,8"), op.done());
+        
+        assertEquals(new LiteralImpl("10,6,8,8"), op.done().getValue());
 
     }
 
@@ -383,35 +407,36 @@ public class TestGROUP_CONCAT extends TestCase2 {
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
 
-        // GROUP_CONCAT(STR(lprice+1))
-        final GROUP_CONCAT op = new GROUP_CONCAT(false/* distinct */,
-//                new StrBOp(
-                        new MathBOp(lprice, new Constant<IV>(new XSDIntIV(1)),
-                                MathBOp.MathOp.PLUS)
-//                        , namespace)
-        , ",");
+        // GROUP_CONCAT(lprice+1)
+        final GROUP_CONCAT op = new GROUP_CONCAT(//
+                false,// distinct
+                new MathBOp(lprice, new Constant<IV>(new XSDIntIV(1)),
+                        MathBOp.MathOp.PLUS), namespace, // namespace
+                ","// separator
+        );
+        
         assertFalse(op.isDistinct());
+        
         assertFalse(op.isWildcard());
 
         op.reset();
+        
         for (IBindingSet bs : data) {
-            /*
-             * FIXME This is failing because 10^^xsd:int is not materialized.
-             * That seems like a StrBOp problem, but it also suggests that we
-             * have a broader problem with our string handling pattern. For
-             * example, if we remove the STR() function, then it is GROUP_CONCAT
-             * which throws the error.
-             */
-            op.get(bs);  
+        
+            op.get(bs);
+            
         }
-        assertEquals(new LiteralImpl("10,6,8,8"), op.done());
+
+        assertEquals(new LiteralImpl("10,6,8,8"), op.done().getValue());
 
     }
 
     public void test_group_concat_with_null() {
 
+        final String namespace = getName();
+        
         final BigdataValueFactory f = BigdataValueFactoryImpl
-                .getInstance(getName());
+                .getInstance(namespace);
 
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
@@ -458,15 +483,22 @@ public class TestGROUP_CONCAT extends TestCase2 {
         
         // GROUP_CONCAT(lprice)
         final GROUP_CONCAT op = new GROUP_CONCAT(false/* distinct */, lprice,
-                ":");
+                namespace, ":");
+
         assertFalse(op.isDistinct());
+        
         assertFalse(op.isWildcard());
+        
 
         op.reset();
+        
         for (IBindingSet bs : data) {
+        
             op.get(bs);
+            
         }
-        assertEquals(new LiteralImpl("9:7:7"), op.done());
+        
+        assertEquals(new LiteralImpl("9:7:7"), op.done().getValue());
 
     }
 
