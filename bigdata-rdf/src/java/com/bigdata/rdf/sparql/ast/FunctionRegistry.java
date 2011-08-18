@@ -66,10 +66,7 @@ import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
  * <p>
  * Note: Use an alternative namespace for functions which do not have official
  * namespaces.
- * 
- * @author <a href="mailto:mroycsi@users.sourceforge.net">Matt Roy</a>
- * @version $Id$
- * 
+ *
  * @see <a href="http://www.w3.org/2005/xpath-functions/">XPath functions</a>
  * @see <a
  *      href="http://lists.w3.org/Archives/Public/public-rdf-dawg/2006AprJun/att-0138/sparql-function-uri.html">Sparql
@@ -761,6 +758,21 @@ public class FunctionRegistry {
 	    }
 
 	}
+
+    public static final void addAlias(final URI functionURI, final URI aliasURI) {
+
+        if (!factories.containsKey(functionURI)) {
+
+            throw new UnsupportedOperationException("FunctionURI:"+functionURI+ " not present.");
+
+        }
+
+        if (factories.putIfAbsent(aliasURI, factories.get(functionURI)) != null) {
+
+            throw new UnsupportedOperationException("Already declared.");
+
+        }
+    }
 
 	public static interface Factory {
 

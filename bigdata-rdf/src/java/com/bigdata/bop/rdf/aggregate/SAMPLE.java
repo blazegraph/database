@@ -39,17 +39,17 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  * Operator reports an arbitrary value from presented binding sets for the given
  * variable. Missing values are not chosen when non-missing values are
  * available.
- * 
+ *
  * @author thompsonbry
  */
 public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
 
     /**
-	 * 
+	 *
 	 */
     private static final long serialVersionUID = 1L;
 
-    public SAMPLE(BOpBase op) {
+    public SAMPLE(SAMPLE op) {
         super(op);
     }
 
@@ -85,7 +85,7 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
             if (firstCause == null) {
 
                 firstCause = t;
-                
+
             }
 
             throw new RuntimeException(t);
@@ -114,21 +114,21 @@ public class SAMPLE extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public void reset() {
 
         sample = null;
-        
+
         firstCause = null;
-        
+
     }
 
     synchronized public IV done() {
 
         if (firstCause != null) {
-            
+
             throw new RuntimeException(firstCause);
-            
+
         }
 
         return sample;
-        
+
     }
 
     /**

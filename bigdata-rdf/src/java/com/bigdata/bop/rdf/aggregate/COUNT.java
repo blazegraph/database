@@ -46,17 +46,17 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * is the cardinality of the distinct solutions in the solution multiset. These
  * semantics are not directly handled by this class. It relies on the
  * aggregation operator to compute those values.
- * 
+ *
  * @author thompsonbry
  */
 public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 1L;
 
-	public COUNT(BOpBase op) {
+	public COUNT(COUNT op) {
 		super(op);
 	}
 
@@ -67,7 +67,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
     public COUNT(final boolean distinct, IValueExpression<IV> expr) {
         super(/*FunctionCode.COUNT,*/ distinct, expr);
     }
-	
+
 	/**
 	 * The running aggregate value.
 	 * <p>
@@ -97,7 +97,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
             if (firstCause == null) {
 
                 firstCause = t;
-                
+
             }
 
             throw new RuntimeException(t);
@@ -134,21 +134,21 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public void reset() {
 
         aggregated = 0L;
-        
+
         firstCause = null;
-        
+
     }
 
     synchronized public IV done() {
-        
+
         if (firstCause != null) {
-            
+
             throw new RuntimeException(firstCause);
-            
+
         }
 
         return new XSDLongIV<BigdataLiteral>(aggregated);
-        
+
     }
 
     /**

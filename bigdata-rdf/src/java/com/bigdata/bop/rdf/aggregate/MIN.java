@@ -48,7 +48,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  * Note: MIN (and MAX) are defined in terms of the ORDER_BY semantics for
  * SPARQL. Therefore, this must handle comparisons when the value is not an IV,
  * e.g., using {@link ValueComparator}.
- * 
+ *
  * @author thompsonbry
  *
  * TODO What is reported if there are no non-null observations?
@@ -56,13 +56,13 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
 
 //    private static final transient Logger log = Logger.getLogger(MIN.class);
-    
+
     /**
-	 * 
+	 *
 	 */
     private static final long serialVersionUID = 1L;
 
-    public MIN(BOpBase op) {
+    public MIN(MIN op) {
         super(op);
     }
 
@@ -97,7 +97,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
             if (firstCause == null) {
 
                 firstCause = t;
-                
+
             }
 
             throw new RuntimeException(t);
@@ -129,7 +129,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
                  * CompareBOp imposes the ordering defined for the "<" operator
                  * which is less robust and will throw a type exception if you
                  * attempt to compare unlike Values.
-                 * 
+                 *
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
                 if (CompareBOp.compare(CompareOp.LT, iv, min)) {
@@ -149,7 +149,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public void reset() {
 
         min = null;
-        
+
         firstCause = null;
 
     }
@@ -157,13 +157,13 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public IV done() {
 
         if (firstCause != null) {
-            
+
             throw new RuntimeException(firstCause);
-            
+
         }
 
         return min;
-        
+
     }
 
     /**
@@ -172,7 +172,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
      * of LT over the column projection of the inner expression). This probably
      * means that we always need to materialize something unless it is an inline
      * numeric IV.
-     * 
+     *
      * FIXME MikeP: What is the right return value here?
      */
     public Requirement getRequirement() {

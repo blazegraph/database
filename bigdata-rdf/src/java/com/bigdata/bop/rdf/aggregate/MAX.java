@@ -48,9 +48,9 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  * Note: MIN (and MAX) are defined in terms of the ORDER_BY semantics for
  * SPARQL. Therefore, this must handle comparisons when the value is not an IV,
  * e.g., using {@link ValueComparator}.
- * 
+ *
  * @author thompsonbry
- * 
+ *
  *         TODO What is reported if there are no non-null observations?
  */
 public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
@@ -58,11 +58,11 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
 //    private static final transient Logger log = Logger.getLogger(MAX.class);
 
     /**
-	 * 
+	 *
 	 */
     private static final long serialVersionUID = 1L;
 
-    public MAX(BOpBase op) {
+    public MAX(MAX op) {
         super(op);
     }
 
@@ -97,7 +97,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
             if (firstCause == null) {
 
                 firstCause = t;
-                
+
             }
 
             throw new RuntimeException(t);
@@ -129,7 +129,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
                  * CompareBOp imposes the ordering defined for the "<" operator
                  * which is less robust and will throw a type exception if you
                  * attempt to compare unlike Values.
-                 * 
+                 *
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
                 if (CompareBOp.compare(CompareOp.GT, iv, max)) {
@@ -149,7 +149,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public void reset() {
 
         max = null;
-        
+
         firstCause = null;
 
     }
@@ -157,13 +157,13 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
     synchronized public IV done() {
 
         if (firstCause != null) {
-            
+
             throw new RuntimeException(firstCause);
-            
+
         }
 
         return max;
-        
+
     }
 
     /**
@@ -172,7 +172,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
      * of LT over the column projection of the inner expression). This probably
      * means that we always need to materialize something unless it is an inline
      * numeric IV.
-     * 
+     *
      * FIXME MikeP: What is the right return value here?
      */
     public Requirement getRequirement() {

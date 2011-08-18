@@ -97,7 +97,7 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements IAggregate<IV> {
 
     }
 
-    public GROUP_CONCAT(BOpBase op) {
+    public GROUP_CONCAT(GROUP_CONCAT op) {
         super(op);
     }
 
