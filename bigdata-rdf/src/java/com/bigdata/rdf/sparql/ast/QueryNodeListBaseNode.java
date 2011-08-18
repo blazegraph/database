@@ -28,79 +28,59 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
- * AST node models an ORDER BY clause.
+ * Base class for AST nodes which model an ordered list of children.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OrderByNode extends SolutionModifierBase implements
-        Iterable<OrderByExpr> {
+abstract public class QueryNodeListBaseNode<E extends IQueryNode>
+        extends QueryNodeBase implements Iterable<E> {
 
-    private final Set<OrderByExpr> orderBy = new LinkedHashSet<OrderByExpr>();
+    protected final List<E> children = new LinkedList<E>();
 
-    public OrderByNode() {
+    public void add(final E e) {
+
+        if (e == null)
+            throw new IllegalArgumentException();
+        
+        children.add(e);
+
     }
 
-    public void addExpr(final OrderByExpr orderBy) {
-        
-        if (this.orderBy.contains(orderBy)) {
+    public Iterator<E> iterator() {
 
-            throw new IllegalArgumentException("duplicate");
-            
-        }
-        
-        this.orderBy.add(orderBy);
-        
+        return children.iterator();
+
     }
-    
-    public void removeOrderBy(final OrderByExpr orderBy) {
-        
-        this.orderBy.remove(orderBy);
-        
-    }
-    
+
     public int size() {
-        
-        return orderBy.size();
-        
-    }
-    
-    public boolean isEmpty() {
-     
-        return orderBy.isEmpty();
-        
-    }
-    
-    public Iterator<OrderByExpr> iterator() {
 
-        return orderBy.iterator();
+        return children.size();
         
+    }
+
+    public boolean isEmpty() {
+        
+        return children.isEmpty();
+
     }
 
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();
-        
-        sb.append("\n");
 
-        sb.append(indent(indent));
-        
-        sb.append("order by");
-        
-        for (OrderByExpr e : orderBy) {
-        
-            sb.append(" ");
-            
-            sb.append(e.toString());
-            
+        for (IQueryNode node : children) {
+
+            sb.append(node.toString(indent + 1));
+
         }
 
         return sb.toString();
-        
+
     }
 
 }

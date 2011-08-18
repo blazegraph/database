@@ -30,8 +30,6 @@ package com.bigdata.bop.solutions;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.aggregate.IAggregate;
 
@@ -51,26 +49,50 @@ abstract public class GroupByOp extends PipelineOp {
 
     public interface Annotations extends PipelineOp.Annotations {
 
+//        /**
+//         * The ordered list of {@link IValueExpression}s to be projected out of
+//         * the aggregation operator (required). The {@link IValueExpression}s
+//         * will be computed against the aggregated solution sets (one solution
+//         * set per group).
+//         */
+//        String SELECT = GroupByOp.class.getName() + ".select";
+//
+//        /**
+//         * The ordered set of or one or more {@link IValueExpression}s defining
+//         * the aggregation groups (required). Variables references will be
+//         * resolved against the incoming solutions.
+//         */
+//        String GROUP_BY = GroupByOp.class.getName() + ".groupBy";
+//
+//        /**
+//         * An {@link IConstraint}[] applied to the aggregated solutions
+//         * (optional).
+//         */
+//        String HAVING = GroupByOp.class.getName() + ".having";
+        
         /**
-         * The ordered list of {@link IValueExpression}s to be projected out of
-         * the aggregation operator (required). The {@link IValueExpression}s
-         * will be computed against the aggregated solution sets (one solution
-         * set per group).
+         * This required annotation describes the {@link IGroupByState} for the
+         * aggregation operator, including the SELECT value expressions to be
+         * projected, the optional GROUP BY value expressions, and the optional
+         * HAVING value expressions.
+         * 
+         * @see IGroupByState
          */
-        String SELECT = GroupByOp.class.getName() + ".select";
+        String GROUP_BY_STATE = GroupByOp.class.getName() + ".groupByState";
 
         /**
-         * The ordered set of or one or more {@link IValueExpression}s defining
-         * the aggregation groups (required). Variables references will be
-         * resolved against the incoming solutions.
+         * This required annotation provides the {@link IGroupByRewriteState},
+         * which is a rewrite of the {@link GroupByState} that allows for
+         * certain optimizations. This data is a required annotation because the
+         * rewrite includes anonymous variables and the identity of those
+         * anonymous variables MUST be stable across each invocation of the
+         * operator. This requirement exists both for pipelined aggregation
+         * operators running on a single node and for distributed aggregation
+         * operators running on a cluster.
+         * 
+         * @see IGroupByRewriteState
          */
-        String GROUP_BY = GroupByOp.class.getName() + ".groupBy";
-
-        /**
-         * An {@link IConstraint}[] applied to the aggregated solutions
-         * (optional).
-         */
-        String HAVING = GroupByOp.class.getName() + ".having";
+        String GROUP_BY_REWRITE = GroupByOp.class.getName() + ".groupByRewrite";
         
     }
 

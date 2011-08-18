@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 
@@ -56,8 +57,18 @@ import com.bigdata.bop.aggregate.IAggregate;
  *          optimizing the aggregation using per-group incremental pipelined
  *          evaluation).
  */
-public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory {
+public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
+        Serializable {
 
+    /**
+     * Note: This class must be serializable so we may distribute it with the
+     * parallel decomposition of an aggregation operator on a cluster, otherwise
+     * each time an operator computes the rewrite it will assign new variables
+     * and we will be unable to combine the decomposed aggregation results on
+     * the query controller.
+     */
+    private static final long serialVersionUID = 1L;
+    
     private final LinkedHashMap<IAggregate<?>,IVariable<?>> aggExpr;
 //    private final LinkedHashMap<IValueExpression<?>,ProjectionType> columnProjections;
     private final IValueExpression<?>[] select2;

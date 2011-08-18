@@ -46,7 +46,10 @@ import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
 import com.bigdata.bop.solutions.GroupByOp;
+import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.GroupByState;
+import com.bigdata.bop.solutions.IGroupByRewriteState;
+import com.bigdata.bop.solutions.IGroupByState;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemoryGroupByOp;
@@ -863,8 +866,11 @@ public class AST2BOpUtility {
         final IConstraint[] havingExprs = having == null ? null
                 : having.getConstraints();
 
-        final GroupByState groupByState = new GroupByState(projectExprs,
+        final IGroupByState groupByState = new GroupByState(projectExprs,
                 groupByExprs, havingExprs);
+
+        final IGroupByRewriteState groupByRewrite = new GroupByRewriter(
+                groupByState);
 
         final int bopId = ctx.idFactory.incrementAndGet();
 
@@ -874,6 +880,17 @@ public class AST2BOpUtility {
 
             /*
              * Extremely efficient pipelined aggregation operator.
+             * 
+             * TODO This operation can be parallelized on a cluster either if it
+             * does not use any operators which can not be decomposed (such as
+             * AVERAGE) or if we rewrite such operators into AVG(X) :=
+             * SUM(X)/COUNT(X). When it is parallelized, we need to run it on
+             * each node and add another instance of this operator on the query
+             * controller which aggregates the aggregates from the nodes in the
+             * cluster. If we have done rewrites of things like AVERAGE, then we
+             * can not compute the AVERAGE until after we have computed the
+             * aggregate of aggregates. The simplest way to do that is using a
+             * LET operator after the aggregates have been combined.
              */
 
             op = new PipelinedAggregationOp(new BOp[] {left}, NV.asMap(new NV[] {//
@@ -883,9 +900,8 @@ public class AST2BOpUtility {
                     new NV(PipelineOp.Annotations.PIPELINED, true),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                    new NV(GroupByOp.Annotations.SELECT, projectExprs), //
-                    new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
-                    new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+                    new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
+                    new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
             }));
 
@@ -909,9 +925,8 @@ public class AST2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.PIPELINED, false),//
                     new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
-                    new NV(GroupByOp.Annotations.SELECT, projectExprs), //
-                    new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
-                    new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+                    new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
+                    new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
             }));
 

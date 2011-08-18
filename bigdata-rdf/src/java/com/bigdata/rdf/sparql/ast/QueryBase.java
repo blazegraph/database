@@ -33,7 +33,7 @@ package com.bigdata.rdf.sparql.ast;
  * @see OrderByNode
  * @see SliceNode
  */
-abstract public class QueryBase {
+abstract public class QueryBase extends QueryNodeBase {
 
 	private IGroupNode root;
     private ProjectionNode projection;
@@ -173,31 +173,33 @@ abstract public class QueryBase {
         
     }
     
-	public String toString() {
+	public String toString(final int indent) {
 		
+	    final String s = indent(indent);
+	    
 		final StringBuilder sb = new StringBuilder();
 		
         if (projection != null && !projection.isEmpty()) {
 
-            sb.append("select");
-
-		    sb.append(projection);
+		    sb.append(projection.toString(indent));
 		    
 		}
 
         if (root != null) {
 
-            sb.append("\nwhere\n");
+            sb.append("\n");
+            
+            sb.append(s);
 
-            sb.append(root.toString());
+            sb.append("where\n");
+
+            sb.append(root.toString(indent));
 
         }
 
         if (groupBy != null && !groupBy.isEmpty()) {
 
-            sb.append("\n");
-
-            sb.append(groupBy.toString());
+            sb.append(groupBy.toString(indent));
 
         }
 
@@ -205,23 +207,21 @@ abstract public class QueryBase {
 
             sb.append("\n");
 
+            sb.append(s);
+
             sb.append(having.toString());
 
         }
 
         if (orderBy != null && !orderBy.isEmpty()) {
 
-            sb.append("\n");
-
-            sb.append(orderBy.toString());
+            sb.append(orderBy.toString(indent));
 
         }
 
         if (slice != null) {
 
-            sb.append("\n");
-
-            sb.append(slice.toString());
+            sb.append(slice.toString(indent));
 
         }
 

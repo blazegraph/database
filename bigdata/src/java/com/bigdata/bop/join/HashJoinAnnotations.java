@@ -48,6 +48,11 @@ public interface HashJoinAnnotations {
      * for the {@link #JOIN_VARS} in order to join (source solutions can still
      * be pass on as optionals,but they will not join with the access path if
      * the join variables are not bound).
+     * 
+     * FIXME If no join variables, then join is full cross product (constraints
+     * are still applied and optional solutions must be reported if a constraint
+     * fails and the join is optional). In general, we are not unit testing for
+     * the case of an unconstrained join.
      */
     String JOIN_VARS = SubqueryHashJoinOp.class.getName() + ".joinVars";
 

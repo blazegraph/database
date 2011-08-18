@@ -21,9 +21,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableFactory;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
@@ -51,13 +49,18 @@ import com.bigdata.util.InnerCause;
  * input solution at a time), it relies on {@link IAggregate}'s contract for
  * "sticky" errors. See {@link IAggregate#get(IBindingSet)} and
  * {@link IAggregate#done()}.
+ * <p>
+ * Note: This this operator will be invoked multiple times, and potentially on
+ * multiple nodes in a cluster, it is critical that the anonymous variables
+ * assigned by the {@link GroupByRewriter} are stable across all invocations on
+ * any node of the cluster (this caution also applies for a single node where
+ * the operator can still be invoked multiple times).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class PipelinedAggregationOp extends GroupByOp implements
-        IVariableFactory {
+public class PipelinedAggregationOp extends GroupByOp {
 
 	private final static transient Logger log = Logger
 			.getLogger(PipelinedAggregationOp.class);
@@ -109,6 +112,10 @@ public class PipelinedAggregationOp extends GroupByOp implements
 							+ getEvaluationContext());
 		}
 
+        getRequiredProperty(Annotations.GROUP_BY_STATE);
+
+        getRequiredProperty(Annotations.GROUP_BY_REWRITE);
+        
 		if (!isSharedState()) {
             /*
              * Note: shared state is used to share the hash table across
@@ -118,6 +125,15 @@ public class PipelinedAggregationOp extends GroupByOp implements
 					+ "=" + isSharedState());
 		}
 		
+		if (!isLastPassRequested()) {
+            /*
+             * Note: A final evaluation pass is required to write out the
+             * aggregates.
+             */
+            throw new UnsupportedOperationException(Annotations.LAST_PASS
+                    + "=" + isLastPassRequested());
+        }
+        
         if (getMaxParallel() != 1) {
             /*
              * Note: The operator MUST be single threaded in order to receive
@@ -160,16 +176,6 @@ public class PipelinedAggregationOp extends GroupByOp implements
 
         return new FutureTask<Void>(new ChunkTask(this, context));
         
-    }
-
-    /**
-     * Return a new anonymous variable (this is overridden by some unit tests in
-     * order to have predictable variable names).
-     */
-    public IVariable<?> var() {
-
-        return Var.var();
-
     }
 
     /**
@@ -397,90 +403,18 @@ public class PipelinedAggregationOp extends GroupByOp implements
          * first invocation of the {@link ChunkTask}.
          */
         private boolean first = true;
-        
-        /**
-         * A map whose keys are the bindings on the specified variables and
-         * whose values are the per-group state.
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         * <p>
-         * Note: This is only iff an explicit GROUP_BY clause is used.
-         */
-        private LinkedHashMap<SolutionGroup, SolutionGroupState> map;
-
-        /**
-         * The aggregates to be computed (they have internal state).
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         * <p>
-         * Note: This is bound iff all solutions will be collected within a
-         * single implicit group.
-         */
-        private LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr;
-        
-        public AggregateStats(final PipelinedAggregationOp op) {
-        }
-
-        /**
-         * Discard the shared state (this can not be discarded until the last
-         * invocation).
-         */
-        private void discardState() {
-            map = null;
-            aggExpr = null;
-        }
-
-    }
-
-    /**
-     * Task executing on the node.
-     */
-    static private class ChunkTask implements Callable<Void> {
-
-        private final BOpContext<IBindingSet> context;
-
-        /**
-         * A map whose keys are the bindings on the specified variables (the
-         * keys and the values are the same since the map implementation does
-         * not allow <code>null</code> values).
-         * <p>
-         * Note: This is bound iff an explicit GROUP_BY clause was used.
-         */
-        private final LinkedHashMap<SolutionGroup, SolutionGroupState> map;
-
-        /**
-         * The aggregates to be computed (they have internal state).
-         * <p>
-         * Note: This is bound iff all solutions will be collected within a
-         * single implicit group.
-         */
-        private final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr;
 
         private final IGroupByState groupByState;
 
         private final IGroupByRewriteState rewrite;
-        
-        private final IValueExpression<?>[] groupBy;
-        
-        ChunkTask(final PipelinedAggregationOp op,
-                final BOpContext<IBindingSet> context) {
 
-            this.context = context;
+        public AggregateStats(final PipelinedAggregationOp op) {
+            
+            this.groupByState = (IGroupByState) op
+                    .getRequiredProperty(Annotations.GROUP_BY_STATE);
 
-            this.groupByState = new GroupByState(//
-                    (IValueExpression<?>[]) op.getRequiredProperty(GroupByOp.Annotations.SELECT), //
-                    (IValueExpression<?>[]) op.getProperty(GroupByOp.Annotations.GROUP_BY), //
-                    (IConstraint[]) op.getProperty(GroupByOp.Annotations.HAVING)//
-            );
-
-            this.rewrite = new GroupByRewriter(groupByState) {
-                @Override
-                public IVariable<?> var() {
-                    return op.var();
-                }
-            };
+            this.rewrite = (IGroupByRewriteState) op
+                    .getRequiredProperty(Annotations.GROUP_BY_REWRITE);
 
             if (groupByState.isAnyDistinct()) {
                 // Pipelined aggregation does not support DISTINCT.
@@ -497,36 +431,141 @@ public class PipelinedAggregationOp extends GroupByOp implements
                         "Nested aggregates not allowed with pipelined aggregation.");
             }
 
-            this.groupBy = groupByState.getGroupByClause();
+        }
 
-//            this.select = groupByState.getSelectClause();
+    }
+
+    /**
+     * Shared execution state for the {@link PipelinedAggregationOp}.
+     */
+    private static class SharedState {
+
+        /**
+         * A map whose keys are the bindings on the specified variables and
+         * whose values are the per-group state.
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         * <p>
+         * Note: This is only iff an explicit GROUP_BY clause is used.
+         */
+        private final LinkedHashMap<SolutionGroup, SolutionGroupState> map;
+
+        /**
+         * The aggregates to be computed (they have internal state).
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         * <p>
+         * Note: This is bound iff all solutions will be collected within a
+         * single implicit group.
+         */
+        private final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr;
+
+        SharedState(final PipelinedAggregationOp op, final AggregateStats stats) {
+
+            if (stats.groupByState.getGroupByClause() == null) {
             
-//            this.having = groupByState.getHavingClause();
+                map = null;
+                
+                aggExpr = stats.rewrite.getAggExpr();
+                
+            } else {
 
-            final AggregateStats stats = (AggregateStats)context.getStats();
+                /*
+                 * The map is only defined if a GROUP_BY clause was used.
+                 */
+                
+                map = new LinkedHashMap<SolutionGroup, SolutionGroupState>(
+                        op.getInitialCapacity(), op.getLoadFactor());
+                
+                aggExpr = null;
+                
+            }
+
+        }
+        
+    }
+    
+    /**
+     * Task executing on the node.
+     */
+    static private class ChunkTask implements Callable<Void> {
+
+        private final BOpContext<IBindingSet> context;
+
+        /**
+         * A map whose keys are the bindings on the specified variables and
+         * whose values are the per-group state.
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         * <p>
+         * Note: This is only iff an explicit GROUP_BY clause is used.
+         */
+        private final LinkedHashMap<SolutionGroup, SolutionGroupState> map;
+
+        /**
+         * The aggregates to be computed (they have internal state).
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         * <p>
+         * Note: This is bound iff all solutions will be collected within a
+         * single implicit group.
+         */
+        private final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr;
+        
+        private final IGroupByState groupByState;
+
+        private final IGroupByRewriteState rewrite;
+        
+        private final IValueExpression<?>[] groupBy;
+
+        private final Object sharedStateKey;
+        
+        ChunkTask(final PipelinedAggregationOp op,
+                final BOpContext<IBindingSet> context) {
+
+            this.context = context;
+
+            this.sharedStateKey = op.getId();
+            
+            final AggregateStats stats = (AggregateStats) context.getStats();
+
+            final SharedState sharedState;
             synchronized (stats) {
                 if (stats.first) {
                     /*
                      * Setup the shared state
                      */
                     stats.first = false;
-                    if (groupBy == null) {
-                        stats.map = null;
-                        stats.aggExpr = rewrite.getAggExpr();
-                    } else {
-                        // The map is only defined if a GROUP_BY clause was
-                        // used.
-                        stats.map = new LinkedHashMap<SolutionGroup, SolutionGroupState>(
-                                op.getInitialCapacity(), op.getLoadFactor());
-                        stats.aggExpr = null;
-                    }
-                } // if(stats.first)
-                /*
-                 * Initialize from the shared state.
-                 */
-                this.map = stats.map;
-                this.aggExpr = stats.aggExpr;
+                    sharedState = new SharedState(op, stats);
+                    context.getRunningQuery().getAttributes()
+                            .put(sharedStateKey, sharedState);
+                } else {
+                    sharedState = (SharedState) context.getRunningQuery()
+                            .getAttributes().get(sharedStateKey);
+                }
             } // synchronized(stats)
+            /*
+             * Initialize from the shared state.
+             */
+            this.map = sharedState.map;
+            this.aggExpr = sharedState.aggExpr;
+            this.groupByState = stats.groupByState;
+            this.rewrite = stats.rewrite;
+            this.groupBy = stats.groupByState.getGroupByClause();
+        }
+
+        /**
+         * Discard the shared state (this can not be discarded until the last
+         * invocation).
+         */
+        private void release() {
+
+            context.getRunningQuery().getAttributes().remove(sharedStateKey);
+
         }
 
         /**
@@ -776,7 +815,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                     }
 
                     // Discard the shared state.
-                    ((AggregateStats) stats).discardState();
+                    release();
 
                 }
                 

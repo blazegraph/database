@@ -39,10 +39,16 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 
 /**
+ * TODO This does not really "test" much, just exercises some basic aspects of
+ * the API. You need to verify the "pretty print" of the AST by hand. It is just
+ * written onto the log.
+ * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
  */
 public class TestAST extends TestCase {
@@ -262,12 +268,59 @@ public class TestAST extends TestCase {
     	orderBy.addExpr(new OrderByExpr(new VarNode("s"), true));
     	orderBy.addExpr(new OrderByExpr(new VarNode("p"), false));
     	query.setOrderBy(orderBy);
-
-        query.setSlice(new SliceNode(10,100));
+    	
+        query.setSlice(new SliceNode(10, 100));
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
-    	
+
+	    /**
+         * Now build up a subquery and add it to the query.
+         * 
+         * <pre>
+         * SELECT ?y ?minName
+         * WHERE {
+         *   :alice :knows ?y .
+         *   {
+         *     SELECT ?y (MIN(?name) AS ?minName)
+         *     WHERE {
+         *       ?y :name ?name .
+         *     } GROUP BY ?y
+         *   }
+         * }
+         * </pre>
+         */
+    	final SubqueriesNode subqueries = new SubqueriesNode();
+    	{
+            
+    	    final SubqueryRoot subquery = new SubqueryRoot();
+            
+            final ProjectionNode projection1 = new ProjectionNode();
+            projection1.addProjectionVar(new VarNode("y"));
+            subquery.setProjection(projection1);
+
+            final TermNode nameConstant = new ConstantNode(
+                    TermId.mockIV(VTE.URI));
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            whereClause.addChild(new StatementPatternNode(new VarNode("y"),
+                    nameConstant, new VarNode("name")));
+            subquery.setRoot(whereClause);
+            
+            final GroupByNode groupBy1 = new GroupByNode();
+            groupBy1.addExpr(new VarNode("y"));
+            subquery.setGroupBy(groupBy1);
+    	    
+            subqueries.add(subquery);
+            
+    	}
+
+    	query.setSubqueries(subqueries);
+
+        // FIXME Add INCLUDE operator paired to a named subquery result. 
+
+        if (log.isInfoEnabled())
+            log.info("\n"+query.toString());
+
     }
     
     public StatementPatternNode sp(final int id) {

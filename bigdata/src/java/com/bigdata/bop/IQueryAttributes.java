@@ -58,6 +58,8 @@ public interface IQueryAttributes {
      * 
      * @param key
      *            The key.
+     * @param val
+     *            The new value (may not be <code>null</code>).
      * 
      * @return The old value.
      * 
@@ -72,10 +74,32 @@ public interface IQueryAttributes {
      * @param key
      *            The key.
      * @param val
-     *            The new value.
+     *            The new value (may not be <code>null</code>).
      * 
      * @return The old value.
      */
     Object putIfAbsent(Object key, Object val);
 
+    /**
+     * Remove the attribute under the key.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return The old value.
+     */
+    Object remove(Object key);
+
+    /**
+     * Atomically remove the attribute under the key iff it has the given value.
+     * 
+     * @param key
+     *            The key.
+     * @param value
+     *            The expected value for that key.
+     *            
+     * @return <code>true</code> iff the entry for that key was removed.
+     */
+    boolean remove(Object key,Object value);
+    
 }

@@ -48,8 +48,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableFactory;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
@@ -65,7 +63,7 @@ import com.bigdata.util.InnerCause;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
+public class MemoryGroupByOp extends GroupByOp {
 
     /**
      * 
@@ -117,6 +115,10 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
 		}
 
         assertAtOnceJavaHeapOp();
+
+        getRequiredProperty(Annotations.GROUP_BY_STATE);
+        
+        getRequiredProperty(Annotations.GROUP_BY_REWRITE);
         
 	}
     
@@ -144,16 +146,6 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
 
         return new FutureTask<Void>(new GroupByTask(this, context));
         
-    }
-
-    /**
-     * Return a new anonymous variable (this is overridden by some unit tests in
-     * order to have predictable variable names).
-     */
-    public IVariable<?> var() {
-
-        return Var.var();
-
     }
 
     /**
@@ -310,18 +302,11 @@ public class MemoryGroupByOp extends GroupByOp implements IVariableFactory {
         	
             this.context = context;
 
-            this.groupByState = new GroupByState(//
-                    (IValueExpression<?>[]) op.getRequiredProperty(GroupByOp.Annotations.SELECT), //
-                    (IValueExpression<?>[]) op.getProperty(GroupByOp.Annotations.GROUP_BY), //
-                    (IConstraint[]) op.getProperty(GroupByOp.Annotations.HAVING)//
-            );
+            this.groupByState = (IGroupByState) op
+                    .getRequiredProperty(Annotations.GROUP_BY_STATE);
 
-            this.rewrite = new GroupByRewriter(groupByState) {
-                @Override
-                public IVariable<?> var() {
-                    return op.var();
-                }
-            };
+            this.rewrite = (IGroupByRewriteState) op
+                    .getRequiredProperty(Annotations.GROUP_BY_REWRITE);
             
             this.groupBy = groupByState.getGroupByClause();
 

@@ -52,16 +52,21 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * then the original binding set is copied to the default sink (optional join
  * semantics). Each subquery is run as a separate query but will be cancelled if
  * the parent query is cancelled.
+ * <p>
+ * This operator does not use internal parallelism, but it is thread-safe and
+ * multiple instances of this operator may be run in parallel by the query
+ * engine for parallel evaluation of different binding set chunks flowing
+ * through the pipeline.
  * 
- * @todo Parallel evaluation of subqueries is not implemented. What is the
- *       appropriate parallelism for this operator? More parallelism should
- *       reduce latency but could increase the memory burden.
- * 
- * @todo Rename as SubqueryPipelineJoinOp. 
+ * @todo Rename as SubqueryPipelineJoinOp.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  * @see AbstractSubqueryOp
+ * 
+ *      TODO If there are no shared variables, then subquery join is full cross
+ *      product (constraints are still applied and optional solutions must be
+ *      reported if a constraint fails and the join is optional).
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -72,25 +77,8 @@ public class SubqueryOp extends PipelineOp {
 
     public interface Annotations extends SubqueryJoinAnnotations {
 
-//        /**
-//         * The maximum parallelism with which the subqueries will be evaluated
-//         * (default {@value #DEFAULT_MAX_PARALLEL}). 
-//         */
-//        String MAX_PARALLEL = SubqueryOp.class.getName()
-//                + ".maxParallel";
-//
-//        int DEFAULT_MAX_PARALLEL = 1;
-
     }
 
-//    /**
-//     * @see Annotations#MAX_PARALLEL
-//     */
-//    public int getMaxParallel() {
-//        return getProperty(Annotations.MAX_PARALLEL,
-//                Annotations.DEFAULT_MAX_PARALLEL);
-//    }
-    
     /**
      * Deep copy constructor.
      */
@@ -109,28 +97,8 @@ public class SubqueryOp extends PipelineOp {
 
         super(args, annotations);
 
-//        if (!getEvaluationContext().equals(BOpEvaluationContext.CONTROLLER))
-//            throw new IllegalArgumentException(Annotations.EVALUATION_CONTEXT
-//                    + "=" + getEvaluationContext());
-
         getRequiredProperty(Annotations.SUBQUERY);
         
-//        if (!getProperty(Annotations.CONTROLLER, Annotations.DEFAULT_CONTROLLER))
-//            throw new IllegalArgumentException(Annotations.CONTROLLER);
-        
-//        // The id of this operator (if any).
-//        final Integer thisId = (Integer)getProperty(Annotations.BOP_ID);
-//        
-//        for(BOp op : args) {
-//
-//            final Integer sinkId = (Integer) op
-//                    .getRequiredProperty(Annotations.SINK_REF);
-//            
-//            if(sinkId.equals(thisId))
-//                throw new RuntimeException("Operand may not target ") 
-//            
-//        }
-
     }
 
     public SubqueryOp(final BOp[] args, NV... annotations) {
@@ -145,18 +113,6 @@ public class SubqueryOp extends PipelineOp {
         
     }
     
-//    public String toString() {
-//    	
-//    	final StringBuilder sb = new StringBuilder(super.toString());
-//    	sb.append("\n{\n");
-//    	final PipelineOp subquery = (PipelineOp) 
-//    		getRequiredProperty(Annotations.SUBQUERY);
-//    	sb.append(BOpUtility.toString(subquery));
-//    	sb.append("\n}");
-//    	return sb.toString();
-//    	
-//    }
-
 	/**
 	 * Evaluates the subquery for each source binding set. If the controller
 	 * operator is interrupted, then the subqueries are cancelled. If a subquery
@@ -165,19 +121,13 @@ public class SubqueryOp extends PipelineOp {
     private static class ControllerTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
-//        private final List<FutureTask<IRunningQuery>> tasks = new LinkedList<FutureTask<IRunningQuery>>();
-//        private final CountDownLatch latch;
         private final boolean optional;
-//        private final int nparallel;
-//      /** The {@link SubqueryOp}. */
-//      private final SubqueryOp controllerOp;
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
         /** The selected variables for the output binding sets (optional). */
         private final IVariable<?>[] selectVars;
         /** The optional constraints on the join. */
         private final IConstraint[] constraints;
-//        private final Executor executor;
         
         public ControllerTask(final SubqueryOp controllerOp,
                 final BOpContext<IBindingSet> context) {
@@ -188,16 +138,11 @@ public class SubqueryOp extends PipelineOp {
             if (context == null)
                 throw new IllegalArgumentException();
 
-//            this.controllerOp = controllerOp;
-            
             this.context = context;
 
             this.optional = controllerOp.getProperty(
                     Annotations.OPTIONAL,
                     Annotations.DEFAULT_OPTIONAL);
-
-//            this.nparallel = controllerOp.getProperty(Annotations.MAX_PARALLEL,
-//                    Annotations.DEFAULT_MAX_PARALLEL);
 
             this.subquery = (PipelineOp) controllerOp
                     .getRequiredProperty(Annotations.SUBQUERY);
@@ -208,49 +153,10 @@ public class SubqueryOp extends PipelineOp {
             this.constraints = (IConstraint[]) controllerOp
                     .getProperty(Annotations.CONSTRAINTS);
             
-//            this.executor = new LatchedExecutor(context.getIndexManager()
-//                    .getExecutorService(), nparallel);
-            
-//            this.latch = new CountDownLatch(controllerOp.arity());
-
-//            /*
-//             * Create FutureTasks for each subquery. The futures are submitted
-//             * to the Executor yet. That happens in call(). By deferring the
-//             * evaluation until call() we gain the ability to cancel all
-//             * subqueries if any subquery fails.
-//             */
-//            for (BOp op : controllerOp.args()) {
-//
-//                /*
-//                 * Task runs subquery and cancels all subqueries in [tasks] if
-//                 * it fails.
-//                 */
-//                tasks.add(new FutureTask<IRunningQuery>(new SubqueryTask(op,
-//                        context)) {
-//                    /*
-//                     * Hook future to count down the latch when the task is
-//                     * done.
-//                     */
-//                    public void run() {
-//                        try {
-//                            super.run();
-//                        } finally {
-//                            latch.countDown();
-//                        }
-//                    }
-//                });
-//
-//            }
-
         }
 
         /**
          * Evaluate the subquery.
-         * 
-         * @todo Support limited parallelism for each binding set read from the
-         *       source. We will need to keep track of the running subqueries in
-         *       order to wait on them before returning from this method and in
-         *       order to cancel them if something goes wrong.
          */
         public Void call() throws Exception {
             
@@ -274,51 +180,11 @@ public class SubqueryOp extends PipelineOp {
 									+ runningSubquery.toString());
 							
 						}
-
-//  Note: Variant using executor, but still does not support parallel evaluation of subqueries.   	
-//                        final FutureTask<IRunningQuery> ft = new FutureTask<IRunningQuery>(
-//                                new SubqueryTask(bset, subquery, context));
-//
-//                        try {
-//
-//                            // run the subquery.
-//                            executor.execute(ft);
-//
-//                            // wait for the outcome.
-//                            ft.get();
-//
-//                        } finally {
-//                            
-//                            /*
-//                             * Ensure that the inner task is cancelled if the
-//                             * outer task is interrupted.
-//                             */
-//                            ft.cancel(true/* mayInterruptIfRunning */);
-//                            
-//                        }
-                        
+   
                     }
                     
                 }
                 
-//                /*
-//                 * Run subqueries with limited parallelism.
-//                 */
-//                for (FutureTask<IRunningQuery> ft : tasks) {
-//                    executor.execute(ft);
-//                }
-//
-//                /*
-//                 * Wait for all subqueries to complete.
-//                 */
-//                latch.await();
-//
-//                /*
-//                 * Get the futures, throwing out any errors.
-//                 */
-//                for (FutureTask<IRunningQuery> ft : tasks)
-//                    ft.get();
-
                 // Now that we know the subqueries ran Ok, flush the sink.
                 context.getSink().flush();
                 
@@ -326,10 +192,6 @@ public class SubqueryOp extends PipelineOp {
                 return null;
 
             } finally {
-
-//                // Cancel any tasks which are still running.
-//                for (FutureTask<IRunningQuery> ft : tasks)
-//                    ft.cancel(true/* mayInterruptIfRunning */);
                 
                 context.getSource().close();
 
@@ -426,45 +288,17 @@ public class SubqueryOp extends PipelineOp {
                          * NOT apply the constraints.
                          */
 
-//                        if (constraints == null
-//                                || BOpUtility.isConsistent(constraints, bset)) {
+                        final IBindingSet tmp = selectVars == null ? bset
+                                : bset.copy(selectVars);
 
-                            final IBindingSet tmp = selectVars == null ? bset
-                                    : bset.copy(selectVars);
-                            
-                            parentContext.getSink().add(new IBindingSet[]{tmp});
-                            
-//                        }
-                        
+                        parentContext.getSink().add(new IBindingSet[] { tmp });
+
                     }
                     
                     // done.
                     return runningSubquery;
                     
                 } catch (Throwable t) {
-
-//					/*
-//					 * Note: SliceOp will cause other operators to be
-//					 * interrupted during normal evaluation. Therefore, while
-//					 * these exceptions should cause the subquery to terminate,
-//					 * they should not be reported as errors to the parent
-//					 * query.
-//					 */
-//        			if (!InnerCause.isInnerCause(t, InterruptedException.class)
-//			 		 && !InnerCause.isInnerCause(t, BufferClosedException.class)
-//			 		 && !InnerCause.isInnerCause(t, ClosedByInterruptException.class)) {
-//    		
-//                        /*
-//                         * If a subquery fails, then propagate the error to the
-//                         * parent and rethrow the first cause error out of the
-//                         * subquery.
-//                         */
-//                        throw new RuntimeException(ControllerTask.this.context
-//                                .getRunningQuery().halt(t));
-//
-//                    }
-//
-//                    return runningSubquery;
 
 					if (runningSubquery == null
 							|| runningSubquery.getCause() != null) {
