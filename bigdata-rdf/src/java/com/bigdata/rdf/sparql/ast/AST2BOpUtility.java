@@ -1026,6 +1026,7 @@ public class AST2BOpUtility {
 	                        BOpEvaluationContext.CONTROLLER),//
 	                new NV(SliceOp.Annotations.PIPELINED, false),//
 	                new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
+	                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
     			})), ctx.queryHints);
 
     	return left;
