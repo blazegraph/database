@@ -64,8 +64,12 @@ public class GroupByNode extends ValueExpressionListBaseNode<IValueExpressionNod
 
     public String toString(final int indent) {
 
-        final StringBuilder sb = new StringBuilder(indent(indent));
+        final StringBuilder sb = new StringBuilder();
 
+        sb.append("\n");
+        
+        sb.append(indent(indent));
+        
         sb.append("group by ");
 
         for (IValueExpressionNode v : this) {
