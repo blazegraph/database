@@ -109,12 +109,34 @@ public class AST2BOpUtility {
 		
 		final QueryRoot query = ctx.query;
 		
-		final IGroupNode root = ctx.query.getRoot();
+        final IGroupNode root = query.getRoot();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");
+
+		PipelineOp left = null;
+
+        final SubqueriesNode subqueries = query.getSubqueries();
+
+        if (subqueries != null && !subqueries.isEmpty()) {
+
+            /*
+             * Add evaluation for SPARQL 1.1 style subqueries.
+             * 
+             * Note: This also adds the pipeline operators which compute the
+             * temporary solution set for WITH ... AS [name] ... INCLUDE style
+             * subqueries.
+             * 
+             * Note: The [root] is passed in here because we need to understand
+             * the join variables which will be used when the subquery result is
+             * joined back into the query For WITH AS INCLUDE style subqueries.
+             */
+            
+            left = addSubqueries(left, subqueries, root, ctx);
+            
+		}
 		
-        PipelineOp left = convert(root, ctx);
+        left = convert(root, ctx);
 
         final ProjectionNode projection = query.getProjection() == null ? null
                 : query.getProjection().isEmpty() ? null : query
@@ -198,6 +220,31 @@ public class AST2BOpUtility {
         return left;
 		
 	}
+
+    /**
+     * Add pipeline operators for SPARQL 1.1 style subqueries and WITH AS
+     * INCLUDE style subqueries.
+     * 
+     * @param left
+     * @param subqueries
+     * @param root
+     *            The top-level {@link IGroupNode} for the query. This is
+     *            required because we need to understand the join variables
+     *            which will be used when the subquery result is joined back
+     *            into the query For WITH AS INCLUDE style subqueries.
+     * @param ctx
+     * @return
+     * 
+     * FIXME Integrate subquery support here.
+     */
+    private static PipelineOp addSubqueries(PipelineOp left,
+            SubqueriesNode subqueries, IGroupNode root, AST2BOpContext ctx) {
+
+        log.error("SUBQUERY NOT SUPPORTED YET: " + subqueries);
+        
+        return left;
+        
+    }
 
     /**
      * Return <code>true</code> if any of the {@link ProjectionNode},
@@ -665,7 +712,16 @@ public class AST2BOpUtility {
     	return left;
     	
     }
-		
+
+    /**
+     * Adds subqueries for join groups to the pipeline (this is NOT SPARQL 1.1
+     * subquery).
+     * 
+     * @param left
+     * @param joinGroup
+     * @param ctx
+     * @return
+     */
     private static final PipelineOp addSubqueries(PipelineOp left,
     		final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
@@ -743,38 +799,32 @@ public class AST2BOpUtility {
     	return left;
     	
     }
-		
+
+    /**
+     * Wrap with an operator which will be evaluated on the query controller so
+     * the results will be streamed back to the query controller in scale-out.
+     * <p>
+     * Note: For scale-out, we need to stream the results back to the node from
+     * which the subquery was issued. If the subquery is issued against the
+     * local query engine where the {@link IBindingSet} was produced, then the
+     * that query engine is the query controller for the subquery and an
+     * {@link EndOp} on the subquery would bring the results for the subquery
+     * back to that query controller.
+     */
 	private static final PipelineOp addEndOp(PipelineOp left,
 			final AST2BOpContext ctx) {
 		
-		if (!left.getEvaluationContext().equals(BOpEvaluationContext.CONTROLLER)) {
-	//			&& !(left instanceof SubqueryOp)) {
+        if (!left.getEvaluationContext()
+                .equals(BOpEvaluationContext.CONTROLLER)) {
 			
-			/*
-			 * Wrap with an operator which will be evaluated on the query
-			 * controller so the results will be streamed back to the query
-			 * controller in scale-out.
-			 * 
-			 * @todo For scale-out, we probably need to stream the results back
-			 * to the node from which the subquery was issued. If the subquery
-			 * is issued against the local query engine where the IBindingSet
-			 * was produced, then the that query engine is the query controller
-			 * for the subquery and a SliceOp on the subquery would bring the
-			 * results for the subquery back to that query controller. There is
-			 * no requirement that the query controller for the subquery and the
-			 * query controller for the parent query be the same node. [I am not
-			 * doing this currently in order to test whether there is a problem
-			 * with SliceOp which interactions with SubqueryOp to allow
-			 * incorrect termination under some circumstances.
-			 */
-	        left = new EndOp(new BOp[] { left }, 
-	        		NV.asMap(
-						new NV(BOp.Annotations.BOP_ID, ctx.nextId()),
-						new NV(BOp.Annotations.EVALUATION_CONTEXT,
-								BOpEvaluationContext.CONTROLLER)
-	//					new NV(PipelineOp.Annotations.SHARED_STATE, true)
-	        		));
-	        
+            left = new EndOp(new BOp[] { left },//
+                    NV.asMap(
+                            //
+                            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER)//
+                    ));
+
 	    }
 		
 		return left;
@@ -850,8 +900,6 @@ public class AST2BOpUtility {
      * @param ctx
      * 
      * @return The left-most operator in the pipeline.
-     * 
-     * TODO Support parallel decomposition of aggregation on a cluster.
      */
     private static final PipelineOp addAggregation(PipelineOp left,
             final ProjectionNode projection, final GroupByNode groupBy,

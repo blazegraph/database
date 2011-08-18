@@ -48,27 +48,6 @@ abstract public class GroupByOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends PipelineOp.Annotations {
-
-//        /**
-//         * The ordered list of {@link IValueExpression}s to be projected out of
-//         * the aggregation operator (required). The {@link IValueExpression}s
-//         * will be computed against the aggregated solution sets (one solution
-//         * set per group).
-//         */
-//        String SELECT = GroupByOp.class.getName() + ".select";
-//
-//        /**
-//         * The ordered set of or one or more {@link IValueExpression}s defining
-//         * the aggregation groups (required). Variables references will be
-//         * resolved against the incoming solutions.
-//         */
-//        String GROUP_BY = GroupByOp.class.getName() + ".groupBy";
-//
-//        /**
-//         * An {@link IConstraint}[] applied to the aggregated solutions
-//         * (optional).
-//         */
-//        String HAVING = GroupByOp.class.getName() + ".having";
         
         /**
          * This required annotation describes the {@link IGroupByState} for the
