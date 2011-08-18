@@ -10,7 +10,7 @@ import com.bigdata.bop.IVariable;
 /**
  * A node in the AST representing a statement pattern.
  */
-public class StatementPatternNode extends QueryNodeBase {
+public class StatementPatternNode extends GroupMemberNodeBase {
 
 	private final TermNode s, p, o, c;
 	

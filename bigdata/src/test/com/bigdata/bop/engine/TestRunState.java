@@ -622,7 +622,8 @@ public class TestRunState extends TestCase2 {
 
         final PipelineOp orderOp = new MockPipelineOp(new BOp[] { join2Op }, //
                 new NV(PipelineOp.Annotations.BOP_ID, orderId),//
-                new NV(PipelineOp.Annotations.LAST_PASS, true)//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1) //
         );
 
         final PipelineOp query = orderOp;
@@ -1534,6 +1535,7 @@ public class TestRunState extends TestCase2 {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.LAST_PASS,true),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL,1),//
                         }));
 
         final PipelineOp query = orderOp;

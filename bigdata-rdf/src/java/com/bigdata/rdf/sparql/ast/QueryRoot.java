@@ -81,7 +81,7 @@ public class QueryRoot extends QueryBase {
     private DatasetNode dataset;
     
     // optional list of subqueries (if any).
-    private SubqueriesNode subqueries;
+    private NamedSubqueriesNode namedSubqueries;
 
     public QueryRoot() {
 
@@ -111,24 +111,24 @@ public class QueryRoot extends QueryBase {
     }
     
     /**
-     * Return the node for the subqueries -or- <code>null</code> if there it
-     * does not exist.
+     * Return the node for the named subqueries -or- <code>null</code> if there
+     * it does not exist.
      */
-    public SubqueriesNode getSubqueries() {
+    public NamedSubqueriesNode getNamedSubqueries() {
         
-        return subqueries;
+        return namedSubqueries;
         
     }
     
     /**
-     * Set or clear the subqueries node.
+     * Set or clear the named subqueries node.
      * 
-     * @param subqueries
-     *            The subqueries not (may be <code>null</code>).
+     * @param namedSubqueries
+     *            The named subqueries not (may be <code>null</code>).
      */
-    public void setSubqueries(final SubqueriesNode subqueries) {
+    public void setNamedSubqueries(final NamedSubqueriesNode namedSubqueries) {
 
-        this.subqueries = subqueries;
+        this.namedSubqueries = namedSubqueries;
         
     }
 
@@ -144,15 +144,15 @@ public class QueryRoot extends QueryBase {
             sb.append(dataset.toString());
         }
 
-        if (subqueries != null && !subqueries.isEmpty()) {
+        if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
             sb.append("\n");
             
             sb.append(s);
             
-            sb.append("subqueries");
+            sb.append("named subqueries");
             
-            sb.append(subqueries.toString(indent));
+            sb.append(namedSubqueries.toString(indent));
 
         }
         

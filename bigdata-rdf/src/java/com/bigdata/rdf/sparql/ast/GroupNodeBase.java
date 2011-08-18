@@ -7,27 +7,28 @@ import java.util.List;
 /**
  * Base class for AST group nodes.
  */
-public abstract class GroupNodeBase extends QueryNodeBase implements IGroupNode {
+public abstract class GroupNodeBase extends GroupMemberNodeBase implements
+        IGroupNode {
 
-	private final List<IQueryNode> children;
+	private final List<IGroupMemberNode> children;
 	
 	private final boolean optional;
 	
 	protected GroupNodeBase(final boolean optional) {
 		
-		this.children = new LinkedList<IQueryNode>();
+		this.children = new LinkedList<IGroupMemberNode>();
 		
 		this.optional = optional;
 		
 	}
 	
-	public Iterator<IQueryNode> iterator() {
+	public Iterator<IGroupMemberNode> iterator() {
 		
 		return children.iterator();
 		
 	}
 	
-	public IGroupNode addChild(final IQueryNode child) {
+	public IGroupNode addChild(final IGroupMemberNode child) {
 		
 		children.add(child);
 		
@@ -37,7 +38,7 @@ public abstract class GroupNodeBase extends QueryNodeBase implements IGroupNode 
 		
 	}
 	
-	public IGroupNode removeChild(final IQueryNode child) {
+	public IGroupNode removeChild(final IGroupMemberNode child) {
 		
 		children.remove(child);
 		

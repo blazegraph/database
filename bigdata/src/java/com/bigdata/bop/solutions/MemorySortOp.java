@@ -93,14 +93,15 @@ public class MemorySortOp extends SortOp {
 							+ getEvaluationContext());
 		}
 
-//        if (getMaxParallel() != 1)
-//            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-//                    + "=" + getMaxParallel());
-
         // shared state is used to share the hash table.
         if (!isSharedState()) {
             throw new UnsupportedOperationException(Annotations.SHARED_STATE
                     + "=" + isSharedState());
+        }
+        
+        if (!isLastPassRequested()) {
+            throw new UnsupportedOperationException(Annotations.LAST_PASS
+                    + "=" + isLastPassRequested());
         }
         
         // required parameter.

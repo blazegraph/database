@@ -116,26 +116,16 @@ public class AST2BOpUtility {
 
 		PipelineOp left = null;
 
-        final SubqueriesNode subqueries = query.getSubqueries();
+        final NamedSubqueriesNode namedSubqueries = query.getNamedSubqueries();
 
-        if (subqueries != null && !subqueries.isEmpty()) {
+        if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
-            /*
-             * Add evaluation for SPARQL 1.1 style subqueries.
-             * 
-             * Note: This also adds the pipeline operators which compute the
-             * temporary solution set for WITH ... AS [name] ... INCLUDE style
-             * subqueries.
-             * 
-             * Note: The [root] is passed in here because we need to understand
-             * the join variables which will be used when the subquery result is
-             * joined back into the query For WITH AS INCLUDE style subqueries.
-             */
-            
-            left = addSubqueries(left, subqueries, root, ctx);
+            // WITH ... AS [name] ... INCLUDE style subquery declarations.
+            left = addNamedSubqueries(left, namedSubqueries, root, ctx);
             
 		}
-		
+
+        // The top-level "WHERE" clause.
         left = convert(root, ctx);
 
         final ProjectionNode projection = query.getProjection() == null ? null
@@ -222,8 +212,9 @@ public class AST2BOpUtility {
 	}
 
     /**
-     * Add pipeline operators for SPARQL 1.1 style subqueries and WITH AS
-     * INCLUDE style subqueries.
+     * Add pipeline operators for named subquery solution sets. The solution
+     * sets will be computed before the rest of the query plan runs. They may be
+     * referenced from other parts of the query plan.
      * 
      * @param left
      * @param subqueries
@@ -235,10 +226,22 @@ public class AST2BOpUtility {
      * @param ctx
      * @return
      * 
-     * FIXME Integrate subquery support here.
+     *         FIXME Integrate named subquery support here. We need to examine
+     *         the places where the named subquery is used to identify the best
+     *         join vars to use when buffering the temporary solution set. The
+     *         named subquery solutions will be joined into the query by a
+     *         {@link NamedSubqueryInclude} within one or more
+     *         {@link IGroupNode}s.
+     * 
+     *         TODO In fact, we can run these where the INCLUDE appears rather
+     *         than up front as long as we are careful not to project bindings
+     *         into the subquery (other than those it projects out). Whether or
+     *         not this is more efficient depends on the subquery and how it is
+     *         combined into the rest of the query. (Running it first should be
+     *         the default policy.)
      */
-    private static PipelineOp addSubqueries(PipelineOp left,
-            SubqueriesNode subqueries, IGroupNode root, AST2BOpContext ctx) {
+    private static PipelineOp addNamedSubqueries(PipelineOp left,
+            NamedSubqueriesNode subqueries, IGroupNode root, AST2BOpContext ctx) {
 
         log.error("SUBQUERY NOT SUPPORTED YET: " + subqueries);
         
@@ -439,6 +442,13 @@ public class AST2BOpUtility {
      * </pre>
      * 
      * TODO Think about how hash joins fit into this.
+     * 
+     * FIXME Integrate support for references to the named solution set. Those
+     * references are {@link NamedSubqueryInclude}s. They may appear within any
+     * {@link IGroupNode}.
+     * 
+     * FIXME Integrate support for SPARQL 1.1 style subqueries. Those are
+     * modeled by {@link SubqueryRoot} (versus {@link NamedSubqueryRoot}).
      */
 	private static PipelineOp convert(final JoinGroupNode joinGroup,
 			final AST2BOpContext ctx) {
@@ -1047,9 +1057,9 @@ public class AST2BOpUtility {
                     new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IVComparator()),//
                     new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
 	                       BOpEvaluationContext.CONTROLLER),//
-	                new NV(MemorySortOp.Annotations.PIPELINED, false),//
 	                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                    new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                    new NV(MemorySortOp.Annotations.LAST_PASS, true),//
     			})), ctx.queryHints);
 
 		

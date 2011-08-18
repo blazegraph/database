@@ -30,7 +30,7 @@ public class UnionNode extends GroupNodeBase {
 	 * something other than a JoinGroupNode as a child.
 	 */
 	@Override
-	public IGroupNode addChild(final IQueryNode child) {
+	public IGroupNode addChild(final IGroupMemberNode child) {
 		
 		// can only add non-optional join groups as children to union
 		if (!(child instanceof JoinGroupNode)) {
