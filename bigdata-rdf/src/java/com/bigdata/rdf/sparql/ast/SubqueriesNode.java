@@ -22,42 +22,23 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 16, 2011
+ * Created on Aug 18, 2011
  */
 
-package com.bigdata.bop;
-
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+package com.bigdata.rdf.sparql.ast;
 
 /**
- * Default implementation.
+ * A node whose children are a list of {@link SubqueryRoot}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultQueryAttributes implements IQueryAttributes {
+public class SubqueriesNode extends QueryNodeListBaseNode<SubqueryRoot> {
 
-    private final ConcurrentMap<Object, Object> map = new ConcurrentHashMap<Object, Object>();
-
-    public Object get(Object key) {
-        return map.get(key);
-    }
-
-    public Object put(Object key, Object val) {
-        return map.put(key, val);
-    }
-
-    public Object putIfAbsent(Object key, Object val) {
-        return map.putIfAbsent(key, val);
-    }
-
-    public Object remove(Object key) {
-        return map.remove(key);
-    }
-
-    public boolean remove(Object key, Object value) {
-        return map.remove(key, value);
+    /**
+     * 
+     */
+    public SubqueriesNode() {
     }
 
 }

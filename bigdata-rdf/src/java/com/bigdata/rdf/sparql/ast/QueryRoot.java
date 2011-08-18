@@ -37,6 +37,23 @@ package com.bigdata.rdf.sparql.ast;
  *      FIXME We will also have to support UPDATE, which is another root for a
  *      SPARQL construct.
  * 
+ *      FIXME Add support for standard SPARQL 1.1 subquery:
+ * 
+ *      <pre>
+ * PREFIX : <http://people.example/>
+ * PREFIX : <http://people.example/>
+ * SELECT ?y ?minName
+ * WHERE {
+ *   :alice :knows ?y .
+ *   {
+ *     SELECT ?y (MIN(?name) AS ?minName)
+ *     WHERE {
+ *       ?y :name ?name .
+ *     } GROUP BY ?y
+ *   }
+ * }
+ * </pre>
+ * 
  *      FIXME Add support for WITH {subquery} AS "name" and INCLUDE. The WITH
  *      must be in the top-level query. For example
  * 
@@ -62,11 +79,25 @@ package com.bigdata.rdf.sparql.ast;
 public class QueryRoot extends QueryBase {
 
     private DatasetNode dataset;
+    
+    // optional list of subqueries (if any).
+    private SubqueriesNode subqueries;
 
     public QueryRoot() {
 
     }
 
+    /**
+     * This is a root node. It may not be attached as a child of another node.
+     * 
+     * @throws UnsupportedOperationException
+     */
+    public void setParent(final IGroupNode parent) {
+    
+        throw new UnsupportedOperationException();
+        
+    }
+    
     public void setDataset(final DatasetNode dataset) {
 
         this.dataset = dataset;
@@ -78,5 +109,57 @@ public class QueryRoot extends QueryBase {
         return dataset;
 
     }
+    
+    /**
+     * Return the node for the subqueries -or- <code>null</code> if there it
+     * does not exist.
+     */
+    public SubqueriesNode getSubqueries() {
+        
+        return subqueries;
+        
+    }
+    
+    /**
+     * Set or clear the subqueries node.
+     * 
+     * @param subqueries
+     *            The subqueries not (may be <code>null</code>).
+     */
+    public void setSubqueries(final SubqueriesNode subqueries) {
 
+        this.subqueries = subqueries;
+        
+    }
+
+    public String toString(final int indent) {
+        
+        final String s = indent(indent);
+        
+        final StringBuilder sb = new StringBuilder();
+
+        if (dataset != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append(dataset.toString());
+        }
+
+        if (subqueries != null && !subqueries.isEmpty()) {
+
+            sb.append("\n");
+            
+            sb.append(s);
+            
+            sb.append("subqueries");
+            
+            sb.append(subqueries.toString(indent));
+
+        }
+        
+        sb.append(super.toString(indent));
+        
+        return sb.toString();
+        
+    }
+    
 }

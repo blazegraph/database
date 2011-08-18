@@ -19,4 +19,10 @@ public class ValueExpressionNode implements IValueExpressionNode {
 		
 	}
 	
+    public String toString() {
+
+        return getClass().getSimpleName() + "(" + ve + ")";
+
+    }
+    
 }

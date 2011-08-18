@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,7 +54,9 @@ import com.bigdata.bop.aggregate.IAggregate;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class GroupByState implements IGroupByState {
+public class GroupByState implements IGroupByState, Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private static final Logger log = Logger.getLogger(GroupByState.class);
     

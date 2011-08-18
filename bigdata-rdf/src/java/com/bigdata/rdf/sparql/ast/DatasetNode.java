@@ -9,6 +9,14 @@ import com.bigdata.rdf.sail.DataSetSummary;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.accesspath.IElementFilter;
 
+/**
+ * AST node models a SPARQL default graph and/or named graph data set.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ * 
+ * TODO Why not an {@link IQueryNode}?
+ */
 public class DatasetNode {
 
 	private final DataSetSummary defaultGraphs, namedGraphs;
@@ -25,21 +33,22 @@ public class DatasetNode {
 	        final IElementFilter<ISPO> defaultGraphFilter, 
             final IElementFilter<ISPO> namedGraphFilter) {
         
-        this(defaultGraphs!=null?new DataSetSummary(defaultGraphs):null,namedGraphs!=null? new DataSetSummary(namedGraphs):null,
-                defaultGraphFilter,namedGraphFilter);
+        this(defaultGraphs != null ? new DataSetSummary(defaultGraphs) : null,
+                namedGraphs != null ? new DataSetSummary(namedGraphs) : null,
+                defaultGraphFilter, namedGraphFilter);
         
     }
 	
-	public DatasetNode(
-			final DataSetSummary defaultGraphs, final DataSetSummary namedGraphs) {
-		
-		this.defaultGraphs = defaultGraphs;
-		this.namedGraphs = namedGraphs;
-		
-		this.defaultGraphFilter = null;
-		this.namedGraphFilter = null;
-		
-	}
+    public DatasetNode(final DataSetSummary defaultGraphs,
+            final DataSetSummary namedGraphs) {
+
+        this.defaultGraphs = defaultGraphs;
+        this.namedGraphs = namedGraphs;
+
+        this.defaultGraphFilter = null;
+        this.namedGraphFilter = null;
+
+    }
 	
 	public DatasetNode(final Dataset dataset) {
 		
@@ -77,5 +86,5 @@ public class DatasetNode {
 	public DataSetSummary getNamedGraphs() {
 		return namedGraphs;
 	}
-	
+
 }

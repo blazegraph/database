@@ -47,7 +47,6 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -122,6 +121,10 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          TODO If no join variables, then join is full cross product
+ *          (constraints are still applied and optional solutions must be
+ *          reported if a constraint fails and the join is optional).
  */
 public class HTreeHashJoinOp<E> extends PipelineOp implements
         IShardwisePipelineOp<E> {
@@ -285,9 +288,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
     }
 
-    public BOpStats newStats() {
+    public BaseJoinStats newStats() {
 
-        return new MyStats();
+        return new BaseJoinStats();
 
     }
 
@@ -296,20 +299,6 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
         return new FutureTask<Void>(new ChunkTask<E>(context, this));
         
-    }
-
-    /**
-     * Extends {@link BOpStats} to provide the shared state for the hash join
-     * across multiple invocations of the operator.
-     */
-    private static class MyStats extends BaseJoinStats {
-
-        private static final long serialVersionUID = 1L;
-
-        public MyStats() {
-            
-        }
-
     }
 
     /**
@@ -415,7 +404,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         
         private final boolean optional;
         
-        private final MyStats stats;
+        private final BaseJoinStats stats;
 
         private final IBlockingBuffer<IBindingSet[]> sink;
         
@@ -442,7 +431,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
             this.context = context;
 
-            this.stats = (MyStats) context.getStats();
+            this.stats = (BaseJoinStats) context.getStats();
 
             this.pred = op.getPredicate();
 
@@ -575,6 +564,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                 final IRawStore store = sourceSolutions.getStore();
 
                 sourceSolutions.close();
+                
 //                sourceSolutions = null;
                 
                 store.close();

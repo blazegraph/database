@@ -54,6 +54,21 @@ public class TestMemoryGroupByOp extends AbstractAggregationTestCase {
 
         final IVariableFactory variableFactory = new MockVariableFactory();
 
+        final IGroupByState groupByState = new GroupByState(//
+                select, groupBy, having);
+
+        final IGroupByRewriteState groupByRewrite = new GroupByRewriter(
+                groupByState) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public IVariable<?> var() {
+                return variableFactory.var();
+            }
+
+        };
+        
         final GroupByOp query = new MemoryGroupByOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, groupById),//
@@ -61,17 +76,10 @@ public class TestMemoryGroupByOp extends AbstractAggregationTestCase {
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.PIPELINED, false),//
                         new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
-                        new NV(GroupByOp.Annotations.SELECT, select), //
-                        new NV(GroupByOp.Annotations.GROUP_BY, groupBy), //
-                        new NV(GroupByOp.Annotations.HAVING, having), //
-                })) {
-            private static final long serialVersionUID = 1L;
-            @Override
-            public IVariable<?> var() {
-                return variableFactory.var();
-            }
+                        new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
+                        new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
+                }));
 
-        };
         return query;
     }
 

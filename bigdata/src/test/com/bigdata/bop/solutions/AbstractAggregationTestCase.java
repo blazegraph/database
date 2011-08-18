@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.solutions;
 
 import java.math.BigInteger;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
@@ -95,6 +96,30 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         super(name);
     }
 
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        final UUID queryId = null;
+        
+        queryContext = new MockQueryContext(queryId);
+        
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        final IMemoryManager mmgr = queryContext.getMemoryManager();
+
+        if (mmgr != null) {
+
+            mmgr.clear();
+            
+        }
+        
+        super.tearDown();
+        
+    }
+    
     /**
      * Provides sequential, predictable, and easily read variable names.
      */
@@ -109,7 +134,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
         
     }
-
+    
     /**
      * The {@link IQueryContext} - operators which require access to the
      * {@link IMemoryManager} MUST explicitly setup and tear down this field.
@@ -1780,6 +1805,21 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price21 } )
         };
 
+        if (isPipelinedAggregationOp()) {
+            try {
+                query.newStats();
+                fail("Expecting " + UnsupportedOperationException.class);
+            } catch (UnsupportedOperationException ex) {
+                if (isPipelinedAggregationOp()) {
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                    return;
+                } else {
+                    throw ex;
+                }
+            }
+        }
+        
         final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
@@ -1799,41 +1839,26 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Force the solutions to be emitted.
         context.setLastInvocation();
 
-        try {
-            
-            final FutureTask<Void> ft = query.eval(context);
-            // Run the query.
-            {
-                final Thread t = new Thread() {
-                    public void run() {
-                        ft.run();
-                    }
-                };
-                t.setDaemon(true);
-                t.start();
-            }
-
-            // Check the solutions.
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                    sink.iterator(), ft);
-
-            if (isPipelinedAggregationOp())
-                fail("Expecting " + UnsupportedOperationException.class);
-
-            assertEquals(1, stats.chunksIn.get());
-            assertEquals(4, stats.unitsIn.get());
-            assertEquals(1, stats.unitsOut.get());
-            assertEquals(1, stats.chunksOut.get());
-
-        } catch (UnsupportedOperationException ex) {
-            if (isPipelinedAggregationOp()) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
-                return;
-            } else {
-                throw ex;
-            }
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
         }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(1, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
 
     }
 
@@ -2114,6 +2139,21 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
         } ;
 
+        if (isPipelinedAggregationOp()) {
+            try {
+                query.newStats();
+                fail("Expecting " + UnsupportedOperationException.class);
+            } catch (UnsupportedOperationException ex) {
+                if (isPipelinedAggregationOp()) {
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                    return;
+                } else {
+                    throw ex;
+                }
+            }
+        }
+
         final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
@@ -2133,41 +2173,26 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Force the solutions to be emitted.
         context.setLastInvocation();
 
-        try {
-            
-            final FutureTask<Void> ft = query.eval(context);
-            // Run the query.
-            {
-                final Thread t = new Thread() {
-                    public void run() {
-                        ft.run();
-                    }
-                };
-                t.setDaemon(true);
-                t.start();
-            }
-
-            // Check the solutions.
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                    sink.iterator(), ft);
-
-            if (isPipelinedAggregationOp())
-                fail("Expecting " + UnsupportedOperationException.class);
-
-            assertEquals(1, stats.chunksIn.get());
-            assertEquals(5, stats.unitsIn.get());
-            assertEquals(1, stats.unitsOut.get());
-            assertEquals(1, stats.chunksOut.get());
-
-        } catch (UnsupportedOperationException ex) {
-            if (isPipelinedAggregationOp()) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
-                return;
-            } else {
-                throw ex;
-            }
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
         }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(5, stats.unitsIn.get());
+        assertEquals(1, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
 
     }
 
@@ -2302,6 +2327,21 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
               new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price140 } )
         } ;
 
+        if (isPipelinedAggregationOp()) {
+            try {
+                query.newStats();
+                fail("Expecting " + UnsupportedOperationException.class);
+            } catch (UnsupportedOperationException ex) {
+                if (isPipelinedAggregationOp()) {
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                    return;
+                } else {
+                    throw ex;
+                }
+            }
+        }
+        
         final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
@@ -2321,41 +2361,26 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Force the solutions to be emitted.
         context.setLastInvocation();
 
-        try {
-            
-            final FutureTask<Void> ft = query.eval(context);
-            // Run the query.
-            {
-                final Thread t = new Thread() {
-                    public void run() {
-                        ft.run();
-                    }
-                };
-                t.setDaemon(true);
-                t.start();
-            }
-
-            // Check the solutions.
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                    sink.iterator(), ft);
-
-            if (isPipelinedAggregationOp())
-                fail("Expecting " + UnsupportedOperationException.class);
-
-            assertEquals(1, stats.chunksIn.get());
-            assertEquals(4, stats.unitsIn.get());
-            assertEquals(1, stats.unitsOut.get());
-            assertEquals(1, stats.chunksOut.get());
-
-        } catch (UnsupportedOperationException ex) {
-            if (isPipelinedAggregationOp()) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
-                return;
-            } else {
-                throw ex;
-            }
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
         }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(1, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
 
     }
 
@@ -2496,6 +2521,21 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price14 } )
         } ;
 
+        if (isPipelinedAggregationOp()) {
+            try {
+                query.newStats();
+                fail("Expecting " + UnsupportedOperationException.class);
+            } catch (UnsupportedOperationException ex) {
+                if (isPipelinedAggregationOp()) {
+                    if (log.isInfoEnabled())
+                        log.info("Ignoring expected exception: " + ex);
+                    return;
+                } else {
+                    throw ex;
+                }
+            }
+        }
+        
         final BOpStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
@@ -2514,42 +2554,27 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         );
         // Force the solutions to be emitted.
         context.setLastInvocation();
-
-        try {
             
-            final FutureTask<Void> ft = query.eval(context);
-            // Run the query.
-            {
-                final Thread t = new Thread() {
-                    public void run() {
-                        ft.run();
-                    }
-                };
-                t.setDaemon(true);
-                t.start();
-            }
-
-            // Check the solutions.
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                    sink.iterator(), ft);
-
-            if (isPipelinedAggregationOp())
-                fail("Expecting " + UnsupportedOperationException.class);
-
-            assertEquals(1, stats.chunksIn.get());
-            assertEquals(4, stats.unitsIn.get());
-            assertEquals(2, stats.unitsOut.get());
-            assertEquals(1, stats.chunksOut.get());
-
-        } catch (UnsupportedOperationException ex) {
-            if (isPipelinedAggregationOp()) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + ex);
-                return;
-            } else {
-                throw ex;
-            }
+        final FutureTask<Void> ft = query.eval(context);
+        // Run the query.
+        {
+            final Thread t = new Thread() {
+                public void run() {
+                    ft.run();
+                }
+            };
+            t.setDaemon(true);
+            t.start();
         }
+
+        // Check the solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+                ft);
+
+        assertEquals(1, stats.chunksIn.get());
+        assertEquals(4, stats.unitsIn.get());
+        assertEquals(2, stats.unitsOut.get());
+        assertEquals(1, stats.chunksOut.get());
 
     }
 

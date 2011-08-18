@@ -365,11 +365,13 @@ public class JoinGroupNode extends GroupNodeBase {
 		
 		if (isOptional()) {
 		
-		    sb.append(_indent).append("optional\n");
+		    sb.append(_indent).append("optional {\n");
+		    
+		} else {
+
+		    sb.append(_indent).append("{\n");
 		    
 		}
-
-        sb.append(_indent).append("{\n");
 
         for (IQueryNode n : this) {
             if (!(n instanceof StatementPatternNode)) {

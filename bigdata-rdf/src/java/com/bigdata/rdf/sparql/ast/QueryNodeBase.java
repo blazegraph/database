@@ -11,11 +11,15 @@ public abstract class QueryNodeBase implements IQueryNode {
 	}
 
 	public void setParent(final IGroupNode parent) {
-		this.parent = parent;
+		
+	    this.parent = parent;
+	    
 	}
 
-	public IGroupNode getParent() {
-		return parent;
+	final public IGroupNode getParent() {
+		
+	    return parent;
+	    
 	}
 	
     /**

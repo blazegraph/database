@@ -87,7 +87,9 @@ public class SliceNode extends SolutionModifierBase {
     
     public String toString(final int indent) {
 
-        final StringBuilder sb = new StringBuilder(indent(indent));
+        final StringBuilder sb = new StringBuilder();
+        sb.append("\n");
+        sb.append(indent(indent));
         sb.append("slice(");
         if (offset != 0L) {
             sb.append("offset=" + offset);
