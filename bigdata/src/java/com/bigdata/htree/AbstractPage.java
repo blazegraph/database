@@ -2,6 +2,7 @@ package com.bigdata.htree;
 
 import java.io.PrintStream;
 import java.lang.ref.Reference;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.apache.log4j.Level;
@@ -222,10 +223,15 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 			return 0;
 		
 		// if bit range outside available then adjust appropriately
-		if (prefixLength + globalDepth > maxbits)
-			return BytesUtil.getBits(key, prefixLength, maxbits - prefixLength);
-		else	
+		if (prefixLength + globalDepth > maxbits) {
+			final int bitlen = maxbits - prefixLength;
+			int ret = BytesUtil.getBits(key, prefixLength, bitlen);
+			// Must adjust such that "11" == "110" and NOT "011"
+			// for bit length comparisons
+			return ret << (globalDepth - bitlen);
+		} else {
 			return BytesUtil.getBits(key, prefixLength, globalDepth);
+		}
 
 	}
 
@@ -723,6 +729,47 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 			tmp = tmp.parent == null ? null : tmp.parent.get();
 		}	
 		return true;
+	}	
+
+    /**
+     * The purpose of this class is to protect nodes against eviction during
+     * cascading mutations which can be triggered when we split a bucket page
+     * and redistribute tuples into the {@link HTree} using insert-raw-tuples.
+     * Those raw tuples are inserted back in through the top of the
+     * {@link HTree}. They can cause {@link BucketPage}s to become full and
+     * split even as we are trying to handle the full {@link BucketPage} which
+     * started off this cascade of mutation. Eventually, things settle down.
+     * 
+     * FIXME Replace with an interface declaring push(AbstractPage) and pop()
+     * methods. Write two implementations of the interface. One is a NOP. The
+     * other does not use a stack, but just increments and decrements the
+     * reference count on the {@link AbstractPage}, checking triggering eviction
+     * on decrement if zero. Use the NOP version if the HTree is read-only (
+     * loaded from a checkpoint and not mutable) and the other version
+     * otherwise. Remember, the mutable {@link HTree} is single threaded.
+     */
+	class EvictionProtection {
+
+//	    private final ArrayList<AbstractPage> protection = new ArrayList<AbstractPage>();
+		
+		EvictionProtection(final AbstractPage start) {
+//			AbstractPage dp = start;
+//			while (dp != null) {
+//				dp.referenceCount++;
+//				protection.add(dp);
+//				dp = dp.getParentDirectory();
+//			}			
+		}
+		
+		void release() {
+//			for (AbstractPage dp : protection) {
+//				if (--dp.referenceCount == 0) {
+//					if (dp.isDirty() && !dp.isDeleted())
+//						dp.htree.writeNodeOrLeaf(dp);
+//				}
+//					
+//			}
+		}
 	}
 
     /**

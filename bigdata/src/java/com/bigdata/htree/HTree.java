@@ -640,7 +640,7 @@ public class HTree extends AbstractHTree
 		// Initial root.
 		final DirectoryPage r = new DirectoryPage(//
 				this,// the owning htree instance
-				false, // overflowDirectory
+				null, // overflowKey
 				addressBits // the global depth of the root.
 		);
 		nnodes++;
@@ -1266,12 +1266,33 @@ public class HTree extends AbstractHTree
 		while (true) {
 
 			// skip prefixLength bits and then extract globalDepth bits. 
+			if (prefixLength >= key.length * 8 && !current.isOverflowDirectory())
+				throw new AssertionError();
+			
 		    final int hashBits = current.getLocalHashCode(key, prefixLength);
 
 		    // find the child directory page or bucket page.
 			final AbstractPage child;
 			if (current.isOverflowDirectory()) {
-				child = current.lastChild();
+				if (!BytesUtil.bytesEqual(key, current.getOverflowKey())) {
+					// if not the overflowKey, then insert extra level
+					final DirectoryPage pd = current.getParentDirectory();
+					
+					assert !pd.isOverflowDirectory();
+					assert pd.isReadOnly() ? current.isReadOnly() : true;
+					
+					current = pd._addLevelForOverflow(current);
+					// we need to fix this since we have introduced a new level
+					// between the old current and its parent directory
+					child = current;
+					// and frig prefixlength to come back in
+					prefixLength -= current.globalDepth;
+					
+					if (log.isDebugEnabled())
+						log.debug("frig prefixLength: " + prefixLength);
+				} else {
+					child = current.lastChild();
+				}
 			} else {				
 				child = current.getChild(hashBits, buddyOffset);
 			}
@@ -2092,7 +2113,7 @@ public class HTree extends AbstractHTree
     private void splitDirectoryPage(final DirectoryPage parent,
             final int buddyOffset, final DirectoryPage oldChild) {
 
-        if(true) {
+        if (true) {
             /*
              * FIXME We need to update this code to handle the directory page
              * not being at maximum depth to work without the concept of buddy
@@ -2140,7 +2161,7 @@ public class HTree extends AbstractHTree
 
         // Allocate a new bucket page (globalDepth is increased by one).
         final DirectoryPage newChild = new DirectoryPage(this,
-                false, // overflowDirectory
+                null, // overflowKey
                 newDepth//
                 );
 

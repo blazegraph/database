@@ -126,9 +126,9 @@ public class TestHTreeWithMemStore extends TestCase {
 
         final int addressBits = 3; 
 
-        final int writeRetentionQueueCapacity = 20;
+        final int writeRetentionQueueCapacity = 30; // FIXME was 20
         
-        final int numOverflowPages = 5000;
+        final int numOverflowPages = 1000; // FIXME was 5000
 
         doOverflowStressTest(addressBits, writeRetentionQueueCapacity, numOverflowPages);
         
@@ -138,9 +138,9 @@ public class TestHTreeWithMemStore extends TestCase {
     
         final int addressBits = 10; 
 
-        final int writeRetentionQueueCapacity = 20;
+        final int writeRetentionQueueCapacity = 100; // FIXME was 20
         
-        final int numOverflowPages = 5000;
+        final int numOverflowPages = 5000; // FIXME was 5000
 
         doOverflowStressTest(addressBits, writeRetentionQueueCapacity, numOverflowPages);
         
@@ -171,9 +171,14 @@ public class TestHTreeWithMemStore extends TestCase {
             assertTrue("store", store == htree.getStore());
             assertEquals("addressBits", addressBits, htree.getAddressBits());
 
-            final byte[] key = new byte[]{1};
-            final byte[] keyAlt = new byte[]{4};
-            final byte[] keyAlt2 = new byte[]{5};
+            final IKeyBuilder keyBuilder = new KeyBuilder();
+
+            // Overflow keys
+            final byte[][] keys = new byte[2000][];
+            for (int i = 0; i < 2000; i++) {
+                keys[i] = keyBuilder.reset().append(new Integer(i).hashCode()).getKey();
+            }
+            
             final byte[] val = new byte[]{2};
             
             final int inserts = (1 << addressBits) * numOverflowPages;
@@ -185,49 +190,57 @@ public class TestHTreeWithMemStore extends TestCase {
             // insert enough tuples to fill the page twice over.
             for (int i = 0; i < inserts; i++) {
 
-                htree.insert(key, val);
+                htree.insert(keys[0], val);
                 
                 if (i % 5 == 0) {
-                    htree.insert(keyAlt, val);
+                    htree.insert(keys[1], val);
                     altInserts1++;
                 }
                 if (i % 7 == 0) {
-                    htree.insert(keyAlt2, val);
+                    htree.insert(keys[2], val);
                     altInserts2++;
                 }
                 
             }
-//            altInserts = altInserts1 + altInserts2;
+            
+            long randInserts = 0;
+            for (int i = 3; i < keys.length; i++) {
+                htree.insert(keys[i], val);
+                randInserts++;              
+            }
                        
             final long load = System.currentTimeMillis();
             
             // now iterate over all the values
             {
                 //  first using lookupAll
-                final ITupleIterator tups = htree.lookupAll(key);
+                final ITupleIterator tups = htree.lookupAll(keys[0]);
                 long visits = 0;
                 while (tups.hasNext()) {
                     final ITuple tup = tups.next();
+                    assertTrue(BytesUtil.bytesEqual(keys[0], tup.getKey()));
                     visits++;
                 }
                 assertEquals(inserts,visits);
             }
             {
                 //  first using lookupAll
-                final ITupleIterator tups = htree.lookupAll(keyAlt);
+                final ITupleIterator tups = htree.lookupAll(keys[1]);
                 long visits = 0;
                 while (tups.hasNext()) {
                     final ITuple tup = tups.next();
+                    assertTrue(BytesUtil.bytesEqual(keys[1], tup.getKey()));
                     visits++;
                 }
                 assertEquals(altInserts1,visits);
             }
             {
                 //  first using lookupAll
-                final ITupleIterator tups = htree.lookupAll(keyAlt2);
+                final ITupleIterator tups = htree.lookupAll(keys[2]);
                 long visits = 0;
                 while (tups.hasNext()) {
                     final ITuple tup = tups.next();
+                    assertTrue(BytesUtil.bytesEqual(keys[2], tup.getKey()));
                     visits++;
                 }
                 assertEquals(altInserts2,visits);
@@ -240,7 +253,7 @@ public class TestHTreeWithMemStore extends TestCase {
                     final ITuple tup = tups.next();
                     visits++;
                 }
-                final long total =(inserts + altInserts1 + altInserts2);
+                final long total =(inserts + altInserts1 + altInserts2 + randInserts);
                 assertEquals(total,visits);
             }
             

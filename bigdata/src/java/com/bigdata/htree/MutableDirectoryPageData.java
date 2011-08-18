@@ -20,7 +20,7 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class MutableDirectoryPageData implements IDirectoryData {
 
-    final boolean overflowDirectory;
+    final byte[] overflowKey;
     
 	/**
 	 * The persistent address of each child page (each child may be either a
@@ -93,13 +93,13 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	 *            <code>true</code> iff the HTree is maintaining per tuple
 	 *            version timestamps.
 	 */
-	public MutableDirectoryPageData(final boolean overflowDirectory,
+	public MutableDirectoryPageData(final byte[] overflowKey,
 	        final int addressBits, 
 			final boolean hasVersionTimestamps) {
 
 //		nentries = 0;
 
-	    this.overflowDirectory = overflowDirectory;
+	    this.overflowKey = overflowKey;
 	    
 		childAddr = new long[1 << addressBits];
 
@@ -125,7 +125,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 		if (src == null)
 			throw new IllegalArgumentException();
 
-		this.overflowDirectory = src.isOverflowDirectory();
+		this.overflowKey = src.getOverflowKey();
 		
 //		nentries = src.getSpannedTupleCount();
 
@@ -176,7 +176,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 	 * @param childEntryCounts
 	 */
 	public MutableDirectoryPageData(//final int nentries, final IRaba keys,
-	        final boolean overflowDirectory,//
+	        final byte[] overflowKey,//
 			final long[] childAddr, //final int[] childEntryCounts,
 			final boolean hasVersionTimestamps,
 			final long minimumVersionTimestamp,
@@ -187,7 +187,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 //		assert keys.capacity() + 1 == childAddr.length;
 //		assert childAddr.length == childEntryCounts.length;
 
-		this.overflowDirectory = overflowDirectory;
+		this.overflowKey = overflowKey;
 		
 //		this.nentries = nentries;
 
@@ -246,7 +246,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 
 	final public boolean isOverflowDirectory() {
 	    
-	    return overflowDirectory;
+	    return overflowKey != null;
 	    
 	}
 	
@@ -280,4 +280,7 @@ public class MutableDirectoryPageData implements IDirectoryData {
 
 	}
 
+	public byte[] getOverflowKey() {
+		return overflowKey;
+	}
 }

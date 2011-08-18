@@ -80,4 +80,12 @@ public interface IDirectoryData extends ITreeNodeData {
      */
     public boolean isOverflowDirectory();
     
+    /**
+     * If this is an overflow directory, then there is a single key for which
+     * the directory will reference multiple BucketPages storing the associated
+     * values.  The key is used to constrain insertions to the Directory, adding
+     * extra levels to discriminate as necessary.
+     */
+    public byte[] getOverflowKey();
+    
 }

@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -32,6 +33,9 @@ import cutthecrap.utils.striterators.Striterator;
  * {@link DirectoryPage#getNumBuddies()}.
  */
 class DirectoryPage extends AbstractPage implements IDirectoryData {
+    
+    private static final Logger log = Logger.getLogger(DirectoryPage.class);
+
 	static int createdPages = 0;
 	
     /**
@@ -684,14 +688,14 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
      *            child.
      */
 	@SuppressWarnings("unchecked")
-    public DirectoryPage(final HTree htree, final boolean overflowDirectory,
+    public DirectoryPage(final HTree htree, final byte[] overflowKey,
             final int globalDepth) {
 
 		super(htree, true/* dirty */, globalDepth);
 
 		childRefs = new Reference[(1 << htree.addressBits)];
 
-		data = new MutableDirectoryPageData(overflowDirectory, htree.addressBits,
+		data = new MutableDirectoryPageData(overflowKey, htree.addressBits,
 				htree.versionTimestamps);
 
 		createdPages++;
@@ -788,8 +792,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
         for (int i = 0; i < slotsOnPage; i++) {
         	
-            final AbstractPage child = childRefs[i] == null ? null
-                    : childRefs[i].get();
+            final AbstractPage child = deref(i);
 
 			/*
 			 * Note: Both child.identity and triggeredByChildId will always be
@@ -1632,7 +1635,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
     }
     
     void replaceChildRef(final Reference<?> oldRef, final AbstractPage newChild) {
-
+    	
         final int slotsOnPage = 1 << htree.addressBits;
 
 		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
@@ -1693,7 +1696,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		
         // Create new directory to insert
         final DirectoryPage ndir = new DirectoryPage((HTree) htree,
-                false, // overflowDirectory
+                null, // overflowKey
                 htree.addressBits/* globalDepth */);
 
         ((HTree) htree).nnodes++;
@@ -1765,12 +1768,15 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			assert false; // unsure for now
 		} else {
             final DirectoryPage blob = new DirectoryPage((HTree) htree,
-                    true/*overflowDirectory*/,
+                    getOverflowKey(),
                     getOverflowPageDepth());
 			blob._addChild(this);
 			blob._addChild(child);
 			
 			pd.replaceChildRef(this.self, blob);
+			
+			if (log.isInfoEnabled())
+				log.info("New Overflow Level: " + getLevel());
 		}
 	}
 
@@ -1852,14 +1858,178 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	@Override
 	boolean isClean() {
 		for (int i = 0; i < childRefs.length; i++) {
-			if (childRefs[i] != null) {
-				final AbstractPage node = childRefs[i].get();
-				if (node != null && !node.isClean()) {
-					return false;
-				}
+			final AbstractPage node = deref(i);
+			if (node != null && !node.isClean()) {
+				return false;
 			}
 		}
 		
 		return !isDirty();
 	}
+
+	public byte[] getOverflowKey() {
+		return data.getOverflowKey();
+	}
+
+	/**
+	 * Called on the condition that an attempt is made to insert a key/value
+	 * into an overflow directory with a different key.
+	 * 
+	 * In this case, this directory has been created to extend the bit resolution
+	 * so that the new key/value is resolved to a different slot and a new BucketPage
+	 * 
+	 * @param overflowKey
+	 * @param child
+	 */
+	DirectoryPage _addLevelForOverflow(final DirectoryPage current) {
+		
+		if (isReadOnly()) {
+			DirectoryPage copy = (DirectoryPage) copyOnWrite(current.getIdentity());
+			return copy._addLevelForOverflow(current);
+		}
+		
+		EvictionProtection ep = new EvictionProtection(this);
+		try {		
+			final DirectoryPage newdir = new DirectoryPage((HTree) htree, null /*overflowKey*/, htree.addressBits);
+			
+			if (isReadOnly()) // TBD: Remove debug point
+				assert !isReadOnly();
+			
+			replaceChildRef(current.self, newdir);
+			
+			
+			// do not want or need to push all bucket values to redistribute, just want to
+			// set the directory to relevant key.
+			// Logically we want to split the bucket pages until there is only one at the key provided
+			final byte[] overflowKey = current.getOverflowKey();
+			
+			final int slot = newdir.getLocalHashCode(overflowKey, newdir._getPrefixLength());
+			
+			newdir.childRefs[slot] = (Reference<AbstractPage>) current.self;
+			current.parent = (Reference<DirectoryPage>) newdir.self;
+			
+			try {
+				current._protectFromEviction();
+				
+				// now fill others with BucketPage references
+				newdir._fillChildSlots(slot, 0, childRefs.length, 0);
+			} finally {
+				current._releaseProtection();
+			}
+			
+			System.out.println("_addLevelForOverflow, level: " + newdir.getLevel());
+			
+			return newdir;
+		} finally {
+			ep.release();
+		}
+	}
+	
+	private void _touchHierarchy() {
+		DirectoryPage dp = this;
+		while (dp != null) {
+			htree.touch(dp);
+			dp = dp.getParentDirectory();
+		}
+	}
+
+	/**
+	 * crawl up the hierarchy decrementing the eviction count
+	 * if any hit zero then explicitly evict
+	 */
+	private void _releaseProtection() {
+		DirectoryPage dp = this;
+		while (dp != null) {
+			if (--dp.referenceCount == 0) {
+				htree.writeNodeRecursive(dp);
+			}
+			dp = dp.getParentDirectory();
+		}
+	}
+
+	/**
+	 * crawl up the hierarchy incrementing the eviction count
+	 */
+	private void _protectFromEviction() {
+		DirectoryPage dp = this;
+		while (dp != null) {
+			dp.referenceCount++;
+			dp = dp.getParentDirectory();
+		}
+	}
+
+	private void _fillChildSlots(final int slot, final int i, final int length, final int depth) {
+		assert !isReadOnly();
+		
+		if (slot == i && length == 1)
+			return;
+		
+		if (slot >= i && slot < (i + length)) {
+			final int delta = length/2;
+			_fillChildSlots(slot, i, delta, depth+1);
+			_fillChildSlots(slot, i+delta, delta, depth+1);
+		} else {
+			final BucketPage bp = new BucketPage((HTree) htree, depth);
+			bp.parent = (Reference<DirectoryPage>) self;
+			for (int s = 0; s < length; s++) {
+				if (isReadOnly())
+					assert !isReadOnly();
+				
+				if (childRefs[i+s] != null) // TBD: remove debug point
+					assert childRefs[i+s] == null;
+				
+				childRefs[i+s] = (Reference<AbstractPage>) bp.self;
+			}
+		}
+	}
+
+	int _getPrefixLength() {
+		int prefixLength = 0;
+		DirectoryPage p = getParentDirectory();
+		while (p != null) {
+			prefixLength += p.globalDepth;
+			p = p.getParentDirectory();
+		}
+		
+		return prefixLength;
+	}
+
+
+	/**
+     * Ensure their is a single reference to the BucketPage. This assumption is
+     * required in the case of overflow, since an overflow Bucket will hold
+     * values for a single key.
+     * 
+     * @param key
+     * @param bp
+     */
+	void _ensureUniqueBucketPage(final byte[] key,
+		Reference<? extends AbstractPage> bp) {
+		final int prefixLength = _getPrefixLength();
+	    final int hashBits = getLocalHashCode(key, prefixLength);
+	    assert childRefs[hashBits] == bp;
+//	    for (int i = 0; i < childRefs.length; i++) {
+//	    	if (i != hashBits && childRefs[i] == bp) {
+//	    		final BucketPage nbp = new BucketPage((HTree) htree, htree.addressBits);
+//	    		childRefs[i] = (Reference<AbstractPage>) nbp.self;
+//	    		nbp.parent = (Reference<DirectoryPage>) self;
+//	    	}
+//	    }
+	    
+	    int start = -1;
+	    int refs = 0;
+	    for (int i = 0; i < childRefs.length; i++) {
+	    	if (childRefs[i] == bp) {
+	    		start = start == -1 ? i : start;
+	    		refs++;
+	    		if (i != hashBits)
+	    			childRefs[i] = null;
+	    	}
+	    }
+	    
+	    assert Integer.bitCount(refs) == 1; // MUST be power of 2
+	    
+	    _fillChildSlots(hashBits, start, refs, 0);
+	}
+
 }

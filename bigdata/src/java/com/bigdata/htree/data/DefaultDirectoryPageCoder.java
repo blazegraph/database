@@ -138,6 +138,12 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
 		}
         buf.putShort(flags);
         
+        if (node.isOverflowDirectory()) {
+            final byte[] ok = node.getOverflowKey();
+        	buf.putShort((short) ok.length);
+        	buf.put(ok);
+        }
+        
 		final int nchildren = node.getChildCount();
 		if (nchildren > Short.MAX_VALUE)
 			throw new UnsupportedOperationException();
@@ -185,6 +191,8 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
         // fields which are cached by the ctor.
         private final short flags;
         private final int nchildren;
+        
+        private final byte[] overflowKey;
 
         /**
          * Offset of the encoded childAddr[] in the buffer.
@@ -196,6 +204,8 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
             return b;
             
         }
+        
+        //static int s_newKeys = 0;
 
         /**
          * Constructor used when the caller is encoding the {@link IDirectoryData}.
@@ -237,6 +247,19 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
             // flags
             flags = buf.getShort(pos);
             pos += SIZEOF_FLAGS;
+            
+    		if (isOverflowDirectory()) {
+                final int oksze = buf.getShort(pos);
+                pos += Bytes.SIZEOF_SHORT;
+            	overflowKey = new byte[oksze];
+            	//s_newKeys++;
+            	
+            	buf.get(pos, overflowKey);           	
+            	pos += oksze;
+    		} else {
+            	overflowKey = null;
+    		}
+
 
             nchildren = buf.getShort(pos);
             pos += Bytes.SIZEOF_SHORT;
@@ -276,7 +299,7 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
 
         final public boolean isOverflowDirectory() {
             
-            return ((flags & FLAG_OVERFLOW_DIRECTORY) != 0);
+            return (flags & AbstractReadOnlyNodeData.FLAG_OVERFLOW_DIRECTORY) != 0;
                         
         }
         
@@ -352,6 +375,10 @@ public class DefaultDirectoryPageCoder implements IAbstractNodeDataCoder<IDirect
             return sb.toString();
             
         }
+
+		public byte[] getOverflowKey() {
+			return overflowKey;
+		}
 
     }
 
