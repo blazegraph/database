@@ -876,7 +876,7 @@ public class AST2BOpUtility {
              * Extremely efficient pipelined aggregation operator.
              */
 
-            op = new PipelinedAggregationOp(new BOp[] {}, NV.asMap(new NV[] {//
+            op = new PipelinedAggregationOp(new BOp[] {left}, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, bopId),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -886,6 +886,7 @@ public class AST2BOpUtility {
                     new NV(GroupByOp.Annotations.SELECT, projectExprs), //
                     new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
                     new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
             }));
 
         } else {
@@ -902,7 +903,7 @@ public class AST2BOpUtility {
              * workstation). BBT 8/17/2011.
              */
             
-            op = new MemoryGroupByOp(new BOp[] {}, NV.asMap(new NV[] {//
+            op = new MemoryGroupByOp(new BOp[] {left}, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, bopId),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -911,6 +912,7 @@ public class AST2BOpUtility {
                     new NV(GroupByOp.Annotations.SELECT, projectExprs), //
                     new NV(GroupByOp.Annotations.GROUP_BY, groupByExprs), //
                     new NV(GroupByOp.Annotations.HAVING, havingExprs), //
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
             }));
 
         }

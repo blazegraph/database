@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
@@ -39,7 +40,7 @@ import com.bigdata.rdf.internal.IV;
  * AST node modeling projected value expressions.
  * <p>
  * Note: "*" is modeled using an explicit variable whose name is <code>*</code>.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -76,7 +77,7 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
      * Adds a variable to be projected. The variable is modeled as an assignment
      * of itself to itself, so everything in the projection node winds up
      * looking like an assignment.
-     * 
+     *
      * @param var
      *            The variable.
      */
@@ -95,7 +96,7 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
     /**
      * Return the ordered subset of the value expressions which project a
      * computed value expression which is not a bare variable.
-     * 
+     *
      * TODO Consistent API for {@link #getAssignmentProjections()} and
      * {@link #getProjectionVars()}.
      */
@@ -140,19 +141,19 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
     public IValueExpression[] getValueExpressions() {
 
         final IValueExpression<?>[] exprs = new IValueExpression[size()];
-        
+
         int i = 0;
-        
-        for(IValueExpressionNode node : this) {
-        
-            exprs[i++] = node.getValueExpression();
-            
+
+        for (AssignmentNode n : this) {
+
+            exprs[i++]=new Bind(n.getVar(),n.getValueExpression());
+
         }
-        
+
         return exprs;
-        
+
     }
-    
+
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
@@ -165,13 +166,13 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         if (isWildcard()) {
 
             sb.append("* ");
-            
+
         } else {
-            
+
             for (AssignmentNode v : this) {
-                
+
                 sb.append(v);
-                
+
             }
 
         }
