@@ -70,6 +70,6 @@
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.4.2.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.4.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-jdk14-1.6.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
