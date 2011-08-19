@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 
 /**
@@ -35,12 +36,18 @@ import com.bigdata.bop.IValueExpression;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class GroupByNode extends ValueExpressionListBaseNode<IValueExpressionNode> {
+public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
     /**
      * 
      */
     public GroupByNode() {
+    }
+
+    public void addGroupByVar(final VarNode var) {
+
+        addExpr(new AssignmentNode(var, var));
+
     }
 
     /**
@@ -54,7 +61,7 @@ public class GroupByNode extends ValueExpressionListBaseNode<IValueExpressionNod
         
         for(IValueExpressionNode node : this) {
         
-            exprs[i++] = node.getValueExpression();
+                exprs[i++] = new Bind(((AssignmentNode)node).getVar(), ((AssignmentNode)node).getValueExpression());
             
         }
         
