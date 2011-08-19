@@ -308,7 +308,7 @@ public class TestAST extends TestCase {
             subquery.setRoot(whereClause);
             
             final GroupByNode groupBy1 = new GroupByNode();
-            groupBy1.addExpr(new VarNode("y"));
+            groupBy1.addGroupByVar(new VarNode("y"));
             subquery.setGroupBy(groupBy1);
     	    
             subqueries.add(subquery);
