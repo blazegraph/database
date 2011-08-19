@@ -67,6 +67,7 @@ public class DistinctBindingSetOp extends PipelineOp {
 
 		switch (getEvaluationContext()) {
 		case CONTROLLER:
+        case HASHED:
 			break;
 		default:
 			throw new UnsupportedOperationException(
