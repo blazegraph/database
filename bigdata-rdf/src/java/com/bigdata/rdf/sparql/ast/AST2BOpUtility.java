@@ -127,7 +127,7 @@ public class AST2BOpUtility {
 		}
 
         // The top-level "WHERE" clause.
-        left = convert(root, ctx);
+        left = convert(left, root, ctx);
 
         final ProjectionNode projection = query.getProjection() == null ? null
                 : query.getProjection().isEmpty() ? null : query
@@ -367,20 +367,21 @@ public class AST2BOpUtility {
      * the top-level "WHERE" clause and may be invoked recursively for embedded
      * join groups.
      * 
+     * @param left
      * @param groupNode
      * @param ctx
      * @return
      */
-	private static PipelineOp convert(final IGroupNode groupNode,
-			final AST2BOpContext ctx) {
-		
+    private static PipelineOp convert(PipelineOp left, final IGroupNode groupNode,
+            final AST2BOpContext ctx) {
+
 		if (groupNode instanceof UnionNode) {
 			
-			return convert((UnionNode) groupNode, ctx);
+			return convertUnion(left, (UnionNode) groupNode, ctx);
 			
 		} else if (groupNode instanceof JoinGroupNode) {
 			
-			return convert((JoinGroupNode) groupNode, ctx);
+			return convertJoinGroup(left, (JoinGroupNode) groupNode, ctx);
 			
 		} else {
 		
@@ -397,7 +398,8 @@ public class AST2BOpUtility {
      * @param ctx
      * @return
      */
-	private static PipelineOp convert(final UnionNode unionNode,
+	private static PipelineOp convertUnion(PipelineOp left,
+	        final UnionNode unionNode,
 			final AST2BOpContext ctx) {
 		
         final int arity = unionNode.getChildCount();
@@ -417,7 +419,8 @@ public class AST2BOpUtility {
             // convert the child
         	if (child instanceof JoinGroupNode) {
         		
-        		subqueries[i++] = convert((JoinGroupNode) child, ctx);
+                subqueries[i++] = convertJoinGroup(null/* left */,
+                        (JoinGroupNode) child, ctx);
         		
 //        	} else if (child instanceof StatementPatternNode) {
 //        		
@@ -448,9 +451,10 @@ public class AST2BOpUtility {
 			anns.add(new NV(Union.Annotations.CONTROLLER, true));
 //      }
         
-        final PipelineOp union = applyQueryHints(new Union(new BOp[]{}, 
-        		NV.asMap(anns.toArray(new NV[anns.size()]))
-			), ctx.queryHints);
+        final PipelineOp union = applyQueryHints(
+                new Union((left == null ? new BOp[] {} : new BOp[] { left }),
+                        NV.asMap(anns.toArray(new NV[anns.size()]))),
+                ctx.queryHints);
         
         return union;
 		
@@ -503,13 +507,16 @@ public class AST2BOpUtility {
      * FIXME Integrate support for SPARQL 1.1 style subqueries. Those are
      * modeled by {@link SubqueryRoot} (versus {@link NamedSubqueryRoot}).
      */
-	private static PipelineOp convert(final JoinGroupNode joinGroup,
+	private static PipelineOp convertJoinGroup(PipelineOp left,
+	        final JoinGroupNode joinGroup,
 			final AST2BOpContext ctx) {
 
 		/*
 		 * Place the StartOp at the beginning of the pipeline.
 		 */
-        PipelineOp left = addStartOp(ctx);
+//        PipelineOp left = addStartOp(ctx);
+	    if(left == null)
+	        left = addStartOp(ctx);
         
         /*
          * Add the pre-conditionals to the pipeline.
@@ -821,7 +828,7 @@ public class AST2BOpUtility {
     			continue;
     		}
     		
-    		final PipelineOp subquery = convert(subgroup, ctx);
+            final PipelineOp subquery = convert(null/* left */, subgroup, ctx);
     		
     		left = new SubqueryOp(new BOp[]{left}, 
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
@@ -865,7 +872,8 @@ public class AST2BOpUtility {
     			
     		} else {
     		
-	    		final PipelineOp subquery = convert(subgroup, ctx);
+                final PipelineOp subquery = convert(null/* left */, subgroup,
+                        ctx);
 	    		
 	    		left = new SubqueryOp(new BOp[]{left}, 
 	                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
