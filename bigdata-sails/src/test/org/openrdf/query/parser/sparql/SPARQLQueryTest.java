@@ -22,10 +22,18 @@ import java.util.Set;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import info.aduna.io.IOUtil;
+import info.aduna.iteration.Iterations;
+import info.aduna.text.StringUtil;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
@@ -62,8 +70,6 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 
@@ -85,6 +91,8 @@ public abstract class SPARQLQueryTest extends TestCase {
 
 	protected final boolean laxCardinality;
 
+	protected final boolean checkOrder;
+
 	/*-----------*
 	 * Variables *
 	 *-----------*/
@@ -98,6 +106,12 @@ public abstract class SPARQLQueryTest extends TestCase {
 	public SPARQLQueryTest(String testURI, String name, String queryFileURL, String resultFileURL,
 			Dataset dataSet, boolean laxCardinality)
 	{
+		this(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality, false);
+	}
+	
+	public SPARQLQueryTest(String testURI, String name, String queryFileURL, String resultFileURL,
+			Dataset dataSet, boolean laxCardinality, boolean checkOrder)
+	{
 		super(name);
 
 		this.testURI = testURI;
@@ -105,6 +119,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		this.resultFileURL = resultFileURL;
 		this.dataset = dataSet;
 		this.laxCardinality = laxCardinality;
+		this.checkOrder = checkOrder;
 	}
 
 	/*---------*
@@ -184,6 +199,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 	protected void runTest()
 		throws Exception
 	{
+//		RepositoryConnection con = dataRep.getConnection();
 		RepositoryConnection con = getQueryConnection(dataRep);
 		try {
 			String queryString = readQueryString();
@@ -238,6 +254,22 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 		else {
 			resultsEqual = QueryResultUtil.equals(queryResultTable, expectedResultTable);
+			
+			if (checkOrder) {
+				// also check the order in which solutions occur.
+				queryResultTable.beforeFirst();
+				expectedResultTable.beforeFirst();
+
+				while (queryResultTable.hasNext()) {
+					BindingSet bs = queryResultTable.next();
+					BindingSet expectedBs = expectedResultTable.next();
+					
+					if (! bs.equals(expectedBs)) {
+						resultsEqual = false;
+						break;
+					}
+				}
+			}
 		}
 
 		if (!resultsEqual) {
@@ -278,13 +310,16 @@ public abstract class SPARQLQueryTest extends TestCase {
 			message.append("\n===================================\n");
 
 			if (!missingBindings.isEmpty()) {
+
 				message.append("Missing bindings: \n");
 				for (BindingSet bs : missingBindings) {
 					message.append(bs);
 					message.append("\n");
 				}
 
-                message.append("===================================\n");
+				message.append("=============");
+				StringUtil.appendN('=', getName().length(), message);
+				message.append("========================\n");
 			}
 
 			if (!unexpectedBindings.isEmpty()) {
@@ -294,7 +329,28 @@ public abstract class SPARQLQueryTest extends TestCase {
 					message.append("\n");
 				}
 
-                message.append("===================================\n");
+				message.append("=============");
+				StringUtil.appendN('=', getName().length(), message);
+				message.append("========================\n");
+			}
+			
+			if (checkOrder && missingBindings.isEmpty() && unexpectedBindings.isEmpty()) {
+				message.append("Results are not in expected order.\n");
+				message.append(" =======================\n");
+				message.append("query result: \n");
+				for (BindingSet bs: queryBindings) {
+					message.append(bs);
+					message.append("\n");
+				}
+				message.append(" =======================\n");
+				message.append("expected result: \n");
+				for (BindingSet bs: expectedBindings) {
+					message.append(bs);
+					message.append("\n");
+				}
+				message.append(" =======================\n");
+
+				System.out.print(message.toString());
 			}
 
             RepositoryConnection con = ((DatasetRepository)dataRep).getDelegate().getConnection();
@@ -324,6 +380,27 @@ public abstract class SPARQLQueryTest extends TestCase {
 			logger.error(message.toString());
 			fail(message.toString());
 		}
+		/* debugging only: print out result when test succeeds 
+		else {
+			queryResultTable.beforeFirst();
+
+			List<BindingSet> queryBindings = Iterations.asList(queryResultTable);
+			StringBuilder message = new StringBuilder(128);
+
+			message.append("\n============ ");
+			message.append(getName());
+			message.append(" =======================\n");
+
+			message.append(" =======================\n");
+			message.append("query result: \n");
+			for (BindingSet bs: queryBindings) {
+				message.append(bs);
+				message.append("\n");
+			}
+			
+			System.out.print(message.toString());
+		}
+		*/
 	}
 
 	private void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
@@ -528,9 +605,18 @@ public abstract class SPARQLQueryTest extends TestCase {
 
 		SPARQLQueryTest createSPARQLQueryTest(String testURI, String name, String queryFileURL,
 				String resultFileURL, Dataset dataSet, boolean laxCardinality);
+
+		SPARQLQueryTest createSPARQLQueryTest(String testURI, String name, String queryFileURL,
+				String resultFileURL, Dataset dataSet, boolean laxCardinality, boolean checkOrder);
 	}
 
 	public static TestSuite suite(String manifestFileURL, Factory factory)
+		throws Exception
+	{
+		return suite(manifestFileURL, factory, true);
+	}
+
+	public static TestSuite suite(String manifestFileURL, Factory factory, boolean approvedOnly)
 		throws Exception
 	{
 		logger.info("Building test suite for {}", manifestFileURL);
@@ -549,10 +635,14 @@ public abstract class SPARQLQueryTest extends TestCase {
 		// Extract test case information from the manifest file. Note that we only
 		// select those test cases that are mentioned in the list.
 		StringBuilder query = new StringBuilder(512);
-		query.append(" SELECT DISTINCT testURI, testName, resultFile, action, queryFile, defaultGraph ");
-		query.append(" FROM {} rdf:first {testURI} dawgt:approval {dawgt:Approved}; ");
+		query.append(" SELECT DISTINCT testURI, testName, resultFile, action, queryFile, defaultGraph, ordered ");
+		query.append(" FROM {} rdf:first {testURI} ");
+		if (approvedOnly) {
+			query.append("                          dawgt:approval {dawgt:Approved}; ");
+		}
 		query.append("                             mf:name {testName}; ");
 		query.append("                             mf:result {resultFile}; ");
+		query.append("                             [ mf:checkOrder {ordered} ]; ");
 		query.append("                             mf:action {action} qt:query {queryFile}; ");
 		query.append("                                               [qt:data {defaultGraph}] ");
 		query.append(" USING NAMESPACE ");
@@ -585,6 +675,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 			String queryFile = bindingSet.getValue("queryFile").toString();
 			URI defaultGraphURI = (URI)bindingSet.getValue("defaultGraph");
 			Value action = bindingSet.getValue("action");
+			Value ordered = bindingSet.getValue("ordered");
 
 			logger.debug("found test case : {}", testName);
 
@@ -619,8 +710,14 @@ public abstract class SPARQLQueryTest extends TestCase {
 				laxCardinalityResult.close();
 			}
 
+			// check if we should test for query result ordering
+			boolean checkOrder = false;
+			if (ordered != null) {
+				checkOrder = Boolean.parseBoolean(ordered.stringValue());
+			}
+
 			SPARQLQueryTest test = factory.createSPARQLQueryTest(testURI.toString(), testName, queryFile,
-					resultFile, dataset, laxCardinality);
+					resultFile, dataset, laxCardinality, checkOrder);
 			if (test != null) {
 				suite.addTest(test);
 			}

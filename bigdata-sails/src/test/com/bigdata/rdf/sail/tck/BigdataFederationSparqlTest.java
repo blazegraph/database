@@ -33,6 +33,7 @@ import junit.framework.TestSuite;
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
+import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
@@ -109,24 +110,44 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
      */
     public static TestSuite fullSuite() throws Exception {
         
-        return ManifestTest.suite(new Factory() {
+        final Factory factory = new Factory() {
         
             public SPARQLQueryTest createSPARQLQueryTest(String URI,
                     String name, String query, String results, Dataset dataSet,
                     boolean laxCardinality) {
+
+                return createSPARQLQueryTest(URI, name, query, results,
+                        dataSet, laxCardinality, true/* checkOrder */);
+
+            }
+            
+            public SPARQLQueryTest createSPARQLQueryTest(String URI,
+                    String name, String query, String results, Dataset dataSet,
+                    boolean laxCardinality, boolean checkOrder) {
             
                 return new BigdataFederationSparqlTest(URI, name, query,
-                        results, dataSet, laxCardinality);
+                        results, dataSet, laxCardinality, checkOrder);
             
             }
-        });
+        };
         
+        final TestSuite suite = new TestSuite();
+
+        // SPARQL 1.0
+        suite.addTest(ManifestTest.suite(factory));
+
+        // SPARQL 1.1
+        suite.addTest(SPARQL11ManifestTest.suite(factory));
+        
+        return suite;
+
     }
 
     public BigdataFederationSparqlTest(String URI, String name, String query,
-            String results, Dataset dataSet, boolean laxCardinality) {
+            String results, Dataset dataSet, boolean laxCardinality,
+            boolean checkOrder) {
 
-        super(URI, name, query, results, dataSet, laxCardinality);
+        super(URI, name, query, results, dataSet, laxCardinality, checkOrder);
         
     }
 

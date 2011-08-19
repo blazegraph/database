@@ -39,8 +39,6 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.DatasetDeclProcessor;
-import org.openrdf.query.parser.sparql.SPARQLParser;
 import org.openrdf.query.parser.sparql.ast.ASTAskQuery;
 import org.openrdf.query.parser.sparql.ast.ASTConstructQuery;
 import org.openrdf.query.parser.sparql.ast.ASTDescribeQuery;
@@ -60,12 +58,13 @@ import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
- * Overridden version of the openrdf 2.3 {@link SPARQLParser} class which
- * extracts additional information required by the and associates it with the
+ * Overridden version of the openrdf 2.3 SPARQLParser class which extracts
+ * additional information required by bigdata and associates it with the
  * {@link ParsedQuery}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
+ *          $
  */
 public class BigdataSPARQLParser implements QueryParser {
 
