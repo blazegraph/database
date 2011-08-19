@@ -1056,7 +1056,6 @@ public class AST2BOpUtility {
                     new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
                     new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
                     new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
             }));
 
         }
@@ -1128,6 +1127,7 @@ public class AST2BOpUtility {
                     new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IVComparator()),//
                     new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
 	                       BOpEvaluationContext.CONTROLLER),//
+	                new NV(MemorySortOp.Annotations.PIPELINED, true),//
 	                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                     new NV(MemorySortOp.Annotations.LAST_PASS, true),//
