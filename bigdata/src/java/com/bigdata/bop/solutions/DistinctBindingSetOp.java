@@ -16,6 +16,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -125,13 +126,6 @@ public class DistinctBindingSetOp extends PipelineOp {
         
     }
 
-    @Override
-    public BOpStats newStats() {
-    	
-    	return new DistinctStats(this);
-    	
-    }
-
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new DistinctTask(this, context));
@@ -177,37 +171,6 @@ public class DistinctBindingSetOp extends PipelineOp {
             return true;
         }
     }
-
-	/**
-	 * Extends {@link BOpStats} to provide the shared state for the distinct
-	 * solution groups across multiple invocations of the DISTINCT operator.
-	 */
-    private static class DistinctStats extends BOpStats {
-
-        /**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * A concurrent map whose keys are the bindings on the specified
-		 * variables (the keys and the values are the same since the map
-		 * implementation does not allow <code>null</code> values).
-		 * <p>
-		 * Note: The map is shared state and can not be discarded or cleared
-		 * until the last invocation!!!
-		 */
-        private final ConcurrentHashMap<Solution, Solution> map;
-
-    	public DistinctStats(final DistinctBindingSetOp op) {
-    		
-            this.map = new ConcurrentHashMap<Solution, Solution>(
-                    op.getInitialCapacity(), op.getLoadFactor(),
-                    op.getConcurrencyLevel());
-
-    	}
-    	
-    }
     
     /**
      * Task executing on the node.
@@ -216,11 +179,14 @@ public class DistinctBindingSetOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-		/**
-		 * A concurrent map whose keys are the bindings on the specified
-		 * variables (the keys and the values are the same since the map
-		 * implementation does not allow <code>null</code> values).
-		 */
+        /**
+         * A concurrent map whose keys are the bindings on the specified
+         * variables (the keys and the values are the same since the map
+         * implementation does not allow <code>null</code> values).
+         * <p>
+         * Note: The map is shared state and can not be discarded or cleared
+         * until the last invocation!!!
+         */
         private final ConcurrentHashMap<Solution, Solution> map;
 
         /**
@@ -228,6 +194,7 @@ public class DistinctBindingSetOp extends PipelineOp {
          */
         private final IVariable<?>[] vars;
         
+        @SuppressWarnings("unchecked")
         DistinctTask(final DistinctBindingSetOp op,
                 final BOpContext<IBindingSet> context) {
 
@@ -241,8 +208,35 @@ public class DistinctBindingSetOp extends PipelineOp {
             if (vars.length == 0)
                 throw new IllegalArgumentException();
 
-			// The map is shared state across invocations of this operator task.
-			this.map = ((DistinctStats) context.getStats()).map;
+            /*
+             * The map is shared state across invocations of this operator task.
+             */
+            {
+                final Integer key = op.getId();
+
+                final IQueryAttributes attribs = context.getRunningQuery()
+                        .getAttributes();
+
+                ConcurrentHashMap<Solution, Solution> map = (ConcurrentHashMap<Solution, Solution>) attribs
+                        .get(key);
+
+                if (map == null) {
+
+                    map = new ConcurrentHashMap<Solution, Solution>(
+                            op.getInitialCapacity(), op.getLoadFactor(),
+                            op.getConcurrencyLevel());
+
+                    final ConcurrentHashMap<Solution, Solution> tmp = (ConcurrentHashMap<Solution, Solution>) attribs
+                            .putIfAbsent(key, map);
+
+                    if (tmp != null)
+                        map = tmp;
+
+                }
+
+                this.map = map;
+
+            }
 
         }
 

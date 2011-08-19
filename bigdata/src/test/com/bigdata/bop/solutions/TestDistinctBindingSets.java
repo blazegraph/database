@@ -29,6 +29,7 @@ package com.bigdata.bop.solutions;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
@@ -40,6 +41,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -262,35 +264,43 @@ public class TestDistinctBindingSets extends TestCase2 {
                         new IConstant[] { new Constant<String>("Leon") }//
                 ), };
 
+        final UUID queryId = UUID.randomUUID();
+
         final BOpStats stats = query.newStats();
 
-        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
-
-        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
-
-        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, null/* indexManager */),
-                -1/* partitionId */, stats, source, sink, null/* sink2 */);
-
-        // get task.
-        final FutureTask<Void> ft = query.eval(context);
+        final MockQueryContext queryContext = new MockQueryContext(queryId);
         
-        // execute task.
-//        jnl.getExecutorService().execute(ft);
-        ft.run();
+        try {
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-        
-        assertTrue(ft.isDone());
-        assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+            final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
-        assertEquals(1L, stats.chunksIn.get());
-        assertEquals(6L, stats.unitsIn.get());
-        assertEquals(4L, stats.unitsOut.get());
-        assertEquals(1L, stats.chunksOut.get());
+            final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                    query, stats);
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */, null/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
+
+            // get task.
+            final FutureTask<Void> ft = query.eval(context);
+
+            ft.run();
+
+            TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(6L, stats.unitsIn.get());
+            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+
+        } finally {
+
+            queryContext.close();
+
+        }
 
     }
-    
+
 }
