@@ -50,10 +50,12 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 public class BigdataSparqlFullRWTxTest extends BigdataSparqlTest {
 
     public BigdataSparqlFullRWTxTest(String testURI, String name, String queryFileURL,
-            String resultFileURL, Dataset dataSet, boolean laxCardinality) {
+            String resultFileURL, Dataset dataSet, boolean laxCardinality,
+            boolean checkOrder) {
 
-        super(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality);
-        
+        super(testURI, name, queryFileURL, resultFileURL, dataSet,
+                laxCardinality, checkOrder);
+
     }
     
     @Override

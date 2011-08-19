@@ -47,6 +47,7 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ManifestTest;
+import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
@@ -61,8 +62,8 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
 /**
  * Test harness for running the SPARQL test suites. This version runs against
@@ -131,7 +132,11 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         if (!testURIs.isEmpty()) {
             final TestSuite suite = new TestSuite();
             for (String s : testURIs) {
-                suite.addTest(getSingleTest(suite1, s));
+                final SPARQLQueryTest test = getSingleTest(suite1, s);
+                if (test == null)
+                    throw new RuntimeException("Could not find test: uri="
+                            + s);
+                suite.addTest(test);
             }
             return suite;
         }
@@ -148,29 +153,26 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      * 
      * @param suite1
      *            The test suite.
-     *            
+     * 
      * @return The test suite without the data set tests.
      */
     static TestSuite filterOutDataSetTests(final TestSuite suite1) {
-        
+
         final TestSuite suite2 = new TestSuite(suite1.getName());
-        
-        final Enumeration<TestSuite> e = suite1.tests();
-        
+        final Enumeration<Test> e = suite1.tests();
         while (e.hasMoreElements()) {
-            
-            final TestSuite suite3 = e.nextElement();
-            
-            if (suite3.getName().equals("dataset") == false) {
-                
-                suite2.addTest(suite3);
-                
+            final Test aTest = e.nextElement();
+            if (aTest instanceof TestSuite) {
+                final TestSuite aTestSuite = (TestSuite) aTest;
+                if (!aTestSuite.getName().equals("dataset")) {
+                    suite2.addTest(filterOutDataSetTests(aTestSuite));
+                }
+            } else {
+                suite2.addTest(aTest);
             }
-            
         }
-        
         return suite2;
-        
+       
     }
 
     /**
@@ -335,63 +337,89 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      *             if there is no test in the suite which is associated with
      *             that testURI.
      */
-    static SPARQLQueryTest getSingleTest(TestSuite suite,
+    static SPARQLQueryTest getSingleTest(final TestSuite suite,
             final String testURI) throws RuntimeException {
     
-        SPARQLQueryTest test = null;
-        final Enumeration e1 = suite.tests();
+        final Enumeration<Test> e1 = suite.tests();
         while (e1.hasMoreElements()) {
-            suite = (TestSuite) e1.nextElement();
-            final Enumeration e2 = suite.tests();
-            while (e2.hasMoreElements()) {
-                 test = (SPARQLQueryTest) e2.nextElement();
-                 if (testURI.equals(test.getTestURI())) {
-                     return test;
-                 }
+            final Test aTest = e1.nextElement();
+            log.warn(aTest.toString());
+            if (aTest instanceof TestSuite) {
+                final SPARQLQueryTest test = getSingleTest((TestSuite) aTest,
+                        testURI);
+                if (test != null)
+                    return test;
+            }
+            if (aTest instanceof SPARQLQueryTest) {
+                final SPARQLQueryTest test = (SPARQLQueryTest) aTest;
+                if (testURI.equals(test.getTestURI())) {
+                    return test;
+                }
             }
         }
-        
-        throw new RuntimeException("could not find a test with that URI");
-        
+        return null;
     }
 
     /**
      * Return the test suite. 
      */
     public static TestSuite suiteLTSWithPipelineJoins() throws Exception {
-       
-        return ManifestTest.suite(new Factory() {
+
+        final Factory factory = new Factory() {
 
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality) {
 
+                return createSPARQLQueryTest(testURI, name, queryFileURL,
+                        resultFileURL, dataSet, laxCardinality, true/* checkOrder */);
+
+            }
+            
+            public SPARQLQueryTest createSPARQLQueryTest(String testURI,
+                    String name, String queryFileURL, String resultFileURL,
+                    Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
+
                 return new BigdataSparqlTest(testURI, name, queryFileURL,
-                        resultFileURL, dataSet, laxCardinality) {
+                        resultFileURL, dataSet, laxCardinality, checkOrder) {
 
                     protected Properties getProperties() {
 
-                        final Properties p = new Properties(super
-                                .getProperties());
+                        final Properties p = new Properties(
+                                super.getProperties());
 
-//                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
-//                                "false");
+                        // p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
+                        // "false");
 
                         return p;
 
                     }
-                    
+
                 };
 
             }
-        });
+
+        };
+
+        final TestSuite suite = new TestSuite();
+
+        // SPARQL 1.0
+        suite.addTest(ManifestTest.suite(factory));
+
+        // SPARQL 1.1
+        suite.addTest(SPARQL11ManifestTest.suite(factory));
+        
+        return suite;
+
     }
 
     public BigdataSparqlTest(String testURI, String name, String queryFileURL,
-            String resultFileURL, Dataset dataSet, boolean laxCardinality) {
+            String resultFileURL, Dataset dataSet, boolean laxCardinality,
+            boolean checkOrder) {
 
-        super(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality);
-        
+        super(testURI, name, queryFileURL, resultFileURL, dataSet,
+                laxCardinality, checkOrder);
+
     }
     
 //    public String getTestURI() {

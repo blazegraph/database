@@ -37,6 +37,7 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
+import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
@@ -71,9 +72,9 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
     private static final Logger log = Logger.getLogger(BigdataEmbeddedFederationSparqlTest.class);
     
     public BigdataEmbeddedFederationSparqlTest(String testURI, String name, String queryFileURL,
-            String resultFileURL, Dataset dataSet, boolean laxCardinality) {
+            String resultFileURL, Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
 
-        super(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality);
+        super(testURI, name, queryFileURL, resultFileURL, dataSet, laxCardinality, checkOrder);
         
     }
     
@@ -115,14 +116,23 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
      */
     public static TestSuite suiteEmbeddedFederation() throws Exception {
        
-        return ManifestTest.suite(new Factory() {
+        final Factory factory = new Factory() {
 
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality) {
+                
+                return createSPARQLQueryTest(testURI, name, queryFileURL,
+                        resultFileURL, dataSet, laxCardinality, true/* checkOrder */);
+                
+            }
+
+            public SPARQLQueryTest createSPARQLQueryTest(String testURI,
+                    String name, String queryFileURL, String resultFileURL,
+                    Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
 
                 return new BigdataEmbeddedFederationSparqlTest(testURI, name, queryFileURL,
-                        resultFileURL, dataSet, laxCardinality) {
+                        resultFileURL, dataSet, laxCardinality, checkOrder) {
 
                     protected Properties getProperties() {
 
@@ -139,7 +149,18 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
                 };
 
             }
-        });
+        };
+        
+        final TestSuite suite = new TestSuite();
+
+        // SPARQL 1.0
+        suite.addTest(ManifestTest.suite(factory));
+
+        // SPARQL 1.1
+        suite.addTest(SPARQL11ManifestTest.suite(factory));
+
+        return suite;
+        
     }
 
     private final String NAMESPACE = getName();

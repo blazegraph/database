@@ -158,15 +158,29 @@ public class BuildInfo {
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
 	<target name="compile" depends="prepare, buildinfo">
 		<mkdir dir="${build.dir}" />
-		<javac destdir="${build.dir}/classes"
-			   classpathref="build.classpath"
+	    <echo>javac</echo>
+	    <echo>    destdir="${build.dir}"</echo>
+	    <echo>    fork="yes"</echo>
+	    <echo>    memorymaximumsize="1g"</echo>
+	    <echo>    debug="yes"</echo>
+	    <echo>    debuglevel="${javac.debuglevel}"</echo>
+	    <echo>    verbose="${javac.verbose}"</echo>
+	    <echo>    encoding="${javac.encoding}"</echo>
+	    <echo>    source="${javac.source}"</echo>
+	    <echo>    target="${javac.target}"</echo>
+		<javac classpathref="build.classpath"
+		       destdir="${build.dir}/classes"
+			   fork="yes"
+			   memorymaximumsize="1g"
 			   debug="${javac.debug}"
 			   debuglevel="${javac.debuglevel}"
 			   verbose="${javac.verbose}"
 			   encoding="${javac.encoding}"
-			   includeantruntime="false">
+			   source="${javac.source}"
+	           target="${javac.target}"
+			   includeantruntime="false"
+			>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
-			<!-- target="${javac.target}" source="${javac.source}" -->
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
@@ -255,7 +269,7 @@ public class BuildInfo {
 		<bndwrap jars="${build.dir}/lib/jgrapht-jdk1.5-0.7.1.jar" output="${build.dir}/bundles/jgrapht-jdk1.5-0.7.1.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar" output="${build.dir}/bundles/lgpl-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/high-scale-lib-v1.1.2.jar" output="${build.dir}/bundles/high-scale-lib-v1.1.2.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/openrdf-sesame-2.3.0-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-2.3.0.jar" definitions="${basedir}/osgi/" />
+		<bndwrap jars="${build.dir}/lib/openrdf-sesame-${sesame.version}-onejar.jar" output="${build.dir}/bundles/openrdf-sesame-${sesame.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/apache/zookeeper-${zookeeper.version}.jar" output="${build.dir}/bundles/zookeeper-${zookeeper.version}.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/nxparser-6-22-2010.jar" output="${build.dir}/bundles/nxparser-2010.6.22.jar" definitions="${basedir}/osgi/" />
 	</target>
@@ -808,6 +822,8 @@ ${postInstallMessage}</echo>
 	   debuglevel="${javac.debuglevel}"
 	   verbose="${javac.verbose}"
 	   encoding="${javac.encoding}"
+	   source="${javac.source}"
+       target="${javac.target}"
 	   includeantruntime="false"
 	>
 	<src path="${bigdata.dir}/bigdata-sails/src/samples" />
@@ -907,31 +923,31 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/iris.jar" />
       <copy file="${bigdata-rdf.lib}/jgrapht-jdk1.5-0.7.1.jar"
             tofile="${dist.lib}/jgrapht.jar" />
-      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.3.0-onejar.jar"
+      <copy file="${bigdata-rdf.lib}/openrdf-sesame-${sesame.version}-onejar.jar"
             tofile="${dist.lib}/openrdf-sesame.jar" />
-      <copy file="${bigdata-rdf.lib}/slf4j-api-1.4.3.jar"
+      <copy file="${bigdata-rdf.lib}/slf4j-api-${slf4j.version}.jar"
             tofile="${dist.lib}/slf4j.jar" />
-      <copy file="${bigdata-rdf.lib}/slf4j-log4j12-1.4.3.jar"
+      <copy file="${bigdata-rdf.lib}/slf4j-log4j12-${slf4j.version}.jar"
             tofile="${dist.lib}/slf4j-log4j.jar" />
 
       <!-- jetty library -->
-      <copy file="${bigdata-jetty.lib}/jetty-continuation-7.2.2.v20101205.jar"
+      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
 	        tofile="${dist.lib}/jetty-continuation.jar" />
-	  <copy file="${bigdata-jetty.lib}/jetty-http-7.2.2.v20101205.jar"
+	  <copy file="${bigdata-jetty.lib}/jetty-http-${jetty.version}.jar"
 	        tofile="${dist.lib}/jetty-http.jar" />
-	  <copy file="${bigdata-jetty.lib}/jetty-io-7.2.2.v20101205.jar"
+	  <copy file="${bigdata-jetty.lib}/jetty-io-${jetty.version}.jar"
 	        tofile="${dist.lib}/jetty-io.jar" />
-	  <copy file="${bigdata-jetty.lib}/jetty-server-7.2.2.v20101205.jar"
+	  <copy file="${bigdata-jetty.lib}/jetty-server-${jetty.version}.jar"
 	        tofile="${dist.lib}/jetty-server.jar" />
-  	  <copy file="${bigdata-jetty.lib}/jetty-util-7.2.2.v20101205.jar"
+  	  <copy file="${bigdata-jetty.lib}/jetty-util-${jetty.version}.jar"
   	        tofile="${dist.lib}/jetty-util.jar" />
-  	  <copy file="${bigdata-jetty.lib}/jetty-webapp-7.2.2.v20101205.jar"
+  	  <copy file="${bigdata-jetty.lib}/jetty-webapp-${jetty.version}.jar"
   	        tofile="${dist.lib}/jetty-webapp.jar" />
-  	  <copy file="${bigdata-jetty.lib}/jetty-servlet-7.2.2.v20101205.jar"
+  	  <copy file="${bigdata-jetty.lib}/jetty-servlet-${jetty.version}.jar"
   	        tofile="${dist.lib}/jetty-servlet.jar" />
-  	  <copy file="${bigdata-jetty.lib}/jetty-security-7.2.2.v20101205.jar"
+  	  <copy file="${bigdata-jetty.lib}/jetty-security-${jetty.version}.jar"
   	        tofile="${dist.lib}/jetty-security.jar" />
-  	  <copy file="${bigdata-jetty.lib}/jetty-xml-7.2.2.v20101205.jar"
+  	  <copy file="${bigdata-jetty.lib}/jetty-xml-${jetty.version}.jar"
   	        tofile="${dist.lib}/jetty-xml.jar" />
 	  <copy file="${bigdata-jetty.lib}/servlet-api-2.5.jar"
 	        tofile="${dist.lib}/servlet-api.jar" />
@@ -1485,8 +1501,8 @@ ${postInstallMessage}</echo>
 
       <property name="junit.jar" location="${bigdata.lib}/junit-3.8.1.jar" />
       <property name="junit-ext.jar" location="${bigdata.lib}/junit-ext-1.1-b3-dev.jar" />
-      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.3.0.jar" />
-      <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-2.3.0.jar" />
+      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-${sesame.version}.jar" />
+      <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-${sesame.version}.jar" />
 
       <property name="classes.test.dir" location="${classes.dir}/test" />
       <mkdir dir="${classes.test.dir}" />
@@ -1513,9 +1529,9 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    nowarn="no"
 </echo>
-      <echo>    source="1.5"
+      <echo>    source="${javac.source}"
 </echo>
-      <echo>    target="1.5"
+      <echo>    target="${javac.target}"
 </echo>
       <echo>    verbose="${javac.verbose}"
 </echo>
@@ -1526,8 +1542,8 @@ ${postInstallMessage}</echo>
              deprecation="no"
              destdir="${classes.test.dir}"
              nowarn="no"
-             source="1.5"
-             target="1.5"
+             source="${javac.source}"
+             target="${javac.target}"
              classpath="${javac.test.classpath}"
              verbose="${javac.verbose}"
       		 includeantruntime="false"
@@ -2234,6 +2250,8 @@ ${postInstallMessage}</echo>
 	   debuglevel="${javac.debuglevel}"
 	   verbose="${javac.verbose}"
 	   encoding="${javac.encoding}"
+       source="${javac.source}"
+       target="${javac.target}"
 	   includeantruntime="false"
 	>
 	<src path="${bigdata.dir}/bigdata-sails/src/samples" />

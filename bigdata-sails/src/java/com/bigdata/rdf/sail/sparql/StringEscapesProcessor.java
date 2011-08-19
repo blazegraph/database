@@ -18,48 +18,48 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
  * 
  * @author Arjohn Kampman
  */
-public class StringEscapesProcessor {
+class StringEscapesProcessor {
 
-	/**
-	 * Processes escape sequences in ASTString objects.
-	 * 
-	 * @param qc
-	 *        The query that needs to be processed.
-	 * @throws MalformedQueryException
-	 *         If an invalid escape sequence was found.
-	 */
-	public static void process(ASTQueryContainer qc)
-		throws MalformedQueryException
-	{
-		StringProcessor visitor = new StringProcessor();
-		try {
-			qc.jjtAccept(visitor, null);
-		}
-		catch (VisitorException e) {
-			throw new MalformedQueryException(e);
-		}
-	}
+    /**
+     * Processes escape sequences in ASTString objects.
+     * 
+     * @param qc
+     *        The query that needs to be processed.
+     * @throws MalformedQueryException
+     *         If an invalid escape sequence was found.
+     */
+    public static void process(ASTQueryContainer qc)
+        throws MalformedQueryException
+    {
+        StringProcessor visitor = new StringProcessor();
+        try {
+            qc.jjtAccept(visitor, null);
+        }
+        catch (VisitorException e) {
+            throw new MalformedQueryException(e);
+        }
+    }
 
-	private static class StringProcessor extends ASTVisitorBase {
+    private static class StringProcessor extends ASTVisitorBase {
 
-		public StringProcessor() {
-		}
+        public StringProcessor() {
+        }
 
-		@Override
-		public Object visit(ASTString stringNode, Object data)
-			throws VisitorException
-		{
-			String value = stringNode.getValue();
-			try {
-				value = SPARQLUtil.decodeString(value);
-				stringNode.setValue(value);
-			}
-			catch (IllegalArgumentException e) {
-				// Invalid escape sequence
-				throw new VisitorException(e.getMessage());
-			}
+        @Override
+        public Object visit(ASTString stringNode, Object data)
+            throws VisitorException
+        {
+            String value = stringNode.getValue();
+            try {
+                value = SPARQLUtil.decodeString(value);
+                stringNode.setValue(value);
+            }
+            catch (IllegalArgumentException e) {
+                // Invalid escape sequence
+                throw new VisitorException(e.getMessage());
+            }
 
-			return super.visit(stringNode, data);
-		}
-	}
+            return super.visit(stringNode, data);
+        }
+    }
 }

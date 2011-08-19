@@ -34,8 +34,8 @@ import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
-import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
+import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
 
 /**
