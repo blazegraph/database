@@ -3,7 +3,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -57,6 +56,7 @@ import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemoryGroupByOp;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
+import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
@@ -204,7 +204,9 @@ public class AST2BOpUtility {
             left = addSlice(left, slice, ctx);
 
         }
-        addEndOp(left, ctx);
+
+        left = addEndOp(left, ctx);
+        
         /*
          * TODO Do we need to add operators for materialization of any remaining
          * variables which are being projected out of the query?
