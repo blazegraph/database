@@ -29,6 +29,8 @@ package com.bigdata.rdf.internal;
 
 import java.util.Random;
 
+import com.bigdata.rdf.internal.impl.TermId;
+
 /**
  * A factory for mock {@link IV}s.
  * 

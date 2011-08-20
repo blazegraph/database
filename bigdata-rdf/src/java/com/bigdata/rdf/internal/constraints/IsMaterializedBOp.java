@@ -112,7 +112,7 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
         if (iv == null)
         	throw new SparqlTypeErrorException();
 
-    	return iv.hasValue() == materialized;
+    	return iv.hasValue() == materialized || !iv.needsMaterialization();
 
     }
     

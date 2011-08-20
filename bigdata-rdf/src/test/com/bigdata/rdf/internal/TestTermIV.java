@@ -34,6 +34,8 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;

@@ -40,7 +40,7 @@ import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.impl.TermId;
 
 /**
  * Handles the term:id index (forward mapping for the lexicon). The keys are

@@ -37,7 +37,6 @@ import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.Range;
 
 /**
  * Operator used to impose a key-range constraint on an access path.

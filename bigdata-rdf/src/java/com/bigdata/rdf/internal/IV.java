@@ -190,14 +190,28 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * <code>true</code> for xsd:float, xsd:double, and xsd:decimal
      */
     boolean isFloatingPointNumeric();
-
+//
+//    /**
+//     * Return the blank node ID for this {@link IV}.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if this {@link IV} does not represent a blank node.
+//     * @return
+//     */
+//    String bnodeId();
+    
     /**
-     * Return the blank node ID for this {@link IV}.
-     * 
-     * @throws UnsupportedOperationException
-     *             if this {@link IV} does not represent a blank node.
-     * @return
+     * Each concrete IV implementation will implement one of the corresponding
+     * openrdf Value interfaces depending on the type of value the IV represents
+     * (URI, BNode, or Literal). This method signifies whether or not the IV
+     * can deliver the information needed by those interfaces with or without
+     * materialization.  For example, inline numerics can implement the entire
+     * Literal interface without needing to be materialized into a 
+     * BigdataLiteral. TermIds cannot answer any of the requests in the openrdf
+     * interfaces without materialization (all the relevant information is in
+     * the lexicon indices).  Even some inlines need materialization.  For
+     * example, ...
      */
-    String bnodeId();
+    boolean needsMaterialization();
 
 }

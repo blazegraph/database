@@ -81,7 +81,7 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
         for (int i = 1; i < arity(); i++) {
             IV right = get(i).get(bindingSet);
             if (right != null) {
-                if (CompareBOp.compare(CompareOp.EQ, iv, right)) {
+                if (CompareBOp.compare(iv, right, CompareOp.EQ)) {
                     found = true;
                     break;
                 }

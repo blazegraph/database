@@ -40,7 +40,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -147,19 +147,19 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
                 XMLGregorianCalendar cal=bl.calendarValue();
                 switch (op()) {
                 case DAY:
-                    return new XSDIntIV(cal.getDay());
+                    return new XSDNumericIV(cal.getDay());
                 case MONTH:
-                    return new XSDIntIV(cal.getMonth());
+                    return new XSDNumericIV(cal.getMonth());
                 case YEAR:
-                    return new XSDIntIV(cal.getYear());
+                    return new XSDNumericIV(cal.getYear());
                 case HOURS:
-                    return new XSDIntIV(cal.getHour());
+                    return new XSDNumericIV(cal.getHour());
                 case SECONDS:
-                    return new XSDIntIV(cal.getSecond());
+                    return new XSDNumericIV(cal.getSecond());
                 case MINUTES:
-                    return new XSDIntIV(cal.getMinute());
+                    return new XSDNumericIV(cal.getMinute());
                 case TIMEZONE:
-                    return new XSDIntIV(cal.getTimezone());
+                    return new XSDNumericIV(cal.getTimezone());
                 default:
                     throw new UnsupportedOperationException();
                 }

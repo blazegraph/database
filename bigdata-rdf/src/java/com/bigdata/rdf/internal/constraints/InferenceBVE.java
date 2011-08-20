@@ -7,7 +7,7 @@ import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.constraint.BooleanValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 
 public class InferenceBVE extends BOpBase implements BooleanValueExpression {
 

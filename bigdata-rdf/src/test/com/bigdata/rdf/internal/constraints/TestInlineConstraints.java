@@ -62,8 +62,8 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -732,26 +732,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                 	final IV left = l3.getIV();
                 	final IV right = l2.getIV();
                 	
-                	if (log.isInfoEnabled()) {
-                	
-                		log.info(left + ": " + left.isInline() + ", " + left.isLiteral() + ", " + left.isNumeric());
-	                	log.info(right + ": " + right.isInline() + ", " + right.isLiteral() + ", " + right.isNumeric());
-	                	
-	                	if (IVUtility.canNumericalCompare(left) &&
-	                			IVUtility.canNumericalCompare(right)) {
-	                		
-	                		final int compare = IVUtility.numericalCompare(left, right);
-	                		log.info("can numerical compare: " + compare);
-	            	        
-	                	} else {
-	                		
-	                		final int compare = (left.compareTo(right));
-	                		log.info("cannot numerical compare: " + compare);
-	            	        
-	                	}
-	                	
-                	}
-
                     int numSolutions = 0;
                     
                     final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);

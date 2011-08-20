@@ -53,7 +53,7 @@ import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
@@ -205,7 +205,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                 for (int j = 0; j < chunks[i].length; j++) {
                     final IBindingSet bset = new ListBindingSet();
                     final int v = r.nextInt(maxInt);
-                    final IV<?,?> iv = new XSDIntIV(v);
+                    final IV<?,?> iv = new XSDNumericIV(v);
 					bset.set(a, new Constant<IV>(iv));
                     chunks[i][j] = bset;
                     ngiven++;

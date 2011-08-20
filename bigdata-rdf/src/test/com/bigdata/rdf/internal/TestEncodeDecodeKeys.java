@@ -41,6 +41,18 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.rdf.internal.ColorsEnumExtension.Color;
+import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
+import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -101,11 +113,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                         return 0;
                     }
                     
-                    public int compareTo(Object o) {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    protected int _compareTo(IV o) {
+                    public int _compareTo(IV o) {
                         throw new UnsupportedOperationException();
                     }
 
@@ -119,16 +127,12 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                         return null;
                     }
 
-//                    public long getTermId() {
-//                        throw new UnsupportedOperationException();
-//                    }
-
                     public boolean isInline() {
                         return true;
                     }
-
-                    public boolean isNonInline() {
-                        return false;
+                    
+                    public boolean needsMaterialization() {
+                    	return false;
                     }
 
                 };
@@ -221,16 +225,16 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDByteIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDByte() {
 
         final IV<?, ?>[] e = {//
-                new XSDByteIV<BigdataLiteral>((byte)Byte.MIN_VALUE),//
-                new XSDByteIV<BigdataLiteral>((byte)-1),//
-                new XSDByteIV<BigdataLiteral>((byte)0),//
-                new XSDByteIV<BigdataLiteral>((byte)1),//
-                new XSDByteIV<BigdataLiteral>((byte)Byte.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>((byte)Byte.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>((byte)-1),//
+                new XSDNumericIV<BigdataLiteral>((byte)0),//
+                new XSDNumericIV<BigdataLiteral>((byte)1),//
+                new XSDNumericIV<BigdataLiteral>((byte)Byte.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -240,16 +244,16 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDShortIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDShort() {
 
         final IV<?, ?>[] e = {//
-                new XSDShortIV<BigdataLiteral>((short)-1),//
-                new XSDShortIV<BigdataLiteral>((short)0),//
-                new XSDShortIV<BigdataLiteral>((short)1),//
-                new XSDShortIV<BigdataLiteral>((short)Short.MIN_VALUE),//
-                new XSDShortIV<BigdataLiteral>((short)Short.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>((short)-1),//
+                new XSDNumericIV<BigdataLiteral>((short)0),//
+                new XSDNumericIV<BigdataLiteral>((short)1),//
+                new XSDNumericIV<BigdataLiteral>((short)Short.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>((short)Short.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -259,16 +263,16 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDIntIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDInt() {
 
         final IV<?, ?>[] e = {//
-                new XSDIntIV<BigdataLiteral>(1),//
-                new XSDIntIV<BigdataLiteral>(0),//
-                new XSDIntIV<BigdataLiteral>(-1),//
-                new XSDIntIV<BigdataLiteral>(Integer.MAX_VALUE),//
-                new XSDIntIV<BigdataLiteral>(Integer.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(1),//
+                new XSDNumericIV<BigdataLiteral>(0),//
+                new XSDNumericIV<BigdataLiteral>(-1),//
+                new XSDNumericIV<BigdataLiteral>(Integer.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Integer.MIN_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -278,16 +282,16 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDLongIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDLong() {
 
         final IV<?, ?>[] e = {//
-                new XSDLongIV<BigdataLiteral>(1L),//
-                new XSDLongIV<BigdataLiteral>(0L),//
-                new XSDLongIV<BigdataLiteral>(-1L),//
-                new XSDLongIV<BigdataLiteral>(Long.MIN_VALUE),//
-                new XSDLongIV<BigdataLiteral>(Long.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(1L),//
+                new XSDNumericIV<BigdataLiteral>(0L),//
+                new XSDNumericIV<BigdataLiteral>(-1L),//
+                new XSDNumericIV<BigdataLiteral>(Long.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Long.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -297,25 +301,25 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDFloatIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDFloat() {
 
         /*
          * Note: -0f and +0f are converted to the same point in the value space.
          */
-//        new XSDFloatIV<BigdataLiteral>(-0f);
+//        new XSDNumericIV<BigdataLiteral>(-0f);
 
         final IV<?, ?>[] e = {//
-                new XSDFloatIV<BigdataLiteral>(1f),//
-                new XSDFloatIV<BigdataLiteral>(-1f),//
-                new XSDFloatIV<BigdataLiteral>(+0f),//
-                new XSDFloatIV<BigdataLiteral>(Float.MAX_VALUE),//
-                new XSDFloatIV<BigdataLiteral>(Float.MIN_VALUE),//
-                new XSDFloatIV<BigdataLiteral>(Float.MIN_NORMAL),//
-                new XSDFloatIV<BigdataLiteral>(Float.POSITIVE_INFINITY),//
-                new XSDFloatIV<BigdataLiteral>(Float.NEGATIVE_INFINITY),//
-                new XSDFloatIV<BigdataLiteral>(Float.NaN),//
+                new XSDNumericIV<BigdataLiteral>(1f),//
+                new XSDNumericIV<BigdataLiteral>(-1f),//
+                new XSDNumericIV<BigdataLiteral>(+0f),//
+                new XSDNumericIV<BigdataLiteral>(Float.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Float.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Float.MIN_NORMAL),//
+                new XSDNumericIV<BigdataLiteral>(Float.POSITIVE_INFINITY),//
+                new XSDNumericIV<BigdataLiteral>(Float.NEGATIVE_INFINITY),//
+                new XSDNumericIV<BigdataLiteral>(Float.NaN),//
         };
 
         doEncodeDecodeTest(e);
@@ -325,25 +329,25 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     }
 
     /**
-     * Unit test for {@link XSDDoubleIV}.
+     * Unit test for {@link XSDNumericIV}.
      */
     public void test_encodeDecode_XSDDouble() {
 
         /*
          * Note: -0d and +0d are converted to the same point in the value space.
          */
-//      new XSDDoubleIV<BigdataLiteral>(-0d);
+//      new XSDNumericIV<BigdataLiteral>(-0d);
 
         final IV<?, ?>[] e = {//
-                new XSDDoubleIV<BigdataLiteral>(1d),//
-                new XSDDoubleIV<BigdataLiteral>(-1d),//
-                new XSDDoubleIV<BigdataLiteral>(+0d),//
-                new XSDDoubleIV<BigdataLiteral>(Double.MAX_VALUE),//
-                new XSDDoubleIV<BigdataLiteral>(Double.MIN_VALUE),//
-                new XSDDoubleIV<BigdataLiteral>(Double.MIN_NORMAL),//
-                new XSDDoubleIV<BigdataLiteral>(Double.POSITIVE_INFINITY),//
-                new XSDDoubleIV<BigdataLiteral>(Double.NEGATIVE_INFINITY),//
-                new XSDDoubleIV<BigdataLiteral>(Double.NaN),//
+                new XSDNumericIV<BigdataLiteral>(1d),//
+                new XSDNumericIV<BigdataLiteral>(-1d),//
+                new XSDNumericIV<BigdataLiteral>(+0d),//
+                new XSDNumericIV<BigdataLiteral>(Double.MAX_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Double.MIN_VALUE),//
+                new XSDNumericIV<BigdataLiteral>(Double.MIN_NORMAL),//
+                new XSDNumericIV<BigdataLiteral>(Double.POSITIVE_INFINITY),//
+                new XSDNumericIV<BigdataLiteral>(Double.NEGATIVE_INFINITY),//
+                new XSDNumericIV<BigdataLiteral>(Double.NaN),//
         };
 
         doEncodeDecodeTest(e);
@@ -540,8 +544,8 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
         if (log.isInfoEnabled()) {
         	for (int i = 0; i < e.length; i++) {
                 log.info("original: " + dt[i]);
-                log.info("asValue : " + ext.asValue((ExtensionIV<?>) e[i], vf));
-                log.info("decoded : " + ext.asValue((ExtensionIV<?>) a[i], vf));
+                log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
+                log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
                 log.info("");
 	        }
 //        	log.info(svf.createLiteral(
@@ -607,7 +611,7 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
          * time into the time zone given to the extension and will also truncate
          * the precision to no more than milliseconds.
          */
-        final ExtensionIV<?> iv = ext.createIV(lit);
+        final LiteralExtensionIV<?> iv = ext.createIV(lit);
 
         // Convert the IV back into a bigdata literal.
         final BigdataLiteral lit2 = (BigdataLiteral) ext.asValue(iv, vf);
@@ -695,11 +699,11 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     public void test_encodeDecode_URIByteIV() {
 
         final IV<?, ?>[] e = {//
-				new URIByteIV<BigdataURI>((byte) Byte.MIN_VALUE),//
-				new URIByteIV<BigdataURI>((byte) -1),//
-				new URIByteIV<BigdataURI>((byte) 0),//
-				new URIByteIV<BigdataURI>((byte) 1),//
-				new URIByteIV<BigdataURI>((byte) Byte.MAX_VALUE),//
+				new VocabURIByteIV<BigdataURI>((byte) Byte.MIN_VALUE),//
+				new VocabURIByteIV<BigdataURI>((byte) -1),//
+				new VocabURIByteIV<BigdataURI>((byte) 0),//
+				new VocabURIByteIV<BigdataURI>((byte) 1),//
+				new VocabURIByteIV<BigdataURI>((byte) Byte.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);
@@ -719,11 +723,11 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
     public void test_encodeDecode_URIShortIV() {
 
         final IV<?, ?>[] e = {//
-				new URIShortIV<BigdataURI>((short) Short.MIN_VALUE),//
-				new URIShortIV<BigdataURI>((short) -1),//
-				new URIShortIV<BigdataURI>((short) 0),//
-				new URIShortIV<BigdataURI>((short) 1),//
-				new URIShortIV<BigdataURI>((short) Short.MAX_VALUE),//
+				new VocabURIShortIV<BigdataURI>((short) Short.MIN_VALUE),//
+				new VocabURIShortIV<BigdataURI>((short) -1),//
+				new VocabURIShortIV<BigdataURI>((short) 0),//
+				new VocabURIShortIV<BigdataURI>((short) 1),//
+				new VocabURIShortIV<BigdataURI>((short) Short.MAX_VALUE),//
         };
 
         doEncodeDecodeTest(e);

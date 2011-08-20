@@ -31,7 +31,7 @@ import java.util.Iterator;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.internal.URIShortIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -45,7 +45,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * vocabulary. It is convention to expose this {@link String} value as a public
  * static field named <code>NAMESPACE</code>. Declaring the namespace used by
  * provides for compact encoding of URIs within that namespace (e.g., using a
- * {@link URIShortIV} for the namespace and a compressed unicode representation
+ * {@link VocabURIShortIV} for the namespace and a compressed unicode representation
  * of the localName of the URI) even if those URIs were not part of the original
  * vocabulary declaration. Thus, it provides a compact fallback encoding if the
  * vocabulary evolves after the {@link AbstractTripleStore} has been

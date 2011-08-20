@@ -45,10 +45,10 @@ import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.MIN;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 
 /**
  * Test suite for {@link GroupByRewriter}.
@@ -262,7 +262,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> x = Var.var("x");
 
         final IConstraint constraint = new SPARQLConstraint(new CompareBOp(new SUM(
-                false/* distinct */, (IValueExpression<IV>) x),new Constant<IV>(new XSDIntIV(10)),CompareOp.GT));
+                false/* distinct */, (IValueExpression<IV>) x),new Constant<IV>(new XSDNumericIV(10)),CompareOp.GT));
 
         /*
          * Set up the expected answer.
@@ -274,7 +274,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IConstraint expectedExpr = new SPARQLConstraint(new CompareBOp(
-                _0, new Constant<IV>(new XSDIntIV(10)), CompareOp.GT));
+                _0, new Constant<IV>(new XSDNumericIV(10)), CompareOp.GT));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);
@@ -367,7 +367,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
 
         final IValueExpression<?> expr = new /* Conditional */Bind(y,
-                new MathBOp(new Constant<IV>(new XSDIntIV(1)), new SUM(
+                new MathBOp(new Constant<IV>(new XSDNumericIV(1)), new SUM(
                         false/* distinct */, (IValueExpression<IV>) x),
                         MathBOp.MathOp.PLUS));
 
@@ -381,7 +381,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IValueExpression<IV> expectedExpr = new Bind(y, new MathBOp(
-                new Constant<IV>(new XSDIntIV(1)), _0, MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), _0, MathBOp.MathOp.PLUS));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);

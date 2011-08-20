@@ -29,6 +29,10 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -64,10 +68,10 @@ public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
      * Attempts to convert the supplied value into an epoch representation.
      * Tests for a literal value with the correct datatype that can be converted
      * to a positive long integer. Encodes the long in a delegate
-     * {@link XSDLongIV}, and returns an {@link ExtensionIV} to wrap the native
+     * {@link XSDLongIV}, and returns an {@link LiteralExtensionIV} to wrap the native
      * type.
      */
-    public ExtensionIV createIV(final Value value) {
+    public LiteralExtensionIV createIV(final Value value) {
         
         if (value instanceof Literal == false)
             throw new IllegalArgumentException();
@@ -83,20 +87,20 @@ public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
         
         final long l = XMLDatatypeUtil.parseLong(s);
         
-        final AbstractLiteralIV delegate = new XSDLongIV(l);
+        final AbstractLiteralIV delegate = new XSDNumericIV(l);
 
-        return new ExtensionIV(delegate, getDatatype().getIV());
+        return new LiteralExtensionIV(delegate, getDatatype().getIV());
         
     }
     
     /**
-     * Use the string value of the {@link ExtensionIV} (which defers to the
+     * Use the string value of the {@link LiteralExtensionIV} (which defers to the
      * string value of the native type) to create a literal with the epoch
      * datatype. 
      */
-    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
         
-        return (V) vf.createLiteral(iv.stringValue(), epoch);
+        return (V) vf.createLiteral(iv.getDelegate().stringValue(), epoch);
         
     }
     

@@ -41,8 +41,8 @@ import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
-import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.spo.SPOPredicate;
 
 /**

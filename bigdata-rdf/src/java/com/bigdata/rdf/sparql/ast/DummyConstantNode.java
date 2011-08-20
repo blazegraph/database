@@ -2,8 +2,8 @@ package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**

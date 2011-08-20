@@ -6,11 +6,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
- * Test suite for {@link InlineLiteralIV}.
+ * Test suite for {@link FullyInlineTypedLiteralIV}.
  */
 public class TestInlineLiteralIV extends TestCase2 {
 
@@ -23,21 +24,21 @@ public class TestInlineLiteralIV extends TestCase2 {
 
 	public void test_InlineLiteralIV_plain() {
 
-        doTest(new InlineLiteralIV<BigdataLiteral>(""));
-        doTest(new InlineLiteralIV<BigdataLiteral>(" "));
-        doTest(new InlineLiteralIV<BigdataLiteral>("1"));
-        doTest(new InlineLiteralIV<BigdataLiteral>("12"));
-        doTest(new InlineLiteralIV<BigdataLiteral>("123"));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(""));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(" "));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("1"));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("12"));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("123"));
 
 	}
 	
 	public void test_InlineLiteralIV_languageCode() {
 
-        doTest(new InlineLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
-        doTest(new InlineLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
-        doTest(new InlineLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
-        doTest(new InlineLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
-        doTest(new InlineLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
+        doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
 
 	}
 
@@ -45,15 +46,15 @@ public class TestInlineLiteralIV extends TestCase2 {
 
 		final URI datatype = new URIImpl("http://www.bigdata.com");
 
-		doTest(new InlineLiteralIV<BigdataLiteral>("", null, datatype));
-		doTest(new InlineLiteralIV<BigdataLiteral>(" ", null, datatype));
-		doTest(new InlineLiteralIV<BigdataLiteral>("1", null, datatype));
-		doTest(new InlineLiteralIV<BigdataLiteral>("12", null, datatype));
-		doTest(new InlineLiteralIV<BigdataLiteral>("123", null, datatype));
+		doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, datatype));
+		doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ", null, datatype));
+		doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("1", null, datatype));
+		doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("12", null, datatype));
+		doTest(new FullyInlineTypedLiteralIV<BigdataLiteral>("123", null, datatype));
 
 	}
 
-	private void doTest(final InlineLiteralIV<BigdataLiteral> iv) {
+	private void doTest(final FullyInlineTypedLiteralIV<BigdataLiteral> iv) {
 
 		assertEquals(VTE.LITERAL, iv.getVTE());
 		

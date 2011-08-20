@@ -33,9 +33,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDLongIV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -147,7 +147,7 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
         }
 
-        return new XSDLongIV<BigdataLiteral>(aggregated);
+        return new XSDNumericIV<BigdataLiteral>(aggregated);
 
     }
 

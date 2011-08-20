@@ -47,8 +47,8 @@ import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**

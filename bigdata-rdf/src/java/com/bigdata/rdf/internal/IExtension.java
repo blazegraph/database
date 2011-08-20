@@ -27,6 +27,8 @@ package com.bigdata.rdf.internal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -34,8 +36,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * {@link IExtension}s are responsible for round-tripping between an RDF
- * {@link Value} and an {@link ExtensionIV} for a particular datatype. Because
- * of how {@link ExtensionIV}s are encoded and decoded, the {@link IExtension}
+ * {@link Value} and an {@link LiteralExtensionIV} for a particular datatype. Because
+ * of how {@link LiteralExtensionIV}s are encoded and decoded, the {@link IExtension}
  * will need to have on hand the {@link BlobIV} for its datatype. This is
  * accomplished via the {@link IDatatypeURIResolver} - the {@link IExtension}
  * will give the resolver the datatype {@link URI} it needs resolved and the
@@ -55,7 +57,7 @@ public interface IExtension<V extends BigdataValue> {
     BigdataURI getDatatype();
 
     /**
-     * Create an {@link ExtensionIV} from an RDF value.
+     * Create an {@link LiteralExtensionIV} from an RDF value.
      * 
      * @param value
      *            The RDF {@link Value}
@@ -63,10 +65,10 @@ public interface IExtension<V extends BigdataValue> {
      * @return The extension {@link IV} -or- <code>null</code> if the
      *         {@link Value} can not be inlined using this {@link IExtension}.
      */
-    ExtensionIV createIV(final Value value);
+    LiteralExtensionIV createIV(final Value value);
     
     /**
-     * Create an RDF value from an {@link ExtensionIV}.
+     * Create an RDF value from an {@link LiteralExtensionIV}.
      * 
      * @param iv
      *          The extension {@link IV}
@@ -75,6 +77,6 @@ public interface IExtension<V extends BigdataValue> {
      * @return
      *          The RDF {@link Value}
      */
-    V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
+    V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf);
     
 }

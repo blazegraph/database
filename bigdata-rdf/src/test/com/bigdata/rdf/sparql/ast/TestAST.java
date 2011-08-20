@@ -39,10 +39,10 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.internal.impl.TermId;
 
 /**
  * TODO This does not really "test" much, just exercises some basic aspects of

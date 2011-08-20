@@ -38,9 +38,9 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.TermId;
 
 /**
  * Unit tests for {@link BigdataValueFactoryImpl}.

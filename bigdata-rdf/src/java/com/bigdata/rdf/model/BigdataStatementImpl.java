@@ -28,7 +28,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.SidIV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.spo.ModifiedEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;

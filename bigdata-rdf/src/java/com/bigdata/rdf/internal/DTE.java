@@ -35,6 +35,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 

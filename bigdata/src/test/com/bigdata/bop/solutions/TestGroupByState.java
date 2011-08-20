@@ -43,13 +43,13 @@ import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.MIN;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 
 /**
  * Test suite for {@link GroupByState}.
@@ -433,7 +433,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDIntIV>(new XSDIntIV(10)), CompareOp.LT))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -480,7 +480,7 @@ public class TestGroupByState extends TestCase2 {
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(new SUM(
                 false/* distinct */, (IValueExpression<IV>) y),
-                new Constant<XSDIntIV>(new XSDIntIV(10)), CompareOp.LT)) //
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT)) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -668,7 +668,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(x,
-                new Constant<XSDIntIV>(new XSDIntIV(10)), CompareOp.LT))//
+                new Constant<XSDNumericIV>(new XSDNumericIV(10)), CompareOp.LT))//
             };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -717,8 +717,8 @@ public class TestGroupByState extends TestCase2 {
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
-                        (IValueExpression<IV>) y)), new Constant<XSDIntIV>(
-                        new XSDIntIV(10)), CompareOp.LT)) //
+                        (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
+                        new XSDNumericIV(10)), CompareOp.LT)) //
         };
 
         final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
@@ -752,7 +752,7 @@ public class TestGroupByState extends TestCase2 {
         final IVariable<IV> x = Var.var("x");
 
         final IValueExpression<IV> xExpr = new /* Conditional */Bind(x,
-                new Constant<IV>(new XSDIntIV(12)));
+                new Constant<IV>(new XSDNumericIV(12)));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { xExpr };
 
@@ -793,8 +793,8 @@ public class TestGroupByState extends TestCase2 {
         final IConstraint[] having = new IConstraint[] {//
         new SPARQLConstraint<XSDBooleanIV>(new CompareBOp(
                 new /* Conditional */Bind(x, new SUM(true/* distinct */,
-                        (IValueExpression<IV>) y)), new Constant<XSDIntIV>(
-                        new XSDIntIV(10)), CompareOp.LT)) //
+                        (IValueExpression<IV>) y)), new Constant<XSDNumericIV>(
+                        new XSDNumericIV(10)), CompareOp.LT)) //
         };
 
         // SELECT may not be null.

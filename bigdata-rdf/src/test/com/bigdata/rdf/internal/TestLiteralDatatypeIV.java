@@ -3,11 +3,15 @@ package com.bigdata.rdf.internal;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.AbstractNonInlineExtensionIVWithDelegateIV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
- * Test suite for {@link LiteralDatatypeIV}.
+ * Test suite for {@link PartlyInlineTypedLiteralIV}.
  */
 public class TestLiteralDatatypeIV extends TestCase2 {
 
@@ -49,29 +53,29 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 
 		final IV<?,?> datatypeIV = newTermId(VTE.URI);
 
-		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>(""), datatypeIV)//
+		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+				new FullyInlineTypedLiteralIV<BigdataLiteral>(""), datatypeIV)//
 				);
 
-		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("abc"), datatypeIV)//
+		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+				new FullyInlineTypedLiteralIV<BigdataLiteral>("abc"), datatypeIV)//
 				);
 
-		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>(" "), datatypeIV)//
+		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+				new FullyInlineTypedLiteralIV<BigdataLiteral>(" "), datatypeIV)//
 				);
 
-		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("1"), datatypeIV)//
+		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+				new FullyInlineTypedLiteralIV<BigdataLiteral>("1"), datatypeIV)//
 				);
 
-		doTest(new LiteralDatatypeIV<BigdataLiteral>(
-				new InlineLiteralIV<BigdataLiteral>("12"), datatypeIV)//
+		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+				new FullyInlineTypedLiteralIV<BigdataLiteral>("12"), datatypeIV)//
 				);
 
 	}
 
-	private void doTest(final LiteralDatatypeIV<BigdataLiteral> iv) {
+	private void doTest(final PartlyInlineTypedLiteralIV<BigdataLiteral> iv) {
 
 		assertEquals(VTE.LITERAL, iv.getVTE());
 		
@@ -87,8 +91,8 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 		
 		final byte[] key = IVUtility.encode(keyBuilder, iv).getKey();
 		
-		final AbstractIV<?, ?> actual = (AbstractIV<?, ?>) IVUtility
-				.decode(key);
+		final PartlyInlineTypedLiteralIV<BigdataLiteral> actual = 
+			(PartlyInlineTypedLiteralIV<BigdataLiteral>) IVUtility.decode(key);
 
 		// Check the extension IVs for consistency.
 		{

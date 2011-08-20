@@ -38,6 +38,19 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -258,7 +271,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
 
         // The datatypeIV for the ExtensionIV.
         final IV datatypeIV = iv.getExtensionIV();
@@ -344,7 +357,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         if (value.stringValue().length() <= maxInlineTextLength) {
 
-            return new InlineURIIV<BigdataURI>(value);
+            return new FullyInlineURIIV<BigdataURI>(value);
 
         }
 
@@ -414,7 +427,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * Test the registered {@link IExtension} handlers. If one handles this
      * datatype, then delegate to that {@link IExtension}.
      * 
-     * @return The {@link ExtensionIV} -or- <code>null</code> if no
+     * @return The {@link LiteralExtensionIV} -or- <code>null</code> if no
      *         {@link IExtension} was registered for that datatype.
      * 
      *         TODO Should we explicitly disallow extensions which override the
@@ -483,7 +496,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         if (totalLength <= maxInlineTextLength) {
 
-            return new InlineLiteralIV<BigdataLiteral>(value.getLabel(), value
+            return new FullyInlineTypedLiteralIV<BigdataLiteral>(value.getLabel(), value
                     .getLanguage(), value.getDatatype());
 
         }
@@ -533,21 +546,21 @@ public class LexiconConfiguration<V extends BigdataValue>
                 return new XSDBooleanIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseBoolean(v));
             case XSDByte:
-                return new XSDByteIV<BigdataLiteral>(XMLDatatypeUtil
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseByte(v));
             case XSDShort:
-                return new XSDShortIV<BigdataLiteral>(XMLDatatypeUtil
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseShort(v));
             case XSDInt:
-                return new XSDIntIV<BigdataLiteral>(XMLDatatypeUtil.parseInt(v));
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil.parseInt(v));
             case XSDLong:
-                return new XSDLongIV<BigdataLiteral>(XMLDatatypeUtil
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseLong(v));
             case XSDFloat:
-                return new XSDFloatIV<BigdataLiteral>(XMLDatatypeUtil
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseFloat(v));
             case XSDDouble:
-                return new XSDDoubleIV<BigdataLiteral>(XMLDatatypeUtil
+                return new XSDNumericIV<BigdataLiteral>(XMLDatatypeUtil
                         .parseDouble(v));
             case XSDInteger:
                 return new XSDIntegerIV<BigdataLiteral>(XMLDatatypeUtil
@@ -712,7 +725,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * 
      * @return <code>true</code> if the {@link DTE} has native inline support
      *         (versus support via an {@link IExtension} handler or inline
-     *         support via a {@link InlineLiteralIV} (a catch all)).
+     *         support via a {@link FullyInlineTypedLiteralIV} (a catch all)).
      */
     private boolean isSupported(final DTE dte) {
 

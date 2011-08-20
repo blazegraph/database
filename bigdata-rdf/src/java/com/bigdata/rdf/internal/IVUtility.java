@@ -41,11 +41,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+import javax.xml.datatype.DatatypeConstants;
+import javax.xml.datatype.XMLGregorianCalendar;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
+import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -56,11 +62,37 @@ import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
+import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
+import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
+import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -76,16 +108,16 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 @SuppressWarnings("unchecked")
 public class IVUtility {
 
-//	private static final transient Logger log = Logger.getLogger(IVUtility.class);
-	
-	/**
-	 * Helper instance for compression/decompression of Unicode string data.
-	 */
-	static UnicodeHelper un = new UnicodeHelper(
-//	        new BOCU1Compressor()
+//    private static final transient Logger log = Logger.getLogger(IVUtility.class);
+    
+    /**
+     * Helper instance for compression/decompression of Unicode string data.
+     */
+    public static UnicodeHelper un = new UnicodeHelper(
+//            new BOCU1Compressor()
 //          new SCSUCompressor()
-	        new NoCompressor()
-	        );
+            new NoCompressor()
+            );
 
     /**
      * Return the byte length of the compressed representation of a unicode
@@ -101,7 +133,7 @@ public class IVUtility {
      * 
      * @return Its compressed byte length.
      */
-    static int byteLengthUnicode(final String s) {
+    public static int byteLengthUnicode(final String s) {
         try {
             return un.encode(s, new NullOutputStream(), new ByteArrayBuffer(s
                     .length()));
@@ -109,7 +141,7 @@ public class IVUtility {
             throw new RuntimeException(ex);
         }
     }
-	
+    
     public static boolean equals(final IV iv1, final IV iv2) {
         
         // same IV or both null
@@ -152,412 +184,73 @@ public class IVUtility {
         
     }
     
-    /**
-     * This method attempts to compare two inline internal values based on
-     * their numerical representation, which is different from the natural
-     * sort ordering of IVs (the natural sort ordering considers the datatype).
-     * <p>
-     * So for example, if we have two IVs representing 2.1d and 1l, this method
-     * will attempt to compare 2.1 to 11 ignoring the datatype. This is useful
-     * for SPARQL filters.
-     */
-    public static int numericalCompare(final IV iv1, final IV iv2) {
-
-		if (!iv1.isInline())
-			throw new IllegalArgumentException("left term is not inline: left="
-					+ iv1 + ", right=" + iv2);
-
-		if (!iv2.isInline())
-			throw new IllegalArgumentException(
-					"right term is not inline: left=" + iv1 + ", right=" + iv2);
-        
-//        if (!iv1.isInline() || !iv2.isInline())
-//            throw new IllegalArgumentException("not inline terms");
-        
-		if (!iv1.isLiteral())
-			throw new IllegalArgumentException(
-					"left term is not literal: left=" + iv1 + ", right=" + iv2);
-
-		if (!iv2.isLiteral())
-			throw new IllegalArgumentException(
-					"right term is not literal: left=" + iv1 + ", right=" + iv2);
-
-//        if (!iv1.isLiteral() || !iv2.isLiteral())
-//            throw new IllegalArgumentException("not literals");
-        
-        final DTE dte1 = iv1.getDTE();
-        final DTE dte2 = iv2.getDTE();
-
-        final int numBooleans = 
-                (dte1 == DTE.XSDBoolean ? 1 : 0) +
-                (dte2 == DTE.XSDBoolean ? 1 : 0);
-        
-        // we can do two booleans
-        if (numBooleans == 1)
-            throw new IllegalArgumentException("only one boolean");
-
-        // we can do two signed numerics
-        if (numBooleans == 0)
-        if (!dte1.isNumeric() || !dte2.isNumeric())
-            throw new IllegalArgumentException("not signed numerics");
-        
-        // we can use the natural ordering if they have the same DTE
-        // this will naturally take care of two booleans or two numerics of the
-        // same datatype
-        if (dte1 == dte2)
-            return iv1.compareTo(iv2);
-        
-        // otherwise we need to try to convert them into comparable numbers
-        final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
-        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
-        
-        // if one's a BigDecimal we should use the BigDecimal comparator for both
-        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
-            return num1.decimalValue().compareTo(num2.decimalValue());
-        }
-        
-        // same for BigInteger
-        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
-            return num1.integerValue().compareTo(num2.integerValue());
-        }
-        
-        // fixed length numerics
-        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
-            // non-BigDecimal floating points - use doubles
-            return Double.compare(num1.doubleValue(), num2.doubleValue());
-        } else {
-            // non-BigInteger integers - use longs
-            final long a = num1.longValue();
-            final long b = num2.longValue();
-            return a == b ? 0 : a < b ? -1 : 1;
-        }
-        
-    }
-
-    /**
-     * Note: openrdf imposes the following type precedence:
-     * 
-     * <pre>
-     *              - simple literal
-     *              - numeric
-     *              - xsd:boolean
-     *              - xsd:dateTime
-     *              - xsd:string
-     *              - RDF term (equal and unequal only)
-     * </pre>
-     */
-    public static int numericalCompare(final IV iv1, final Literal lit2) {
-
-        if (!iv1.isInline())
-            throw new IllegalArgumentException("left term is not inline: left="
-                    + iv1 + ", right=" + lit2);
-
-        if (!iv1.isLiteral())
-            throw new IllegalArgumentException(
-                    "left term is not literal: left=" + iv1 + ", right=" + lit2);
-
-        final DTE dte1 = iv1.getDTE();
-//        final DTE dte2 = iv2.getDTE();
-        final URI dt2 = lit2.getDatatype();
-
-        if (dt2 == null)
-            throw new IllegalArgumentException(
-                    "right term is not datatype literal: left=" + iv1
-                            + ", right=" + lit2);
-
-        final int numBooleans = 
-                (dte1 == DTE.XSDBoolean ? 1 : 0) +
-                (dt2.equals(XSD.BOOLEAN) ? 1 : 0);
-
-        if (numBooleans == 1)
-            throw new IllegalArgumentException("only one boolean");
-
-        // we can do two numerics
-        if (numBooleans == 0)
-        if (!dte1.isNumeric() || !XMLDatatypeUtil.isNumericDatatype(dt2))
-            throw new IllegalArgumentException("not numerics");
-        
-//        // we can use the natural ordering if they have the same DTE
-//        // this will naturally take care of two booleans or two numerics of the
-//        // same datatype
-//        if (dte1 == dte2)
-//            return iv1.compareTo(iv2);
-        
-        // otherwise we need to try to convert them into comparable numbers
-        final AbstractLiteralIV<BigdataLiteral,?> num1 = (AbstractLiteralIV<BigdataLiteral,?>) iv1; 
-//        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
-
-        // we can do two booleans
-        if (numBooleans == 2) {
-              final Boolean leftBool = Boolean.valueOf(num1.booleanValue());
-              final Boolean rightBool = Boolean.valueOf(lit2.booleanValue());
-              return leftBool.compareTo(rightBool);
-        }
-
-        // if one's a BigDecimal we should use the BigDecimal comparator for both
-        if (dte1 == DTE.XSDDecimal || dt2.equals(XSD.DECIMAL)) {
-            return num1.decimalValue().compareTo(lit2.decimalValue());
-        }
-        
-        // same for BigInteger
-        if (dte1 == DTE.XSDInteger || dt2.equals(DTE.XSDInteger)) {
-            return num1.integerValue().compareTo(lit2.integerValue());
-        }
-        
-        // fixed length numerics
-        if (dte1.isFloatingPointNumeric() || XMLDatatypeUtil.isFloatingPointDatatype(dt2)) {
-            // non-BigDecimal floating points - use doubles
-            return Double.compare(num1.doubleValue(), lit2.doubleValue());
-        } else {
-            // non-BigInteger integers - use longs
-            final long a = num1.longValue();
-            final long b = lit2.longValue();
-            return a == b ? 0 : a < b ? -1 : 1;
-        }
-
-    }
-
-    /* 
-     * NB: This is the openrdf code for comparing literals from QueryEvaluationUtil.
-     * Additional logic in the openrdf ValueComparator provides for the precedence
-     * of plain literals, etc.
-     */
-//    public static boolean compareLiterals(Literal leftLit, Literal rightLit, CompareOp operator)
-//            throws ValueExprEvaluationException
-//        {
-//            // type precendence:
-//            // - simple literal
-//            // - numeric
-//            // - xsd:boolean
-//            // - xsd:dateTime
-//            // - xsd:string
-//            // - RDF term (equal and unequal only)
-//
-//            URI leftDatatype = leftLit.getDatatype();
-//            URI rightDatatype = rightLit.getDatatype();
-//
-//            Integer compareResult = null;
-//
-//            if (QueryEvaluationUtil.isStringLiteral(leftLit) && QueryEvaluationUtil.isStringLiteral(rightLit)) {
-//                compareResult = leftLit.getLabel().compareTo(rightLit.getLabel());
-//            }
-//            else if (leftDatatype != null && rightDatatype != null) {
-//                URI commonDatatype = null;
-//
-//                if (leftDatatype.equals(rightDatatype)) {
-//                    commonDatatype = leftDatatype;
-//                }
-//                else if (XMLDatatypeUtil.isNumericDatatype(leftDatatype)
-//                        && XMLDatatypeUtil.isNumericDatatype(rightDatatype))
-//                {
-//                    // left and right arguments have different datatypes, try to find a
-//                    // more general, shared datatype
-//                    if (leftDatatype.equals(XMLSchema.DOUBLE) || rightDatatype.equals(XMLSchema.DOUBLE)) {
-//                        commonDatatype = XMLSchema.DOUBLE;
-//                    }
-//                    else if (leftDatatype.equals(XMLSchema.FLOAT) || rightDatatype.equals(XMLSchema.FLOAT)) {
-//                        commonDatatype = XMLSchema.FLOAT;
-//                    }
-//                    else if (leftDatatype.equals(XMLSchema.DECIMAL) || rightDatatype.equals(XMLSchema.DECIMAL)) {
-//                        commonDatatype = XMLSchema.DECIMAL;
-//                    }
-//                    else {
-//                        commonDatatype = XMLSchema.INTEGER;
-//                    }
-//                }
-//
-//                if (commonDatatype != null) {
-//                    try {
-//                        if (commonDatatype.equals(XMLSchema.DOUBLE)) {
-//                            compareResult = Double.compare(leftLit.doubleValue(), rightLit.doubleValue());
-//                        }
-//                        else if (commonDatatype.equals(XMLSchema.FLOAT)) {
-//                            compareResult = Float.compare(leftLit.floatValue(), rightLit.floatValue());
-//                        }
-//                        else if (commonDatatype.equals(XMLSchema.DECIMAL)) {
-//                            compareResult = leftLit.decimalValue().compareTo(rightLit.decimalValue());
-//                        }
-//                        else if (XMLDatatypeUtil.isIntegerDatatype(commonDatatype)) {
-//                            compareResult = leftLit.integerValue().compareTo(rightLit.integerValue());
-//                        }
-//                        else if (commonDatatype.equals(XMLSchema.BOOLEAN)) {
-//                            Boolean leftBool = Boolean.valueOf(leftLit.booleanValue());
-//                            Boolean rightBool = Boolean.valueOf(rightLit.booleanValue());
-//                            compareResult = leftBool.compareTo(rightBool);
-//                        }
-//                        else if (XMLDatatypeUtil.isCalendarDatatype(commonDatatype)) {
-//                            XMLGregorianCalendar left = leftLit.calendarValue();
-//                            XMLGregorianCalendar right = rightLit.calendarValue();
-//
-//                            compareResult = left.compare(right);
-//
-//                            // Note: XMLGregorianCalendar.compare() returns compatible
-//                            // values
-//                            // (-1, 0, 1) but INDETERMINATE needs special treatment
-//                            if (compareResult == DatatypeConstants.INDETERMINATE) {
-//                                throw new ValueExprEvaluationException("Indeterminate result for date/time comparison");
-//                            }
-//                        }
-//                        else if (commonDatatype.equals(XMLSchema.STRING)) {
-//                            compareResult = leftLit.getLabel().compareTo(rightLit.getLabel());
-//                        }
-//                    }
-//                    catch (IllegalArgumentException e) {
-//                        // One of the basic-type method calls failed, try syntactic match
-//                        // before throwing an error
-//                        if (leftLit.equals(rightLit)) {
-//                            switch (operator) {
-//                                case EQ:
-//                                    return true;
-//                                case NE:
-//                                    return false;
-//                            }
-//                        }
-//
-//                        throw new ValueExprEvaluationException(e);
-//                    }
-//                }
-//            }
-//
-//            if (compareResult != null) {
-//                // Literals have compatible ordered datatypes
-//                switch (operator) {
-//                    case LT:
-//                        return compareResult.intValue() < 0;
-//                    case LE:
-//                        return compareResult.intValue() <= 0;
-//                    case EQ:
-//                        return compareResult.intValue() == 0;
-//                    case NE:
-//                        return compareResult.intValue() != 0;
-//                    case GE:
-//                        return compareResult.intValue() >= 0;
-//                    case GT:
-//                        return compareResult.intValue() > 0;
-//                    default:
-//                        throw new IllegalArgumentException("Unknown operator: " + operator);
-//                }
-//            }
-//            else {
-//                // All other cases, e.g. literals with languages, unequal or
-//                // unordered datatypes, etc. These arguments can only be compared
-//                // using the operators 'EQ' and 'NE'. See SPARQL's RDFterm-equal
-//                // operator
-//
-//                boolean literalsEqual = leftLit.equals(rightLit);
-//
-//                if (!literalsEqual) {
-//                    if (leftDatatype != null && rightDatatype != null && isSupportedDatatype(leftDatatype)
-//                            && isSupportedDatatype(rightDatatype))
-//                    {
-//                        // left and right arguments have incompatible but supported datatypes
-//                        
-//                        // we need to check that the lexical-to-value mapping for both datatypes succeeds
-//                        if (!XMLDatatypeUtil.isValidValue(leftLit.getLabel(), leftDatatype)) {
-//                            throw new ValueExprEvaluationException("not a valid datatype value: " + leftLit);
-//                        }
-//                        
-//                        if (!XMLDatatypeUtil.isValidValue(rightLit.getLabel(), rightDatatype)) {
-//                            throw new ValueExprEvaluationException("not a valid datatype value: " + rightLit);
-//                        }
-//                    }
-//                    else if (leftDatatype != null && rightLit.getLanguage() == null || rightDatatype != null
-//                            && leftLit.getLanguage() == null)
-//                    {
-//                        // For literals with unsupported datatypes we don't know if their
-//                        // values are equal
-//                        throw new ValueExprEvaluationException("Unable to compare literals with unsupported types");
-//                    }
-//                }
-//
-//                switch (operator) {
-//                    case EQ:
-//                        return literalsEqual;
-//                    case NE:
-//                        return !literalsEqual;
-//                    case LT:
-//                    case LE:
-//                    case GE:
-//                    case GT:
-//                        throw new ValueExprEvaluationException(
-//                                "Only literals with compatible, ordered datatypes can be compared using <, <=, > and >= operators");
-//                    default:
-//                        throw new IllegalArgumentException("Unknown operator: " + operator);
-//                }
-//            }
-//        }
-//
-//    private static boolean isSupportedDatatype(URI datatype) {
-//        return (XMLSchema.STRING.equals(datatype) || XMLDatatypeUtil.isNumericDatatype(datatype) || XMLDatatypeUtil.isCalendarDatatype(datatype));
-//    }
-
     public static IV literalMath(final Literal l1, final Literal l2, 
-			final MathOp op)
-	{
-		final URI dt1 = l1.getDatatype();
-		final URI dt2 = l2.getDatatype();
-	
-		// Only numeric value can be used in math expressions
-		if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1)) {
-			throw new IllegalArgumentException("Not a number: " + l1);
-		}
-		if (dt2 == null || !XMLDatatypeUtil.isNumericDatatype(dt2)) {
-			throw new IllegalArgumentException("Not a number: " + l2);
-		}
-	
-		// Determine most specific datatype that the arguments have in common,
-		// choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
-		// per the SPARQL/XPATH spec
-		URI commonDatatype;
-	
-		if (dt1.equals(XMLSchema.DOUBLE) || dt2.equals(XMLSchema.DOUBLE)) {
-			commonDatatype = XMLSchema.DOUBLE;
-		} else if (dt1.equals(XMLSchema.FLOAT) || dt2.equals(XMLSchema.FLOAT)) {
-			commonDatatype = XMLSchema.FLOAT;
-		} else if (dt1.equals(XMLSchema.DECIMAL) || dt2.equals(XMLSchema.DECIMAL)) {
-			commonDatatype = XMLSchema.DECIMAL;
-		} else if (op == MathOp.DIVIDE) {
-			// Result of integer divide is decimal and requires the arguments to
-			// be handled as such, see for details:
-			// http://www.w3.org/TR/xpath-functions/#func-numeric-divide
-			commonDatatype = XMLSchema.DECIMAL;
-		} else {
-			commonDatatype = XMLSchema.INTEGER;
-		}
-	
-		// Note: Java already handles cases like divide-by-zero appropriately
-		// for floats and doubles, see:
-		// http://www.particle.kth.se/~lindsey/JavaCourse/Book/Part1/Tech/
-		// Chapter02/floatingPt2.html
-	
-		try {
-			if (commonDatatype.equals(XMLSchema.DOUBLE)) {
-				double left = l1.doubleValue();
-				double right = l2.doubleValue();
-				return IVUtility.numericalMath(left, right, op);
-			}
-			else if (commonDatatype.equals(XMLSchema.FLOAT)) {
-				float left = l1.floatValue();
-				float right = l2.floatValue();
-				return IVUtility.numericalMath(left, right, op);
-			}
-			else if (commonDatatype.equals(XMLSchema.DECIMAL)) {
-				BigDecimal left = l1.decimalValue();
-				BigDecimal right = l2.decimalValue();
-				return IVUtility.numericalMath(left, right, op);
-			}
-			else { // XMLSchema.INTEGER
-				BigInteger left = l1.integerValue();
-				BigInteger right = l2.integerValue();
-				return IVUtility.numericalMath(left, right, op);
-			}
-		} catch (NumberFormatException e) {
-			throw new SparqlTypeErrorException();
-		} catch (ArithmeticException e) {
-			throw new SparqlTypeErrorException();
-		}
-		
-	}
+            final MathOp op)
+    {
+        final URI dt1 = l1.getDatatype();
+        final URI dt2 = l2.getDatatype();
+    
+        // Only numeric value can be used in math expressions
+        if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1)) {
+            throw new IllegalArgumentException("Not a number: " + l1);
+        }
+        if (dt2 == null || !XMLDatatypeUtil.isNumericDatatype(dt2)) {
+            throw new IllegalArgumentException("Not a number: " + l2);
+        }
+    
+        // Determine most specific datatype that the arguments have in common,
+        // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
+        // per the SPARQL/XPATH spec
+        URI commonDatatype;
+    
+        if (dt1.equals(XMLSchema.DOUBLE) || dt2.equals(XMLSchema.DOUBLE)) {
+            commonDatatype = XMLSchema.DOUBLE;
+        } else if (dt1.equals(XMLSchema.FLOAT) || dt2.equals(XMLSchema.FLOAT)) {
+            commonDatatype = XMLSchema.FLOAT;
+        } else if (dt1.equals(XMLSchema.DECIMAL) || dt2.equals(XMLSchema.DECIMAL)) {
+            commonDatatype = XMLSchema.DECIMAL;
+        } else if (op == MathOp.DIVIDE) {
+            // Result of integer divide is decimal and requires the arguments to
+            // be handled as such, see for details:
+            // http://www.w3.org/TR/xpath-functions/#func-numeric-divide
+            commonDatatype = XMLSchema.DECIMAL;
+        } else {
+            commonDatatype = XMLSchema.INTEGER;
+        }
+    
+        // Note: Java already handles cases like divide-by-zero appropriately
+        // for floats and doubles, see:
+        // http://www.particle.kth.se/~lindsey/JavaCourse/Book/Part1/Tech/
+        // Chapter02/floatingPt2.html
+    
+        try {
+            if (commonDatatype.equals(XMLSchema.DOUBLE)) {
+                double left = l1.doubleValue();
+                double right = l2.doubleValue();
+                return IVUtility.numericalMath(left, right, op);
+            }
+            else if (commonDatatype.equals(XMLSchema.FLOAT)) {
+                float left = l1.floatValue();
+                float right = l2.floatValue();
+                return IVUtility.numericalMath(left, right, op);
+            }
+            else if (commonDatatype.equals(XMLSchema.DECIMAL)) {
+                BigDecimal left = l1.decimalValue();
+                BigDecimal right = l2.decimalValue();
+                return IVUtility.numericalMath(left, right, op);
+            }
+            else { // XMLSchema.INTEGER
+                BigInteger left = l1.integerValue();
+                BigInteger right = l2.integerValue();
+                return IVUtility.numericalMath(left, right, op);
+            }
+        } catch (NumberFormatException e) {
+            throw new SparqlTypeErrorException();
+        } catch (ArithmeticException e) {
+            throw new SparqlTypeErrorException();
+        }
+        
+    }
     
     public static final IV numericalMath(final Literal l1, final IV iv2, 
             final MathOp op) {
@@ -645,57 +338,57 @@ public class IVUtility {
     }
 
     public static final IV numericalMath(final IV iv1, final IV iv2, 
-    		final MathOp op) {
-    	
-		if (!iv1.isInline())
-			throw new IllegalArgumentException(
-					"left term is not inline: left=" + iv1 + ", right=" + iv2);
-
-		if (!iv2.isInline())
-			throw new IllegalArgumentException(
-					"right term is not inline: left=" + iv1 + ", right=" + iv2);
+            final MathOp op) {
         
-		if (!iv1.isLiteral())
-			throw new IllegalArgumentException(
-					"left term is not literal: left=" + iv1 + ", right=" + iv2);
+        if (!iv1.isInline())
+            throw new IllegalArgumentException(
+                    "left term is not inline: left=" + iv1 + ", right=" + iv2);
 
-		if (!iv2.isLiteral())
-			throw new IllegalArgumentException(
-					"right term is not literal: left=" + iv1 + ", right=" + iv2);
+        if (!iv2.isInline())
+            throw new IllegalArgumentException(
+                    "right term is not inline: left=" + iv1 + ", right=" + iv2);
+        
+        if (!iv1.isLiteral())
+            throw new IllegalArgumentException(
+                    "left term is not literal: left=" + iv1 + ", right=" + iv2);
+
+        if (!iv2.isLiteral())
+            throw new IllegalArgumentException(
+                    "right term is not literal: left=" + iv1 + ", right=" + iv2);
 
         final DTE dte1 = iv1.getDTE();
         final DTE dte2 = iv2.getDTE();
 
         if (!dte1.isNumeric())
-			throw new IllegalArgumentException(
-					"right term is not numeric: left=" + iv1 + ", right=" + iv2);
+            throw new IllegalArgumentException(
+                    "right term is not numeric: left=" + iv1 + ", right=" + iv2);
 
         if (!dte2.isNumeric())
-			throw new IllegalArgumentException(
-					"left term is not numeric: left=" + iv1 + ", right=" + iv2);
+            throw new IllegalArgumentException(
+                    "left term is not numeric: left=" + iv1 + ", right=" + iv2);
 
         final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
         final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
         
-		// Determine most specific datatype that the arguments have in common,
-		// choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
-		// per the SPARQL/XPATH spec
+        // Determine most specific datatype that the arguments have in common,
+        // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
+        // per the SPARQL/XPATH spec
         
         if (dte1 == DTE.XSDDouble || dte2 == DTE.XSDDouble) {
-        	return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+            return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
         } else if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat) {
-        	return numericalMath(num1.floatValue(), num2.floatValue(), op);
+            return numericalMath(num1.floatValue(), num2.floatValue(), op);
         } if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
-        	return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
+            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
         } if (op == MathOp.DIVIDE) {
-			// Result of integer divide is decimal and requires the arguments to
-			// be handled as such, see for details:
-			// http://www.w3.org/TR/xpath-functions/#func-numeric-divide
-        	return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
+            // Result of integer divide is decimal and requires the arguments to
+            // be handled as such, see for details:
+            // http://www.w3.org/TR/xpath-functions/#func-numeric-divide
+            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
         } else {
-        	return numericalMath(num1.integerValue(), num2.integerValue(), op);
+            return numericalMath(num1.integerValue(), num2.integerValue(), op);
         }
-        	
+            
 //        // if one's a BigDecimal we should use the BigDecimal comparator for both
 //        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
 //            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
@@ -709,16 +402,16 @@ public class IVUtility {
 //        // fixed length numerics
 //        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
 //            // non-BigDecimal floating points
-//        	if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat)
-//        		return numericalMath(num1.floatValue(), num2.floatValue(), op);
-//        	else
-//        		return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
+//            if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat)
+//                return numericalMath(num1.floatValue(), num2.floatValue(), op);
+//            else
+//                return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
 //        } else {
 //            // non-BigInteger integers
-//        	if (dte1 == DTE.XSDInt && dte2 == DTE.XSDInt)
-//        		return numericalMath(num1.intValue(), num2.intValue(), op);
-//        	else
-//        		return numericalMath(num1.longValue(), num2.longValue(), op);
+//            if (dte1 == DTE.XSDInt && dte2 == DTE.XSDInt)
+//                return numericalMath(num1.intValue(), num2.intValue(), op);
+//            else
+//                return numericalMath(num1.longValue(), num2.longValue(), op);
 //        }
         
     }
@@ -759,14 +452,15 @@ public class IVUtility {
             return numericalFunc(num1.longValue(),op);
         }
     }
+    
     private static final IV numericalFunc(final BigDecimal left, final NumericOp op) {
         switch(op) {
         case ABS:
             return new XSDDecimalIV(left.abs());
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left.doubleValue()));
+            return new XSDNumericIV(Math.ceil(left.doubleValue()));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left.doubleValue()));
+            return new XSDNumericIV(Math.floor(left.doubleValue()));
         case ROUND:
             return new XSDDecimalIV(left.round(MathContext.UNLIMITED));
         default:
@@ -778,11 +472,11 @@ public class IVUtility {
         case ABS:
             return new XSDIntegerIV(left.abs());
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left.doubleValue()));
+            return new XSDNumericIV(Math.ceil(left.doubleValue()));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left.doubleValue()));
+            return new XSDNumericIV(Math.floor(left.doubleValue()));
         case ROUND:
-            return new XSDDoubleIV(Math.round(left.doubleValue()));
+            return new XSDNumericIV(Math.round(left.doubleValue()));
         default:
             throw new UnsupportedOperationException();
         }
@@ -790,13 +484,13 @@ public class IVUtility {
     private static final IV numericalFunc(final float left, final NumericOp op) {
         switch(op) {
         case ABS:
-            return new XSDFloatIV(Math.abs(left));
+            return new XSDNumericIV(Math.abs(left));
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left));
+            return new XSDNumericIV(Math.ceil(left));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left));
+            return new XSDNumericIV(Math.floor(left));
         case ROUND:
-            return new XSDFloatIV(Math.round(left));
+            return new XSDNumericIV(Math.round(left));
         default:
             throw new UnsupportedOperationException();
         }
@@ -804,13 +498,13 @@ public class IVUtility {
     private static final IV numericalFunc(final int left, final NumericOp op) {
         switch(op) {
         case ABS:
-            return new XSDIntIV(Math.abs(left));
+            return new XSDNumericIV(Math.abs(left));
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left));
+            return new XSDNumericIV(Math.ceil(left));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left));
+            return new XSDNumericIV(Math.floor(left));
         case ROUND:
-            return new XSDIntIV(Math.round(left));
+            return new XSDNumericIV(Math.round(left));
         default:
             throw new UnsupportedOperationException();
         }
@@ -818,13 +512,13 @@ public class IVUtility {
     private static final IV numericalFunc(final long left, final NumericOp op) {
         switch(op) {
         case ABS:
-            return new XSDLongIV(Math.abs(left));
+            return new XSDNumericIV(Math.abs(left));
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left));
+            return new XSDNumericIV(Math.ceil(left));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left));
+            return new XSDNumericIV(Math.floor(left));
         case ROUND:
-            return new XSDLongIV(Math.round(left));
+            return new XSDNumericIV(Math.round(left));
         default:
             throw new UnsupportedOperationException();
         }
@@ -832,171 +526,104 @@ public class IVUtility {
     private static final IV numericalFunc(final double left, final NumericOp op) {
         switch(op) {
         case ABS:
-            return new XSDDoubleIV(Math.abs(left));
+            return new XSDNumericIV(Math.abs(left));
         case CEIL:
-            return new XSDDoubleIV(Math.ceil(left));
+            return new XSDNumericIV(Math.ceil(left));
         case FLOOR:
-            return new XSDDoubleIV(Math.floor(left));
+            return new XSDNumericIV(Math.floor(left));
         case ROUND:
-            return new XSDDoubleIV(Math.round(left));
+            return new XSDNumericIV(Math.round(left));
         default:
             throw new UnsupportedOperationException();
         }
     }
     
     public static final IV numericalMath(final BigDecimal left, 
-    		final BigDecimal right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDDecimalIV(left.add(right));
-    	case MINUS:
-    		return new XSDDecimalIV(left.subtract(right));
-    	case MULTIPLY:
-    		return new XSDDecimalIV(left.multiply(right));
-    	case DIVIDE:
-    		return new XSDDecimalIV(left.divide(right, RoundingMode.HALF_UP));
-    	case MIN:
-    		return new XSDDecimalIV(left.compareTo(right) < 0 ? left : right);
-    	case MAX:
-    		return new XSDDecimalIV(left.compareTo(right) > 0 ? left : right);
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
+            final BigDecimal right, final MathOp op) {
+        
+        switch(op) {
+        case PLUS:
+            return new XSDDecimalIV(left.add(right));
+        case MINUS:
+            return new XSDDecimalIV(left.subtract(right));
+        case MULTIPLY:
+            return new XSDDecimalIV(left.multiply(right));
+        case DIVIDE:
+            return new XSDDecimalIV(left.divide(right, RoundingMode.HALF_UP));
+        case MIN:
+            return new XSDDecimalIV(left.compareTo(right) < 0 ? left : right);
+        case MAX:
+            return new XSDDecimalIV(left.compareTo(right) > 0 ? left : right);
+        default:
+            throw new UnsupportedOperationException();
+        }
+        
     }
     
     public static final IV numericalMath(final BigInteger left, 
-    		final BigInteger right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDIntegerIV(left.add(right));
-    	case MINUS:
-    		return new XSDIntegerIV(left.subtract(right));
-    	case MULTIPLY:
-    		return new XSDIntegerIV(left.multiply(right));
-    	case DIVIDE:
-    		return new XSDIntegerIV(left.divide(right));
-    	case MIN:
-    		return new XSDIntegerIV(left.compareTo(right) < 0 ? left : right);
-    	case MAX:
-    		return new XSDIntegerIV(left.compareTo(right) > 0 ? left : right);
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
+            final BigInteger right, final MathOp op) {
+        
+        switch(op) {
+        case PLUS:
+            return new XSDIntegerIV(left.add(right));
+        case MINUS:
+            return new XSDIntegerIV(left.subtract(right));
+        case MULTIPLY:
+            return new XSDIntegerIV(left.multiply(right));
+        case DIVIDE:
+            return new XSDIntegerIV(left.divide(right));
+        case MIN:
+            return new XSDIntegerIV(left.compareTo(right) < 0 ? left : right);
+        case MAX:
+            return new XSDIntegerIV(left.compareTo(right) > 0 ? left : right);
+        default:
+            throw new UnsupportedOperationException();
+        }
+        
     }
     
     public static final IV numericalMath(final float left, 
-    		final float right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDFloatIV(left+right);
-    	case MINUS:
-    		return new XSDFloatIV(left-right);
-    	case MULTIPLY:
-    		return new XSDFloatIV(left*right);
-    	case DIVIDE:
-    		return new XSDFloatIV(left/right);
-    	case MIN:
-    		return new XSDFloatIV(Math.min(left,right));
-    	case MAX:
-    		return new XSDFloatIV(Math.max(left,right));
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
+            final float right, final MathOp op) {
+        
+        switch(op) {
+        case PLUS:
+            return new XSDNumericIV(left+right);
+        case MINUS:
+            return new XSDNumericIV(left-right);
+        case MULTIPLY:
+            return new XSDNumericIV(left*right);
+        case DIVIDE:
+            return new XSDNumericIV(left/right);
+        case MIN:
+            return new XSDNumericIV(Math.min(left,right));
+        case MAX:
+            return new XSDNumericIV(Math.max(left,right));
+        default:
+            throw new UnsupportedOperationException();
+        }
+        
     }
     
     public static final IV numericalMath(final double left, 
-    		final double right, final MathOp op) {
-    	
-    	switch(op) {
-    	case PLUS:
-    		return new XSDDoubleIV(left+right);
-    	case MINUS:
-    		return new XSDDoubleIV(left-right);
-    	case MULTIPLY:
-    		return new XSDDoubleIV(left*right);
-    	case DIVIDE:
-    		return new XSDDoubleIV(left/right);
-    	case MIN:
-    		return new XSDDoubleIV(Math.min(left,right));
-    	case MAX:
-    		return new XSDDoubleIV(Math.max(left,right));
-    	default:
-    		throw new UnsupportedOperationException();
-    	}
-    	
-    }
-    
-//    private static final IV numericalMath(final int left, 
-//    		final int right, final MathOp op) {
-//    	
-//    	switch(op) {
-//    	case PLUS:
-//    		return new XSDIntIV(left+right);
-//    	case MINUS:
-//    		return new XSDIntIV(left-right);
-//    	case MULTIPLY:
-//    		return new XSDIntIV(left*right);
-//    	case DIVIDE:
-//    		return new XSDIntIV(left/right);
-//    	case MIN:
-//    		return new XSDIntIV(Math.min(left,right));
-//    	case MAX:
-//    		return new XSDIntIV(Math.max(left,right));
-//    	default:
-//    		throw new UnsupportedOperationException();
-//    	}
-//    	
-//    }
-//    
-//    private static final IV numericalMath(final long left, 
-//    		final long right, final MathOp op) {
-//    	
-//    	switch(op) {
-//    	case PLUS:
-//    		return new XSDLongIV(left+right);
-//    	case MINUS:
-//    		return new XSDLongIV(left-right);
-//    	case MULTIPLY:
-//    		return new XSDLongIV(left*right);
-//    	case DIVIDE:
-//    		return new XSDLongIV(left/right);
-//    	case MIN:
-//    		return new XSDLongIV(Math.min(left,right));
-//    	case MAX:
-//    		return new XSDLongIV(Math.max(left,right));
-//    	default:
-//    		throw new UnsupportedOperationException();
-//    	}
-//    	
-//    }
-    
-    /**
-     * Used to test whether a given value constant can be used in an inline
-     * filter or not.  If so, we can use one of the inline constraints
-     * {@link InlineGT}, {@link AbstractInlineConstraint}, {@link LT}, {@link LE}, which in turn defer
-     * to the numerical comparison operator {@link #numericalCompare(IV, IV)}. 
-     */
-    public static final boolean canNumericalCompare(final IV iv) {
+            final double right, final MathOp op) {
         
-        // inline boolean or inline signed numeric
-        return iv.isInline() && iv.isLiteral() &&
-                (iv.getDTE() == DTE.XSDBoolean || iv.isNumeric());
+        switch(op) {
+        case PLUS:
+            return new XSDNumericIV(left+right);
+        case MINUS:
+            return new XSDNumericIV(left-right);
+        case MULTIPLY:
+            return new XSDNumericIV(left*right);
+        case DIVIDE:
+            return new XSDNumericIV(left/right);
+        case MIN:
+            return new XSDNumericIV(Math.min(left,right));
+        case MAX:
+            return new XSDNumericIV(Math.max(left,right));
+        default:
+            throw new UnsupportedOperationException();
+        }
         
-    }
-
-    /**
-     * Convenience method.  Return true if both operands return true.
-     */
-    public static final boolean canNumericalCompare(final IV iv1, final IV iv2) {
-    	
-    	return canNumericalCompare(iv1) && canNumericalCompare(iv2);
-    	
     }
     
     /**
@@ -1052,8 +679,8 @@ public class IVUtility {
      */
     public static IV[] decode(final byte[] key, final int numTerms) {
 
-    	return decode(key, 0 /* offset */, numTerms);
-    	
+        return decode(key, 0 /* offset */, numTerms);
+        
     }
     
     /**
@@ -1069,8 +696,8 @@ public class IVUtility {
      * @return The set of {@link IV}s.
      */
     public static IV[] decode(final byte[] key, final int offset, 
-    		final int numTerms) {
-        	
+            final int numTerms) {
+            
         if (numTerms <= 0)
             return new IV[0];
         
@@ -1163,16 +790,16 @@ public class IVUtility {
                     o += extensionIV.byteLength();
 
                     // Decode the inline component.
-                    final AbstractIV delegate = (AbstractIV) IVUtility
-                            .decodeFromOffset(key, o);
+                    final AbstractLiteralIV delegate = (AbstractLiteralIV) 
+                    		IVUtility.decodeFromOffset(key, o);
 
                     // TODO Should really be switch((int)extensionByte).
                     switch (AbstractIV.getInternalValueTypeEnum(flags)) {
                     case URI:
-                        return new URINamespaceIV<BigdataURI>(delegate,
+                        return new PartlyInlineURIIV<BigdataURI>(delegate,
                                 extensionIV);
                     case LITERAL:
-                        return new LiteralDatatypeIV<BigdataLiteral>(delegate,
+                        return new PartlyInlineTypedLiteralIV<BigdataLiteral>(delegate,
                                 extensionIV);
                     default:
                         throw new AssertionError();
@@ -1203,11 +830,11 @@ public class IVUtility {
                 
             } else {
 
-				/*
-				 * Handle a TermId, including a NullIV.
-				 */ 
-				
-				// decode the term identifier.
+                /*
+                 * Handle a TermId, including a NullIV.
+                 */ 
+                
+                // decode the term identifier.
                 final long termId = KeyBuilder.decodeLong(key, o);
 
                 if (termId == TermId.NULL)
@@ -1240,9 +867,9 @@ public class IVUtility {
             return new SidIV(spo);
         }
         case BNODE:
-        	return decodeInlineBNode(flags,key,o);
+            return decodeInlineBNode(flags,key,o);
         case URI:
-        	return decodeInlineURI(flags,key,o);
+            return decodeInlineURI(flags,key,o);
         case LITERAL:
             return decodeInlineLiteral(flags, key, o);
         default:
@@ -1251,21 +878,21 @@ public class IVUtility {
         
     }
 
-	/**
-	 * Decode an inline blank node from an offset.
-	 * 
-	 * @param flags
-	 *            The flags.
-	 * @param key
-	 *            The key.
-	 * @param o
-	 *            The offset.
-	 *            
-	 * @return The decoded {@link IV}.
-	 */
-	static private IV decodeInlineBNode(final byte flags, final byte[] key,
-			final int o) {
-    	
+    /**
+     * Decode an inline blank node from an offset.
+     * 
+     * @param flags
+     *            The flags.
+     * @param key
+     *            The key.
+     * @param o
+     *            The offset.
+     *            
+     * @return The decoded {@link IV}.
+     */
+    static private IV decodeInlineBNode(final byte flags, final byte[] key,
+            final int o) {
+        
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
         switch (dte) {
@@ -1295,71 +922,71 @@ public class IVUtility {
                     1/* flags */+ nbytes);
         }
         default:
-			throw new UnsupportedOperationException("dte=" + dte);
+            throw new UnsupportedOperationException("dte=" + dte);
         }
     }
 
-	/**
-	 * Decode an inline URI from a byte offset.
-	 * 
-	 * @param flags
-	 *            The flags byte.
-	 * @param key
-	 *            The key.
-	 * @param o
-	 *            The offset.
-	 * 
-	 * @return The decoded {@link IV}.
-	 */
-	static private IV decodeInlineURI(final byte flags, final byte[] key,
-			final int o) {
+    /**
+     * Decode an inline URI from a byte offset.
+     * 
+     * @param flags
+     *            The flags byte.
+     * @param key
+     *            The key.
+     * @param o
+     *            The offset.
+     * 
+     * @return The decoded {@link IV}.
+     */
+    static private IV decodeInlineURI(final byte flags, final byte[] key,
+            final int o) {
 
-		// The data type
-		final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
-		switch (dte) {
-		case XSDByte: {
-			final byte x = key[o];//KeyBuilder.decodeByte(key[o]);
-			return new URIByteIV<BigdataURI>(x);
-		}
-		case XSDShort: {
-			final short x = KeyBuilder.decodeShort(key, o);
-			return new URIShortIV<BigdataURI>(x);
-		}
-		case XSDString: {
-			// decode buffer.
-			final StringBuilder sb = new StringBuilder();
-			// inline string value
-			final String str1;
-			// #of bytes read.
-			final int nbytes;
-			try {
-				nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
-						- o), sb);
-				str1 = sb.toString();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-			return new InlineURIIV<BigdataURI>(new URIImpl(str1),
-					1/* flags */+ nbytes);
-		}
-		default:
-			throw new UnsupportedOperationException("dte=" + dte);
-		}
+        // The data type
+        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        switch (dte) {
+        case XSDByte: {
+            final byte x = key[o];//KeyBuilder.decodeByte(key[o]);
+            return new VocabURIByteIV<BigdataURI>(x);
+        }
+        case XSDShort: {
+            final short x = KeyBuilder.decodeShort(key, o);
+            return new VocabURIShortIV<BigdataURI>(x);
+        }
+        case XSDString: {
+            // decode buffer.
+            final StringBuilder sb = new StringBuilder();
+            // inline string value
+            final String str1;
+            // #of bytes read.
+            final int nbytes;
+            try {
+                nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+                        - o), sb);
+                str1 = sb.toString();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return new FullyInlineURIIV<BigdataURI>(new URIImpl(str1),
+                    1/* flags */+ nbytes);
+        }
+        default:
+            throw new UnsupportedOperationException("dte=" + dte);
+        }
 
-	}
+    }
 
-	/**
-	 * Decode an inline literal from an offset.
-	 * 
-	 * @param flags
-	 *            The flags byte.
-	 * @param key
-	 *            The key.
-	 * @param o
-	 *            The offset.
-	 */
-	static private IV decodeInlineLiteral(final byte flags, final byte[] key,
-			int o) {
+    /**
+     * Decode an inline literal from an offset.
+     * 
+     * @param flags
+     *            The flags byte.
+     * @param key
+     *            The key.
+     * @param o
+     *            The offset.
+     */
+    static private IV decodeInlineLiteral(final byte flags, final byte[] key,
+            int o) {
 
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
@@ -1379,72 +1006,72 @@ public class IVUtility {
             final byte x = KeyBuilder.decodeByte(key[o]);
             final AbstractLiteralIV iv = (x == 0) ? 
                     XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDByte: {
             final byte x = KeyBuilder.decodeByte(key[o]);
-            final AbstractLiteralIV iv = new XSDByteIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDShort: {
             final short x = KeyBuilder.decodeShort(key, o);
-            final AbstractLiteralIV iv = new XSDShortIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDInt: {
             final int x = KeyBuilder.decodeInt(key, o);
-            final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv;
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
         }
         case XSDLong: {
             final long x = KeyBuilder.decodeLong(key, o);
-            final AbstractLiteralIV iv = new XSDLongIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDFloat: {
             final float x = KeyBuilder.decodeFloat(key, o);
-            final AbstractLiteralIV iv = new XSDFloatIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDDouble: {
             final double x = KeyBuilder.decodeDouble(key, o);
-            final AbstractLiteralIV iv = new XSDDoubleIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            final AbstractLiteralIV iv = new XSDNumericIV<BigdataLiteral>(x);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDInteger: {
             final BigInteger x = KeyBuilder.decodeBigInteger(o, key);
             final AbstractLiteralIV iv = new XSDIntegerIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDDecimal: {
             final BigDecimal x = KeyBuilder.decodeBigDecimal(o, key);
             final AbstractLiteralIV iv = new XSDDecimalIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case UUID: {
             final UUID x = KeyBuilder.decodeUUID(key, o);
             final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv;
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
         }
         case XSDUnsignedByte: {
             final byte x = KeyBuilder.decodeByte(key[o]);
             final AbstractLiteralIV iv = new XSDUnsignedByteIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDUnsignedShort: {
             final short x = KeyBuilder.decodeShort(key, o);
             final AbstractLiteralIV iv = new XSDUnsignedShortIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDUnsignedInt: {
             final int x = KeyBuilder.decodeInt(key, o);
             final AbstractLiteralIV iv = new XSDUnsignedIntIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv;
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
         }
         case XSDUnsignedLong: {
             final long x = KeyBuilder.decodeLong(key, o);
             final AbstractLiteralIV iv = new XSDUnsignedLongIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv; 
         }
         case XSDString: {
             if(isExtension) {
@@ -1466,32 +1093,32 @@ public class IVUtility {
                 throw new RuntimeException(e);
             }
             // Note: The 'delegate' will be an InlineLiteralIV w/o a datatype.
-            final InlineLiteralIV<BigdataLiteral> iv = new InlineLiteralIV<BigdataLiteral>(
+            final FullyInlineTypedLiteralIV<BigdataLiteral> iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(
                     str1, null/* languageCode */, null/* datatype */,
-					1/* flags */+ 1/* termCode */+ nread);
-            return isExtension ? new ExtensionIV<BigdataLiteral>(iv, datatype)
+                    1/* flags */+ 1/* termCode */+ nread);
+            return isExtension ? new LiteralExtensionIV<BigdataLiteral>(iv, datatype)
                     : iv;
             }
             return decodeInlineUnicodeLiteral(key,o);
         }
         default:
-			throw new UnsupportedOperationException("dte=" + dte);
+            throw new UnsupportedOperationException("dte=" + dte);
         }
 
     }
 
-	/**
-	 * Decode an inline literal which is represented as a one or two compressed
-	 * Unicode values.
-	 * 
-	 * @param key
-	 *            The key.
-	 * @param offset
-	 *            The offset into the key.
-	 *            
-	 * @return The decoded {@link IV}.
-	 */
-    static private InlineLiteralIV<BigdataLiteral> decodeInlineUnicodeLiteral(
+    /**
+     * Decode an inline literal which is represented as a one or two compressed
+     * Unicode values.
+     * 
+     * @param key
+     *            The key.
+     * @param offset
+     *            The offset into the key.
+     *            
+     * @return The decoded {@link IV}.
+     */
+    static private FullyInlineTypedLiteralIV<BigdataLiteral> decodeInlineUnicodeLiteral(
             final byte[] key, final int offset) {
 
         int o = offset;
@@ -1548,10 +1175,10 @@ public class IVUtility {
             str2 = null;
         }
         final int byteLength = 1/* flags */+ 1/* termCode */+ nread;
-        final InlineLiteralIV<BigdataLiteral> iv;
+        final FullyInlineTypedLiteralIV<BigdataLiteral> iv;
         switch (termCode) {
         case ITermIndexCodes.TERM_CODE_LIT:
-            iv = new InlineLiteralIV<BigdataLiteral>(//
+            iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str1,//
                     null, // language
                     null, // datatype
@@ -1559,7 +1186,7 @@ public class IVUtility {
                     );
             break;
         case ITermIndexCodes.TERM_CODE_LCL:
-            iv = new InlineLiteralIV<BigdataLiteral>(//
+            iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str2,//
                     str1, // language
                     null, // datatype
@@ -1567,7 +1194,7 @@ public class IVUtility {
                     );
             break;
         case ITermIndexCodes.TERM_CODE_DTL:
-            iv = new InlineLiteralIV<BigdataLiteral>(//
+            iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(//
                     str2,//
                     null, // language
                     new URIImpl(str1), // datatype
@@ -1580,15 +1207,15 @@ public class IVUtility {
         return iv;
     }
 
-	/**
-	 * Decode an IV from its string representation as encoded by
-	 * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
-	 * is used by the prototype IRIS integration.)
-	 * 
-	 * @param s
-	 *            the string representation
-	 * @return the IV
-	 */
+    /**
+     * Decode an IV from its string representation as encoded by
+     * {@link BlobIV#toString()} and {@link AbstractInlineIV#toString()} (this
+     * is used by the prototype IRIS integration.)
+     * 
+     * @param s
+     *            the string representation
+     * @return the IV
+     */
     public static final IV fromString(final String s) {
         if (s.startsWith("TermIV")) {
             return TermId.fromString(s);
@@ -1609,27 +1236,27 @@ public class IVUtility {
             }
             case XSDByte: {
                 final byte x = Byte.valueOf(val);
-                return new XSDByteIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case XSDShort: {
                 final short x = Short.valueOf(val);
-                return new XSDShortIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case XSDInt: {
                 final int x = Integer.valueOf(val);
-                return new XSDIntIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case XSDLong: {
                 final long x = Long.valueOf(val);
-                return new XSDLongIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case XSDFloat: {
                 final float x = Float.valueOf(val);
-                return new XSDFloatIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case XSDDouble: {
                 final double x = Double.valueOf(val);
-                return new XSDDoubleIV<BigdataLiteral>(x);
+                return new XSDNumericIV<BigdataLiteral>(x);
             }
             case UUID: {
                 final UUID x = UUID.fromString(val);

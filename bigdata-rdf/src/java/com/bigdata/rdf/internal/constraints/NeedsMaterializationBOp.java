@@ -34,7 +34,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.util.InnerCause;
 
 /**

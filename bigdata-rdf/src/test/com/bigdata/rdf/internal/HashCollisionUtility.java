@@ -68,6 +68,9 @@ import com.bigdata.io.compression.RecordCompressor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -1718,8 +1721,8 @@ sparse, but this suggests that we should try a different coder for the leaf keys
 		 * 
 		 * @throws InterruptedException
 		 * 
-		 *             FIXME Handle {@link BlobIV}, {@link URINamespaceIV}, and
-		 *             {@link LiteralDatatypeIV}. These are three kinds of
+		 *             FIXME Handle {@link BlobIV}, {@link PartlyInlineURIIV}, and
+		 *             {@link PartlyInlineTypedLiteralIV}. These are three kinds of
 		 *             "non-inline" values. They will have to be queued for
 		 *             insertion into the TERMS index and Statement which depend
 		 *             on those non-inline values will have to be deferred until

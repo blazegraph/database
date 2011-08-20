@@ -29,7 +29,9 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.bop.BOp;
@@ -39,9 +41,10 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -105,24 +108,64 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	return (CompareOp) getRequiredProperty(Annotations.OP);
     }
 
-    public static boolean compare(final CompareOp op, final IV left,
-            final IV right) {
+    public static boolean compare( 
+    		final IV<BigdataValue, ?> left,
+            final IV<BigdataValue, ?> right,
+            final CompareOp op) {
 
-        if (left.isStatement() || right.isStatement()) {
-    		
-    		throw new SparqlTypeErrorException();
-    		
-    	}
+//    	final BigdataValue val1 = left.getValue();
+//    	final BigdataValue val2 = right.getValue();
+//    	
+//    	try {
+//    	
+//    		// use the Sesame implementation directly
+//    		final boolean accept = QueryEvaluationUtil.compare(val1, val2, op);
+//    		
+//    		if (log.isDebugEnabled()) {
+//    			log.debug(accept);
+//    		}
+//    		
+//    		return accept;
+//    		
+//    	} catch (Exception ex) {
+//    		
+//    		if (log.isDebugEnabled()) {
+//    			log.debug("exception: " + ex);
+//    		}
+//    		
+//    		throw new SparqlTypeErrorException();
+//    		
+//    	}
+
     	
-    	// handle the special case where we have exact termId equality
-    	// probably would never hit this because of SameTermBOp
-    	if (op == CompareOp.EQ && !left.isInline() && !right.isInline()) {
-    		
-//            final long tid1 = left.getTermId();
-//            final long tid2 = right.getTermId();
-//            
-//            if (tid1 == tid2 && tid1 != TermId.NULL && tid2 != TermId.NULL)
-//                return true;
+		if (left.isLiteral() && right.isLiteral()) {
+			// Both left and right argument is a Literal
+			return compareLiterals(left, right, op);
+		}
+		else {
+			// All other value combinations
+			switch (op) {
+				case EQ:
+					return valuesEqual(left, right);
+				case NE:
+					return !valuesEqual(left, right);
+				default:
+					throw new SparqlTypeErrorException();
+			}
+		}
+		
+    }
+    
+    private static boolean compareLiterals(
+    		final IV<BigdataValue, ?> left,
+    		final IV<BigdataValue, ?> right,
+    		final CompareOp op) {
+    	
+    	/*
+    	 * Handle the special case where we have exact termId equality.
+    	 * Probably would never hit this because of SameTermBOp 
+    	 */
+    	if (!left.isInline() && !right.isInline() && op == CompareOp.EQ) {
 
             if (!left.isNullIV() && !right.isNullIV() && left.equals(right)) {
                 /*
@@ -133,23 +176,85 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     	}
     	
-    	// handle inlines: booleans, numerics, and dateTimes (if inline) 
-    	if (IVUtility.canNumericalCompare(left, right)) {
+    	/*
+    	 * We want to special case the LiteralExtensionIV, which
+    	 * handles xsd:dateTime.  If we defer to Sesame for this, we will be
+    	 * forced into materialization because the first step in Sesame's
+    	 * evaluation is to get the datatype (requires materialization for
+    	 * LiteralExtensionIV).
+    	 */
+    	if (left instanceof LiteralExtensionIV &&
+    			right instanceof LiteralExtensionIV) {
+    	
+    		final IV leftDatatype = ((LiteralExtensionIV) left).getExtensionIV();
     		
-            return _accept(op,IVUtility.numericalCompare(left, right));
+    		final IV rightDatatype = ((LiteralExtensionIV) right).getExtensionIV();
+    		
+    		if (leftDatatype.equals(rightDatatype)) {
+    		
+    			return _accept(left.compareTo(right), op);
+    			
+    		}
     		
     	}
-
-    	final BigdataValue val1 = left.getValue();
-    	final BigdataValue val2 = right.getValue();
+//    	
+//    	if (left.isInline() && left.isNumeric() && right.isInline() && right.isNumeric()) {
+//    		
+//            final DTE dte1 = left.getDTE();
+//            final DTE dte2 = right.getDTE();
+//
+//            // we can use the natural ordering if they have the same DTE
+//            // this will naturally take care of two booleans or two numerics of the
+//            // same datatype
+//            if (dte1 == dte2)
+//                return _accept(left.compareTo(right), op);
+//            
+//            // otherwise we need to try to convert them into comparable numbers
+//            final AbstractLiteralIV num1 = (AbstractLiteralIV) left; 
+//            final AbstractLiteralIV num2 = (AbstractLiteralIV) right; 
+//            
+//            // if one's a BigDecimal we should use the BigDecimal comparator for both
+//            if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+//                return _accept(num1.decimalValue().compareTo(num2.decimalValue()), op);
+//            }
+//            
+//            // same for BigInteger
+//            if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
+//                return _accept(num1.integerValue().compareTo(num2.integerValue()), op);
+//            }
+//            
+//            // fixed length numerics
+//            if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
+//                // non-BigDecimal floating points - use doubles
+//                return _accept(Double.compare(num1.doubleValue(), num2.doubleValue()), op);
+//            } else {
+//                // non-BigInteger integers - use longs
+//                final long a = num1.longValue();
+//                final long b = num2.longValue();
+//                return _accept(a == b ? 0 : a < b ? -1 : 1, op);
+//            }
+//
+//    	}
     	
-        if (val1 == null || val2 == null)
-        	throw new NotMaterializedException();
-        
+		/*
+		 * Now that the IVs implement the right openrdf interfaces,
+		 * we should be able to mix and match inline with non-inline,
+		 * using either the IV directly or its materialized value.
+		 */
+//		final Literal l1 = left.isInline() ? (Literal) left : left.getValue();
+		final Literal l1 = (Literal) left;
+		
+//		final Literal l2 = right.isInline() ? (Literal) right : right.getValue();
+		final Literal l2 = (Literal) right;
+		
+		log.debug(l1);
+		log.debug(l2);
+		
     	try {
     	
     		// use the Sesame implementation directly
-    		final boolean accept = QueryEvaluationUtil.compare(val1, val2, op);
+    		final boolean accept = 
+    				QueryEvaluationUtil.compareLiterals(l1, l2, op);
     		
     		if (log.isDebugEnabled()) {
     			log.debug(accept);
@@ -157,7 +262,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     		return accept;
     		
-    	} catch (Exception ex) {
+    	} catch (ValueExprEvaluationException ex) {
     		
     		if (log.isDebugEnabled()) {
     			log.debug("exception: " + ex);
@@ -166,7 +271,36 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		throw new SparqlTypeErrorException();
     		
     	}
+    	
     }
+    
+	private static boolean valuesEqual(
+			final IV<BigdataValue, ?> left, final IV<BigdataValue, ?> right) {
+		
+    	// must be the same type of value (e.g. both URIs, both BNodes, etc)
+    	if (left.getVTE() != right.getVTE()) {
+    		return false;
+    	}
+
+		/*
+		 * We can't use IV.equals() when we have a null IV. A null IV might
+		 * have a materialized value that matches a term id in the database.
+		 * Different IVs, same materialized value (this can happen via the
+		 * datatype or str operator, anything that mints a new Value during
+		 * query evaluation). 
+		 */
+		if (left.isNullIV() || right.isNullIV()) {
+			
+			return left.getValue().equals(right.getValue());
+			
+		} else {
+			
+			return left.equals(right);
+			
+		}
+		
+	}
+
     public boolean accept(final IBindingSet s) {
         
     	final IV left = get(0).get(s);
@@ -182,13 +316,13 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     		log.debug("left value: " + (left.hasValue() ? left.getValue() : null));
     		log.debug("right value: " + (right.hasValue() ? right.getValue() : null));
-    }
+    	}
     
-    	final CompareOp op = op();
-    	return compare(op,left,right);
+    	return compare(left, right, op());
+    	
     }
     	
-    static protected boolean _accept(final CompareOp op,final int compare) {
+    static protected boolean _accept(final int compare, final CompareOp op) {
     	
     	switch(op) {
     	case EQ:
