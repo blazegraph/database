@@ -293,6 +293,8 @@ public class SliceOp extends PipelineOp {
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
+            try {
+            
             /*
              * buffer forms chunks which get flushed onto the sink.
              * 
@@ -346,7 +348,11 @@ public class SliceOp extends PipelineOp {
                     }
 
                 }
+                
+            }
 
+            } finally {
+                sink.close();
             }
 
             return null;
