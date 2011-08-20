@@ -33,7 +33,7 @@ package com.bigdata.rdf.sparql.ast;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class GroupMemberNodeBase extends QueryNodeBase implements
+abstract public class GroupMemberNodeBase extends QueryNodeBase implements
         IGroupMemberNode {
 
     /**
@@ -42,8 +42,5 @@ public class GroupMemberNodeBase extends QueryNodeBase implements
     public GroupMemberNodeBase() {
     }
 
-    public String toString(int indent) {
-        return toString();
-    }
 
 }

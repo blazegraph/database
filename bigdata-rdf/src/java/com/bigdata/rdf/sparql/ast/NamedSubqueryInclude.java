@@ -66,4 +66,8 @@ public class NamedSubqueryInclude extends GroupMemberNodeBase {
         
     }
 
+    @Override
+    public String toString(int indent) {
+        return indent(indent)+"INCLUDE %"+this.name;
+    }
 }
