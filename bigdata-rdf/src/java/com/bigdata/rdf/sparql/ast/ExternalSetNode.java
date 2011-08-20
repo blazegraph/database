@@ -35,5 +35,8 @@ package com.bigdata.rdf.sparql.ast;
  * @version $Id$
  */
 public class ExternalSetNode extends GroupMemberNodeBase {
-
+    @Override
+    public String toString(int indent) {
+        return indent(indent)+"ExternalSetNode";
+    }
 }

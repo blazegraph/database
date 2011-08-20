@@ -207,7 +207,7 @@ public class AST2BOpUtility {
             left = addSlice(left, slice, ctx);
 
         }
-        
+        addEndOp(left, ctx);
         return left;
 		
 	}
@@ -565,7 +565,9 @@ public class AST2BOpUtility {
         /*
          * Add the end operator if necessary.
          */
+        if (joinGroup.getParent() != null) {
         left = addEndOp(left, ctx);
+        }
         
 		return left;
 		
@@ -957,7 +959,7 @@ public class AST2BOpUtility {
 		     * DISTINCT on the native heap.
 		     */
 	        op = new DistinctBindingSetsWithHTreeOp(//
-	                new BOp[]{},//
+	                new BOp[]{left},//
 	                NV.asMap(new NV[]{//
 	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,bopId),//
 	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,vars),//
@@ -1016,6 +1018,48 @@ public class AST2BOpUtility {
 
         final GroupByOp op;
         
+        HashSet<IVariable<IV>> vars = new HashSet<IVariable<IV>>();
+
+        if (projectExprs != null) {
+            for (IValueExpression expr : projectExprs) {
+                if(expr instanceof Bind){
+                    vars.add(((Bind)expr).getVar());
+                    expr=((Bind)expr).getExpr();
+                }
+                if (expr instanceof IVariable<?>) {
+
+                    vars.add((IVariable<IV>) expr);
+
+                } else if (expr instanceof INeedsMaterialization) {
+
+                    vars.addAll(((INeedsMaterialization) expr).getTermsToMaterialize());
+
+                }
+            }
+
+        }
+
+        if (groupByExprs != null) {
+            for (IValueExpression expr : groupByExprs) {
+                if(expr instanceof Bind){
+                    vars.add(((Bind)expr).getVar());
+                    expr=((Bind)expr).getExpr();
+                }
+                if (expr instanceof IVariable<?>) {
+
+                    vars.add((IVariable<IV>) expr);
+
+                } else if (expr instanceof INeedsMaterialization) {
+
+                    vars.addAll(((INeedsMaterialization) expr).getTermsToMaterialize());
+
+                }
+            }
+
+        }
+
+        left = addMaterializationSteps(left, bopId, vars, ctx);
+
         if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
 
             /*
