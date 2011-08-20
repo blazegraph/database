@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.IConstraint;
-import com.bigdata.rdf.internal.XSDBooleanIV;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**

@@ -13,25 +13,25 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.SameTermBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -40,8 +40,8 @@ import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
-import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Unit tests for runtime query optimization using {@link JoinGraph} and the
@@ -454,14 +454,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDIntIV(120)), MathOp.PLUS) }, NV
+                                    new XSDNumericIV(120)), MathOp.PLUS) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDIntIV(120)), MathOp.MINUS) }, NV
+                                    new XSDNumericIV(120)), MathOp.MINUS) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 
@@ -472,14 +472,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDIntIV(170)), MathOp.PLUS) }, NV
+                                    new XSDNumericIV(170)), MathOp.PLUS) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDIntIV(170)), MathOp.MINUS) }, NV
+                                    new XSDNumericIV(170)), MathOp.MINUS) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 

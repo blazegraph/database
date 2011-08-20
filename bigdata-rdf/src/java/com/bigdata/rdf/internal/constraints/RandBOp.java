@@ -29,12 +29,8 @@ import java.util.Random;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.NV;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.WrappedIV;
-import com.bigdata.rdf.internal.XSDDoubleIV;
-import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 
 public class RandBOp extends IVValueExpression<IV> {
     Random rand = new Random();
@@ -55,7 +51,7 @@ public class RandBOp extends IVValueExpression<IV> {
     }
 
     public IV get(IBindingSet bindingSet) {
-        return new XSDDoubleIV(rand.nextDouble());
+        return new XSDNumericIV(rand.nextDouble());
     }
 
 }

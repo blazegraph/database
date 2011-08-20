@@ -33,12 +33,11 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDLongIV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -75,12 +74,12 @@ public class TestCOUNT extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -109,7 +108,7 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDLongIV(data.length), op.done());
+        assertEquals(new XSDNumericIV(data.length), op.done());
 
     }
 
@@ -129,12 +128,12 @@ public class TestCOUNT extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -157,7 +156,7 @@ public class TestCOUNT extends TestCase2 {
 
         // COUNT(lprice+1)
         final COUNT op = new COUNT(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDIntIV(1)), MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
@@ -165,7 +164,7 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDLongIV(data.length), op.done());
+        assertEquals(new XSDNumericIV(data.length), op.done());
 
     }
 
@@ -185,10 +184,10 @@ public class TestCOUNT extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -217,7 +216,7 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDLongIV(3L), op.done());
+        assertEquals(new XSDNumericIV(3L), op.done());
 
     }
 
@@ -241,12 +240,12 @@ public class TestCOUNT extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -270,7 +269,7 @@ public class TestCOUNT extends TestCase2 {
         /*
          * Setup a materialized IV for ZERO (0).
          */
-        final IV ZERO = new XSDIntIV(0);
+        final IV ZERO = new XSDNumericIV(0);
         ZERO.setValue(f.createLiteral("0", XSD.INT));
 
         // Note: Formula will produce an error for non-numeric data.

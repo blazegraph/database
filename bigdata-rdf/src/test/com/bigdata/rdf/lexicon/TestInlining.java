@@ -39,10 +39,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.ColorsEnumExtension;
 import com.bigdata.rdf.internal.EpochExtension;
-import com.bigdata.rdf.internal.ExtensionIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.SampleExtensionFactory;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -321,8 +321,8 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             assertTrue(l2.getIV().isInline());
 //            assertFalse(l3.getIV().isInline());
             
-            final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
-            final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
+            final LiteralExtensionIV iv1 = (LiteralExtensionIV) l1.getIV();
+            final LiteralExtensionIV iv2 = (LiteralExtensionIV) l2.getIV();
             
 			assertEquals(iv1.getExtensionIV(), datatype.getIV());
 			assertEquals(iv2.getExtensionIV(), datatype.getIV());
@@ -424,9 +424,9 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             assertFalse(l4.getIV().isInline());
             assertFalse(l5.getIV().isInline());
             
-            final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
-            final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
-            final ExtensionIV iv3 = (ExtensionIV) l3.getIV();
+            final LiteralExtensionIV iv1 = (LiteralExtensionIV) l1.getIV();
+            final LiteralExtensionIV iv2 = (LiteralExtensionIV) l2.getIV();
+            final LiteralExtensionIV iv3 = (LiteralExtensionIV) l3.getIV();
             
             if(log.isInfoEnabled()) log.info(l1.getLabel() + ": " + iv1.getDelegate().byteValue());
             if(log.isInfoEnabled()) log.info(l2.getLabel() + ": " + iv2.getDelegate().byteValue());

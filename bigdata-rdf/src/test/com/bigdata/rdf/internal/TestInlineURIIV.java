@@ -5,12 +5,13 @@ import junit.framework.TestCase2;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 
 /**
- * Test suite for {@link InlineURIIV}.
+ * Test suite for {@link FullyInlineURIIV}.
  */
 public class TestInlineURIIV extends TestCase2 {
 
@@ -23,14 +24,14 @@ public class TestInlineURIIV extends TestCase2 {
 
 	public void test_InlineURIIV() {
 
-        doTest(new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")));
-        doTest(new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/")));
-        doTest(new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/foo")));
-        doTest(new InlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com:80/foo")));
+        doTest(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")));
+        doTest(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/")));
+        doTest(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/foo")));
+        doTest(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com:80/foo")));
 
 	}
 
-	private void doTest(final InlineURIIV<BigdataURI> iv) {
+	private void doTest(final FullyInlineURIIV<BigdataURI> iv) {
 
 		assertEquals(VTE.URI, iv.getVTE());
 		

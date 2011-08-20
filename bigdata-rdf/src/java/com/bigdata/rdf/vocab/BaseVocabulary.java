@@ -45,8 +45,8 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.URIByteIV;
-import com.bigdata.rdf.internal.URIShortIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -286,7 +286,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
                 
                 final BigdataValue value = e.getValue();
                 
-                final IV iv = new URIByteIV<BigdataURI>((byte) i);
+                final IV iv = new VocabURIByteIV<BigdataURI>((byte) i);
                 
                 // Cache the IV on the Value.
                 value.setIV(iv);
@@ -308,7 +308,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
                 
                 final BigdataValue value = e.getValue();
                                 
-                final IV iv = new URIShortIV<BigdataURI>((short) i);
+                final IV iv = new VocabURIShortIV<BigdataURI>((short) i);
                 
                 // Cache the IV on the Value.
                 value.setIV(iv);

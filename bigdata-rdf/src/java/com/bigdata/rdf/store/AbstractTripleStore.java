@@ -89,14 +89,14 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
-import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
@@ -3896,7 +3896,7 @@ abstract public class AbstractTripleStore extends
 
                     // sid in the object position.
                     tempStore.addStatements(tempStore, true/*copyOnly*/, db
-                                    .getAccessPath(null, null, sid).iterator(),
+                                    .getAccessPath((IV) null, (IV) null, (IV) sid).iterator(),
                                     null/* filter */);
 
                     // finished with this sid.

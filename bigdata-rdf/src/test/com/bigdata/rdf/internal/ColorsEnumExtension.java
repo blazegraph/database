@@ -28,6 +28,10 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -64,10 +68,10 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
      * that can be converted to one of the colors in the {@link Color} enum
      * based on the string value of the literal's label.  Each {@link Color}
      * in the enum maps to a particular byte. This byte is encoded in a
-     * delegate {@link XSDByteIV}, and an {@link ExtensionIV} is returned that
+     * delegate {@link XSDByteIV}, and an {@link LiteralExtensionIV} is returned that
      * wraps the native type.
      */
-    public ExtensionIV createIV(final Value value) {
+    public LiteralExtensionIV createIV(final Value value) {
         
         if (value instanceof Literal == false)
             throw new IllegalArgumentException();
@@ -87,9 +91,9 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
             return null;
         }
         
-        final AbstractLiteralIV delegate = new XSDByteIV(c.getByte());
+        final AbstractLiteralIV delegate = new XSDNumericIV(c.getByte());
 
-        return new ExtensionIV(delegate, getDatatype().getIV());
+        return new LiteralExtensionIV(delegate, getDatatype().getIV());
         
     }
     
@@ -98,7 +102,7 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
      * a {@link Color}, and then use the string value of the {@link Color} to
      * create an RDF literal.
      */
-    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
         
         final byte b = iv.getDelegate().byteValue();
         

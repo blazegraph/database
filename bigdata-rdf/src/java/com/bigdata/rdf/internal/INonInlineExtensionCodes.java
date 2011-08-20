@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
+import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+
 /**
  * An interface declaring the one byte extension code for non-inline {@link IV}
  * s.
@@ -46,12 +50,12 @@ public interface INonInlineExtensionCodes {
     final byte BlobIV = 0;
 
     /**
-     * @see URINamespaceIV
+     * @see PartlyInlineURIIV
      */
     final byte URINamespaceIV = -1;
 
     /**
-     * @see LiteralDatatypeIV
+     * @see PartlyInlineTypedLiteralIV
      */
     final byte LiteralDatatypeIV = -2;
 

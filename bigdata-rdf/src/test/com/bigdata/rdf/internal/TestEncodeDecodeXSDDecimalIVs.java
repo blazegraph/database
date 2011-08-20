@@ -34,6 +34,7 @@ import java.util.Random;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**

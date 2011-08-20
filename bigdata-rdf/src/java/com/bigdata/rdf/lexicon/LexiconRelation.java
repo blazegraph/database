@@ -79,16 +79,16 @@ import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -2175,7 +2175,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * identifier.
              */
 
-            final BigdataBNode bnode = valueFactory.createBNode(iv.bnodeId());
+        	final String id = ((BNode) iv).getID();
+        	
+            final BigdataBNode bnode = valueFactory.createBNode(id);
 
             // set the term identifier on the object.
             bnode.setIV(iv);

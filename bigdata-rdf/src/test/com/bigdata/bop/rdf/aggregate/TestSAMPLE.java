@@ -36,8 +36,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -70,12 +70,12 @@ public class TestSAMPLE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -131,12 +131,12 @@ public class TestSAMPLE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -158,7 +158,7 @@ public class TestSAMPLE extends TestCase2 {
         };
 
         final IValueExpression<IV> expr = new MathBOp(lprice, new Constant<IV>(
-                new XSDIntIV(1)), MathBOp.MathOp.PLUS);
+                new XSDNumericIV(1)), MathBOp.MathOp.PLUS);
 
         // SAMPLE(lprice+1)
         final SAMPLE op = new SAMPLE(false/* distinct */, expr);
@@ -195,12 +195,12 @@ public class TestSAMPLE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -246,7 +246,7 @@ public class TestSAMPLE extends TestCase2 {
 
     /**
      * Note: This will produce a NotMaterializedException unless we force the
-     * materialization of all the XSDIntIV values for lprice, but that is just
+     * materialization of all the XSDNumericIV values for lprice, but that is just
      * because MathBOp is persnickety. Since SAMPLE really accepts any non-null
      * value, I've left out this unit test.
      * 
@@ -272,12 +272,12 @@ public class TestSAMPLE extends TestCase2 {
 //        final IConstant<String> book2 = new Constant<String>("book2");
 //        final IConstant<String> book3 = new Constant<String>("book3");
 //        final IConstant<String> book4 = new Constant<String>("book4");
-//        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-//                new XSDIntIV<BigdataLiteral>(5));
-//        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-//                new XSDIntIV<BigdataLiteral>(7));
-//        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-//                new XSDIntIV<BigdataLiteral>(9));
+//        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+//                new XSDNumericIV<BigdataLiteral>(5));
+//        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+//                new XSDNumericIV<BigdataLiteral>(7));
+//        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+//                new XSDNumericIV<BigdataLiteral>(9));
 //
 //        /**
 //         * The test data:
@@ -305,7 +305,7 @@ public class TestSAMPLE extends TestCase2 {
 //         * that an error is provoked.
 //         */
 //        
-//        final IValueExpression<IV> expr = new MathBOp(lprice, new Constant(new XSDIntIV(1)),
+//        final IValueExpression<IV> expr = new MathBOp(lprice, new Constant(new XSDNumericIV(1)),
 //                MathBOp.MathOp.PLUS);
 //
 //        // SAMPLE(lprice+1)

@@ -110,7 +110,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
 
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
-        final IV<?, ?> iv = expr.get(bindingSet);
+        final IV iv = expr.get(bindingSet);
 
         if (iv != null) {
 
@@ -132,7 +132,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
                  *
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
-                if (CompareBOp.compare(CompareOp.GT, iv, max)) {
+                if (CompareBOp.compare(iv, max, CompareOp.GT)) {
 
                     max = iv;
 

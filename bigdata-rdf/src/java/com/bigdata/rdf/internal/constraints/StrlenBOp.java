@@ -30,7 +30,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -62,7 +62,7 @@ public class StrlenBOp extends AbstractLiteralBOp {
          final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         int length = label.length();
-        return new XSDIntIV(length);
+        return new XSDNumericIV(length);
     }
 
 }

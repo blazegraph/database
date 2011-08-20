@@ -34,8 +34,8 @@ import java.io.ObjectOutput;
 import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 

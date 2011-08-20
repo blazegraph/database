@@ -6,17 +6,17 @@ import java.util.Set;
 
 import javax.xml.datatype.DatatypeFactory;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.AbstractInlineIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.IVValueExpression;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -130,7 +130,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
             final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
 
-            return vf.createLiteral(((AbstractInlineIV) iv).stringValue(), datatype);
+            return vf.createLiteral(((Value) iv).stringValue(), datatype);
 
         } else if (iv.hasValue()) {
 
@@ -146,7 +146,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
     protected static String literalLabel(IV iv) {
         if (iv.isInline()) {
-            return ((AbstractInlineIV) iv).stringValue();
+            return ((Value) iv).stringValue();
         } else if (iv.hasValue()) {
             return ((BigdataLiteral) iv.getValue()).getLabel();
         } else {

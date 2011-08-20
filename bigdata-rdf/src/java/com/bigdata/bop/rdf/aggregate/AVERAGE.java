@@ -38,10 +38,10 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.XSDLongIV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -116,7 +116,7 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
             return ZERO;
         
         return IVUtility.numericalMath(aggregated,
-                new XSDLongIV<BigdataLiteral>(n), MathBOp.MathOp.DIVIDE);
+                new XSDNumericIV<BigdataLiteral>(n), MathBOp.MathOp.DIVIDE);
         
     }
 

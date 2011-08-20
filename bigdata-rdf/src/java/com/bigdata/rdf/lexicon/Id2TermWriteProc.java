@@ -31,7 +31,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 

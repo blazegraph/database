@@ -28,12 +28,12 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.AbstractInlineIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -102,7 +102,7 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression impl
 
             final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
 
-            return vf.createLiteral( (( AbstractInlineIV)iv).stringValue(),datatype);
+            return vf.createLiteral( (( Value)iv).stringValue(),datatype);
 
         } else if (iv.hasValue()) {
 

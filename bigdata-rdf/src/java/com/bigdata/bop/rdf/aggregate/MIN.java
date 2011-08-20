@@ -132,7 +132,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
                  *
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/300#comment:5
                  */
-                if (CompareBOp.compare(CompareOp.LT, iv, min)) {
+                if (CompareBOp.compare(iv, min, CompareOp.LT)) {
 
                     min = iv;
 

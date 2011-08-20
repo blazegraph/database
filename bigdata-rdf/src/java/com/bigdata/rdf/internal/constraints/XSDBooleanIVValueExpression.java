@@ -28,7 +28,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 
 /**
  * Base class for RDF value expression BOps that happen to evaluate to an

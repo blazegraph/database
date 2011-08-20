@@ -44,9 +44,9 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
-import com.bigdata.rdf.internal.AbstractIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**

@@ -51,9 +51,9 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -107,11 +107,11 @@ public class TestProjectionOp extends TestCase2 {
         final IVariable<IV> x = Var.var("x");
         final IVariable<IV> y = Var.var("y");
         final IVariable<IV> z = Var.var("z");
-        final IConstant<IV> _1 = new Constant<IV>(new XSDIntIV(1));
-        final IConstant<IV> _2 = new Constant<IV>(new XSDIntIV(2));
-        final IConstant<IV> _3 = new Constant<IV>(new XSDIntIV(3));
-        final IConstant<IV> _4 = new Constant<IV>(new XSDIntIV(4));
-        final IConstant<IV> _5 = new Constant<IV>(new XSDIntIV(5));
+        final IConstant<IV> _1 = new Constant<IV>(new XSDNumericIV(1));
+        final IConstant<IV> _2 = new Constant<IV>(new XSDNumericIV(2));
+        final IConstant<IV> _3 = new Constant<IV>(new XSDNumericIV(3));
+        final IConstant<IV> _4 = new Constant<IV>(new XSDNumericIV(4));
+        final IConstant<IV> _5 = new Constant<IV>(new XSDNumericIV(5));
         
         // The computed values are all xsd:integer.
         final IConstant<IV> __2 = new Constant<IV>(new XSDIntegerIV(BigInteger.valueOf(2)));

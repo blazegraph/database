@@ -7,10 +7,10 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.internal.BlobIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.striterator.AbstractKeyOrder;
 

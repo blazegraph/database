@@ -32,16 +32,15 @@ import junit.framework.TestCase2;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.internal.DateTimeExtension;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NumericBNodeIV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDByteIV;
-import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
+import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -95,13 +94,13 @@ public class TestIVComparator extends TestCase2 {
         final IV<BigdataLiteral,Void> noninline_xsd_string_lit1 = new TermId<BigdataLiteral>(VTE.LITERAL,termId++);
         final IV<BigdataLiteral,Void> noninline_xsd_string_lit2 = new TermId<BigdataLiteral>(VTE.LITERAL,termId++);
         
-        final IV<BigdataLiteral, Byte> inline_xsd_byte1 = new XSDByteIV<BigdataLiteral>((byte) 1);
-        final IV<BigdataLiteral, Integer> inline_xsd_int1 = new XSDIntIV<BigdataLiteral>(1);
+        final IV<BigdataLiteral, Number> inline_xsd_byte1 = new XSDNumericIV<BigdataLiteral>((byte) 1);
+        final IV<BigdataLiteral, Number> inline_xsd_int1 = new XSDNumericIV<BigdataLiteral>(1);
 
         final IV<BigdataLiteral, Boolean> inline_xsd_boolean_true = new XSDBooleanIV<BigdataLiteral>(true);
         final IV<BigdataLiteral, Boolean> inline_xsd_boolean_false = new XSDBooleanIV<BigdataLiteral>(false);
 
-        final IV<BigdataLiteral, Integer> inline_xsd_dateTime1 = new XSDIntIV<BigdataLiteral>(1);
+        final IV<BigdataLiteral, Number> inline_xsd_dateTime1 = new XSDNumericIV<BigdataLiteral>(1);
 
         /*
          * URIs

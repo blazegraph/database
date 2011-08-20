@@ -35,11 +35,11 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDDecimalIV;
-import com.bigdata.rdf.internal.XSDIntIV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -76,12 +76,12 @@ public class TestAVERAGE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -130,12 +130,12 @@ public class TestAVERAGE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -158,7 +158,7 @@ public class TestAVERAGE extends TestCase2 {
 
         // AVERAGE(lprice*2)
         final AVERAGE op = new AVERAGE(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDIntIV(2)), MathBOp.MathOp.MULTIPLY));
+                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
@@ -189,12 +189,12 @@ public class TestAVERAGE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:
@@ -260,12 +260,12 @@ public class TestAVERAGE extends TestCase2 {
         final IConstant<String> book2 = new Constant<String>("book2");
         final IConstant<String> book3 = new Constant<String>("book3");
         final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDIntIV<BigdataLiteral>> price5 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(5));
-        final IConstant<XSDIntIV<BigdataLiteral>> price7 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(7));
-        final IConstant<XSDIntIV<BigdataLiteral>> price9 = new Constant<XSDIntIV<BigdataLiteral>>(
-                new XSDIntIV<BigdataLiteral>(9));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(5));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(7));
+        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                new XSDNumericIV<BigdataLiteral>(9));
 
         /**
          * The test data:

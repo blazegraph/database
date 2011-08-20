@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -53,9 +54,9 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     IV createInlineIV(final Value value);
     
     /**
-     * Create an RDF value from an {@link ExtensionIV}. Looks through an
+     * Create an RDF value from an {@link LiteralExtensionIV}. Looks through an
      * internal catalog of {@link IExtension}s to find one that knows how to
-     * handle the extension datatype from the supplied {@link ExtensionIV}.
+     * handle the extension datatype from the supplied {@link LiteralExtensionIV}.
      * 
      * @param iv
      *            the extension IV
@@ -64,7 +65,7 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      *            
      * @return The RDF {@link Value}
      */
-    V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
+    V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf);
 
     /**
      * Initialize the extensions, which need to resolve their datatype URIs into

@@ -3,6 +3,8 @@ package com.bigdata.rdf.internal;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 
