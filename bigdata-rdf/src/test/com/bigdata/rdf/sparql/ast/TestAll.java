@@ -58,6 +58,8 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("AST");
 
         suite.addTestSuite(TestAST.class);
+
+        suite.addTestSuite(TestASTTriplesModeEvaluation.class);
         
         return suite;
         

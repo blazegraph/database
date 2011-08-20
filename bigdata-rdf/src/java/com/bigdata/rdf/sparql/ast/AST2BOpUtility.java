@@ -3,6 +3,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -19,6 +20,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
@@ -174,11 +176,6 @@ public class AST2BOpUtility {
 
             } else {
 
-                /*
-                 * TODO Should we use or discard the {@link ProjectionOp} here?
-                 * Does it offer any advantage?
-                 */
-
                 left = addProjectedAssigments(left,
                         projection.getAssignmentProjections(), ctx);
 
@@ -208,6 +205,19 @@ public class AST2BOpUtility {
 
         }
         addEndOp(left, ctx);
+        /*
+         * TODO Do we need to add operators for materialization of any remaining
+         * variables which are being projected out of the query?
+         * 
+         * TODO We do not want to force materialization for subqueries.  They
+         * should stay as IVs.
+         */
+        
+        if (log.isInfoEnabled()) {
+            log.info("ast:\n" + query);
+            log.info("pipeline:\n" + BOpUtility.toString(left));
+        }
+        
         return left;
 		
 	}
@@ -589,10 +599,10 @@ public class AST2BOpUtility {
 	}
 	
     /**
-     *         FIXME Replace with pipelined projection operator which computes
-     *         the value expressions. We do not need to use subquery to do this.
-     *         It will have to do the materialization pipeline dance. It will
-     *         NOT need to do a conditional bind.
+     * Project select expressions (non-aggregation case).
+     * 
+     * TODO Should we use or discard the {@link ProjectionOp} here? Does it
+     * offer any advantage?
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
 	        final List<AssignmentNode> assignments,
@@ -618,6 +628,7 @@ public class AST2BOpUtility {
     		final List<AssignmentNode> assignments,
             final AST2BOpContext ctx,
             final boolean projection) {
+	    
 		final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
 		for (AssignmentNode assignmentNode : assignments) {
@@ -901,12 +912,15 @@ public class AST2BOpUtility {
      * that query engine is the query controller for the subquery and an
      * {@link EndOp} on the subquery would bring the results for the subquery
      * back to that query controller.
+     * 
+     * TODO Should be conditional based on whether or not we are running on a
+     * cluster, but also see https://sourceforge.net/apps/trac/bigdata/ticket/227.
      */
 	private static final PipelineOp addEndOp(PipelineOp left,
 			final AST2BOpContext ctx) {
 		
-        if (!left.getEvaluationContext()
-                .equals(BOpEvaluationContext.CONTROLLER)) {
+        if (!left.getEvaluationContext().equals(
+                        BOpEvaluationContext.CONTROLLER)) {
 			
             left = new EndOp(new BOp[] { left },//
                     NV.asMap(
@@ -1018,7 +1032,10 @@ public class AST2BOpUtility {
 
         final GroupByOp op;
         
-        HashSet<IVariable<IV>> vars = new HashSet<IVariable<IV>>();
+        /* FIXME Review. I believe that AssignmentNode.getValueExpression() should
+         * always return the Bind().
+         */
+        final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
         if (projectExprs != null) {
             for (IValueExpression expr : projectExprs) {

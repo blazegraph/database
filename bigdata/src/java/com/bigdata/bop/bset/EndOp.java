@@ -15,12 +15,12 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * A operator which may be used at the end of query pipelines when there is a
- * requirement marshal solutions back to the query controller by no requirement
- * to {@link SliceOp slice} solutions. The primary use case for {@link EndOp} is
- * when it is evaluated on the query controller so the results will be streamed
- * back to the query controller in scale-out. You MUST specify
- * {@link BOp.Annotations#EVALUATION_CONTEXT} as
- * {@link BOpEvaluationContext#CONTROLLER} when it is to be used for this
+ * requirement to marshal solutions back to the query controller but no
+ * requirement to {@link SliceOp slice} solutions. The primary use case for
+ * {@link EndOp} is on a cluster, where it is evaluated on the query controller
+ * so the results will be streamed back to the query controller from the nodes
+ * of the cluster. You MUST specify {@link BOp.Annotations#EVALUATION_CONTEXT}
+ * as {@link BOpEvaluationContext#CONTROLLER} when it is to be used for this
  * purpose.
  * 
  * FIXME This is hacked to extend {@link SliceOp} instead as that appears to be
@@ -68,7 +68,7 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new OpTask(this, context));
+        return new FutureTask<Void>(new OpTask(/*this, */context));
         
     }
 
@@ -78,13 +78,13 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
      */
     static private class OpTask implements Callable<Void> {
 
-        private final PipelineOp op;
+//        private final PipelineOp op;
         
         private final BOpContext<IBindingSet> context;
         
-        OpTask(final PipelineOp op, final BOpContext<IBindingSet> context) {
+        OpTask(/*final PipelineOp op, */final BOpContext<IBindingSet> context) {
 
-            this.op = op;
+//            this.op = op;
             
             this.context = context;
             
@@ -97,22 +97,30 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
-//            boolean didRun = false;
-            
-            while (source.hasNext()) {
+            try {
 
-                final IBindingSet[] chunk = source.next();
+                boolean didRun = false;
 
-                sink.add(chunk);
-                
-//                didRun = true;
+                while (source.hasNext()) {
+
+                    final IBindingSet[] chunk = source.next();
+
+                    sink.add(chunk);
+
+                    didRun = true;
+
+                }
+
+                if (didRun)
+                    sink.flush();
+
+                return null;
+
+            } finally {
+
+                sink.close();
                 
             }
-
-//			if(didRun)
-//				sink.flush();
-
-            return null;
 
         }
 
