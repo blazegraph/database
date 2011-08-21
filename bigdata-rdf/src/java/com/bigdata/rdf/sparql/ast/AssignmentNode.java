@@ -110,4 +110,24 @@ public class AssignmentNode extends ValueExpressionNodeBase implements
         
     }
 
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof AssignmentNode))
+            return false;
+
+        final AssignmentNode t = (AssignmentNode) o;
+
+        if (!var.equals(t.var))
+            return false;
+
+        if (!ve.equals(t.ve))
+            return false;
+
+        return true;
+
+    }
+
 }

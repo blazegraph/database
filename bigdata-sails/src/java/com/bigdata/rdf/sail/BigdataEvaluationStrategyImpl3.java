@@ -679,7 +679,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
     
-    CloseableIteration<BindingSet, QueryEvaluationException> 
+    private CloseableIteration<BindingSet, QueryEvaluationException> 
 		evaluateNatively(final TupleExpr tupleExpr, final BindingSet bs) 
 		    throws QueryEvaluationException, UnsupportedOperatorException {
 		try {
@@ -706,7 +706,28 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		}
 	}
 
-    CloseableIteration<BindingSet, QueryEvaluationException> 
+    /**
+     * Translate the Sesame {@link TupleExpr} into a bigdata query plan and
+     * evaluate that query plan.
+     * 
+     * @param root
+     *            The level of the {@link TupleExpr} at which we intercept the
+     *            Sesame evaluation.
+     * @param bs
+     *            The initial {@link BindingSet}.
+     * 
+     * @return An iterator from which the solutions may be drained.
+     * 
+     * @throws UnsupportedOperatorException
+     * @throws UnrecognizedValueException
+     * @throws QueryEvaluationException
+     * 
+     *             FIXME SPARQL 1.0 and SPARQL 1.1 : This is where we need to
+     *             handle {@link QueryRoot}. However, we are only invoking this
+     *             method right now for the top-level construction which we are
+     *             willing to recognize. For example: UNION or JOIN.
+     */
+    private CloseableIteration<BindingSet, QueryEvaluationException> 
     	doEvaluateNatively(final TupleExpr root, final BindingSet bs)
     		throws UnsupportedOperatorException, UnrecognizedValueException, 
     				QueryEvaluationException {
@@ -1047,7 +1068,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
 
-    CloseableIteration<BindingSet, QueryEvaluationException> 
+    private CloseableIteration<BindingSet, QueryEvaluationException> 
 		doEvaluateNatively(final PipelineOp query, final BindingSet bs,
 			final QueryEngine queryEngine, final IVariable[] required
 			) 
@@ -1176,7 +1197,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	 * 
 	 * @throws QueryEvaluationException
 	 */
-	CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
+	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
 			final IRunningQuery runningQuery, final IVariable[] required
 			) throws QueryEvaluationException {
 
@@ -1203,7 +1224,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     }
 	
-	public static ICloseableIterator<IBindingSet> iterator(
+	private static ICloseableIterator<IBindingSet> iterator(
 			final IRunningQuery runningQuery) {
 		
 		// The iterator draining the query solutions.
@@ -1222,7 +1243,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 	    
 	}
 	
-	public static CloseableIteration<BindingSet, QueryEvaluationException> 
+	private static CloseableIteration<BindingSet, QueryEvaluationException> 
 		iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
 			final IVariable[] required) {
     
@@ -1351,7 +1372,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
     
-    protected void attachRangeBOps(final SOpGroup g) {
+    private void attachRangeBOps(final SOpGroup g) {
 
 		final Map<IVariable,Collection<IValueExpression>> lowerBounds =
 			new LinkedHashMap<IVariable,Collection<IValueExpression>>();
@@ -1469,7 +1490,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 		}
     }
 
-    protected IVariable[] gatherRequiredVariables(final TupleExpr root, 
+    private IVariable[] gatherRequiredVariables(final TupleExpr root, 
     		final Collection<Filter> sesameFilters) {
     	
         /*
@@ -1522,7 +1543,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      * @return
      *          the variables it uses
      */
-    protected Set<String> collectVariables(final QueryModelNode op) {
+    private Set<String> collectVariables(final QueryModelNode op) {
 
         final Set<String> vars = new HashSet<String>();
         if (op instanceof Projection) {
@@ -2587,7 +2608,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
      *       values directly as a tuple-based function call. I'm not sure if
      *       that is supported within Sesame/SPARQL.
      */
-    protected CloseableIteration<BindingSet, QueryEvaluationException> search(
+    private CloseableIteration<BindingSet, QueryEvaluationException> search(
             final Var svar, final String languageCode, final String label,
             final BindingSet bindings, final Scope scope)
             throws QueryEvaluationException {

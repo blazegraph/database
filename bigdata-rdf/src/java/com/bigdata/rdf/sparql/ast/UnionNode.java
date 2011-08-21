@@ -82,4 +82,19 @@ public class UnionNode extends GroupNodeBase {
 
     }
 
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof UnionNode))
+            return false;
+
+        if(!super.equals(o))
+            return false;
+        
+        return true;
+
+    }
+
 }

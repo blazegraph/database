@@ -47,6 +47,7 @@ import com.bigdata.rdf.internal.IV;
 public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
     private boolean distinct = false;
+    private boolean reduced = false;
 
     public ProjectionNode() {
     }
@@ -60,6 +61,18 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
     public boolean isDistinct() {
 
         return distinct;
+
+    }
+
+    public void setReduced(final boolean reduced) {
+
+        this.reduced = reduced;
+
+    }
+
+    public boolean isReduced() {
+
+        return reduced;
 
     }
 
@@ -167,21 +180,52 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         if (distinct)
             sb.append("distinct ");
 
+        if (reduced)
+            sb.append("reduced ");
+
         if (isWildcard()) {
 
             sb.append("* ");
             
         } else {
-            
+
+            boolean first = true;
+
             for (AssignmentNode v : this) {
-                
+
+                if (first) {
+                    first = false;
+                } else {
+                    sb.append(" ");
+                }
+
                 sb.append(v);
-                
+            
             }
 
         }
 
         return sb.toString();
+
+    }
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!super.equals(o))
+            return false;
+
+        if (!(o instanceof ProjectionNode))
+            return false;
+
+        final ProjectionNode t = (ProjectionNode) o;
+
+        if (distinct != t.distinct)
+            return false;
+
+        return true;
 
     }
 
