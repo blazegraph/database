@@ -57,7 +57,14 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
+        // test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT)
         suite.addTestSuite(TestBigdataExprBuilder.class);
+
+        // test suite for group graph patterns (join groups, unions, subquery, etc).
+        suite.addTestSuite(TestGroupGraphPatternBuilder.class);
+
+        // test suite for building up value expressions.
+        suite.addTestSuite(TestValueExprBuilder.class);
 
         return suite;
 

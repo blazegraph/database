@@ -81,7 +81,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             StringEscapesProcessor.process(qc);
             BaseDeclProcessor.process(qc, baseURI);
             final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-            WildcardProjectionProcessor.process(qc);
+//            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
             final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
 
@@ -132,14 +132,20 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     private IQueryNode buildQueryModel(final ASTQueryContainer qc,
             final AbstractTripleStore tripleStore)
             throws MalformedQueryException {
+
         final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(
-                tripleStore.getValueFactory());
+                new BigdataASTContext(tripleStore));
+
         try {
+
             return (IQueryNode) qc.jjtAccept(exprBuilder, null);
-        }
-        catch (VisitorException e) {
+            
+        } catch (VisitorException e) {
+
             throw new MalformedQueryException(e.getMessage(), e);
+
         }
+
     }
 
     static private Properties getQueryHints(final ASTQueryContainer qc)

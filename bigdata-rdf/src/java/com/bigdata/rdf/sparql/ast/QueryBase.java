@@ -35,8 +35,8 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class QueryBase extends QueryNodeBase {
 
-	private IGroupNode whereClause;
     private ProjectionNode projection;
+    private IGroupNode whereClause;
     private GroupByNode groupBy;
     private HavingNode having;
     private OrderByNode orderBy;
@@ -61,7 +61,7 @@ abstract public class QueryBase extends QueryNodeBase {
      * @param whereClause
      *            The "WHERE" clause.
      */
-    public void setRoot(final IGroupNode whereClause) {
+    public void setWhereClause(final IGroupNode whereClause) {
         
         this.whereClause = whereClause;
         
@@ -226,6 +226,68 @@ abstract public class QueryBase extends QueryNodeBase {
         }
 
         return sb.toString();
+
+    }
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof QueryBase))
+            return false;
+
+        final QueryBase t = (QueryBase) o;
+
+        if (projection == null) {
+            if (t.projection != null)
+                return false;
+        } else {
+            if (!projection.equals(t.projection))
+                return false;
+        }
+
+        if (whereClause == null) {
+            if (t.whereClause != null)
+                return false;
+        } else {
+            if (!whereClause.equals(t.whereClause))
+                return false;
+        }
+
+        if (groupBy == null) {
+            if (t.groupBy != null)
+                return false;
+        } else {
+            if (!groupBy.equals(t.groupBy))
+                return false;
+        }
+
+        if (having == null) {
+            if (t.having != null)
+                return false;
+        } else {
+            if (!having.equals(t.having))
+                return false;
+        }
+
+        if (orderBy == null) {
+            if (t.orderBy != null)
+                return false;
+        } else {
+            if (!orderBy.equals(t.orderBy))
+                return false;
+        }
+
+        if (slice == null) {
+            if (t.slice != null)
+                return false;
+        } else {
+            if (!slice.equals(t.slice))
+                return false;
+        }
+
+        return true;
 
     }
 

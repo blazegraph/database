@@ -87,7 +87,7 @@ public class TestAST extends TestCase {
     	
     	final QueryRoot query = new QueryRoot();
     	
-    	query.setRoot(root);
+    	query.setWhereClause(root);
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -113,7 +113,7 @@ public class TestAST extends TestCase {
     	
         final QueryRoot query = new QueryRoot();
         
-        query.setRoot(root);
+        query.setWhereClause(root);
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -143,7 +143,7 @@ public class TestAST extends TestCase {
     	
         final QueryRoot query = new QueryRoot();
         
-        query.setRoot(root);
+        query.setWhereClause(root);
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -178,7 +178,7 @@ public class TestAST extends TestCase {
     	
         final QueryRoot query = new QueryRoot();
         
-        query.setRoot(union);
+        query.setWhereClause(union);
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -220,7 +220,7 @@ public class TestAST extends TestCase {
     	
         final QueryRoot query = new QueryRoot();
         
-        query.setRoot(root);
+        query.setWhereClause(root);
 
     	if (log.isInfoEnabled())
     		log.info("\n"+query.toString());
@@ -249,7 +249,7 @@ public class TestAST extends TestCase {
     	
         final QueryRoot query = new QueryRoot();
         
-        query.setRoot(root);
+        query.setWhereClause(root);
 
     	final ProjectionNode project = new ProjectionNode();
         project.setDistinct(true);
@@ -305,7 +305,7 @@ public class TestAST extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("y"),
                     nameConstant, new VarNode("name")));
-            subquery.setRoot(whereClause);
+            subquery.setWhereClause(whereClause);
             
             final GroupByNode groupBy1 = new GroupByNode();
             groupBy1.addGroupByVar(new VarNode("y"));

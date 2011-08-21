@@ -123,14 +123,14 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 
 		boolean DEFAULT_DISTINCT = false;
 		
-		/**
-         * Optional boolean property indicates whether the aggregate
-         * uses star argument like COUNT(*)
-         * (default {@value #DEFAULT_STAR}).
-         */
-        String STAR = AggregateBase.class.getName() + ".star";
-
-        boolean DEFAULT_STAR = false;
+//		/**
+//         * Optional boolean property indicates whether the aggregate
+//         * uses star argument like COUNT(*)
+//         * (default {@value #DEFAULT_STAR}).
+//         */
+//        String STAR = AggregateBase.class.getName() + ".star";
+//
+//        boolean DEFAULT_STAR = false;
 
 	}
 

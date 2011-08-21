@@ -7,7 +7,6 @@ import java.util.concurrent.ConcurrentMap;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
-import org.openrdf.query.algebra.AggregateOperator;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
@@ -81,6 +80,11 @@ public class FunctionRegistry {
 
 	public static final String SPARQL_FUNCTIONS = "http://www.w3.org/2006/sparql-functions#";
 	public static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions#";
+	
+    /**
+     * Functions in SPARQL 1.1 for which there is not yet any official URI.
+     */
+    public static final String SPARQL11_UNDEFINED_FUNCTIONS = "http://www.w3.org/TR/sparql11-query/#SparqlOps";
 
     public static final URI BOUND = new URIImpl(SPARQL_FUNCTIONS+"bound");
     public static final URI IS_LITERAL = new URIImpl(SPARQL_FUNCTIONS+"isLiteral");
@@ -130,6 +134,13 @@ public class FunctionRegistry {
     public static final URI STR_LEN = new URIImpl(SPARQL_FUNCTIONS+"strlen");
     public static final URI SUBSTR = new URIImpl(SPARQL_FUNCTIONS+"substr");
 
+    /**
+     * FIXME IRI function, as defined in <a
+     * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+     * Language for RDF</a>.
+     */
+    public static final URI IRI = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+"iri");
+     
     public static final URI EQ = new URIImpl(XPATH_FUNCTIONS+"equal-to");
     public static final URI NE = new URIImpl(XPATH_FUNCTIONS+"not-equal-to");
     public static final URI GT = new URIImpl(XPATH_FUNCTIONS+"greater-than");
