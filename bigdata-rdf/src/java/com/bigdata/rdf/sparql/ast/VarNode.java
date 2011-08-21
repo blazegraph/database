@@ -16,6 +16,8 @@ import com.bigdata.rdf.internal.IV;
  */
 public class VarNode extends TermNode {
 
+    private boolean anonymous;
+    
 	public VarNode(final IVariable<IV> var) {
 		
 		super(var);
@@ -34,16 +36,57 @@ public class VarNode extends TermNode {
 
     }
 
+    /**
+     * Return <code>true</code> if this is an anonymous variable (anonymous
+     * variables are introduced during a rewrite of the query in which blank
+     * nodes are replaced by anonymous variables). This marker is useful mainly
+     * when reading the AST tree as an aid to understanding where a given
+     * variable came from in the original query.
+     */
+    public boolean isAnonymous() {
+	    return anonymous;
+	}
+
+    /**
+     * Mark this as an anonymous variable (one introduced during a query rewrite
+     * in place of a blank node).
+     * 
+     * @param anonymous
+     */
+	public void setAnonymous(final boolean anonymous) {
+	    this.anonymous = anonymous;
+	}
+
+    /**
+     * Overridden to mark anonymous variables.
+     * 
+     * @see #isAnonymous()
+     */
+    @Override
+    public String toString() {
+
+        return "VarNode(" + getVar() + ")" + (anonymous ? "[anonymous]" : "");
+
+    }
+ 
     @Override
     public boolean equals(Object obj) {
         
         if (obj == this)
             return true;
         
-        if (obj instanceof VarNode)
-            return getVar().equals(((VarNode) obj).getVar());
+        if (!(obj instanceof VarNode))
+            return false;
 
-        return false;
+        final VarNode t = (VarNode) obj;
+
+        if (!getVar().equals(t.getVar()))
+            return false;
+
+        if (anonymous != t.anonymous)
+            return false;
+        
+        return true;
         
     }
 	

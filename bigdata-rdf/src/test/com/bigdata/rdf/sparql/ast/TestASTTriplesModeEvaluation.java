@@ -94,7 +94,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 final QueryRoot query = new QueryRoot();
 
-                query.setRoot(root);
+                query.setWhereClause(root);
 
                 final ProjectionNode pn = new ProjectionNode();
                 pn.addProjectionVar(new VarNode("s"));
@@ -135,7 +135,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 final QueryRoot query = new QueryRoot();
 
-                query.setRoot(root);
+                query.setWhereClause(root);
 
                 final ProjectionNode pn = new ProjectionNode();
                 
@@ -182,7 +182,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 final QueryRoot query = new QueryRoot();
 
-                query.setRoot(root);
+                query.setWhereClause(root);
 
                 final ProjectionNode pn = new ProjectionNode();
                 pn.addProjectionVar(new VarNode("s"));

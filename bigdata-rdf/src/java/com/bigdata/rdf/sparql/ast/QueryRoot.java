@@ -161,5 +161,38 @@ public class QueryRoot extends QueryBase {
         return sb.toString();
         
     }
-    
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof QueryRoot))
+            return false;
+
+        if (!super.equals(o))
+            return false;
+
+        final QueryRoot t = (QueryRoot) o;
+
+        if (dataset == null) {
+            if (t.dataset != null)
+                return false;
+        } else {
+            if (!dataset.equals(t.dataset))
+                return false;
+        }
+
+        if (namedSubqueries == null) {
+            if (t.namedSubqueries != null)
+                return false;
+        } else {
+            if (!namedSubqueries.equals(t.namedSubqueries))
+                return false;
+        }
+
+        return true;
+
+    }
+
 }

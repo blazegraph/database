@@ -43,7 +43,7 @@ public class SOp2ASTUtility {
 		
 		final QueryRoot query = new QueryRoot();
 		
-		query.setRoot(astRoot);
+		query.setWhereClause(astRoot);
 		
 		/*
 		 * FIXME We need to take over the rest of the SPARQL for the Sesame

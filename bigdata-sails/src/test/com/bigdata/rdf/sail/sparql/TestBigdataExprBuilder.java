@@ -25,33 +25,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.Map;
-import java.util.Properties;
-
-import junit.framework.TestCase;
-
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Test suite for {@link BigdataExprBuilder}.
@@ -71,7 +55,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * 
  * TODO Test SELECT DISTINCT, SELECT REDUCED, SELECT *.
  */
-public class TestBigdataExprBuilder extends TestCase {
+public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     private static final Logger log = Logger
             .getLogger(TestBigdataExprBuilder.class);
@@ -81,107 +65,6 @@ public class TestBigdataExprBuilder extends TestCase {
 
     public TestBigdataExprBuilder(String name) {
         super(name);
-    }
-
-    protected String baseURI = null;
-    protected AbstractTripleStore tripleStore = null;
-   
-    protected void setUp() throws Exception {
-        
-        tripleStore = getStore(getProperties());
-        
-    }
-
-    protected void tearDown() throws Exception {
-        
-        if(tripleStore != null) {
-            
-            tripleStore.__tearDownUnitTest();
-            
-            tripleStore = null;
-            
-        }
-        
-    }
-    
-    /*
-     * Mock up the tripleStore.
-     */
-    
-    protected Properties getProperties() {
-
-        final Properties properties = new Properties();
-
-//        // turn on quads.
-//        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
-
-        // override the default vocabulary.
-        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
-                NoVocabulary.class.getName());
-
-        // turn off axioms.
-        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
-                NoAxioms.class.getName());
-
-        // Note: No persistence.
-        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-                BufferMode.Transient.toString());
-        
-        return properties;
-
-    }
-
-    protected AbstractTripleStore getStore(final Properties properties) {
-
-        final String namespace = "kb";
-
-        // create/re-open journal.
-        final Journal journal = new Journal(properties);
-
-        final LocalTripleStore lts = new LocalTripleStore(journal, namespace,
-                ITx.UNISOLATED, properties);
-
-        lts.create();
-
-        return lts;
-
-    }
-
-    /*
-     * Mock up the parser and jjtree AST => bigdata AST translator.
-     */
-    
-    protected QueryRoot parse(final String queryStr, final String baseURI)
-            throws MalformedQueryException, TokenMgrError, ParseException {
-
-        final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
-        StringEscapesProcessor.process(qc);
-        BaseDeclProcessor.process(qc, baseURI);
-        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-//        WildcardProjectionProcessor.process(qc); // No. We use "*" as a variable name.
-        BlankNodeVarProcessor.process(qc);
-        final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
-
-        return (QueryRoot) queryRoot;
-
-    }
-
-    private IQueryNode buildQueryModel(final ASTQueryContainer qc,
-            final AbstractTripleStore tripleStore)
-            throws MalformedQueryException {
-
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(
-                tripleStore.getValueFactory());
-        try {
-        
-            return (IQueryNode) qc.jjtAccept(exprBuilder, null);
-            
-        } catch (VisitorException e) {
-            
-            throw new MalformedQueryException(e.getMessage(), e);
-        
-        }
-        
     }
 
     /**
@@ -206,7 +89,7 @@ public class TestBigdataExprBuilder extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
-            expected.setRoot(whereClause);
+            expected.setWhereClause(whereClause);
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
@@ -250,7 +133,7 @@ public class TestBigdataExprBuilder extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
-            expected.setRoot(whereClause);
+            expected.setWhereClause(whereClause);
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
@@ -282,7 +165,7 @@ public class TestBigdataExprBuilder extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
-            expected.setRoot(whereClause);
+            expected.setWhereClause(whereClause);
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
@@ -313,7 +196,7 @@ public class TestBigdataExprBuilder extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
-            expected.setRoot(whereClause);
+            expected.setWhereClause(whereClause);
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
@@ -347,7 +230,7 @@ public class TestBigdataExprBuilder extends TestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o")));
-            expected.setRoot(whereClause);
+            expected.setWhereClause(whereClause);
             
             final SliceNode slice = new SliceNode();
             expected.setSlice(slice);
@@ -361,67 +244,4 @@ public class TestBigdataExprBuilder extends TestCase {
 
     }
     
-    /**
-     * Unit test for join group
-     * <pre>
-     * select ?s where {?s ?p ?o. ?o ?p2 ?s}
-     * </pre>
-     * @throws MalformedQueryException
-     * @throws TokenMgrError
-     * @throws ParseException
-     */
-    public void test_select_joins() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o. ?o ?p2 ?s}";
-
-        final QueryRoot expected = new QueryRoot();
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setRoot(whereClause);
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
-            whereClause.addChild(new StatementPatternNode(new VarNode("o"),
-                    new VarNode("p2"), new VarNode("s")));
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
-
-    protected static void assertSameAST(final String queryStr,
-            final QueryRoot expected, final QueryRoot actual) {
-
-        log.error("queryStr:\n" + queryStr);
-        log.error("expected: " + expected);
-        log.error("actual  :" + actual);
-
-        assertEquals("parent", expected.getParent(), actual.getParent());
-
-        assertEquals("dataset", expected.getDataset(), actual.getDataset());
-
-        assertEquals("namedSubqueries", expected.getNamedSubqueries(),
-                actual.getNamedSubqueries());
-
-        assertEquals("projection", expected.getProjection(),
-                actual.getProjection());
-
-        assertEquals("whereClause", expected.getWhereClause(),
-                actual.getWhereClause());
-
-        assertEquals("groupBy", expected.getGroupBy(), actual.getGroupBy());
-
-        assertEquals("having", expected.getHaving(), actual.getHaving());
-
-        assertEquals("slice", expected.getSlice(), actual.getSlice());
-
-    }
-
 }
