@@ -11,6 +11,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -21,6 +22,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -220,7 +222,139 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         }
 
     }
+    /**
+     * Unit test developed to identify a problem where a query with 3 solutions
+     * passes through those solutions but a query with one does not.
+     *
+     * @throws Exception
+     */
+    public void testOptionalDistinct() throws Exception {
 
+        final Properties properties = getProperties();
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            final URI x = new URIImpl("http://www.foo.org/x");
+            final URI y = new URIImpl("http://www.foo.org/y");
+            final URI z = new URIImpl("http://www.foo.org/z");
+            final URI A = new URIImpl("http://www.foo.org/A");
+            final URI B = new URIImpl("http://www.foo.org/B");
+            final URI C = new URIImpl("http://www.foo.org/C");
+            final URI rdfType = RDF.TYPE;
+
+            // add statements using the URIs declared above.
+            store.addStatement(x, rdfType, C);
+            store.addStatement(x, y, B);
+            store.addStatement(z, rdfType, A);
+
+            final AtomicInteger idFactory = new AtomicInteger(0);
+
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(store.getIndexManager());
+
+
+            IV type=store.getIV(rdfType);
+            IV cIv=store.getIV(C);
+            IV bIv=store.getIV(B);
+
+            /*
+             * Run query expecting 1 statements.
+             */
+            {
+
+                final IGroupNode root = new JoinGroupNode();
+                root.addChild(new StatementPatternNode(new VarNode("s"), new ConstantNode(new Constant<IV>(type)),new ConstantNode(new Constant<IV>(cIv))));
+                JoinGroupNode optional=new JoinGroupNode(true);
+                optional.addChild(new StatementPatternNode(new VarNode("s"), new ConstantNode(new Constant<IV>(bIv)),new VarNode("o")));
+                root.addChild(optional);
+
+                final QueryRoot query = new QueryRoot();
+
+                query.setWhereClause(root);
+
+                final ProjectionNode pn = new ProjectionNode();
+                pn.addProjectionVar(new VarNode("s"));
+                pn.addProjectionVar(new VarNode("o"));
+                query.setProjection(pn);
+
+                final PipelineOp pipeline = AST2BOpUtility
+                        .convert(new AST2BOpContext(query, idFactory, store,
+                                queryEngine, new Properties()));
+
+                // Submit query for evaluation.
+                final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
+
+                final AbstractRunningQuery runningQuery = queryEngine.eval(UUID
+                        .randomUUID(), pipeline,
+                        new ThickAsynchronousIterator<IBindingSet[]>(
+                                existingBindings));
+
+                final Iterator<IBindingSet[]> iter = runningQuery.iterator();
+
+                int i = 0;
+                while (iter.hasNext()) {
+                    final IBindingSet[] set = iter.next();
+                    i += set.length;
+                }
+
+                assertEquals("Baseline", 1, i);
+
+            }
+            /*
+             * Run query expecting 1 statements, but distinct flag.
+             */
+            {
+
+                final IGroupNode root = new JoinGroupNode();
+                root.addChild(new StatementPatternNode(new VarNode("s"), new ConstantNode(new Constant<IV>(type)),new ConstantNode(new Constant<IV>(cIv))));
+                JoinGroupNode optional=new JoinGroupNode(true);
+                optional.addChild(new StatementPatternNode(new VarNode("s"), new ConstantNode(new Constant<IV>(bIv)),new VarNode("o")));
+                root.addChild(optional);
+
+                final QueryRoot query = new QueryRoot();
+
+                query.setWhereClause(root);
+
+                final ProjectionNode pn = new ProjectionNode();
+                pn.addProjectionVar(new VarNode("s"));
+                pn.addProjectionVar(new VarNode("o"));
+                pn.setDistinct(true);
+                query.setProjection(pn);
+
+                final PipelineOp pipeline = AST2BOpUtility
+                        .convert(new AST2BOpContext(query, idFactory, store,
+                                queryEngine, new Properties()));
+
+                // Submit query for evaluation.
+                final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
+
+                final AbstractRunningQuery runningQuery = queryEngine.eval(UUID
+                        .randomUUID(), pipeline,
+                        new ThickAsynchronousIterator<IBindingSet[]>(
+                                existingBindings));
+
+                final Iterator<IBindingSet[]> iter = runningQuery.iterator();
+
+                int i = 0;
+                while (iter.hasNext()) {
+                    final IBindingSet[] set = iter.next();
+                    i += set.length;
+                }
+
+                assertEquals("Baseline", 1, i);
+
+            }
+
+
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!
