@@ -68,5 +68,22 @@ abstract public class ValueExpressionListBaseNode<E extends IValueExpressionNode
         return exprs.isEmpty();
         
     }
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof ValueExpressionListBaseNode<?>))
+            return false;
+
+        final ValueExpressionListBaseNode<? extends IValueExpressionNode> t = (ValueExpressionListBaseNode<?>) o;
+
+        if (!exprs.equals(t.exprs))
+            return false;
+        
+        return true;
+        
+    }
     
 }

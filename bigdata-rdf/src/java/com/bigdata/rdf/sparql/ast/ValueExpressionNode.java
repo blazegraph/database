@@ -25,4 +25,20 @@ public class ValueExpressionNode implements IValueExpressionNode {
 
     }
     
+    @Override
+    public boolean equals(final Object o) {
+
+        if (o == this)
+            return true;
+
+        if (!(o instanceof ValueExpressionNode))
+            return false;
+        
+        if (!ve.equals(((ValueExpressionNode) o).ve))
+            return false;
+
+        return true;
+
+    }
+
 }

@@ -16,18 +16,18 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  */
 public class JoinGroupNode extends GroupNodeBase {
 
-	/**
-	 * Construct a non-optional join group.
-	 */
-	public JoinGroupNode() {
+    /**
+     * Construct a non-optional join group.
+     */
+    public JoinGroupNode() {
 
-		super(false);
-		
-	}
+        this(false/* optional */);
 
-	public JoinGroupNode(final boolean optional) {
+    }
 
-		super(optional);
+    public JoinGroupNode(final boolean optional) {
+
+        super(optional);
 		
 	}
 
@@ -413,5 +413,20 @@ public class JoinGroupNode extends GroupNodeBase {
         return sb.toString();
 
 	}
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof JoinGroupNode))
+            return false;
+
+        if(!super.equals(o))
+            return false;
+        
+        return true;
+
+    }
 
 }

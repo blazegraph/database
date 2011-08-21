@@ -14,7 +14,6 @@ import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueExpr;
 
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
 
@@ -82,6 +81,11 @@ public class SOpTreeBuilder {
         
     }
     
+    /*
+     * FIXME SPARQL 1.0 and SPARQL 1.1 : We need to recognize and handle the
+     * following additional constructs: {SELECT (projected value expressions);
+     * ORDER BY; GROUP BY / HAVING; SUBQUERY; PROPERTY PATHS)}.
+     */
     private void collectSOps(final List<SOp> sops, final TupleExpr tupleExpr, 
     		final boolean rslj, final int g, final int pg) {
     	

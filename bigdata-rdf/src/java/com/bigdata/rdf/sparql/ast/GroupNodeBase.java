@@ -12,7 +12,7 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
 
 	private final List<IGroupMemberNode> children;
 	
-	private final boolean optional;
+	private boolean optional;
 	
 	protected GroupNodeBase(final boolean optional) {
 		
@@ -20,8 +20,8 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
 		
 		this.optional = optional;
 		
-	}
-	
+    }
+
 	public Iterator<IGroupMemberNode> iterator() {
 		
 		return children.iterator();
@@ -60,4 +60,30 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
 		
 	}
 	
+	public void setOptional(final boolean optional) {
+	    
+	    this.optional = optional;
+	    
+	}
+	
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof GroupNodeBase))
+            return false;
+
+        final GroupNodeBase t = (GroupNodeBase) o;
+
+        if (optional != t.optional)
+            return false;
+
+        if (!children.equals(t.children))
+            return false;
+        
+        return true;
+
+    }
+    
 }

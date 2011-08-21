@@ -112,7 +112,7 @@ public class AST2BOpUtility {
 		
 		final QueryRoot query = ctx.query;
 		
-        final IGroupNode root = query.getRoot();
+        final IGroupNode root = query.getWhereClause();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");

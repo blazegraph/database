@@ -104,4 +104,24 @@ public class SliceNode extends SolutionModifierBase {
         
     }
 
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof SliceNode))
+            return false;
+
+        final SliceNode t = (SliceNode) o;
+
+        if (limit != t.limit)
+            return false;
+
+        if (offset != t.offset)
+            return false;
+
+        return true;
+        
+    }
+    
 }

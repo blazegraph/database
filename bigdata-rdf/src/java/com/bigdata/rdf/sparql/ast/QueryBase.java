@@ -35,7 +35,7 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class QueryBase extends QueryNodeBase {
 
-	private IGroupNode root;
+	private IGroupNode whereClause;
     private ProjectionNode projection;
     private GroupByNode groupBy;
     private HavingNode having;
@@ -49,21 +49,21 @@ abstract public class QueryBase extends QueryNodeBase {
     /**
      * Return the {@link IGroupNode} (corresponds to the WHERE clause).
      */
-    public IGroupNode getRoot() {
+    public IGroupNode getWhereClause() {
 
-        return root;
+        return whereClause;
         
     }
 
     /**
-     * Set the {@link IGroupNode}.
+     * Set the {@link IGroupNode} (corresponds to the WHERE clause).
      *  
-     * @param root
+     * @param whereClause
      *            The "WHERE" clause.
      */
-    public void setRoot(final IGroupNode root) {
+    public void setRoot(final IGroupNode whereClause) {
         
-        this.root = root;
+        this.whereClause = whereClause;
         
     }
     
@@ -185,7 +185,7 @@ abstract public class QueryBase extends QueryNodeBase {
 		    
 		}
 
-        if (root != null) {
+        if (whereClause != null) {
 
             sb.append("\n");
             
@@ -193,7 +193,7 @@ abstract public class QueryBase extends QueryNodeBase {
 
             sb.append("where\n");
 
-            sb.append(root.toString(indent));
+            sb.append(whereClause.toString(indent));
 
         }
 

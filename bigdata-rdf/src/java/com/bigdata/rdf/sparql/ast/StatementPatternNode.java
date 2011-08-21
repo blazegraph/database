@@ -127,4 +127,39 @@ public class StatementPatternNode extends GroupMemberNodeBase {
 		
 	}
 
+    public boolean equals(final Object obj) {
+
+        if (this == obj)
+            return true;
+
+        if (!(obj instanceof StatementPatternNode))
+            return false;
+
+        final StatementPatternNode t = (StatementPatternNode) obj;
+
+        if (!s.equals(t.s))
+            return false;
+        if (!p.equals(t.p))
+            return false;
+        if (!o.equals(t.o))
+            return false;
+        if (c == null) {
+            if (t.c != null)
+                return false;
+        } else {
+            if (!c.equals(t.c))
+                return false;
+        }
+        if (scope == null) {
+            if (t.scope != null)
+                return false;
+        } else {
+            if (!scope.equals(t.scope))
+                return false;
+        }
+
+        return true;
+
+    }
+
 }
