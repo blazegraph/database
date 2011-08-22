@@ -44,6 +44,8 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  *          FIXME Reconcile this with {@link InGraphBinarySearchFilter} and
  *          {@link InGraphHashSetFilter} and also with the use of an in-memory
  *          join against the incoming binding sets to handle SPARQL data sets.
+ *          
+ *          FIXME Reconcile with {@link ComputedIN}.
  */
 abstract public class InBOp extends XSDBooleanIVValueExpression {
 
@@ -51,7 +53,10 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
 
 	public interface Annotations extends BOp.Annotations {
 
-        String NOT = (InBOp.class.getName() + ".not").intern();
+	    /**
+	     * <code>true</code> iff this is "NOT IN" rather than "IN".
+	     */
+        String NOT = InBOp.class.getName() + ".not";
 
     }
 
@@ -91,31 +96,37 @@ abstract public class InBOp extends XSDBooleanIVValueExpression {
         if (var == null)
             throw new IllegalArgumentException();
 
-        if(arity()<2){
+        if (arity() < 2) {
             throw new IllegalArgumentException();
         }
 
     }
 
     /**
-     * @see Annotations#VARIABLE
+     * The value expression to be tested.
      */
     @SuppressWarnings("unchecked")
-    public IVariable<IV> getVariable() {
+    public IValueExpression<IV> getValueExpression() {
 
-        return (IVariable<IV>) get(0);
+        return (IValueExpression<IV>) get(0);
 
     }
 
     /**
-     * @see Annotations#SET
+     * The remaining arguments to the IN/NOT IN function, which must be a set of
+     * constants.
      */
     @SuppressWarnings("unchecked")
     public IConstant<IV>[] getSet() {
-        IConstant<IV>[] set=new IConstant[arity()-1];
-        for(int i=1;i<arity();i++){
-            set[i-1]=(IConstant<IV>)get(i);
+
+        final IConstant<IV>[] set = new IConstant[arity() - 1];
+
+        for (int i = 1; i < arity(); i++) {
+
+            set[i - 1] = (IConstant<IV>) get(i);
+
         }
+
         return set;
 
     }

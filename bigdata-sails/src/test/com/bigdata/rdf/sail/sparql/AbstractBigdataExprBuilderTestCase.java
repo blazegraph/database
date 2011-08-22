@@ -45,7 +45,12 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -80,12 +85,15 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected AbstractTripleStore tripleStore = null;
     /** The namespace of the {@link LexiconRelation}. */
     protected String lex = null;
+    protected BigdataValueFactory valueFactory = null;
    
     protected void setUp() throws Exception {
         
         tripleStore = getStore(getProperties());
 
         lex = tripleStore.getLexiconRelation().getNamespace();
+        
+        valueFactory = tripleStore.getValueFactory();
         
     }
 
@@ -103,8 +111,28 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
         lex = null;
         
+        valueFactory = null;
+        
     }
-    
+
+    // TODO Verify with MikeP
+    @SuppressWarnings("unchecked")
+    protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
+
+        IV iv = tripleStore.getLexiconRelation().getInlineIV(value);
+
+        if (iv == null) {
+
+            iv = (IV<BigdataValue, ?>) TermId.mockIV(VTE.valueOf(value));
+            
+            iv.setValue(value);
+
+        }
+
+        return iv;
+
+    }
+
     /*
      * Mock up the tripleStore.
      */

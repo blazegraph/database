@@ -80,11 +80,16 @@ public class FunctionRegistry {
 
 	public static final String SPARQL_FUNCTIONS = "http://www.w3.org/2006/sparql-functions#";
 	public static final String XPATH_FUNCTIONS = "http://www.w3.org/2005/xpath-functions#";
-	
+
+	/**
+     * Functions in SPARQL 1.0 for which there is not yet any official URI.
+     */
+    public static final String SPARQL10_UNDEFINED_FUNCTIONS = "http://www.bigdata.com/sparql-1.0-undefined-functions";
+
     /**
      * Functions in SPARQL 1.1 for which there is not yet any official URI.
      */
-    public static final String SPARQL11_UNDEFINED_FUNCTIONS = "http://www.w3.org/TR/sparql11-query/#SparqlOps";
+    public static final String SPARQL11_UNDEFINED_FUNCTIONS = "http://www.bigdata.com/sparql-1.1-undefined-functions";
 
     public static final URI BOUND = new URIImpl(SPARQL_FUNCTIONS+"bound");
     public static final URI IS_LITERAL = new URIImpl(SPARQL_FUNCTIONS+"isLiteral");
@@ -135,12 +140,28 @@ public class FunctionRegistry {
     public static final URI SUBSTR = new URIImpl(SPARQL_FUNCTIONS+"substr");
 
     /**
-     * FIXME IRI function, as defined in <a
+     * FIXME Implement and register the IRI function, as defined in <a
      * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
      * Language for RDF</a>.
      */
-    public static final URI IRI = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+"iri");
-     
+    public static final URI IRI = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS
+            + "iri");
+
+    /**
+     * FIXME Implement and register the BNODE()/BNODE(Literal) function as
+     * defined in <a
+     * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+     * Language for RDF</a>.
+     */
+    public static final URI BNODE = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+ "bnode");
+
+    /**
+     * FIXME Implement and register the EXISTS(graphPattern) function as defined
+     * in <a href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1
+     * Query Language for RDF</a>.
+     */
+    public static final URI EXISTS = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+ "exists");
+
     public static final URI EQ = new URIImpl(XPATH_FUNCTIONS+"equal-to");
     public static final URI NE = new URIImpl(XPATH_FUNCTIONS+"not-equal-to");
     public static final URI GT = new URIImpl(XPATH_FUNCTIONS+"greater-than");
@@ -166,7 +187,6 @@ public class FunctionRegistry {
     public static final URI MIN = new URIImpl(SPARQL_FUNCTIONS+"min");
     public static final URI SAMPLE = new URIImpl(SPARQL_FUNCTIONS+"sample");
     public static final URI SUM = new URIImpl(SPARQL_FUNCTIONS+"sum");
-
 
     public static final URI XSD_BOOL = XMLSchema.BOOLEAN;
     public static final URI XSD_DT = XMLSchema.DATETIME;
@@ -586,10 +606,13 @@ public class FunctionRegistry {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-				IValueExpression<? extends IV> arg =
-					args[0].getValueExpression();
+                IValueExpression<? extends IV> arg = args[0]
+                        .getValueExpression();
+
 				if (!(arg instanceof XSDBooleanIVValueExpression)) {
-					arg = new EBVBOp(arg);
+				
+				    arg = new EBVBOp(arg);
+				    
 				}
 
 				return new NotBOp(arg);
@@ -597,67 +620,11 @@ public class FunctionRegistry {
 			}
 		});
 
-		  add(IN, new Factory() {
-	            public IValueExpression<? extends IV> create(final String lex,
-	                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+		add(IN, new InFactory(false/*not*/));
 
-	                try{
-	                    checkArgs(args, VarNode.class,ConstantNode.class);
-	                    IValueExpression<? extends IV> arg =
-	                            args[0].getValueExpression();
+        add(NOT_IN, new InFactory(true/*not*/));
 
-	                    IConstant<? extends IV> set[]=new IConstant[args.length-1];
-	                    for(int i=1;i<args.length;i++){
-	                            set[i-1]=((ConstantNode)args[i]).getVal();
-	                    }
-
-	                    return new InHashBOp(false,arg, set);
-	                }catch(IllegalArgumentException iae){
-	                    checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
-
-                        IValueExpression<? extends IV> set[]=new IValueExpression[args.length];
-                        for(int i=0;i<args.length;i++){
-                                set[i]=((ValueExpressionNode)args[i]).getValueExpression();
-                        }
-
-                        return new ComputedIN(false,set);
-	                }
-
-
-
-	            }
-	        });
-		  add(NOT_IN, new Factory() {
-              public IValueExpression<? extends IV> create(final String lex,
-                      Map<String, Object> scalarValues, final ValueExpressionNode... args) {
-
-                  try{
-                      checkArgs(args, VarNode.class,ConstantNode.class);
-                      IValueExpression<? extends IV> arg =
-                              args[0].getValueExpression();
-
-                      IConstant<? extends IV> set[]=new IConstant[args.length-1];
-                      for(int i=1;i<args.length;i++){
-                              set[i-1]=((ConstantNode)args[i]).getVal();
-                      }
-
-                      return new InHashBOp(true,arg, set);
-                  }catch(IllegalArgumentException iae){
-                      checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
-
-                      IValueExpression<? extends IV> set[]=new IValueExpression[args.length];
-                      for(int i=0;i<args.length;i++){
-                              set[i]=((ValueExpressionNode)args[i]).getValueExpression();
-                      }
-
-                      return new ComputedIN(true,set);
-                  }
-
-
-
-              }
-          });
-		add(SAME_TERM, new SameTermFactory());
+		add(SAME_TERM, SameTermFactory.INSTANCE);
 
 		add(EQ, new CompareFactory(CompareOp.EQ));
 
@@ -729,27 +696,64 @@ public class FunctionRegistry {
 
     }
 
+    /**
+     * Verify type constraints.
+     * 
+     * @param args
+     *            The arguments to some function.
+     * @param types
+     *            The type constraints. If there are more arguments given than
+     *            constraints, then the last constraint in this vararg parameter
+     *            will be used to validate the additional arguments.
+     * @throws IllegalArgumentException
+     *             if the type constraints are violated.
+     */
     public static final void checkArgs(final ValueExpressionNode[] args,
     		final Class... types) {
 
-    	if (args.length < types.length) {
-    		throw new IllegalArgumentException("wrong # of args");
+        if (args.length < types.length) {
+
+            throw new IllegalArgumentException("wrong # of args");
+
     	}
 
     	for (int i = 0; i < args.length; i++) {
-    		if (!types[i>=types.length?types.length-1:i].isAssignableFrom(args[i].getClass())) {
-    			throw new IllegalArgumentException(
-    					"wrong type for arg# " + i + ": " + args[i].getClass());
-    		}
+
+    	    if (!types[i >= types.length ? types.length - 1 : i]
+                    .isAssignableFrom(args[i].getClass())) {
+            
+    	        throw new IllegalArgumentException("wrong type for arg# " + i
+                        + ": " + args[i].getClass());
+            
+    	    }
+    	    
     	}
 
     }
 
-	public static final IValueExpression<? extends IV> toVE(
+    /**
+     * Convert a {@link FunctionNode} into an {@link IValueExpression}.
+     * 
+     * @param lex
+     *            The namespace of the lexicon relation.
+     * @param functionURI
+     *            The function URI.
+     * @param scalarValues
+     *            Scalar values for the function (optional). This is used for
+     *            things like the <code>separator</code> in GROUP_CONCAT.
+     * @param args
+     *            The function arguments.
+     *            
+     * @return The {@link IValueExpression}.
+     */
+    public static final IValueExpression<? extends IV> toVE(
 			final String lex, final URI functionURI,
 			final Map<String,Object> scalarValues,
 			final ValueExpressionNode... args) {
 
+        if (functionURI == null)
+            throw new IllegalArgumentException("functionURI is null");
+        
 		final Factory f = factories.get(functionURI);
 
 		if (f == null) {
@@ -814,8 +818,12 @@ public class FunctionRegistry {
 				args[1].getValueExpression();
 
 
-			if (left.equals(right)&&(left instanceof IVariable||left instanceof Constant)&&(right instanceof IVariable||right instanceof Constant)) {
-	    		if (op == CompareOp.EQ || op==CompareOp.LE || op==CompareOp.GE) {
+            if (left.equals(right)
+                    && (left instanceof IVariable || left instanceof Constant)
+                    && (right instanceof IVariable || right instanceof Constant)) {
+                
+                if (op == CompareOp.EQ || op == CompareOp.LE
+                        || op == CompareOp.GE) {
 
 	    			return TrueBOp.INSTANCE;
 
@@ -952,6 +960,8 @@ public class FunctionRegistry {
 
 	public static class SameTermFactory implements Factory {
 
+	    public static final SameTermFactory INSTANCE = new SameTermFactory();
+	    
 		public IValueExpression<? extends IV> create(
 				final String lex, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
@@ -960,6 +970,7 @@ public class FunctionRegistry {
 
 			final IValueExpression<? extends IV> left =
 				args[0].getValueExpression();
+			
 			final IValueExpression<? extends IV> right =
 				args[1].getValueExpression();
 
@@ -982,12 +993,12 @@ public class FunctionRegistry {
 	    	if (left instanceof Constant) {
 
 	    		final IV iv = ((Constant<? extends IV>) left).get();
-	            if (!iv.isInline() && iv.isNullIV()) {
+
+	    		if (!iv.isInline() && iv.isNullIV()) {
 //	    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
 
 	    			if (iv.isURI() && !(right instanceof DatatypeBOp)) {
 
-//	    				return new FalseBOp(new SameTermBOp(left, right));
 	    				return FalseBOp.INSTANCE;
 
 	    			} else {
@@ -1003,12 +1014,12 @@ public class FunctionRegistry {
 	    	if (right instanceof Constant) {
 
 	    		final IV iv = ((Constant<? extends IV>) right).get();
-	            if (!iv.isInline() && iv.isNullIV()) {
+
+	    		if (!iv.isInline() && iv.isNullIV()) {
 //	    		if (iv.isTermId() && iv.getTermId() == TermId.NULL) {
 
 	    			if (iv.isURI() && !(left instanceof DatatypeBOp)) {
 
-//	    				return new FalseBOp(new SameTermBOp(left, right));
 	    				return FalseBOp.INSTANCE;
 
 	    			} else {
@@ -1166,4 +1177,122 @@ public class FunctionRegistry {
 
         }
 	}
+
+    /**
+     * <code>NumericExpression IN ArgList</code> is an infix operator. The left
+     * argument in the syntax must be provided as the first argument to this
+     * factory. The ArgList must be provided as the [1...nargs] arguments to the
+     * factory.
+     * <p>
+     * This optimizes IN/0 (foo IN()) as FALSE.
+     * <p>
+     * This optimizes IN/1 (foo IN(valueExpr) as SameTerm.
+     * <p>
+     * This optimizes expr IN Constants using a hash set over the constants.
+     */
+    public static class InFactory implements Factory {
+
+        private final boolean not;
+
+        /**
+         * 
+         * @param not
+         *            <code>true</code> iff this is NOT IN.
+         */
+        public InFactory(final boolean not) {
+
+            this.not = not;
+
+        }
+
+        public IValueExpression<? extends IV> create(final String lex,
+                final Map<String, Object> scalarValues,
+                final ValueExpressionNode... args) {
+
+            if (args.length == 0) {
+                /*
+                 * The first argument is the left hand side of the infix IN
+                 * operator.
+                 */
+                throw new IllegalArgumentException();
+            }
+            
+            if (args.length == 1) {
+
+                /*
+                 * "foo IN()" is always false. 
+                 * 
+                 * "foo NOT IN()" is always true.
+                 */
+                return not ? TrueBOp.INSTANCE : FalseBOp.INSTANCE;
+
+            }
+
+            if (args.length == 2) {
+
+                /*
+                 * "foo IN(bar)" is SameTerm(foo,bar).
+                 */
+
+                final IValueExpression ret = SameTermFactory.INSTANCE.create(
+                        lex, scalarValues, args);
+
+                if (not)
+                    return new NotBOp(ret);
+
+                return ret;
+
+            }
+
+            try {
+
+                /*
+                 * First, attempt to use an optimized variant. The args MUST be
+                 * [var,constant(s)].
+                 */
+
+                checkArgs(args, ValueExpressionNode.class, ConstantNode.class);
+
+                final IValueExpression<? extends IV> arg = args[0]
+                        .getValueExpression();
+
+                final IConstant<? extends IV> set[] = new IConstant[args.length - 1];
+
+                for (int i = 1; i < args.length; i++) {
+
+                    set[i - 1] = ((ConstantNode) args[i]).getVal();
+
+                }
+
+                return new InHashBOp(not, arg, set);
+
+            } catch (IllegalArgumentException iae) {
+
+                /*
+                 * Use a variant which handles value expressions for the members
+                 * of the set. The first member of the list is taken to be the
+                 * valueExpr which is then tested against each other member of
+                 * the list.
+                 */
+
+                checkArgs(args, ValueExpressionNode.class,
+                        ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> set[] = new IValueExpression[args.length];
+
+                for (int i = 0; i < args.length; i++) {
+
+                    set[i] = ((ValueExpressionNode) args[i])
+                            .getValueExpression();
+
+                }
+
+                return new ComputedIN(not, set);
+
+            }
+
+        }
+
+    }
+
 }

@@ -31,14 +31,13 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * A constraint that a variable may only take on the bindings enumerated by some
- * set.
- *
+ * A constraint that a value expression which may only take on the bindings
+ * enumerated by some set of constants.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: INHashMap.java 4357 2011-03-31 17:11:26Z thompsonbry $
  */
@@ -50,22 +49,28 @@ public class InHashBOp extends InBOp {
 	private static final long serialVersionUID = 8032412126003678642L;
 
 	/**
-     * The variable (cached).
+     * The value expression to be computed for each solution (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
      * operator is used.
      */
-    private transient volatile IVariable<IV> var;
+    private transient volatile IValueExpression<IV> valueExpr;
 
     /**
-     * The sorted data (cached).
+     * The set of constants to be tested (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
      * operator is used.
      */
     private transient volatile LinkedHashSet<IV> set;
-    
-    private transient boolean not=false;
+
+    /**
+     * <code>true</code> iff this is NOT IN (cached).
+     * <p>
+     * Note: This cache is not serialized and is compiled on demand when the
+     * operator is used.
+     */
+    private transient boolean not;
 
     /**
      * Deep copy constructor.
@@ -78,24 +83,29 @@ public class InHashBOp extends InBOp {
      * Shallow copy constructor.
      */
     public InHashBOp(final BOp[] args, final Map<String, Object> annotations) {
+
         super(args, annotations);
+
     }
 
     /**
-     *
+     * 
      * @param x
      *            Some variable.
      * @param set
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public InHashBOp(boolean not,IValueExpression<? extends IV> var,IConstant<? extends IV>...set) {
-        super(not,var,set);
+    public InHashBOp(boolean not, IValueExpression<? extends IV> var,
+            IConstant<? extends IV>... set) {
+     
+        super(not, var, set);
+        
     }
 
     private void init() {
 
-        var = getVariable();
+        valueExpr = getValueExpression();
 
         // populate the cache.
         final IConstant<IV>[] a = getSet();
@@ -109,26 +119,32 @@ public class InHashBOp extends InBOp {
             set.add(val);
 
         }
-        not=((Boolean)getProperty(Annotations.NOT)).booleanValue();
+
+        not = ((Boolean) getProperty(Annotations.NOT)).booleanValue();
+        
     }
 
     public boolean accept(final IBindingSet bindingSet) {
-        if (var == null) {
+        
+        if (valueExpr == null) {
             synchronized (this) {
-                if (var == null) {
+                if (valueExpr == null) {
+                    // init() is guarded by double-checked locking pattern.
                     init();
                 }
             }
         }
 
-        // get binding for "var".
-        final IConstant<IV> x = bindingSet.get(var);
-        if (x == null)
+        // get as-bound value of the value expression.
+        final IV v = valueExpr.get(bindingSet);
+
+        if (v == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-        
-        final IV v = x.get();
+
         final boolean found = set.contains(v);
-        return not?!found:found;
+
+        return not ? !found : found;
+
     }
 
 }
