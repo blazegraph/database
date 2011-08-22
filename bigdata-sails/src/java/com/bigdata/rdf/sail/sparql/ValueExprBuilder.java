@@ -501,6 +501,23 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * 
      * @see FunctionRegistry#IN
      * @see FunctionRegistry#NOT_IN
+     * 
+     *      FIXME SELECT (?s IN (?p,?o) AS ?x) ... fails due to the handling of
+     *      the IN infix operator. It is producing:
+     * 
+     *      <pre>
+     * QueryContainer
+     *  SelectQuery
+     *   Select
+     *    ProjectionElem
+     *     Var (s)
+     *     In
+     *      Var (p)
+     *      Var (o)
+     *     Var (x)
+     * </pre>
+     * 
+     *      where Var(s), In, and Var(x) are siblings.
      */
     @Override
     public ValueExpressionNode visit(ASTIn node, Object data)
