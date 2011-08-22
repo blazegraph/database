@@ -402,6 +402,13 @@ public class JoinGroupNode extends GroupNodeBase {
         }
 
         for (IQueryNode n : this) {
+            if (!(n instanceof SubqueryRoot)) {
+                continue;
+            }
+            sb.append(((SubqueryRoot) n).toString(indent + 1)).append("\n");
+        }
+
+        for (IQueryNode n : this) {
             if (!(n instanceof AssignmentNode)) {
                 continue;
             }

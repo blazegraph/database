@@ -40,7 +40,6 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -52,8 +51,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
  * @author Arjohn Kampman
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- *         FIXME Replace with {@link GroupNodeBase} ({@link JoinGroupNode} or
- *         {@link UnionGroupNode})?
+ * TODO Clean up.
  */
 class GroupGraphPattern {
 

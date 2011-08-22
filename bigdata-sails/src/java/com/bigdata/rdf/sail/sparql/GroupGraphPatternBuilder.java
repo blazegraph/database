@@ -41,12 +41,14 @@ import org.openrdf.query.parser.sparql.ast.ASTObjectList;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
+import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -59,96 +61,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * ASTWhereClause has GroupGraphPattern child which is a (SelectQuery (aka
  * subquery)), GraphPattern (BasicGraphPattern aka JoinGroup or
  * GraphPatternNotTriples)
- * 
- * <pre>
- * void GroupGraphPattern() #GraphPatternGroup :
- * {}
- * {
- *     <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
- * }
- * 
- * void GraphPattern() #void :
- * {}
- * {
- *     [BasicGraphPattern()] [ GraphPatternNotTriples() [<DOT>] GraphPattern() ]
- * }
- * 
- * void BasicGraphPattern() :
- * {}
- * {
- *     TriplesBlock() ( FilterOrBind() [<DOT>] [TriplesBlock()] )*
- * |
- *     ( FilterOrBind() [<DOT>] [TriplesBlock()] )+
- * }
- * 
- * void FilterOrBind() #void :
- * {}
- * {
- *     Filter()
- *     |
- *     Bind()
- * }
- * 
- * void GraphPatternNotTriples() #void :
- * {}
- * {
- *     OptionalGraphPattern()
- * |   GroupOrUnionGraphPattern()
- * |   GraphGraphPattern()
- * |   MinusGraphPattern()
- * }
- * 
- * void OptionalGraphPattern() :
- * {}
- * {
- *     <OPTIONAL> <LBRACE> GraphPattern() <RBRACE>
- * }
- * 
- * void GraphGraphPattern() :
- * {}
- * {
- *     <GRAPH> VarOrIRIref() GroupGraphPattern()
- * }
- * 
- * void GroupOrUnionGraphPattern() #void :
- * {}
- * {
- *     GroupGraphPattern() [ <UNION> GroupOrUnionGraphPattern() #UnionGraphPattern(2) ]
- * }
- * 
- * void MinusGraphPattern() :
- * {}
- * {
- *     <MINUS_SETOPER> GroupGraphPattern()
- * }
- * 
- * void TriplesBlock() #void :
- * {}
- * {
- *     // Note: recursive rule rewriten to non-recursive rule, requires lookahead
- *     TriplesSameSubjectPath() ( LOOKAHEAD(2) <DOT> TriplesSameSubjectPath() )* [<DOT>]
- * }
- * 
- * void TriplesSameSubjectPath() :
- * {}
- * {
- *     VarOrTerm() PropertyListPath()
- *     |
- *     TriplesNode() [PropertyListPath()]
- * }
- * 
- * void PropertyListPath() :
- * {}
- * {
- *     (VerbPath() | VerbSimple()) ObjectList() (LOOKAHEAD(2) <SEMICOLON> [PropertyListPath()] )*
- * }
- * 
- * void VerbPath() #void :
- * {}
- * {
- *     Path()
- * }
- * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: GroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
@@ -312,6 +224,25 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 //
 
     /**
+     * Note: Delegated to an anonymous {@link BigdataExprBuilder}. The
+     * {@link GroupGraphPattern} is passed into the delegate so it can recognize
+     * that the {@link ASTSelectQuery} is appearing as a subquery rather than as
+     * the top-level query.
+     */
+    @Override
+    public Void visit(final ASTSelectQuery node, Object data)
+            throws VisitorException {
+
+        final SubqueryRoot subSelect = (SubqueryRoot) node.jjtAccept(
+                new BigdataExprBuilder(context), graphPattern/* not-null */);
+
+        graphPattern.addRequiredTE(subSelect);
+
+        return null;
+
+    }
+
+    /**
      * Note: Delegated to the {@link ValueExprBuilder}.
      */
     @Override
@@ -358,24 +289,6 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
     }
     
-//    private ASTObjectList getObjectList(final Node node) {
-//       
-//        if (node == null) {
-//            
-//            return null;
-//            
-//        } else if (node instanceof ASTPropertyListPath) {
-//            
-//            return ((ASTPropertyListPath) node).getObjectList();
-//            
-//        } else {
-//            
-//            return getObjectList(node.jjtGetParent());
-//            
-//        }
-//        
-//    }
-
     @Override
     public Object visit(final ASTPropertyListPath propListNode, Object data)
             throws VisitorException {
