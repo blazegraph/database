@@ -477,7 +477,8 @@ public class DistinctBindingSetsWithHTreeOp extends PipelineOp {
                         	
 							for (int i = 0; i < vars.length; i++) {
 
-								tmp.set(vars[i], vals[i]);
+                                if (vals[i] != null)
+                                    tmp.set(vars[i], vals[i]);
 
 							}
 							
