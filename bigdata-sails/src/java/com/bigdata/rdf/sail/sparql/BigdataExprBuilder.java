@@ -53,8 +53,10 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -139,77 +141,69 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
          * |   AskQuery()
          * }
          * </pre>
-         * 
-         * Note: The code delegates to ASTQuery.jjtAccept(this,...). However,
-         * that pattern winds up reentering into this class on the visit()
-         * method for the appropriate concrete subtype of ASTQuery. This is a
-         * bit circular. We could have invoked visit(astNode,null) as easily.
          */
 
-        final ASTQuery astQuery = node.getQuery();
+        return (QueryRoot) node.getQuery().jjtAccept(this, null);
+        
+    }
+    
+    /**
+     * This is the entry point for both a top-level SELECT and a SubSelect. The
+     * two contexts are differentiated based on the <i>data</i>, which is non-
+     * <code>null</code> if this is a SubSelect. The method returns either a
+     * {@link QueryRoot} or a {@link SubqueryRoot} depending on whether or not
+     * the {@link ASTSelectQuery} appears as a top-level query or a subquery.
+     * 
+     * FIXME All the aggregate and order by logic needs to be redone.
+     * 
+     * @throws VisitorException
+     */
+    @Override
+    public QueryBase visit(final ASTSelectQuery node, Object data)
+            throws VisitorException {
 
-        final QueryRoot queryRoot = new QueryRoot();
+        final QueryBase queryRoot = data == null ? new QueryRoot()
+                : new SubqueryRoot();
+        
+        final ASTSelectQuery selectQuery = node;
 
         /*
-         * Handle different core query types: {ASTSelectQuery, ASTAskQuery,
-         * ASTConstructQuery, ASTDescribeQuery}.
-         * 
-         * TODO Refactor into visit(astQuery,null) with implementation in each
-         * visit(ASTSelectQuery), visit(ASTAskQuery), etc. (How do we model ASK,
-         * CONSTRUCT, DESCRIBE?)
+         * PROJECTION.
          */
-        {
-            if (astQuery instanceof ASTSelectQuery) {
-                final ASTSelectQuery selectQuery = (ASTSelectQuery) astQuery;
+        final ASTSelect select = selectQuery.getSelect();
+        final ProjectionNode projection = new ProjectionNode();
+        queryRoot.setProjection(projection);
+        if (select.isDistinct())
+            projection.setDistinct(true);
+        if (select.isReduced())
+            projection.setReduced(true);
+        if (select.isWildcard()) {
+            projection.addProjectionVar(new VarNode("*"));
+        } else {
+            final Iterator<ASTProjectionElem> itr = select
+                    .getProjectionElemList().iterator();
+            while (itr.hasNext()) {
                 /*
-                 * PROJECTION.
+                 * (Var | Expression AS Var)
                  */
-                final ASTSelect select = selectQuery.getSelect();
-                final ProjectionNode projection = new ProjectionNode();
-                queryRoot.setProjection(projection);
-                if (select.isDistinct())
-                    projection.setDistinct(true);
-                if (select.isReduced())
-                    projection.setReduced(true);
-                if (select.isWildcard()) {
-                    projection.addProjectionVar(new VarNode("*"));
+                final ASTProjectionElem e = itr.next();
+                if (!e.hasAlias()) {
+                    // Var
+                    final ASTVar aVar = (ASTVar) e
+                            .jjtGetChild(0/* index */);
+                    projection.addProjectionVar(new VarNode(aVar
+                            .getName()));
                 } else {
-                    final Iterator<ASTProjectionElem> itr = select
-                            .getProjectionElemList().iterator();
-                    while (itr.hasNext()) {
-                        /*
-                         * (Var | Expression AS Var)
-                         */
-                        final ASTProjectionElem e = itr.next();
-                        if (!e.hasAlias()) {
-                            // Var
-                            final ASTVar aVar = (ASTVar) e
-                                    .jjtGetChild(0/* index */);
-                            projection.addProjectionVar(new VarNode(aVar
-                                    .getName()));
-                        } else {
-                            // Expression AS Var
-                            final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
-                            final IValueExpressionNode ve = (IValueExpressionNode) expr
-                                    .jjtAccept(valueExprBuilder, null/* data */);
-                            final ASTVar aVar = (ASTVar) e
-                                    .jjtGetChild(1/* index */);
-                            projection
-                                    .addProjectionExpression(new AssignmentNode(
-                                            new VarNode(aVar.getName()), ve));
-                        }
-                    }
+                    // Expression AS Var
+                    final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
+                    final IValueExpressionNode ve = (IValueExpressionNode) expr
+                            .jjtAccept(valueExprBuilder, null/* data */);
+                    final ASTVar aVar = (ASTVar) e
+                            .jjtGetChild(1/* index */);
+                    projection
+                            .addProjectionExpression(new AssignmentNode(
+                                    new VarNode(aVar.getName()), ve));
                 }
-
-            } else {
-                /*
-                 * FIXME ASTAskQuery
-                 * 
-                 * FIXME ASTDescribeQuery
-                 * 
-                 * FIXME ASTConstructQuery
-                 */
-                throw new UnsupportedOperationException("ASTQuery=" + astQuery);
             }
         }
 
@@ -221,7 +215,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
          */
         {
 
-            final ASTWhereClause whereClause = astQuery.getWhereClause();
+            final ASTWhereClause whereClause = selectQuery.getWhereClause();
 
             final ASTGraphPatternGroup graphPatternGroup = whereClause
                     .getGraphPatternGroup();
@@ -242,8 +236,8 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
         // Handle SLICE
         {
-            final ASTLimit theLimit = astQuery.getLimit();
-            final ASTOffset theOffset = astQuery.getOffset();
+            final ASTLimit theLimit = selectQuery.getLimit();
+            final ASTOffset theOffset = selectQuery.getOffset();
             if (theLimit != null || theOffset != null) {
                 final SliceNode theSlice = new SliceNode();
                 if (theLimit != null)
@@ -255,14 +249,8 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
         }
         
         return queryRoot;
-        
-//        return (IQueryNode) aChild.jjtAccept(this, null);
-        
-    }
 
-//    /*
-//     * FIXME All the aggregate and order by logic needs to be redone.
-//     */
+    }
 //    @Override
 //    public TupleExpr visit(ASTSelectQuery node, Object data)
 //        throws VisitorException

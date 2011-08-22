@@ -42,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -55,14 +56,8 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @version $Id: TestGroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
  *          thompsonbry $
  * 
- *          FIXME Test SubSelect
- *          
- *          FIXME Test SERVICE (Sesame extension?)
- * 
  *          FIXME Test Exists(), which is basically a subquery which projects no
  *          solutions and has a limit of ONE (1).
- * 
- *          FIXME Test property paths (in another test suite).
  */
 public class TestGroupGraphPatternBuilder extends
         AbstractBigdataExprBuilderTestCase {
@@ -637,4 +632,60 @@ public class TestGroupGraphPatternBuilder extends
 
     }
     
+    /**
+     * Unit test for simple subquery without anything else in the outer join
+     * group.
+     * 
+     * <pre>
+     * SELECT ?s where {{SELECT ?s where {?s ?p ?o}}}
+     * </pre>
+     * 
+     * Note: This requires recursion back in through the
+     * {@link BigdataExprBuilder}.
+     */
+    public void test_subSelect() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ?s where { {select ?s where { ?s ?p ?o  } } }";
+
+        final QueryRoot expected = new QueryRoot();
+        final SubqueryRoot subSelect;
+        {
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                whereClause.addChild(wrapperGroup);
+                
+                subSelect = new SubqueryRoot();
+                wrapperGroup.addChild(subSelect);
+            }
+            {
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(new VarNode("s"));
+                subSelect.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                subSelect.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+   
 }
