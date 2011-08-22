@@ -92,6 +92,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -235,28 +236,15 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     }
 
-    // TODO Verify with MikeP
-    @SuppressWarnings("unchecked")
-    protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
-
-        IV iv = context.lexicon.getInlineIV(value);
-
-        if (iv == null) {
-
-            iv = (IV<BigdataValue, ?>) TermId.mockIV(VTE.valueOf(value));
-            
-            iv.setValue(value);
-            
-        }
-
-        return iv;
-
+    //
+    //
+    //
+    
+    @Override
+    public Object visit(ASTBind node, Object data) throws VisitorException {
+        return new AssignmentNode((VarNode) right(node), left(node));
     }
-    
-    //
-    //
-    //
-    
+
     @Override
     public FunctionNode visit(ASTOr node, Object data) throws VisitorException {
         return binary(node, FunctionRegistry.OR);
@@ -589,112 +577,6 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return new FunctionNode(context.lex, FunctionRegistry.NOT_IN,
                 null/* scalarValues */, args);
 
-    }
-
-    /*
-     * Note: openrdf uses the BlankNodeToVarConverter to create anonymous
-     * variables from blank nodes and then flags those as anonymous variables in
-     * this step. 
-     */
-    @Override
-    public VarNode visit(ASTVar node, Object data) throws VisitorException {
-        final VarNode var = new VarNode(node.getName());
-        if (node.isAnonymous())
-            var.setAnonymous(true);
-        return var;
-    }
-
-    @Override
-    public Object visit(ASTQName node, Object data) throws VisitorException {
-        throw new VisitorException(
-                "QNames must be resolved before building the query model");
-    }
-
-    @Override
-    public Object visit(ASTBlankNode node, Object data) throws VisitorException {
-        throw new VisitorException(
-                "Blank nodes must be replaced with variables before building the query model");
-    }
-
-    @Override
-    public Object visit(ASTBind node, Object data) throws VisitorException {
-        return new AssignmentNode((VarNode) right(node), left(node));
-    }
-
-    @Override
-    public ConstantNode visit(ASTIRI node, Object data) throws VisitorException {
-        BigdataURI uri;
-        try {
-            uri = context.valueFactory.createURI(node.getValue());
-        }
-        catch (IllegalArgumentException e) {
-            // invalid URI
-            throw new VisitorException(e.getMessage());
-        }
-
-        return new ConstantNode(makeIV(uri));
-    }
-
-    @Override
-    public ConstantNode visit(ASTRDFLiteral node, Object data)
-        throws VisitorException
-    {
-        final String label = (String) node.getLabel().jjtAccept(this, null);
-        final String lang = node.getLang();
-        final ASTIRI datatypeNode = node.getDatatype();
-        final BigdataValueFactory valueFactory = context.valueFactory;
-        
-        final BigdataLiteral literal;
-        if (datatypeNode != null) {
-            final BigdataURI datatype;
-            try {
-                datatype = valueFactory.createURI(datatypeNode.getValue());
-            } catch (IllegalArgumentException e) {
-                // invalid URI
-                throw new VisitorException(e.getMessage());
-            }
-            literal = valueFactory.createLiteral(label, datatype);
-        } else if (lang != null) {
-            literal = valueFactory.createLiteral(label, lang);
-        } else {
-            literal = valueFactory.createLiteral(label);
-        }
-
-        return new ConstantNode(makeIV(literal));
-    }
-
-    @Override
-    public ConstantNode visit(ASTNumericLiteral node, Object data)
-            throws VisitorException {
-
-        final BigdataLiteral literal = context.valueFactory.createLiteral(
-                node.getValue(), node.getDatatype());
-        
-        return new ConstantNode(makeIV(literal));
-        
-    }
-
-    @Override
-    public ConstantNode visit(ASTTrue node, Object data)
-            throws VisitorException {
-        
-        return new ConstantNode(
-                makeIV(context.valueFactory.createLiteral(true)));
-        
-    }
-
-    @Override
-    public ConstantNode visit(ASTFalse node, Object data)
-            throws VisitorException {
-        
-        return new ConstantNode(
-                makeIV(context.valueFactory.createLiteral(false)));
-        
-    }
-
-    @Override
-    public String visit(ASTString node, Object data) throws VisitorException {
-        return node.getValue();
     }
 
     /*

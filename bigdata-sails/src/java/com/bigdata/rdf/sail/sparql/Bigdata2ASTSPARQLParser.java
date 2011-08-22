@@ -82,11 +82,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             BaseDeclProcessor.process(qc, baseURI);
             final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
             /*
-             * FIXME Add a batch resolution step in which we collect all RDF
-             * Values, batch resolve them against the lexicon, and then
-             * annotation (or rewrite) the AST with the BigdataValue's and their
-             * resolved IVs. Update the ValueExprBuilder to leverage that
-             * required batch resolve step.
+             * FIXME See {@link ValueExprBuilder#makeIV(BigdataValue)} for what
+             * we should be doing here. The test suite also needs to be updated.
              */
 //            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
