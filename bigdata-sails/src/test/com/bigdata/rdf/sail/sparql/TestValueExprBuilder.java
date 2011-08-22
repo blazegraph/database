@@ -532,6 +532,77 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * <pre>
+     * SELECT (regex(?o, "^ali") as ?x) where {?s ?p ?o}
+     * </pre>
+     */
+    public void test_select_regex() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ( regex(?o,\"^ali\") as ?x) where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionExpression(//
+                    new AssignmentNode(//
+                            new VarNode("x"), //
+                            new FunctionNode(lex, //
+                                    FunctionRegistry.REGEX,//
+                                    null, // scalarValues
+                                    new ValueExpressionNode[] {// args
+                                    new VarNode("o"),
+                                    new ConstantNode(makeIV(valueFactory.createLiteral("^ali"))),
+                                    })//
+                            ));
+            expected.setProjection(projection);
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected.getProjection(), actual.getProjection());
+
+    }
+
+    /**
+     * <pre>
+     * SELECT (regex(?o, "^ali", "i") as ?x) where {?s ?p ?o}
+     * </pre>
+     */
+    public void test_select_regex_flags() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ( regex(?o,\"^ali\", \"i\") as ?x) where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionExpression(//
+                    new AssignmentNode(//
+                            new VarNode("x"), //
+                            new FunctionNode(lex, //
+                                    FunctionRegistry.REGEX,//
+                                    null, // scalarValues
+                                    new ValueExpressionNode[] {// args
+                                    new VarNode("o"),
+                                    new ConstantNode(makeIV(valueFactory.createLiteral("^ali"))),
+                                    new ConstantNode(makeIV(valueFactory.createLiteral("i"))),
+                                    })//
+                            ));
+            expected.setProjection(projection);
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected.getProjection(), actual.getProjection());
+
+    }
+
+    /**
      * IN with empty arg list
      * 
      * <pre>
@@ -612,5 +683,5 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
     public void test_exists() {
         fail("write test for EXISTS");
     }
-
+    
 }
