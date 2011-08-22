@@ -29,6 +29,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -45,21 +46,27 @@ public class InBinaryBOp extends InBOp {
 	private static final long serialVersionUID = 2251370041131847351L;
 
 	/**
-     * The variable (cached).
+     * The value expression to be computed for each solution (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
      * operator is used.
      */
-    private transient volatile IVariable<IV> var;
+    private transient volatile IValueExpression<IV> valueExpr;
 
     /**
-     * The sorted data (cached).
+     * The ordered list of constants (cached).
      * <p>
      * Note: This cache is not serialized and is compiled on demand when the
      * operator is used.
      */
     private transient volatile IV[] set;
     
+    /**
+     * <code>true</code> iff this is NOT IN (cached).
+     * <p>
+     * Note: This cache is not serialized and is compiled on demand when the
+     * operator is used.
+     */
     private transient boolean not;
 
     /**
@@ -73,23 +80,27 @@ public class InBinaryBOp extends InBOp {
      * Shallow copy constructor.
      */
     public InBinaryBOp(final BOp[] args, final Map<String, Object> annotations) {
+        
         super(args, annotations);
+        
     }
 
     /**
-     *
+     * 
      * @param x
      *            Some variable.
      * @param set
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public InBinaryBOp(boolean not,final IVariable var, final IConstant[] set) {
-        super(not,var,set);
+    public InBinaryBOp(boolean not, final IVariable var, final IConstant[] set) {
+     
+        super(not, var, set);
+
     }
 
     @SuppressWarnings("unchecked")
-    static private  IV[] sort(final IConstant<IV>[] set) {
+    static private IV[] sort(final IConstant<IV>[] set) {
 
         final int n = set.length;
 
@@ -118,31 +129,28 @@ public class InBinaryBOp extends InBOp {
 
     private void init() {
 
-        var = getVariable();
+        valueExpr = getValueExpression();
 
         set = sort(getSet());
         not=((Boolean)getProperty(Annotations.NOT)).booleanValue();
     }
 
     public boolean accept(final IBindingSet bindingSet) {
-        if (var == null) {
+
+        if (valueExpr == null) {
             synchronized (this) {
-                if (var == null) {
+                if (valueExpr == null) {
                     // init() is guarded by double-checked locking pattern.
                     init();
                 }
             }
         }
 
-        // get binding for "x".
-        @SuppressWarnings("unchecked")
-        final IConstant<IV> x = bindingSet.get(var);
+        // get the as-bound value for that value expression.
+        final IV v = valueExpr.get(bindingSet);
 
-        if (x == null) {
+        if (v == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-        }
-
-        final IV v = x.get();
 
         // lookup the bound value in the set of values.
         final int pos = Arrays.binarySearch(set, v);
@@ -150,7 +158,7 @@ public class InBinaryBOp extends InBOp {
         // true iff the bound value was found in the set.
         final boolean found = pos >= 0;
 
-        return not?!found:found;
+        return not ? !found : found;
 
     }
 

@@ -34,13 +34,23 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
+/**
+ * "IN" and "NOT IN" operator based on testing of the enumerated value
+ * expressions.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class ComputedIN extends XSDBooleanIVValueExpression {
 
     private static final long serialVersionUID = 9066209752427789308L;
 
     public interface Annotations extends BOp.Annotations {
 
-        String NOT = (ComputedIN.class.getName() + ".not").intern();
+        /**
+         * <code>true</code> iff this is "NOT IN" rather than "IN".
+         */
+        String NOT = ComputedIN.class.getName() + ".not";
 
     }
 
@@ -48,8 +58,11 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
 
     @SuppressWarnings("rawtypes")
     public ComputedIN(boolean not, IValueExpression<? extends IV>... ise) {
+        
         super(ise, NV.asMap(new NV(Annotations.NOT, Boolean.valueOf(not))));
+        
         this.not = not;
+        
     }
 
     public ComputedIN(final BOp[] args, final Map<String, Object> annotations) {
@@ -57,7 +70,9 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
 
         if (getProperty(Annotations.NOT) == null)
             throw new IllegalArgumentException();
+
         this.not = ((Boolean) getProperty(Annotations.NOT)).booleanValue();
+
         final IValueExpression<? extends IV> var = get(0);
 
         if (var == null)
@@ -66,27 +81,45 @@ public class ComputedIN extends XSDBooleanIVValueExpression {
         if (arity() < 2) {
             throw new IllegalArgumentException();
         }
+
     }
 
     public ComputedIN(final ComputedIN op) {
+        
         super(op);
+        
     }
 
     @SuppressWarnings({ "rawtypes" })
-    public boolean accept(IBindingSet bindingSet) {
+    public boolean accept(final IBindingSet bindingSet) {
+
         final IV iv = get(0).get(bindingSet);
+
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
+
         boolean found = false;
+
         for (int i = 1; i < arity(); i++) {
-            IV right = get(i).get(bindingSet);
+
+            final IV right = get(i).get(bindingSet);
+
             if (right != null) {
+
                 if (CompareBOp.compare(iv, right, CompareOp.EQ)) {
+
                     found = true;
+
                     break;
+
                 }
+
             }
+
         }
+
         return not ? !found : found;
+
     }
+
 }

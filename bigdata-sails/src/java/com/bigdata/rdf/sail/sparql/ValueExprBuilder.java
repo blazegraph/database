@@ -32,20 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.BooleanLiteralImpl;
-import org.openrdf.query.algebra.And;
-import org.openrdf.query.algebra.BNodeGenerator;
-import org.openrdf.query.algebra.Coalesce;
-import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.Exists;
-import org.openrdf.query.algebra.FunctionCall;
-import org.openrdf.query.algebra.If;
 import org.openrdf.query.algebra.Not;
-import org.openrdf.query.algebra.Or;
-import org.openrdf.query.algebra.Regex;
-import org.openrdf.query.algebra.ValueConstant;
-import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.parser.sparql.ast.ASTAggregate;
 import org.openrdf.query.parser.sparql.ast.ASTAnd;
 import org.openrdf.query.parser.sparql.ast.ASTAvg;
@@ -83,6 +71,7 @@ import org.openrdf.query.parser.sparql.ast.ASTQName;
 import org.openrdf.query.parser.sparql.ast.ASTRDFLiteral;
 import org.openrdf.query.parser.sparql.ast.ASTRegexExpression;
 import org.openrdf.query.parser.sparql.ast.ASTSameTerm;
+import org.openrdf.query.parser.sparql.ast.ASTSample;
 import org.openrdf.query.parser.sparql.ast.ASTStr;
 import org.openrdf.query.parser.sparql.ast.ASTStrDt;
 import org.openrdf.query.parser.sparql.ast.ASTStrLang;
@@ -94,10 +83,11 @@ import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -140,12 +130,80 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     }
 
+    /**
+     * Handle a simple function without any arguments.
+     */
+    protected FunctionNode noneary(final SimpleNode node, final URI functionURI)
+            throws VisitorException {
+
+        return new FunctionNode(context.lex, functionURI,
+                null/* scalarValues */, new ValueExpressionNode[] {});
+
+    }
+
+    /**
+     * Handle a simple unary function (the child of the node is the argument to
+     * the function).
+     */
     protected FunctionNode unary(final SimpleNode node, final URI functionURI)
             throws VisitorException {
 
         return new FunctionNode(context.lex, functionURI,
                 null/* scalarValues */,
                 new ValueExpressionNode[] { left(node) });
+
+    }
+
+    /**
+     * Handle a simple binary function (both children of the node are arguments
+     * to the function).
+     */
+    protected FunctionNode binary(final SimpleNode node, final URI functionURI)
+            throws VisitorException {
+
+        return new FunctionNode(context.lex, functionURI,
+                null/* scalarValues */, new ValueExpressionNode[] { left(node),
+                        right(node) });
+
+    }
+
+    /**
+     * Handle a simple ternary function (there are three children of the node
+     * which are the arguments to the function).
+     */
+    protected FunctionNode ternary(final SimpleNode node, final URI functionURI)
+            throws VisitorException {
+
+        return new FunctionNode(context.lex, functionURI,
+                null/* scalarValues */, new ValueExpressionNode[] {
+                        left(node),
+                        right(node),
+                        (ValueExpressionNode) node.jjtGetChild(2).jjtAccept(
+                                this, null) });
+
+    }
+
+    /**
+     * Handle a simple nary function (all children of the node are arguments to
+     * the function).
+     */
+    protected FunctionNode nary(final SimpleNode node, final URI functionURI)
+            throws VisitorException {
+
+        final int nargs = node.jjtGetNumChildren();
+
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs];
+
+        for (int i = 0; i < nargs; i++) {
+
+            final Node argNode = node.jjtGetChild(i);
+
+            args[i] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+
+        }
+
+        return new FunctionNode(context.lex, FunctionRegistry.COALESCE,
+                null/* scalarValues */, args);
 
     }
 
@@ -160,23 +218,39 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
                     AggregateBase.Annotations.DISTINCT, (Object) Boolean.TRUE);
             
         }
-        
+
+        if (node instanceof ASTCount && ((ASTCount) node).isWildcard()) {
+
+            /*
+             * Note: The wildcard is dropped by openrdf.
+             */
+            
+            return new FunctionNode(context.lex, functionURI, scalarValues,
+                    new ValueExpressionNode[] { new VarNode("*") });
+
+        }
+
         return new FunctionNode(context.lex, functionURI, scalarValues,
                 new ValueExpressionNode[] { left(node) });
 
     }
 
-    protected FunctionNode binary(final SimpleNode node, final URI functionURI)
-            throws VisitorException {
+    // TODO Verify with MikeP
+    @SuppressWarnings("unchecked")
+    protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
 
-        return new FunctionNode(context.lex, functionURI,
-                null/* scalarValues */, new ValueExpressionNode[] { left(node),
-                        right(node) });
+        IV iv = context.lexicon.getInlineIV(value);
 
-    }
+        if (iv == null) {
 
-    protected IV makeIV(final BigdataValue value) {
-        return context.lexicon.getInlineIV(value);
+            iv = (IV<BigdataValue, ?>) TermId.mockIV(VTE.valueOf(value));
+            
+            iv.setValue(value);
+            
+        }
+
+        return iv;
+
     }
     
     //
@@ -198,20 +272,10 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return unary(node, FunctionRegistry.NOT);
     }
 
-    @Override // FIXME ASTCoalesce [nary]
-    public Coalesce visit(ASTCoalesce node, Object data)
-        throws VisitorException
-    {
-
-        Coalesce coalesce = new Coalesce();
-        int noOfArgs = node.jjtGetNumChildren();
-
-        for (int i = 0; i < noOfArgs; i++) {
-            ValueExpr arg = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, data);
-            coalesce.addArgument(arg);
-        }
-
-        return coalesce;
+    @Override
+    public FunctionNode visit(ASTCoalesce node, Object data)
+            throws VisitorException {
+        return nary(node, FunctionRegistry.COALESCE);
     }
 
     @Override
@@ -282,21 +346,32 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     }
 
-    @Override // FIXME ASTFunctionCall
+    /** ASTFunctionCall (IRIRef, ArgList). */
+    @Override
     public Object visit(ASTFunctionCall node, Object data)
         throws VisitorException
     {
-        ValueConstant uriNode = (ValueConstant)node.jjtGetChild(0).jjtAccept(this, null);
-        URI functionURI = (URI)uriNode.getValue();
 
-        FunctionCall functionCall = new FunctionCall(functionURI.toString());
+        final ConstantNode uriNode = (ConstantNode) node.jjtGetChild(0)
+                .jjtAccept(this, null);
 
-        for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-            Node argNode = node.jjtGetChild(i);
-            functionCall.addArg((ValueExpr)argNode.jjtAccept(this, null));
+        final BigdataURI functionURI = (BigdataURI) uriNode.getValue();
+
+        final int nargs = node.jjtGetNumChildren() - 1;
+        
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs];
+        
+        for (int i = 0; i < nargs; i++) {
+        
+            final Node argNode = node.jjtGetChild(i + 1);
+            
+            args[i] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+            
         }
 
-        return functionCall;
+        return new FunctionNode(context.lex, functionURI,
+                null/* scalarValues */, args);
+
     }
 
     @Override
@@ -368,35 +443,26 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return unary(node, FunctionRegistry.IS_NUMERIC);
     }
 
-    @Override// FIXME ASTBNodeFunc
-    public Object visit(ASTBNodeFunc node, Object data)
-        throws VisitorException
-    {
-
-        BNodeGenerator generator = new BNodeGenerator();
-
-        if (node.jjtGetNumChildren() > 0) {
-            ValueExpr nodeIdExpr = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
-            generator.setNodeIdExpr(nodeIdExpr);
+    /** TODO Same functionURI for BNode() and BNode(Literal)? */
+    @Override
+    public FunctionNode visit(ASTBNodeFunc node, Object data)
+            throws VisitorException {
+        if (node.jjtGetNumChildren() == 0) {
+            return noneary(node, FunctionRegistry.BNODE);
         }
-
-        return generator;
+        return unary(node, FunctionRegistry.BNODE);
     }
 
-    @Override // FIXME ASTRegexExpression
-    public Object visit(ASTRegexExpression node, Object data)
-        throws VisitorException
-    {
-        ValueExpr arg = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
-        ValueExpr pattern = (ValueExpr)node.jjtGetChild(1).jjtAccept(this, null);
-        ValueExpr flags = null;
-        if (node.jjtGetNumChildren() > 2) {
-            flags = (ValueExpr)node.jjtGetChild(2).jjtAccept(this, null);
+    @Override
+    public FunctionNode visit(ASTRegexExpression node, Object data)
+            throws VisitorException {
+        if (node.jjtGetNumChildren() == 2) {
+            return binary(node, FunctionRegistry.REGEX);
         }
-        return new Regex(arg, pattern, flags);
+        return ternary(node, FunctionRegistry.REGEX);
     }
 
-    // FIXME EXISTS
+    // FIXME EXISTS(GroupGraphPattern) is basically a subquery.
     @Override
     public Exists visit(ASTExistsFunc node, Object data)
         throws VisitorException
@@ -407,7 +473,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return e;
     }
 
-    // FIXME NOT EXISTS
+    // FIXME NOT EXISTS is NOT(EXISTS()).
     @Override
     public Not visit(ASTNotExistsFunc node, Object data)
         throws VisitorException
@@ -417,107 +483,95 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return new Not(e);
     }
 
-    // FIXME IF THEN ELSE
-    public If visit(ASTIf node, Object data)
-        throws VisitorException
-    {
-        If result = null;
-
-        if (node.jjtGetNumChildren() < 3) {
-            throw new VisitorException("IF construction missing required number of arguments");
-        }
-
-        ValueExpr condition = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
-        ValueExpr resultExpr = (ValueExpr)node.jjtGetChild(1).jjtAccept(this, null);
-        ValueExpr alternative = (ValueExpr)node.jjtGetChild(2).jjtAccept(this, null);
-
-        result = new If(condition, resultExpr, alternative);
-
-        return result;
+    @Override
+    public FunctionNode visit(ASTIf node, Object data) throws VisitorException {
+        return ternary(node, FunctionRegistry.IF);
     }
 
-    // FIXME IN (and optimizations for this in AST2BOpUtility w/ inline AP).
-    public ValueExpr visit(ASTIn node, Object data)
+    /**
+     * "IN" and "NOT IN" are infix notation operators. The syntax for "IN" is
+     * [NumericExpression IN ArgList]. However, the IN operators declared by the
+     * {@link FunctionRegistry} require that the outer NumericExpression is
+     * their first argument.
+     * <p>
+     * Note: This will optimize for IN/0 (comparison with an empty list) and
+     * IN/1 (comparison with a single value expression). The function registry
+     * will further optimize for IN/nary, where the members of the set are
+     * constants and the outer expression is a variable.
+     * 
+     * @see FunctionRegistry#IN
+     * @see FunctionRegistry#NOT_IN
+     */
+    @Override
+    public ValueExpressionNode visit(ASTIn node, Object data)
         throws VisitorException
     {
-        ValueExpr result = null;
-        ValueExpr leftArg = (ValueExpr)node.jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
 
-        int listItemCount = node.jjtGetNumChildren();
+        final int nargs = node.jjtGetNumChildren();
+        
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
 
-        if (listItemCount == 0) {
-            result = new ValueConstant(BooleanLiteralImpl.FALSE);
-        }
-        else if (listItemCount == 1) {
-            ValueExpr arg = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
+        /*
+         * Reach up to the parent's 1st child for the left argument to the infix
+         * IN operator.
+         */
+        final ValueExpressionNode leftArg = (ValueExpressionNode) node
+                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
+        
+        args[0] = leftArg;
 
-            result = new Compare(leftArg, arg, CompareOp.EQ);
-        }
-        else {
-            // create a set of disjunctive comparisons to represent the IN
-            // operator: X IN (a, b, c) -> X = a || X = b || X = c.
-            Or or = new Or();
-            Or currentOr = or;
-            for (int i = 0; i < listItemCount - 1; i++) {
-                ValueExpr arg = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
+        /*
+         * Handle the ArgList for IN.
+         */
 
-                currentOr.setLeftArg(new Compare(leftArg, arg, CompareOp.EQ));
+        for (int i = 0; i < nargs; i++) {
 
-                if (i == listItemCount - 2) { // second-to-last item
-                    arg = (ValueExpr)node.jjtGetChild(i + 1).jjtAccept(this, null);
-                    currentOr.setRightArg(new Compare(leftArg, arg, CompareOp.EQ));
-                }
-                else {
-                    currentOr = new Or();
-                    or.setRightArg(currentOr);
-                }
-            }
-            result = or;
+            final Node argNode = node.jjtGetChild(i);
+
+            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+
         }
 
-        return result;
+        return new FunctionNode(context.lex, FunctionRegistry.IN,
+                null/* scalarValues */, args);
+
     }
 
-    // FIXME NOT IN (and optimizations for this in AST2BOpUtility w/ inline AP).
-    public ValueExpr visit(ASTNotIn node, Object data)
-        throws VisitorException
-    {
-        ValueExpr result = null;
-        ValueExpr leftArg = (ValueExpr)node.jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
+    /**
+     * See IN above.
+     */
+    @Override
+    public ValueExpressionNode visit(ASTNotIn node, Object data)
+            throws VisitorException {
 
-        int listItemCount = node.jjtGetNumChildren();
+        final int nargs = node.jjtGetNumChildren();
 
-        if (listItemCount == 0) {
-            result = new ValueConstant(BooleanLiteralImpl.TRUE);
-        }
-        else if (listItemCount == 1) {
-            ValueExpr arg = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
 
-            result = new Compare(leftArg, arg, CompareOp.NE);
-        }
-        else {
-            // create a set of conjunctive comparisons to represent the NOT IN
-            // operator: X NOT IN (a, b, c) -> X != a && X != b && X != c.
-            And and = new And();
-            And currentAnd = and;
-            for (int i = 0; i < listItemCount - 1; i++) {
-                ValueExpr arg = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
+        /*
+         * Reach up to the parent's 1st child for the left argument to the infix
+         * NOT IN operator.
+         */
+        final ValueExpressionNode leftArg = (ValueExpressionNode) node
+                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
 
-                currentAnd.setLeftArg(new Compare(leftArg, arg, CompareOp.NE));
+        args[0] = leftArg;
 
-                if (i == listItemCount - 2) { // second-to-last item
-                    arg = (ValueExpr)node.jjtGetChild(i + 1).jjtAccept(this, null);
-                    currentAnd.setRightArg(new Compare(leftArg, arg, CompareOp.NE));
-                }
-                else {
-                    currentAnd = new And();
-                    and.setRightArg(currentAnd);
-                }
-            }
-            result = and;
+        /*
+         * Handle the ArgList for NOT IN.
+         */
+
+        for (int i = 0; i < nargs; i++) {
+
+            final Node argNode = node.jjtGetChild(i);
+
+            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+
         }
 
-        return result;
+        return new FunctionNode(context.lex, FunctionRegistry.NOT_IN,
+                null/* scalarValues */, args);
+
     }
 
     /*
@@ -655,6 +709,11 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     @Override
     public Object visit(ASTAvg node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.AVERAGE);
+    }
+
+    @Override
+    public Object visit(ASTSample node, Object data) throws VisitorException {
+        return aggregate(node, FunctionRegistry.SAMPLE);
     }
 
     /**
