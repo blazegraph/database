@@ -30,309 +30,268 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.algebra.And;
-import org.openrdf.query.algebra.ArbitraryLengthPath;
-import org.openrdf.query.algebra.Compare;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.Difference;
 import org.openrdf.query.algebra.Exists;
-import org.openrdf.query.algebra.Filter;
-import org.openrdf.query.algebra.Join;
-import org.openrdf.query.algebra.LeftJoin;
-import org.openrdf.query.algebra.QueryModelNode;
-import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.Union;
-import org.openrdf.query.algebra.ValueConstant;
-import org.openrdf.query.algebra.ValueExpr;
-import org.openrdf.query.algebra.Var;
-import org.openrdf.query.algebra.ZeroLengthPath;
-import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
-import org.openrdf.query.parser.sparql.ast.ASTCollection;
+import org.openrdf.query.parser.sparql.ast.ASTConstraint;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTMinusGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTObjectList;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
-import org.openrdf.query.parser.sparql.ast.ASTPathAlternative;
-import org.openrdf.query.parser.sparql.ast.ASTPathElt;
-import org.openrdf.query.parser.sparql.ast.ASTPathMod;
-import org.openrdf.query.parser.sparql.ast.ASTPathOneInPropertySet;
-import org.openrdf.query.parser.sparql.ast.ASTPathSequence;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
-import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
-import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Visitor handles the <code>GroupGraphPattern</code> production (aka the
  * "WHERE" clause). This includes <code>SubSelect</code>,
- * <code>TriplesBlock</code>, and <code>GraphPatternNotTriples</code>.
+ * <code>TriplesBlock</code>, and <code>GraphPatternNotTriples</code>. *
+ * ASTWhereClause has GroupGraphPattern child which is a (SelectQuery (aka
+ * subquery)), GraphPattern (BasicGraphPattern aka JoinGroup or
+ * GraphPatternNotTriples)
+ * 
+ * <pre>
+ * void GroupGraphPattern() #GraphPatternGroup :
+ * {}
+ * {
+ *     <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
+ * }
+ * 
+ * void GraphPattern() #void :
+ * {}
+ * {
+ *     [BasicGraphPattern()] [ GraphPatternNotTriples() [<DOT>] GraphPattern() ]
+ * }
+ * 
+ * void BasicGraphPattern() :
+ * {}
+ * {
+ *     TriplesBlock() ( FilterOrBind() [<DOT>] [TriplesBlock()] )*
+ * |
+ *     ( FilterOrBind() [<DOT>] [TriplesBlock()] )+
+ * }
+ * 
+ * void FilterOrBind() #void :
+ * {}
+ * {
+ *     Filter()
+ *     |
+ *     Bind()
+ * }
+ * 
+ * void GraphPatternNotTriples() #void :
+ * {}
+ * {
+ *     OptionalGraphPattern()
+ * |   GroupOrUnionGraphPattern()
+ * |   GraphGraphPattern()
+ * |   MinusGraphPattern()
+ * }
+ * 
+ * void OptionalGraphPattern() :
+ * {}
+ * {
+ *     <OPTIONAL> <LBRACE> GraphPattern() <RBRACE>
+ * }
+ * 
+ * void GraphGraphPattern() :
+ * {}
+ * {
+ *     <GRAPH> VarOrIRIref() GroupGraphPattern()
+ * }
+ * 
+ * void GroupOrUnionGraphPattern() #void :
+ * {}
+ * {
+ *     GroupGraphPattern() [ <UNION> GroupOrUnionGraphPattern() #UnionGraphPattern(2) ]
+ * }
+ * 
+ * void MinusGraphPattern() :
+ * {}
+ * {
+ *     <MINUS_SETOPER> GroupGraphPattern()
+ * }
+ * 
+ * void TriplesBlock() #void :
+ * {}
+ * {
+ *     // Note: recursive rule rewriten to non-recursive rule, requires lookahead
+ *     TriplesSameSubjectPath() ( LOOKAHEAD(2) <DOT> TriplesSameSubjectPath() )* [<DOT>]
+ * }
+ * 
+ * void TriplesSameSubjectPath() :
+ * {}
+ * {
+ *     VarOrTerm() PropertyListPath()
+ *     |
+ *     TriplesNode() [PropertyListPath()]
+ * }
+ * 
+ * void PropertyListPath() :
+ * {}
+ * {
+ *     (VerbPath() | VerbSimple()) ObjectList() (LOOKAHEAD(2) <SEMICOLON> [PropertyListPath()] )*
+ * }
+ * 
+ * void VerbPath() #void :
+ * {}
+ * {
+ *     Path()
+ * }
+ * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: GroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
+ *          thompsonbry $
+ *          
+ *          FIXME Add support for property paths.
+ *          
+ *          FIXME Add support for {@link ASTMinusGraphPattern}
  */
 public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
+
+    /**
+     * Used to build up {@link FilterNode}s.
+     */
+    private final ValueExprBuilder valueExprBuilder;
+
+    private GroupGraphPattern graphPattern;
 
     public GroupGraphPatternBuilder(final BigdataASTContext context) {
 
         super(context);
 
+        this.valueExprBuilder = new ValueExprBuilder(context);
+
+        this.graphPattern = new GroupGraphPattern();
+
+    }
+
+    //
+    //
+    //
+
+    @Override
+    public GroupNodeBase visit(final ASTGraphPatternGroup node, Object data)
+        throws VisitorException
+    {
+        
+        final GroupGraphPattern parentGP = graphPattern;
+        
+        graphPattern = new GroupGraphPattern(parentGP);
+
+        // visit the children of the node (default behavior).
+        super.visit(node, null);
+
+        // Filters are scoped to the graph pattern group and do not affect
+        // bindings external to the group
+        final GroupNodeBase group = graphPattern.buildGroup(new JoinGroupNode());
+
+        // FIXME [TODO not sure this is the cleanest way of handling this.]
+        if (data != null && data instanceof Exists) {
+            throw new UnsupportedOperationException("Exists => Subquery?");
+//            ((Exists)data).setSubQuery(te);
+        } else {
+            parentGP.addRequiredTE(group);
+        }
+
+        graphPattern = parentGP;
+
+        return group;
+
     }
 
     /**
-     * ASTWhereClause has GroupGraphPattern child which is a (SelectQuery
-     * (aka subquery)), GraphPattern (BasicGraphPattern aka JoinGroup or
-     * GraphPatternNotTriples)
-     * 
-     * <pre>
-     * void GroupGraphPattern() #GraphPatternGroup :
-     * {}
-     * {
-     *     <LBRACE> (SelectQuery() | GraphPattern()) <RBRACE>
-     * }
-     * 
-     * void GraphPattern() #void :
-     * {}
-     * {
-     *     [BasicGraphPattern()] [ GraphPatternNotTriples() [<DOT>] GraphPattern() ]
-     * }
-     * 
-     * void BasicGraphPattern() :
-     * {}
-     * {
-     *     TriplesBlock() ( FilterOrBind() [<DOT>] [TriplesBlock()] )*
-     * |
-     *     ( FilterOrBind() [<DOT>] [TriplesBlock()] )+
-     * }
-     * 
-     * 
-     * void FilterOrBind() #void :
-     * {}
-     * {
-     *     Filter()
-     *     |
-     *     Bind()
-     * }
-     * 
-     * void GraphPatternNotTriples() #void :
-     * {}
-     * {
-     *     OptionalGraphPattern()
-     * |   GroupOrUnionGraphPattern()
-     * |   GraphGraphPattern()
-     * |   MinusGraphPattern()
-     * }
-     * 
-     * void OptionalGraphPattern() :
-     * {}
-     * {
-     *     // Note: does not refer GroupGraphPattern() because constraints are not limited
-     *     // to the optional graph pattern, but can also reference the operator's LHS
-     *     <OPTIONAL> <LBRACE> GraphPattern() <RBRACE>
-     * }
-     * 
-     * void GraphGraphPattern() :
-     * {}
-     * {
-     *     <GRAPH> VarOrIRIref() GroupGraphPattern()
-     * }
-     * 
-     * void GroupOrUnionGraphPattern() #void :
-     * {}
-     * {
-     *     GroupGraphPattern() [ <UNION> GroupOrUnionGraphPattern() #UnionGraphPattern(2) ]
-     * }
-     * 
-     * void MinusGraphPattern() :
-     * {}
-     * {
-     *     <MINUS_SETOPER> GroupGraphPattern()
-     * }
-     * 
-     * void TriplesBlock() #void :
-     * {}
-     * {
-     *     // Note: recursive rule rewriten to non-recursive rule, requires lookahead
-     *     TriplesSameSubjectPath() ( LOOKAHEAD(2) <DOT> TriplesSameSubjectPath() )* [<DOT>]
-     * }
-     * 
-     * void TriplesSameSubjectPath() :
-     * {}
-     * {
-     *     VarOrTerm() PropertyListPath()
-     *     |
-     *     TriplesNode() [PropertyListPath()]
-     * }
-     * 
-     * void PropertyListPath() :
-     * {}
-     * {
-     *     (VerbPath() | VerbSimple()) ObjectList() (LOOKAHEAD(2) <SEMICOLON> [PropertyListPath()] )*
-     * }
-     * 
-     * void VerbPath() #void :
-     * {}
-     * {
-     *     Path()
-     * }
-     * </pre>
+     * Note: while openrdf lifts the filters out of the optional, we do not need
+     * to do this per MikeP.
      */
     @Override
-    public IGroupNode visit(final ASTGraphPatternGroup node, Object data) {
+    public Void visit(final ASTOptionalGraphPattern node, Object data)
+            throws VisitorException {
 
-        /**
-         * "where {?s ?p ?o}" translates to
-         * 
-         * <pre>
-         * >   GraphPatternGroup
-         * >    BasicGraphPattern
-         * >     TriplesSameSubjectPath
-         * >      Var (s)
-         * >      PropertyListPath
-         * >       Var (p)
-         * >       ObjectList
-         * >        Var (o)
-         * </pre>
-         * 
-         * "where {?s ?p ?o. ?o ?p2 ?s}" translates to
-         * 
-         * <pre>
-         * >   GraphPatternGroup
-         * >    BasicGraphPattern
-         * >     TriplesSameSubjectPath
-         * >      Var (s)
-         * >      PropertyListPath
-         * >       Var (p)
-         * >       ObjectList
-         * >        Var (o)
-         * >     TriplesSameSubjectPath
-         * >      Var (o)
-         * >      PropertyListPath
-         * >       Var (p2)
-         * >       ObjectList
-         * >        Var (s)
-         * </pre>
-         */
+        final GroupGraphPattern parentGP = graphPattern;
+        
+        graphPattern = new GroupGraphPattern(parentGP);
 
-        // if(graphPatternGroup instanceof ASTUnionGraphPattern) {
-        //
-        // }
+        // visit the children.
+        super.visit(node, null);
+
+        final GroupNodeBase group = graphPattern.buildGroup(new JoinGroupNode(
+                true/* optional */));
+
+        parentGP.addRequiredTE(group);
+
+        graphPattern = parentGP;
+
+        return null;
+    }
+
+    @Override
+    public Void visit(final ASTGraphGraphPattern node, Object data)
+            throws VisitorException {
+        
+        final TermNode oldContext = graphPattern.getContext();
+        final Scope oldScope = graphPattern.getStatementPatternScope();
+
+        final TermNode newContext = (TermNode) node.jjtGetChild(0).jjtAccept(
+                this, null);
+
+        graphPattern.setContextVar(newContext);
+        graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
+
+        node.jjtGetChild(1).jjtAccept(this, null);
+
+        graphPattern.setContextVar(oldContext);
+        graphPattern.setStatementPatternScope(oldScope);
+
+        return null;
+    }
+
+    @Override
+    public Void visit(final ASTUnionGraphPattern node, Object data)
+            throws VisitorException {
+        
+        final GroupGraphPattern parentGP = graphPattern;
+
+        graphPattern = new GroupGraphPattern(parentGP);
+        
+        node.jjtGetChild(0).jjtAccept(this, null);
+        
+//        final GroupNodeBase leftArg = graphPattern.buildTupleExpr();
+//
+//        graphPattern = new GroupGraphPattern(parentGP);
+//        
+        node.jjtGetChild(1).jjtAccept(this, null);
+//        
+//        TupleExpr rightArg = graphPattern.buildTupleExpr();
+//
+//        final UnionNode union = new UnionNode();
+//
+//        union.addChild(leftArg);
+//        
+//        union.addChild(rightArg);
+//        
+//        parentGP.addRequiredTE(union);
+        
+        parentGP.addRequiredTE(graphPattern.buildGroup(new UnionNode()));
+        
+        graphPattern = parentGP;
 
         return null;
         
     }
 
-//    @Override
-//    public Object visit(ASTGraphPatternGroup node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//        graphPattern = new GraphPattern(parentGP);
-//
-//        super.visit(node, null);
-//
-//        // Filters are scoped to the graph pattern group and do not affect
-//        // bindings external to the group
-//        TupleExpr te = graphPattern.buildTupleExpr();
-//
-//        // TODO not sure this is the cleanest way of handling this.
-//        if (data != null && data instanceof Exists) {
-//            ((Exists)data).setSubQuery(te);
-//        }
-//        else {
-//            parentGP.addRequiredTE(te);
-//        }
-//
-//        graphPattern = parentGP;
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public Object visit(ASTOptionalGraphPattern node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//        graphPattern = new GraphPattern(parentGP);
-//
-//        super.visit(node, null);
-//
-//        // Optional constraints also apply to left hand side of operator
-//        List<ValueExpr> constraints = graphPattern.removeAllConstraints();
-//
-//        TupleExpr leftArg = parentGP.buildTupleExpr();
-//        TupleExpr rightArg = graphPattern.buildTupleExpr();
-//
-//        LeftJoin leftJoin;
-//
-//        if (constraints.isEmpty()) {
-//            leftJoin = new LeftJoin(leftArg, rightArg);
-//        }
-//        else {
-//            ValueExpr constraint = constraints.get(0);
-//            for (int i = 1; i < constraints.size(); i++) {
-//                constraint = new And(constraint, constraints.get(i));
-//            }
-//
-//            leftJoin = new LeftJoin(leftArg, rightArg, constraint);
-//        }
-//
-//        graphPattern = parentGP;
-//
-//        graphPattern.clear();
-//        graphPattern.addRequiredTE(leftJoin);
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public Object visit(ASTGraphGraphPattern node, Object data)
-//        throws VisitorException
-//    {
-//        Var oldContext = graphPattern.getContextVar();
-//        Scope oldScope = graphPattern.getStatementPatternScope();
-//
-//        ValueExpr newContext = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
-//
-//        graphPattern.setContextVar(valueExpr2Var(newContext));
-//        graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);
-//
-//        node.jjtGetChild(1).jjtAccept(this, null);
-//
-//        graphPattern.setContextVar(oldContext);
-//        graphPattern.setStatementPatternScope(oldScope);
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public Object visit(ASTUnionGraphPattern node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//
-//        graphPattern = new GraphPattern(parentGP);
-//        node.jjtGetChild(0).jjtAccept(this, null);
-//        TupleExpr leftArg = graphPattern.buildTupleExpr();
-//
-//        graphPattern = new GraphPattern(parentGP);
-//        node.jjtGetChild(1).jjtAccept(this, null);
-//        TupleExpr rightArg = graphPattern.buildTupleExpr();
-//
-//        parentGP.addRequiredTE(new Union(leftArg, rightArg));
-//        graphPattern = parentGP;
-//
-//        return null;
-//    }
-//
-//    @Override
+//    @Override // FIXME MinusGraphPattern
 //    public Object visit(ASTMinusGraphPattern node, Object data)
 //        throws VisitorException
 //    {
@@ -351,83 +310,216 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 //        return null;
 //    }
 //
-//    @Override
-//    public Object visit(ASTPropertyList propListNode, Object data)
-//        throws VisitorException
-//    {
-//        ValueExpr subject = (ValueExpr)data;
-//        ValueExpr predicate = (ValueExpr)propListNode.getVerb().jjtAccept(this, null);
-//        @SuppressWarnings("unchecked")
-//        List<ValueExpr> objectList = (List<ValueExpr>)propListNode.getObjectList().jjtAccept(this, null);
-//
-//        Var subjVar = valueExpr2Var(subject);
-//        Var predVar = valueExpr2Var(predicate);
-//
-//        for (ValueExpr object : objectList) {
-//            Var objVar = valueExpr2Var(object);
-//            graphPattern.addRequiredSP(subjVar, predVar, objVar);
-//        }
-//
-//        ASTPropertyList nextPropList = propListNode.getNextPropertyList();
-//        if (nextPropList != null) {
-//            nextPropList.jjtAccept(this, subject);
-//        }
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public Object visit(ASTPathAlternative pathAltNode, Object data)
-//        throws VisitorException
-//    {
-//
-//        if (pathAltNode.jjtGetNumChildren() > 1) {
-//
-//            GraphPattern parentGP = graphPattern;
-//
-//            graphPattern = new GraphPattern(parentGP);
-//            pathAltNode.jjtGetChild(0).jjtAccept(this, data);
-//            TupleExpr leftArg = graphPattern.buildTupleExpr();
-//
-//            graphPattern = new GraphPattern(parentGP);
-//
-//            pathAltNode.jjtGetChild(1).jjtAccept(this, data);
-//            TupleExpr rightArg = graphPattern.buildTupleExpr();
-//            parentGP.addRequiredTE(new Union(leftArg, rightArg));
-//
-//            graphPattern = parentGP;
-//        }
-//        else {
-//            pathAltNode.jjtGetChild(0).jjtAccept(this, data);
-//        }
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public PropertySetElem visit(ASTPathOneInPropertySet node, Object data)
-//        throws VisitorException
-//    {
-//
-//        PropertySetElem result = new PropertySetElem();
-//        result.setInverse(node.isInverse());
-//        ValueConstant predicate = (ValueConstant)node.jjtGetChild(0).jjtAccept(this, data);
-//        result.setPredicate(predicate);
-//
-//        return result;
-//    }
-//
-//    private ASTObjectList getObjectList(Node node) {
+
+    /**
+     * Note: Delegated to the {@link ValueExprBuilder}.
+     */
+    @Override
+    public Object visit(final ASTConstraint node, Object data)
+            throws VisitorException {
+
+        final ValueExpressionNode valueExpr = (ValueExpressionNode) node
+                .jjtGetChild(0).jjtAccept(valueExprBuilder, null);
+
+        graphPattern.addConstraint(valueExpr);
+
+        return valueExpr;
+        
+    }
+
+    @Override
+    public Object visit(final ASTPropertyList propListNode, Object data)
+            throws VisitorException {
+        
+        final TermNode subject = (TermNode) data;
+        
+        final TermNode predicate = (TermNode) propListNode.getVerb().jjtAccept(
+                this, null);
+        
+        @SuppressWarnings("unchecked")
+        final List<TermNode> objectList = (List<TermNode>) propListNode
+                .getObjectList().jjtAccept(this, null);
+
+        for (TermNode object : objectList) {
+            
+            graphPattern.addRequiredSP(subject, predicate, object);
+            
+        }
+
+        final ASTPropertyList nextPropList = propListNode.getNextPropertyList();
+        
+        if (nextPropList != null) {
+            
+            nextPropList.jjtAccept(this, subject);
+            
+        }
+
+        return null;
+
+    }
+    
+//    private ASTObjectList getObjectList(final Node node) {
+//       
 //        if (node == null) {
+//            
 //            return null;
-//        }
-//        if (node instanceof ASTPropertyListPath) {
-//            return ((ASTPropertyListPath)node).getObjectList();
-//        }
-//        else {
+//            
+//        } else if (node instanceof ASTPropertyListPath) {
+//            
+//            return ((ASTPropertyListPath) node).getObjectList();
+//            
+//        } else {
+//            
 //            return getObjectList(node.jjtGetParent());
+//            
 //        }
+//        
 //    }
+
+    @Override
+    public Object visit(final ASTPropertyListPath propListNode, Object data)
+            throws VisitorException {
+        
+        final TermNode subject = (TermNode) data;
+    
+        final TermNode verbPath = (TermNode) propListNode.getVerb().jjtAccept(this,
+                data);
+
+        if (verbPath instanceof VarNode) {
+
+            @SuppressWarnings("unchecked")
+            final List<TermNode> objectList = (List<TermNode>) propListNode
+                    .getObjectList().jjtAccept(this, null);
+
+            for (TermNode object : objectList) {
+
+                graphPattern.addRequiredSP(subject, verbPath, object);
+                
+            }
+
+        } else {
+        
+            // path is a single IRI or a more complex path. handled by the
+            // visitor.
+
+        }
+
+        final ASTPropertyListPath nextPropList = propListNode.getNextPropertyList();
+        
+        if (nextPropList != null) {
+        
+            nextPropList.jjtAccept(this, subject);
+            
+        }
+
+        return null;
+
+    }
+
+    @Override
+    public List<TermNode> visit(final ASTObjectList node, Object data)
+            throws VisitorException {
+        
+        final int childCount = node.jjtGetNumChildren();
+        
+        final List<TermNode> result = new ArrayList<TermNode>(childCount);
+
+        for (int i = 0; i < childCount; i++) {
+            
+            result.add((TermNode) node.jjtGetChild(i).jjtAccept(this, null));
+            
+        }
+
+        return result;
+    }
+
+    @Override
+    public VarNode visit(final ASTBlankNodePropertyList node, Object data)
+            throws VisitorException {
+        
+        final VarNode bnodeVar = context.createAnonVar(node.getVarName());
+        
+        super.visit(node, bnodeVar);
+        
+        return bnodeVar;
+        
+    }
+
+    //
+    // Property paths
+    //
+    
+//  @Override
+//  public Var visit(ASTCollection node, Object data)
+//      throws VisitorException
+//  {
+//      String listVarName = node.getVarName();
+//      Var rootListVar = createAnonVar(listVarName);
+//
+//      Var listVar = rootListVar;
+//
+//      int childCount = node.jjtGetNumChildren();
+//      for (int i = 0; i < childCount; i++) {
+//          ValueExpr childValue = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
+//
+//          Var childVar = valueExpr2Var(childValue);
+//          graphPattern.addRequiredSP(listVar, createConstVar(RDF.FIRST), childVar);
+//
+//          Var nextListVar;
+//          if (i == childCount - 1) {
+//              nextListVar = createConstVar(RDF.NIL);
+//          }
+//          else {
+//              nextListVar = createAnonVar(listVarName + "-" + (i + 1));
+//          }
+//
+//          graphPattern.addRequiredSP(listVar, createConstVar(RDF.REST), nextListVar);
+//          listVar = nextListVar;
+//      }
+//
+//      return rootListVar;
+//  }
+//
+//  @Override
+//  public Object visit(ASTPathAlternative pathAltNode, Object data)
+//      throws VisitorException
+//  {
+//
+//      if (pathAltNode.jjtGetNumChildren() > 1) {
+//
+//          GraphPattern parentGP = graphPattern;
+//
+//          graphPattern = new GraphPattern(parentGP);
+//          pathAltNode.jjtGetChild(0).jjtAccept(this, data);
+//          TupleExpr leftArg = graphPattern.buildTupleExpr();
+//
+//          graphPattern = new GraphPattern(parentGP);
+//
+//          pathAltNode.jjtGetChild(1).jjtAccept(this, data);
+//          TupleExpr rightArg = graphPattern.buildTupleExpr();
+//          parentGP.addRequiredTE(new Union(leftArg, rightArg));
+//
+//          graphPattern = parentGP;
+//      }
+//      else {
+//          pathAltNode.jjtGetChild(0).jjtAccept(this, data);
+//      }
+//
+//      return null;
+//  }
+//
+//  @Override
+//  public PropertySetElem visit(ASTPathOneInPropertySet node, Object data)
+//      throws VisitorException
+//  {
+//
+//      PropertySetElem result = new PropertySetElem();
+//      result.setInverse(node.isInverse());
+//      ValueConstant predicate = (ValueConstant)node.jjtGetChild(0).jjtAccept(this, data);
+//      result.setPredicate(predicate);
+//
+//      return result;
+//  }
 //
 //    @Override
 //    public Object visit(ASTPathSequence pathSeqNode, Object data)
@@ -683,241 +775,157 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 //
 //        return completeMatch;
 //    }
-//
+
+    //
+    // Property path related stuff.
+    //
+    
 //    private TupleExpr replaceVarOccurrence(TupleExpr te, List<ValueExpr> objectList, Var replacementVar)
-//        throws VisitorException
-//    {
-//        for (ValueExpr objExpr : objectList) {
-//            Var objVar = valueExpr2Var(objExpr);
-//            VarReplacer replacer = new VarReplacer(objVar, replacementVar);
-//            te.visit(replacer);
+//            throws VisitorException
+//        {
+//            for (ValueExpr objExpr : objectList) {
+//                Var objVar = valueExpr2Var(objExpr);
+//                VarReplacer replacer = new VarReplacer(objVar, replacementVar);
+//                te.visit(replacer);
+//            }
+//            return te;
 //        }
-//        return te;
-//    }
 //
-//    private TupleExpr handlePathModifiers(Scope scope, Var subjVar, TupleExpr te, Var endVar, Var contextVar,
-//            long lowerBound, long upperBound)
-//        throws VisitorException
-//    {
+//        private TupleExpr handlePathModifiers(Scope scope, Var subjVar, TupleExpr te, Var endVar, Var contextVar,
+//                long lowerBound, long upperBound)
+//            throws VisitorException
+//        {
 //
-//        TupleExpr result = te;
+//            TupleExpr result = te;
 //
-//        if (lowerBound >= 0L) {
+//            if (lowerBound >= 0L) {
 //
-//            if (lowerBound < upperBound) {
+//                if (lowerBound < upperBound) {
 //
-//                if (upperBound < Long.MAX_VALUE) {
-//                    // upperbound is fixed-length
+//                    if (upperBound < Long.MAX_VALUE) {
+//                        // upperbound is fixed-length
 //
-//                    // create set of unions for all path lengths between lower
-//                    // and upper bound.
-//                    Union union = new Union();
-//                    Union currentUnion = union;
+//                        // create set of unions for all path lengths between lower
+//                        // and upper bound.
+//                        Union union = new Union();
+//                        Union currentUnion = union;
 //
-//                    for (long length = lowerBound; length < upperBound; length++) {
+//                        for (long length = lowerBound; length < upperBound; length++) {
 //
-//                        TupleExpr path = createPath(scope, subjVar, te, endVar, contextVar, length);
+//                            TupleExpr path = createPath(scope, subjVar, te, endVar, contextVar, length);
 //
-//                        currentUnion.setLeftArg(path);
-//                        if (length == upperBound - 1) {
-//                            path = createPath(scope, subjVar, te, endVar, contextVar, length + 1);
-//                            currentUnion.setRightArg(path);
+//                            currentUnion.setLeftArg(path);
+//                            if (length == upperBound - 1) {
+//                                path = createPath(scope, subjVar, te, endVar, contextVar, length + 1);
+//                                currentUnion.setRightArg(path);
+//                            }
+//                            else {
+//                                Union nextUnion = new Union();
+//                                currentUnion.setRightArg(nextUnion);
+//                                currentUnion = nextUnion;
+//                            }
 //                        }
-//                        else {
-//                            Union nextUnion = new Union();
-//                            currentUnion.setRightArg(nextUnion);
-//                            currentUnion = nextUnion;
-//                        }
+//
+//                        result = union;
 //                    }
+//                    else {
+//                        // upperbound is abitrary-length
 //
-//                    result = union;
+//                        result = new ArbitraryLengthPath(scope, subjVar, te, endVar, contextVar, lowerBound);
+//                    }
 //                }
 //                else {
-//                    // upperbound is abitrary-length
+//                    // create single path of fixed length.
+//                    TupleExpr path = createPath(scope, subjVar, te, endVar, contextVar, lowerBound);
+//                    result = path;
+//                }
+//            }
 //
-//                    result = new ArbitraryLengthPath(scope, subjVar, te, endVar, contextVar, lowerBound);
+//            return result;
+//        }
+//
+//        private TupleExpr createPath(Scope scope, Var subjVar, TupleExpr pathExpression, Var endVar,
+//                Var contextVar, long length)
+//            throws VisitorException
+//        {
+//            if (pathExpression instanceof StatementPattern) {
+//                Var predVar = ((StatementPattern)pathExpression).getPredicateVar();
+//
+//                if (length == 0L) {
+//                    return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
+//                }
+//                else {
+//                    GraphPattern gp = new GraphPattern();
+//                    gp.setContextVar(contextVar);
+//                    gp.setStatementPatternScope(scope);
+//
+//                    Var nextVar = null;
+//
+//                    for (long i = 0L; i < length; i++) {
+//                        if (i < length - 1) {
+//                            nextVar = createAnonVar(predVar.getValue() + "-path-" + length + "-" + i);
+//                        }
+//                        else {
+//                            nextVar = endVar;
+//                        }
+//                        gp.addRequiredSP(subjVar, predVar, nextVar);
+//                        subjVar = nextVar;
+//                    }
+//                    return gp.buildTupleExpr();
 //                }
 //            }
 //            else {
-//                // create single path of fixed length.
-//                TupleExpr path = createPath(scope, subjVar, te, endVar, contextVar, lowerBound);
-//                result = path;
-//            }
-//        }
-//
-//        return result;
-//    }
-//
-//    private TupleExpr createPath(Scope scope, Var subjVar, TupleExpr pathExpression, Var endVar,
-//            Var contextVar, long length)
-//        throws VisitorException
-//    {
-//        if (pathExpression instanceof StatementPattern) {
-//            Var predVar = ((StatementPattern)pathExpression).getPredicateVar();
-//
-//            if (length == 0L) {
-//                return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
-//            }
-//            else {
-//                GraphPattern gp = new GraphPattern();
-//                gp.setContextVar(contextVar);
-//                gp.setStatementPatternScope(scope);
-//
-//                Var nextVar = null;
-//
-//                for (long i = 0L; i < length; i++) {
-//                    if (i < length - 1) {
-//                        nextVar = createAnonVar(predVar.getValue() + "-path-" + length + "-" + i);
-//                    }
-//                    else {
-//                        nextVar = endVar;
-//                    }
-//                    gp.addRequiredSP(subjVar, predVar, nextVar);
-//                    subjVar = nextVar;
+//                if (length == 0L) {
+//                    return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
 //                }
-//                return gp.buildTupleExpr();
-//            }
-//        }
-//        else {
-//            if (length == 0L) {
-//                return new ZeroLengthPath(scope, subjVar, endVar, contextVar);
-//            }
-//            else {
-//                GraphPattern gp = new GraphPattern();
-//                gp.setContextVar(contextVar);
-//                gp.setStatementPatternScope(scope);
+//                else {
+//                    GraphPattern gp = new GraphPattern();
+//                    gp.setContextVar(contextVar);
+//                    gp.setStatementPatternScope(scope);
 //
-//                Var nextVar = null;
-//                for (long i = 0L; i < length; i++) {
-//                    if (i < length - 1L) {
-//                        nextVar = createAnonVar(subjVar.getName() + "-expression-path-" + length + "-" + i);
+//                    Var nextVar = null;
+//                    for (long i = 0L; i < length; i++) {
+//                        if (i < length - 1L) {
+//                            nextVar = createAnonVar(subjVar.getName() + "-expression-path-" + length + "-" + i);
+//                        }
+//                        else {
+//                            nextVar = endVar;
+//                        }
+//
+//                        // create a clone of the path expression.
+//                        TupleExpr clone = pathExpression.clone();
+//
+//                        VarReplacer replacer = new VarReplacer(endVar, nextVar);
+//                        clone.visit(replacer);
+//
+//                        gp.addRequiredTE(clone);
+//
+//                        subjVar = nextVar;
 //                    }
-//                    else {
-//                        nextVar = endVar;
-//                    }
-//
-//                    // create a clone of the path expression.
-//                    TupleExpr clone = pathExpression.clone();
-//
-//                    VarReplacer replacer = new VarReplacer(endVar, nextVar);
-//                    clone.visit(replacer);
-//
-//                    gp.addRequiredTE(clone);
-//
-//                    subjVar = nextVar;
+//                    return gp.buildTupleExpr();
 //                }
-//                return gp.buildTupleExpr();
 //            }
 //        }
-//    }
 //
-//    private class VarReplacer extends QueryModelVisitorBase<VisitorException> {
+//        private class VarReplacer extends QueryModelVisitorBase<VisitorException> {
 //
-//        private Var toBeReplaced;
+//            private Var toBeReplaced;
 //
-//        private Var replacement;
+//            private Var replacement;
 //
-//        public VarReplacer(Var toBeReplaced, Var replacement) {
-//            this.toBeReplaced = toBeReplaced;
-//            this.replacement = replacement;
-//        }
-//
-//        @Override
-//        public void meet(Var var) {
-//            if (toBeReplaced.equals(var)) {
-//                QueryModelNode parent = var.getParentNode();
-//                parent.replaceChildNode(var, replacement);
-//                replacement.setParentNode(parent);
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public Object visit(ASTPropertyListPath propListNode, Object data)
-//        throws VisitorException
-//    {
-//        ValueExpr subject = (ValueExpr)data;
-//        ValueExpr verbPath = (ValueExpr)propListNode.getVerb().jjtAccept(this, data);
-//
-//        if (verbPath instanceof Var) {
-//
-//            @SuppressWarnings("unchecked")
-//            List<ValueExpr> objectList = (List<ValueExpr>)propListNode.getObjectList().jjtAccept(this, null);
-//
-//            Var subjVar = valueExpr2Var(subject);
-//
-//            Var predVar = valueExpr2Var(verbPath);
-//            for (ValueExpr object : objectList) {
-//                Var objVar = valueExpr2Var(object);
-//                graphPattern.addRequiredSP(subjVar, predVar, objVar);
-//            }
-//        }
-//        else {
-//            // path is a single IRI or a more complex path. handled by the
-//            // visitor.
-//
-//        }
-//
-//        ASTPropertyListPath nextPropList = propListNode.getNextPropertyList();
-//        if (nextPropList != null) {
-//            nextPropList.jjtAccept(this, subject);
-//        }
-//
-//        return null;
-//    }
-//
-//    @Override
-//    public List<ValueExpr> visit(ASTObjectList node, Object data)
-//        throws VisitorException
-//    {
-//        int childCount = node.jjtGetNumChildren();
-//        List<ValueExpr> result = new ArrayList<ValueExpr>(childCount);
-//
-//        for (int i = 0; i < childCount; i++) {
-//            result.add((ValueExpr)node.jjtGetChild(i).jjtAccept(this, null));
-//        }
-//
-//        return result;
-//    }
-//
-//    @Override
-//    public Var visit(ASTBlankNodePropertyList node, Object data)
-//        throws VisitorException
-//    {
-//        Var bnodeVar = createAnonVar(node.getVarName());
-//        super.visit(node, bnodeVar);
-//        return bnodeVar;
-//    }
-//
-//    @Override
-//    public Var visit(ASTCollection node, Object data)
-//        throws VisitorException
-//    {
-//        String listVarName = node.getVarName();
-//        Var rootListVar = createAnonVar(listVarName);
-//
-//        Var listVar = rootListVar;
-//
-//        int childCount = node.jjtGetNumChildren();
-//        for (int i = 0; i < childCount; i++) {
-//            ValueExpr childValue = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
-//
-//            Var childVar = valueExpr2Var(childValue);
-//            graphPattern.addRequiredSP(listVar, createConstVar(RDF.FIRST), childVar);
-//
-//            Var nextListVar;
-//            if (i == childCount - 1) {
-//                nextListVar = createConstVar(RDF.NIL);
-//            }
-//            else {
-//                nextListVar = createAnonVar(listVarName + "-" + (i + 1));
+//            public VarReplacer(Var toBeReplaced, Var replacement) {
+//                this.toBeReplaced = toBeReplaced;
+//                this.replacement = replacement;
 //            }
 //
-//            graphPattern.addRequiredSP(listVar, createConstVar(RDF.REST), nextListVar);
-//            listVar = nextListVar;
+//            @Override
+//            public void meet(Var var) {
+//                if (toBeReplaced.equals(var)) {
+//                    QueryModelNode parent = var.getParentNode();
+//                    parent.replaceChildNode(var, replacement);
+//                    replacement.setParentNode(parent);
+//                }
+//            }
 //        }
-//
-//        return rootListVar;
-//    }
 
 }

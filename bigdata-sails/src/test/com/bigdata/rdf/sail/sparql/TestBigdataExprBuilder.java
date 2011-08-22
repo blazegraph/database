@@ -27,6 +27,7 @@ package com.bigdata.rdf.sail.sparql;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
@@ -88,23 +89,12 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
-//        final QueryRoot actual = new QueryRoot();
-//        {
-//
-//            final ProjectionNode projection2 = new ProjectionNode();
-//            projection2.addProjectionVar(new VarNode("s"));
-//            actual.setProjection(projection2);
-//
-//            final JoinGroupNode whereClause2 = new JoinGroupNode();
-//            whereClause2.addChild(new StatementPatternNode(new VarNode("s"),
-//                    new VarNode("p"), new VarNode("o")));
-//            actual.setRoot(whereClause2);
-//        }
 
         assertSameAST(sparql, expected, actual);
 
@@ -132,7 +122,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
         }
         
@@ -164,7 +155,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
         }
         
@@ -195,7 +187,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
         }
         
@@ -229,7 +222,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o")));
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
             
             final SliceNode slice = new SliceNode();

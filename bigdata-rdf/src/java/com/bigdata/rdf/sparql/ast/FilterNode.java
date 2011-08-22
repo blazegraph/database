@@ -70,14 +70,33 @@ public class FilterNode extends ValueExpressionNodeBase {
 		return varsToMaterialize;
 	}
 
-	public String toString(final int indent) {
-		
-	    final StringBuilder sb = new StringBuilder(indent(indent));
+    @Override
+    public String toString(final int indent) {
 
-		sb.append("filter(").append(ve).append(")");
-		
-		return sb.toString();
-		
-	}
+        final StringBuilder sb = new StringBuilder(indent(indent));
+
+        sb.append("filter(").append(ve).append(")");
+
+        return sb.toString();
+
+    }
+
+    @Override
+    public boolean equals(Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof FilterNode))
+            return false;
+
+        final FilterNode t = (FilterNode) o;
+
+        if (!ve.equals(t.ve))
+            return false;
+
+        return true;
+
+    }
 
 }

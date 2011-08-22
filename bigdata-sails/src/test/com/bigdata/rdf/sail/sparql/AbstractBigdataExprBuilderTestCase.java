@@ -34,7 +34,9 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
@@ -115,7 +117,10 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
     }
 
-    // TODO Verify with MikeP
+    /**
+     * FIXME See {@link ValueExprBuilder#makeIV(BigdataValue)} for what we
+     * should be doing here.
+     */
     @SuppressWarnings("unchecked")
     protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
 
@@ -188,9 +193,27 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
 //        WildcardProjectionProcessor.process(qc); // No. We use "*" as a variable name.
         BlankNodeVarProcessor.process(qc);
-        final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
-
-        return (QueryRoot) queryRoot;
+        if (true) {
+            /*
+             * bigdata
+             */
+            final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
+            return (QueryRoot) queryRoot;
+        } else {
+            /*
+             * openrdf
+             */
+            TupleExprBuilder tupleExprBuilder = new TupleExprBuilder(
+                    new ValueFactoryImpl());
+            try {
+                final TupleExpr result = (TupleExpr) qc.jjtAccept(
+                        tupleExprBuilder, null);
+                log.error("openrdf:\n" + result);
+                throw new AssertionFailedError("Parse tree on log: " + queryStr);
+            } catch (VisitorException e) {
+                throw new MalformedQueryException(e.getMessage(), e);
+            }
+        }
 
     }
 

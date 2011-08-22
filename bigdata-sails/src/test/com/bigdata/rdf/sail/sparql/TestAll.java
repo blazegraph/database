@@ -57,14 +57,23 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite(TestAll.class.getPackage()
                 .getName());
 
-        // test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT)
-        suite.addTestSuite(TestBigdataExprBuilder.class);
+        // Test suite for building up value expressions.
+        suite.addTestSuite(TestValueExprBuilder.class);
 
-        // test suite for group graph patterns (join groups, unions, subquery, etc).
+        /*
+         * Test suite for group graph patterns (join groups, unions, optional,
+         * subquery, etc) and filters in those graph patterns.
+         */
         suite.addTestSuite(TestGroupGraphPatternBuilder.class);
 
-        // test suite for building up value expressions.
-        suite.addTestSuite(TestValueExprBuilder.class);
+        /*
+         * Test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT),
+         * including DISTINCT/REDUCED, GROUP BY, HAVING, ORDER BY, and
+         * LIMIT/OFFSET.
+         */
+        suite.addTestSuite(TestBigdataExprBuilder.class);
+
+        // TODO Test suite for property paths.
 
         return suite;
 
