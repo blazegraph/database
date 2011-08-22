@@ -7,9 +7,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
 
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -18,11 +21,14 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -50,13 +56,13 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
         return new StatementPatternNode(new VarNode("s"), new VarNode("p"),
                 new VarNode("o"));
-        
+
     }
 
     /**
      * Unit test developed to identify a problem where a query with 3 solutions
      * passes through those solutions but a query with one does not.
-     * 
+     *
      * @throws Exception
      */
     public void testAST() throws Exception {
@@ -79,17 +85,17 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
             store.addStatement(x, rdfType, C);
             store.addStatement(y, rdfType, B);
             store.addStatement(z, rdfType, A);
- 
+
             final AtomicInteger idFactory = new AtomicInteger(0);
-            
+
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
-            
+
             /*
              * Run query expecting 3 statements.
              */
             {
-                
+
                 final IGroupNode root = new JoinGroupNode();
 
                 root.addChild(sp());
@@ -105,7 +111,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 final PipelineOp pipeline = AST2BOpUtility
                         .convert(new AST2BOpContext(query, idFactory, store,
                                 queryEngine, new Properties()));
-                
+
                 // Submit query for evaluation.
                 final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
 
@@ -113,7 +119,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                         .randomUUID(), pipeline,
                         new ThickAsynchronousIterator<IBindingSet[]>(
                                 existingBindings));
-                
+
                 final Iterator<IBindingSet[]> iter = runningQuery.iterator();
 
                 int i = 0;
@@ -123,14 +129,14 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 }
 
                 assertEquals("Baseline", 3, i);
-                
+
             }
-            
+
             /*
              * Run query expecting 1 statement using SLICE w/ LIMIT :=1.
              */
             if(true){
-                
+
                 final IGroupNode root = new JoinGroupNode();
 
                 root.addChild(sp());
@@ -140,9 +146,9 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 query.setWhereClause(root);
 
                 final ProjectionNode pn = new ProjectionNode();
-                
+
                 pn.addProjectionVar(new VarNode("s"));
-                
+
                 query.setProjection(pn);
 
                 final SliceNode sn = new SliceNode();
@@ -152,7 +158,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 final PipelineOp pipeline = AST2BOpUtility
                         .convert(new AST2BOpContext(query, idFactory, store,
                                 queryEngine, new Properties()));
-                
+
                 // Submit query for evaluation.
                 final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
 
@@ -160,7 +166,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                         .randomUUID(), pipeline,
                         new ThickAsynchronousIterator<IBindingSet[]>(
                                 existingBindings));
-                
+
                 final Iterator<IBindingSet[]> iter = runningQuery.iterator();
 
                 int i = 0;
@@ -170,14 +176,14 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 }
 
                 assertEquals("SLICE(limit=1)", 1, i);
-            
+
             }
 
             /*
              * Run query expecting 3 statements using DISTINCT
              */
             {
-                
+
                 final IGroupNode root = new JoinGroupNode();
 
                 root.addChild(sp());
@@ -194,7 +200,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 final PipelineOp pipeline = AST2BOpUtility
                         .convert(new AST2BOpContext(query, idFactory, store,
                                 queryEngine, new Properties()));
-                
+
                 // Submit query for evaluation.
                 final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
 
@@ -202,7 +208,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                         .randomUUID(), pipeline,
                         new ThickAsynchronousIterator<IBindingSet[]>(
                                 existingBindings));
-                
+
                 final Iterator<IBindingSet[]> iter = runningQuery.iterator();
 
                 int i = 0;
@@ -214,7 +220,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 assertEquals("DISTINCT", 3, i);
 
             }
-            
+
         } finally {
 
             store.__tearDownUnitTest();
@@ -355,6 +361,110 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         }
 
     }
+
+    /**
+     * Unit test developed to identify a problem where a query with 3 solutions
+     * passes through those solutions but a query with one does not.
+     *
+     * @throws Exception
+     */
+    public void testProjectedGroupByWithConstant() throws Exception {
+
+        final Properties properties = getProperties();
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            final URI x = new URIImpl("http://www.foo.org/x");
+            final URI z = new URIImpl("http://www.foo.org/z");
+            final URI predicate = new URIImpl("http://www.foo.org/predicate1");
+            final URI C = new URIImpl("http://www.foo.org/typeC");
+            final URI rdfType = RDF.TYPE;
+            final Literal one= new LiteralImpl("1",XMLSchema.INT);
+            final Literal two= new LiteralImpl("1",XMLSchema.INT);
+            final Literal three= new LiteralImpl("1",XMLSchema.INT);
+
+
+            // add statements using the URIs declared above.
+            store.addStatement(x, rdfType, C);
+            store.addStatement(x, predicate, one);
+            store.addStatement(x, predicate, two);
+            store.addStatement(x, predicate, three);
+
+            store.addStatement(z, rdfType, C);
+            store.addStatement(z, predicate, two);
+            store.addStatement(z, predicate, three);
+
+            final AtomicInteger idFactory = new AtomicInteger(0);
+
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(store.getIndexManager());
+
+
+            IV type=store.getIV(rdfType);
+            IV cIv=store.getIV(C);
+            IV predicateIv=store.getIV(predicate);
+
+            /*
+             * Run query expecting 1 statements.
+             */
+            {
+                VarNode s=new VarNode("s");
+                VarNode o=new VarNode("o");
+                final IGroupNode root = new JoinGroupNode();
+                root.addChild(new StatementPatternNode(s, new ConstantNode(new Constant<IV>(type)),new ConstantNode(new Constant<IV>(cIv))));
+                root.addChild(new StatementPatternNode(s, new ConstantNode(new Constant<IV>(predicateIv)),o));
+
+                final QueryRoot query = new QueryRoot();
+
+                query.setWhereClause(root);
+
+                final ProjectionNode pn = new ProjectionNode();
+
+
+                pn.addProjectionVar(new VarNode("index"));
+                query.setProjection(pn);
+
+                GroupByNode gbn=new GroupByNode();
+                MathBOp op=new MathBOp(o.getValueExpression(),
+                        new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,store.getNamespace());
+                ValueExpressionNode ven=new ValueExpressionNode(op);
+
+                gbn.addExpr(new AssignmentNode(new VarNode("index"),ven ));
+                query.setGroupBy(gbn);
+                final PipelineOp pipeline = AST2BOpUtility
+                        .convert(new AST2BOpContext(query, idFactory, store,
+                                queryEngine, new Properties()));
+
+                // Submit query for evaluation.
+                final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
+
+                final AbstractRunningQuery runningQuery = queryEngine.eval(UUID
+                        .randomUUID(), pipeline,
+                        new ThickAsynchronousIterator<IBindingSet[]>(
+                                existingBindings));
+
+                final Iterator<IBindingSet[]> iter = runningQuery.iterator();
+
+                int i = 0;
+                while (iter.hasNext()) {
+                    final IBindingSet[] set = iter.next();
+                    i += set.length;
+                }
+
+                assertEquals("Baseline", 1, i);
+
+            }
+
+
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!
@@ -374,7 +484,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         // no persistence.
         properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
                 BufferMode.Transient.toString());
-        
+
         return properties;
 
     }
