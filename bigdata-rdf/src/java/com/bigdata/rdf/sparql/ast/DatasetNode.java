@@ -106,13 +106,66 @@ public class DatasetNode extends QueryNodeBase {
 	}
 
     @Override
-    public String toString(int indent) {
-        return toString(); // FIXME toString().
+    public String toString(final int indent) {
+        final String s = indent(indent);
+        final StringBuilder sb = new StringBuilder();
+        if (defaultGraphs != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("defaultGraphs=");
+            sb.append(defaultGraphs.toString());
+        }
+        if (namedGraphs != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("namedGraphs=");
+            sb.append(namedGraphs.toString());
+        }
+        if (defaultGraphFilter != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("defaultGraphFilter=" + defaultGraphFilter);
+        }
+        if (namedGraphFilter != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("namedGraphFilter=" + namedGraphFilter);
+        }
+        return sb.toString();
     }
 
-//    public boolean equals(final Object o) {
-//        // FIXME Auto-generated method stub
-//        throw new UnsupportedOperationException();
-//    }
-    
+    public boolean equals(final Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof DatasetNode))
+            return false;
+        final DatasetNode t = (DatasetNode) o;
+        if (defaultGraphs == null) {
+            if (t.defaultGraphs != null)
+                return false;
+        } else if (!defaultGraphs.equals(t.defaultGraphs)) {
+            return false;
+        }
+        if (namedGraphs == null) {
+            if (t.namedGraphs != null)
+                return false;
+        } else if (!namedGraphs.equals(t.namedGraphs)) {
+            return false;
+        }
+        if (defaultGraphFilter == null) {
+            if (t.defaultGraphFilter != null)
+                return false;
+        } else if (!defaultGraphFilter.equals(t.defaultGraphFilter)) {
+            return false;
+        }
+        if (namedGraphFilter == null) {
+            if (t.namedGraphFilter != null)
+                return false;
+        } else if (!namedGraphFilter.equals(t.namedGraphFilter)) {
+            return false;
+        }
+        return true;
+
+    }
+
 }

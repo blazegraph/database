@@ -457,6 +457,7 @@ public class JoinGroupNode extends GroupNodeBase {
 
 	}
 
+	@Override
     public boolean equals(final Object o) {
 
         if (this == o)
@@ -467,7 +468,17 @@ public class JoinGroupNode extends GroupNodeBase {
 
         if(!super.equals(o))
             return false;
+
+        final JoinGroupNode t = (JoinGroupNode) o;
         
+        if (context == null) {
+            if (t.context != null)
+                return false;
+        } else {
+            if (!context.equals(context))
+                return false;
+        }
+            
         return true;
 
     }

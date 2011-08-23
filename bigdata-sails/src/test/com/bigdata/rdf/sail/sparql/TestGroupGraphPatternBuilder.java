@@ -58,7 +58,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  *          thompsonbry $
  * 
  *          FIXME Test Exists(), which is basically a subquery which projects no
- *          solutions and has a limit of ONE (1).
+ *          solutions and has a limit of ONE (1) (i.e., an ASK query).
  */
 public class TestGroupGraphPatternBuilder extends
         AbstractBigdataExprBuilderTestCase {
@@ -167,12 +167,14 @@ public class TestGroupGraphPatternBuilder extends
             expected.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            
             final JoinGroupNode graphGroup = new JoinGroupNode();
+            whereClause.addChild(graphGroup);
+            graphGroup.setContext(new VarNode("src"));
             graphGroup.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o"), new VarNode("src"),
                     Scope.NAMED_CONTEXTS));
-            whereClause.addChild(graphGroup);
-            expected.setWhereClause(whereClause);
         }
 
         final QueryRoot actual = parse(sparql, baseURI);
@@ -204,6 +206,7 @@ public class TestGroupGraphPatternBuilder extends
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             final JoinGroupNode graphGroup = new JoinGroupNode();
+            graphGroup.setContext(new ConstantNode(graphConst));
             graphGroup.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o"), new ConstantNode(
                             graphConst), Scope.NAMED_CONTEXTS));
@@ -330,6 +333,8 @@ public class TestGroupGraphPatternBuilder extends
             
                 final JoinGroupNode joinGroup = new JoinGroupNode();
                 
+                joinGroup.setContext(new VarNode("src"));
+
                 joinGroup.addChild(new StatementPatternNode(new VarNode("o"),
                         new VarNode("p2"), new VarNode("s"),
                         new VarNode("src"), Scope.NAMED_CONTEXTS));

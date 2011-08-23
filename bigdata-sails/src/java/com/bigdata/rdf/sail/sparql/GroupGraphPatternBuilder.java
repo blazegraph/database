@@ -107,7 +107,11 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
         // Filters are scoped to the graph pattern group and do not affect
         // bindings external to the group
-        final GroupNodeBase group = graphPattern.buildGroup(new JoinGroupNode());
+        final JoinGroupNode joinGroup = new JoinGroupNode();
+        if (node.jjtGetParent() instanceof ASTGraphGraphPattern) {
+            joinGroup.setContext(parentGP.getContext());
+        }
+        final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
 
         // FIXME [TODO not sure this is the cleanest way of handling this.]
         if (data != null && data instanceof Exists) {
