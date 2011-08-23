@@ -33,12 +33,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
+import org.openrdf.query.parser.sparql.ast.ASTGroupClause;
+import org.openrdf.query.parser.sparql.ast.ASTGroupCondition;
+import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
 import org.openrdf.query.parser.sparql.ast.ASTLimit;
 import org.openrdf.query.parser.sparql.ast.ASTOffset;
+import org.openrdf.query.parser.sparql.ast.ASTOrderClause;
+import org.openrdf.query.parser.sparql.ast.ASTOrderCondition;
 import org.openrdf.query.parser.sparql.ast.ASTProjectionElem;
 import org.openrdf.query.parser.sparql.ast.ASTQuery;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
@@ -50,13 +57,18 @@ import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.GroupByNode;
+import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.OrderByExpr;
+import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -104,12 +116,30 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 //    }
 
     /**
+     * Skip the prolog, any information it contains should already have been
+     * processed.
+     * 
+     * Note: BaseDecl and PrefixDeclList are also on the ASTQueryContainer
+     * node, but they are being ignored here.
+     * 
+     * Note: {@link ASTQuery} is an abstract type. The concrete classes are:
+     * ASTAskQuery, ASTConstructQuery, ASTDescribeQuery, and ASTSelectQuery.
+     * 
      * <pre>
      * ASTQueryContainer QueryContainer():
      * {}
      * {
      *     Prolog() Query() <EOF>
      *     { return jjtThis; }
+     * }
+     * 
+     * void Query() #void :
+     * {}
+     * {
+     *     SelectQuery()
+     * |   ConstructQuery()
+     * |   DescribeQuery()
+     * |   AskQuery()
      * }
      * </pre>
      */
@@ -120,28 +150,6 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
         if (log.isInfoEnabled())
             log.info("\n" + node.dump(">"));
-
-        /**
-         * Skip the prolog, any information it contains should already have been
-         * processed.
-         * 
-         * Note: BaseDecl and PrefixDeclList are also on the ASTQueryContainer
-         * node, but they are being ignored here.
-         * 
-         * Note: ASTQuery is an abstract type. The concrete classes are:
-         * ASTAskQuery, ASTConstructQuery, ASTDescribeQuery, and ASTSelectQuery.
-         * 
-         * <pre>
-         * void Query() #void :
-         * {}
-         * {
-         *     SelectQuery()
-         * |   ConstructQuery()
-         * |   DescribeQuery()
-         * |   AskQuery()
-         * }
-         * </pre>
-         */
 
         return (QueryRoot) node.getQuery().jjtAccept(this, null);
         
@@ -154,9 +162,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      * {@link QueryRoot} or a {@link SubqueryRoot} depending on whether or not
      * the {@link ASTSelectQuery} appears as a top-level query or a subquery.
      * 
-     * FIXME All the aggregate and order by logic needs to be redone.
-     * 
-     * @throws VisitorException
+     * FIXME The aggregate logic needs to be redone.
      */
     @Override
     public QueryBase visit(final ASTSelectQuery node, Object data)
@@ -210,8 +216,8 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
         /*
          * Handle the "WHERE" clause.
          * 
-         * TODO This delegates the translation to a helper visitor, but
-         * delegation may be a problem when we recurse through SubSelect.
+         * Note: This delegates the translation to a helper visitor. A SubSelect
+         * will wind up delegated back to an instance of this visitor.
          */
         {
 
@@ -225,32 +231,151 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        // FIXME GROUP BY / HAVING
+        // Handle GROUP BY
+        {
+
+            final ASTGroupClause groupNode = node.getGroupClause();
+            
+            if (groupNode != null) {
+
+                final GroupByNode groupBy = (GroupByNode) groupNode.jjtAccept(
+                        this, null);
+
+                queryRoot.setGroupBy(groupBy);
+
+            }
+
+        }
+
+        // Handle HAVING.
+        {
+
+            final ASTHavingClause havingClause = node.getHavingClause();
+
+            if (havingClause != null) {
+
+                final HavingNode havingNode = new HavingNode();
+
+                final int nchildren = havingClause.jjtGetNumChildren();
+
+                for (int i = 0; i < nchildren; i++) {
+
+                    /*
+                     * Delegate children to the GroupGraphPatternBuilder (it
+                     * handles ASTConstraint, which is also used in FILTER). It
+                     * will delegate to the ValueExprBuilder to handle the inner
+                     * value expression.
+                     */
+                    final IValueExpressionNode ve = (IValueExpressionNode) havingClause
+                            .jjtGetChild(i).jjtAccept(groupGraphPatternBuilder,
+                                    null/* data */);
+
+                    havingNode.addExpr(ve);
+
+                }
+
+                queryRoot.setHaving(havingNode);
+                
+            }
+            
+        }
         
-//        // FIXME ORDER BY
-//        ASTOrderClause orderNode = node.getOrderClause();
-//        if (orderNode != null) {
-//            List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
-//            tupleExpr = new Order(tupleExpr, orderElemements);
-//        }
+        //      ASTHavingClause havingNode = node.getHavingClause();
+//      if (havingNode != null) {
+//
+//          // add implicit group if necessary
+//          if (!(tupleExpr instanceof Group)) {
+//              tupleExpr = new Group(tupleExpr);
+//          }
+//
+//          // FIXME is the child of a HAVING node always a compare?
+//          Compare condition = (Compare)havingNode.jjtGetChild(0).jjtAccept(this, tupleExpr);
+//
+//          // retrieve any aggregate operators from the condition.
+//          AggregateCollector collector = new AggregateCollector();
+//          collector.meet(condition);
+//
+//          // replace operator occurrences with an anonymous var, and alias it
+//          // to the group
+//          Extension extension = new Extension();
+//          for (AggregateOperator operator : collector.getOperators()) {
+//              VarNode var = context.createAnonVar("-const-" + context.constantVarID++);
+//
+//              // replace occurrence of the operator in the filter condition
+//              // with the variable.
+//              AggregateOperatorReplacer replacer = new AggregateOperatorReplacer(operator, var);
+//              replacer.meet(condition);
+//
+//              String alias = var.getName();
+//
+//              // create an extension linking the operator to the variable
+//              // name.
+//              ExtensionElem pe = new ExtensionElem(operator, alias);
+//              extension.addElement(pe);
+//
+//              // add the aggregate operator to the group.
+//              GroupElem ge = new GroupElem(alias, operator);
+//
+//              // FIXME quite often the aggregate in the HAVING clause will be
+//              // a
+//              // duplicate of an aggregate in the projection. We could perhaps
+//              // optimize for that, to avoid
+//              // having to evaluate twice.
+//              ((Group)tupleExpr).addGroupElement(ge);
+//          }
+//
+//          extension.setArg(tupleExpr);
+//          tupleExpr = new Filter(extension, condition);
+//      }
+
+        // Handle ORDER BY
+        {
+
+            final ASTOrderClause orderNode = node.getOrderClause();
+
+            if (orderNode != null) {
+
+                final OrderByNode orderBy = new OrderByNode();
+
+                final List<OrderByExpr> orderElemements = (List<OrderByExpr>) orderNode
+                        .jjtAccept(this, null);
+
+                for (OrderByExpr orderByExpr : orderElemements)
+                    orderBy.addExpr(orderByExpr);
+
+                queryRoot.setOrderBy(orderBy);
+
+            }
+        
+        }
 
         // Handle SLICE
         {
+
             final ASTLimit theLimit = selectQuery.getLimit();
+            
             final ASTOffset theOffset = selectQuery.getOffset();
+            
             if (theLimit != null || theOffset != null) {
+            
                 final SliceNode theSlice = new SliceNode();
+                
                 if (theLimit != null)
                     theSlice.setLimit(theLimit.getValue());
+                
                 if (theOffset != null)
                     theSlice.setOffset(theOffset.getValue());
+                
                 queryRoot.setSlice(theSlice);
+                
             }
+            
         }
         
         return queryRoot;
 
     }
+    
 //    @Override
 //    public TupleExpr visit(ASTSelectQuery node, Object data)
 //        throws VisitorException
@@ -673,89 +798,66 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 //
 //        return tupleExpr;
 //    }
-//
-//    @Override
-//    public Group visit(ASTGroupClause node, Object data)
-//        throws VisitorException
-//    {
-//        TupleExpr tupleExpr = (TupleExpr)data;
-//        Group g = new Group(tupleExpr);
-//        int childCount = node.jjtGetNumChildren();
-//
-//        List<String> groupBindingNames = new ArrayList<String>();
-//        for (int i = 0; i < childCount; i++) {
-//            String name = (String)node.jjtGetChild(i).jjtAccept(this, g);
-//            groupBindingNames.add(name);
-//        }
-//
-//        g.setGroupBindingNames(groupBindingNames);
-//
-//        return g;
-//    }
-//
-//    @Override
-//    public String visit(ASTGroupCondition node, Object data)
-//        throws VisitorException
-//    {
-//        Group group = (Group)data;
-//        TupleExpr arg = group.getArg();
-//
-//        Extension extension = null;
-//        if (arg instanceof Extension) {
-//            extension = (Extension)arg;
-//        }
-//        else {
-//            extension = new Extension();
-//        }
-//
-//        String name = null;
-//        ValueExpr ve = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, data);
-//        if (ve instanceof Var) {
-//            name = ((Var)ve).getName();
-//        }
-//        else {
-//            if (node.jjtGetNumChildren() > 1) {
-//                Var v = (Var)node.jjtGetChild(1).jjtAccept(this, data);
-//                name = v.getName();
-//            }
-//            else {
-//                // create an alias on the spot
-//                name = createConstVar(null).getName();
-//            }
-//
-//            ExtensionElem elem = new ExtensionElem(ve, name);
-//            extension.addElement(elem);
-//        }
-//
-//        if (extension.getElements().size() > 0 && !(arg instanceof Extension)) {
-//            extension.setArg(arg);
-//            group.setArg(extension);
-//        }
-//
-//        return name;
-//    }
-//
-//    @Override
-//    public List<OrderElem> visit(ASTOrderClause node, Object data)
-//        throws VisitorException
-//    {
-//        int childCount = node.jjtGetNumChildren();
-//        List<OrderElem> elements = new ArrayList<OrderElem>(childCount);
-//
-//        for (int i = 0; i < childCount; i++) {
-//            elements.add((OrderElem)node.jjtGetChild(i).jjtAccept(this, null));
-//        }
-//
-//        return elements;
-//    }
-//
-//    @Override
-//    public OrderElem visit(ASTOrderCondition node, Object data)
-//        throws VisitorException
-//    {
-//        ValueExpr valueExpr = (ValueExpr)node.jjtGetChild(0).jjtAccept(this, null);
-//        return new OrderElem(valueExpr, node.isAscending());
-//    }
+
+    @Override
+    public GroupByNode visit(ASTGroupClause node, Object data)
+            throws VisitorException {
+        
+        final GroupByNode groupBy = new GroupByNode();
+        
+        final int childCount = node.jjtGetNumChildren();
+
+        for (int i = 0; i < childCount; i++) {
+
+            /*
+             * Delegate to the value expression builder. 
+             */
+
+            final AssignmentNode expr = (AssignmentNode) node.jjtGetChild(i)
+                    .jjtAccept(valueExprBuilder, null/* data */);
+
+            groupBy.addExpr((AssignmentNode) expr);
+            
+        }
+
+        return groupBy;
+        
+    }
+
+    @Override
+    public List<OrderByExpr> visit(final ASTOrderClause node, Object data)
+            throws VisitorException {
+        
+        final int childCount = node.jjtGetNumChildren();
+
+        final List<OrderByExpr> elements = new ArrayList<OrderByExpr>(
+                childCount);
+
+        for (int i = 0; i < childCount; i++) {
+
+            elements.add((OrderByExpr) node.jjtGetChild(i)
+                    .jjtAccept(this, null));
+
+        }
+
+        return elements;
+    }
+
+    @Override
+    public OrderByExpr visit(final ASTOrderCondition node, Object data)
+        throws VisitorException
+    {
+
+        /*
+         * Note: Delegate to the ValueExpressionBuilder.
+         */
+
+        final ValueExpressionNode valueExpr = (ValueExpressionNode) node
+                .jjtGetChild(0).jjtAccept(valueExprBuilder, null);
+
+        return new OrderByExpr(valueExpr, node.isAscending());
+        
+    }
 
     @Override
     public Long visit(ASTLimit node, Object data)

@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * AST node models an ORDER BY clause.
@@ -40,18 +40,12 @@ import java.util.Set;
 public class OrderByNode extends SolutionModifierBase implements
         Iterable<OrderByExpr> {
 
-    private final Set<OrderByExpr> orderBy = new LinkedHashSet<OrderByExpr>();
+    private final List<OrderByExpr> orderBy = new LinkedList<OrderByExpr>();
 
     public OrderByNode() {
     }
 
     public void addExpr(final OrderByExpr orderBy) {
-        
-        if (this.orderBy.contains(orderBy)) {
-
-            throw new IllegalArgumentException("duplicate");
-            
-        }
         
         this.orderBy.add(orderBy);
         
@@ -101,6 +95,24 @@ public class OrderByNode extends SolutionModifierBase implements
 
         return sb.toString();
         
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof OrderByNode))
+            return false;
+
+        final OrderByNode t = (OrderByNode) o;
+
+        if (!orderBy.equals(t.orderBy))
+            return false;
+
+        return true;
+
     }
 
 }

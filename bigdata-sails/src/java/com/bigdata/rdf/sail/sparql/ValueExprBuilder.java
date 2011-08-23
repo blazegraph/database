@@ -39,17 +39,15 @@ import org.openrdf.query.parser.sparql.ast.ASTAnd;
 import org.openrdf.query.parser.sparql.ast.ASTAvg;
 import org.openrdf.query.parser.sparql.ast.ASTBNodeFunc;
 import org.openrdf.query.parser.sparql.ast.ASTBind;
-import org.openrdf.query.parser.sparql.ast.ASTBlankNode;
 import org.openrdf.query.parser.sparql.ast.ASTBound;
 import org.openrdf.query.parser.sparql.ast.ASTCoalesce;
 import org.openrdf.query.parser.sparql.ast.ASTCompare;
 import org.openrdf.query.parser.sparql.ast.ASTCount;
 import org.openrdf.query.parser.sparql.ast.ASTDatatype;
 import org.openrdf.query.parser.sparql.ast.ASTExistsFunc;
-import org.openrdf.query.parser.sparql.ast.ASTFalse;
 import org.openrdf.query.parser.sparql.ast.ASTFunctionCall;
 import org.openrdf.query.parser.sparql.ast.ASTGroupConcat;
-import org.openrdf.query.parser.sparql.ast.ASTIRI;
+import org.openrdf.query.parser.sparql.ast.ASTGroupCondition;
 import org.openrdf.query.parser.sparql.ast.ASTIRIFunc;
 import org.openrdf.query.parser.sparql.ast.ASTIf;
 import org.openrdf.query.parser.sparql.ast.ASTIn;
@@ -65,34 +63,21 @@ import org.openrdf.query.parser.sparql.ast.ASTMin;
 import org.openrdf.query.parser.sparql.ast.ASTNot;
 import org.openrdf.query.parser.sparql.ast.ASTNotExistsFunc;
 import org.openrdf.query.parser.sparql.ast.ASTNotIn;
-import org.openrdf.query.parser.sparql.ast.ASTNumericLiteral;
 import org.openrdf.query.parser.sparql.ast.ASTOr;
-import org.openrdf.query.parser.sparql.ast.ASTQName;
-import org.openrdf.query.parser.sparql.ast.ASTRDFLiteral;
 import org.openrdf.query.parser.sparql.ast.ASTRegexExpression;
 import org.openrdf.query.parser.sparql.ast.ASTSameTerm;
 import org.openrdf.query.parser.sparql.ast.ASTSample;
 import org.openrdf.query.parser.sparql.ast.ASTStr;
 import org.openrdf.query.parser.sparql.ast.ASTStrDt;
 import org.openrdf.query.parser.sparql.ast.ASTStrLang;
-import org.openrdf.query.parser.sparql.ast.ASTString;
 import org.openrdf.query.parser.sparql.ast.ASTSum;
-import org.openrdf.query.parser.sparql.ast.ASTTrue;
-import org.openrdf.query.parser.sparql.ast.ASTVar;
 import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -579,6 +564,87 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     }
 
+    /**
+     * Aggregate value expressions in GROUP BY clause. The content of this
+     * production can be a {@link VarNode}, {@link AssignmentNode}, or
+     * {@link FunctionNode} (which handles both built-in functions and extension
+     * functions). However, we always wrap it as an {@link AssignmentNode} and
+     * return that. A {@link VarNode} will just bind itself. A bare
+     * {@link FunctionNode} will bind an anonymous variable.
+     */
+    @Override
+    public AssignmentNode visit(final ASTGroupCondition node, Object data)
+            throws VisitorException {
+        
+        final IValueExpressionNode ve = (IValueExpressionNode) node.jjtGetChild(0)
+                .jjtAccept(this, data);
+
+        if (node.jjtGetNumChildren() == 2) {
+
+            /*
+             * For some reason, the grammar appears to have removed the "AS"
+             * leaving us with just [var, expr] rather than [var, AS, expr] or
+             * [AS(var,expr)] (the latter would be my preference).
+             */
+            
+            final IValueExpressionNode ve2 = (IValueExpressionNode) node
+                    .jjtGetChild(1).jjtAccept(this, data);
+
+            return new AssignmentNode((VarNode) ve, ve2);
+
+        }
+
+//        if (ve instanceof AssignmentNode) {
+//
+//            // Already an assignment.
+//            return (AssignmentNode) ve;
+//
+//        }
+
+        if (ve instanceof VarNode) {
+
+            // Assign to self.
+            return new AssignmentNode((VarNode) ve, (VarNode) ve);
+
+        }
+
+        // Wrap with assignment to an anonymous variable.
+        return new AssignmentNode(context.createAnonVar("groupBy-"
+                + context.constantVarID++), ve);
+
+//        TupleExpr arg = group.getArg();
+//
+//        Extension extension = null;
+//        if (arg instanceof Extension) {
+//            extension = (Extension) arg;
+//        } else {
+//            extension = new Extension();
+//        }
+//
+//        String name = null;
+//        ValueExpr ve = (ValueExpr) node.jjtGetChild(0).jjtAccept(this, data);
+//        if (ve instanceof Var) {
+//            name = ((Var) ve).getName();
+//        } else {
+//            if (node.jjtGetNumChildren() > 1) {
+//                Var v = (Var) node.jjtGetChild(1).jjtAccept(this, data);
+//                name = v.getName();
+//            } else {
+//                // create an alias on the spot
+//                name = createConstVar(null).getName();
+//            }
+//
+//            ExtensionElem elem = new ExtensionElem(ve, name);
+//            extension.addElement(elem);
+//        }
+//
+//        if (extension.getElements().size() > 0 && !(arg instanceof Extension)) {
+//            extension.setArg(arg);
+//            group.setArg(extension);
+//        }
+
+    }
+    
     /*
      * Aggregate functions. Each accepts a scalar boolean "distinct" argument.
      * In addition, COUNT may be used with "*" as the inner expression.

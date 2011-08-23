@@ -43,4 +43,20 @@ public class FunctionNode extends ValueExpressionNode {
 		
 	}
 	
+    @Override
+    public boolean equals(final Object o) {
+
+        if (o == this)
+            return true;
+
+        if (!(o instanceof FunctionNode))
+            return false;
+        
+        if (!super.equals(o))
+            return false;
+
+        return true;
+
+    }
+
 }

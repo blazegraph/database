@@ -52,9 +52,9 @@ public class StrBOp extends IVValueExpression<IV>
     /**
 	 *
 	 */
-    private static final long             serialVersionUID = 3125106876006900339L;
+    private static final long serialVersionUID = 3125106876006900339L;
 
-    private static final transient Logger log              = Logger.getLogger(StrBOp.class);
+    private static final transient Logger log = Logger.getLogger(StrBOp.class);
 
     public interface Annotations extends BOp.Annotations {
 

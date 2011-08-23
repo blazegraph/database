@@ -56,19 +56,21 @@ public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
     public IValueExpression[] getValueExpressions() {
 
         final IValueExpression<?>[] exprs = new IValueExpression[size()];
-        
+
         int i = 0;
-        
-        for(IValueExpressionNode node : this) {
-        
-                exprs[i++] = new Bind(((AssignmentNode)node).getVar(), ((AssignmentNode)node).getValueExpression());
-            
+
+        for (IValueExpressionNode node : this) {
+
+            exprs[i++] = new Bind(((AssignmentNode) node).getVar(),
+                    ((AssignmentNode) node).getValueExpression());
+
         }
-        
+
         return exprs;
         
     }
 
+    @Override
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();
@@ -87,6 +89,19 @@ public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
         return sb.toString();
 
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof GroupByNode))
+            return false;
+
+        return super.equals(o);
+        
     }
 
 }
