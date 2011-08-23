@@ -32,6 +32,7 @@ import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -72,7 +73,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (?s as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -103,7 +104,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (?s + ?o as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -140,7 +141,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (?s < ?o as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -173,7 +174,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select ( <http://xmlns.com/foaf/0.1/> as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -206,7 +207,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
 //        final String sparql = "select ( _:a1 as ?x) where {?s ?p ?o}";
 //
-//        final QueryRoot expected = new QueryRoot();
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
 //        {
 //
 //            final ProjectionNode projection = new ProjectionNode();
@@ -235,7 +236,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (\"abc\" as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -262,7 +263,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (\"12\"^^<http://www.w3.org/2001/XMLSchema#int> as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -291,7 +292,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (count(?s) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -325,7 +326,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (count(distinct ?s) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -362,7 +363,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (count(*) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -396,7 +397,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (count(distinct *) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -434,7 +435,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final String sparql = "select (<" + FunctionRegistry.ADD
                 + ">(?s,?o) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -469,7 +470,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (coalesce(?s,?p,?o) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -505,7 +506,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (if(?s,?p,?o) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -541,7 +542,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select ( regex(?o,\"^ali\") as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -576,7 +577,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select ( regex(?o,\"^ali\", \"i\") as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -614,7 +615,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (?s IN() as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -650,7 +651,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select (?s IN(?p,?o) as ?x) where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();

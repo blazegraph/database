@@ -34,6 +34,7 @@ import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -97,7 +98,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where { }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -126,7 +127,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -158,7 +159,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {GRAPH ?src {?s ?p ?o}}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -194,7 +195,7 @@ public class TestGroupGraphPatternBuilder extends
         final IV<BigdataValue, ?> graphConst = makeIV(valueFactory
                 .createURI("http://www.bigdata.com"));
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -228,7 +229,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o . ?o ?p2 ?s}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -264,7 +265,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o . { ?o ?p2 ?s } }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -311,7 +312,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o . GRAPH ?src { ?o ?p2 ?s } }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -357,7 +358,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where { { ?s ?p ?o } .  { ?o ?p2 ?s } }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -399,7 +400,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where { { ?s ?p ?o } UNION  { ?o ?p2 ?s } }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -441,7 +442,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o OPTIONAL { ?o ?p2 ?s }}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -481,7 +482,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o . FILTER (?s = ?o) }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -521,7 +522,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o ; ?p2 ?o2 }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -559,7 +560,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o , ?o2 , ?o3 . }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -602,7 +603,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where {?s ?p ?o ; ?p2 ?o2 , ?o3}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -648,7 +649,7 @@ public class TestGroupGraphPatternBuilder extends
 
         final String sparql = "select ?s where { {select ?s where { ?s ?p ?o  } } }";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         final SubqueryRoot subSelect;
         {
 

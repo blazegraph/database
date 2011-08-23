@@ -52,12 +52,4 @@ public abstract class QueryNodeBase implements IQueryNode {
         
     }
 
-//    /** FIXME Remove once all classes implement equals(). */
-//    public boolean equals(Object o) {
-//
-//        throw new UnsupportedOperationException(getClass().getName()
-//                + " does not override equals()");
-//        
-//    }
-    
 }

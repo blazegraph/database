@@ -22,25 +22,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2011
+ * Created on Aug 23, 2011
  */
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.IBindingSet;
+
 /**
- * An extension point for external operators which consume and produce solution
- * multisets.
+ * Interface for AST rewrites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ExternalSetNode extends GroupMemberNodeBase {
+public interface IASTOptimizer {
 
-    @Override
-    public String toString(int indent) {
+    /**
+     * Optimize the AST.
+     * 
+     * @param context
+     *            The evaluation context.
+     * @param queryNode
+     *            The AST (in).
+     * @param dataset
+     *            The data set against which the AST will be evaluated.
+     * @param bindingSet
+     *            Optional array of zero or more input solutions.
+     * 
+     * @return The optimized AST.
+     */
+    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
+            DatasetNode dataset, IBindingSet[] bindingSet);
 
-        return indent(indent) + "ExternalSetNode";
-
-    }
-    
 }

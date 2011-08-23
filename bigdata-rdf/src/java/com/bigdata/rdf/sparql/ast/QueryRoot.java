@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.sail.QueryType;
+
 /**
  * The top-level Query.
  * 
@@ -83,8 +85,10 @@ public class QueryRoot extends QueryBase {
     // optional list of subqueries (if any).
     private NamedSubqueriesNode namedSubqueries;
 
-    public QueryRoot() {
-
+    public QueryRoot(final QueryType queryType) {
+        
+        super(queryType);
+        
     }
 
     /**

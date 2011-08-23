@@ -58,7 +58,7 @@ import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
- * Overridden version of the openrdf 2.3 SPARQLParser class which extracts
+ * Overridden version of the openrdf 2.4.2 SPARQLParser class which extracts
  * additional information required by bigdata and associates it with the
  * {@link ParsedQuery}.
  * 
@@ -75,19 +75,19 @@ public class BigdataSPARQLParser implements QueryParser {
      *         Additional information is available by casting the returned
      *         object to that interface.
      */
-    public ParsedQuery parseQuery(String queryStr, String baseURI)
+    public ParsedQuery parseQuery(final String queryStr, final String baseURI)
         throws MalformedQueryException
     {
         try {
-            ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
+            final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
             StringEscapesProcessor.process(qc);
             BaseDeclProcessor.process(qc, baseURI);
-            Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+            final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
             WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
-            TupleExpr tupleExpr = buildQueryModel(qc);
+            final TupleExpr tupleExpr = buildQueryModel(qc);
 
-            ParsedQuery query;
+            final ParsedQuery query;
 
             // Note: Bigdata override.
             final Properties queryHints = getQueryHints(qc);

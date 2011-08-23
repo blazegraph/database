@@ -34,18 +34,46 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
+import org.openrdf.query.algebra.Extension;
+import org.openrdf.query.algebra.ExtensionElem;
+import org.openrdf.query.algebra.Filter;
+import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.MultiProjection;
+import org.openrdf.query.algebra.Projection;
+import org.openrdf.query.algebra.ProjectionElem;
+import org.openrdf.query.algebra.ProjectionElemList;
+import org.openrdf.query.algebra.Reduced;
+import org.openrdf.query.algebra.SameTerm;
+import org.openrdf.query.algebra.StatementPattern;
+import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.Union;
+import org.openrdf.query.algebra.ValueConstant;
+import org.openrdf.query.algebra.ValueExpr;
+import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+import org.openrdf.query.parser.ParsedQuery;
+import org.openrdf.query.parser.serql.ast.ASTConstructQuery;
+import org.openrdf.query.parser.sparql.ast.ASTAskQuery;
+import org.openrdf.query.parser.sparql.ast.ASTBaseDecl;
+import org.openrdf.query.parser.sparql.ast.ASTDescribe;
+import org.openrdf.query.parser.sparql.ast.ASTDescribeQuery;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTGroupClause;
-import org.openrdf.query.parser.sparql.ast.ASTGroupCondition;
 import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
 import org.openrdf.query.parser.sparql.ast.ASTLimit;
 import org.openrdf.query.parser.sparql.ast.ASTOffset;
 import org.openrdf.query.parser.sparql.ast.ASTOrderClause;
 import org.openrdf.query.parser.sparql.ast.ASTOrderCondition;
+import org.openrdf.query.parser.sparql.ast.ASTPrefixDecl;
 import org.openrdf.query.parser.sparql.ast.ASTProjectionElem;
 import org.openrdf.query.parser.sparql.ast.ASTQuery;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
@@ -56,17 +84,23 @@ import org.openrdf.query.parser.sparql.ast.ASTWhereClause;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -102,28 +136,17 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
     }
 
-    /*---------*
-     * Methods *
-     *---------*/
-
-//    @Override
-//    public TupleExpr visit(ASTQueryContainer node, Object data)
-//        throws VisitorException
-//    {
-//        // Skip the prolog, any information it contains should already have been
-//        // processed
-//        return (TupleExpr)node.getQuery().jjtAccept(this, null);
-//    }
-
     /**
-     * Skip the prolog, any information it contains should already have been
-     * processed.
-     * 
-     * Note: BaseDecl and PrefixDeclList are also on the ASTQueryContainer
-     * node, but they are being ignored here.
-     * 
+     * This is the top-level entry point for a SPARQL query.
+     * <p>
+     * Note: {@link ASTBaseDecl} and {@link ASTPrefixDecl}s are available from
+     * the {@link ASTQueryContainer} node. They are being ignored here as they
+     * should have been processed before running the {@link BigdataExprBuilder}.
+     * <p>
      * Note: {@link ASTQuery} is an abstract type. The concrete classes are:
-     * ASTAskQuery, ASTConstructQuery, ASTDescribeQuery, and ASTSelectQuery.
+     * {@link ASTAskQuery}, {@link ASTConstructQuery}, {@link ASTDescribeQuery},
+     * and {@link ASTSelectQuery}. This method will wind up delegating to the
+     * visitor method for the appropriate concrete {@link ASTQuery} instance.
      * 
      * <pre>
      * ASTQueryContainer QueryContainer():
@@ -133,6 +156,23 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      *     { return jjtThis; }
      * }
      * 
+     * void Prolog() #void :
+     * {}
+     * {
+     *     [ BaseDecl() ] ( PrefixDecl() )*
+     * }
+     * 
+     * void BaseDecl() :
+     * { Token t; }
+     * {
+     *     <BASE> t = <Q_IRI_REF> {jjtThis.setIRI(_trimString(t.image, 1));}
+     * }
+     * 
+     * void PrefixDecl() :
+     * { Token prefix; }
+     * {
+     *     <PREFIX> prefix = <PNAME_NS> IRI()
+     * }
      * void Query() #void :
      * {}
      * {
@@ -145,15 +185,18 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      */
     @Override
     public QueryRoot visit(final ASTQueryContainer node, final Object data)
-        throws VisitorException
-    {
+            throws VisitorException {
 
         if (log.isInfoEnabled())
             log.info("\n" + node.dump(">"));
 
         return (QueryRoot) node.getQuery().jjtAccept(this, null);
-        
+
     }
+
+    //
+    // ASTQuery visitor methods for SELECT, ASK, DESCRIBE and CONSTRUCT.
+    //
     
     /**
      * This is the entry point for both a top-level SELECT and a SubSelect. The
@@ -161,22 +204,18 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      * <code>null</code> if this is a SubSelect. The method returns either a
      * {@link QueryRoot} or a {@link SubqueryRoot} depending on whether or not
      * the {@link ASTSelectQuery} appears as a top-level query or a subquery.
-     * 
-     * FIXME The aggregate logic needs to be redone.
      */
     @Override
-    public QueryBase visit(final ASTSelectQuery node, Object data)
+    public QueryBase visit(final ASTSelectQuery astQuery, Object data)
             throws VisitorException {
 
-        final QueryBase queryRoot = data == null ? new QueryRoot()
-                : new SubqueryRoot();
-        
-        final ASTSelectQuery selectQuery = node;
+        final QueryBase queryRoot = data == null ? new QueryRoot(
+                QueryType.SELECT) : new SubqueryRoot();
 
         /*
-         * PROJECTION.
+         * Handle SELECT expressions.
          */
-        final ASTSelect select = selectQuery.getSelect();
+        final ASTSelect select = astQuery.getSelect();
         final ProjectionNode projection = new ProjectionNode();
         queryRoot.setProjection(projection);
         if (select.isDistinct())
@@ -213,594 +252,453 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             }
         }
 
-        /*
-         * Handle the "WHERE" clause.
-         * 
-         * Note: This delegates the translation to a helper visitor. A SubSelect
-         * will wind up delegated back to an instance of this visitor.
-         */
-        {
-
-            final ASTWhereClause whereClause = selectQuery.getWhereClause();
-
-            final ASTGraphPatternGroup graphPatternGroup = whereClause
-                    .getGraphPatternGroup();
-
-            queryRoot.setWhereClause((IGroupNode) graphPatternGroup.jjtAccept(
-                    groupGraphPatternBuilder, null/* data */));
-
-        }
-
-        // Handle GROUP BY
-        {
-
-            final ASTGroupClause groupNode = node.getGroupClause();
-            
-            if (groupNode != null) {
-
-                final GroupByNode groupBy = (GroupByNode) groupNode.jjtAccept(
-                        this, null);
-
-                queryRoot.setGroupBy(groupBy);
-
-            }
-
-        }
-
-        // Handle HAVING.
-        {
-
-            final ASTHavingClause havingClause = node.getHavingClause();
-
-            if (havingClause != null) {
-
-                final HavingNode havingNode = new HavingNode();
-
-                final int nchildren = havingClause.jjtGetNumChildren();
-
-                for (int i = 0; i < nchildren; i++) {
-
-                    /*
-                     * Delegate children to the GroupGraphPatternBuilder (it
-                     * handles ASTConstraint, which is also used in FILTER). It
-                     * will delegate to the ValueExprBuilder to handle the inner
-                     * value expression.
-                     */
-                    final IValueExpressionNode ve = (IValueExpressionNode) havingClause
-                            .jjtGetChild(i).jjtAccept(groupGraphPatternBuilder,
-                                    null/* data */);
-
-                    havingNode.addExpr(ve);
-
-                }
-
-                queryRoot.setHaving(havingNode);
-                
-            }
-            
-        }
+        handleWhereClause(astQuery, queryRoot);
         
-        //      ASTHavingClause havingNode = node.getHavingClause();
-//      if (havingNode != null) {
-//
-//          // add implicit group if necessary
-//          if (!(tupleExpr instanceof Group)) {
-//              tupleExpr = new Group(tupleExpr);
-//          }
-//
-//          // FIXME is the child of a HAVING node always a compare?
-//          Compare condition = (Compare)havingNode.jjtGetChild(0).jjtAccept(this, tupleExpr);
-//
-//          // retrieve any aggregate operators from the condition.
-//          AggregateCollector collector = new AggregateCollector();
-//          collector.meet(condition);
-//
-//          // replace operator occurrences with an anonymous var, and alias it
-//          // to the group
-//          Extension extension = new Extension();
-//          for (AggregateOperator operator : collector.getOperators()) {
-//              VarNode var = context.createAnonVar("-const-" + context.constantVarID++);
-//
-//              // replace occurrence of the operator in the filter condition
-//              // with the variable.
-//              AggregateOperatorReplacer replacer = new AggregateOperatorReplacer(operator, var);
-//              replacer.meet(condition);
-//
-//              String alias = var.getName();
-//
-//              // create an extension linking the operator to the variable
-//              // name.
-//              ExtensionElem pe = new ExtensionElem(operator, alias);
-//              extension.addElement(pe);
-//
-//              // add the aggregate operator to the group.
-//              GroupElem ge = new GroupElem(alias, operator);
-//
-//              // FIXME quite often the aggregate in the HAVING clause will be
-//              // a
-//              // duplicate of an aggregate in the projection. We could perhaps
-//              // optimize for that, to avoid
-//              // having to evaluate twice.
-//              ((Group)tupleExpr).addGroupElement(ge);
-//          }
-//
-//          extension.setArg(tupleExpr);
-//          tupleExpr = new Filter(extension, condition);
-//      }
+        handleGroupBy(astQuery, queryRoot);
 
-        // Handle ORDER BY
-        {
+        handleHaving(astQuery, queryRoot);
 
-            final ASTOrderClause orderNode = node.getOrderClause();
-
-            if (orderNode != null) {
-
-                final OrderByNode orderBy = new OrderByNode();
-
-                final List<OrderByExpr> orderElemements = (List<OrderByExpr>) orderNode
-                        .jjtAccept(this, null);
-
-                for (OrderByExpr orderByExpr : orderElemements)
-                    orderBy.addExpr(orderByExpr);
-
-                queryRoot.setOrderBy(orderBy);
-
-            }
+        handleOrderBy(astQuery, queryRoot);
         
-        }
-
-        // Handle SLICE
-        {
-
-            final ASTLimit theLimit = selectQuery.getLimit();
-            
-            final ASTOffset theOffset = selectQuery.getOffset();
-            
-            if (theLimit != null || theOffset != null) {
-            
-                final SliceNode theSlice = new SliceNode();
-                
-                if (theLimit != null)
-                    theSlice.setLimit(theLimit.getValue());
-                
-                if (theOffset != null)
-                    theSlice.setOffset(theOffset.getValue());
-                
-                queryRoot.setSlice(theSlice);
-                
-            }
-            
-        }
+        handleSlice(astQuery, queryRoot);
         
         return queryRoot;
 
     }
-    
-//    @Override
-//    public TupleExpr visit(ASTSelectQuery node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//
-//        // Start with building the graph pattern
-//        graphPattern = new GraphPattern();
-//        node.getWhereClause().jjtAccept(this, null);
-//        TupleExpr tupleExpr = graphPattern.buildTupleExpr();
-//
-//        // Apply grouping
-//        ASTGroupClause groupNode = node.getGroupClause();
-//        if (groupNode != null) {
-//
-//            tupleExpr = (TupleExpr)groupNode.jjtAccept(this, tupleExpr);
-//        }
-//
-//        // Apply HAVING group filter condition
-//        ASTHavingClause havingNode = node.getHavingClause();
-//        if (havingNode != null) {
-//
-//            // add implicit group if necessary
-//            if (!(tupleExpr instanceof Group)) {
-//                tupleExpr = new Group(tupleExpr);
-//            }
-//
-//            // FIXME is the child of a HAVING node always a compare?
-//            Compare condition = (Compare)havingNode.jjtGetChild(0).jjtAccept(this, tupleExpr);
-//
-//            // retrieve any aggregate operators from the condition.
-//            AggregateCollector collector = new AggregateCollector();
-//            collector.meet(condition);
-//
-//            // replace operator occurrences with an anonymous var, and alias it
-//            // to the group
-//            Extension extension = new Extension();
-//            for (AggregateOperator operator : collector.getOperators()) {
-//                VarNode var = context.createAnonVar("-const-" + context.constantVarID++);
-//
-//                // replace occurrence of the operator in the filter condition
-//                // with the variable.
-//                AggregateOperatorReplacer replacer = new AggregateOperatorReplacer(operator, var);
-//                replacer.meet(condition);
-//
-//                String alias = var.getName();
-//
-//                // create an extension linking the operator to the variable
-//                // name.
-//                ExtensionElem pe = new ExtensionElem(operator, alias);
-//                extension.addElement(pe);
-//
-//                // add the aggregate operator to the group.
-//                GroupElem ge = new GroupElem(alias, operator);
-//
-//                // FIXME quite often the aggregate in the HAVING clause will be
-//                // a
-//                // duplicate of an aggregate in the projection. We could perhaps
-//                // optimize for that, to avoid
-//                // having to evaluate twice.
-//                ((Group)tupleExpr).addGroupElement(ge);
-//            }
-//
-//            extension.setArg(tupleExpr);
-//            tupleExpr = new Filter(extension, condition);
-//        }
-//
-//        // Apply result ordering
-//        ASTOrderClause orderNode = node.getOrderClause();
-//        if (orderNode != null) {
-//            List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
-//            tupleExpr = new Order(tupleExpr, orderElemements);
-//        }
-//
-//        // Apply projection
-//        tupleExpr = (TupleExpr)node.getSelect().jjtAccept(this, tupleExpr);
-//
-//        // Process limit and offset clauses
-//        ASTLimit limitNode = node.getLimit();
-//        long limit = -1L;
-//        if (limitNode != null) {
-//            limit = (Long)limitNode.jjtAccept(this, null);
-//        }
-//
-//        ASTOffset offsetNode = node.getOffset();
-//        long offset = -1L;
-//        if (offsetNode != null) {
-//            offset = (Long)offsetNode.jjtAccept(this, null);
-//        }
-//
-//        if (offset >= 1L || limit >= 0L) {
-//            tupleExpr = new Slice(tupleExpr, offset, limit);
-//        }
-//
-//        if (parentGP != null) {
-//            parentGP.addRequiredTE(tupleExpr);
-//            graphPattern = parentGP;
-//        }
-//
-//        return tupleExpr;
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTSelect node, Object data)
-//        throws VisitorException
-//    {
-//        TupleExpr result = (TupleExpr)data;
-//
-//        Extension extension = new Extension();
-//
-//        ProjectionElemList projElemList = new ProjectionElemList();
-//
-//        for (ASTProjectionElem projElemNode : node.getProjectionElemList()) {
-//
-//            Node child = projElemNode.jjtGetChild(0);
-//
-//            String alias = projElemNode.getAlias();
-//            if (alias != null) {
-//                // aliased projection element
-//                ValueExpr valueExpr = (ValueExpr)child.jjtAccept(this, null);
-//
-//                projElemList.addElement(new ProjectionElem(alias));
-//
-//                if (valueExpr instanceof AggregateOperator) {
-//                    // Apply implicit grouping if necessary
-//                    GroupFinder groupFinder = new GroupFinder();
-//                    result.visit(groupFinder);
-//                    Group group = groupFinder.getGroup();
-//
-//                    boolean existingGroup = true;
-//                    if (group == null) {
-//                        group = new Group(result);
-//                        existingGroup = false;
-//                    }
-//
-//                    group.addGroupElement(new GroupElem(alias, (AggregateOperator)valueExpr));
-//
-//                    extension.setArg(group);
-//
-//                    if (!existingGroup) {
-//                        result = group;
-//                    }
-//                }
-//                extension.addElement(new ExtensionElem(valueExpr, alias));
-//            }
-//            else if (child instanceof ASTVar) {
-//                Var projVar = (Var)child.jjtAccept(this, null);
-//                projElemList.addElement(new ProjectionElem(projVar.getName()));
-//            }
-//            else {
-//                throw new IllegalStateException("required alias for non-Var projection elements not found");
-//            }
-//        }
-//
-//        if (!extension.getElements().isEmpty()) {
-//            extension.setArg(result);
-//            result = extension;
-//        }
-//
-//        result = new Projection(result, projElemList);
-//
-//        if (node.isDistinct()) {
-//            result = new Distinct(result);
-//        }
-//        else if (node.isReduced()) {
-//            result = new Reduced(result);
-//        }
-//
-//        return result;
-//    }
-//
-//    private class GroupFinder extends QueryModelVisitorBase<VisitorException> {
-//
-//        private Group group;
-//
-//        @Override 
-//        public void meet(Projection projection) {
-//            // stop tree traversal on finding a projection: we do not wish to find the group in a sub-select.
-//        }
-//        
-//        @Override
-//        public void meet(Group group) {
-//            this.group = group;
-//        }
-//
-//        public Group getGroup() {
-//            return group;
-//        }
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTConstructQuery node, Object data)
-//        throws VisitorException
-//    {
-//        // Start with building the graph pattern
-//        graphPattern = new GraphPattern();
-//        node.getWhereClause().jjtAccept(this, null);
-//        TupleExpr tupleExpr = graphPattern.buildTupleExpr();
-//
-//        // Apply result ordering
-//        ASTOrderClause orderNode = node.getOrderClause();
-//        if (orderNode != null) {
-//            List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
-//            tupleExpr = new Order(tupleExpr, orderElemements);
-//        }
-//
-//        // Process construct clause
-//        ASTConstruct constructNode = node.getConstruct();
-//        if (!constructNode.isWildcard()) {
-//            tupleExpr = (TupleExpr)constructNode.jjtAccept(this, tupleExpr);
-//        }
-//        else {
-//            // create construct clause from graph pattern.
-//            ConstructorBuilder cb = new ConstructorBuilder();
-//
-//            // SPARQL does not allow distinct or reduced right now. Leaving
-//            // functionality in construct builder for
-//            // possible future use.
-//            tupleExpr = cb.buildConstructor(tupleExpr, false, false);
-//        }
-//
-//        // process limit and offset clauses
-//        ASTLimit limitNode = node.getLimit();
-//        long limit = -1L;
-//        if (limitNode != null) {
-//            limit = (Long)limitNode.jjtAccept(this, null);
-//        }
-//
-//        ASTOffset offsetNode = node.getOffset();
-//        long offset = -1;
-//        if (offsetNode != null) {
-//            offset = (Long)offsetNode.jjtAccept(this, null);
-//        }
-//
-//        if (offset >= 1 || limit >= 0) {
-//            tupleExpr = new Slice(tupleExpr, offset, limit);
-//        }
-//
-//        return tupleExpr;
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTConstruct node, Object data)
-//        throws VisitorException
-//    {
-//        TupleExpr result = (TupleExpr)data;
-//
-//        // Collect construct triples
-//        graphPattern = new GraphPattern();
-//        super.visit(node, null);
-//        TupleExpr constructExpr = graphPattern.buildTupleExpr();
-//
-//        // Retrieve all StatementPattern's from the construct expression
-//        List<StatementPattern> statementPatterns = StatementPatternCollector.process(constructExpr);
-//
-//        Set<Var> constructVars = getConstructVars(statementPatterns);
-//
-//        // Create BNodeGenerator's for all anonymous variables
-//        Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
-//
-//        for (Var var : constructVars) {
-//            if (var.isAnonymous() && !extElemMap.containsKey(var)) {
-//                ValueExpr valueExpr;
-//
-//                if (var.hasValue()) {
-//                    valueExpr = new ValueConstant(var.getValue());
-//                }
-//                else {
-//                    valueExpr = new BNodeGenerator();
-//                }
-//
-//                extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
-//            }
-//        }
-//
-//        if (!extElemMap.isEmpty()) {
-//            result = new Extension(result, extElemMap.values());
-//        }
-//
-//        // Create a Projection for each StatementPattern in the constructor
-//        List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
-//
-//        for (StatementPattern sp : statementPatterns) {
-//            ProjectionElemList projElemList = new ProjectionElemList();
-//
-//            projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
-//            projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
-//            projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
-//
-//            projList.add(projElemList);
-//        }
-//
-//        if (projList.size() == 1) {
-//            result = new Projection(result, projList.get(0));
-//        }
-//        else if (projList.size() > 1) {
-//            result = new MultiProjection(result, projList);
-//        }
-//        else {
-//            // Empty constructor
-//            result = new EmptySet();
-//        }
-//
-//        return new Reduced(result);
-//    }
-//
-//    /**
-//     * Gets the set of variables that are relevant for the constructor. This
-//     * method accumulates all subject, predicate and object variables from the
-//     * supplied statement patterns, but ignores any context variables.
-//     */
-//    private Set<Var> getConstructVars(Collection<StatementPattern> statementPatterns) {
-//        Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
-//
-//        for (StatementPattern sp : statementPatterns) {
-//            vars.add(sp.getSubjectVar());
-//            vars.add(sp.getPredicateVar());
-//            vars.add(sp.getObjectVar());
-//        }
-//
-//        return vars;
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTDescribeQuery node, Object data)
-//        throws VisitorException
-//    {
-//        TupleExpr tupleExpr = null;
-//
-//        if (node.getWhereClause() != null) {
-//            // Start with building the graph pattern
-//            graphPattern = new GraphPattern();
-//            node.getWhereClause().jjtAccept(this, null);
-//            tupleExpr = graphPattern.buildTupleExpr();
-//
-//            // Apply result ordering
-//            ASTOrderClause orderNode = node.getOrderClause();
-//            if (orderNode != null) {
-//                List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
-//                tupleExpr = new Order(tupleExpr, orderElemements);
-//            }
-//
-//            // Process limit and offset clauses
-//            ASTLimit limitNode = node.getLimit();
-//            long limit = -1;
-//            if (limitNode != null) {
-//                limit = (Long)limitNode.jjtAccept(this, null);
-//            }
-//
-//            ASTOffset offsetNode = node.getOffset();
-//            long offset = -1;
-//            if (offsetNode != null) {
-//                offset = (Long)offsetNode.jjtAccept(this, null);
-//            }
-//
-//            if (offset >= 1 || limit >= 0) {
-//                tupleExpr = new Slice(tupleExpr, offset, limit);
-//            }
-//        }
-//
-//        // Process describe clause last
-//        return (TupleExpr)node.getDescribe().jjtAccept(this, tupleExpr);
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTDescribe node, Object data)
-//        throws VisitorException
-//    {
-//        TupleExpr result = (TupleExpr)data;
-//
-//        // Create a graph query that produces the statements that have the
-//        // requests resources as subject or object
-//        Var subjVar = createAnonVar("-descr-subj");
-//        Var predVar = createAnonVar("-descr-pred");
-//        Var objVar = createAnonVar("-descr-obj");
-//        StatementPattern sp = new StatementPattern(subjVar, predVar, objVar);
-//
-//        if (result == null) {
-//            result = sp;
-//        }
-//        else {
-//            result = new Join(result, sp);
-//        }
-//
-//        List<SameTerm> sameTerms = new ArrayList<SameTerm>(2 * node.jjtGetNumChildren());
-//
-//        for (int i = 0; i < node.jjtGetNumChildren(); i++) {
-//            ValueExpr resource = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
-//
-//            sameTerms.add(new SameTerm(subjVar.clone(), resource));
-//            sameTerms.add(new SameTerm(objVar.clone(), resource));
-//        }
-//
-//        ValueExpr constraint = sameTerms.get(0);
-//        for (int i = 1; i < sameTerms.size(); i++) {
-//            constraint = new Or(constraint, sameTerms.get(i));
-//        }
-//
-//        result = new Filter(result, constraint);
-//
-//        ProjectionElemList projElemList = new ProjectionElemList();
-//        projElemList.addElement(new ProjectionElem(subjVar.getName(), "subject"));
-//        projElemList.addElement(new ProjectionElem(predVar.getName(), "predicate"));
-//        projElemList.addElement(new ProjectionElem(objVar.getName(), "object"));
-//        result = new Projection(result, projElemList);
-//
-//        return new Reduced(result);
-//    }
-//
-//    @Override
-//    public TupleExpr visit(ASTAskQuery node, Object data)
-//        throws VisitorException
-//    {
-//        graphPattern = new GraphPattern();
-//
-//        super.visit(node, null);
-//
-//        TupleExpr tupleExpr = graphPattern.buildTupleExpr();
-//        tupleExpr = new Slice(tupleExpr, 0, 1);
-//
-//        return tupleExpr;
-//    }
 
+    /**
+     * ASK query.
+     */
     @Override
-    public GroupByNode visit(ASTGroupClause node, Object data)
+    public QueryBase visit(final ASTAskQuery node, Object data)
+            throws VisitorException {
+
+        final QueryBase queryRoot = data == null ? new QueryRoot(QueryType.ASK)
+                : new SubqueryRoot();
+
+        /*
+         * Note: Nothing is projected.
+         */
+        
+        handleWhereClause(node, queryRoot);
+
+        /*
+         * Note: GROUP BY and HAVING are not currently permitted by the SPARQL
+         * 1.1 grammar. This means that you can not place a constraint on
+         * aggregates in an ASK query.
+         */
+        
+//      handleGroupBy(node, queryRoot);
+//
+//      handleHaving(node, queryRoot);
+
+        /*
+         * Note: At most one solution.
+         */
+        
+        final SliceNode slice = new SliceNode(0L/* offset */, 1L/* limit */);
+
+        queryRoot.setSlice(slice);
+        
+        return queryRoot;
+        
+    }
+
+    /**
+     * DESCRIBE query.
+     * <p>
+     * Note: The openrdf parser has a "Describe" production which is not in the
+     * SPARQL 1.1 grammar (it is an equivalent grammar in that it accepts the
+     * same inputs). This means that the "projection" part of the DESCRIBE query
+     * is visited on the {@link ASTDescribe} node.
+     */
+    @Override
+    public QueryBase visit(final ASTDescribeQuery node, Object data)
+            throws VisitorException {
+
+        final QueryBase queryRoot = data == null ? new QueryRoot(
+                QueryType.DESCRIBE) : new SubqueryRoot();
+
+        // Process describe clause
+        node.getDescribe().jjtAccept(this, queryRoot);
+
+        handleWhereClause(node, queryRoot);
+        
+        handleGroupBy(node, queryRoot);
+
+        handleHaving(node, queryRoot);
+
+        handleOrderBy(node, queryRoot);
+        
+        handleSlice(node, queryRoot);
+
+        return queryRoot;
+        
+    }
+
+    /**
+     * This is the "projection" part of the DESCRIBE query. This code marks the
+     * query as a "DESCRIBE", generates the appropriate joins to "describe" the
+     * resources, attaches constraints on those joins, and attaches an
+     * appropriate {@link ProjectionNode} to the {@link QueryBase}.
+     * 
+     * @param
+     * @param data
+     *            The {@link QueryBase}.
+     * 
+     *            FIXME Is this efficient? It models the Sesame DESCRIBE and I
+     *            know that the tuple expression generated by Sesame used to be
+     *            very inefficient. Bigdata has rewrite logic for that somewhere
+     *            which should be used here instead. Also, attach construct
+     *            template to the {@link QueryBase} here?
+     */
+    @Override
+    public Void visit(final ASTDescribe node, Object data)
+            throws VisitorException {
+        
+        final QueryBase queryRoot = (QueryBase) data;
+        
+        /*
+         * Create a graph query that produces the statements that have the
+         * requests resources as subject or object.
+         */
+        
+        final VarNode subjVar = context.createAnonVar("-descr-subj");
+        final VarNode predVar = context.createAnonVar("-descr-pred");
+        final VarNode objVar = context.createAnonVar("-descr-obj");
+        final StatementPatternNode sp = new StatementPatternNode(subjVar,
+                predVar, objVar);
+
+        /*
+         * Add the statement pattern to the where clause so it is joined with
+         * whatever was already specified in the where clause. If there is no
+         * where clause, then we will create an empty join group and add the
+         * statement pattern to that.
+         */
+        IGroupNode whereClause = queryRoot.getWhereClause();
+        if (whereClause == null) {
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+        }
+        whereClause.addChild(sp);
+
+        /*
+         * Setup SameTerm constraints for each variable or IRI in the "DESCRIBE"
+         * clause.
+         */
+        {
+
+            final int nchildren = node.jjtGetNumChildren();
+
+            final FunctionNode sameTerms[] = new FunctionNode[2 * nchildren];
+
+            for (int i = 0, j = 0; i < nchildren; i++) {
+
+                /*
+                 * Note: Delegates to the ValueExprBuilder. Can visit VarNode or
+                 * ConstantNode(IV<URI,_>).
+                 */
+
+                final ValueExpressionNode resource = (ValueExpressionNode) node
+                        .jjtGetChild(i).jjtAccept(valueExprBuilder, null);
+
+                sameTerms[j++] = new FunctionNode(context.lex,
+                        FunctionRegistry.SAME_TERM, null/* scalarValues */,
+                        new ValueExpressionNode[] { subjVar, resource });
+
+                sameTerms[j++] = new FunctionNode(context.lex,
+                        FunctionRegistry.SAME_TERM, null/* scalarValues */,
+                        new ValueExpressionNode[] { objVar, resource });
+
+            }
+
+            final ValueExpressionNode constraint = new FunctionNode(
+                    context.lex, FunctionRegistry.IN, null/* scalarValues */,
+                    sameTerms);
+
+            whereClause.addChild(new FilterNode(constraint));
+
+        }
+
+        final ProjectionNode projection = new ProjectionNode();
+        projection.setReduced(true);
+        projection.addProjectionVar(subjVar);
+        projection.addProjectionVar(predVar);
+        projection.addProjectionVar(objVar);
+        queryRoot.setProjection(projection);
+
+        return null;
+        
+    }
+
+    // FIXME Incorporate this in place of the Sesame DESCRIBE query generation.
+//    protected void optimizeDescribe() {
+//        try {
+//            ParsedQuery parsedQuery = getParsedQuery();
+//            TupleExpr node = parsedQuery.getTupleExpr();
+//            if (log.isInfoEnabled())
+//                log.info(node);
+//            node = ((Reduced) node).getArg();
+//            node = ((Projection) node).getArg();
+//            ValueExpr ve = ((Filter) node).getCondition();
+//            node = ((Filter) node).getArg();
+//            if (node instanceof Join) {
+//                node = ((Join) node).getLeftArg();
+//                final Set<Var> vars = new HashSet<Var>();
+//                ve.visitChildren(new QueryModelVisitorBase() {
+//                    @Override
+//                    public void meet(SameTerm same) throws Exception {
+//                        Var var = (Var) same.getRightArg();
+//                        vars.add(var);
+//                    }
+//                });
+//                Collection<StatementPattern> sps = new LinkedList<StatementPattern>();
+//                Collection<ProjectionElemList> projElemLists = 
+//                    new LinkedList<ProjectionElemList>();
+//                for (Var v : vars) {
+//                    {
+//                        Var p = createAnonVar("-p" + v.getName() + "-1");
+//                        Var o = createAnonVar("-o" + v.getName());
+//                        StatementPattern sp = new StatementPattern(v, p, o);
+//                        sps.add(sp);
+//                        ProjectionElemList projElemList = new ProjectionElemList();
+//                        projElemList.addElement(new ProjectionElem(v.getName(), "subject"));
+//                        projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                        projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                        projElemLists.add(projElemList);
+//                    }
+//                    {
+//                        Var s = createAnonVar("-s" + v.getName());
+//                        Var p = createAnonVar("-p" + v.getName() + "-2");
+//                        StatementPattern sp = new StatementPattern(s, p, v);
+//                        sps.add(sp);
+//                        ProjectionElemList projElemList = new ProjectionElemList();
+//                        projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                        projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                        projElemList.addElement(new ProjectionElem(v.getName(), "object"));
+//                        projElemLists.add(projElemList);
+//                    }
+//                }
+//                Iterator<StatementPattern> it = sps.iterator();
+//                Union union = new Union(it.next(), it.next());
+//                while (it.hasNext()) {
+//                    union = new Union(union, it.next());
+//                }
+//                node = new Join(node, union);
+//                node = new MultiProjection(node, projElemLists);
+//                node = new Reduced(node);
+//                parsedQuery.setTupleExpr(node);
+//            } else {
+//                final Set<ValueConstant> vals = new HashSet<ValueConstant>();
+//                ve.visitChildren(new QueryModelVisitorBase() {
+//                    @Override
+//                    public void meet(SameTerm same) throws Exception {
+//                        ValueConstant val = (ValueConstant) same.getRightArg();
+//                        vals.add(val);
+//                    }
+//                });
+//                Collection<StatementPattern> joins = new LinkedList<StatementPattern>();
+//                Collection<ProjectionElemList> projElemLists = 
+//                    new LinkedList<ProjectionElemList>();
+//                Collection<ExtensionElem> extElems = new LinkedList<ExtensionElem>();
+//                int i = 0;
+//                int constVarID = 1;
+//                for (ValueConstant v : vals) {
+//                    {
+//                        Var s = createConstVar(v.getValue(), constVarID++);
+//                        Var p = createAnonVar("-p" + i + "-1");
+//                        Var o = createAnonVar("-o" + i);
+//                        StatementPattern sp = new StatementPattern(s, p, o);
+//                        joins.add(sp);
+//                        ProjectionElemList projElemList = new ProjectionElemList();
+//                        projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                        projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                        projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                        projElemLists.add(projElemList);
+//                        extElems.add(new ExtensionElem(v, s.getName()));
+//                    }
+//                    {
+//                        Var s = createAnonVar("-s" + i);
+//                        Var p = createAnonVar("-p" + i + "-2");
+//                        Var o = createConstVar(v.getValue(), constVarID++);
+//                        StatementPattern sp = new StatementPattern(s, p, o);
+//                        joins.add(sp);
+//                        ProjectionElemList projElemList = new ProjectionElemList();
+//                        projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                        projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                        projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                        projElemLists.add(projElemList);
+//                        extElems.add(new ExtensionElem(v, o.getName()));
+//                    }
+//                    i++;
+//                }
+//                Iterator<StatementPattern> it = joins.iterator();
+//                node = it.next();
+//                while (it.hasNext()) {
+//                    StatementPattern j = it.next();
+//                    node = new Union(j, node);
+//                }
+//                node = new Extension(node, extElems);
+//                node = new MultiProjection(node, projElemLists);
+//                node = new Reduced(node);
+//                parsedQuery.setTupleExpr(node);
+//            }
+//        } catch (Exception ex) {
+//            throw new RuntimeException(ex);
+//        }
+//    }
+//
+//    private Var createConstVar(Value value, int constantVarID) {
+//        Var var = createAnonVar("-const-" + constantVarID);
+//        var.setValue(value);
+//        return var;
+//    }
+//
+//    private Var createAnonVar(String varName) {
+//        Var var = new Var(varName);
+//        var.setAnonymous(true);
+//        return var;
+//    }
+        
+//  @Override
+//  public TupleExpr visit(ASTConstructQuery node, Object data)
+//      throws VisitorException
+//  {
+//      // Start with building the graph pattern
+//      graphPattern = new GraphPattern();
+//      node.getWhereClause().jjtAccept(this, null);
+//      TupleExpr tupleExpr = graphPattern.buildTupleExpr();
+//
+//      // Apply result ordering
+//      ASTOrderClause orderNode = node.getOrderClause();
+//      if (orderNode != null) {
+//          List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
+//          tupleExpr = new Order(tupleExpr, orderElemements);
+//      }
+//
+//      // Process construct clause
+//      ASTConstruct constructNode = node.getConstruct();
+//      if (!constructNode.isWildcard()) {
+//          tupleExpr = (TupleExpr)constructNode.jjtAccept(this, tupleExpr);
+//      }
+//      else {
+//          // create construct clause from graph pattern.
+//          ConstructorBuilder cb = new ConstructorBuilder();
+//
+//          // SPARQL does not allow distinct or reduced right now. Leaving
+//          // functionality in construct builder for
+//          // possible future use.
+//          tupleExpr = cb.buildConstructor(tupleExpr, false, false);
+//      }
+//
+//      // process limit and offset clauses
+//      ASTLimit limitNode = node.getLimit();
+//      long limit = -1L;
+//      if (limitNode != null) {
+//          limit = (Long)limitNode.jjtAccept(this, null);
+//      }
+//
+//      ASTOffset offsetNode = node.getOffset();
+//      long offset = -1;
+//      if (offsetNode != null) {
+//          offset = (Long)offsetNode.jjtAccept(this, null);
+//      }
+//
+//      if (offset >= 1 || limit >= 0) {
+//          tupleExpr = new Slice(tupleExpr, offset, limit);
+//      }
+//
+//      return tupleExpr;
+//  }
+//
+//  @Override
+//  public TupleExpr visit(ASTConstruct node, Object data)
+//      throws VisitorException
+//  {
+//      TupleExpr result = (TupleExpr)data;
+//
+//      // Collect construct triples
+//      graphPattern = new GraphPattern();
+//      super.visit(node, null);
+//      TupleExpr constructExpr = graphPattern.buildTupleExpr();
+//
+//      // Retrieve all StatementPattern's from the construct expression
+//      List<StatementPattern> statementPatterns = StatementPatternCollector.process(constructExpr);
+//
+//      Set<Var> constructVars = getConstructVars(statementPatterns);
+//
+//      // Create BNodeGenerator's for all anonymous variables
+//      Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
+//
+//      for (Var var : constructVars) {
+//          if (var.isAnonymous() && !extElemMap.containsKey(var)) {
+//              ValueExpr valueExpr;
+//
+//              if (var.hasValue()) {
+//                  valueExpr = new ValueConstant(var.getValue());
+//              }
+//              else {
+//                  valueExpr = new BNodeGenerator();
+//              }
+//
+//              extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
+//          }
+//      }
+//
+//      if (!extElemMap.isEmpty()) {
+//          result = new Extension(result, extElemMap.values());
+//      }
+//
+//      // Create a Projection for each StatementPattern in the constructor
+//      List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
+//
+//      for (StatementPattern sp : statementPatterns) {
+//          ProjectionElemList projElemList = new ProjectionElemList();
+//
+//          projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
+//          projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
+//          projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
+//
+//          projList.add(projElemList);
+//      }
+//
+//      if (projList.size() == 1) {
+//          result = new Projection(result, projList.get(0));
+//      }
+//      else if (projList.size() > 1) {
+//          result = new MultiProjection(result, projList);
+//      }
+//      else {
+//          // Empty constructor
+//          result = new EmptySet();
+//      }
+//
+//      return new Reduced(result);
+//  }
+//
+//  /**
+//   * Gets the set of variables that are relevant for the constructor. This
+//   * method accumulates all subject, predicate and object variables from the
+//   * supplied statement patterns, but ignores any context variables.
+//   */
+//  private Set<Var> getConstructVars(Collection<StatementPattern> statementPatterns) {
+//      Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
+//
+//      for (StatementPattern sp : statementPatterns) {
+//          vars.add(sp.getSubjectVar());
+//          vars.add(sp.getPredicateVar());
+//          vars.add(sp.getObjectVar());
+//      }
+//
+//      return vars;
+//  }
+
+    //
+    // Grammar constructions below the ASTQuery node.
+    //
+    
+    @Override
+    public GroupByNode visit(final ASTGroupClause node, Object data)
             throws VisitorException {
         
         final GroupByNode groupBy = new GroupByNode();
@@ -827,13 +725,17 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     @Override
     public List<OrderByExpr> visit(final ASTOrderClause node, Object data)
             throws VisitorException {
-        
+
         final int childCount = node.jjtGetNumChildren();
 
         final List<OrderByExpr> elements = new ArrayList<OrderByExpr>(
                 childCount);
 
         for (int i = 0; i < childCount; i++) {
+
+            /*
+             * Note: OrderByExpr will delegate to the ValueExprBuilder.
+             */
 
             elements.add((OrderByExpr) node.jjtGetChild(i)
                     .jjtAccept(this, null));
@@ -843,14 +745,13 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
         return elements;
     }
 
+    /**
+     * Note: Delegate to the {@link ValueExprBuilder}.
+     */
     @Override
     public OrderByExpr visit(final ASTOrderCondition node, Object data)
         throws VisitorException
     {
-
-        /*
-         * Note: Delegate to the ValueExpressionBuilder.
-         */
 
         final ValueExpressionNode valueExpr = (ValueExpressionNode) node
                 .jjtGetChild(0).jjtAccept(valueExprBuilder, null);
@@ -860,17 +761,177 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
-    public Long visit(ASTLimit node, Object data)
-        throws VisitorException
-    {
+    public Long visit(ASTLimit node, Object data) throws VisitorException {
         return node.getValue();
     }
 
     @Override
-    public Long visit(ASTOffset node, Object data)
-        throws VisitorException
-    {
+    public Long visit(ASTOffset node, Object data) throws VisitorException {
         return node.getValue();
+    }
+
+    //
+    // private helper methods.
+    //
+    
+    /**
+     * Handle the optional WHERE clause. (For example, DESCRIBE may be used
+     * without a WHERE clause.)
+     * <P>
+     * Note: This delegates the translation to a helper visitor. A SubSelect
+     * will wind up delegated back to an instance of this visitor.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleWhereClause(final ASTQuery astQuery,
+            final QueryBase queryRoot) throws VisitorException {
+
+        final ASTWhereClause whereClause = astQuery.getWhereClause();
+
+        if (whereClause != null) {
+
+            final ASTGraphPatternGroup graphPatternGroup = whereClause
+                    .getGraphPatternGroup();
+
+            queryRoot.setWhereClause((IGroupNode) graphPatternGroup.jjtAccept(
+                    groupGraphPatternBuilder, null/* data */));
+
+        }
+
+    }
+
+    /**
+     * Handle an optional GROUP BY clause.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleGroupBy(final ASTQuery astQuery, final QueryBase queryRoot)
+            throws VisitorException {
+        
+        final ASTGroupClause groupNode = astQuery.getGroupClause();
+        
+        if (groupNode != null) {
+
+            final GroupByNode groupBy = (GroupByNode) groupNode.jjtAccept(
+                    this, null);
+
+            queryRoot.setGroupBy(groupBy);
+
+        }
+
+    }
+    
+    /**
+     * Handle an optional HAVING clause.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleHaving(final ASTQuery astQuery, final QueryBase queryRoot)
+            throws VisitorException {
+
+        final ASTHavingClause havingClause = astQuery.getHavingClause();
+
+        if (havingClause != null) {
+
+            final HavingNode havingNode = new HavingNode();
+
+            final int nchildren = havingClause.jjtGetNumChildren();
+
+            for (int i = 0; i < nchildren; i++) {
+
+                /*
+                 * Delegate children to the GroupGraphPatternBuilder (it handles
+                 * ASTConstraint, which is also used in FILTER). It will
+                 * delegate to the ValueExprBuilder to handle the inner value
+                 * expression.
+                 */
+                final IValueExpressionNode ve = (IValueExpressionNode) havingClause
+                        .jjtGetChild(i).jjtAccept(groupGraphPatternBuilder,
+                                null/* data */);
+
+                havingNode.addExpr(ve);
+
+            }
+
+            queryRoot.setHaving(havingNode);
+
+        }
+
+    }
+    
+    /**
+     * Handle an optional ORDER BY clause.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleOrderBy(final ASTQuery astQuery,
+            final QueryBase queryRoot) throws VisitorException {
+
+        final ASTOrderClause orderNode = astQuery.getOrderClause();
+
+        if (orderNode != null) {
+
+            final OrderByNode orderBy = new OrderByNode();
+
+            @SuppressWarnings("unchecked")
+            final List<OrderByExpr> orderElemements = (List<OrderByExpr>) orderNode
+                    .jjtAccept(this, null);
+
+            for (OrderByExpr orderByExpr : orderElemements)
+                orderBy.addExpr(orderByExpr);
+
+            queryRoot.setOrderBy(orderBy);
+
+        }
+    
+    }
+    
+    /**
+     * Handle an optional LIMIT/OFFSET.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleSlice(final ASTQuery astQuery,
+            final QueryBase queryRoot) {
+
+        final ASTLimit theLimit = astQuery.getLimit();
+
+        final ASTOffset theOffset = astQuery.getOffset();
+
+        if (theLimit != null || theOffset != null) {
+
+            final SliceNode theSlice = new SliceNode();
+
+            if (theLimit != null)
+                theSlice.setLimit(theLimit.getValue());
+
+            if (theOffset != null)
+                theSlice.setOffset(theOffset.getValue());
+
+            queryRoot.setSlice(theSlice);
+
+        }
+
     }
 
 }
