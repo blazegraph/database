@@ -17,6 +17,13 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 public class JoinGroupNode extends GroupNodeBase {
 
     /**
+     * The graph variable or constant iff this {@link JoinGroupNode} models a
+     * GraphPatternGroup. When not present, your have to read up the parent
+     * chain to locate the dominating graph context.
+     */
+    private TermNode context;
+    
+    /**
      * Construct a non-optional join group.
      */
     public JoinGroupNode() {
@@ -31,6 +38,35 @@ public class JoinGroupNode extends GroupNodeBase {
 		
 	}
 
+    /**
+     * Set the context for a GroupGraphPattern.
+     * 
+     * @param context
+     *            The context (may be <code>null</code>).
+     */
+    public void setContext(final TermNode context) {
+        
+        this.context = context;
+        
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to return the context associated with this
+     * {@link JoinGroupNode} if it is defined and otherwise read up the parent
+     * chain.
+     */
+    @Override
+    public TermNode getContext() {
+        
+        if(context != null)
+            return context;
+        
+        return super.getContext();
+        
+    }
+    
 	/**
 	 * Calculate the variable bindings that will definitely be produced by this
 	 * join group. A group will produce bindings for vars from its statement

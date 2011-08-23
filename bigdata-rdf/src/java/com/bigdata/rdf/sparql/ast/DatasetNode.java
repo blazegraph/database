@@ -14,10 +14,8 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
- * 
- * TODO Why not an {@link IQueryNode}?
  */
-public class DatasetNode {
+public class DatasetNode extends QueryNodeBase {
 
 	private final DataSetSummary defaultGraphs, namedGraphs;
 	
@@ -57,6 +55,26 @@ public class DatasetNode {
 		
 	}
 	
+    /**
+     * Core constructor implementation.
+     *  
+     * @param defaultGraphs
+     *            The list of default graphs (optional). When not specified, all
+     *            graphs will be used unless a <i>defaultGraphsFilter</i> is
+     *            applied.
+     * @param namedGraphs
+     *            The list of named graphs (optional). When not specified, all
+     *            graphs will be used unless a <i>namedGraphsFilter</i> is
+     *            applied.
+     * @param defaultGraphFilter
+     *            A filter for default graphs (optional and typically only used
+     *            when the <i>defaultGraphs</i> is <code>null</code>, e.g., to
+     *            apply ACLs).
+     * @param namedGraphFilter
+     *            A filter for named graphs (optional and typically only used
+     *            when the <i>namedGraphs</i> is <code>null</code>, e.g., to
+     *            apply ACLs).
+     */
 	public DatasetNode(
 	        final DataSetSummary defaultGraphs, 
 	        final DataSetSummary namedGraphs,
@@ -87,4 +105,14 @@ public class DatasetNode {
 		return namedGraphs;
 	}
 
+    @Override
+    public String toString(int indent) {
+        return toString(); // FIXME toString().
+    }
+
+//    public boolean equals(final Object o) {
+//        // FIXME Auto-generated method stub
+//        throw new UnsupportedOperationException();
+//    }
+    
 }

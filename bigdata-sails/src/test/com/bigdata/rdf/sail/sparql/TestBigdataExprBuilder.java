@@ -25,13 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
@@ -51,16 +52,17 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * Test suite for {@link BigdataExprBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestBigdataExprBuilder.java 5073 2011-08-23 00:33:54Z
+ *          thompsonbry $
  * 
- * TODO Test each query type (SELECT, ASK, DESCRIBE, CONSTRUCT).
+ *          TODO Update grammar to pick up additional SPARQL 1.1 functions.
  * 
- * TODO Modify grammar and test named subquery (WITH AS INCLUDE).
+ *          TODO Modify grammar and test named subquery (WITH AS INCLUDE).
  */
 public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
-    private static final Logger log = Logger
-            .getLogger(TestBigdataExprBuilder.class);
+//    private static final Logger log = Logger
+//            .getLogger(TestBigdataExprBuilder.class);
     
     public TestBigdataExprBuilder() {
     }
@@ -81,7 +83,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select ?s where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -113,7 +115,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select DISTINCT ?s where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -146,7 +148,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select REDUCED ?s where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -180,7 +182,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY ?o";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -218,7 +220,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY (?o AS ?z)";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -258,7 +260,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY str(?o)";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -277,7 +279,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                     FunctionRegistry.STR, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("o") });
             // Note: anonymous variable.
-            final VarNode anonvar1 = new VarNode("groupBy-1");
+            final VarNode anonvar1 = new VarNode("-groupBy-1");
             anonvar1.setAnonymous(true);
             groupBy.addExpr(new AssignmentNode(anonvar1, funct));
 
@@ -302,7 +304,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "SELECT ?s where {?s ?p ?o} HAVING (?o > ?s)";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -344,7 +346,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "SELECT ?s where {?s ?p ?o} ORDER BY DESC(?s)";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -370,6 +372,48 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
+     * Unit test for ORDER BY in SELECT query using a value expression rather
+     * than a bare variable (this exercises the delegation to the
+     * {@link ValueExprBuilder}).
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} ORDER BY DESC(str(?s))
+     * </pre>
+     */
+    public void test_orderBy_expr() throws MalformedQueryException, TokenMgrError,
+            ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} ORDER BY DESC(str(?s))";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final OrderByNode orderBy = new OrderByNode();
+            expected.setOrderBy(orderBy);
+            final FunctionNode funct = new FunctionNode(lex,
+                    FunctionRegistry.STR, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("s") });
+            orderBy.addExpr(new OrderByExpr(funct, false/* ascending */));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
      * Unit test for SELECT query with a wildcard (<code>*</code>).
      * 
      * <pre>
@@ -381,7 +425,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select * where {?s ?p ?o}";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -416,7 +460,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final String sparql = "select ?s where {?s ?p ?o} limit 10 offset 5";
 
-        final QueryRoot expected = new QueryRoot();
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
@@ -441,4 +485,230 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     }
 
+    /**
+     * Unit test for simple ASK query. (Applications can use the ASK form to
+     * test whether or not a query pattern has a solution. No information is
+     * returned about the possible query solutions, just whether or not a
+     * solution exists. EXISTS() is basically an ASK subquery.)
+     * 
+     * <pre>
+     * ASK where {?s ?p ?o}
+     * </pre>
+     */
+    public void test_ask() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "ask where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.ASK);
+        {
+
+            /*
+             * Note: No projection.
+             */
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            expected.setSlice(new SliceNode(0L/* offset */, 1L/* limit */));
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * Unit test for simple DESCRIBE query. (The main differences between
+     * DESCRIBE and SELECT is that the DESCRIBE query allows only a simple list
+     * of variables or IRIs in place of the select expressions and involves an
+     * implicit CONSTRUCT. Both DESCRIBE and SELECT allow the same solution
+     * modifiers.)
+     * 
+     * <pre>
+     * DESCRIBE ?s where {?s ?p ?o}
+     * </pre>
+     * 
+     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     */
+    public void test_describe() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "describe ?s where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+        
+        fail("test construct template");
+
+    }
+    
+    /**
+     * Unit test for <code>DESCRIBE *</code> query.
+     * 
+     * <pre>
+     * DESCRIBE * where {?s ?p ?o}
+     * </pre>
+     * 
+     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     */
+    public void test_describe_star() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "describe * where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("*"));
+            expected.setProjection(projection);
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+            expected.setWhereClause(whereClause);
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+        fail("test construct template");
+
+    }
+    
+    /**
+     * Unit test for <code>DESCRIBE</code> query for an IRI.
+     * 
+     * <pre>
+     * DESCRIBE <http://www.bigdata.com>
+     * </pre>
+     * 
+     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     */
+    public void test_describe_iri() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "describe <http://www.bigdata.com>";
+
+        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.addProjectionExpression(new AssignmentNode(new VarNode(
+                    "-iri-1"), new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com")))));
+            
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+        fail("test construct template and implicit join groups");
+    
+    }
+
+    /**
+     * Unit test for <code>DESCRIBE</code> query where a mixture of variables
+     * and IRIs are used in the projection.
+     * 
+     * <pre>
+     * DESCRIBE ?s <http://www.bigdata.com> where {?s ?p ?o}
+     * </pre>
+     * 
+     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     */
+    public void test_describe_vars_and_iris() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "describe ?s <http://www.bigdata.com> where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.addProjectionVar(new VarNode("?s"));
+            projection.addProjectionExpression(new AssignmentNode(new VarNode(
+                    "-iri-1"), new ConstantNode(makeIV(valueFactory
+                    .createURI("http://www.bigdata.com")))));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+            expected.setWhereClause(whereClause);
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+        fail("test construct template");
+    
+    }
+    
+    /**
+     * Unit test for simple CONSTRUCT query.
+     * 
+     * <pre>
+     * CONSTRUCT ?s where {?s ?p ?o}
+     * </pre>
+     * 
+     * FIXME CONSTRUCT has two forms which we need to test. In the first form a
+     * ConstructTemplate appears before the DatasetClause. In the second form a
+     * TriplesTemplate appears after the WhereClause and before the optional
+     * SolutionModifier. Both forms allow the SolutionModifier.
+     */
+    public void test_construct() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "construct ?s where {?s ?p ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+        
+        fail("test construct template");
+
+    }
+    
 }

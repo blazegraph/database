@@ -43,6 +43,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.sail.QueryType;
 
 /**
  * TODO This does not really "test" much, just exercises some basic aspects of
@@ -85,7 +86,7 @@ public class TestAST extends TestCase {
     	root.addChild(sp(2));
     	root.addChild(filter(3));
     	
-    	final QueryRoot query = new QueryRoot();
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
     	
     	query.setWhereClause(root);
 
@@ -111,7 +112,7 @@ public class TestAST extends TestCase {
     	
     	root.addChild(optional);
     	
-        final QueryRoot query = new QueryRoot();
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
         
         query.setWhereClause(root);
 
@@ -141,7 +142,7 @@ public class TestAST extends TestCase {
     	
     	root.addChild(optional);
     	
-        final QueryRoot query = new QueryRoot();
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
         
         query.setWhereClause(root);
 
@@ -176,8 +177,8 @@ public class TestAST extends TestCase {
     	union.addChild(g1);
     	union.addChild(g2);
     	
-        final QueryRoot query = new QueryRoot();
-        
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
+
         query.setWhereClause(union);
 
     	if (log.isInfoEnabled())
@@ -218,7 +219,7 @@ public class TestAST extends TestCase {
     	root.addChild(filter(2));
     	root.addChild(union);
     	
-        final QueryRoot query = new QueryRoot();
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
         
         query.setWhereClause(root);
 
@@ -247,7 +248,7 @@ public class TestAST extends TestCase {
     	j3.addChild(sp(10)).addChild(sp(11)).addChild(filter(12));
     	root.addChild(j3);
     	
-        final QueryRoot query = new QueryRoot();
+        final QueryRoot query = new QueryRoot(QueryType.SELECT);
         
         query.setWhereClause(root);
 

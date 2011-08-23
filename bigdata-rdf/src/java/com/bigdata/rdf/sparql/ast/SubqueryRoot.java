@@ -23,12 +23,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.sail.QueryType;
+
 /**
  * A SPARQL 1.1 style subquery.
  */
 public class SubqueryRoot extends SubqueryBase implements IGroupMemberNode {
 
     public SubqueryRoot() {
+        
+        super(QueryType.SELECT);
+        
+    }
+
+    /**
+     * Note: This constructor variant may be used with the implicit subquery for
+     * EXISTS to specify the type of the subquery as {@link QueryType#ASK}.
+     * 
+     * @param queryType
+     */
+    public SubqueryRoot(final QueryType queryType) {
+
+        super(queryType);
 
     }
 

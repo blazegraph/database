@@ -28,6 +28,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -99,7 +100,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 root.addChild(sp());
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 
@@ -142,7 +143,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 root.addChild(sp());
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 
@@ -191,7 +192,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 root.addChild(sp());
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 
@@ -291,7 +292,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 
                 root.addChild(optional);
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 
@@ -345,7 +346,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
 
                 root.addChild(optional);
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 
@@ -437,8 +438,8 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
              * Run query expecting 1 statements.
              */
             {
-                VarNode s=new VarNode("s");
-                VarNode o = new VarNode("o");
+                final VarNode s = new VarNode("s");
+                final VarNode o = new VarNode("o");
                 final IGroupNode root = new JoinGroupNode();
                 root.addChild(new StatementPatternNode(s, new ConstantNode(
                         new Constant<IV>(type)), new ConstantNode(
@@ -446,7 +447,7 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
                 root.addChild(new StatementPatternNode(s, new ConstantNode(
                         new Constant<IV>(predicateIv)), o));
 
-                final QueryRoot query = new QueryRoot();
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
                 query.setWhereClause(root);
 

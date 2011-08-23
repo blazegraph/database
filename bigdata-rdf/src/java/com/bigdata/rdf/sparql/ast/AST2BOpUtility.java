@@ -105,6 +105,13 @@ public class AST2BOpUtility {
     private static final transient Logger log = Logger
             .getLogger(AST2BOpUtility.class);
 
+    private static final IASTOptimizer[] optimizers;
+    static {
+        optimizers = new IASTOptimizer[] {
+                
+        };
+    }
+
 	/**
 	 * Convert an AST query plan into a set of executable pipeline operators.
 	 */
@@ -181,7 +188,18 @@ public class AST2BOpUtility {
 
             }
 
-            if (projection.isDistinct()) {
+            /*
+             * Note: REDUCED allows, but does not require, either complete or
+             * partial filtering of duplicates. It is part of what openrdf does
+             * for a DESCRIBE query.
+             * 
+             * Note: We do not currently have special operator for REDUCED. One
+             * could be created using chunk wise DISTINCT. Note that REDUCED may
+             * not change the order in which the solutions appear (but we are
+             * evaluating it before ORDER BY so that is Ok.)
+             */
+  
+            if (projection.isDistinct() || projection.isReduced()) {
 
                 left = addDistinct(left, projection.getProjectionVars(), ctx);
 

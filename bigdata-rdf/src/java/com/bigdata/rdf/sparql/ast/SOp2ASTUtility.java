@@ -14,6 +14,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sail.sop.SOp;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree;
@@ -41,7 +42,11 @@ public class SOp2ASTUtility {
 		
 		final IGroupNode astRoot = convert(sopRoot);
 		
-		final QueryRoot query = new QueryRoot();
+        /*
+         * TODO This is always using SELECT since the SOpTree does not provide
+         * access to the actual QueryType.
+         */
+		final QueryRoot query = new QueryRoot(QueryType.SELECT); 
 		
 		query.setWhereClause(astRoot);
 		

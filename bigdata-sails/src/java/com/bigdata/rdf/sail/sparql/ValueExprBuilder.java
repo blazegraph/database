@@ -609,7 +609,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         }
 
         // Wrap with assignment to an anonymous variable.
-        return new AssignmentNode(context.createAnonVar("groupBy-"
+        return new AssignmentNode(context.createAnonVar("-groupBy-"
                 + context.constantVarID++), ve);
 
 //        TupleExpr arg = group.getArg();

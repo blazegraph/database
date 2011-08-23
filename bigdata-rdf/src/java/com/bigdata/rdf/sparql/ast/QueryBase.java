@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.sail.QueryType;
+
 /**
  * Contains the projection clause, where clause, and solution modified clauses.
  * 
@@ -35,6 +37,7 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class QueryBase extends QueryNodeBase {
 
+    private QueryType queryType;
     private ProjectionNode projection;
     private IGroupNode whereClause;
     private GroupByNode groupBy;
@@ -42,10 +45,40 @@ abstract public class QueryBase extends QueryNodeBase {
     private OrderByNode orderBy;
     private SliceNode slice;
 
-	public QueryBase() {
-
+    /**
+     * Constructor is hidden to force people to declare the {@link QueryType}.
+     */
+    @SuppressWarnings("unused")
+    private QueryBase() {
+        
+    }
+    
+	public QueryBase(final QueryType queryType) {
+	    
+	    this.queryType = queryType;
+	    
 	}
 
+    /**
+     * Return the type of query. This provides access to information which may
+     * otherwise be difficult to determine by inspecting the generated AST or
+     * query plan.
+     */
+	public QueryType getQueryType() {
+	    
+	    return queryType;
+	    
+	}
+
+    /**
+     * Set the type of query.
+     */
+	public void setQueryType(final QueryType queryType) {
+	    
+	    this.queryType = queryType;
+	    
+	}
+	
     /**
      * Return the {@link IGroupNode} (corresponds to the WHERE clause).
      */
@@ -238,6 +271,14 @@ abstract public class QueryBase extends QueryNodeBase {
             return false;
 
         final QueryBase t = (QueryBase) o;
+
+        if (queryType == null) {
+            if (t.queryType != null)
+                return false;
+        } else {
+            if (!queryType.equals(t.queryType))
+                return false;
+        }
 
         if (projection == null) {
             if (t.projection != null)

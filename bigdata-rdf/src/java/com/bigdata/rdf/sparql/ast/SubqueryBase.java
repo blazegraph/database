@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.sail.QueryType;
+
 /**
  * AST node for subqueries.
  * 
@@ -35,4 +37,10 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class SubqueryBase extends QueryBase {
 
+    public SubqueryBase(final QueryType queryType) {
+        
+        super(queryType);
+        
+    }
+    
 }
