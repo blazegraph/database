@@ -32,22 +32,31 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.FN;
 import org.openrdf.query.algebra.Exists;
 import org.openrdf.query.algebra.Not;
+import org.openrdf.query.parser.sparql.ast.ASTAbs;
 import org.openrdf.query.parser.sparql.ast.ASTAggregate;
 import org.openrdf.query.parser.sparql.ast.ASTAnd;
 import org.openrdf.query.parser.sparql.ast.ASTAvg;
 import org.openrdf.query.parser.sparql.ast.ASTBNodeFunc;
 import org.openrdf.query.parser.sparql.ast.ASTBind;
 import org.openrdf.query.parser.sparql.ast.ASTBound;
+import org.openrdf.query.parser.sparql.ast.ASTCeil;
 import org.openrdf.query.parser.sparql.ast.ASTCoalesce;
 import org.openrdf.query.parser.sparql.ast.ASTCompare;
+import org.openrdf.query.parser.sparql.ast.ASTConcat;
+import org.openrdf.query.parser.sparql.ast.ASTContains;
 import org.openrdf.query.parser.sparql.ast.ASTCount;
 import org.openrdf.query.parser.sparql.ast.ASTDatatype;
+import org.openrdf.query.parser.sparql.ast.ASTDay;
+import org.openrdf.query.parser.sparql.ast.ASTEncodeForURI;
 import org.openrdf.query.parser.sparql.ast.ASTExistsFunc;
+import org.openrdf.query.parser.sparql.ast.ASTFloor;
 import org.openrdf.query.parser.sparql.ast.ASTFunctionCall;
 import org.openrdf.query.parser.sparql.ast.ASTGroupConcat;
 import org.openrdf.query.parser.sparql.ast.ASTGroupCondition;
+import org.openrdf.query.parser.sparql.ast.ASTHours;
 import org.openrdf.query.parser.sparql.ast.ASTIRIFunc;
 import org.openrdf.query.parser.sparql.ast.ASTIf;
 import org.openrdf.query.parser.sparql.ast.ASTIn;
@@ -57,20 +66,41 @@ import org.openrdf.query.parser.sparql.ast.ASTIsLiteral;
 import org.openrdf.query.parser.sparql.ast.ASTIsNumeric;
 import org.openrdf.query.parser.sparql.ast.ASTLang;
 import org.openrdf.query.parser.sparql.ast.ASTLangMatches;
+import org.openrdf.query.parser.sparql.ast.ASTLowerCase;
+import org.openrdf.query.parser.sparql.ast.ASTMD5;
 import org.openrdf.query.parser.sparql.ast.ASTMath;
 import org.openrdf.query.parser.sparql.ast.ASTMax;
 import org.openrdf.query.parser.sparql.ast.ASTMin;
+import org.openrdf.query.parser.sparql.ast.ASTMinutes;
+import org.openrdf.query.parser.sparql.ast.ASTMonth;
 import org.openrdf.query.parser.sparql.ast.ASTNot;
 import org.openrdf.query.parser.sparql.ast.ASTNotExistsFunc;
 import org.openrdf.query.parser.sparql.ast.ASTNotIn;
+import org.openrdf.query.parser.sparql.ast.ASTNow;
 import org.openrdf.query.parser.sparql.ast.ASTOr;
+import org.openrdf.query.parser.sparql.ast.ASTRand;
 import org.openrdf.query.parser.sparql.ast.ASTRegexExpression;
+import org.openrdf.query.parser.sparql.ast.ASTRound;
+import org.openrdf.query.parser.sparql.ast.ASTSHA1;
+import org.openrdf.query.parser.sparql.ast.ASTSHA224;
+import org.openrdf.query.parser.sparql.ast.ASTSHA256;
+import org.openrdf.query.parser.sparql.ast.ASTSHA384;
+import org.openrdf.query.parser.sparql.ast.ASTSHA512;
 import org.openrdf.query.parser.sparql.ast.ASTSameTerm;
 import org.openrdf.query.parser.sparql.ast.ASTSample;
+import org.openrdf.query.parser.sparql.ast.ASTSeconds;
 import org.openrdf.query.parser.sparql.ast.ASTStr;
 import org.openrdf.query.parser.sparql.ast.ASTStrDt;
+import org.openrdf.query.parser.sparql.ast.ASTStrEnds;
 import org.openrdf.query.parser.sparql.ast.ASTStrLang;
+import org.openrdf.query.parser.sparql.ast.ASTStrLen;
+import org.openrdf.query.parser.sparql.ast.ASTStrStarts;
+import org.openrdf.query.parser.sparql.ast.ASTSubstr;
 import org.openrdf.query.parser.sparql.ast.ASTSum;
+import org.openrdf.query.parser.sparql.ast.ASTTimezone;
+import org.openrdf.query.parser.sparql.ast.ASTTz;
+import org.openrdf.query.parser.sparql.ast.ASTUpperCase;
+import org.openrdf.query.parser.sparql.ast.ASTYear;
 import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
@@ -286,6 +316,53 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
+    public FunctionNode visit(ASTSubstr node, Object data)
+            throws VisitorException {
+        return nary(node, FN.SUBSTRING);
+    }
+
+    @Override
+    public FunctionNode visit(ASTConcat node, Object data)
+            throws VisitorException {
+        return nary(node, FN.CONCAT);
+    }
+
+    @Override
+    public FunctionNode visit(ASTAbs node, Object data) throws VisitorException {
+        return unary(node, FN.NUMERIC_ABS);
+    }
+
+    @Override
+    public FunctionNode visit(ASTCeil node, Object data)
+            throws VisitorException {
+        return unary(node, FN.NUMERIC_CEIL);
+    }
+
+    @Override
+    public FunctionNode visit(ASTContains node, Object data)
+            throws VisitorException {
+        return binary(node, FN.CONTAINS);
+    }
+
+    @Override
+    public FunctionNode visit(ASTFloor node, Object data)
+            throws VisitorException {
+        return unary(node, FN.NUMERIC_FLOOR);
+    }
+
+    @Override
+    public FunctionNode visit(ASTRound node, Object data)
+            throws VisitorException {
+        return unary(node, FN.NUMERIC_ROUND);
+    }
+
+    @Override
+    public FunctionNode visit(ASTRand node, Object data)
+            throws VisitorException {
+        return noneary(node, FunctionRegistry.RAND);
+    }
+
+    @Override
     public FunctionNode visit(ASTSameTerm node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.SAME_TERM);
@@ -348,6 +425,13 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
+    public FunctionNode visit(ASTEncodeForURI node, Object data)
+        throws VisitorException
+    {
+        return unary(node, FN.ENCODE_FOR_URI);
+    }
+
+    @Override
     public FunctionNode visit(ASTStr node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.STR);
     }
@@ -359,9 +443,126 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
+    public FunctionNode visit(ASTStrStarts node, Object data)
+            throws VisitorException {
+        return binary(node, FN.STARTS_WITH);
+    }
+
+    @Override
+    public FunctionNode visit(ASTStrEnds node, Object data)
+            throws VisitorException {
+        return binary(node, FN.ENDS_WITH);
+    }
+
+    @Override
+    public FunctionNode visit(ASTStrLen node, Object data)
+            throws VisitorException {
+        return unary(node, FN.STRING_LENGTH);
+    }
+
+    @Override
+    public FunctionNode visit(ASTUpperCase node, Object data)
+            throws VisitorException {
+        return unary(node, FN.UPPER_CASE);
+    }
+
+    @Override
+    public FunctionNode visit(ASTLowerCase node, Object data)
+            throws VisitorException {
+        return unary(node, FN.LOWER_CASE);
+    }
+
+    @Override
     public FunctionNode visit(ASTStrLang node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.STR_LANG);
+    }
+
+    @Override
+    public FunctionNode visit(ASTNow node, Object data) throws VisitorException {
+        return noneary(node, FunctionRegistry.NOW);
+    }
+
+    @Override
+    public FunctionNode visit(ASTYear node, Object data)
+            throws VisitorException {
+        return unary(node, FN.YEAR_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTMonth node, Object data)
+            throws VisitorException {
+        return unary(node, FN.MONTH_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTDay node, Object data) throws VisitorException {
+        return unary(node, FN.DAY_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTHours node, Object data)
+            throws VisitorException {
+        return unary(node, FN.HOURS_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTMinutes node, Object data)
+            throws VisitorException {
+        return unary(node, FN.MINUTES_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSeconds node, Object data)
+            throws VisitorException {
+        return unary(node, FN.SECONDS_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTTimezone node, Object data)
+            throws VisitorException {
+        return unary(node, FN.TIMEZONE_FROM_DATETIME);
+    }
+
+    @Override
+    public FunctionNode visit(ASTTz node, Object data) throws VisitorException {
+        return unary(node, FunctionRegistry.TIMEZONE);
+    }
+
+    @Override
+    public FunctionNode visit(ASTMD5 node, Object data) throws VisitorException {
+        return unary(node, FunctionRegistry.MD5);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSHA1 node, Object data)
+            throws VisitorException {
+        return unary(node, FunctionRegistry.SHA1);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSHA224 node, Object data)
+        throws VisitorException
+ {
+        return unary(node, FunctionRegistry.SHA224);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSHA256 node, Object data)
+            throws VisitorException {
+        return unary(node, FunctionRegistry.SHA256);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSHA384 node, Object data)
+            throws VisitorException {
+        return unary(node, FunctionRegistry.SHA384);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSHA512 node, Object data)
+            throws VisitorException {
+        return unary(node, FunctionRegistry.SHA512);
     }
 
     @Override
