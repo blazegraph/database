@@ -9,6 +9,9 @@ import com.bigdata.bop.IVariable;
 
 /**
  * A node in the AST representing a statement pattern.
+ * 
+ * TODO This should inherit the context dynamically from the parent rather than
+ * requiring the context to be specified explicitly.
  */
 public class StatementPatternNode extends GroupMemberNodeBase {
 

@@ -26,9 +26,10 @@ import com.bigdata.service.ResourceService;
  * Helper class summarizes the named graphs or default graph mode for a quads
  * query.
  */
+@SuppressWarnings("rawtypes")
 public class DataSetSummary {
 
-	public static Set<IV> toInternalValues(final Set<URI> graphs) {
+    public static Set<IV> toInternalValues(final Set<URI> graphs) {
 		
 		final Set<IV> s = new LinkedHashSet<IV>();
 		
@@ -240,7 +241,7 @@ public class DataSetSummary {
      * 
      * @todo This should randomly sample in case there is bias.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked" })
     public SubqueryCostReport estimateSubqueryCost(
             final BOpContextBase context, final int limit, final Predicate pred) {
 
@@ -286,4 +287,29 @@ public class DataSetSummary {
 
     }
 
+    @Override
+    public String toString() {
+
+        return "DataSetSummary{ngraphs=" + graphs.size() + ", nknown " + nknown
+                + "}";
+        
+    }
+
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+        
+        if (!(o instanceof DataSetSummary))
+            return false;
+        
+        final DataSetSummary t = (DataSetSummary) o;
+        
+        if (!graphs.equals(t.graphs))
+            return false;
+
+        return true;
+        
+    }
+    
 }

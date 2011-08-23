@@ -106,6 +106,55 @@ public class AST2BOpUtility {
             .getLogger(AST2BOpUtility.class);
 
     private static final IASTOptimizer[] optimizers;
+    
+    /**
+     * FIXME Capture the openrdf optimizer patterns here:
+     * 
+     * <pre>
+     * optimizerList.add(new BindingAssigner());
+     * optimizerList.add(new ConstantOptimizer(strategy));
+     * optimizerList.add(new CompareOptimizer());
+     * optimizerList.add(new ConjunctiveConstraintSplitter());
+     * optimizerList.add(new SameTermFilterOptimizer());
+     * // only need to optimize the join order this way if we are not
+     * // using native joins
+     * if (nativeJoins == false) {
+     *     optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics(
+     *             this)));
+     * }
+     * optimizerList.add(new FilterOptimizer());
+     * optimizerList.optimize(tupleExpr, dataset, bindings);
+     * replaceValues(dataset, tupleExpr, bindings);
+     * </pre>
+     * 
+     * TODO Optimize away empty join groups and optimize those containing just a
+     * single child by lifting the child into the parent whenever possible.
+     * 
+     * TODO Recognize OR of constraints and rewrite as IN. We can then optimize
+     * the IN operator in a variety of ways.
+     * 
+     * TODO Optimize IN and named graph and default graph queries with inline
+     * access path.
+     * 
+     * TODO Optimize when you have a nested graph pattern with an eventual
+     * parent graph pattern by placing a SameTerm filter to ensure that the
+     * nested graph pattern only find solutions which are not allowed by the
+     * outer graph.
+     * 
+     * FIXME Either handle via AST rewrites or verify that AST2BOpUtility
+     * handles this during convert().
+     * <p>
+     * An empty {} matches a single empty solution.
+     * <p>
+     * GRAPH ?g {} matches the distinct named graphs in the named graph portion
+     * of the data set (special case). This should be translated into a distinct
+     * term advancer on CSPO if there is no data set. If the named graphs are
+     * listed explicitly, then just return that list. Third case: Anzo supports
+     * a FILTER on the named graph or default graphs for ACLs.
+     * <p>
+     * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure on
+     * this one.)
+     */
     static {
         optimizers = new IASTOptimizer[] {
                 
