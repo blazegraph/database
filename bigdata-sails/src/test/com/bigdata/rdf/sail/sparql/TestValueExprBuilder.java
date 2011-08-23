@@ -28,6 +28,7 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.Collections;
 
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
@@ -37,8 +38,10 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -195,36 +198,38 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     /**
      * Unit test with BNode. Should be rewritten as an anonymous variable.
-     * 
-     * TODO We will have to check the structure specifically for this unless we
-     * can know in advance the identifier which will be used for the anonymous
-     * variable. Also, note that a bare blank node may not appear in the SELECT
-     * expression with (bnode as ?x) so we have to test this somewhere else in
-     * the syntax of the query.
+     * <p>
+     * Note: a bare blank node may not appear in the SELECT expression with
+     * (bnode as ?x) so we have to test this somewhere else in the syntax of the
+     * query.
      */
     public void test_select_bnode() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-//        final String sparql = "select ( _:a1 as ?x) where {?s ?p ?o}";
-//
-//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-//        {
-//
-//            final ProjectionNode projection = new ProjectionNode();
-//            projection.addProjectionExpression(//
-//                    new AssignmentNode(//
-//                            new VarNode("x"), //
-//                            new ConstantNode(makeIV(valueFactory
-//                                    .createBNode("a1")))));
-//            expected.setProjection(projection);
-//
-//        }
-//
-//        final QueryRoot actual = parse(sparql, baseURI);
-//
-//        assertSameAST(sparql, expected.getProjection(), actual.getProjection());
-        
-        fail("write test");
+        final String sparql = "select ?s where {?s ?p _:a1}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            final VarNode blankNodeVar = new VarNode("-anon-1");
+            blankNodeVar.setAnonymous(true);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), blankNodeVar, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
 
     }
 
@@ -609,6 +614,10 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT (?s IN() as ?x) where {?s ?p ?o}
      * </pre>
+     * 
+     * TODO There is an issue for this against the SPARQL grammar.
+     * 
+     * @see http://www.openrdf.org/issues/browse/SES-818
      */
     public void test_select_foo_IN_none() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -645,6 +654,10 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT (?s IN(?p,?o) as ?x) where {?s ?p ?o}
      * </pre>
+     * 
+     * TODO There is an issue for this against the SPARQL grammar.
+     * 
+     * @see http://www.openrdf.org/issues/browse/SES-818
      */
     public void test_select_foo_IN_bar() throws MalformedQueryException,
             TokenMgrError, ParseException {

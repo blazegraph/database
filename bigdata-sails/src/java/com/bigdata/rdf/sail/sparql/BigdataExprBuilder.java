@@ -203,7 +203,11 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
                     .getProjectionElemList().iterator();
             while (itr.hasNext()) {
                 /*
-                 * (Var | Expression AS Var)
+                 * The last argument of the children is the Var. Anything before
+                 * that is an ArgList which must be interpreted in its own
+                 * right.
+                 * 
+                 * (Var | ArgList Var)
                  */
                 final ASTProjectionElem e = itr.next();
                 if (!e.hasAlias()) {
