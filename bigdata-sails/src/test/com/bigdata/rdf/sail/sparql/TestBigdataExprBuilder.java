@@ -56,8 +56,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * TODO Test each query type (SELECT, ASK, DESCRIBE, CONSTRUCT).
  * 
  * TODO Modify grammar and test named subquery (WITH AS INCLUDE).
- * 
- * TODO Test SELECT DISTINCT, SELECT REDUCED, SELECT *.
  */
 public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
