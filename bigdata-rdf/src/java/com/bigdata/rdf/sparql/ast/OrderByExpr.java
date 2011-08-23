@@ -75,7 +75,7 @@ public class OrderByExpr {
             
         }
 
-        sb.append("?").append(ve.toString());
+        sb.append(ve.toString());
 
         if (!ascending) {
             
@@ -84,6 +84,27 @@ public class OrderByExpr {
         }
 
         return sb.toString();
+
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof OrderByExpr))
+            return false;
+
+        final OrderByExpr t = (OrderByExpr) o;
+
+        if (ascending != t.ascending)
+            return false;
+
+        if (!ve.equals(t.ve))
+            return false;
+        
+        return true;
 
     }
 

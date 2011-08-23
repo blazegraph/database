@@ -31,11 +31,20 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GroupByNode;
+import com.bigdata.rdf.sparql.ast.HavingNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.OrderByExpr;
+import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -45,12 +54,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @version $Id$
  * 
  * TODO Test each query type (SELECT, ASK, DESCRIBE, CONSTRUCT).
- * 
- * TODO Test SLICE.
- * 
- * TODO Test conversion of value expressions.
- * 
- * TODO Test SUBQUERY.
  * 
  * TODO Modify grammar and test named subquery (WITH AS INCLUDE).
  * 
@@ -167,6 +170,208 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
     
     /**
+     * Unit test for GROUP BY in SELECT query with a bare variable in the group
+     * by clause.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} GROUP BY ?o
+     * </pre>
+     */
+    public void test_groupBy_bareVar() throws MalformedQueryException, TokenMgrError,
+            ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY ?o";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final GroupByNode groupBy = new GroupByNode();
+            expected.setGroupBy(groupBy);
+            groupBy.addExpr(new AssignmentNode(new VarNode("o"), new VarNode(
+                    "o")));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for GROUP BY in SELECT query with BIND(expr AS var).
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} GROUP BY (?o AS ?z)
+     * </pre>
+     */
+    public void test_groupBy_bindExpr() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY (?o AS ?z)";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final GroupByNode groupBy = new GroupByNode();
+            expected.setGroupBy(groupBy);
+            groupBy.addExpr(//
+                    new AssignmentNode(new VarNode("o"),
+                    (IValueExpressionNode) new VarNode("z"))//
+                    );
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for GROUP BY in SELECT query with function call without "AS".
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} GROUP BY str(?o)
+     * </pre>
+     */
+    public void test_groupBy_functionCall() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} GROUP BY str(?o)";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final GroupByNode groupBy = new GroupByNode();
+            expected.setGroupBy(groupBy);
+            final FunctionNode funct = new FunctionNode(lex,
+                    FunctionRegistry.STR, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("o") });
+            // Note: anonymous variable.
+            final VarNode anonvar1 = new VarNode("groupBy-1");
+            anonvar1.setAnonymous(true);
+            groupBy.addExpr(new AssignmentNode(anonvar1, funct));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for HAVING clause (with an implicit group consisting of all
+     * solutions).
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} HAVING (?o GT ?s)
+     * </pre>
+     */
+    public void test_having() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} HAVING (?o > ?s)";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final HavingNode having = new HavingNode();
+            expected.setHaving(having);
+            having.addExpr(new FunctionNode(lex, //
+                    FunctionRegistry.GT,//
+                    null, // scalarValues
+                    new ValueExpressionNode[] {// args
+                    new VarNode("o"), new VarNode("s") })//
+            );
+            
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for ORDER BY in SELECT query.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o} ORDER BY DESC(?s)
+     * </pre>
+     */
+    public void test_orderBy() throws MalformedQueryException, TokenMgrError,
+            ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o} ORDER BY DESC(?s)";
+
+        final QueryRoot expected = new QueryRoot();
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final OrderByNode orderBy = new OrderByNode();
+            expected.setOrderBy(orderBy);
+            orderBy.addExpr(new OrderByExpr(new VarNode("s"), false/* ascending */));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
      * Unit test for SELECT query with a wildcard (<code>*</code>).
      * 
      * <pre>
@@ -237,5 +442,5 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         assertSameAST(sparql, expected, actual);
 
     }
-    
+
 }
