@@ -435,7 +435,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return ternary(node, FunctionRegistry.REGEX);
     }
 
-    // FIXME EXISTS(GroupGraphPattern) is basically a subquery.
+    // FIXME EXISTS(GroupGraphPattern) is basically an ASK subquery.
     @Override
     public Exists visit(ASTExistsFunc node, Object data)
         throws VisitorException
@@ -465,12 +465,10 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * "IN" and "NOT IN" are infix notation operators. The syntax for "IN" is
      * [NumericExpression IN ArgList]. However, the IN operators declared by the
      * {@link FunctionRegistry} require that the outer NumericExpression is
-     * their first argument.
-     * <p>
-     * Note: This will optimize for IN/0 (comparison with an empty list) and
-     * IN/1 (comparison with a single value expression). The function registry
-     * will further optimize for IN/nary, where the members of the set are
-     * constants and the outer expression is a variable.
+     * their first argument. The function registry optimizes several different
+     * cases, including where the set is empty, where it has one member, and
+     * where the members of the set are constants and the outer expression is a
+     * variable.
      * 
      * @see FunctionRegistry#IN
      * @see FunctionRegistry#NOT_IN

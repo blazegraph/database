@@ -33,6 +33,8 @@ import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.constraints.ComputedIN;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -510,6 +512,180 @@ public class TestGroupGraphPatternBuilder extends
            
         }
 
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * IN with empty arg list in a FILTER. This should be turned into a FALSE
+     * constraint.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o . FILTER (?s IN()) }
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_IN_filter() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. FILTER (?s IN())}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+                    FunctionRegistry.IN,//
+                    null, // scalarValues
+                    new ValueExpressionNode[] {// args
+                    new VarNode("s") })));//
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * IN with an arg list in a FILTER. The arg list has a single value. This
+     * should be turned into a SameTerm constraint.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o. FILTER (?s IN(?o))}
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_IN_filter_singletonSet() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. FILTER (?s IN(?o))}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+                    FunctionRegistry.IN,//
+                    null, // scalarValues
+                    new ValueExpressionNode[] {// args
+                    new VarNode("s"), // variable 
+                    new VarNode("o")  // other arg
+                    })));//
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * IN with a non-empty arg list in a FILTER. The arguments are expressions
+     * rather than constants. This should be turned into a {@link ComputedIN}.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o. FILTER (?s IN(?p,?o))}
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_IN_filter_variables()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. FILTER (?s IN(?p,?o))}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+                    FunctionRegistry.IN,//
+                    null, // scalarValues
+                    new ValueExpressionNode[] {// args
+                    new VarNode("s"), // // variable
+                    new VarNode("p"), new VarNode("o") // other args. 
+                    })));//
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * IN with a non-empty arg list in a FILTER. The arguments are expressions
+     * rather than constants. This should be turned into an optimized IN using a
+     * hash set or binary search.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o. FILTER (?s IN(?p,?o))}
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_IN_filter_constants()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "SELECT ?s where {?s ?p ?o. FILTER (?s IN(1,2))}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+                    FunctionRegistry.IN,//
+                    null, // scalarValues
+                    new ValueExpressionNode[] {// args
+                    new VarNode("s"), // var
+                    // other args to IN()
+                    new ConstantNode(makeIV(valueFactory.createLiteral("1",XSD.INTEGER))),
+                    new ConstantNode(makeIV(valueFactory.createLiteral("2",XSD.INTEGER)))
+                    })));//
+
+        }
+        
         final QueryRoot actual = parse(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
