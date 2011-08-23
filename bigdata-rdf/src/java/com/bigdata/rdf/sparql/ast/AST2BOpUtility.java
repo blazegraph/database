@@ -161,7 +161,136 @@ public class AST2BOpUtility {
         };
     }
 
-	/**
+    // FIXME Incorporate this in place of the Sesame DESCRIBE query generation.
+//  protected void optimizeDescribe() {
+//      try {
+//          ParsedQuery parsedQuery = getParsedQuery();
+//          TupleExpr node = parsedQuery.getTupleExpr();
+//          if (log.isInfoEnabled())
+//              log.info(node);
+//          node = ((Reduced) node).getArg();
+//          node = ((Projection) node).getArg();
+//          ValueExpr ve = ((Filter) node).getCondition();
+//          node = ((Filter) node).getArg();
+//          if (node instanceof Join) {
+//              node = ((Join) node).getLeftArg();
+//              final Set<Var> vars = new HashSet<Var>();
+//              ve.visitChildren(new QueryModelVisitorBase() {
+//                  @Override
+//                  public void meet(SameTerm same) throws Exception {
+//                      Var var = (Var) same.getRightArg();
+//                      vars.add(var);
+//                  }
+//              });
+//              Collection<StatementPattern> sps = new LinkedList<StatementPattern>();
+//              Collection<ProjectionElemList> projElemLists = 
+//                  new LinkedList<ProjectionElemList>();
+//              for (Var v : vars) {
+//                  {
+//                      Var p = createAnonVar("-p" + v.getName() + "-1");
+//                      Var o = createAnonVar("-o" + v.getName());
+//                      StatementPattern sp = new StatementPattern(v, p, o);
+//                      sps.add(sp);
+//                      ProjectionElemList projElemList = new ProjectionElemList();
+//                      projElemList.addElement(new ProjectionElem(v.getName(), "subject"));
+//                      projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                      projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                      projElemLists.add(projElemList);
+//                  }
+//                  {
+//                      Var s = createAnonVar("-s" + v.getName());
+//                      Var p = createAnonVar("-p" + v.getName() + "-2");
+//                      StatementPattern sp = new StatementPattern(s, p, v);
+//                      sps.add(sp);
+//                      ProjectionElemList projElemList = new ProjectionElemList();
+//                      projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                      projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                      projElemList.addElement(new ProjectionElem(v.getName(), "object"));
+//                      projElemLists.add(projElemList);
+//                  }
+//              }
+//              Iterator<StatementPattern> it = sps.iterator();
+//              Union union = new Union(it.next(), it.next());
+//              while (it.hasNext()) {
+//                  union = new Union(union, it.next());
+//              }
+//              node = new Join(node, union);
+//              node = new MultiProjection(node, projElemLists);
+//              node = new Reduced(node);
+//              parsedQuery.setTupleExpr(node);
+//          } else {
+//              final Set<ValueConstant> vals = new HashSet<ValueConstant>();
+//              ve.visitChildren(new QueryModelVisitorBase() {
+//                  @Override
+//                  public void meet(SameTerm same) throws Exception {
+//                      ValueConstant val = (ValueConstant) same.getRightArg();
+//                      vals.add(val);
+//                  }
+//              });
+//              Collection<StatementPattern> joins = new LinkedList<StatementPattern>();
+//              Collection<ProjectionElemList> projElemLists = 
+//                  new LinkedList<ProjectionElemList>();
+//              Collection<ExtensionElem> extElems = new LinkedList<ExtensionElem>();
+//              int i = 0;
+//              int constVarID = 1;
+//              for (ValueConstant v : vals) {
+//                  {
+//                      Var s = createConstVar(v.getValue(), constVarID++);
+//                      Var p = createAnonVar("-p" + i + "-1");
+//                      Var o = createAnonVar("-o" + i);
+//                      StatementPattern sp = new StatementPattern(s, p, o);
+//                      joins.add(sp);
+//                      ProjectionElemList projElemList = new ProjectionElemList();
+//                      projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                      projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                      projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                      projElemLists.add(projElemList);
+//                      extElems.add(new ExtensionElem(v, s.getName()));
+//                  }
+//                  {
+//                      Var s = createAnonVar("-s" + i);
+//                      Var p = createAnonVar("-p" + i + "-2");
+//                      Var o = createConstVar(v.getValue(), constVarID++);
+//                      StatementPattern sp = new StatementPattern(s, p, o);
+//                      joins.add(sp);
+//                      ProjectionElemList projElemList = new ProjectionElemList();
+//                      projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
+//                      projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
+//                      projElemList.addElement(new ProjectionElem(o.getName(), "object"));
+//                      projElemLists.add(projElemList);
+//                      extElems.add(new ExtensionElem(v, o.getName()));
+//                  }
+//                  i++;
+//              }
+//              Iterator<StatementPattern> it = joins.iterator();
+//              node = it.next();
+//              while (it.hasNext()) {
+//                  StatementPattern j = it.next();
+//                  node = new Union(j, node);
+//              }
+//              node = new Extension(node, extElems);
+//              node = new MultiProjection(node, projElemLists);
+//              node = new Reduced(node);
+//              parsedQuery.setTupleExpr(node);
+//          }
+//      } catch (Exception ex) {
+//          throw new RuntimeException(ex);
+//      }
+//  }
+//
+//  private Var createConstVar(Value value, int constantVarID) {
+//      Var var = createAnonVar("-const-" + constantVarID);
+//      var.setValue(value);
+//      return var;
+//  }
+//
+//  private Var createAnonVar(String varName) {
+//      Var var = new Var(varName);
+//      var.setAnonymous(true);
+//      return var;
+//  }
+
+    /**
 	 * Convert an AST query plan into a set of executable pipeline operators.
 	 */
 	public static PipelineOp convert(final AST2BOpContext ctx) {
