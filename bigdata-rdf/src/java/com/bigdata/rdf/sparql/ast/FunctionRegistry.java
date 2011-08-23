@@ -70,6 +70,9 @@ import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
  * @see <a
  *      href="http://lists.w3.org/Archives/Public/public-rdf-dawg/2006AprJun/att-0138/sparql-function-uri.html">Sparql
  *      functions</a>
+ *      
+ * TODO Openrdf now defines the URIs for the XPath functions in <code>org.openrdf.model.vocabulary.FN</code>.
+ * Use referencs to that class here?
  */
 public class FunctionRegistry {
 
