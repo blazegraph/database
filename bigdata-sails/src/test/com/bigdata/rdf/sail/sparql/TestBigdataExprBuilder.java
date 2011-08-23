@@ -37,11 +37,13 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
+import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -534,7 +536,10 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * DESCRIBE ?s where {?s ?p ?o}
      * </pre>
      * 
-     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     * Note: The DESCRIBE projection and where class of the DESCRIBE query are
+     * modeled directly, but this does not capture the semantics of the DESCRIBE
+     * query. You MUST run an {@link IASTOptimizer} to rewrite the
+     * {@link QueryBase} in order to capture the semantics of a DESCRIBE query.
      */
     public void test_describe() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -559,8 +564,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         assertSameAST(sparql, expected, actual);
         
-        fail("test construct template");
-
     }
     
     /**
@@ -570,7 +573,10 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * DESCRIBE * where {?s ?p ?o}
      * </pre>
      * 
-     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     * Note: The DESCRIBE projection and where class of the DESCRIBE query are
+     * modeled directly, but this does not capture the semantics of the DESCRIBE
+     * query. You MUST run an {@link IASTOptimizer} to rewrite the
+     * {@link QueryBase} in order to capture the semantics of a DESCRIBE query.
      */
     public void test_describe_star() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -595,18 +601,22 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         assertSameAST(sparql, expected, actual);
 
-        fail("test construct template");
-
     }
     
     /**
      * Unit test for <code>DESCRIBE</code> query for an IRI.
+     * <p>
+     * Note: There is no "where clause" for this query. One must be added when
+     * the query semantics of describe are imposed by an AST rewrite.
      * 
      * <pre>
      * DESCRIBE <http://www.bigdata.com>
      * </pre>
      * 
-     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     * Note: The DESCRIBE projection and where class of the DESCRIBE query are
+     * modeled directly, but this does not capture the semantics of the DESCRIBE
+     * query. You MUST run an {@link IASTOptimizer} to rewrite the
+     * {@link QueryBase} in order to capture the semantics of a DESCRIBE query.
      */
     public void test_describe_iri() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -618,18 +628,19 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
-            projection.addProjectionExpression(new AssignmentNode(new VarNode(
-                    "-iri-1"), new ConstantNode(makeIV(valueFactory
-                    .createURI("http://www.bigdata.com")))));
             
+            final VarNode anonvar = new VarNode("-iri-1");
+            anonvar.setAnonymous(true);
+            projection.addProjectionExpression(new AssignmentNode(anonvar,
+                    new ConstantNode(makeIV(valueFactory
+                            .createURI("http://www.bigdata.com")))));
+
         }
         
         final QueryRoot actual = parse(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
 
-        fail("test construct template and implicit join groups");
-    
     }
 
     /**
@@ -640,7 +651,10 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * DESCRIBE ?s <http://www.bigdata.com> where {?s ?p ?o}
      * </pre>
      * 
-     * FIXME For DESCRIBE, we need to specify the CONSTRUCT template in the AST!
+     * Note: The DESCRIBE projection and where class of the DESCRIBE query are
+     * modeled directly, but this does not capture the semantics of the DESCRIBE
+     * query. You MUST run an {@link IASTOptimizer} to rewrite the
+     * {@link QueryBase} in order to capture the semantics of a DESCRIBE query.
      */
     public void test_describe_vars_and_iris() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -652,10 +666,12 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
-            projection.addProjectionVar(new VarNode("?s"));
-            projection.addProjectionExpression(new AssignmentNode(new VarNode(
-                    "-iri-1"), new ConstantNode(makeIV(valueFactory
-                    .createURI("http://www.bigdata.com")))));
+            projection.addProjectionVar(new VarNode("s"));
+            final VarNode anonvar = new VarNode("-iri-1");
+            anonvar.setAnonymous(true);
+            projection.addProjectionExpression(new AssignmentNode(anonvar,
+                    new ConstantNode(makeIV(valueFactory
+                            .createURI("http://www.bigdata.com")))));
             
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
@@ -667,8 +683,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot actual = parse(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
-
-        fail("test construct template");
     
     }
     

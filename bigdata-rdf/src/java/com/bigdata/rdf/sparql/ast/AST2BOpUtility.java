@@ -154,6 +154,13 @@ public class AST2BOpUtility {
      * <p>
      * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure on
      * this one.)
+     * 
+     * FIXME Add rewrite for DESCRIBE (see the code inline below). Note that
+     * openrdf used "REDUCED" in their projection. We might want to do the same
+     * in the rewritten query.
+     * 
+     * FIXME "describe <http://www.bigdata.com>" does not have a whereClause.
+     * The rewrite must supply an appropriate one.
      */
     static {
         optimizers = new IASTOptimizer[] {
