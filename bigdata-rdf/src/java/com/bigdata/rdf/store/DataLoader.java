@@ -753,28 +753,30 @@ public class DataLoader {
             // Next try searching for the desired resource from the root
             // of the jar; that is, search the jar file for an exact match
             // of the input string.
-            rdfStream = 
-               getClass().getClassLoader().getResourceAsStream(resource);
+            rdfStream = getClass().getClassLoader().getResourceAsStream(
+                    resource);
 
             if (rdfStream == null) {
 
-            /*
-             * If we do not find as a Resource then try the file system.
-             */
-            
-            final File file = new File(resource);
-            
-            if(file.exists()) {
-                
-                loadFiles(totals, 0/* depth */, file, baseURL,
-                        rdfFormat, null, filter, endOfBatch);
+                /*
+                 * If we do not find as a Resource then try the file system.
+                 */
 
-                return;
-                
+                final File file = new File(resource);
+
+                if (file.exists()) {
+
+                    loadFiles(totals, 0/* depth */, file, baseURL, rdfFormat,
+                            null, filter, endOfBatch);
+
+                    return;
+
+                }
+
             }
-            
+
         }
-        
+
         /* 
          * Obtain a buffered reader on the input stream.
          */
@@ -805,8 +807,6 @@ public class DataLoader {
 
             rdfStream.close();
 
-        }
-        
         }
         
     }
