@@ -141,6 +141,11 @@ public class AST2BOpUtility {
      * nested graph pattern only find solutions which are not allowed by the
      * outer graph.
      * 
+     * TODO StatementPatternNode should inherit the context dynamically from the
+     * parent rather than requiring the context to be specified explicitly. This
+     * is also true for a subquery. If it specifies a GRAPH pattern, then you
+     * MUST put a FILTER on it. (An IASTOptimizer could take care of that.)
+     * 
      * FIXME Either handle via AST rewrites or verify that AST2BOpUtility
      * handles this during convert().
      * <p>

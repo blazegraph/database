@@ -33,8 +33,8 @@ package com.bigdata.rdf.sparql.ast;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class GroupMemberNodeBase extends QueryNodeBase implements
-        IGroupMemberNode {
+abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
+        QueryNodeBase implements IGroupMemberNode {
 
     /**
      * 
@@ -51,9 +51,9 @@ abstract public class GroupMemberNodeBase extends QueryNodeBase implements
     
         final IQueryNode parent = getParent();
         
-        if (parent instanceof GroupMemberNodeBase) {
+        if (parent instanceof GroupMemberNodeBase<?>) {
 
-            return ((GroupMemberNodeBase) parent).getContext();
+            return ((GroupMemberNodeBase<?>) parent).getContext();
             
         }
         

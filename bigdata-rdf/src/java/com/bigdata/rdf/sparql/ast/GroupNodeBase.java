@@ -7,28 +7,28 @@ import java.util.List;
 /**
  * Base class for AST group nodes.
  */
-public abstract class GroupNodeBase extends GroupMemberNodeBase implements
-        IGroupNode {
+public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
+        GroupMemberNodeBase<E> implements IGroupNode<E> {
 
-	private final List<IGroupMemberNode> children;
+	private final List<E> children;
 	
 	private boolean optional;
 	
 	protected GroupNodeBase(final boolean optional) {
 		
-		this.children = new LinkedList<IGroupMemberNode>();
+		this.children = new LinkedList<E>();
 		
 		this.optional = optional;
 		
     }
 
-	public Iterator<IGroupMemberNode> iterator() {
+	public Iterator<E> iterator() {
 		
 		return children.iterator();
 		
 	}
-	
-	public IGroupNode addChild(final IGroupMemberNode child) {
+
+	public IGroupNode<E> addChild(final E child) {
 		
 		children.add(child);
 		
@@ -38,7 +38,7 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
 		
 	}
 	
-	public IGroupNode removeChild(final IGroupMemberNode child) {
+	public IGroupNode<E> removeChild(final E child) {
 		
 		children.remove(child);
 		
@@ -48,6 +48,12 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
 		
 	}
 	
+    public boolean isEmpty() {
+        
+        return children.isEmpty();
+        
+    }
+    
 	public int getChildCount() {
 		
 		return children.size();
@@ -74,7 +80,7 @@ public abstract class GroupNodeBase extends GroupMemberNodeBase implements
         if (!(o instanceof GroupNodeBase))
             return false;
 
-        final GroupNodeBase t = (GroupNodeBase) o;
+        final GroupNodeBase<?> t = (GroupNodeBase<?>) o;
 
         if (optional != t.optional)
             return false;

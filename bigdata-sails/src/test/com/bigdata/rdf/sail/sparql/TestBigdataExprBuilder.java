@@ -33,6 +33,7 @@ import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
@@ -696,19 +697,23 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * FIXME CONSTRUCT has two forms which we need to test. In the first form a
      * ConstructTemplate appears before the DatasetClause. In the second form a
      * TriplesTemplate appears after the WhereClause and before the optional
-     * SolutionModifier. Both forms allow the SolutionModifier.
+     * SolutionModifier. Both forms allow the SolutionModifier. However, openrdf
+     * has not yet implemented the 2nd form.  Also, Anzo has an extension of
+     * CONSTRUCT for quads.
      */
     public void test_construct() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-        final String sparql = "construct ?s where {?s ?p ?o}";
+        final String sparql = "construct { ?s ?p ?o } where {?s ?p ?o}";
 
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
         {
 
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
+            final ConstructNode construct = new ConstructNode();
+            expected.setConstruct(construct);
+            construct.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
             
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
@@ -720,8 +725,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot actual = parse(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
-        
-        fail("test construct template");
 
     }
     

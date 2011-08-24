@@ -34,6 +34,7 @@ import org.openrdf.query.algebra.Exists;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTConstraint;
+import org.openrdf.query.parser.sparql.ast.ASTConstruct;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTMinusGraphPattern;
@@ -45,6 +46,7 @@ import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -90,6 +92,29 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
     }
 
     //
+    // CONSTRUCT (handled as a TriplesBlock).
+    //
+
+    @Override
+    public ConstructNode visit(final ASTConstruct node, Object data)
+            throws VisitorException {
+
+        final GroupGraphPattern parentGP = graphPattern;
+        
+        graphPattern = new GroupGraphPattern();//parentGP); Note: No parent.
+
+        // visit the children of the node (default behavior).
+        super.visit(node, null);
+
+        final ConstructNode group = graphPattern.buildGroup(new ConstructNode());
+        
+        graphPattern = parentGP;
+
+        return group;
+        
+    }
+
+    //
     //
     //
 
@@ -118,7 +143,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
             throw new UnsupportedOperationException("Exists => Subquery?");
 //            ((Exists)data).setSubQuery(te);
         } else {
-            parentGP.addRequiredTE(group);
+            parentGP.add(group);
         }
 
         graphPattern = parentGP;
@@ -145,7 +170,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         final GroupNodeBase group = graphPattern.buildGroup(new JoinGroupNode(
                 true/* optional */));
 
-        parentGP.addRequiredTE(group);
+        parentGP.add(group);
 
         graphPattern = parentGP;
 
@@ -199,7 +224,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 //        
 //        parentGP.addRequiredTE(union);
         
-        parentGP.addRequiredTE(graphPattern.buildGroup(new UnionNode()));
+        parentGP.add(graphPattern.buildGroup(new UnionNode()));
         
         graphPattern = parentGP;
 
@@ -240,7 +265,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         final SubqueryRoot subSelect = (SubqueryRoot) node.jjtAccept(
                 new BigdataExprBuilder(context), graphPattern/* not-null */);
 
-        graphPattern.addRequiredTE(subSelect);
+        graphPattern.add(subSelect);
 
         return null;
 
@@ -277,7 +302,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
         for (TermNode object : objectList) {
             
-            graphPattern.addRequiredSP(subject, predicate, object);
+            graphPattern.addSP(subject, predicate, object);
             
         }
 
@@ -310,7 +335,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
             for (TermNode object : objectList) {
 
-                graphPattern.addRequiredSP(subject, verbPath, object);
+                graphPattern.addSP(subject, verbPath, object);
                 
             }
 
@@ -361,7 +386,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         return bnodeVar;
         
     }
-
+    
     //
     // Property paths
     //
