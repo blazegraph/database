@@ -57,6 +57,13 @@ public class VarNode extends TermNode {
 	    this.anonymous = anonymous;
 	}
 
+	/**
+	 * Return <code>true</code> iff the variable is <code>*</code>.
+	 */
+	public boolean isWildcard() {
+	    return ((Var)getValueExpression()).isWildcard();
+	}
+	
     /**
      * Overridden to mark anonymous variables.
      * 
