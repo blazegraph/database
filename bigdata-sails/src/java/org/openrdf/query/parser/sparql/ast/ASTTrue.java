@@ -2,7 +2,7 @@
 
 package org.openrdf.query.parser.sparql.ast;
 
-public class ASTTrue extends SimpleNode {
+public class ASTTrue extends ASTRDFValue {
 
 	public ASTTrue(int id) {
 		super(id);

@@ -385,6 +385,12 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
     /**
      * Handle a CONSTRUCT query.
+     * <p>
+     * This builds a {@link ConstructNode} which is a model of the statement
+     * patterns in the construct template and attaches the where clause and
+     * solution modifiers. However, this is NOT a complete description of the
+     * semantics of the query. An {@link IASTOptimizer} will intercept the
+     * CONSTRUCT query and rewrite it before it is executed.
      * 
      * FIXME There is an alternative form of a CONSTRUCT query which this is not
      * covering. (CONSTRUCT WHERE { TriplesTemplate? } SolutionModifier. openrdf

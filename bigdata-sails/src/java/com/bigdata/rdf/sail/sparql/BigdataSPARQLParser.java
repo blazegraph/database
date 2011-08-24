@@ -47,6 +47,7 @@ import org.openrdf.query.parser.sparql.BaseDeclProcessor;
 import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
 import org.openrdf.query.parser.sparql.DatasetDeclProcessor;
 import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
+import org.openrdf.query.parser.sparql.SPARQLParser;
 import org.openrdf.query.parser.sparql.StringEscapesProcessor;
 import org.openrdf.query.parser.sparql.TupleExprBuilder;
 import org.openrdf.query.parser.sparql.UpdateExprBuilder;
@@ -74,7 +75,7 @@ import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
- * Overridden version of the openrdf 2.4.2 SPARQLParser class which extracts
+ * Overridden version of the {@link SPARQLParser} class which extracts
  * additional information required by bigdata and associates it with the
  * {@link ParsedQuery}.
  * 

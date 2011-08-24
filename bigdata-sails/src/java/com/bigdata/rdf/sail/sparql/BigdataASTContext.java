@@ -21,24 +21,29 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/* Portions of this code are:
+ *
+ * Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2007.
+ *
+ * Licensed under the Aduna BSD-style license.
+ */
 /*
  * Created on Aug 21, 2011
  */
 
 package com.bigdata.rdf.sail.sparql;
 
-import org.openrdf.model.Value;
-
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
+ * Object provides context required in various stages of parsing queries or
+ * updates.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

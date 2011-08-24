@@ -2,7 +2,7 @@
 
 package org.openrdf.query.parser.sparql.ast;
 
-public class ASTRDFLiteral extends SimpleNode {
+public class ASTRDFLiteral extends ASTRDFValue {
 
 	private String lang;
 

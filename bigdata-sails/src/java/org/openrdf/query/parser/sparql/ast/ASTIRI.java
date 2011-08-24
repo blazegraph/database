@@ -2,7 +2,7 @@
 
 package org.openrdf.query.parser.sparql.ast;
 
-public class ASTIRI extends SimpleNode {
+public class ASTIRI extends ASTRDFValue {
 
 	private String value;
 
