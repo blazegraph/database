@@ -38,9 +38,10 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.parser.serql.ast.ASTConstructQuery;
 import org.openrdf.query.parser.sparql.ast.ASTAskQuery;
 import org.openrdf.query.parser.sparql.ast.ASTBaseDecl;
+import org.openrdf.query.parser.sparql.ast.ASTConstruct;
+import org.openrdf.query.parser.sparql.ast.ASTConstructQuery;
 import org.openrdf.query.parser.sparql.ast.ASTDescribe;
 import org.openrdf.query.parser.sparql.ast.ASTDescribeQuery;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
@@ -63,6 +64,7 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
@@ -173,11 +175,15 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     //
     
     /**
-     * This is the entry point for both a top-level SELECT and a SubSelect. The
-     * two contexts are differentiated based on the <i>data</i>, which is non-
-     * <code>null</code> if this is a SubSelect. The method returns either a
-     * {@link QueryRoot} or a {@link SubqueryRoot} depending on whether or not
-     * the {@link ASTSelectQuery} appears as a top-level query or a subquery.
+     * This is the entry point for both a top-level SELECT and a SubSelect.
+     * 
+     * @param data
+     *            Non-<code>null</code> iff this is a SubSelect.
+     * 
+     * @return The method returns either a {@link QueryRoot} or a
+     *         {@link SubqueryRoot} depending on whether or not the
+     *         {@link ASTSelectQuery} appears as a top-level query or a
+     *         subquery.
      */
     @Override
     public QueryBase visit(final ASTSelectQuery astQuery, Object data)
@@ -373,212 +379,54 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
         }
         
-//        /*
-//         * Create a graph query that produces the statements that have the
-//         * requests resources as subject or object.
-//         */
-//        
-//        final VarNode subjVar = context.createAnonVar("-descr-subj");
-//        final VarNode predVar = context.createAnonVar("-descr-pred");
-//        final VarNode objVar = context.createAnonVar("-descr-obj");
-//        final StatementPatternNode sp = new StatementPatternNode(subjVar,
-//                predVar, objVar);
-//
-//        /*
-//         * Add the statement pattern to the where clause so it is joined with
-//         * whatever was already specified in the where clause. If there is no
-//         * where clause, then we will create an empty join group and add the
-//         * statement pattern to that.
-//         */
-//        IGroupNode whereClause = queryRoot.getWhereClause();
-//        if (whereClause == null) {
-//            whereClause = new JoinGroupNode();
-//            queryRoot.setWhereClause(whereClause);
-//        }
-//        whereClause.addChild(sp);
-//
-//        /*
-//         * Setup SameTerm constraints for each variable or IRI in the "DESCRIBE"
-//         * clause.
-//         */
-//        {
-//
-//            final int nchildren = node.jjtGetNumChildren();
-//
-//            final FunctionNode sameTerms[] = new FunctionNode[2 * nchildren];
-//
-//            for (int i = 0, j = 0; i < nchildren; i++) {
-//
-//                /*
-//                 * Note: Delegates to the ValueExprBuilder. Can visit VarNode or
-//                 * ConstantNode(IV<URI,_>).
-//                 */
-//
-//                final ValueExpressionNode resource = (ValueExpressionNode) node
-//                        .jjtGetChild(i).jjtAccept(valueExprBuilder, null);
-//
-//                sameTerms[j++] = new FunctionNode(context.lex,
-//                        FunctionRegistry.SAME_TERM, null/* scalarValues */,
-//                        new ValueExpressionNode[] { subjVar, resource });
-//
-//                sameTerms[j++] = new FunctionNode(context.lex,
-//                        FunctionRegistry.SAME_TERM, null/* scalarValues */,
-//                        new ValueExpressionNode[] { objVar, resource });
-//
-//            }
-//
-//            final ValueExpressionNode constraint = new FunctionNode(
-//                    context.lex, FunctionRegistry.IN, null/* scalarValues */,
-//                    sameTerms);
-//
-//            whereClause.addChild(new FilterNode(constraint));
-//
-//        }
-//
-//        final ProjectionNode projection = new ProjectionNode();
-//        projection.setReduced(true);
-//        projection.addProjectionVar(subjVar);
-//        projection.addProjectionVar(predVar);
-//        projection.addProjectionVar(objVar);
-//        queryRoot.setProjection(projection);
-
         return null;
         
     }
 
-        
-//  @Override
-//  public TupleExpr visit(ASTConstructQuery node, Object data)
-//      throws VisitorException
-//  {
-//      // Start with building the graph pattern
-//      graphPattern = new GraphPattern();
-//      node.getWhereClause().jjtAccept(this, null);
-//      TupleExpr tupleExpr = graphPattern.buildTupleExpr();
-//
-//      // Apply result ordering
-//      ASTOrderClause orderNode = node.getOrderClause();
-//      if (orderNode != null) {
-//          List<OrderElem> orderElemements = (List<OrderElem>)orderNode.jjtAccept(this, null);
-//          tupleExpr = new Order(tupleExpr, orderElemements);
-//      }
-//
-//      // Process construct clause
-//      ASTConstruct constructNode = node.getConstruct();
-//      if (!constructNode.isWildcard()) {
-//          tupleExpr = (TupleExpr)constructNode.jjtAccept(this, tupleExpr);
-//      }
-//      else {
-//          // create construct clause from graph pattern.
-//          ConstructorBuilder cb = new ConstructorBuilder();
-//
-//          // SPARQL does not allow distinct or reduced right now. Leaving
-//          // functionality in construct builder for
-//          // possible future use.
-//          tupleExpr = cb.buildConstructor(tupleExpr, false, false);
-//      }
-//
-//      // process limit and offset clauses
-//      ASTLimit limitNode = node.getLimit();
-//      long limit = -1L;
-//      if (limitNode != null) {
-//          limit = (Long)limitNode.jjtAccept(this, null);
-//      }
-//
-//      ASTOffset offsetNode = node.getOffset();
-//      long offset = -1;
-//      if (offsetNode != null) {
-//          offset = (Long)offsetNode.jjtAccept(this, null);
-//      }
-//
-//      if (offset >= 1 || limit >= 0) {
-//          tupleExpr = new Slice(tupleExpr, offset, limit);
-//      }
-//
-//      return tupleExpr;
-//  }
-//
-//  @Override
-//  public TupleExpr visit(ASTConstruct node, Object data)
-//      throws VisitorException
-//  {
-//      TupleExpr result = (TupleExpr)data;
-//
-//      // Collect construct triples
-//      graphPattern = new GraphPattern();
-//      super.visit(node, null);
-//      TupleExpr constructExpr = graphPattern.buildTupleExpr();
-//
-//      // Retrieve all StatementPattern's from the construct expression
-//      List<StatementPattern> statementPatterns = StatementPatternCollector.process(constructExpr);
-//
-//      Set<Var> constructVars = getConstructVars(statementPatterns);
-//
-//      // Create BNodeGenerator's for all anonymous variables
-//      Map<Var, ExtensionElem> extElemMap = new HashMap<Var, ExtensionElem>();
-//
-//      for (Var var : constructVars) {
-//          if (var.isAnonymous() && !extElemMap.containsKey(var)) {
-//              ValueExpr valueExpr;
-//
-//              if (var.hasValue()) {
-//                  valueExpr = new ValueConstant(var.getValue());
-//              }
-//              else {
-//                  valueExpr = new BNodeGenerator();
-//              }
-//
-//              extElemMap.put(var, new ExtensionElem(valueExpr, var.getName()));
-//          }
-//      }
-//
-//      if (!extElemMap.isEmpty()) {
-//          result = new Extension(result, extElemMap.values());
-//      }
-//
-//      // Create a Projection for each StatementPattern in the constructor
-//      List<ProjectionElemList> projList = new ArrayList<ProjectionElemList>();
-//
-//      for (StatementPattern sp : statementPatterns) {
-//          ProjectionElemList projElemList = new ProjectionElemList();
-//
-//          projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
-//          projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
-//          projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
-//
-//          projList.add(projElemList);
-//      }
-//
-//      if (projList.size() == 1) {
-//          result = new Projection(result, projList.get(0));
-//      }
-//      else if (projList.size() > 1) {
-//          result = new MultiProjection(result, projList);
-//      }
-//      else {
-//          // Empty constructor
-//          result = new EmptySet();
-//      }
-//
-//      return new Reduced(result);
-//  }
-//
-//  /**
-//   * Gets the set of variables that are relevant for the constructor. This
-//   * method accumulates all subject, predicate and object variables from the
-//   * supplied statement patterns, but ignores any context variables.
-//   */
-//  private Set<Var> getConstructVars(Collection<StatementPattern> statementPatterns) {
-//      Set<Var> vars = new LinkedHashSet<Var>(statementPatterns.size() * 2);
-//
-//      for (StatementPattern sp : statementPatterns) {
-//          vars.add(sp.getSubjectVar());
-//          vars.add(sp.getPredicateVar());
-//          vars.add(sp.getObjectVar());
-//      }
-//
-//      return vars;
-//  }
+    /**
+     * Handle a CONSTRUCT query.
+     * 
+     * FIXME There is an alternative form of a CONSTRUCT query which this is not
+     * covering. (CONSTRUCT WHERE { TriplesTemplate? } SolutionModifier. openrdf
+     * does not support this form yet.
+     * 
+     * FIXME Add support for quads (Anzo extension).
+     */
+    @Override
+    public QueryBase visit(final ASTConstructQuery node, Object data)
+            throws VisitorException {
+
+        final QueryBase queryRoot = data == null ? new QueryRoot(
+                QueryType.CONSTRUCT) : new SubqueryRoot();
+
+        /*
+         * Process construct clause.
+         * 
+         * Note: The children of the ASTConstruct is a TriplesBlock in
+         * sparql.jjt. This delegates to the GroupGraphPatternBuilder, which
+         * handles the TriplesBlock.
+         */
+
+        final ASTConstruct constructNode = node.getConstruct();
+
+        final ConstructNode tmp = (ConstructNode) constructNode.jjtAccept(
+                groupGraphPatternBuilder, null/* data */);
+
+        queryRoot.setConstruct(tmp);
+
+        handleWhereClause(node, queryRoot);
+
+        handleGroupBy(node, queryRoot);
+
+        handleHaving(node, queryRoot);
+
+        handleOrderBy(node, queryRoot);
+
+        handleSlice(node, queryRoot);
+
+        return queryRoot;
+
+    }
 
     //
     // Grammar constructions below the ASTQuery node.

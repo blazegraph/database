@@ -6,7 +6,7 @@ import org.apache.log4j.Logger;
  * A special kind of group {@link IGroupNode} that represents the sparql union
  * operator. This node only accepts {@link JoinGroupNode}s as children. 
  */
-public class UnionNode extends GroupNodeBase {
+public class UnionNode extends GroupNodeBase<IGroupMemberNode> {
 	
 	private static final transient Logger log = Logger.getLogger(UnionNode.class);
 	
@@ -30,7 +30,7 @@ public class UnionNode extends GroupNodeBase {
 	 * something other than a JoinGroupNode as a child.
 	 */
 	@Override
-	public IGroupNode addChild(final IGroupMemberNode child) {
+	public UnionNode addChild(final IGroupMemberNode child) {
 		
 		// can only add non-optional join groups as children to union
 		if (!(child instanceof JoinGroupNode)) {
@@ -44,7 +44,7 @@ public class UnionNode extends GroupNodeBase {
 			log.warn("optional tag on child will be ignored");
 		}
 		
-		return super.addChild(child);
+		return (UnionNode) super.addChild(child);
 		
 	}
 	

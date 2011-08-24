@@ -48,9 +48,8 @@ public class BigdataConstructIterator implements
         this.vf = vf;
         this.leftovers = new LinkedList<Statement>();
         /*
-         * FIXME This must reuse the reverse blank nodes mapping for the
-         * SailConnection to resolve blank node term identifiers to blank node
-         * objects across the scope of the SailConnection.
+         * Note: CONSTRUCT only scopes bnodes (or at least bnodes in the
+         * template) to the solution.
          */
         stmtIt = db.asStatementIterator(db
                 .bulkCompleteStatements(new ChunkedWrappedIterator<ISPO>(
@@ -227,7 +226,7 @@ public class BigdataConstructIterator implements
         
         /**
          * Convert a bindingset into an SPO.  All values should already be
-         * bigdata values, we dont' use db.getTermId(Value).
+         * bigdata values, we don't use db.getTermId(Value).
          */
         private SPO convert(final BindingSet bindingSet) {
             final Value subject = bindingSet.getValue("subject");

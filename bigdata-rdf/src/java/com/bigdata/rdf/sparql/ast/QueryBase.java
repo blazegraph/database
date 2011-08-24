@@ -38,8 +38,9 @@ import com.bigdata.rdf.sail.QueryType;
 abstract public class QueryBase extends QueryNodeBase {
 
     private QueryType queryType;
+    private ConstructNode construct;
     private ProjectionNode projection;
-    private IGroupNode whereClause;
+    private IGroupNode<IGroupMemberNode> whereClause;
     private GroupByNode groupBy;
     private HavingNode having;
     private OrderByNode orderBy;
@@ -80,23 +81,23 @@ abstract public class QueryBase extends QueryNodeBase {
 	}
 	
     /**
-     * Return the {@link IGroupNode} (corresponds to the WHERE clause).
+     * Return the construction -or- <code>null</code> if there is no construction.
      */
-    public IGroupNode getWhereClause() {
-
-        return whereClause;
+    public ConstructNode getConstruct() {
+        
+        return construct;
         
     }
-
+    
     /**
-     * Set the {@link IGroupNode} (corresponds to the WHERE clause).
-     *  
-     * @param whereClause
-     *            The "WHERE" clause.
+     * Set or clear the construction.
+     * 
+     * @param construction
+     *            The construction (may be <code>null</code>).
      */
-    public void setWhereClause(final IGroupNode whereClause) {
-        
-        this.whereClause = whereClause;
+    public void setConstruct(final ConstructNode construct) {
+
+        this.construct = construct;
         
     }
     
@@ -118,6 +119,27 @@ abstract public class QueryBase extends QueryNodeBase {
     public void setProjection(final ProjectionNode projection) {
 
         this.projection = projection;
+        
+    }
+    
+    /**
+     * Return the {@link IGroupNode} (corresponds to the WHERE clause).
+     */
+    public IGroupNode<IGroupMemberNode> getWhereClause() {
+
+        return whereClause;
+        
+    }
+
+    /**
+     * Set the {@link IGroupNode} (corresponds to the WHERE clause).
+     *  
+     * @param whereClause
+     *            The "WHERE" clause.
+     */
+    public void setWhereClause(final IGroupNode<IGroupMemberNode> whereClause) {
+        
+        this.whereClause = whereClause;
         
     }
     
@@ -211,7 +233,13 @@ abstract public class QueryBase extends QueryNodeBase {
 	    final String s = indent(indent);
 	    
 		final StringBuilder sb = new StringBuilder();
-		
+
+        if (construct != null && !construct.isEmpty()) {
+
+            sb.append(construct.toString(indent));
+            
+        }
+
         if (projection != null && !projection.isEmpty()) {
 
 		    sb.append(projection.toString(indent));
@@ -277,6 +305,14 @@ abstract public class QueryBase extends QueryNodeBase {
                 return false;
         } else {
             if (!queryType.equals(t.queryType))
+                return false;
+        }
+
+        if (construct == null) {
+            if (t.construct != null)
+                return false;
+        } else {
+            if (!construct.equals(t.construct))
                 return false;
         }
 

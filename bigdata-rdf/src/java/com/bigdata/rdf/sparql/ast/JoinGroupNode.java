@@ -14,7 +14,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  * An optional or non-optional collection of query nodes that run together in
  * a group.
  */
-public class JoinGroupNode extends GroupNodeBase {
+public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 
     /**
      * The graph variable or constant iff this {@link JoinGroupNode} models a
@@ -104,7 +104,7 @@ public class JoinGroupNode extends GroupNodeBase {
 		
 		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
 		
-		IGroupNode parent = getParent();
+		IGroupNode<?> parent = getParent();
 		
 		while (parent != null) {
 			
