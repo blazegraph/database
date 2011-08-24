@@ -2,7 +2,7 @@
 
 package org.openrdf.query.parser.sparql.ast;
 
-public class ASTBlankNode extends SimpleNode {
+public class ASTBlankNode extends ASTRDFValue {
 
 	private String id;
 

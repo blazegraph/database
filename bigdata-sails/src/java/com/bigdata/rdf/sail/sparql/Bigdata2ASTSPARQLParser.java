@@ -78,11 +78,11 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
-    private final AbstractTripleStore tripleStore;
+    private final BigdataASTContext context;
 
     public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
         
-        this.tripleStore = tripleStore;
+        this.context = new BigdataASTContext(tripleStore);
         
     }
 
@@ -124,6 +124,15 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                     }
                     
                     PrefixDeclProcessor.process(uc);
+                    /*
+                     * Note: In the query part of an update, blank nodes are treated
+                     * as anonymous vars. In the data part of the update, like in a
+                     * construct node, if a blank node is seen, for each binding set
+                     * in the solution list, a new blank node is generated. If it is
+                     * an update, that generated bnode is stored in the server, or
+                     * if it's a constructnode, that new bnode is returned as the
+                     * results.
+                     */
                     BlankNodeVarProcessor.process(uc);
 
                     UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
@@ -166,13 +175,17 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             StringEscapesProcessor.process(qc);
             BaseDeclProcessor.process(qc, baseURI);
             final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-            /*
-             * FIXME See {@link ValueExprBuilder#makeIV(BigdataValue)} for what
-             * we should be doing here. The test suite also needs to be updated.
-             */
 //            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
-            final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
+            /*
+             * Batch resolve ASTRDFValue to BigdataValues with their associated
+             * IVs.
+             */
+            new BatchRDFValueResolver(context).process(qc);
+            /*
+             * Build the bigdata AST from the parse tree.
+             */
+            final IQueryNode queryRoot = buildQueryModel(qc, context);
 
             ParsedQuery query;
 
@@ -219,11 +232,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     }
 
     private IQueryNode buildQueryModel(final ASTQueryContainer qc,
-            final AbstractTripleStore tripleStore)
-            throws MalformedQueryException {
+            final BigdataASTContext context) throws MalformedQueryException {
 
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(
-                new BigdataASTContext(tripleStore));
+        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
 
         try {
 

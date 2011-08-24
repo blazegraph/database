@@ -4,7 +4,7 @@ package org.openrdf.query.parser.sparql.ast;
 
 import org.openrdf.model.URI;
 
-public class ASTNumericLiteral extends SimpleNode {
+public class ASTNumericLiteral extends ASTRDFValue {
 
 	private String value;
 

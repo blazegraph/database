@@ -34,14 +34,11 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.sparql.BaseDeclProcessor;
 import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
 import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
 import org.openrdf.query.parser.sparql.StringEscapesProcessor;
-import org.openrdf.query.parser.sparql.TupleExprBuilder;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
@@ -55,7 +52,6 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -89,11 +85,19 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     }
 
     protected String baseURI = null;
+    
+    /*
+     * TODO All of these fields can be moved into the [context] field.
+     */
+    
     protected AbstractTripleStore tripleStore = null;
-    /** The namespace of the {@link LexiconRelation}. */
-    protected String lex = null;
+
+    protected String lex = null;// The namespace of the LexiconRelation.
+
     protected BigdataValueFactory valueFactory = null;
-   
+
+    protected BigdataASTContext context;
+
     protected void setUp() throws Exception {
         
         tripleStore = getStore(getProperties());
@@ -101,6 +105,8 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         lex = tripleStore.getLexiconRelation().getNamespace();
         
         valueFactory = tripleStore.getValueFactory();
+        
+        this.context = new BigdataASTContext(tripleStore);
         
     }
 
@@ -120,11 +126,17 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
         valueFactory = null;
         
+        context = null;
+        
     }
 
     /**
-     * FIXME See {@link ValueExprBuilder#makeIV(BigdataValue)} for what we
-     * should be doing here.
+     * Note: makeIV() in the tests can leave the IV as a MockIV since we will
+     * never have anything in the database (unless there is a Vocabulary or it
+     * is otherwise inline, in which case this code is sufficient to resolve the
+     * inline IV).
+     * 
+     * @see {@link BatchRDFValueResolver}.
      */
     @SuppressWarnings("unchecked")
     protected IV<BigdataValue, ?> makeIV(final BigdataValue value) {
@@ -198,36 +210,24 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
 //        WildcardProjectionProcessor.process(qc); // No. We use "*" as a variable name.
         BlankNodeVarProcessor.process(qc);
-        if (true) {
-            /*
-             * bigdata
-             */
-            final IQueryNode queryRoot = buildQueryModel(qc, tripleStore);
-            return (QueryRoot) queryRoot;
-        } else {
-            /*
-             * openrdf
-             */
-            TupleExprBuilder tupleExprBuilder = new TupleExprBuilder(
-                    new ValueFactoryImpl());
-            try {
-                final TupleExpr result = (TupleExpr) qc.jjtAccept(
-                        tupleExprBuilder, null);
-                log.error("openrdf:\n" + result);
-                throw new AssertionFailedError("Parse tree on log: " + queryStr);
-            } catch (VisitorException e) {
-                throw new MalformedQueryException(e.getMessage(), e);
-            }
-        }
+        /*
+         * Batch resolve ASTRDFValue to BigdataValues with their associated
+         * IVs.
+         */
+        new BatchRDFValueResolver(context).process(qc);
+        /*
+         * Build the bigdata AST from the parse tree.
+         */
+        final IQueryNode queryRoot = buildQueryModel(qc, context);
+        return (QueryRoot) queryRoot;
 
     }
 
     private IQueryNode buildQueryModel(final ASTQueryContainer qc,
-            final AbstractTripleStore tripleStore)
-            throws MalformedQueryException {
+            final BigdataASTContext context) throws MalformedQueryException {
 
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(
-                new BigdataASTContext(tripleStore));
+        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
+        
         try {
         
             return (IQueryNode) qc.jjtAccept(exprBuilder, null);
@@ -253,26 +253,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
                     + "> but was: <" + actual + ">");
 
         }
-
-//        assertEquals("parent", expected.getParent(), actual.getParent());
-//
-//        assertEquals("dataset", expected.getDataset(), actual.getDataset());
-//
-//        assertEquals("namedSubqueries", expected.getNamedSubqueries(),
-//                actual.getNamedSubqueries());
-//
-//        assertEquals("projection", expected.getProjection(),
-//                actual.getProjection());
-//
-//        assertEquals("whereClause", expected.getWhereClause(),
-//                actual.getWhereClause());
-//
-//        assertEquals("groupBy", expected.getGroupBy(), actual.getGroupBy());
-//
-//        assertEquals("having", expected.getHaving(), actual.getHaving());
-//
-//        assertEquals("slice", expected.getSlice(), actual.getSlice());
-
+        
     }
 
 }
