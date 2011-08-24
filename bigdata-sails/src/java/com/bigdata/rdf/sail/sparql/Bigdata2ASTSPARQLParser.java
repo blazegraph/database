@@ -29,19 +29,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.parser.ParsedQuery;
+import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.BaseDeclProcessor;
 import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
+import org.openrdf.query.parser.sparql.DatasetDeclProcessor;
 import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
 import org.openrdf.query.parser.sparql.StringEscapesProcessor;
+import org.openrdf.query.parser.sparql.UpdateExprBuilder;
+import org.openrdf.query.parser.sparql.ast.ASTPrefixDecl;
 import org.openrdf.query.parser.sparql.ast.ASTQuery;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ASTUpdate;
+import org.openrdf.query.parser.sparql.ast.ASTUpdateContainer;
+import org.openrdf.query.parser.sparql.ast.ASTUpdateSequence;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
@@ -60,6 +71,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
  *          $
+ * 
+ *          TODO Update the BigdataSPARQLSyntaxTest to use this version of the
+ *          parser.  That will verify parser compliance against some manifest
+ *          driven test suites.
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
@@ -70,6 +85,72 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         this.tripleStore = tripleStore;
         
     }
+
+    /*
+     * FIXME SPARQL 1.1 UPDATE
+     */
+    public ParsedUpdate parseUpdate(String updateStr, String baseURI)
+            throws MalformedQueryException
+        {
+            try {
+
+                ParsedUpdate update = new ParsedUpdate();
+
+                ASTUpdateSequence updateSequence = SyntaxTreeBuilder.parseUpdateSequence(updateStr);
+
+                List<ASTUpdateContainer> updateOperations = updateSequence.getUpdateContainers();
+
+                List<ASTPrefixDecl> sharedPrefixDeclarations = null;
+                
+                for (ASTUpdateContainer uc : updateOperations) {
+
+                    
+                    StringEscapesProcessor.process(uc);
+                    BaseDeclProcessor.process(uc, baseURI);
+                    
+                    // do a special dance to handle prefix declarations in sequences: if the current
+                    // operation has its own prefix declarations, use those. Otherwise, try and use
+                    // prefix declarations from a previous operation in this sequence.
+                    List<ASTPrefixDecl> prefixDeclList = uc.getPrefixDeclList();
+                    if (prefixDeclList == null || prefixDeclList.size() == 0) {
+                        if (sharedPrefixDeclarations != null) {
+                            for (ASTPrefixDecl prefixDecl: sharedPrefixDeclarations) {
+                                uc.jjtAppendChild(prefixDecl);
+                            }
+                        }
+                    }
+                    else {
+                        sharedPrefixDeclarations = prefixDeclList;
+                    }
+                    
+                    PrefixDeclProcessor.process(uc);
+                    BlankNodeVarProcessor.process(uc);
+
+                    UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(new ValueFactoryImpl());
+
+                    // Handle dataset declaration
+                    Dataset dataset = DatasetDeclProcessor.process(uc);
+                    if (dataset != null) {
+                        update.setDataset(dataset);
+                    }
+
+                    ASTUpdate updateNode = uc.getUpdate();
+                    update.addUpdateExpr((UpdateExpr)updateNode.jjtAccept(updateExprBuilder, null));
+                }
+                
+                return update;
+            }
+            catch (ParseException e) {
+                throw new MalformedQueryException(e.getMessage(), e);
+            }
+            catch (TokenMgrError e) {
+                throw new MalformedQueryException(e.getMessage(), e);
+            }
+            catch (VisitorException e) {
+                throw new MalformedQueryException(e.getMessage(), e);
+            }
+
+        }
 
     /**
      * {@inheritDoc}

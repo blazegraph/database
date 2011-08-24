@@ -37,30 +37,33 @@ public class WildcardProjectionProcessor extends ASTVisitorBase {
 		ASTQuery queryNode = qc.getQuery();
 
 		// scan for (possibly nested) select clauses
-		SelectClauseCollector collector = new SelectClauseCollector();
-		try {
-			queryNode.jjtAccept(collector, null);
-			
-			Set<ASTSelect> selectClauses = collector.getSelectClauses();
-	
-			for (ASTSelect selectClause : selectClauses) {
-				if (selectClause.isWildcard()) {
-					ASTSelectQuery q = (ASTSelectQuery) selectClause.jjtGetParent();
-					
-					addQueryVars(q.getWhereClause(), selectClause);
-					selectClause.setWildcard(false);
+		if (queryNode != null) {
+			SelectClauseCollector collector = new SelectClauseCollector();
+			try {
+				queryNode.jjtAccept(collector, null);
+
+				Set<ASTSelect> selectClauses = collector.getSelectClauses();
+
+				for (ASTSelect selectClause : selectClauses) {
+					if (selectClause.isWildcard()) {
+						ASTSelectQuery q = (ASTSelectQuery)selectClause.jjtGetParent();
+
+						addQueryVars(q.getWhereClause(), selectClause);
+						selectClause.setWildcard(false);
+					}
 				}
+
 			}
-			
-		} catch (VisitorException e) {
-			throw new MalformedQueryException(e);
+			catch (VisitorException e) {
+				throw new MalformedQueryException(e);
+			}
 		}
-		
+
 		// check for possible wildcard in DESCRIBE query
 		if (queryNode instanceof ASTDescribeQuery) {
 			ASTDescribeQuery describeQuery = (ASTDescribeQuery)queryNode;
 			ASTDescribe describeClause = describeQuery.getDescribe();
-			
+
 			if (describeClause.isWildcard()) {
 				addQueryVars(describeQuery.getWhereClause(), describeClause);
 				describeClause.setWildcard(false);
@@ -68,7 +71,6 @@ public class WildcardProjectionProcessor extends ASTVisitorBase {
 		}
 	}
 
-	
 	private static void addQueryVars(ASTWhereClause queryBody, Node wildcardNode)
 		throws MalformedQueryException
 	{
@@ -121,8 +123,7 @@ public class WildcardProjectionProcessor extends ASTVisitorBase {
 			return super.visit(node, data);
 		}
 	}
-	
-	
+
 	/*------------------------------------*
 	 * Inner class SelectClauseCollector  *
 	 *------------------------------------*/

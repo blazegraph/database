@@ -33,7 +33,10 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLSyntaxTest;
+import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
@@ -136,11 +139,16 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");
 
+            // Sesame Sail test.
             tckSuite.addTestSuite(BigdataStoreTest.LTSWithPipelineJoins.class);
 
+            // Sesame SailConnection test.
             tckSuite.addTestSuite(BigdataConnectionTest.LTSWithPipelineJoins.class);
 
             try {
+
+                // SPARQL parser compliance test.
+                tckSuite.addTest(BigdataSPARQLSyntaxTest.suite());
 
                 /*
                  * suite() will call suiteLTSWithPipelineJoins() and then
@@ -157,6 +165,23 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
             }
 
             suite.addTest(tckSuite);
+
+            /*
+             * SPARQL 1.1 test suite for things which do not fit in with the
+             * manifest test design.
+             * 
+             * FIXME This should be run for full r/w tx, the embedded federation
+             * and scale-out, not just quads.
+             */
+            tckSuite.addTestSuite(BigdataComplexSparqlQueryTest.class);
+
+            /*
+             * SPARQL 1.1 update test suite.
+             * 
+             * FIXME This should be run for full r/w tx, the embedded federation
+             * and scale-out, not just quads.
+             */
+            tckSuite.addTestSuite(BigdataSPARQLUpdateTest.class);
 
         }
         

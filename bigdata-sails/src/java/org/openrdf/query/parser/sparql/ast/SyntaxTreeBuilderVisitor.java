@@ -4,6 +4,8 @@ package org.openrdf.query.parser.sparql.ast;
 public interface SyntaxTreeBuilderVisitor
 {
   public Object visit(SimpleNode node, Object data) throws VisitorException;
+  public Object visit(ASTUpdateSequence node, Object data) throws VisitorException;
+  public Object visit(ASTUpdateContainer node, Object data) throws VisitorException;
   public Object visit(ASTQueryContainer node, Object data) throws VisitorException;
   public Object visit(ASTBaseDecl node, Object data) throws VisitorException;
   public Object visit(ASTPrefixDecl node, Object data) throws VisitorException;
@@ -116,5 +118,21 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTString node, Object data) throws VisitorException;
   public Object visit(ASTQName node, Object data) throws VisitorException;
   public Object visit(ASTBlankNode node, Object data) throws VisitorException;
+  public Object visit(ASTGraphRefAll node, Object data) throws VisitorException;
+  public Object visit(ASTGraphOrDefault node, Object data) throws VisitorException;
+  public Object visit(ASTQuadsNotTriples node, Object data) throws VisitorException;
+  public Object visit(ASTLoad node, Object data) throws VisitorException;
+  public Object visit(ASTClear node, Object data) throws VisitorException;
+  public Object visit(ASTDrop node, Object data) throws VisitorException;
+  public Object visit(ASTAdd node, Object data) throws VisitorException;
+  public Object visit(ASTMove node, Object data) throws VisitorException;
+  public Object visit(ASTCopy node, Object data) throws VisitorException;
+  public Object visit(ASTCreate node, Object data) throws VisitorException;
+  public Object visit(ASTInsertData node, Object data) throws VisitorException;
+  public Object visit(ASTDeleteData node, Object data) throws VisitorException;
+  public Object visit(ASTDeleteWhere node, Object data) throws VisitorException;
+  public Object visit(ASTDeleteClause node, Object data) throws VisitorException;
+  public Object visit(ASTInsertClause node, Object data) throws VisitorException;
+  public Object visit(ASTModify node, Object data) throws VisitorException;
 }
-/* JavaCC - OriginalChecksum=b28e6edf394fdcb0cee1b3940b574979 (do not edit this line) */
+/* JavaCC - OriginalChecksum=5ff9c1affabb7a887a28ebe55ab39c3a (do not edit this line) */

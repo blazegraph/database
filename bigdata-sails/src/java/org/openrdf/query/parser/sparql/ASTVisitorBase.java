@@ -6,6 +6,7 @@
 package org.openrdf.query.parser.sparql;
 
 import org.openrdf.query.parser.sparql.ast.ASTAbs;
+import org.openrdf.query.parser.sparql.ast.ASTAdd;
 import org.openrdf.query.parser.sparql.ast.ASTAnd;
 import org.openrdf.query.parser.sparql.ast.ASTAskQuery;
 import org.openrdf.query.parser.sparql.ast.ASTAvg;
@@ -17,6 +18,7 @@ import org.openrdf.query.parser.sparql.ast.ASTBlankNode;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTBound;
 import org.openrdf.query.parser.sparql.ast.ASTCeil;
+import org.openrdf.query.parser.sparql.ast.ASTClear;
 import org.openrdf.query.parser.sparql.ast.ASTCoalesce;
 import org.openrdf.query.parser.sparql.ast.ASTCollection;
 import org.openrdf.query.parser.sparql.ast.ASTCompare;
@@ -25,19 +27,27 @@ import org.openrdf.query.parser.sparql.ast.ASTConstraint;
 import org.openrdf.query.parser.sparql.ast.ASTConstruct;
 import org.openrdf.query.parser.sparql.ast.ASTConstructQuery;
 import org.openrdf.query.parser.sparql.ast.ASTContains;
+import org.openrdf.query.parser.sparql.ast.ASTCopy;
 import org.openrdf.query.parser.sparql.ast.ASTCount;
+import org.openrdf.query.parser.sparql.ast.ASTCreate;
 import org.openrdf.query.parser.sparql.ast.ASTDatasetClause;
 import org.openrdf.query.parser.sparql.ast.ASTDatatype;
 import org.openrdf.query.parser.sparql.ast.ASTDay;
+import org.openrdf.query.parser.sparql.ast.ASTDeleteClause;
+import org.openrdf.query.parser.sparql.ast.ASTDeleteData;
+import org.openrdf.query.parser.sparql.ast.ASTDeleteWhere;
 import org.openrdf.query.parser.sparql.ast.ASTDescribe;
 import org.openrdf.query.parser.sparql.ast.ASTDescribeQuery;
+import org.openrdf.query.parser.sparql.ast.ASTDrop;
 import org.openrdf.query.parser.sparql.ast.ASTEncodeForURI;
 import org.openrdf.query.parser.sparql.ast.ASTExistsFunc;
 import org.openrdf.query.parser.sparql.ast.ASTFalse;
 import org.openrdf.query.parser.sparql.ast.ASTFloor;
 import org.openrdf.query.parser.sparql.ast.ASTFunctionCall;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
+import org.openrdf.query.parser.sparql.ast.ASTGraphOrDefault;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
+import org.openrdf.query.parser.sparql.ast.ASTGraphRefAll;
 import org.openrdf.query.parser.sparql.ast.ASTGroupClause;
 import org.openrdf.query.parser.sparql.ast.ASTGroupConcat;
 import org.openrdf.query.parser.sparql.ast.ASTGroupCondition;
@@ -47,6 +57,8 @@ import org.openrdf.query.parser.sparql.ast.ASTIRI;
 import org.openrdf.query.parser.sparql.ast.ASTIRIFunc;
 import org.openrdf.query.parser.sparql.ast.ASTIf;
 import org.openrdf.query.parser.sparql.ast.ASTIn;
+import org.openrdf.query.parser.sparql.ast.ASTInsertClause;
+import org.openrdf.query.parser.sparql.ast.ASTInsertData;
 import org.openrdf.query.parser.sparql.ast.ASTIsBlank;
 import org.openrdf.query.parser.sparql.ast.ASTIsIRI;
 import org.openrdf.query.parser.sparql.ast.ASTIsLiteral;
@@ -54,6 +66,7 @@ import org.openrdf.query.parser.sparql.ast.ASTIsNumeric;
 import org.openrdf.query.parser.sparql.ast.ASTLang;
 import org.openrdf.query.parser.sparql.ast.ASTLangMatches;
 import org.openrdf.query.parser.sparql.ast.ASTLimit;
+import org.openrdf.query.parser.sparql.ast.ASTLoad;
 import org.openrdf.query.parser.sparql.ast.ASTLowerCase;
 import org.openrdf.query.parser.sparql.ast.ASTMD5;
 import org.openrdf.query.parser.sparql.ast.ASTMath;
@@ -61,7 +74,9 @@ import org.openrdf.query.parser.sparql.ast.ASTMax;
 import org.openrdf.query.parser.sparql.ast.ASTMin;
 import org.openrdf.query.parser.sparql.ast.ASTMinusGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTMinutes;
+import org.openrdf.query.parser.sparql.ast.ASTModify;
 import org.openrdf.query.parser.sparql.ast.ASTMonth;
+import org.openrdf.query.parser.sparql.ast.ASTMove;
 import org.openrdf.query.parser.sparql.ast.ASTNot;
 import org.openrdf.query.parser.sparql.ast.ASTNotExistsFunc;
 import org.openrdf.query.parser.sparql.ast.ASTNotIn;
@@ -83,6 +98,7 @@ import org.openrdf.query.parser.sparql.ast.ASTProjectionElem;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
 import org.openrdf.query.parser.sparql.ast.ASTQName;
+import org.openrdf.query.parser.sparql.ast.ASTQuadsNotTriples;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ASTRDFLiteral;
 import org.openrdf.query.parser.sparql.ast.ASTRand;
@@ -113,6 +129,9 @@ import org.openrdf.query.parser.sparql.ast.ASTTriplesSameSubjectPath;
 import org.openrdf.query.parser.sparql.ast.ASTTrue;
 import org.openrdf.query.parser.sparql.ast.ASTTz;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
+import org.openrdf.query.parser.sparql.ast.ASTUpdate;
+import org.openrdf.query.parser.sparql.ast.ASTUpdateContainer;
+import org.openrdf.query.parser.sparql.ast.ASTUpdateSequence;
 import org.openrdf.query.parser.sparql.ast.ASTUpperCase;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
 import org.openrdf.query.parser.sparql.ast.ASTWhereClause;
@@ -129,6 +148,108 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
 public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
 
 	public Object visit(ASTAbs node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTUpdateSequence node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTUpdateContainer node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTAdd node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTClear node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTCopy node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTCreate node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTDeleteClause node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTDeleteData node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTDeleteWhere node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTDrop node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTGraphOrDefault node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTGraphRefAll node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTInsertClause node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTInsertData node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTLoad node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTModify node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTMove node, Object data)
 		throws VisitorException
 	{
 		return node.childrenAccept(this, data);
@@ -770,6 +891,12 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
 		return node.childrenAccept(this, data);
 	}
 
+	public Object visit(ASTQuadsNotTriples node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
 	public Object visit(ASTTrue node, Object data)
 		throws VisitorException
 	{
@@ -777,6 +904,12 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
 	}
 
 	public Object visit(ASTUnionGraphPattern node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTUpdate node, Object data)
 		throws VisitorException
 	{
 		return node.childrenAccept(this, data);

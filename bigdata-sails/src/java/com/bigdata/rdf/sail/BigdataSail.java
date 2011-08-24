@@ -88,6 +88,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
@@ -1951,6 +1952,12 @@ public class BigdataSail extends SailBase implements Sail {
 
             assertWritableConn();
 
+            if (prefix == null)
+                throw new SailException();
+
+            if (namespace == null)
+                throw new SailException();
+
 //            database.addNamespace(namespace,prefix);
             namespaces.put(prefix, namespace);
             
@@ -3185,6 +3192,24 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        /*
+         * Update
+         */
+        
+        /**
+         * {@inheritDoc}
+         * 
+         * FIXME SPARQL 1.1 update. 
+         */
+        @Override
+        public void executeUpdate(final UpdateExpr updateExpr,
+                final Dataset dataset, final BindingSet bindingSet,
+                boolean includeInferred) throws SailException {
+
+            throw new UnsupportedOperationException("SPARQL 1.1 Update");
+            
+        }
+        
         /*
          * High-level query.
          */

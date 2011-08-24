@@ -11,9 +11,9 @@ import java.util.Map;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.sparql.ast.ASTIRI;
+import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 import org.openrdf.query.parser.sparql.ast.ASTPrefixDecl;
 import org.openrdf.query.parser.sparql.ast.ASTQName;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
@@ -38,7 +38,7 @@ public class PrefixDeclProcessor {
 	 *         If the query contains redefined prefixes or qnames that use
 	 *         undefined prefixes.
 	 */
-	public static Map<String, String> process(ASTQueryContainer qc)
+	public static Map<String, String> process(ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		List<ASTPrefixDecl> prefixDeclList = qc.getPrefixDeclList();

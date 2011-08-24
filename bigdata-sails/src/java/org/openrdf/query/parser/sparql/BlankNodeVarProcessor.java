@@ -15,7 +15,7 @@ import org.openrdf.query.parser.sparql.ast.ASTBasicGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNode;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTCollection;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
@@ -28,7 +28,7 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
  */
 public class BlankNodeVarProcessor extends ASTVisitorBase {
 
-	public static void process(ASTQueryContainer qc)
+	public static void process(ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		try {

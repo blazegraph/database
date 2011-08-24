@@ -14,7 +14,7 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.parser.sparql.ast.ASTDatasetClause;
 import org.openrdf.query.parser.sparql.ast.ASTIRI;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 
 /**
  * Extracts a SPARQL {@link Dataset} from an ASTQueryContainer, if one is
@@ -34,12 +34,12 @@ public class DatasetDeclProcessor {
 	 * @throws MalformedQueryException
 	 *         If DatasetClause does not contain a valid URI.
 	 */
-	public static Dataset process(ASTQueryContainer qc)
+	public static Dataset process(ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		DatasetImpl dataset = null;
 
-		List<ASTDatasetClause> datasetClauses = qc.getQuery().getDatasetClauseList();
+		List<ASTDatasetClause> datasetClauses = qc.getOperation().getDatasetClauseList();
 
 		if (!datasetClauses.isEmpty()) {
 			dataset = new DatasetImpl();

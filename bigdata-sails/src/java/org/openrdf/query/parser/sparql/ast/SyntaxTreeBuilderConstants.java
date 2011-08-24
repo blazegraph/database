@@ -247,91 +247,125 @@ public interface SyntaxTreeBuilderConstants {
   /** RegularExpression Id. */
   int SHA512 = 118;
   /** RegularExpression Id. */
-  int Q_IRI_REF = 119;
+  int LOAD = 119;
   /** RegularExpression Id. */
-  int PNAME_NS = 120;
+  int CLEAR = 120;
   /** RegularExpression Id. */
-  int PNAME_LN = 121;
+  int DROP = 121;
   /** RegularExpression Id. */
-  int BLANK_NODE_LABEL = 122;
+  int ADD = 122;
   /** RegularExpression Id. */
-  int VAR1 = 123;
+  int MOVE = 123;
   /** RegularExpression Id. */
-  int VAR2 = 124;
+  int COPY = 124;
   /** RegularExpression Id. */
-  int LANGTAG = 125;
+  int CREATE = 125;
   /** RegularExpression Id. */
-  int INTEGER = 126;
+  int INSERT = 126;
   /** RegularExpression Id. */
-  int INTEGER_POSITIVE = 127;
+  int DATA = 127;
   /** RegularExpression Id. */
-  int INTEGER_NEGATIVE = 128;
+  int DELETE = 128;
   /** RegularExpression Id. */
-  int DECIMAL = 129;
+  int WITH = 129;
   /** RegularExpression Id. */
-  int DECIMAL1 = 130;
+  int SILENT = 130;
   /** RegularExpression Id. */
-  int DECIMAL2 = 131;
+  int DEFAULT_GRAPH = 131;
   /** RegularExpression Id. */
-  int DECIMAL_POSITIVE = 132;
+  int ALL = 132;
   /** RegularExpression Id. */
-  int DECIMAL_NEGATIVE = 133;
+  int INTO = 133;
   /** RegularExpression Id. */
-  int DOUBLE = 134;
+  int TO = 134;
   /** RegularExpression Id. */
-  int DOUBLE1 = 135;
+  int USING = 135;
   /** RegularExpression Id. */
-  int DOUBLE2 = 136;
+  int Q_IRI_REF = 136;
   /** RegularExpression Id. */
-  int DOUBLE3 = 137;
+  int PNAME_NS = 137;
   /** RegularExpression Id. */
-  int EXPONENT = 138;
+  int PNAME_LN = 138;
   /** RegularExpression Id. */
-  int DOUBLE_POSITIVE = 139;
+  int BLANK_NODE_LABEL = 139;
   /** RegularExpression Id. */
-  int DOUBLE_NEGATIVE = 140;
+  int VAR1 = 140;
   /** RegularExpression Id. */
-  int STRING_LITERAL1 = 141;
+  int VAR2 = 141;
   /** RegularExpression Id. */
-  int STRING_LITERAL2 = 142;
+  int LANGTAG = 142;
   /** RegularExpression Id. */
-  int STRING_LITERAL_LONG1 = 143;
+  int INTEGER = 143;
   /** RegularExpression Id. */
-  int STRING_LITERAL_LONG2 = 144;
+  int INTEGER_POSITIVE = 144;
   /** RegularExpression Id. */
-  int SAFE_CHAR1 = 145;
+  int INTEGER_NEGATIVE = 145;
   /** RegularExpression Id. */
-  int SAFE_CHAR2 = 146;
+  int DECIMAL = 146;
   /** RegularExpression Id. */
-  int SAFE_CHAR_LONG1 = 147;
+  int DECIMAL1 = 147;
   /** RegularExpression Id. */
-  int SAFE_CHAR_LONG2 = 148;
+  int DECIMAL2 = 148;
   /** RegularExpression Id. */
-  int ECHAR = 149;
+  int DECIMAL_POSITIVE = 149;
   /** RegularExpression Id. */
-  int HEX = 150;
+  int DECIMAL_NEGATIVE = 150;
   /** RegularExpression Id. */
-  int ALPHA = 151;
+  int DOUBLE = 151;
   /** RegularExpression Id. */
-  int NUM = 152;
+  int DOUBLE1 = 152;
   /** RegularExpression Id. */
-  int PN_CHARS_BASE = 153;
+  int DOUBLE2 = 153;
   /** RegularExpression Id. */
-  int PN_CHARS_U = 154;
+  int DOUBLE3 = 154;
   /** RegularExpression Id. */
-  int PN_START_CHAR = 155;
+  int EXPONENT = 155;
   /** RegularExpression Id. */
-  int VAR_CHAR = 156;
+  int DOUBLE_POSITIVE = 156;
   /** RegularExpression Id. */
-  int PN_END_CHAR = 157;
+  int DOUBLE_NEGATIVE = 157;
   /** RegularExpression Id. */
-  int PN_CHAR = 158;
+  int STRING_LITERAL1 = 158;
   /** RegularExpression Id. */
-  int PN_PREFIX = 159;
+  int STRING_LITERAL2 = 159;
   /** RegularExpression Id. */
-  int PN_LOCAL = 160;
+  int STRING_LITERAL_LONG1 = 160;
   /** RegularExpression Id. */
-  int VARNAME = 161;
+  int STRING_LITERAL_LONG2 = 161;
+  /** RegularExpression Id. */
+  int SAFE_CHAR1 = 162;
+  /** RegularExpression Id. */
+  int SAFE_CHAR2 = 163;
+  /** RegularExpression Id. */
+  int SAFE_CHAR_LONG1 = 164;
+  /** RegularExpression Id. */
+  int SAFE_CHAR_LONG2 = 165;
+  /** RegularExpression Id. */
+  int ECHAR = 166;
+  /** RegularExpression Id. */
+  int HEX = 167;
+  /** RegularExpression Id. */
+  int ALPHA = 168;
+  /** RegularExpression Id. */
+  int NUM = 169;
+  /** RegularExpression Id. */
+  int PN_CHARS_BASE = 170;
+  /** RegularExpression Id. */
+  int PN_CHARS_U = 171;
+  /** RegularExpression Id. */
+  int PN_START_CHAR = 172;
+  /** RegularExpression Id. */
+  int VAR_CHAR = 173;
+  /** RegularExpression Id. */
+  int PN_END_CHAR = 174;
+  /** RegularExpression Id. */
+  int PN_CHAR = 175;
+  /** RegularExpression Id. */
+  int PN_PREFIX = 176;
+  /** RegularExpression Id. */
+  int PN_LOCAL = 177;
+  /** RegularExpression Id. */
+  int VARNAME = 178;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -457,6 +491,23 @@ public interface SyntaxTreeBuilderConstants {
     "\"sha256\"",
     "\"sha384\"",
     "\"sha512\"",
+    "\"load\"",
+    "\"clear\"",
+    "\"drop\"",
+    "\"add\"",
+    "\"move\"",
+    "\"copy\"",
+    "\"create\"",
+    "\"insert\"",
+    "\"data\"",
+    "\"delete\"",
+    "\"with\"",
+    "\"silent\"",
+    "\"default\"",
+    "\"all\"",
+    "\"into\"",
+    "\"to\"",
+    "\"using\"",
     "<Q_IRI_REF>",
     "<PNAME_NS>",
     "<PNAME_LN>",
