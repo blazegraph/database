@@ -24,7 +24,6 @@
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.4.2-onejar.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/nxparser-6-22-2010.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/tuprolog/2p-v2.2.jar"/>
@@ -67,9 +66,10 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4_8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4_8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.4.2.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.4.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.5.0-onejar.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.5.0.jar"/>
+	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.5.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

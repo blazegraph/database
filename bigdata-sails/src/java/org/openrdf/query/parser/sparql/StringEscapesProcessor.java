@@ -6,7 +6,7 @@
 package org.openrdf.query.parser.sparql;
 
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 import org.openrdf.query.parser.sparql.ast.ASTString;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
@@ -28,7 +28,7 @@ public class StringEscapesProcessor {
 	 * @throws MalformedQueryException
 	 *         If an invalid escape sequence was found.
 	 */
-	public static void process(ASTQueryContainer qc)
+	public static void process(ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		StringProcessor visitor = new StringProcessor();

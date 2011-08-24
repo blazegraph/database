@@ -10,7 +10,7 @@ import info.aduna.net.ParsedURI;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.sparql.ast.ASTBaseDecl;
 import org.openrdf.query.parser.sparql.ast.ASTIRI;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ASTOperationContainer;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 /**
@@ -39,7 +39,7 @@ public class BaseDeclProcessor {
 	 *         If the base URI specified in the query model is not an absolute
 	 *         URI.
 	 */
-	public static void process(ASTQueryContainer qc, String externalBaseURI)
+	public static void process(ASTOperationContainer qc, String externalBaseURI)
 		throws MalformedQueryException
 	{
 		ParsedURI parsedBaseURI = null;

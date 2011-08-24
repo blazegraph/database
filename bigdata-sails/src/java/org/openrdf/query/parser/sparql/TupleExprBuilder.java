@@ -200,7 +200,7 @@ public class TupleExprBuilder extends ASTVisitorBase {
 
 	private ValueFactory valueFactory;
 
-	private GraphPattern graphPattern;
+	GraphPattern graphPattern = new GraphPattern();
 
 	private int constantVarID = 1;
 
@@ -216,7 +216,7 @@ public class TupleExprBuilder extends ASTVisitorBase {
 	 * Methods *
 	 *---------*/
 
-	private Var valueExpr2Var(ValueExpr valueExpr) {
+	protected Var valueExpr2Var(ValueExpr valueExpr) {
 		if (valueExpr instanceof Var) {
 			return (Var)valueExpr;
 		}
@@ -581,6 +581,9 @@ public class TupleExprBuilder extends ASTVisitorBase {
 			projElemList.addElement(new ProjectionElem(sp.getSubjectVar().getName(), "subject"));
 			projElemList.addElement(new ProjectionElem(sp.getPredicateVar().getName(), "predicate"));
 			projElemList.addElement(new ProjectionElem(sp.getObjectVar().getName(), "object"));
+			if (sp.getContextVar() != null) {
+				projElemList.addElement(new ProjectionElem(sp.getContextVar().getName(), "context"));
+			}
 
 			projList.add(projElemList);
 		}
@@ -836,7 +839,7 @@ public class TupleExprBuilder extends ASTVisitorBase {
 
 		graphPattern = parentGP;
 
-		return null;
+		return te;
 	}
 
 	@Override
@@ -957,7 +960,7 @@ public class TupleExprBuilder extends ASTVisitorBase {
 			nextPropList.jjtAccept(this, subject);
 		}
 
-		return null;
+		return graphPattern.buildTupleExpr();
 	}
 
 	@Override
@@ -1993,9 +1996,9 @@ public class TupleExprBuilder extends ASTVisitorBase {
 					currentOr.setRightArg(new Compare(leftArg, arg, CompareOp.EQ));
 				}
 				else {
-					Or newOr = new Or();
-					currentOr.setRightArg(newOr);
-					currentOr = newOr;
+               Or newOr = new Or();
+               currentOr.setRightArg(newOr);
+               currentOr = newOr; 
 				}
 			}
 			result = or;
@@ -2035,9 +2038,9 @@ public class TupleExprBuilder extends ASTVisitorBase {
 					currentAnd.setRightArg(new Compare(leftArg, arg, CompareOp.NE));
 				}
 				else {
-					And newAnd = new And();
-					currentAnd.setRightArg(newAnd);
-					currentAnd = newAnd;
+               And newAnd = new And();
+               currentAnd.setRightArg(newAnd);
+               currentAnd = newAnd; 
 				}
 			}
 			result = and;
