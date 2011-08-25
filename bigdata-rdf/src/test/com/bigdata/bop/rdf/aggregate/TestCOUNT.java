@@ -108,7 +108,7 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDNumericIV(data.length), op.done());
+        assertEquals(new XSDNumericIV((long) data.length), op.done());
 
     }
 
@@ -164,7 +164,7 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDNumericIV(data.length), op.done());
+        assertEquals(new XSDNumericIV((long) data.length), op.done());
 
     }
 
