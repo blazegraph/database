@@ -293,7 +293,8 @@ public class TestAST extends TestCase {
     	final NamedSubqueriesNode subqueries = new NamedSubqueriesNode();
     	{
             
-    	    final NamedSubqueryRoot subquery = new NamedSubqueryRoot();
+            final NamedSubqueryRoot subquery = new NamedSubqueryRoot(
+                    QueryType.SELECT);
     	    subquery.setName("foo");
             
             final ProjectionNode projection1 = new ProjectionNode();

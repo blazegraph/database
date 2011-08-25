@@ -120,7 +120,7 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression impl
 
     volatile transient Set<IVariable<IV>> terms;
 
-    public Set<IVariable<IV>> getTermsToMaterialize() {
+    public Set<IVariable<IV>> getVarsToMaterialize() {
 
         if (terms == null) {
 

@@ -1,27 +1,26 @@
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
-
-import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
  * AST node models a value expression which imposes a constraint.
  */
-public class FilterNode extends ValueExpressionNodeBase {
+public class FilterNode extends GroupMemberValueExpressionNodeBase {
 
-	private final IValueExpressionNode ve;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+//	private final IValueExpressionNode ve;
 	
-	private final Set<IVariable<?>> consumedVars;
-	
-	private final INeedsMaterialization.Requirement materializationRequirement;
-	
-	private final Set<IVariable<IV>> varsToMaterialize;
+//	private final Set<IVariable<?>> consumedVars;
+//	
+//	private final INeedsMaterialization.Requirement materializationRequirement;
+//	
+//	private final Set<IVariable<IV>> varsToMaterialize;
 
     /**
      * 
@@ -30,73 +29,61 @@ public class FilterNode extends ValueExpressionNodeBase {
      */
 	public FilterNode(final IValueExpressionNode ve) {
 		
-		this.ve = ve;
-
-		consumedVars = new LinkedHashSet<IVariable<?>>();
-
-        final Iterator<IVariable<?>> it = BOpUtility.getSpannedVariables(ve
-                .getValueExpression());
-
-        while (it.hasNext()) {
-
-            consumedVars.add(it.next());
-            
-        }
-		
-		varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
-		
-        materializationRequirement = gatherVarsToMaterialize(
-                ve.getValueExpression(), varsToMaterialize);
+        super(new BOp[] { (BOp) ve }, null/* anns */);
 
 	}
 	
 	public IValueExpression<? extends IV> getValueExpression() {
-		return ve.getValueExpression();
+
+	    return getValueExpressionNode().getValueExpression();
+	    
 	}
 	
-	public IValueExpressionNode getValueExpressionNode() {
-		return ve;
+    public IValueExpressionNode getValueExpressionNode() {
+
+        return (IValueExpressionNode) get(0);
+        
 	}
 
-	public Set<IVariable<?>> getConsumedVars() {
-		return consumedVars;
-	}
+//	public Set<IVariable<?>> getConsumedVars() {
+//		return consumedVars;
+//	}
 	
-	public INeedsMaterialization.Requirement getMaterializationRequirement() {
-		return materializationRequirement;
-	}
-	
-	public Set<IVariable<IV>> getVarsToMaterialize() {
-		return varsToMaterialize;
-	}
+//	public INeedsMaterialization.Requirement getRequirement() {
+//		return materializationRequirement;
+//	}
+//	
+//	public Set<IVariable<IV>> getVarsToMaterialize() {
+//		return varsToMaterialize;
+//	}
 
     @Override
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
 
-        sb.append("filter(").append(ve).append(")");
+        sb.append("filter(").append(getValueExpressionNode()).append(")");
 
         return sb.toString();
 
     }
 
-    @Override
-    public boolean equals(Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof FilterNode))
-            return false;
-
-        final FilterNode t = (FilterNode) o;
-
-        if (!ve.equals(t.ve))
-            return false;
-
-        return true;
-
-    }
+//    @Override
+//    public boolean equals(Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof FilterNode))
+//            return false;
+//
+//        final FilterNode t = (FilterNode) o;
+//
+//        if (!ve.equals(t.ve))
+//            return false;
+//
+//        return true;
+//
+//    }
 
 }

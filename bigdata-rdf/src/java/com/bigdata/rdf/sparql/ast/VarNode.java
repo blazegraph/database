@@ -16,7 +16,19 @@ import com.bigdata.rdf.internal.IV;
  */
 public class VarNode extends TermNode {
 
-    private boolean anonymous;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    //    private boolean anonymous;
+    interface Annotations extends TermNode.Annotations {
+        
+        String ANONYMOUS = "anonymous";
+        
+        boolean DEFAULT_ANONYMOUS = false;
+        
+    }
     
 	public VarNode(final IVariable<IV> var) {
 		
@@ -44,7 +56,9 @@ public class VarNode extends TermNode {
      * variable came from in the original query.
      */
     public boolean isAnonymous() {
-	    return anonymous;
+
+        return getProperty(Annotations.ANONYMOUS, Annotations.DEFAULT_ANONYMOUS);
+        
 	}
 
     /**
@@ -54,14 +68,18 @@ public class VarNode extends TermNode {
      * @param anonymous
      */
 	public void setAnonymous(final boolean anonymous) {
-	    this.anonymous = anonymous;
+
+	    setProperty(Annotations.ANONYMOUS, anonymous);
+	    
 	}
 
 	/**
 	 * Return <code>true</code> iff the variable is <code>*</code>.
 	 */
 	public boolean isWildcard() {
-	    return ((Var)getValueExpression()).isWildcard();
+
+        return ((Var<?>) getValueExpression()).isWildcard();
+	    
 	}
 	
     /**
@@ -72,29 +90,30 @@ public class VarNode extends TermNode {
     @Override
     public String toString() {
 
-        return "VarNode(" + getVar() + ")" + (anonymous ? "[anonymous]" : "");
+        return "VarNode(" + getVar() + ")"
+                + (isAnonymous() ? "[anonymous]" : "");
 
     }
  
-    @Override
-    public boolean equals(Object obj) {
-        
-        if (obj == this)
-            return true;
-        
-        if (!(obj instanceof VarNode))
-            return false;
-
-        final VarNode t = (VarNode) obj;
-
-        if (!getVar().equals(t.getVar()))
-            return false;
-
-        if (anonymous != t.anonymous)
-            return false;
-        
-        return true;
-        
-    }
+//    @Override
+//    public boolean equals(Object obj) {
+//        
+//        if (obj == this)
+//            return true;
+//        
+//        if (!(obj instanceof VarNode))
+//            return false;
+//
+//        final VarNode t = (VarNode) obj;
+//
+//        if (!getVar().equals(t.getVar()))
+//            return false;
+//
+//        if (anonymous != t.anonymous)
+//            return false;
+//        
+//        return true;
+//        
+//    }
 	
 }

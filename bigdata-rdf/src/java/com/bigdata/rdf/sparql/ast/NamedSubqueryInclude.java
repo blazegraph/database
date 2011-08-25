@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
  * that a named solution set should be joined with the solutions in the group.
@@ -38,7 +39,11 @@ package com.bigdata.rdf.sparql.ast;
  */
 public class NamedSubqueryInclude extends GroupMemberNodeBase {
 
-    private String name;
+    interface Annotations extends SubqueryRoot.Annotations {
+        
+        String SUBQUERY_NAME = "subqueryName";
+        
+    }
 
     /**
      * 
@@ -51,8 +56,8 @@ public class NamedSubqueryInclude extends GroupMemberNodeBase {
      */
     public String getName() {
         
-        return name;
-        
+        return (String) getProperty(Annotations.SUBQUERY_NAME);
+                
     }
 
     /**
@@ -62,12 +67,17 @@ public class NamedSubqueryInclude extends GroupMemberNodeBase {
      */
     public void setName(String name) {
      
-        this.name = name;
+        if(name == null)
+            throw new IllegalArgumentException();
+        
+        setProperty(Annotations.SUBQUERY_NAME, name);
         
     }
 
     @Override
     public String toString(int indent) {
-        return indent(indent)+"INCLUDE %"+this.name;
+
+        return indent(indent) + "INCLUDE %" + getName();
+
     }
 }

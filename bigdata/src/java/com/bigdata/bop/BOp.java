@@ -36,7 +36,8 @@ import java.util.Map;
 import cutthecrap.utils.striterators.IPropertySet;
 
 /**
- * An operator, such as a constant, variable, join, sort, filter, etc.
+ * An operator, such as a constant, variable, join, sort, filter, etc. Abstract
+ * operations, such as the AST, are also described with this data structure.
  * <p>
  * Operators are organized in a tree of operators. The <i>arity</i> of an
  * operator is the number of child operands declared by that operator class. The
@@ -48,11 +49,6 @@ import cutthecrap.utils.striterators.IPropertySet;
  * iterators for a closure operator), those shared by many operators (such as
  * set of variables which are selected by a join or distributed hash table), or
  * those shared by all operators (such as a cost model).
- * <p>
- * Operators are effectively immutable (mutation APIs always return a deep copy
- * of the operator to which the mutation has been applied), {@link Serializable}
- * to facilitate distributed computing, and {@link Cloneable} to facilitate
- * non-destructive tree rewrites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -65,7 +61,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
     BOp[] NOARGS = new BOp[] {};
     
     /**
-     * An empty immutable annotations map.
+     * An empty <em>immutable</em> annotations map.
      */
     Map<String,Object> NOANNS = Collections.emptyMap();
 
@@ -86,14 +82,11 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
 
     /**
      * The operator's arguments as list.
-     * <p>
-     * Note: This is much less efficient than {@link #argIterator()}.
      */
     List<BOp> args();
     
     /**
-     * An iterator visiting the operator's arguments. The iterator does
-     * not support removal. (This is more efficient than #args()).
+     * An iterator visiting the operator's arguments.
      */
     Iterator<BOp> argIterator();
 

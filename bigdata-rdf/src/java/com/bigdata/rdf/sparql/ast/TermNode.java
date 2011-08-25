@@ -13,7 +13,12 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public abstract class TermNode extends ValueExpressionNode {
 
-	public TermNode(final IVariableOrConstant<IV> term) {
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    public TermNode(final IVariableOrConstant<IV> term) {
 		
 		super(term);
 		
@@ -28,7 +33,7 @@ public abstract class TermNode extends ValueExpressionNode {
 		return (IVariableOrConstant<IV>) super.getValueExpression();
 	}
 	
-	public BigdataValue getValue() {
+    public BigdataValue getValue() {
 		
 		final IVariableOrConstant<IV> ve = getValueExpression();
 		

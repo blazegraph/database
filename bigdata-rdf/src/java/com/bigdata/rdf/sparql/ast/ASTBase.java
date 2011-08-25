@@ -22,45 +22,42 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2011
+ * Created on Aug 25, 2011
  */
 
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.rdf.sail.QueryType;
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.ModifiableBOpBase;
 
 /**
- * AST node for subqueries.
+ * Base class for the AST.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class SubqueryBase extends QueryBase implements
-        IGroupMemberNode {
+public class ASTBase extends ModifiableBOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
-    
-    private IGroupNode parent;
 
-    final public IGroupNode getParent() {
-
-        return parent;
-
+    /**
+     * @param op
+     */
+    public ASTBase(ASTBase op) {
+        super(op);
     }
 
-    final public void setParent(final IGroupNode parent) {
-
-        this.parent = parent;
-
-    }
-
-    public SubqueryBase(final QueryType queryType) {
-
-        super(queryType);
-
+    /**
+     * @param args
+     * @param annotations
+     */
+    public ASTBase(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
     }
 
 }

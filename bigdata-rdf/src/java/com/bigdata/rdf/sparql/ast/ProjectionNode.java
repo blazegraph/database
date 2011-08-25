@@ -33,7 +33,6 @@ import java.util.List;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -46,43 +45,54 @@ import com.bigdata.rdf.internal.IV;
  */
 public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
-    private boolean distinct = false;
-    private boolean reduced = false;
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends ValueExpressionListBaseNode.Annotations {
+    
+        String DISTINCT = "distinct";
+
+        boolean DEFAULT_DISTINCT = false;
+
+        String REDUCED = "reduced";
+
+        boolean DEFAULT_REDUCED = false;
+    
+    }
 
     public ProjectionNode() {
+
     }
 
     public void setDistinct(final boolean distinct) {
 
-        this.distinct = distinct;
+        setProperty(Annotations.DISTINCT, distinct);
 
     }
 
     public boolean isDistinct() {
 
-        return distinct;
+        return getProperty(Annotations.DISTINCT, Annotations.DEFAULT_DISTINCT);
 
     }
 
     public void setReduced(final boolean reduced) {
 
-        this.reduced = reduced;
+        setProperty(Annotations.REDUCED, reduced);
 
     }
 
     public boolean isReduced() {
 
-        return reduced;
+        return getProperty(Annotations.REDUCED, Annotations.DEFAULT_REDUCED);
 
     }
 
-    @SuppressWarnings("unchecked")
     public boolean isWildcard() {
 
         if (isEmpty())
             return false;
 
-        return Var.var("*").equals(exprs.get(0).getVar());
+        return getExpr(0).getVar().isWildcard();
 
     }
 
@@ -177,10 +187,10 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         
         sb.append("select ");
 
-        if (distinct)
+        if (isDistinct())
             sb.append("distinct ");
 
-        if (reduced)
+        if (isReduced())
             sb.append("reduced ");
 
         if (isWildcard()) {
@@ -209,24 +219,24 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!super.equals(o))
-            return false;
-
-        if (!(o instanceof ProjectionNode))
-            return false;
-
-        final ProjectionNode t = (ProjectionNode) o;
-
-        if (distinct != t.distinct)
-            return false;
-
-        return true;
-
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!super.equals(o))
+//            return false;
+//
+//        if (!(o instanceof ProjectionNode))
+//            return false;
+//
+//        final ProjectionNode t = (ProjectionNode) o;
+//
+//        if (distinct != t.distinct)
+//            return false;
+//
+//        return true;
+//
+//    }
 
 }

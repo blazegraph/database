@@ -82,40 +82,4 @@ public class BigdataASTContext {
         return var;
     }
 
-    /*
-     * MikeP believes that openrdf creates a variable for a constant. We just
-     * leave things as constants so we do not need this method. The closest
-     * thing we have is the TermNode, which can be a VarNode or a ConstantNode.
-     */
-//    protected VarNode createConstVar(final Value value) {
-//        final VarNode var = createAnonVar("-const-" + constantVarID++);
-//        if(true) {
-//            /*
-//             * FIXME What is this for? We do not have any means to set a value
-//             * on a variable.
-//             */
-//            throw new UnsupportedOperationException();
-//        }
-////        var.setValue(value);
-//        return var;
-//    }
-
-    /*
-     * MikeP believes that openrdf creates a variable for a constant. We just
-     * leave things as constants so we do not need this method. The closest
-     * thing we have is the TermNode, which can be a VarNode or a ConstantNode.
-     */
-//    protected VarNode valueExpr2Var(final ValueExpressionNode valueExpr) {
-//        if (valueExpr instanceof VarNode) {
-//            return (VarNode) valueExpr;
-//        } else if (valueExpr instanceof ConstantNode) {
-//            return createConstVar(((ConstantNode) valueExpr).getValue());
-//        } else if (valueExpr == null) {
-//            throw new IllegalArgumentException("valueExpr is null");
-//        } else {
-//            throw new IllegalArgumentException("valueExpr is a: "
-//                    + valueExpr.getClass());
-//        }
-//    }
-
 }

@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+
+import com.bigdata.bop.BOp;
 
 /**
  * Base class for AST nodes which model an ordered list of children.
@@ -40,32 +40,38 @@ import java.util.List;
 abstract public class QueryNodeListBaseNode<E extends IQueryNode>
         extends QueryNodeBase implements Iterable<E> {
 
-    protected final List<E> children = new LinkedList<E>();
+//    private final List<E> children = new LinkedList<E>();
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public void add(final E e) {
 
         if (e == null)
             throw new IllegalArgumentException();
         
-        children.add(e);
+        addArg((BOp) e);
 
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<E> iterator() {
 
-        return children.iterator();
+        return (Iterator) argIterator();
 
     }
 
     public int size() {
 
-        return children.size();
+        return arity();
         
     }
 
     public boolean isEmpty() {
         
-        return children.isEmpty();
+        return size() == 0;
 
     }
 
@@ -73,7 +79,7 @@ abstract public class QueryNodeListBaseNode<E extends IQueryNode>
 
         final StringBuilder sb = new StringBuilder();
 
-        for (IQueryNode node : children) {
+        for (IQueryNode node : this) {
 
             sb.append(node.toString(indent + 1));
 

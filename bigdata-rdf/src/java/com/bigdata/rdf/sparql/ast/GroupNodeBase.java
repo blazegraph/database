@@ -1,15 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 
 import com.bigdata.bop.BOp;
-
-import cutthecrap.utils.striterators.EmptyIterator;
-import cutthecrap.utils.striterators.Expander;
-import cutthecrap.utils.striterators.SingleValueIterator;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Base class for AST group nodes.
@@ -17,28 +10,38 @@ import cutthecrap.utils.striterators.Striterator;
 public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         GroupMemberNodeBase<E> implements IGroupNode<E> {
 
-	private final List<E> children;
-	
-	private boolean optional;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends GroupMemberNodeBase.Annotations {
+    
+        String OPTIONAL = "optional";
+
+        boolean DEFAULT_OPTIONAL = false;
+
+    }
+
+//    private final List<E> children;
 	
 	protected GroupNodeBase(final boolean optional) {
 		
-		this.children = new LinkedList<E>();
-		
-		this.optional = optional;
+		setOptional( optional );
 		
     }
 
-	public Iterator<E> iterator() {
+	@SuppressWarnings("unchecked")
+    public Iterator<E> iterator() {
 		
-		return children.iterator();
+		return (Iterator<E>) argIterator();
 		
 	}
 
 	public IGroupNode<E> addChild(final E child) {
 		
-		children.add(child);
-		
+        addArg((BOp) child);
+
 		child.setParent(this);
 		
 		return this;
@@ -47,9 +50,8 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 	
 	public IGroupNode<E> removeChild(final E child) {
 		
-		children.remove(child);
-		
-		child.setParent(null);
+        if (removeArg((BOp) child))
+            child.setParent(null);
 		
 		return this;
 		
@@ -57,125 +59,73 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 	
     public boolean isEmpty() {
         
-        return children.isEmpty();
+        return arity() == 0;
         
     }
     
-	public int getChildCount() {
+	public int size() {
 		
-		return children.size();
+		return arity();
 		
 	}
 	
 	public boolean isOptional() {
 		
-		return optional;
+        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
 		
 	}
 	
 	public void setOptional(final boolean optional) {
 	    
-	    this.optional = optional;
+	    setProperty(Annotations.OPTIONAL, optional);
 	    
 	}
 	
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof GroupNodeBase))
-            return false;
-
-        final GroupNodeBase<?> t = (GroupNodeBase<?>) o;
-
-        if (optional != t.optional)
-            return false;
-
-        if (!children.equals(t.children))
-            return false;
-        
-        return true;
-
-    }
-
-    /**
-     * Visits itself and then its children (recursively).
-     */
-    @SuppressWarnings("unchecked")
-    public Iterator<IQueryNode> preOrderIterator() {
-
-        return new Striterator(new SingleValueIterator(this))
-                .append(preOrderIterator2(0, this));
-
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof GroupNodeBase))
+//            return false;
+//
+//        final GroupNodeBase<?> t = (GroupNodeBase<?>) o;
+//
+//        if (optional != t.optional)
+//            return false;
+//
+//        if (!children.equals(t.children))
+//            return false;
+//        
+//        return true;
+//
+//    }
 
     /**
-     * Visits the children (recursively) using pre-order traversal, but does NOT
-     * visit this node.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to also clone the children and then set the parent reference
+     * on the cloned children.
      */
-    @SuppressWarnings("unchecked")
-    static private Iterator<BOp> preOrderIterator2(final int depth,
-            final GroupNodeBase op) {
+    @Override
+    public GroupNodeBase<E> clone() {
 
-        /*
-         * Iterator visits the direct children, expanding them in turn with a
-         * recursive application of the pre-order iterator.
-         */
-        
-        // mild optimization when no children are present.
-        if (op.isEmpty())
-            return EmptyIterator.DEFAULT;
+        @SuppressWarnings("unchecked")
+        final GroupNodeBase<E> tmp = (GroupNodeBase<E>) super.clone();
 
-        return new Striterator(op.children.iterator()).addFilter(new Expander() {
+        final int size = size();
 
-            private static final long serialVersionUID = 1L;
+        for (int i = 0; i < size; i++) {
 
-            /*
-             * Expand each child in turn.
-             */
-            protected Iterator expand(final Object childObj) {
+            IGroupMemberNode aChild = (IGroupMemberNode) tmp.get(i);
 
-                /*
-                 * A child of this node.
-                 */
+            aChild = (IGroupMemberNode) ((ASTBase) aChild).clone();
 
-                final IGroupMemberNode child = (IGroupMemberNode) childObj;
+            tmp.setArg(i, (ASTBase) aChild);
 
-                if (child instanceof GroupNodeBase<?>) {
+        }
 
-                    /*
-                     * The child is a Node (has children).
-                     * 
-                     * Visit the children (recursive pre-order traversal).
-                     */
-
-//                  System.err.println("Node["+depth+"]: "+op.getClass().getName());
-
-                    final Striterator itr = new Striterator(
-                            new SingleValueIterator(child));
-
-                    // append this node in post-order position.
-                    itr.append(preOrderIterator2(depth + 1,
-                            (GroupNodeBase) child));
-
-                    return itr;
-
-                } else {
-
-                    /*
-                     * The child is a leaf.
-                     */
-
-//                  System.err.println("Leaf["+depth+"]: "+op.getClass().getName());
-                    
-                    // Visit the leaf itself.
-                    return new SingleValueIterator(child);
-
-                }
-
-            }
-        });
+        return tmp;
 
     }
 

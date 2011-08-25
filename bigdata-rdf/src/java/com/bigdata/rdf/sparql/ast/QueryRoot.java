@@ -35,56 +35,27 @@ import com.bigdata.rdf.sail.QueryType;
  * @see HavingNode
  * @see OrderByNode
  * @see SliceNode
- * 
- *      FIXME We will also have to support UPDATE, which is another root for a
- *      SPARQL construct.
- * 
- *      FIXME Add support for standard SPARQL 1.1 subquery:
- * 
- *      <pre>
- * PREFIX : <http://people.example/>
- * PREFIX : <http://people.example/>
- * SELECT ?y ?minName
- * WHERE {
- *   :alice :knows ?y .
- *   {
- *     SELECT ?y (MIN(?name) AS ?minName)
- *     WHERE {
- *       ?y :name ?name .
- *     } GROUP BY ?y
- *   }
- * }
- * </pre>
- * 
- *      FIXME Add support for WITH {subquery} AS "name" and INCLUDE. The WITH
- *      must be in the top-level query. For example
- * 
- *      <pre>
- * SELECT ?var1
- * WITH {
- *         SELECT ?var9
- *         WHERE {
- *                 ?var9 p3:invoiceDocumentDate ?_var10.
- *                 ?var9 p3:paymentPeriod ?_var11. 
- *                 ?var9 rdf:type p3:Invoice
- *                 FILTER ((?_var10 <  """2012-01-01"""^^<http://www.w3.org/2001/XMLSchema#date>))
- *                 FILTER ((?_var11 >= """0"""^^<http://www.w3.org/2001/XMLSchema#int>))
- *         }
- * } AS %namedSet1
- *  WHERE {
- *         ?var9 p3:invoicePaymentDate ?var3.
- *          LET (?var1 := TEXT(?var3, "yyyy-MM")).  
- *         INCLUDE %namedSet1
- * }
- * </pre>
  */
 public class QueryRoot extends QueryBase {
 
-    private DatasetNode dataset;
-    
-    // optional list of subqueries (if any).
-    private NamedSubqueriesNode namedSubqueries;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
+    interface Annotations extends QueryBase.Annotations {
+        
+        String DATASET = "dataset";
+        
+        String NAMED_SUBQUERIES = "namedSubqueries";
+        
+    }
+
+//    private DatasetNode dataset;
+//    
+//    // optional list of subqueries (if any).
+//    private NamedSubqueriesNode namedSubqueries;
+    
     public QueryRoot(final QueryType queryType) {
         
         super(queryType);
@@ -96,7 +67,7 @@ public class QueryRoot extends QueryBase {
      * 
      * @throws UnsupportedOperationException
      */
-    public void setParent(final IGroupNode parent) {
+    public void setParent(final IGroupNode<?> parent) {
     
         throw new UnsupportedOperationException();
         
@@ -104,13 +75,13 @@ public class QueryRoot extends QueryBase {
     
     public void setDataset(final DatasetNode dataset) {
 
-        this.dataset = dataset;
+        setProperty(Annotations.DATASET, dataset);
 
     }
 
     public DatasetNode getDataset() {
 
-        return dataset;
+        return (DatasetNode) getProperty(Annotations.DATASET);
 
     }
     
@@ -120,7 +91,7 @@ public class QueryRoot extends QueryBase {
      */
     public NamedSubqueriesNode getNamedSubqueries() {
         
-        return namedSubqueries;
+        return (NamedSubqueriesNode) getProperty(Annotations.NAMED_SUBQUERIES);
         
     }
     
@@ -132,8 +103,8 @@ public class QueryRoot extends QueryBase {
      */
     public void setNamedSubqueries(final NamedSubqueriesNode namedSubqueries) {
 
-        this.namedSubqueries = namedSubqueries;
-        
+        setProperty(Annotations.NAMED_SUBQUERIES, namedSubqueries);
+
     }
 
     public String toString(final int indent) {
@@ -142,6 +113,10 @@ public class QueryRoot extends QueryBase {
         
         final StringBuilder sb = new StringBuilder();
 
+        final DatasetNode dataset = getDataset();
+
+        final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
+        
         if (dataset != null) {
             sb.append("\n");
             sb.append(s);
@@ -166,37 +141,37 @@ public class QueryRoot extends QueryBase {
         
     }
 
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof QueryRoot))
-            return false;
-
-        if (!super.equals(o))
-            return false;
-
-        final QueryRoot t = (QueryRoot) o;
-
-        if (dataset == null) {
-            if (t.dataset != null)
-                return false;
-        } else {
-            if (!dataset.equals(t.dataset))
-                return false;
-        }
-
-        if (namedSubqueries == null) {
-            if (t.namedSubqueries != null)
-                return false;
-        } else {
-            if (!namedSubqueries.equals(t.namedSubqueries))
-                return false;
-        }
-
-        return true;
-
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof QueryRoot))
+//            return false;
+//
+//        if (!super.equals(o))
+//            return false;
+//
+//        final QueryRoot t = (QueryRoot) o;
+//
+//        if (dataset == null) {
+//            if (t.dataset != null)
+//                return false;
+//        } else {
+//            if (!dataset.equals(t.dataset))
+//                return false;
+//        }
+//
+//        if (namedSubqueries == null) {
+//            if (t.namedSubqueries != null)
+//                return false;
+//        } else {
+//            if (!namedSubqueries.equals(t.namedSubqueries))
+//                return false;
+//        }
+//
+//        return true;
+//
+//    }
 
 }

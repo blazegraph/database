@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
 
@@ -33,35 +34,54 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OrderByExpr {
+public class OrderByExpr extends ASTBase {
 
-	private final IValueExpressionNode ve;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends ASTBase.Annotations {
+        
+        String ASCENDING = "ascending";
+
+        boolean DEFAULT_ASCENDING = true;
+        
+    }
+    
+//	private final IValueExpressionNode ve;
 	
-	private final boolean ascending;
+//	private final boolean ascending;
 	
     public OrderByExpr(final IValueExpressionNode ve, final boolean ascending) {
 
-        this.ve = ve;
+        super(new BOp[] { (BOp) ve }, null/* anns */);
 
-        this.ascending = ascending;
+        setAscending(ascending);
 
     }
 
+    final public boolean isAscending() {
+
+        return getProperty(Annotations.ASCENDING, Annotations.DEFAULT_ASCENDING);
+
+    }
+
+    final public void setAscending(boolean ascending) {
+
+        setProperty(Annotations.ASCENDING, ascending);
+
+    }
+   
     public IValueExpressionNode getValueExpressionNode() {
 
-        return ve;
+        return (IValueExpressionNode) get(0);
 
     }
 
     public IValueExpression<? extends IV> getValueExpression() {
 
-        return ve.getValueExpression();
-
-    }
-
-    public boolean isAscending() {
-
-        return ascending;
+        return getValueExpressionNode().getValueExpression();
 
     }
 
@@ -69,13 +89,15 @@ public class OrderByExpr {
 
         final StringBuilder sb = new StringBuilder();
 
+        final boolean ascending = isAscending();
+        
         if (!ascending) {
 
             sb.append("desc(");
             
         }
 
-        sb.append(ve.toString());
+        sb.append(getValueExpressionNode().toString());
 
         if (!ascending) {
             
@@ -87,25 +109,25 @@ public class OrderByExpr {
 
     }
 
-    @Override
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof OrderByExpr))
-            return false;
-
-        final OrderByExpr t = (OrderByExpr) o;
-
-        if (ascending != t.ascending)
-            return false;
-
-        if (!ve.equals(t.ve))
-            return false;
-        
-        return true;
-
-    }
+//    @Override
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof OrderByExpr))
+//            return false;
+//
+//        final OrderByExpr t = (OrderByExpr) o;
+//
+//        if (ascending != t.ascending)
+//            return false;
+//
+//        if (!ve.equals(t.ve))
+//            return false;
+//        
+//        return true;
+//
+//    }
 
 }

@@ -916,7 +916,7 @@ public class Rule2BOpUtility {
 				
 				final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
 				
-				final Set<IVariable<IV>> t = bop2.getTermsToMaterialize();
+				final Set<IVariable<IV>> t = bop2.getVarsToMaterialize();
 				
 				if (t.size() > 0) {
 					

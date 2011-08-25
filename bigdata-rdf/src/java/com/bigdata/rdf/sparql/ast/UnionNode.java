@@ -8,7 +8,12 @@ import org.apache.log4j.Logger;
  */
 public class UnionNode extends GroupNodeBase<IGroupMemberNode> {
 	
-	private static final transient Logger log = Logger.getLogger(UnionNode.class);
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    private static final transient Logger log = Logger.getLogger(UnionNode.class);
 	
 	/**
 	 * Construct a non-optional union.

@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+
+import com.bigdata.bop.BOp;
 
 /**
  * Base class for AST nodes which model an ordered list of value expressions.
@@ -40,50 +40,63 @@ import java.util.List;
 abstract public class ValueExpressionListBaseNode<E extends IValueExpressionNode>
         extends SolutionModifierBase implements Iterable<E> {
 
-    protected final List<E> exprs = new LinkedList<E>();
+//    private final List<E> exprs = new LinkedList<E>();
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public void addExpr(final E e) {
 
         if (e == null)
             throw new IllegalArgumentException();
         
-        exprs.add(e);
+        addArg((BOp) e);
 
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Iterator<E> iterator() {
 
-        return exprs.iterator();
+        return (Iterator) argIterator();
 
     }
 
+    @SuppressWarnings("unchecked")
+    public E getExpr(final int index) {
+
+        return (E) get(index);
+        
+    }
+    
     public int size() {
 
-        return exprs.size();
+        return arity();
         
     }
 
     public boolean isEmpty() {
         
-        return exprs.isEmpty();
+        return size() == 0;
         
     }
 
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof ValueExpressionListBaseNode<?>))
-            return false;
-
-        final ValueExpressionListBaseNode<? extends IValueExpressionNode> t = (ValueExpressionListBaseNode<?>) o;
-
-        if (!exprs.equals(t.exprs))
-            return false;
-        
-        return true;
-        
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof ValueExpressionListBaseNode<?>))
+//            return false;
+//
+//        final ValueExpressionListBaseNode<? extends IValueExpressionNode> t = (ValueExpressionListBaseNode<?>) o;
+//
+//        if (!exprs.equals(t.exprs))
+//            return false;
+//        
+//        return true;
+//        
+//    }
     
 }

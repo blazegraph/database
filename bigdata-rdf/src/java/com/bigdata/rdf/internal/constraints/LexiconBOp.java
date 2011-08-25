@@ -140,7 +140,7 @@ public abstract class LexiconBOp extends IVValueExpression<IV> implements INeeds
 
     volatile transient Set<IVariable<IV>> terms;
 
-    public Set<IVariable<IV>> getTermsToMaterialize() {
+    public Set<IVariable<IV>> getVarsToMaterialize() {
 
         if (terms == null) {
 

@@ -35,4 +35,9 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class SolutionModifierBase extends QueryNodeBase {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
 }
