@@ -1950,13 +1950,13 @@ public class BigdataSail extends SailBase implements Sail {
         public void setNamespace(final String prefix, final String namespace)
                 throws SailException {
 
-            assertWritableConn();
-
             if (prefix == null) // per Sesame TCK behavior
                 throw new NullPointerException();
 
             if (namespace == null) // per Sesame TCK behavior
                 throw new NullPointerException();
+
+            assertWritableConn();
 
 //            database.addNamespace(namespace,prefix);
             namespaces.put(prefix, namespace);
@@ -1965,6 +1965,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         public String getNamespace(final String prefix) {
             
+            if (prefix == null) // per Sesame TCK behavior
+                throw new NullPointerException();
+
 //            return database.getNamespace(prefix);
             return namespaces.get(prefix);
             
@@ -1972,6 +1975,9 @@ public class BigdataSail extends SailBase implements Sail {
         
         public void removeNamespace(final String prefix) {
             
+            if (prefix == null) // per Sesame TCK behavior
+                throw new NullPointerException();
+
 //            database.removeNamespace(prefix);
             namespaces.remove(prefix);
             
