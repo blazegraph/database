@@ -27,7 +27,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
+import com.bigdata.rdf.internal.constraints.StrBOp;
+import com.bigdata.rdf.internal.constraints.StrdtBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -504,7 +507,118 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         }
 
     }
+    /**
+     * Unit test developed to identify a problem where a query with 3 solutions
+     * passes through those solutions but a query with one does not.
+     *
+     * @throws Exception
+     */
+    public void testProjectedGroupByWithNestedVars() throws Exception {
 
+        final Properties properties = getProperties();
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            final URI x = new URIImpl("http://www.foo.org/x");
+            final URI z = new URIImpl("http://www.foo.org/z");
+            final URI predicate = new URIImpl("http://www.foo.org/predicate1");
+            final URI C = new URIImpl("http://www.foo.org/typeC");
+            final URI rdfType = RDF.TYPE;
+            final Literal one= new LiteralImpl("1",XMLSchema.INT);
+            final Literal two= new LiteralImpl("2",XMLSchema.INT);
+            final Literal three= new LiteralImpl("three",XMLSchema.STRING);
+
+
+            // add statements using the URIs declared above.
+            store.addStatement(x, rdfType, C);
+            store.addStatement(x, predicate, one);
+            store.addStatement(x, predicate, two);
+            store.addStatement(x, predicate, three);
+
+            store.addStatement(z, rdfType, C);
+            store.addStatement(z, predicate, two);
+            store.addStatement(z, predicate, three);
+
+            final AtomicInteger idFactory = new AtomicInteger(0);
+
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(store.getIndexManager());
+
+            final IV type = store.getIV(rdfType);
+            final IV cIv = store.getIV(C);
+            final IV predicateIv = store.getIV(predicate);
+
+            /*
+             * Run query expecting 1 statements.
+             */
+            {
+                final VarNode s = new VarNode("s");
+                final VarNode o = new VarNode("o");
+                final IGroupNode root = new JoinGroupNode();
+                root.addChild(new StatementPatternNode(s, new ConstantNode(
+                        new Constant<IV>(type)), new ConstantNode(
+                        new Constant<IV>(cIv))));
+                root.addChild(new StatementPatternNode(s, new ConstantNode(
+                        new Constant<IV>(predicateIv)), o));
+
+
+                final CoalesceBOp coalesce=new CoalesceBOp(s.getValueExpression(),o.getValueExpression());
+
+                final StrBOp op = new StrBOp(coalesce, store.getNamespace());
+
+                final ValueExpressionNode ven = new ValueExpressionNode(op);
+
+                root.addChild(new AssignmentNode(new VarNode("index"), ven));
+
+
+
+                final QueryRoot query = new QueryRoot(QueryType.SELECT);
+
+                query.setWhereClause(root);
+
+                final ProjectionNode pn = new ProjectionNode();
+
+
+                pn.addProjectionVar(new VarNode("index"));
+                query.setProjection(pn);
+
+
+                final PipelineOp pipeline = AST2BOpUtility
+                        .convert(new AST2BOpContext(query, idFactory, store,
+                                queryEngine, new Properties()));
+
+                // Submit query for evaluation.
+                final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
+
+                final AbstractRunningQuery runningQuery = queryEngine.eval(UUID
+                        .randomUUID(), pipeline,
+                        new ThickAsynchronousIterator<IBindingSet[]>(
+                                existingBindings));
+
+                final Iterator<IBindingSet[]> iter = runningQuery.iterator();
+
+                int i = 0;
+                while (iter.hasNext()) {
+                    final IBindingSet[] set = iter.next();
+                    i += set.length;
+                }
+
+                runningQuery.get(); // check the future.
+
+                assertEquals("Baseline", 1, i);
+
+            }
+
+
+        } finally {
+
+            store.__tearDownUnitTest();
+
+        }
+
+    }
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!

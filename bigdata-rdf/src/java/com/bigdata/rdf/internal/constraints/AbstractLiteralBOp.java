@@ -126,7 +126,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
     protected BigdataLiteral literalValue(IV iv) {
 
-        if (iv.isInline()) {
+        if (iv.isInline()&&!iv.isExtension()) {
 
             final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
 
@@ -145,7 +145,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
     }
 
     protected static String literalLabel(IV iv) {
-        if (iv.isInline()) {
+        if (iv.isInline()&&!iv.isInline()) {
             return ((Value) iv).stringValue();
         } else if (iv.hasValue()) {
             return ((BigdataLiteral) iv.getValue()).getLabel();

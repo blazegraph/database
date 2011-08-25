@@ -1408,7 +1408,7 @@ public class AST2BOpUtility {
                 
             }
 
-    		sortOrders[i++] = new SortOrder(expr, orderByExpr.isAscending());
+            sortOrders[i] = new SortOrder(expr, orderByExpr.isAscending());
     		
 		}
 		
