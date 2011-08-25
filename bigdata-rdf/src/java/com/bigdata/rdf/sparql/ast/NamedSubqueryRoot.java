@@ -49,10 +49,14 @@ public class NamedSubqueryRoot extends SubqueryBase {
     /**
      * 
      * @param queryType
+     * @param name
+     *            The name of the subquery result set.
      */
-    public NamedSubqueryRoot(final QueryType queryType) {
+    public NamedSubqueryRoot(final QueryType queryType, final String name) {
 
         super(queryType);
+
+        setName(name);
 
     }
 

@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
@@ -41,6 +42,9 @@ import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -48,6 +52,7 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -57,10 +62,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestBigdataExprBuilder.java 5073 2011-08-23 00:33:54Z
  *          thompsonbry $
- * 
- *          TODO Update grammar to pick up additional SPARQL 1.1 functions.
- * 
- *          TODO Modify grammar and test named subquery (WITH AS INCLUDE).
  */
 public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
@@ -720,6 +721,98 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for WITH {subquery} AS "name" and INCLUDE. The WITH must be in
+     * the top-level query. For example:
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * SELECT ?p2
+     * WITH {
+     *         SELECT DISTINCT ?p
+     *         WHERE {
+     *                 ?s ?p ?o
+     *         }
+     * } AS %namedSet1
+     *  WHERE {
+     *         ?p rdfs:subPropertyOf ?p2
+     *         INCLUDE %namedSet1
+     * }
+     * </pre>
+     */
+    public void test_namedSubquery() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+                "\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>" + //
+                "\nSELECT ?p2" + //
+                "\n WITH {" + //
+                "\n         SELECT DISTINCT ?p" + //
+                "\n         WHERE {" + //
+                "\n                 ?s ?p ?o" + //
+                "\n          }" + //
+                "\n } AS %namedSet1" + //
+                "\n WHERE {" + //
+                "\n        ?p rdfs:subPropertyOf ?p2" + //
+                "\n        INCLUDE %namedSet1" + //
+                "\n}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final String namedSet = "namedSet1";
+            
+            final VarNode s = new VarNode("s");
+            final VarNode p = new VarNode("p");
+            final VarNode o = new VarNode("o");
+            final VarNode p2 = new VarNode("p2");
+
+            final TermNode subPropertyOf = new ConstantNode(
+                    makeIV(valueFactory.createURI(RDFS.SUBPROPERTYOF
+                            .stringValue())));
+            
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(p2);
+                expected.setProjection(projection);
+            }
+            
+            final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+            expected.setNamedSubqueries(namedSubqueries);
+            {
+
+                final NamedSubqueryRoot namedSubqueryRoot = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet);
+                
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubqueryRoot.setProjection(projection);
+                projection.addProjectionVar(p);
+                projection.setDistinct(true);
+                
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                namedSubqueryRoot.setWhereClause(whereClause);
+                whereClause.addChild(new StatementPatternNode(s, p, o,
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+                namedSubqueries.add(namedSubqueryRoot);
+                
+            }
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(p, subPropertyOf, p2,
+                    null/* c */, Scope.DEFAULT_CONTEXTS));
+            whereClause.addChild(new NamedSubqueryInclude(namedSet));
+            
         }
         
         final QueryRoot actual = parse(sparql, baseURI);

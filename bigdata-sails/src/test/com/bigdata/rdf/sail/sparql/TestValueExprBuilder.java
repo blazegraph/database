@@ -691,8 +691,12 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
-     * FIXME Test EXISTS(GroupGraphPattern). This should probably turn into a
-     * subquery.
+     * FIXME Test EXISTS(GroupGraphPattern). This should probably turn into an
+     * ASK subquery. We could bind a variable for the count of the #of results
+     * (either zero or one). E.g., "SELECT (COUNT(*) as ?x) where
+     * {groupGraphPattern} LIMIT 1". ?x would be projected out of the subquery
+     * and used in the EXISTS() function, which would just test whether ?x was
+     * ZERO (0) or ONE (1).
      */
     public void test_exists() {
         fail("write test for EXISTS");
