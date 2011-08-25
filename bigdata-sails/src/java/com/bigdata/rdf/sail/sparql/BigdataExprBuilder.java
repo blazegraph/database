@@ -190,7 +190,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             throws VisitorException {
 
         final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.SELECT) : new SubqueryRoot();
+                QueryType.SELECT) : new SubqueryRoot(QueryType.SELECT);
 
         /*
          * Handle SELECT expressions.
@@ -258,7 +258,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             throws VisitorException {
 
         final QueryBase queryRoot = data == null ? new QueryRoot(QueryType.ASK)
-                : new SubqueryRoot();
+                : new SubqueryRoot(QueryType.ASK);
 
         /*
          * Note: Nothing is projected.
@@ -301,7 +301,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             throws VisitorException {
 
         final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.DESCRIBE) : new SubqueryRoot();
+                QueryType.DESCRIBE) : new SubqueryRoot(QueryType.DESCRIBE);
 
         // Process describe clause
         node.getDescribe().jjtAccept(this, queryRoot);
@@ -403,7 +403,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             throws VisitorException {
 
         final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.CONSTRUCT) : new SubqueryRoot();
+                QueryType.CONSTRUCT) : new SubqueryRoot(QueryType.CONSTRUCT);
 
         /*
          * Process construct clause.

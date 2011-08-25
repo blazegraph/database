@@ -845,7 +845,7 @@ public class TestGroupGraphPatternBuilder extends
                 final JoinGroupNode wrapperGroup = new JoinGroupNode();
                 whereClause.addChild(wrapperGroup);
                 
-                subSelect = new SubqueryRoot();
+                subSelect = new SubqueryRoot(QueryType.SELECT);
                 wrapperGroup.addChild(subSelect);
             }
             {

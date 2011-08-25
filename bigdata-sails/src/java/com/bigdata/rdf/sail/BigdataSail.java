@@ -1952,11 +1952,11 @@ public class BigdataSail extends SailBase implements Sail {
 
             assertWritableConn();
 
-            if (prefix == null)
-                throw new SailException();
+            if (prefix == null) // per Sesame TCK behavior
+                throw new NullPointerException();
 
-            if (namespace == null)
-                throw new SailException();
+            if (namespace == null) // per Sesame TCK behavior
+                throw new NullPointerException();
 
 //            database.addNamespace(namespace,prefix);
             namespaces.put(prefix, namespace);

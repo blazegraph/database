@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -42,6 +43,11 @@ import com.bigdata.bop.constraint.EQ;
  * is used for query evaluation operators. The copy-on-write contract provides a
  * safety margin during concurrent evaluation of query plans by ensuring that
  * all references are fully published.
+ * <p>
+ * Instances of this class are effectively immutable (mutation APIs always
+ * return a deep copy of the operator to which the mutation has been applied),
+ * {@link Serializable} to facilitate distributed computing, and
+ * {@link Cloneable} to facilitate non-destructive tree rewrites.
  * <p>
  * <h2>Constructor patterns</h2>
  * <p>
@@ -235,12 +241,23 @@ public class BOpBase extends CoreBaseBOp {
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This is much less efficient than {@link #argIterator()}.
+     */
     final public List<BOp> args() {
 
         return Collections.unmodifiableList(Arrays.asList(args));
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The iterator does not support removal. (This is more efficient than
+     * #args()).
+     */
     final public Iterator<BOp> argIterator() {
     	
     	return new ArgIterator();
@@ -537,5 +554,5 @@ public class BOpBase extends CoreBaseBOp {
         return tmp;
         
     }
-    
+
 }

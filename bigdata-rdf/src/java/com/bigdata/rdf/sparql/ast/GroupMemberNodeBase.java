@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * Anything which can appear in an {@link IGroupNode}.
  * 
@@ -35,6 +39,8 @@ package com.bigdata.rdf.sparql.ast;
  */
 abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
         QueryNodeBase implements IGroupMemberNode {
+
+    private static final long serialVersionUID = 1L;
 
     private IGroupNode parent;
     
@@ -50,10 +56,19 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
 
     }
 
-    /**
-     * 
-     */
     public GroupMemberNodeBase() {
+    }
+
+    public GroupMemberNodeBase(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
+    public GroupMemberNodeBase(GroupMemberNodeBase<E> op) {
+
+        super(op);
+        
     }
 
     /**

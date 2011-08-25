@@ -31,7 +31,7 @@ public interface IGroupNode<E extends IGroupMemberNode> extends
     /**
      * Return the #of children which are direct members of the group.
      */
-    int getChildCount();
+    int size();
 
     /**
      * Return whether or not this is an optional group. Optional groups may or

@@ -23,12 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Iterator;
-
 import com.bigdata.rdf.sail.QueryType;
-
-import cutthecrap.utils.striterators.SingleValueIterator;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Contains the projection clause, where clause, and solution modified clauses.
@@ -41,15 +36,40 @@ import cutthecrap.utils.striterators.Striterator;
  * @see SliceNode
  */
 abstract public class QueryBase extends QueryNodeBase {
+    
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
-    private QueryType queryType;
-    private ConstructNode construct;
-    private ProjectionNode projection;
-    private IGroupNode<IGroupMemberNode> whereClause;
-    private GroupByNode groupBy;
-    private HavingNode having;
-    private OrderByNode orderBy;
-    private SliceNode slice;
+    interface Annotations extends QueryNodeBase.Annotations {
+        
+        String QUERY_TYPE = "queryType";
+
+        String CONSTRUCT = "construct";
+
+        String PROJECTION = "projection";
+
+        String WHERE_CLAUSE = "whereClause";
+
+        String GROUP_BY = "groupBy";
+
+        String HAVING = "having";
+
+        String ORDER_BY = "orderBy";
+
+        String SLICE = "slice";
+        
+    }
+
+//    private QueryType queryType;
+//    private ConstructNode construct;
+//    private ProjectionNode projection;
+//    private IGroupNode<IGroupMemberNode> whereClause;
+//    private GroupByNode groupBy;
+//    private HavingNode having;
+//    private OrderByNode orderBy;
+//    private SliceNode slice;
 
     /**
      * Constructor is hidden to force people to declare the {@link QueryType}.
@@ -61,7 +81,7 @@ abstract public class QueryBase extends QueryNodeBase {
     
 	public QueryBase(final QueryType queryType) {
 	    
-	    this.queryType = queryType;
+        setQueryType(queryType);
 	    
 	}
 
@@ -72,8 +92,8 @@ abstract public class QueryBase extends QueryNodeBase {
      */
 	public QueryType getQueryType() {
 	    
-	    return queryType;
-	    
+        return (QueryType) getProperty(Annotations.QUERY_TYPE);
+
 	}
 
     /**
@@ -81,7 +101,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
 	public void setQueryType(final QueryType queryType) {
 	    
-	    this.queryType = queryType;
+        setProperty(Annotations.QUERY_TYPE, queryType);
 	    
 	}
 	
@@ -89,8 +109,8 @@ abstract public class QueryBase extends QueryNodeBase {
      * Return the construction -or- <code>null</code> if there is no construction.
      */
     public ConstructNode getConstruct() {
-        
-        return construct;
+
+        return (ConstructNode) getProperty(Annotations.CONSTRUCT);
         
     }
     
@@ -102,7 +122,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setConstruct(final ConstructNode construct) {
 
-        this.construct = construct;
+        setProperty(Annotations.CONSTRUCT, construct);
         
     }
     
@@ -110,11 +130,11 @@ abstract public class QueryBase extends QueryNodeBase {
      * Return the projection -or- <code>null</code> if there is no projection.
      */
     public ProjectionNode getProjection() {
-        
-        return projection;
-        
+
+        return (ProjectionNode) getProperty(Annotations.PROJECTION);
+
     }
-    
+
     /**
      * Set or clear the projection.
      * 
@@ -123,17 +143,18 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setProjection(final ProjectionNode projection) {
 
-        this.projection = projection;
-        
+        setProperty(Annotations.PROJECTION, projection);
+
     }
-    
+
     /**
      * Return the {@link IGroupNode} (corresponds to the WHERE clause).
      */
+    @SuppressWarnings("unchecked")
     public IGroupNode<IGroupMemberNode> getWhereClause() {
 
-        return whereClause;
-        
+        return (IGroupNode<IGroupMemberNode>) getProperty(Annotations.WHERE_CLAUSE);
+
     }
 
     /**
@@ -144,7 +165,8 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setWhereClause(final IGroupNode<IGroupMemberNode> whereClause) {
         
-        this.whereClause = whereClause;
+        setProperty(Annotations.WHERE_CLAUSE, whereClause);
+
         
     }
     
@@ -153,7 +175,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public GroupByNode getGroupBy() {
         
-        return groupBy;
+        return (GroupByNode) getProperty(Annotations.GROUP_BY);
         
     }
 
@@ -165,7 +187,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setGroupBy(final GroupByNode groupBy) {
 
-        this.groupBy = groupBy;
+        setProperty(Annotations.GROUP_BY, groupBy);
         
     }
     
@@ -174,7 +196,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public HavingNode getHaving() {
         
-        return having;
+        return (HavingNode) getProperty(Annotations.HAVING);
         
     }
 
@@ -186,7 +208,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setHaving(final HavingNode having) {
 
-        this.having = having;
+        setProperty(Annotations.HAVING, having);
         
     }
 
@@ -195,7 +217,7 @@ abstract public class QueryBase extends QueryNodeBase {
 	 */
 	public SliceNode getSlice() {
         
-	    return slice;
+        return (SliceNode) getProperty(Annotations.SLICE);
 	    
     }
 
@@ -207,7 +229,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setSlice(final SliceNode slice) {
 
-        this.slice = slice;
+        setProperty(Annotations.SLICE, slice);
         
     }
 
@@ -217,8 +239,8 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public OrderByNode getOrderBy() {
      
-        return orderBy;
-        
+        return (OrderByNode) getProperty(Annotations.ORDER_BY);
+
     }
 
     /**
@@ -229,7 +251,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     public void setOrderBy(final OrderByNode orderBy) {
     
-        this.orderBy = orderBy;
+        setProperty(Annotations.ORDER_BY, orderBy);
         
     }
     
@@ -239,6 +261,14 @@ abstract public class QueryBase extends QueryNodeBase {
 	    
 		final StringBuilder sb = new StringBuilder();
 
+        final ConstructNode construct = getConstruct();
+        final ProjectionNode projection = getProjection();
+        final IGroupNode<IGroupMemberNode> whereClause = getWhereClause();
+        final GroupByNode groupBy = getGroupBy();
+        final HavingNode having = getHaving();
+        final OrderByNode orderBy = getOrderBy();
+        final SliceNode slice = getSlice();
+        
         if (construct != null && !construct.isEmpty()) {
 
             sb.append(construct.toString(indent));
@@ -295,108 +325,82 @@ abstract public class QueryBase extends QueryNodeBase {
 
     }
 
-    public boolean equals(final Object o) {
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof QueryBase))
+//            return false;
+//
+//        final QueryBase t = (QueryBase) o;
+//
+//        if (queryType == null) {
+//            if (t.queryType != null)
+//                return false;
+//        } else {
+//            if (!queryType.equals(t.queryType))
+//                return false;
+//        }
+//
+//        if (construct == null) {
+//            if (t.construct != null)
+//                return false;
+//        } else {
+//            if (!construct.equals(t.construct))
+//                return false;
+//        }
+//
+//        if (projection == null) {
+//            if (t.projection != null)
+//                return false;
+//        } else {
+//            if (!projection.equals(t.projection))
+//                return false;
+//        }
+//
+//        if (whereClause == null) {
+//            if (t.whereClause != null)
+//                return false;
+//        } else {
+//            if (!whereClause.equals(t.whereClause))
+//                return false;
+//        }
+//
+//        if (groupBy == null) {
+//            if (t.groupBy != null)
+//                return false;
+//        } else {
+//            if (!groupBy.equals(t.groupBy))
+//                return false;
+//        }
+//
+//        if (having == null) {
+//            if (t.having != null)
+//                return false;
+//        } else {
+//            if (!having.equals(t.having))
+//                return false;
+//        }
+//
+//        if (orderBy == null) {
+//            if (t.orderBy != null)
+//                return false;
+//        } else {
+//            if (!orderBy.equals(t.orderBy))
+//                return false;
+//        }
+//
+//        if (slice == null) {
+//            if (t.slice != null)
+//                return false;
+//        } else {
+//            if (!slice.equals(t.slice))
+//                return false;
+//        }
+//
+//        return true;
+//
+//    }
 
-        if (this == o)
-            return true;
-
-        if (!(o instanceof QueryBase))
-            return false;
-
-        final QueryBase t = (QueryBase) o;
-
-        if (queryType == null) {
-            if (t.queryType != null)
-                return false;
-        } else {
-            if (!queryType.equals(t.queryType))
-                return false;
-        }
-
-        if (construct == null) {
-            if (t.construct != null)
-                return false;
-        } else {
-            if (!construct.equals(t.construct))
-                return false;
-        }
-
-        if (projection == null) {
-            if (t.projection != null)
-                return false;
-        } else {
-            if (!projection.equals(t.projection))
-                return false;
-        }
-
-        if (whereClause == null) {
-            if (t.whereClause != null)
-                return false;
-        } else {
-            if (!whereClause.equals(t.whereClause))
-                return false;
-        }
-
-        if (groupBy == null) {
-            if (t.groupBy != null)
-                return false;
-        } else {
-            if (!groupBy.equals(t.groupBy))
-                return false;
-        }
-
-        if (having == null) {
-            if (t.having != null)
-                return false;
-        } else {
-            if (!having.equals(t.having))
-                return false;
-        }
-
-        if (orderBy == null) {
-            if (t.orderBy != null)
-                return false;
-        } else {
-            if (!orderBy.equals(t.orderBy))
-                return false;
-        }
-
-        if (slice == null) {
-            if (t.slice != null)
-                return false;
-        } else {
-            if (!slice.equals(t.slice))
-                return false;
-        }
-
-        return true;
-
-    }
-
-    public Iterator<IQueryNode> preOrderIterator() {
-
-        final Striterator itr = new Striterator(new SingleValueIterator(this));
-
-        if (construct != null)
-            itr.append(construct.preOrderIterator());
-        
-        if (projection != null)
-            itr.append(projection.preOrderIterator());
-        
-        if (whereClause != null)
-            itr.append(whereClause.preOrderIterator());
-        
-        if (groupBy != null)
-            itr.append(groupBy.preOrderIterator());
-        
-        if (having != null)
-            itr.append(having.preOrderIterator());
-
-        if (slice != null)
-            itr.append(slice.preOrderIterator());
-
-        return itr;
-        
-    }
-    
 }

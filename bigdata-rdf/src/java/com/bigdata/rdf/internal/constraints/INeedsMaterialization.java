@@ -69,6 +69,6 @@ public interface INeedsMaterialization {
 	 * Provide a set of terms that need to be materialized before the bop can
 	 * evaluate.
 	 */
-	Set<IVariable<IV>> getTermsToMaterialize();
+	Set<IVariable<IV>> getVarsToMaterialize();
 	
 }

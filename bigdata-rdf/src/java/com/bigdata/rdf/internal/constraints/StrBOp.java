@@ -148,7 +148,7 @@ public class StrBOp extends IVValueExpression<IV>
 
     private volatile transient Set<IVariable<IV>> terms;
 
-    public Set<IVariable<IV>> getTermsToMaterialize() {
+    public Set<IVariable<IV>> getVarsToMaterialize() {
 
         if (terms == null) {
 

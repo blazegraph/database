@@ -23,17 +23,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.sail.QueryType;
+
 /**
  * A subquery with a named solution set which can be referenced from other parts
  * of the query.
  * 
  * @see NamedSubqueryInclude
  */
-public class NamedSubqueryRoot extends SubqueryRoot {
+public class NamedSubqueryRoot extends SubqueryBase {
 
-    private String name;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
-    public NamedSubqueryRoot() {
+    interface Annotations extends SubqueryRoot.Annotations {
+        
+        String SUBQUERY_NAME = "subqueryName";
+        
+    }
+    
+//    private String name;
+
+    /**
+     * 
+     * @param queryType
+     */
+    public NamedSubqueryRoot(final QueryType queryType) {
+
+        super(queryType);
 
     }
 
@@ -42,7 +61,7 @@ public class NamedSubqueryRoot extends SubqueryRoot {
      */
     public String getName() {
 
-        return name;
+        return (String) getProperty(Annotations.SUBQUERY_NAME);
         
     }
 
@@ -52,8 +71,11 @@ public class NamedSubqueryRoot extends SubqueryRoot {
      * @param name
      */
     public void setName(String name) {
-     
-        this.name = name;
+
+        if(name == null)
+            throw new IllegalArgumentException();
+        
+        setProperty(Annotations.SUBQUERY_NAME, name);
         
     }
 

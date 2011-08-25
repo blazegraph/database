@@ -1,30 +1,20 @@
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
-
-import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
  * AST node models the assignment of a value expression to a variable.
  */
-public class AssignmentNode extends ValueExpressionNodeBase implements
+public class AssignmentNode extends GroupMemberValueExpressionNodeBase implements
         IValueExpressionNode {
 
-    private final VarNode                           var;
-
-    private final IValueExpressionNode              ve;
-
-    private final Set<IVariable<?>>                 consumedVars;
-
-    private final INeedsMaterialization.Requirement materializationRequirement;
-
-    private final Set<IVariable<IV>>                varsToMaterialize;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     /**
      * 
@@ -35,56 +25,41 @@ public class AssignmentNode extends ValueExpressionNodeBase implements
      */
     public AssignmentNode(final VarNode var, final IValueExpressionNode ve) {
 
-        this.var = var;
-        this.ve = ve;
+        super(new BOp[] { var, (BOp) ve }, null/* anns */);
 
-        consumedVars = new LinkedHashSet<IVariable<?>>();
-
-        final Iterator<IVariable<?>> it = BOpUtility.getSpannedVariables(ve
-                .getValueExpression());
-
-        while (it.hasNext()) {
-            consumedVars.add(it.next());
-        }
-
-        varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
-
-        materializationRequirement = gatherVarsToMaterialize(
-                ve.getValueExpression(), varsToMaterialize);
-
-    }
-
-    public IValueExpressionNode getValueExpressionNode() {
-        return ve;
-    }
-
-    public IValueExpression<? extends IV> getValueExpression() {
-        return ve.getValueExpression();
     }
 
     public VarNode getVarNode() {
-        return var;
+        
+        return (VarNode) get(0);
+        
     }
 
     public IVariable<IV> getVar() {
-        return var.getVar();
+
+        return getVarNode().getVar();
+        
     }
 
-    public Set<IVariable<?>> getConsumedVars() {
-        return consumedVars;
+    public IValueExpressionNode getValueExpressionNode() {
+     
+        return (IValueExpressionNode) get(1);
+        
     }
 
-    public INeedsMaterialization.Requirement getMaterializationRequirement() {
-        return materializationRequirement;
-    }
+    public IValueExpression<? extends IV> getValueExpression() {
 
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-        return varsToMaterialize;
+        return getValueExpressionNode().getValueExpression();
+        
     }
 
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
+
+        final VarNode var = getVarNode();
+
+        final IValueExpressionNode ve = getValueExpressionNode();
         
         if (ve == var) {
 
@@ -110,24 +85,24 @@ public class AssignmentNode extends ValueExpressionNodeBase implements
         
     }
 
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof AssignmentNode))
-            return false;
-
-        final AssignmentNode t = (AssignmentNode) o;
-
-        if (!var.equals(t.var))
-            return false;
-
-        if (!ve.equals(t.ve))
-            return false;
-
-        return true;
-
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof AssignmentNode))
+//            return false;
+//
+//        final AssignmentNode t = (AssignmentNode) o;
+//
+//        if (!var.equals(t.var))
+//            return false;
+//
+//        if (!ve.equals(t.ve))
+//            return false;
+//
+//        return true;
+//
+//    }
 
 }

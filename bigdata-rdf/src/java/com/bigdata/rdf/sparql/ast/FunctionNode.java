@@ -17,6 +17,11 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class FunctionNode extends ValueExpressionNode {
 
     /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    /**
      * Construct a function node in the AST.
      * 
      * @param lex
@@ -43,20 +48,20 @@ public class FunctionNode extends ValueExpressionNode {
 		
 	}
 	
-    @Override
-    public boolean equals(final Object o) {
-
-        if (o == this)
-            return true;
-
-        if (!(o instanceof FunctionNode))
-            return false;
-        
-        if (!super.equals(o))
-            return false;
-
-        return true;
-
-    }
+//    @Override
+//    public boolean equals(final Object o) {
+//
+//        if (o == this)
+//            return true;
+//
+//        if (!(o instanceof FunctionNode))
+//            return false;
+//        
+//        if (!super.equals(o))
+//            return false;
+//
+//        return true;
+//
+//    }
 
 }

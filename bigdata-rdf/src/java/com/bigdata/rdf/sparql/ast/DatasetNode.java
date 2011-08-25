@@ -17,17 +17,46 @@ import com.bigdata.relation.accesspath.IElementFilter;
  */
 public class DatasetNode extends QueryNodeBase {
 
-	private final DataSetSummary defaultGraphs, namedGraphs;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends QueryNodeBase.Annotations {
+        
+        /**
+         * A {@link DataSetSummary} for the default graph.
+         */
+        String DEFAULT_GRAPHS = "defaultGraphs";
+
+        /**
+         * An optional filter for the default graph.
+         */
+        String DEFAULT_GRAPH_FILTER = "defaultGraphFilter";
+
+        /** A {@link DataSetSummary} for the named graphs. */
+        String NAMED_GRAPHS = "namedGraphs";
+
+        /**
+         * An optional filter for the named graphs.
+         */
+        String NAMED_GRAPH_FILTER = "namedGraphFilter";
+        
+    }
+    
+//	private final DataSetSummary defaultGraphs, namedGraphs;
+//	
+//	private final IElementFilter<ISPO> defaultGraphFilter, namedGraphFilter;
 	
-	private final IElementFilter<ISPO> defaultGraphFilter, namedGraphFilter;
-	
+    @SuppressWarnings("rawtypes")
 	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs) {
 		
 		this(new DataSetSummary(defaultGraphs), new DataSetSummary(namedGraphs));
 		
 	}
 	
-	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs,
+	@SuppressWarnings("rawtypes")
+    public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs,
 	        final IElementFilter<ISPO> defaultGraphFilter, 
             final IElementFilter<ISPO> namedGraphFilter) {
         
@@ -40,11 +69,13 @@ public class DatasetNode extends QueryNodeBase {
     public DatasetNode(final DataSetSummary defaultGraphs,
             final DataSetSummary namedGraphs) {
 
-        this.defaultGraphs = defaultGraphs;
-        this.namedGraphs = namedGraphs;
-
-        this.defaultGraphFilter = null;
-        this.namedGraphFilter = null;
+        this(defaultGraphs, namedGraphs, null, null);
+        
+//        this.defaultGraphs = defaultGraphs;
+//        this.namedGraphs = namedGraphs;
+//
+//        this.defaultGraphFilter = null;
+//        this.namedGraphFilter = null;
 
     }
 	
@@ -81,34 +112,75 @@ public class DatasetNode extends QueryNodeBase {
 			final IElementFilter<ISPO> defaultGraphFilter, 
 			final IElementFilter<ISPO> namedGraphFilter) {
 		
-		this.defaultGraphFilter = defaultGraphFilter;
-		this.namedGraphFilter = namedGraphFilter;
+		setDefaultGraphs(defaultGraphs);
+
+		setNamedGraphs(namedGraphs);
 		
-		this.defaultGraphs = defaultGraphs;
-		this.namedGraphs = namedGraphs;
-		
+        setDefaultGraphFilter(defaultGraphFilter);
+        
+        setNamedGraphFilter(namedGraphFilter);
+        
 	}
-	
-	public IElementFilter<ISPO> getDefaultGraphFilter() {
-		return defaultGraphFilter;
-	}
-	
-	public IElementFilter<ISPO> getNamedGraphFilter() {
-		return namedGraphFilter;
-	}
-	
+
+    public void setDefaultGraphs(final DataSetSummary defaultGraphs) {
+
+        setProperty(Annotations.DEFAULT_GRAPHS, defaultGraphs);
+
+    }
+
+    public void setNamedGraphs(final DataSetSummary namedGraphs) {
+
+        setProperty(Annotations.NAMED_GRAPHS, namedGraphs);
+
+    }
+
+    public void setDefaultGraphFilter(
+            final IElementFilter<ISPO> defaultGraphFilter) {
+
+        setProperty(Annotations.DEFAULT_GRAPH_FILTER, defaultGraphFilter);
+
+    }
+
+    public void setNamedGraphFilter(final IElementFilter<ISPO> namedGraphFilter) {
+
+        setProperty(Annotations.NAMED_GRAPH_FILTER, namedGraphFilter);
+
+    }
+
 	public DataSetSummary getDefaultGraphs() {
-		return defaultGraphs;
+        
+	    return (DataSetSummary) getProperty(Annotations.DEFAULT_GRAPHS);
+	    
 	}
 	
 	public DataSetSummary getNamedGraphs() {
-		return namedGraphs;
+		
+	    return (DataSetSummary) getProperty(Annotations.NAMED_GRAPHS);
+	    
 	}
+
+    @SuppressWarnings("unchecked")
+    public IElementFilter<ISPO> getDefaultGraphFilter() {
+        
+        return (IElementFilter<ISPO>) getProperty(Annotations.DEFAULT_GRAPH_FILTER);
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    public IElementFilter<ISPO> getNamedGraphFilter() {
+
+        return (IElementFilter<ISPO>) getProperty(Annotations.NAMED_GRAPH_FILTER);
+        
+    }
 
     @Override
     public String toString(final int indent) {
         final String s = indent(indent);
         final StringBuilder sb = new StringBuilder();
+        final DataSetSummary defaultGraphs = getDefaultGraphs();
+        final DataSetSummary namedGraphs = getNamedGraphs();
+        final IElementFilter<?> defaultGraphFilter = getDefaultGraphFilter();
+        final IElementFilter<?> namedGraphFilter = getNamedGraphFilter();
         if (defaultGraphs != null) {
             sb.append("\n");
             sb.append(s);
@@ -134,38 +206,38 @@ public class DatasetNode extends QueryNodeBase {
         return sb.toString();
     }
 
-    public boolean equals(final Object o) {
-        if (this == o)
-            return true;
-        if (!(o instanceof DatasetNode))
-            return false;
-        final DatasetNode t = (DatasetNode) o;
-        if (defaultGraphs == null) {
-            if (t.defaultGraphs != null)
-                return false;
-        } else if (!defaultGraphs.equals(t.defaultGraphs)) {
-            return false;
-        }
-        if (namedGraphs == null) {
-            if (t.namedGraphs != null)
-                return false;
-        } else if (!namedGraphs.equals(t.namedGraphs)) {
-            return false;
-        }
-        if (defaultGraphFilter == null) {
-            if (t.defaultGraphFilter != null)
-                return false;
-        } else if (!defaultGraphFilter.equals(t.defaultGraphFilter)) {
-            return false;
-        }
-        if (namedGraphFilter == null) {
-            if (t.namedGraphFilter != null)
-                return false;
-        } else if (!namedGraphFilter.equals(t.namedGraphFilter)) {
-            return false;
-        }
-        return true;
-
-    }
+//    public boolean equals(final Object o) {
+//        if (this == o)
+//            return true;
+//        if (!(o instanceof DatasetNode))
+//            return false;
+//        final DatasetNode t = (DatasetNode) o;
+//        if (defaultGraphs == null) {
+//            if (t.defaultGraphs != null)
+//                return false;
+//        } else if (!defaultGraphs.equals(t.defaultGraphs)) {
+//            return false;
+//        }
+//        if (namedGraphs == null) {
+//            if (t.namedGraphs != null)
+//                return false;
+//        } else if (!namedGraphs.equals(t.namedGraphs)) {
+//            return false;
+//        }
+//        if (defaultGraphFilter == null) {
+//            if (t.defaultGraphFilter != null)
+//                return false;
+//        } else if (!defaultGraphFilter.equals(t.defaultGraphFilter)) {
+//            return false;
+//        }
+//        if (namedGraphFilter == null) {
+//            if (t.namedGraphFilter != null)
+//                return false;
+//        } else if (!namedGraphFilter.equals(t.namedGraphFilter)) {
+//            return false;
+//        }
+//        return true;
+//
+//    }
     
 }

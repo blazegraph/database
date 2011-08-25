@@ -11,7 +11,12 @@ import com.bigdata.rdf.internal.IV;
  */
 public class ConstantNode extends TermNode {
 
-	public ConstantNode(final IConstant<IV> val) {
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    public ConstantNode(final IConstant<IV> val) {
 		
 		super(val);
 		

@@ -28,27 +28,12 @@ import com.bigdata.rdf.sail.QueryType;
 /**
  * A SPARQL 1.1 style subquery.
  */
-public class SubqueryRoot extends SubqueryBase implements IGroupMemberNode {
+public class SubqueryRoot extends SubqueryBase {
 
-    private IGroupNode parent;
-
-    final public IGroupNode getParent() {
-
-        return parent;
-
-    }
-
-    final public void setParent(final IGroupNode parent) {
-
-        this.parent = parent;
-
-    }
-
-    public SubqueryRoot() {
-        
-        super(QueryType.SELECT);
-        
-    }
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     /**
      * Note: This constructor variant may be used with the implicit subquery for

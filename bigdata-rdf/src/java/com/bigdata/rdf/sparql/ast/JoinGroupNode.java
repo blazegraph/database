@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
@@ -17,11 +18,22 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 
     /**
-     * The graph variable or constant iff this {@link JoinGroupNode} models a
-     * GraphPatternGroup. When not present, your have to read up the parent
-     * chain to locate the dominating graph context.
+     * 
      */
-    private TermNode context;
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends GroupNodeBase.Annotations {
+
+        /**
+         * The graph variable or constant iff this {@link JoinGroupNode} models
+         * a GraphPatternGroup. When not present, your have to read up the
+         * parent chain to locate the dominating graph context.
+         */
+        String CONTEXT = "context";
+        
+    }
+    
+//    private TermNode context;
     
     /**
      * Construct a non-optional join group.
@@ -46,8 +58,8 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
      */
     public void setContext(final TermNode context) {
         
-        this.context = context;
-        
+        setProperty(Annotations.CONTEXT, context);
+
     }
     
     /**
@@ -59,12 +71,15 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
      */
     @Override
     public TermNode getContext() {
-        
-        if(context != null)
+
+        TermNode context = (TermNode) getProperty(Annotations.CONTEXT);
+
+        if (context != null)
             return context;
-        
+
+        // Note: the base class will case the parent.
         return super.getContext();
-        
+
     }
     
 	/**
@@ -353,9 +368,11 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 				
 				final FilterNode filter = (FilterNode) node;
 				
-				if (filter.getMaterializationRequirement() != 
-						INeedsMaterialization.Requirement.NEVER) {
-				
+                final INeedsMaterialization req = filter
+                        .getMaterializationRequirement();
+
+                if (req.getRequirement() != INeedsMaterialization.Requirement.NEVER) {
+
 					return false;
 					
 				}
@@ -457,30 +474,30 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 
 	}
 
-	@Override
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof JoinGroupNode))
-            return false;
-
-        if(!super.equals(o))
-            return false;
-
-        final JoinGroupNode t = (JoinGroupNode) o;
-        
-        if (context == null) {
-            if (t.context != null)
-                return false;
-        } else {
-            if (!context.equals(context))
-                return false;
-        }
-            
-        return true;
-
-    }
+//	@Override
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof JoinGroupNode))
+//            return false;
+//
+//        if(!super.equals(o))
+//            return false;
+//
+//        final JoinGroupNode t = (JoinGroupNode) o;
+//        
+//        if (context == null) {
+//            if (t.context != null)
+//                return false;
+//        } else {
+//            if (!context.equals(context))
+//                return false;
+//        }
+//            
+//        return true;
+//
+//    }
 
 }

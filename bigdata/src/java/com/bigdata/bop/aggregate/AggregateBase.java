@@ -212,7 +212,7 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 	
 	private volatile transient Set<IVariable<E>> terms;
 
-    final public Set<IVariable<E>> getTermsToMaterialize() {
+    final public Set<IVariable<E>> getVarsToMaterialize() {
 
         if (terms == null) {
 

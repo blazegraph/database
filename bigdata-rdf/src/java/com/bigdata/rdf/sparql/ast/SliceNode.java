@@ -35,15 +35,28 @@ package com.bigdata.rdf.sparql.ast;
  */
 public class SliceNode extends SolutionModifierBase {
 
-    private long offset, limit;
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    interface Annotations extends SolutionModifierBase.Annotations {
+
+        final String OFFSET = "offset";
+
+        final long DEFAULT_OFFSET = 0L;
+
+        final String LIMIT = "limit";
+
+        final long DEFAULT_LIMIT = Long.MAX_VALUE;
+    
+    }
     
     /**
      * Slice with defaults that do not impose a constraint (offset is ZERO,
      * limit is {@link Long#MAX_VALUE}).
      */
     public SliceNode() {
-        offset = 0;
-        limit = Long.MAX_VALUE;
     }
     
     /**
@@ -53,36 +66,46 @@ public class SliceNode extends SolutionModifierBase {
      *            The limit (use {@link Long#MAX_VALUE} if there is no limit).
      */
     public SliceNode(final long offset, final long limit) {
-      
-        this.offset = offset;
+     
+        setOffset(offset);
         
-        this.limit = limit;
+        setLimit(limit);
         
     }
 
     public void setOffset(final long offset) {
-        this.offset = offset;
+        
+        setProperty(Annotations.OFFSET, offset);
+        
     }
 
     public long getOffset() {
-        return offset;
+        
+        return getProperty(Annotations.OFFSET, Annotations.DEFAULT_OFFSET);
+
     }
 
     public void setLimit(final long limit) {
-        this.limit = limit;
+
+        setProperty(Annotations.LIMIT, limit);
+        
     }
 
     public long getLimit() {
-        return limit;
+
+        return getProperty(Annotations.LIMIT, Annotations.DEFAULT_LIMIT);
+
     }
 
     /**
      * Return <code>true</code> if the slice will impose a constraint (
-     * <code>offset
-     * GT ZERO</code> or <code>limit LT {@link Long#MAX_VALUE}</code>).
+     * <code>offset GT ZERO</code> or
+     * <code>limit LT {@link Long#MAX_VALUE}</code>).
      */
     public boolean hasSlice() {
-        return offset > 0 || limit < Long.MAX_VALUE;
+
+        return getOffset() > 0 || getLimit() < Long.MAX_VALUE;
+        
     }
     
     public String toString(final int indent) {
@@ -91,6 +114,8 @@ public class SliceNode extends SolutionModifierBase {
         sb.append("\n");
         sb.append(indent(indent));
         sb.append("slice(");
+        final long offset = getOffset();
+        final long limit = getLimit();
         if (offset != 0L) {
             sb.append("offset=" + offset);
         }
@@ -101,27 +126,27 @@ public class SliceNode extends SolutionModifierBase {
         }
         sb.append(")");
         return sb.toString();
-        
+
     }
 
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof SliceNode))
-            return false;
-
-        final SliceNode t = (SliceNode) o;
-
-        if (limit != t.limit)
-            return false;
-
-        if (offset != t.offset)
-            return false;
-
-        return true;
-        
-    }
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof SliceNode))
+//            return false;
+//
+//        final SliceNode t = (SliceNode) o;
+//
+//        if (limit != t.limit)
+//            return false;
+//
+//        if (offset != t.offset)
+//            return false;
+//
+//        return true;
+//        
+//    }
     
 }

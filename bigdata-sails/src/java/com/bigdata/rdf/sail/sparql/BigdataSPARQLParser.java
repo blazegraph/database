@@ -82,6 +82,8 @@ import com.bigdata.rdf.sail.QueryType;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
  *          $
+ *          
+ * @deprecated by {@link Bigdata2ASTSPARQLParser}
  */
 public class BigdataSPARQLParser implements QueryParser {
 

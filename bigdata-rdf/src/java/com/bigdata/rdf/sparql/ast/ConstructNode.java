@@ -33,20 +33,21 @@ package com.bigdata.rdf.sparql.ast;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME We might want to open this up a bit more to allow group graph
- *          patterns or something like that to be embedded. Right now it only
- *          permits statement patterns. That handles the traditional CONSTRUCT
- *          but not the Anzo CONSTRUCT extension for quads.
  */
-public class ConstructNode<E extends StatementPatternNode> extends GroupNodeBase<E> {
+public class ConstructNode extends GroupNodeBase<StatementPatternNode> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public ConstructNode() {
         super(false/* optional */);
     }
 
     @Override
-    public IGroupNode<E> addChild(final E child) {
+    public IGroupNode<StatementPatternNode> addChild(
+            final StatementPatternNode child) {
 
         if (!(child instanceof StatementPatternNode))
             throw new UnsupportedOperationException();

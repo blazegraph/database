@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+
+import com.bigdata.bop.BOp;
 
 /**
  * AST node models an ORDER BY clause.
@@ -40,39 +40,45 @@ import java.util.List;
 public class OrderByNode extends SolutionModifierBase implements
         Iterable<OrderByExpr> {
 
-    private final List<OrderByExpr> orderBy = new LinkedList<OrderByExpr>();
+//    private final List<OrderByExpr> orderBy = new LinkedList<OrderByExpr>();
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public OrderByNode() {
     }
 
     public void addExpr(final OrderByExpr orderBy) {
         
-        this.orderBy.add(orderBy);
+        addArg((BOp) orderBy);
         
     }
     
-    public void removeOrderBy(final OrderByExpr orderBy) {
+    public boolean removeOrderBy(final OrderByExpr orderBy) {
         
-        this.orderBy.remove(orderBy);
+        return removeArg(orderBy);
         
     }
     
     public int size() {
         
-        return orderBy.size();
+        return arity();
         
     }
     
     public boolean isEmpty() {
      
-        return orderBy.isEmpty();
+        return arity() == 0;
         
     }
     
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<OrderByExpr> iterator() {
 
-        return orderBy.iterator();
-        
+        return (Iterator) argIterator();
+
     }
 
     public String toString(final int indent) {
@@ -85,7 +91,7 @@ public class OrderByNode extends SolutionModifierBase implements
         
         sb.append("order by");
         
-        for (OrderByExpr e : orderBy) {
+        for (OrderByExpr e : this) {
         
             sb.append(" ");
             
@@ -97,22 +103,22 @@ public class OrderByNode extends SolutionModifierBase implements
         
     }
 
-    @Override
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof OrderByNode))
-            return false;
-
-        final OrderByNode t = (OrderByNode) o;
-
-        if (!orderBy.equals(t.orderBy))
-            return false;
-
-        return true;
-
-    }
+//    @Override
+//    public boolean equals(final Object o) {
+//
+//        if (this == o)
+//            return true;
+//
+//        if (!(o instanceof OrderByNode))
+//            return false;
+//
+//        final OrderByNode t = (OrderByNode) o;
+//
+//        if (!orderBy.equals(t.orderBy))
+//            return false;
+//
+//        return true;
+//
+//    }
 
 }

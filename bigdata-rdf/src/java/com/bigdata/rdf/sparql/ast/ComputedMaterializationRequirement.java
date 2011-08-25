@@ -22,12 +22,13 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 17, 2011
+ * Created on Aug 25, 2011
  */
 
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -36,14 +37,41 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
+ * Computed {@link INeedsMaterialization} metadata for an
+ * {@link IValueExpression}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class ValueExpressionNodeBase extends GroupMemberNodeBase
-        implements IValueExpressionMetadata {
+public class ComputedMaterializationRequirement implements
+        INeedsMaterialization {
+
+    private final INeedsMaterialization.Requirement requirement;
+
+    private final Set<IVariable<IV>> varsToMaterialize;
+
+    public ComputedMaterializationRequirement(IValueExpression ve) {
+
+        varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
+
+        requirement = gatherVarsToMaterialize(ve,
+                varsToMaterialize);
+
+    }
+
+    public Requirement getRequirement() {
+        
+        return requirement;
+        
+    }
+
+    public Set<IVariable<IV>> getVarsToMaterialize() {
+        
+        return varsToMaterialize;
+        
+    }
 
     /**
      * Static helper used to determine materialization requirements.
@@ -64,7 +92,7 @@ public abstract class ValueExpressionNodeBase extends GroupMemberNodeBase
                 
                 final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
                 
-                final Set<IVariable<IV>> t = bop2.getTermsToMaterialize();
+                final Set<IVariable<IV>> t = bop2.getVarsToMaterialize();
                 
                 if (t.size() > 0) {
                     

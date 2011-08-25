@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Set;
 
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
@@ -45,7 +44,7 @@ public interface IValueExpressionMetadata {
      * determine which solutions will continue on through the pipeline and which
      * will be filtered out.
      */
-    abstract public Set<IVariable<?>> getConsumedVars();
+    Set<IVariable<?>> getConsumedVars();
 
     /**
      * Return the materialization requirement for this filter. Many filters
@@ -53,12 +52,20 @@ public interface IValueExpressionMetadata {
      * work on both materialized terms and internal values (a good example of
      * this is CompareBOp).
      */
-    abstract public INeedsMaterialization.Requirement getMaterializationRequirement();
-
-    /**
-     * Return the set of variables that will need to be materialized in the
-     * binding set in order for this filter to be evaluated.
-     */
-    abstract public Set<IVariable<IV>> getVarsToMaterialize();
+    INeedsMaterialization getMaterializationRequirement();
+    
+//    /**
+//     * Return the materialization requirement for this filter. Many filters
+//     * require materialized variables to do their filtering. Some filters can
+//     * work on both materialized terms and internal values (a good example of
+//     * this is CompareBOp).
+//     */
+//    abstract public INeedsMaterialization.Requirement getRequirement();
+//
+//    /**
+//     * Return the set of variables that will need to be materialized in the
+//     * binding set in order for this filter to be evaluated.
+//     */
+//    abstract public Set<IVariable<IV>> getVarsToMaterialize();
 
 }

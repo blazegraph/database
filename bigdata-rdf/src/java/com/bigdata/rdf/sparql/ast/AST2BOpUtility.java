@@ -628,7 +628,7 @@ public class AST2BOpUtility {
 	        final UnionNode unionNode,
 			final AST2BOpContext ctx) {
 		
-        final int arity = unionNode.getChildCount();
+        final int arity = unionNode.size();
         
 		if (arity == 0) {
 			throw new IllegalArgumentException();
@@ -856,7 +856,8 @@ public class AST2BOpUtility {
 			/*
 			 * Get the vars this filter needs materialized.
 			 */
-			vars.addAll(assignmentNode.getVarsToMaterialize());
+            vars.addAll(assignmentNode.getMaterializationRequirement()
+                    .getVarsToMaterialize());
 			
 			/*
 			 * Remove the ones we've already done.
@@ -918,8 +919,9 @@ public class AST2BOpUtility {
 			/*
 			 * Get the vars this filter needs materialized.
 			 */
-			vars.addAll(filter.getVarsToMaterialize());
-			
+            vars.addAll(filter.getMaterializationRequirement()
+                    .getVarsToMaterialize());
+
 			/*
 			 * Remove the ones we've already done.
 			 */
@@ -1271,7 +1273,7 @@ public class AST2BOpUtility {
 
                 } else if (expr instanceof INeedsMaterialization) {
 
-                    vars.addAll(((INeedsMaterialization) expr).getTermsToMaterialize());
+                    vars.addAll(((INeedsMaterialization) expr).getVarsToMaterialize());
 
                 }
             }
@@ -1290,7 +1292,7 @@ public class AST2BOpUtility {
 
                 } else if (expr instanceof INeedsMaterialization) {
 
-                    vars.addAll(((INeedsMaterialization) expr).getTermsToMaterialize());
+                    vars.addAll(((INeedsMaterialization) expr).getVarsToMaterialize());
 
                 }
             }
@@ -1402,7 +1404,7 @@ public class AST2BOpUtility {
             } else if (expr instanceof INeedsMaterialization) {
 
                 vars.addAll(((INeedsMaterialization) expr)
-                        .getTermsToMaterialize());
+                        .getVarsToMaterialize());
                 
             }
 

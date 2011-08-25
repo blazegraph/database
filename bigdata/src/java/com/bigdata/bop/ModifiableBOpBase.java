@@ -27,14 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
-
-import com.bigdata.bop.constraint.EQ;
 
 /**
  * Abstract base class for mutable {@link BOp}s. Unlike {@link BOpBase}, this
@@ -68,37 +65,16 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     private static final long serialVersionUID = 1L;
 
     /**
-     * The argument values - <strong>direct access to this field is
-     * discouraged</strong> - the field is protected to support
-     * <em>mutation</em> APIs and should not be relied on for other purposes.
-     * <p>
-     * Note: This field is reported out as a {@link List} so we can make it
-     * thread safe and, if desired, immutable. However, it is internally a
-     * simple array. Subclasses can implement mutation operations which return
-     * deep copies in which the argument values have been modified using
-     * {@link #_set(int, BOp)}.
-     * <p>
-     * If we allowed mutation of the arguments (outside of the object creation
-     * pattern) then caching of the arguments (or annotations) by classes such
-     * as {@link EQ} will cause {@link #clone()} to fail because (a) it will do
-     * a field-by-field copy on the concrete implementation class; and (b) it
-     * will not consistently update the cached references. In order to "fix"
-     * this problem, any classes which cache arguments or annotations would have
-     * to explicitly overrides {@link #clone()} in order to set those fields
-     * based on the arguments on the cloned {@link ModifiableBOpBase} class.
-     * <p>
-     * Note: This must be at least "effectively" final per the effectively
-     * immutable contract for {@link BOp}s.
+     * A mutable list containing the argument values (aka children) and never
+     * <code>null</code>.
      */
-    private final BOp[] args;
+    private final ArrayList<BOp> args;
 
     /**
-     * The operator annotations.
-     * <p>
-     * Note: This must be at least "effectively" final per the effectively
-     * immutable contract for {@link BOp}s.
+     * A mutable map containing the operator annotations and never
+     * <code>null</code>.
      */
-    private final Map<String,Object> annotations;
+    private final Map<String, Object> annotations;
 
     /**
      * Deep copy constructor (required).
@@ -124,14 +100,11 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      *             if the argument is <code>null</code>.
      */
     public ModifiableBOpBase(final ModifiableBOpBase op) {
-        // Note: only shallow copy is required to achieve immutable semantics!
-        if (op.args == BOp.NOARGS || op.args.length == 0) {
-            // fast path for zero arity operators.
-            args = BOp.NOARGS;
-        } else {
-            args = Arrays.copyOf(op.args, op.args.length);
-        }
+
+        args = new ArrayList<BOp>(op.args);
+
         annotations = new LinkedHashMap<String, Object>(op.annotations);
+
     }
 
     /**
@@ -140,16 +113,23 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      * @param args
      *            The arguments to the operator.
      * @param annotations
-     *            The annotations for the operator (optional).
+     *            The annotations for the operator (optional). When
+     *            <code>null</code>, a mutable map with a default capacity of
+     *            {@value CoreBaseBOp#DEFAULT_INITIAL_CAPACITY} is allocated. Do
+     *            NOT specify an immutable map.
      */
-    public ModifiableBOpBase(final BOp[] args, final Map<String, Object> annotations) {
+    public ModifiableBOpBase(final BOp[] args,
+            final Map<String, Object> annotations) {
 
         if (args == null)
             throw new IllegalArgumentException();
 
         checkArgs(args);
 
-        this.args = args;
+        this.args = new ArrayList<BOp>(args.length);
+
+        for(BOp t : args)
+            this.args.add(t);
 
         this.annotations = (annotations == null ? new LinkedHashMap<String, Object>(
                 DEFAULT_INITIAL_CAPACITY) : annotations);
@@ -164,7 +144,7 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     
     public BOp get(final int index) {
         
-        return args[index];
+        return args.get(index);
         
     }
 
@@ -184,75 +164,91 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         if (newArg == null)
             throw new IllegalArgumentException();
 
-        args[index] = newArg;
+        args.set(index, newArg);
 
         return this;
 
     }
 
-    public int arity() {
+    /**
+     * Add a new argument.
+     * 
+     * @param newArg
+     *            The argument.
+     * 
+     * @return <i>this</i>.
+     */
+    public void addArg(final BOp newArg) {
         
-        return args.length;
+        args.add(newArg);
         
     }
 
     /**
-     * A mutable list backed by the {@link #args}[]. Elements of the list may be
-     * modified, but the size of the list can not be changed.
+     * Add an argument iff it is not already present.
+     * 
+     * @param arg
+     *            The argument.
+     */
+    public void addArgIfAbsent(final BOp arg) {
+        
+        if(!args.contains(arg))
+            args.add(arg);
+        
+    }
+    
+    /**
+     * Remove the 1st occurrence of the argument.
+     * 
+     * @param arg
+     *            The argument.
+     *            
+     * @return <code>true</code> iff the argument was removed.
+     */
+    public boolean removeArg(final BOp arg) {
+        
+        return args.remove(arg);
+        
+    }
+    
+    public int arity() {
+        
+        return args.size();
+        
+    }
+
+    /**
+     * The list of arguments (aka children) of this node.
      */
     final public List<BOp> args() {
 
-        return Arrays.asList(args);
-        
-    }
-
-    final public Iterator<BOp> argIterator() {
-        
-        return new ArgIterator();
+        return args;
         
     }
 
     /**
-     * An iterator visiting the arguments which does not support removal.
+     * {@inheritDoc}
+     * <p>
+     * Note: This {@link Iterator} supports removal.
      */
-    private class ArgIterator implements Iterator<BOp> {
-
-        private int i = 0;
-
-        public boolean hasNext() {
-            return i < args.length;
-        }
-
-        public BOp next() {
-            if (!hasNext())
-                throw new NoSuchElementException();
-            return args[i++];
-        }
-
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-
+    final public Iterator<BOp> argIterator() {
+        
+        return args.iterator();
+        
     }
 
     // shallow copy
     public BOp[] toArray() {
 
-        final BOp[] a = new BOp[args.length];
-
-        return Arrays.copyOf(args, args.length, a.getClass());
+        return args.toArray(new BOp[args.size()]);
 
     }
 
     // shallow copy
-    @SuppressWarnings("unchecked")
     public <T> T[] toArray(final T[] a) {
-        if (a.length < args.length)
-            return (T[]) Arrays.copyOf(args, args.length, a.getClass());
-        System.arraycopy(args, 0, a, 0, args.length);
-        if (a.length > args.length)
-            a[args.length] = null;
-        return a;
+
+        return args.toArray(a);
+        
     }
 
 //    @SuppressWarnings("unchecked")
