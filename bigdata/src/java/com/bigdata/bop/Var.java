@@ -59,7 +59,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     private Var(final String name) {
 
 //        super(new BOp[] {}, null/* annotations */);
-        super(NOARGS, NOANNS);
+        super(BOp.NOARGS, BOp.NOANNS);
         
         assert name != null;
 

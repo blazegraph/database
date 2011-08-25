@@ -368,7 +368,7 @@ public class TestMemorySortOp extends TestCase2 {
             , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )   // x+y=N/A
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _3 } ) // x+y=4
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _4 } ) // x+y=6
-            , new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    )  // x+y=1
+            , new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    )  // x+y=N/A
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _2 } ) // x+y=4
         } ;
 

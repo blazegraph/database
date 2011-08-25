@@ -85,7 +85,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     public Constant(final IVariable<E> var, final E value) {
 
-        super(NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
+        super(BOp.NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
 
         if (var == null)
             throw new IllegalArgumentException();
@@ -99,7 +99,7 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     public Constant(final E value) {
 
-        super(NOARGS, NOANNS);
+        super(BOp.NOARGS, BOp.NOANNS);
 
         if (value == null)
             throw new IllegalArgumentException();

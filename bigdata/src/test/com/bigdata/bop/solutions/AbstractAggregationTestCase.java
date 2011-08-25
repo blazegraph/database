@@ -1971,7 +1971,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         
         final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(4));
+                new XSDNumericIV<BigdataLiteral>(4L));
         final IBindingSet expected[] = new IBindingSet[]
         {
               new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
@@ -2132,7 +2132,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         
         final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(4));
+                new XSDNumericIV<BigdataLiteral>(4L));
         final IBindingSet expected[] = new IBindingSet[]
         {
               new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )

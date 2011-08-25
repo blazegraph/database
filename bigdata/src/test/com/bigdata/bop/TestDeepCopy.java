@@ -89,7 +89,6 @@ public class TestDeepCopy extends TestCase2 {
             Predicate.class,//
             Constant.class,//
             Var.class,//
-            QuoteOp.class,//
             Bind.class,//
             // com.bigdata.bop.constraint
             EQ.class,//

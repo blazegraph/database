@@ -274,19 +274,20 @@ public class MemorySortOp extends SortOp {
                             
                         }
 
-                    }
+                        // add to the set of solutions to be sorted.
+                        stats.solutions.add(bset);
 
-                    /*
-                     * Note: By synchronizing on [stats] here we are able to run
-                     * concurrent evaluation tasks for this operator which
-                     * compute the as-bound values.
-                     */
-                    synchronized (stats) {
-                        for (IBindingSet bset : a) {
-                            // add to the set of solutions to be sorted.
-                            stats.solutions.add(bset);
-                        }
-                    }
+                    } // next source solution
+
+//                    /*
+//                     * Note: By synchronizing on [stats] here we are able to run
+//                     * concurrent evaluation tasks for this operator which
+//                     * compute the as-bound values.
+//                     */
+//                    synchronized (stats) {
+//                        for (IBindingSet bset : a) {
+//                        }
+//                    }
                         
                 }
 

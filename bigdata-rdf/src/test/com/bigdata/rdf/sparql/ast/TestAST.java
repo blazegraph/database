@@ -33,7 +33,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
@@ -335,7 +334,7 @@ public class TestAST extends TestCase {
     }
     
     public Predicate pred(final int id) {
-    	return new Predicate(BOpBase.NOARGS, 
+    	return new Predicate(BOp.NOARGS, 
 			NV.asMap(new NV(BOp.Annotations.BOP_ID, id))
     	);
     }
@@ -349,7 +348,7 @@ public class TestAST extends TestCase {
     private static final class Filter extends XSDBooleanIVValueExpression {
     	
     	public Filter(final int id) {
-    		super(BOpBase.NOARGS, 
+    		super(BOp.NOARGS, 
         			NV.asMap(new NV(BOp.Annotations.BOP_ID, id)));
     	}
     	

@@ -46,7 +46,7 @@ public class DistinctFilter extends BOpFilterBase {
      * A instance using the default configuration for the in memory hash map.
      */
     public static DistinctFilter newInstance() {
-        return new DistinctFilter(NOARGS, NOANNS);
+        return new DistinctFilter(BOp.NOARGS, BOp.NOANNS);
     }
     
     /**

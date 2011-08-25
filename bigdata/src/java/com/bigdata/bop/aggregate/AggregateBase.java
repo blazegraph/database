@@ -8,7 +8,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.impl.LiteralImpl;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -134,7 +133,7 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 
 	}
 
-	public AggregateBase(BOpBase op) {
+	public AggregateBase(AggregateBase<E> op) {
 		super(op);
 	}
 

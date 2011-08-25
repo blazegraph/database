@@ -54,7 +54,7 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
 
 	public NeedsMaterializationBOp(final IValueExpression x) {
         
-        this(new BOp[] { x }, NOANNS); 
+        this(new BOp[] { x }, BOp.NOANNS); 
         
     }
     

@@ -411,6 +411,51 @@ public class TestGroupByState extends TestCase2 {
     }
 
     /**
+     * Unit test verifies that a constant within a group by clause does not
+     * cause the group by clause to be interpreted as an aggregate.
+     * 
+     * <pre>
+     * select ?index
+     * group by (?o + 1 AS ?index)
+     * </pre>
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_aggregateExpr_04() {
+        
+        final IVariable<IV<?,?>> index = Var.var("index");
+        final IVariable<IV<?,?>> o = Var.var("o");
+
+        final IValueExpression<?> mathExpr = new Bind(index, //
+                new MathBOp(o, new Constant(new XSDNumericIV(1)),
+                        MathBOp.MathOp.PLUS));
+
+        final IValueExpression<?>[] select = new IValueExpression[] { new Bind(
+                index, index) };
+
+        final IValueExpression<?>[] groupBy = new IValueExpression[] { mathExpr };
+
+        final IConstraint[] having = null;
+
+        final LinkedHashSet<IVariable<?>> groupByVars = new LinkedHashSet<IVariable<?>>();
+        groupByVars.add(index);
+
+        final LinkedHashSet<IVariable<?>> selectVars = new LinkedHashSet<IVariable<?>>();
+        selectVars.add(index);
+
+        final LinkedHashSet<IVariable<?>> havingVars = new LinkedHashSet<IVariable<?>>();
+
+        final MockGroupByState expected = new MockGroupByState(groupBy,
+                groupByVars, select, selectVars, having, havingVars,
+                false/* anyDistinct */, false/* selectDependency */,
+                false/* nestedAggregates */, true/* simpleHaving */);
+
+        final IGroupByState actual = new GroupByState(select, groupBy, having);
+
+        assertSameState(expected, actual);
+
+    }
+    
+    /**
      * <pre>
      * SELECT SUM(?y) as ?x
      * GROUP BY ?z

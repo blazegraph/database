@@ -340,7 +340,7 @@ public class Rule2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
-        final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
+        final PipelineOp startOp = applyQueryHints(new StartOp(BOp.NOARGS,
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, idFactory
                                 .incrementAndGet()),//
@@ -1699,7 +1699,7 @@ public class Rule2BOpUtility {
         for (int i = 0; i < steps.length; i++) {
 
             // convert the child IStep
-            final BOpBase tmp = convert(steps[i], idFactory, db, queryEngine,
+            final BOp tmp = convert(steps[i], idFactory, db, queryEngine,
                     queryHints);
 
             /*

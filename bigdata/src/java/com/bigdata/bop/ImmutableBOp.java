@@ -47,7 +47,7 @@ abstract public class ImmutableBOp extends BOpBase {
     /**
      * @param op
      */
-    public ImmutableBOp(BOpBase op) {
+    public ImmutableBOp(ImmutableBOp op) {
         super(op);
     }
 

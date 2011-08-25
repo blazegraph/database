@@ -36,6 +36,20 @@ package com.bigdata.rdf.sparql.ast;
 abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
         QueryNodeBase implements IGroupMemberNode {
 
+    private IGroupNode parent;
+    
+    final public IGroupNode getParent() {
+        
+        return parent;
+        
+    }
+
+    final public void setParent(final IGroupNode parent) {
+
+        this.parent = parent;
+
+    }
+
     /**
      * 
      */

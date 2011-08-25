@@ -23,7 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
+
 import com.bigdata.rdf.sail.QueryType;
+
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Contains the projection clause, where clause, and solution modified clauses.
@@ -368,4 +373,30 @@ abstract public class QueryBase extends QueryNodeBase {
 
     }
 
+    public Iterator<IQueryNode> preOrderIterator() {
+
+        final Striterator itr = new Striterator(new SingleValueIterator(this));
+
+        if (construct != null)
+            itr.append(construct.preOrderIterator());
+        
+        if (projection != null)
+            itr.append(projection.preOrderIterator());
+        
+        if (whereClause != null)
+            itr.append(whereClause.preOrderIterator());
+        
+        if (groupBy != null)
+            itr.append(groupBy.preOrderIterator());
+        
+        if (having != null)
+            itr.append(having.preOrderIterator());
+
+        if (slice != null)
+            itr.append(slice.preOrderIterator());
+
+        return itr;
+        
+    }
+    
 }

@@ -43,7 +43,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
@@ -585,7 +584,7 @@ public class SOp2BOpUtility {
     	}
     	
         PipelineOp left = Rule2BOpUtility.applyQueryHints(
-        		new StartOp(BOpBase.NOARGS,
+        		new StartOp(BOp.NOARGS,
 			        NV.asMap(new NV[] {//
 			              new NV(Predicate.Annotations.BOP_ID, idFactory
 			                      .incrementAndGet()),//
@@ -740,7 +739,7 @@ public class SOp2BOpUtility {
     	PipelineOp left = pipelineOp;
     	if (left == null) {
     		left = Rule2BOpUtility.applyQueryHints(
-            		new StartOp(BOpBase.NOARGS,
+            		new StartOp(BOp.NOARGS,
         			        NV.asMap(new NV[] {//
         			              new NV(Predicate.Annotations.BOP_ID, idFactory
         			                      .incrementAndGet()),//
