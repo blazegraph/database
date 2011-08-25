@@ -46,13 +46,13 @@ public class SparqlTypeErrorBOp extends XSDBooleanIVValueExpression {
 
 	private SparqlTypeErrorBOp() {
 		
-		this(NOARGS, NOANNS);
+		this(BOp.NOARGS, BOp.NOANNS);
 		
 	}
 	
 	public SparqlTypeErrorBOp(final IValueExpression<? extends IV> x) {
 		
-		this(new BOp[] { x }, NOANNS);
+		this(new BOp[] { x }, BOp.NOANNS);
 		
 	}
 	

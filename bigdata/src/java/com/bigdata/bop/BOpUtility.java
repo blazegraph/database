@@ -832,19 +832,9 @@ public class BOpUtility {
      */
     private static String indent(final int height) {
 
-        if( height == -1 ) {
+        return CoreBaseBOp.indent(height);
         
-            // The height is not defined.
-            
-            return "";
-            
-        }
-        
-        return ws.substring(0, height * 4);
-
     }
-
-    private static final transient String ws = "                                                                                                                                                                                                                                                                                ";
 
 //    /**
 //     * Verify that all bops from the identified <i>startId</i> to the root are

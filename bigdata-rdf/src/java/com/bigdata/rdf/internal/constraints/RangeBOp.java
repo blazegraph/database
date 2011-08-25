@@ -55,13 +55,13 @@ final public class RangeBOp extends BOpBase
 	
 	public interface Annotations extends ImmutableBOp.Annotations {
 
-		String VAR = (RangeBOp.class.getName() + ".var").intern();
+		String VAR = RangeBOp.class.getName() + ".var";
 
 		/** The inclusive lower bound. */
-		String FROM = (RangeBOp.class.getName() + ".from").intern();
+		String FROM = RangeBOp.class.getName() + ".from";
 		
 		/** The exclusive upper bound. */
-		String TO = (RangeBOp.class.getName() + ".to").intern();
+		String TO = RangeBOp.class.getName() + ".to";
 		
     }
     
@@ -70,7 +70,7 @@ final public class RangeBOp extends BOpBase
     		final IValueExpression<IV> from, 
     		final IValueExpression<IV> to) {
 
-        this(NOARGS, 
+        this(BOp.NOARGS, 
         		NV.asMap(new NV(Annotations.VAR, var),
         				 new NV(Annotations.FROM, from),
         				 new NV(Annotations.TO, to)));

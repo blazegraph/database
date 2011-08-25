@@ -30,7 +30,6 @@ package com.bigdata.bop.rdf.filter;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.ap.filter.BOpResolver;
 import com.bigdata.rdf.spo.ISPO;
@@ -55,7 +54,7 @@ public class StripContextFilter extends BOpResolver {
      * A default instance.
      */
     public static StripContextFilter newInstance() {
-        return new StripContextFilter(BOpBase.NOARGS, BOpBase.NOANNS);
+        return new StripContextFilter(BOp.NOARGS, BOp.NOANNS);
     }
 
     /**

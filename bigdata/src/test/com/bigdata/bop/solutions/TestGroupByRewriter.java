@@ -452,5 +452,5 @@ public class TestGroupByRewriter extends TestCase2 {
         assertEquals(expectedExpr, actualExpr);
 
     }
-
+    
 }

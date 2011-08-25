@@ -1,27 +1,37 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
+
+import com.bigdata.bop.CoreBaseBOp;
+
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * AST node base class.
  */
 public abstract class QueryNodeBase implements IQueryNode {
 
-	private IGroupNode parent;
-	
 	public QueryNodeBase() {
 	}
-
-	public void setParent(final IGroupNode parent) {
-		
-	    this.parent = parent;
-	    
-	}
-
-	final public IGroupNode getParent() {
-		
-	    return parent;
-	    
-	}
 	
+    @Override
+    public final String toString() {
+
+        return toString(0/* indent */);
+        
+    }
+
+    /**
+     * Visits itself.
+     */
+    @SuppressWarnings("unchecked")
+    public Iterator<IQueryNode> preOrderIterator() {
+
+        return new Striterator(new SingleValueIterator(this));
+        
+    }
+
     /**
      * Returns a string that may be used to indent a dump of the nodes in the
      * tree.
@@ -30,6 +40,8 @@ public abstract class QueryNodeBase implements IQueryNode {
      *            The indentation depth.
      * 
      * @return A string suitable for indent at that height.
+     * 
+     * FIXME Use {@link CoreBaseBOp#indent(int)}
      */
     protected static String indent(final int depth) {
 
@@ -44,12 +56,5 @@ public abstract class QueryNodeBase implements IQueryNode {
     }
 
     private static final transient String ws = "                                                                                                                                                                                                                  ";
-
-    @Override
-    public final String toString() {
-
-        return toString(0/* indent */);
-        
-    }
 
 }

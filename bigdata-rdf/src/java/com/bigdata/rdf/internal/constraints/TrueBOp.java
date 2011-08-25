@@ -45,13 +45,13 @@ public class TrueBOp extends XSDBooleanIVValueExpression {
 
 	private TrueBOp() {
 		
-		this(NOARGS, NOANNS);
+		this(BOp.NOARGS, BOp.NOANNS);
 		
 	}
 	
 	public TrueBOp(final IValueExpression<? extends IV> x) {
 		
-		this(new BOp[] { x }, NOANNS);
+		this(new BOp[] { x }, BOp.NOANNS);
 		
 	}
 	

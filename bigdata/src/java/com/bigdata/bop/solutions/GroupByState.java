@@ -367,6 +367,14 @@ public class GroupByState implements IGroupByState, Serializable {
         if (op == null)
             throw new IllegalArgumentException();
 
+        if (op instanceof IConstant && isSelectClause) {
+            /*
+             * A constant appearing in the root of a SELECT expression is an
+             * aggregate.
+             */
+            return true;
+        }
+
         return isAggregate(op, isSelectClause, isSelectDependency,
                 isNestedAggregates, isAnyDistinct, false/* withinAggregateFunction */);
 
@@ -392,8 +400,8 @@ public class GroupByState implements IGroupByState, Serializable {
         boolean isAggregate = aggregationContext;
         {
             final BOp t = op;
-            if (t instanceof IConstant)
-                return true;
+//            if (t instanceof IConstant)
+//                return true;
             if (t instanceof IVariable<?>) {
                 final IVariable<?> v = (IVariable<?>) t;
                 if (aggregationContext) {

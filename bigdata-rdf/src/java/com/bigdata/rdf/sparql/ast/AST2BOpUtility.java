@@ -16,7 +16,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
@@ -126,6 +125,13 @@ public class AST2BOpUtility {
      * optimizerList.optimize(tupleExpr, dataset, bindings);
      * replaceValues(dataset, tupleExpr, bindings);
      * </pre>
+     * 
+     * FIXME We should be able to bind a constant on a Variable in order to do
+     * the BindingAssigner optimization and in order to do the optimization for
+     * a named graph access pattern in which there is only one graph in the db
+     * which could be visited so it gets bound to a constant (a bug reported
+     * by matt). [We can perhaps do this using an AssignmentNode which bind a
+     * ConstantNode onto a VarNode?]
      * 
      * TODO Optimize away empty join groups and optimize those containing just a
      * single child by lifting the child into the parent whenever possible.
@@ -796,7 +802,7 @@ public class AST2BOpUtility {
 	private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
 		
         final PipelineOp start = applyQueryHints(
-        		new StartOp(BOpBase.NOARGS,
+        		new StartOp(BOp.NOARGS,
 			        NV.asMap(new NV[] {//
 			              new NV(Predicate.Annotations.BOP_ID, 
 			            		  ctx.idFactory.incrementAndGet()),
@@ -1231,6 +1237,12 @@ public class AST2BOpUtility {
 
         final IConstraint[] havingExprs = having == null ? null
                 : having.getConstraints();
+
+//        System.err.println(""+groupBy);
+//        System.err.println(BOpUtility.toString(groupByExprs[0]));
+//        System.err.println(""+having);
+//        System.err.println(""+projection);
+//        System.err.println(BOpUtility.toString(projectExprs[0]));
 
         final IGroupByState groupByState = new GroupByState(projectExprs,
                 groupByExprs, havingExprs);

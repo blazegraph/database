@@ -30,6 +30,20 @@ import com.bigdata.rdf.sail.QueryType;
  */
 public class SubqueryRoot extends SubqueryBase implements IGroupMemberNode {
 
+    private IGroupNode parent;
+
+    final public IGroupNode getParent() {
+
+        return parent;
+
+    }
+
+    final public void setParent(final IGroupNode parent) {
+
+        this.parent = parent;
+
+    }
+
     public SubqueryRoot() {
         
         super(QueryType.SELECT);

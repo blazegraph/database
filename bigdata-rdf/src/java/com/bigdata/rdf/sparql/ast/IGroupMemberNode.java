@@ -36,4 +36,15 @@ package com.bigdata.rdf.sparql.ast;
  */
 public interface IGroupMemberNode extends IQueryNode {
 
+    /**
+     * Return the group to which this node belongs.
+     */
+    IGroupNode getParent();
+    
+    /**
+     * Set the group to which this bindings producer node belongs. Should only
+     * be called the group node during the addChild() method.
+     */
+    void setParent(final IGroupNode parent);
+
 }

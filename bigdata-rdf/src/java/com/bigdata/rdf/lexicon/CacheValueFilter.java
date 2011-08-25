@@ -30,7 +30,6 @@ package com.bigdata.rdf.lexicon;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.ap.filter.BOpResolver;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -51,7 +50,7 @@ public class CacheValueFilter extends BOpResolver {
      * A default instance.
      */
     public static CacheValueFilter newInstance() {
-        return new CacheValueFilter(BOpBase.NOARGS, BOpBase.NOANNS);
+        return new CacheValueFilter(BOp.NOARGS, BOp.NOANNS);
     }
 
     /**

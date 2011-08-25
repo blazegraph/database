@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,16 @@ import cutthecrap.utils.striterators.IPropertySet;
 public interface BOp extends Cloneable, Serializable, IPropertySet {
 
     /**
+     * An empty array.
+     */
+    BOp[] NOARGS = new BOp[] {};
+    
+    /**
+     * An empty immutable annotations map.
+     */
+    Map<String,Object> NOANNS = Collections.emptyMap();
+
+    /**
      * The #of arguments to the operation.
      */
     int arity();
@@ -73,12 +84,11 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      */
     BOp get(int index);
 
-	/**
-	 * The operator's arguments as an unmodified list.
-	 * 
-	 * @todo Consider deprecating since this is much less efficient than
-	 *       {@link #argIterator()}.
-	 */
+    /**
+     * The operator's arguments as list.
+     * <p>
+     * Note: This is much less efficient than {@link #argIterator()}.
+     */
     List<BOp> args();
     
     /**
@@ -197,36 +207,6 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      */
     boolean isController();
     
-//    /**
-//     * Return <code>true</code> iff this operator is an access path which writes
-//     * on the database.
-//     * 
-//     * @see com.bigdata.bop.IPredicate.Annotations#MUTATION
-//     * 
-//     * @todo Move to {@link IPredicate}?
-//     */
-//    boolean isMutation();
-//
-//	/**
-//	 * The timestamp or transaction identifier on which the operator will read
-//	 * or write.
-//	 * 
-//	 * @see Annotations#TIMESTAMP
-//	 * 
-//	 * @throws IllegalStateException
-//	 *             if {@link Annotations#TIMESTAMP} was not specified.
-//	 * 
-//	 * @todo move to {@link IPredicate}?
-//	 */
-//    long getTimestamp();
-
-//    /**
-//     * Compare this {@link BOp} with another {@link BOp}.
-//     * 
-//     * @return <code>true</code> if all arguments and annotations are the same.
-//     */
-//    boolean sameData(final BOp o);
-
 	/**
 	 * Interface declaring well known annotations.
 	 * <p>
@@ -241,7 +221,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * identifier for the {@link BOp} within the context of its owning
          * query.
          */
-        String BOP_ID = (BOp.class.getName() + ".bopId").intern();
+        String BOP_ID = BOp.class.getName() + ".bopId";
 
         /**
          * The timeout for the operator evaluation (milliseconds).
@@ -256,7 +236,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          *       be interpreted with respect to the time when the query began to
          *       execute.
          */
-        String TIMEOUT = (BOp.class.getName() + ".timeout").intern();
+        String TIMEOUT = BOp.class.getName() + ".timeout";
 
         /**
          * The default timeout for operator evaluation.
@@ -269,7 +249,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOpEvaluationContext
          */
-        String EVALUATION_CONTEXT = (BOp.class.getName() + ".evaluationContext").intern();
+        String EVALUATION_CONTEXT = BOp.class.getName() + ".evaluationContext";
 
         BOpEvaluationContext DEFAULT_EVALUATION_CONTEXT = BOpEvaluationContext.ANY;
 
@@ -283,7 +263,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * 
          * @see BOp#isController()
          */
-        String CONTROLLER = (BOp.class.getName()+".controller").intern();
+        String CONTROLLER = BOp.class.getName()+".controller";
         
         boolean DEFAULT_CONTROLLER = false;
         
