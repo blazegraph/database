@@ -31,10 +31,10 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
     }
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<E> iterator() {
 		
-		return (Iterator<E>) argIterator();
+		return (Iterator) argIterator();
 		
 	}
 
