@@ -294,8 +294,7 @@ public class TestAST extends TestCase {
     	{
             
             final NamedSubqueryRoot subquery = new NamedSubqueryRoot(
-                    QueryType.SELECT);
-    	    subquery.setName("foo");
+                    QueryType.SELECT, "foo");
             
             final ProjectionNode projection1 = new ProjectionNode();
             projection1.addProjectionVar(new VarNode("y"));

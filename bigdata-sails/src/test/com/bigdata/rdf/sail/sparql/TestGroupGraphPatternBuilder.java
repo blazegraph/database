@@ -58,9 +58,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestGroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
  *          thompsonbry $
- * 
- *          FIXME Test Exists(), which is basically a subquery which projects no
- *          solutions and has a limit of ONE (1) (i.e., an ASK query).
  */
 public class TestGroupGraphPatternBuilder extends
         AbstractBigdataExprBuilderTestCase {

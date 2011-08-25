@@ -39,6 +39,8 @@ package com.bigdata.rdf.sparql.ast;
  */
 public class NamedSubqueryInclude extends GroupMemberNodeBase {
 
+    private static final long serialVersionUID = 1L;
+
     interface Annotations extends SubqueryRoot.Annotations {
         
         String SUBQUERY_NAME = "subqueryName";
@@ -46,9 +48,11 @@ public class NamedSubqueryInclude extends GroupMemberNodeBase {
     }
 
     /**
-     * 
+     * @param name
+     *            The name of the subquery result set.
      */
-    public NamedSubqueryInclude() {
+    public NamedSubqueryInclude(final String name) {
+        setName(name);
     }
 
     /**
