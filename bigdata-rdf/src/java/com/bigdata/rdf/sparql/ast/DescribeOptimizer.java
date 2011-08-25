@@ -117,9 +117,8 @@ public class DescribeOptimizer implements IASTOptimizer {
 		
 		where.addChild(union);
 
-		final ConstructNode<StatementPatternNode> construct = 
-			new ConstructNode<StatementPatternNode>();
-		
+        final ConstructNode construct = new ConstructNode();
+
 		final ProjectionNode projection = describe.getProjection();
 		
 		describe.setProjection(null);
