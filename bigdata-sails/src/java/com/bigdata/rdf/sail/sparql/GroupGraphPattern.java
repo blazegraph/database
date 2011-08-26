@@ -125,4 +125,21 @@ class GroupGraphPattern {
                 
     }
 
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(super.toString() + "{");
+        sb.append("context=" + context);
+        sb.append(", scope=" + spScope);
+        sb.append(", children=[");
+        boolean first = true;
+        for (IGroupMemberNode child : children) {
+            if (!first)
+                sb.append(", ");
+            sb.append(child);
+            first = false;
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+    
 }

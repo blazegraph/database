@@ -45,18 +45,12 @@ import org.openrdf.query.parser.sparql.ast.ASTRDFValue;
 import org.openrdf.query.parser.sparql.ast.ASTString;
 import org.openrdf.query.parser.sparql.ast.ASTTrue;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
+import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -74,6 +68,65 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
         this.context = context;
 
     }
+
+    /**
+     * Return the depth of the node in the parse tree. The depth is ZERO (0) if
+     * the node does not have a parent.
+     * 
+     * @param node
+     *            The node.
+
+     * @return The depth of that node.
+     */
+    protected int depth(Node node) {
+        
+        int i = 0;
+        
+        while ((node = node.jjtGetParent()) != null) {
+        
+            i++;
+            
+        }
+        
+        return i;
+
+    }
+
+    /**
+     * Return a white space string which may be used to indent the node to its
+     * depth in the parse tree.
+     * 
+     * @param node
+     *            The node.
+     *            
+     * @return The indent string.
+     */
+    protected String indent(final Node node) {
+        return indent(depth(node));
+    }
+    
+    /**
+     * Returns a string that may be used to indent a dump of the nodes in the
+     * tree.
+     * 
+     * @param depth
+     *            The indentation depth.
+     * 
+     * @return A string suitable for indent at that height.
+     */
+    protected static String indent(final int depth) {
+
+        if (depth < 0) {
+
+            return "";
+
+        }
+
+        return ws.substring(0, depth *2);
+
+    }
+
+    private static final transient String ws = "                                                                                                                                                                                                                  ";
 
     /**
      * Note: The {@link BatchRDFValueResolver} is responsible for annotating the
@@ -146,20 +199,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     public ConstantNode visit(final ASTIRI node, Object data)
             throws VisitorException {
         
-//        BigdataURI uri;
-//        
-//        try {
-//        
-//            uri = context.valueFactory.createURI(node.getValue());
-//            
-//        } catch (IllegalArgumentException e) {
-//            
-//            // invalid URI
-//            throw new VisitorException(e.getMessage());
-//            
-//        }
-//
-//        return new ConstantNode(makeIV(uri));
         return new ConstantNode(makeIV((BigdataValue)node.getRDFValue()));
         
     }
@@ -168,29 +207,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     public ConstantNode visit(final ASTRDFLiteral node, Object data)
             throws VisitorException {
         
-//        final String label = (String) node.getLabel().jjtAccept(this, null);
-//        final String lang = node.getLang();
-//        final ASTIRI datatypeNode = node.getDatatype();
-//        final BigdataValueFactory valueFactory = context.valueFactory;
-//        
-//        final BigdataLiteral literal;
-//        if (datatypeNode != null) {
-//            final BigdataURI datatype;
-//            try {
-//                datatype = valueFactory.createURI(datatypeNode.getValue());
-//            } catch (IllegalArgumentException e) {
-//                // invalid URI
-//                throw new VisitorException(e.getMessage());
-//            }
-//            literal = valueFactory.createLiteral(label, datatype);
-//        } else if (lang != null) {
-//            literal = valueFactory.createLiteral(label, lang);
-//        } else {
-//            literal = valueFactory.createLiteral(label);
-//        }
-//
-//        return new ConstantNode(makeIV(literal));
-
         return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
 
     }
@@ -198,11 +214,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     @Override
     public ConstantNode visit(ASTNumericLiteral node, Object data)
             throws VisitorException {
-
-//        final BigdataLiteral literal = context.valueFactory.createLiteral(
-//                node.getValue(), node.getDatatype());
-//        
-//        return new ConstantNode(makeIV(literal));
 
         return new ConstantNode(makeIV((BigdataValue)node.getRDFValue()));
         
@@ -212,9 +223,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     public ConstantNode visit(ASTTrue node, Object data)
             throws VisitorException {
         
-//        return new ConstantNode(
-//                makeIV(context.valueFactory.createLiteral(true)));
-        
         return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
         
     }
@@ -223,9 +231,6 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     public ConstantNode visit(ASTFalse node, Object data)
             throws VisitorException {
         
-//        return new ConstantNode(
-//                makeIV(context.valueFactory.createLiteral(false)));
-
         return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
 
     }
@@ -236,5 +241,5 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
         return node.getValue();
         
     }
-
+    
 }

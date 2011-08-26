@@ -22,18 +22,18 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2011
+ * Created on Aug 26, 2011
  */
 
 package com.bigdata.rdf.sparql.ast;
 
 /**
- * A node whose children are a list of {@link NamedSubqueryRoot}s.
+ * A special function node for modeling EXISTS.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NamedSubqueriesNode extends QueryNodeListBaseNode<NamedSubqueryRoot> {
+public class ExistsNode extends ExistsNodeBase {
 
     /**
      * 
@@ -41,29 +41,16 @@ public class NamedSubqueriesNode extends QueryNodeListBaseNode<NamedSubqueryRoot
     private static final long serialVersionUID = 1L;
 
     /**
-     * 
+     * @param lex
+     * @param anonvar
+     *            An anonymous variable which will be bound by an ASK subquery.
+     * @param graphPattern
+     *            The inner value of the EXISTS function.
      */
-    public NamedSubqueriesNode() {
-    }
+    public ExistsNode(String lex, VarNode anonvar, GroupNodeBase<?> graphPattern) {
 
-    public String toString(final int indent) {
-
-        final String s = indent(indent);
-
-        final StringBuilder sb = new StringBuilder(s);
-
-        for (NamedSubqueryRoot n : this) {
-            sb.append("\n");
-            sb.append(s);
-            sb.append("WITH {");
-            sb.append(n.toString(indent + 1));
-            sb.append("\n");
-            sb.append(s);
-            sb.append("AS " + n.getName() + "\n");
-        }
-
-        return sb.toString();
+        super(lex, FunctionRegistry.EXISTS, anonvar, graphPattern );
 
     }
-    
+
 }

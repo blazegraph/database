@@ -37,6 +37,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.constraints.ComputedIN;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -475,7 +476,7 @@ public class TestGroupGraphPatternBuilder extends
     }
 
     /**
-     * Unit test for simple triple pattern in the default context.
+     * Unit test for simple triple pattern in the default context with a FILTER.
      * 
      * <pre>
      * SELECT ?s where {?s ?p ?o FILTER ?s = ?o}
@@ -500,6 +501,51 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
+            final ValueExpressionNode ve = new FunctionNode(lex,
+                    FunctionRegistry.EQ, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("s"),
+                            new VarNode("o") });
+
+            whereClause.addChild(new FilterNode(ve));
+           
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for simple triple pattern in the default context with a BIND
+     * and a FILTER.
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o BIND(?o AS ?x) FILTER (?s = ?x) }
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_bind_and_filter()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "select ?s where {?s ?p ?o . BIND(?o AS ?x) FILTER (?s = ?o) }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new AssignmentNode(new VarNode("x"),
+                    new VarNode("o")));
+            
             final ValueExpressionNode ve = new FunctionNode(lex,
                     FunctionRegistry.EQ, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("s"),
@@ -867,4 +913,151 @@ public class TestGroupGraphPatternBuilder extends
 
     }
    
+    /**
+     * Unit test for simple subquery joined with a triple pattern in the outer
+     * join group.
+     * 
+     * <pre>
+     * SELECT ?s where { (?s <http://www.w3.org/2000/01/rdf-schema#label> ?o) . {SELECT ?s where {?s ?p ?o}}}
+     * </pre>
+     * 
+     * Note: This requires recursion back in through the
+     * {@link BigdataExprBuilder}.
+     * 
+     * FIXME This is dropping the triple pattern in the outer whereClause.
+     */
+    public void test_triplePattern_join_subSelect() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ?s " //
+                + "where {"//
+                + " (?s <http://www.w3.org/2000/01/rdf-schema#label> ?o) ."
+                + " {"//
+                + "   select ?s where { ?s ?p ?o }" //
+                +"  }"//
+                + "}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final SubqueryRoot subSelect;
+        {
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(
+                                new VarNode("s"),
+                                new ConstantNode(
+                                        makeIV(valueFactory
+                                                .createURI("http://www.w3.org/2000/01/rdf-schema#label"))),
+                                new VarNode("o")));
+                
+                final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                whereClause.addChild(wrapperGroup);
+                
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+                wrapperGroup.addChild(subSelect);
+            }
+            {
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(new VarNode("s"));
+                subSelect.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                subSelect.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    
+    /**
+     * Unit test for simple subquery joined with a bind.
+     * 
+     * <pre>
+     * SELECT ?s where { bind(<http://www.bigdata.com> as ?o) { SELECT ?s where {?s ?p ?o} } }
+     * </pre>
+     * 
+     * Note: This requires recursion back in through the
+     * {@link BigdataExprBuilder}.
+     */
+    public void test_bind_join_subSelect() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ?s where { bind(<http://www.bigdata.com> as ?o) {select ?s where { ?s ?p ?o  } } }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final SubqueryRoot subSelect;
+        {
+
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new AssignmentNode(new VarNode("o"),
+                        new ConstantNode(makeIV(valueFactory
+                                .createURI("http://www.bigdata.com")))));
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                whereClause.addChild(wrapperGroup);
+                
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+                wrapperGroup.addChild(subSelect);
+                
+            }
+            {
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(new VarNode("s"));
+                subSelect.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                subSelect.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+   
+    /**
+     * Unit test for sub-SubSelect. There is a top-level query. It uses a
+     * subquery. The subquery uses a subquery. The purpose of this is to test
+     * for the correct nexting of the generated AST.
+     */
+    public void test_subSubSelect() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        fail("write test");
+
+    }
+
 }

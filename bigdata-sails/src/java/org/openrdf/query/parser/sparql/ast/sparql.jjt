@@ -224,6 +224,16 @@ TOKEN [IGNORE_CASE] :
 |	<SHA512: "sha512">
 }
 
+TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
+{
+    <INCLUDE: "include">
+}
+
+TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
+{
+	<VAR3: "%" <VARNAME>>
+}
+
 TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
 {
 	<LOAD: "load">
@@ -370,6 +380,7 @@ void SelectQuery() :
 {
 	Select()
 	( DatasetClause() )*
+	( NamedSubquery() )*
 	WhereClause()
 	SolutionModifier()
 }
@@ -405,6 +416,7 @@ void ConstructQuery() :
 {
 	Construct()
 	( DatasetClause() )*
+	( NamedSubquery() )*
 	WhereClause()
 	SolutionModifier()
 }
@@ -428,6 +440,7 @@ void DescribeQuery() :
 {
 	Describe()
 	( DatasetClause() )*
+	( NamedSubquery() )*
 	[ WhereClause() ]
 	SolutionModifier()
 }
@@ -448,8 +461,14 @@ void AskQuery() :
 {
 	<ASK>
 	( DatasetClause() )*
+	( NamedSubquery() )*
 	WhereClause()
 }
+
+void NamedSubquery() :
+{Token t;}{
+  	<WITH> <LBRACE> SelectQuery() <RBRACE> <AS> t = <VAR3>  	{  	  jjtThis.setName(t.image);
+  	}} 
 
 void DatasetClause() :
 {}
@@ -553,9 +572,16 @@ void FilterOrBind() #void :
 {
     Filter()
     |
+    NamedSubqueryInclude()
+    | 
     Bind()
 }
 
+void NamedSubqueryInclude() :
+{Token t;}
+{
+     <INCLUDE> t = <VAR3>
+     { jjtThis.setName(t.image); }}
 
 void TriplesBlock() #void :
 {}
@@ -876,8 +902,10 @@ void RelationalExpression() #void :
 	|	<LE> NumericExpression() {jjtThis.setOperator(CompareOp.LE);} #Compare(2)
 	|	<GE> NumericExpression() {jjtThis.setOperator(CompareOp.GE);} #Compare(2)
 	|	<GT> NumericExpression() {jjtThis.setOperator(CompareOp.GT);} #Compare(2)
-	|	In()
-	|	NotIn()
+//	@see http://www.openrdf.org/issues/browse/SES-818
+//	|	In() 
+//	|	NotIn()
+	|	In()    #Infix(2)	|	NotIn() #Infix(2)
 	]
 }
 

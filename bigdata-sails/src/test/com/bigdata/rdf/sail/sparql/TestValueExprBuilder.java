@@ -27,8 +27,10 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.Collections;
 
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
@@ -36,9 +38,11 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -691,15 +695,76 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
     }
 
     /**
-     * FIXME Test EXISTS(GroupGraphPattern). This should probably turn into an
-     * ASK subquery. We could bind a variable for the count of the #of results
-     * (either zero or one). E.g., "SELECT (COUNT(*) as ?x) where
-     * {groupGraphPattern} LIMIT 1". ?x would be projected out of the subquery
-     * and used in the EXISTS() function, which would just test whether ?x was
-     * ZERO (0) or ONE (1).
+     * Unit test for NOT EXISTS.
+     * 
+     * <pre>
+     * PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> 
+     * 
+     * SELECT ?person
+     * WHERE 
+     * {
+     *     ?person rdf:type  foaf:Person .
+     *     FILTER NOT EXISTS { ?person foaf:name ?name }
+     * }
+     * </pre>
+     * 
+     * TODO Also unit test EXISTS.
      */
-    public void test_exists() {
-        fail("write test for EXISTS");
+    public void test_not_exists() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = ""//
+                + "PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"//
+                + "PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> \n"//
+                + "SELECT ?person \n"//
+                + " WHERE { \n"//
+                + "       ?person rdf:type  foaf:Person . \n"//
+                + "       FILTER NOT EXISTS { ?person foaf:name ?name } \n"//
+                + "}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ConstantNode rdfType = new ConstantNode(
+                    makeIV(valueFactory.createURI(RDF.TYPE.stringValue())));
+
+            final ConstantNode foafPerson = new ConstantNode(
+                    makeIV(valueFactory.createURI(FOAF.PERSON.stringValue())));
+
+            final ConstantNode foafName = new ConstantNode(
+                    makeIV(valueFactory.createURI(FOAF.NAME.stringValue())));
+
+            final VarNode person = new VarNode("person");
+
+            final VarNode name = new VarNode("name");
+
+            final VarNode anonvar = context.createAnonVar("-exists-"
+                    + context.constantVarID++);
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.addProjectionVar(person);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(person, rdfType,
+                    foafPerson, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode existsPattern = new JoinGroupNode();
+            existsPattern.addChild(new StatementPatternNode(person, foafName,
+                    name, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new NotExistsNode(lex, anonvar,
+                    existsPattern)));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
     }
-    
+
 }

@@ -210,6 +210,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
 //        WildcardProjectionProcessor.process(qc); // No. We use "*" as a variable name.
         BlankNodeVarProcessor.process(qc);
+//        InfixProcessor.process(qc);
         /*
          * Batch resolve ASTRDFValue to BigdataValues with their associated
          * IVs.
