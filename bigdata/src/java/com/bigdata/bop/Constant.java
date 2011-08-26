@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop;
 
+
 /**
  * A constant.
  * 
@@ -43,8 +44,17 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         /**
          * The {@link IVariable} which is bound to that constant value
          * (optional).
+         * <p>
+         * {@link BOpContext#bind(IPredicate, IConstraint[], Object, IBindingSet)}
+         * takes care of propagating the binding onto the variable for solutions
+         * which join.
+         * <p>
+         * Note: The {@link Var} class in bigdata provides a guarantee of
+         * reference testing for equality, which is why we can not simply attach
+         * the constant to the variable and have the variable report its bound
+         * value. *
          */
-        String VAR = (Constant.class.getName() + ".var").intern();
+        String VAR = Constant.class.getName() + ".var";
 
     }
     
@@ -83,6 +93,33 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         
     }
 
+    /**
+     * Create a constant which models a variable bound to that constant. This
+     * may be used when a variable has an external binding, such as when a
+     * single binding set is provided as input to a query. By pairing the
+     * {@link Constant} with the {@link IVariable} and handling this case when
+     * solutions are joined the resulting solutions will have the variable with
+     * its constant bound value.
+     * <p>
+     * Note: The {@link Var} class in bigdata provides a guarantee of reference
+     * testing for equality, which is why we can not simply attach the constant
+     * to the variable and have the variable report its bound value. *
+     * <p>
+     * Note: A very similar effect may be achieved by simply binding the
+     * variable on the {@link IBindingSet} to the constant. However, there are
+     * some (few) cases where we can not do that because the binding must be
+     * applied for all solutions and we lack access to the input solutions.
+     * <p>
+     * See
+     * {@link BOpContext#bind(IPredicate, IConstraint[], Object, IBindingSet)},
+     * which takes care of propagating the binding onto the variable for
+     * solutions which join.
+     * 
+     * @param var
+     *            The variable.
+     * @param value
+     *            The bound value.
+     */
     public Constant(final IVariable<E> var, final E value) {
 
         super(BOp.NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
@@ -97,6 +134,12 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     }
 
+    /**
+     * Create a constant for the value.
+     * 
+     * @param value
+     *            The value (may not be <code>null</code>).
+     */
     public Constant(final E value) {
 
         super(BOp.NOARGS, BOp.NOANNS);
