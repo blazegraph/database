@@ -275,6 +275,22 @@ public class ModifiableBOpBase extends CoreBaseBOp {
 //        return tmp;
 //        
 //    }
+    
+    /**
+     * Copy all annotations from the caller's map.
+     * 
+     * @param anns
+     *            The annotations to be copied.
+     * 
+     * @return <i>this</i>
+     */
+    public ModifiableBOpBase copyAll(final Map<String, Object> anns) {
+
+        annotations.putAll(anns);
+
+        return this;
+
+    }
 
     /**
      * Set the named property value (destructive mutation).

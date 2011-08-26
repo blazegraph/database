@@ -177,6 +177,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
 //            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
+//            InfixProcessor.process(qc);
             /*
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.

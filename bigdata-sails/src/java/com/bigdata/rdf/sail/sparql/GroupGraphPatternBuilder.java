@@ -36,26 +36,37 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Exists;
+import org.openrdf.query.algebra.Extension;
+import org.openrdf.query.algebra.ExtensionElem;
+import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.query.parser.sparql.ast.ASTBasicGraphPattern;
+import org.openrdf.query.parser.sparql.ast.ASTBind;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTConstraint;
 import org.openrdf.query.parser.sparql.ast.ASTConstruct;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTMinusGraphPattern;
+import org.openrdf.query.parser.sparql.ast.ASTNamedSubqueryInclude;
 import org.openrdf.query.parser.sparql.ast.ASTObjectList;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
 import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
+import org.openrdf.query.parser.sparql.ast.ASTVar;
+import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -80,6 +91,8 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  */
 public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
+    private static final Logger log = Logger.getLogger(GroupGraphPatternBuilder.class);
+    
     /**
      * Used to build up {@link FilterNode}s.
      */
@@ -128,13 +141,19 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
     public GroupNodeBase visit(final ASTGraphPatternGroup node, Object data)
         throws VisitorException
     {
-        
-        final GroupGraphPattern parentGP = graphPattern;
+
+        // FIXME Comment out.
+        final int depth = depth(node);
+        log.error("depth=" + depth + ", parentGP=\n" + indent(node)
+                + graphPattern);
+        log.error("depth=" + depth + "\n" + node.dump(indent(node)));
+
+        final GroupGraphPattern parentGP = graphPattern; // FIXME BBT: starts empty.
         
         graphPattern = new GroupGraphPattern(parentGP);
 
         // visit the children of the node (default behavior).
-        super.visit(node, null);
+        super.visit(node, null); // FIXME BBT : have [triplePattern + subSelect] 
 
         // Filters are scoped to the graph pattern group and do not affect
         // bindings external to the group
@@ -151,6 +170,9 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         } else {
             parentGP.add(group);
         }
+
+        log.error("depth=" + depth + ", graphPattern(out)=\n" + indent(node)
+                + graphPattern);
 
         graphPattern = parentGP;
 
@@ -214,21 +236,7 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         
         node.jjtGetChild(0).jjtAccept(this, null);
         
-//        final GroupNodeBase leftArg = graphPattern.buildTupleExpr();
-//
-//        graphPattern = new GroupGraphPattern(parentGP);
-//        
         node.jjtGetChild(1).jjtAccept(this, null);
-//        
-//        TupleExpr rightArg = graphPattern.buildTupleExpr();
-//
-//        final UnionNode union = new UnionNode();
-//
-//        union.addChild(leftArg);
-//        
-//        union.addChild(rightArg);
-//        
-//        parentGP.addRequiredTE(union);
         
         parentGP.add(graphPattern.buildGroup(new UnionNode()));
         
@@ -259,13 +267,15 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 //
 
     /**
+     * A SubSelect can appear in an {@link ASTGraphPatternGroup}.
+     * <p>
      * Note: Delegated to an anonymous {@link BigdataExprBuilder}. The
      * {@link GroupGraphPattern} is passed into the delegate so it can recognize
      * that the {@link ASTSelectQuery} is appearing as a subquery rather than as
      * the top-level query.
      */
     @Override
-    public Void visit(final ASTSelectQuery node, Object data)
+    public SubqueryRoot visit(final ASTSelectQuery node, Object data)
             throws VisitorException {
 
         final SubqueryRoot subSelect = (SubqueryRoot) node.jjtAccept(
@@ -273,11 +283,43 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
 
         graphPattern.add(subSelect);
 
-        return null;
+        return subSelect;
 
     }
 
     /**
+     * A BIND (or filter) can appear in an {@link ASTBasicGraphPattern}.
+     * <p>
+     * Note: Delegated to the {@link ValueExprBuilder} which handles the value
+     * expression construction.
+     * 
+     * @return The {@link AssignmentNode} for the BIND.
+     */
+    @Override
+    public AssignmentNode visit(final ASTBind node, Object data)
+            throws VisitorException {
+
+        if (node.jjtGetNumChildren() != 2)
+            throw new AssertionError("Expecting two children, not "
+                    + node.jjtGetNumChildren() + ", node=" + node.dump(">>>"));
+
+        final ValueExpressionNode ve = (ValueExpressionNode) node
+                .jjtGetChild(0).jjtAccept(valueExprBuilder, data);
+
+        final Node aliasNode = node.jjtGetChild(1);
+
+        final String alias = ((ASTVar) aliasNode).getName();
+
+        final AssignmentNode bind = new AssignmentNode(new VarNode(alias), ve);
+
+        graphPattern.add(bind);
+
+        return bind;
+    }
+    
+    /**
+     * A FILTER.
+     * <p>
      * Note: Delegated to the {@link ValueExprBuilder}.
      */
     @Override
@@ -290,6 +332,21 @@ public class GroupGraphPatternBuilder extends BigdataASTVisitorBase {
         graphPattern.addConstraint(valueExpr);
 
         return valueExpr;
+        
+    }
+
+    /**
+     * INCLUDE for a named subquery result set.
+     * <p>
+     * Note: Delegated to the {@link ValueExprBuilder}.
+     */
+    @Override
+    public Void visit(final ASTNamedSubqueryInclude node, Object data)
+            throws VisitorException {
+
+        graphPattern.add(new NamedSubqueryInclude(node.getName()));
+
+        return null;
         
     }
 

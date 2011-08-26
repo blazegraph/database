@@ -48,6 +48,7 @@ import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTGroupClause;
 import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
 import org.openrdf.query.parser.sparql.ast.ASTLimit;
+import org.openrdf.query.parser.sparql.ast.ASTNamedSubquery;
 import org.openrdf.query.parser.sparql.ast.ASTOffset;
 import org.openrdf.query.parser.sparql.ast.ASTOrderClause;
 import org.openrdf.query.parser.sparql.ast.ASTOrderCondition;
@@ -59,9 +60,11 @@ import org.openrdf.query.parser.sparql.ast.ASTSelect;
 import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
 import org.openrdf.query.parser.sparql.ast.ASTWhereClause;
+import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
@@ -70,12 +73,15 @@ import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -189,52 +195,13 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     public QueryBase visit(final ASTSelectQuery astQuery, Object data)
             throws VisitorException {
 
-        final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.SELECT) : new SubqueryRoot(QueryType.SELECT);
+        final QueryBase queryRoot = getQueryBase(astQuery, data,
+                QueryType.SELECT);
 
-        /*
-         * Handle SELECT expressions.
-         */
-        final ASTSelect select = astQuery.getSelect();
-        final ProjectionNode projection = new ProjectionNode();
-        queryRoot.setProjection(projection);
-        if (select.isDistinct())
-            projection.setDistinct(true);
-        if (select.isReduced())
-            projection.setReduced(true);
-        if (select.isWildcard()) {
-            projection.addProjectionVar(new VarNode("*"));
-        } else {
-            final Iterator<ASTProjectionElem> itr = select
-                    .getProjectionElemList().iterator();
-            while (itr.hasNext()) {
-                /*
-                 * The last argument of the children is the Var. Anything before
-                 * that is an ArgList which must be interpreted in its own
-                 * right.
-                 * 
-                 * (Var | ArgList Var)
-                 */
-                final ASTProjectionElem e = itr.next();
-                if (!e.hasAlias()) {
-                    // Var
-                    final ASTVar aVar = (ASTVar) e
-                            .jjtGetChild(0/* index */);
-                    projection.addProjectionVar(new VarNode(aVar
-                            .getName()));
-                } else {
-                    // Expression AS Var
-                    final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
-                    final IValueExpressionNode ve = (IValueExpressionNode) expr
-                            .jjtAccept(valueExprBuilder, null/* data */);
-                    final ASTVar aVar = (ASTVar) e
-                            .jjtGetChild(1/* index */);
-                    projection
-                            .addProjectionExpression(new AssignmentNode(
-                                    new VarNode(aVar.getName()), ve));
-                }
-            }
-        }
+        // Accept optional NamedSubquery(s).
+        handleNamedSubqueryClause(astQuery, queryRoot);
+                
+        handleSelect(astQuery, queryRoot);
 
         handleWhereClause(astQuery, queryRoot);
         
@@ -257,8 +224,10 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     public QueryBase visit(final ASTAskQuery node, Object data)
             throws VisitorException {
 
-        final QueryBase queryRoot = data == null ? new QueryRoot(QueryType.ASK)
-                : new SubqueryRoot(QueryType.ASK);
+        final QueryBase queryRoot = getQueryBase(node, data, QueryType.ASK);
+
+        // Accept optional NamedSubquery(s).
+        handleNamedSubqueryClause(node, queryRoot);
 
         /*
          * Note: Nothing is projected.
@@ -300,9 +269,11 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     public QueryBase visit(final ASTDescribeQuery node, Object data)
             throws VisitorException {
 
-        final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.DESCRIBE) : new SubqueryRoot(QueryType.DESCRIBE);
+        final QueryBase queryRoot = getQueryBase(node, data, QueryType.DESCRIBE);
 
+        // Accept optional NamedSubquery(s).
+        handleNamedSubqueryClause(node, queryRoot);
+        
         // Process describe clause
         node.getDescribe().jjtAccept(this, queryRoot);
 
@@ -402,8 +373,11 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     public QueryBase visit(final ASTConstructQuery node, Object data)
             throws VisitorException {
 
-        final QueryBase queryRoot = data == null ? new QueryRoot(
-                QueryType.CONSTRUCT) : new SubqueryRoot(QueryType.CONSTRUCT);
+        final QueryBase queryRoot = getQueryBase(node, data,
+                QueryType.CONSTRUCT);
+
+        // Accept optional NamedSubquery(s).
+        handleNamedSubqueryClause(node, queryRoot);
 
         /*
          * Process construct clause.
@@ -514,6 +488,195 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     //
     // private helper methods.
     //
+
+    /**
+     * Handle the optional WITH SelectQuery AS NAME clause(s).  These are a
+     * SPARQL 1.1 extension for named temporary solution sets.
+     * <P>
+     * Note: This delegates the translation to a helper visitor. A SubSelect
+     * will wind up delegated back to an instance of this visitor.
+     * 
+     * @param astQuery
+     *            The AST query node. This is an abstract base class. There are
+     *            concrete instances for SELECT, ASK, DESCRIBE, and CONSTRUCT.
+     * @param queryRoot
+     *            The bigdata query root.
+     */
+    private void handleNamedSubqueryClause(final ASTQuery astQuery,
+            final QueryBase queryRoot) throws VisitorException {
+
+        {
+
+            // Check for any instances of this child.
+            final ASTNamedSubquery aNamedSubquery = (ASTNamedSubquery) astQuery
+                    .jjtGetChild(ASTNamedSubquery.class);
+
+            if (aNamedSubquery == null) {
+
+                // No instances.
+                return;
+                
+            }
+            
+        }
+
+        if (!(queryRoot instanceof QueryRoot))
+            throw new VisitorException(
+                    "WITH SubSelect AS %namedSet only allowed for top-level query.");
+
+        /*
+         * Setup the AST node for the named subqueries.
+         */
+        
+        final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+
+        ((QueryRoot) queryRoot).setNamedSubqueries(namedSubqueries);
+
+        final int nchildren = astQuery.jjtGetNumChildren();
+
+        for (int i = 0; i < nchildren; i++) {
+
+            final Node aChild = astQuery.jjtGetChild(i);
+
+            if (!(aChild instanceof ASTNamedSubquery))
+                continue;
+
+            // Found a named subquery.
+            final ASTNamedSubquery aNamedSubquery = (ASTNamedSubquery) aChild;
+            
+            /*
+             * Note: This visitor will wind up accepting and returning a
+             * SubqueryRoot rather than a NamedSubqueryRoot, so we have to copy
+             * the data into an appropriate object.
+             */
+            
+            // Accept the Subquery
+            final SubqueryRoot subquery = (SubqueryRoot) aNamedSubquery
+                    .jjtAccept(groupGraphPatternBuilder, queryRoot/* data */);
+
+            // Create instance of the right class.
+            final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
+                    subquery.getQueryType(), aNamedSubquery.getName());
+            
+            // Add to the container.
+            namedSubqueries.add(namedSubquery);
+
+            // Copy all args.
+            for (BOp arg : subquery.args()) {
+                namedSubquery.addArg(arg);
+            }
+
+            // Copy all annotations.
+            namedSubquery.copyAll(subquery.annotations());
+
+        }
+
+    }
+    
+    /**
+     * Return the appropriate {@link QueryBase} instance.
+     * 
+     * @param node
+     *            The {@link ASTQuery} node.
+     * @param data
+     *            The data. This can be bound to some things other than a
+     *            {@link QueryBase}. Such bindings are ignored. When it is a
+     *            {@link QueryBase}, then the returned object will be some kind
+     *            of {@link SubqueryBase}. Otherwise it will be a
+     *            {@link QueryRoot}.
+     * @param queryType
+     *            The type of the {@link ASTQuery}.
+     *            
+     * @return Some kind of {@link QueryBase} object.
+     */
+    private QueryBase getQueryBase(final ASTQuery node, final Object data,
+            final QueryType queryType) {
+
+        if (data instanceof QueryBase)
+            return new SubqueryRoot(queryType);
+
+        if (data instanceof GroupGraphPattern)
+            return new SubqueryRoot(queryType);
+        
+        return new QueryRoot(queryType);
+        
+    }
+
+    /**
+     * Handle a SELECT clause. The {@link ProjectionNode} will be attached to
+     * the {@link QueryBase}.
+     * 
+     * @param astQuery
+     *            The {@link ASTSelectQuery} node.
+     * @param queryRoot
+     *            The {@link QueryBase}.
+     * 
+     * @throws VisitorException
+     */
+    private void handleSelect(final ASTSelectQuery astQuery,
+            final QueryBase queryRoot) throws VisitorException {
+
+        final ASTSelect select = astQuery.getSelect();
+
+        final ProjectionNode projection = new ProjectionNode();
+        
+        queryRoot.setProjection(projection);
+        
+        if (select.isDistinct())
+            projection.setDistinct(true);
+        
+        if (select.isReduced())
+            projection.setReduced(true);
+        
+        if (select.isWildcard()) {
+            projection.addProjectionVar(new VarNode("*"));
+        
+        } else {
+        
+            final Iterator<ASTProjectionElem> itr = select
+                    .getProjectionElemList().iterator();
+            
+            while (itr.hasNext()) {
+                
+                /*
+                 * The last argument of the children is the Var. Anything before
+                 * that is an ArgList which must be interpreted in its own
+                 * right.
+                 * 
+                 * (Var | ArgList Var)
+                 */
+                
+                final ASTProjectionElem e = itr.next();
+                
+                if (!e.hasAlias()) {
+                
+                    // Var
+                    final ASTVar aVar = (ASTVar) e.jjtGetChild(0/* index */);
+                    
+                    projection.addProjectionVar(new VarNode(aVar.getName()));
+            
+                } else {
+                    
+                    // Expression AS Var
+                    final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
+                    
+                    final IValueExpressionNode ve = (IValueExpressionNode) expr
+                            .jjtAccept(valueExprBuilder, null/* data */);
+                    
+                    final String varname = e.getAlias();
+//                    final ASTVar aVar = (ASTVar) e.jjtGetChild(1/* index */);
+//                    final String varname = aVar.getName();
+                    
+                    projection.addProjectionExpression(new AssignmentNode(
+                            new VarNode(varname), ve));
+                
+                }
+            
+            }
+            
+        }
+
+    }
     
     /**
      * Handle the optional WHERE clause. (For example, DESCRIBE may be used

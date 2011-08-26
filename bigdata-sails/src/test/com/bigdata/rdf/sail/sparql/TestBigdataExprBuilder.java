@@ -762,7 +762,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "\n } AS %namedSet1" + //
                 "\n WHERE {" + //
                 "\n        ?p rdfs:subPropertyOf ?p2" + //
-                "\n        INCLUDE %namedSet1" + //
+//                "\n        INCLUDE %namedSet1" + //
                 "\n}"//
         ;
 

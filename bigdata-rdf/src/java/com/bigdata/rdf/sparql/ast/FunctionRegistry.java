@@ -159,11 +159,20 @@ public class FunctionRegistry {
     public static final URI BNODE = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+ "bnode");
 
     /**
-     * FIXME Implement and register the EXISTS(graphPattern) function as defined
-     * in <a href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1
-     * Query Language for RDF</a>.
+     * The EXISTS(graphPattern) function as defined in <a
+     * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+     * Language for RDF</a>.
      */
-    public static final URI EXISTS = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS+ "exists");
+    public static final URI EXISTS = new URIImpl(SPARQL11_UNDEFINED_FUNCTIONS
+            + "exists");
+
+    /**
+     * The NOT EXISTS(graphPattern) function as defined in <a
+     * href="http://www.w3.org/TR/sparql11-query/#SparqlOps">SPARQL 1.1 Query
+     * Language for RDF</a>.
+     */
+    public static final URI NOT_EXISTS = new URIImpl(
+            SPARQL11_UNDEFINED_FUNCTIONS + "not-exists");
 
     public static final URI EQ = new URIImpl(XPATH_FUNCTIONS+"equal-to");
     public static final URI NE = new URIImpl(XPATH_FUNCTIONS+"not-equal-to");
@@ -695,7 +704,11 @@ public class FunctionRegistry {
 
 	    add(SHA384,new DigestFactory(DigestOp.SHA384));
 
-	    add(SHA512,new DigestFactory(DigestOp.SHA512));
+        add(SHA512,new DigestFactory(DigestOp.SHA512));
+
+        add(EXISTS, new ExistsFactory(true));
+
+        add(NOT_EXISTS, new ExistsFactory(false));
 
     }
 
@@ -1293,6 +1306,47 @@ public class FunctionRegistry {
                 return new ComputedIN(not, set);
 
             }
+
+        }
+
+    }
+
+    /**
+     * Factory for EXISTS() and NOT EXISTS(). The EXISTS() node in the AST must
+     * be marked with the group graph pattern as an annotation. The
+     * {@link FunctionNode} will be a simple test of an anonymous variable.
+     * EXISTS tests the variable for <code>true</code>. Not exists tests the
+     * variable for <code>false</code>. The name of that anonymous variable is
+     * the sole {@link ValueExpressionNode} passed into this factory.
+     * <p>
+     * The "guts" of the EXISTS logic is translated by an {@link IASTOptimizer}
+     * into an ASK subquery (an instance of {@link SubqueryRoot}). This will be
+     * executed as a special BOp that bind the success or failure of that ASK
+     * subquery on the anonymous variable. The "ASK" subquery does not fail, it
+     * just binds the truth state of the ASK subquery on the anonymous variable.
+     * The {@link IValueExpression} returned by this factory just tests the
+     * truth state of that anonymous variable.
+     */
+    public static class ExistsFactory implements Factory {
+
+        final private boolean exists;
+
+        public ExistsFactory(boolean exists) {
+
+            this.exists = exists;
+
+        }
+
+        @Override
+        public IValueExpression<? extends IV> create(String lex,
+                Map<String, Object> scalarValues, ValueExpressionNode... args) {
+
+            if (args.length != 1)
+                throw new IllegalArgumentException();
+
+            final VarNode anonvar = (VarNode) args[0];
+
+            return exists ? anonvar.getVar() : new NotBOp(anonvar.getVar());
 
         }
 

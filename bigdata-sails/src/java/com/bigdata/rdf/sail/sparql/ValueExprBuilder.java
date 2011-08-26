@@ -37,10 +37,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.FN;
-import org.openrdf.query.algebra.Exists;
-import org.openrdf.query.algebra.Not;
 import org.openrdf.query.parser.sparql.ast.ASTAbs;
 import org.openrdf.query.parser.sparql.ast.ASTAggregate;
 import org.openrdf.query.parser.sparql.ast.ASTAnd;
@@ -66,6 +65,7 @@ import org.openrdf.query.parser.sparql.ast.ASTHours;
 import org.openrdf.query.parser.sparql.ast.ASTIRIFunc;
 import org.openrdf.query.parser.sparql.ast.ASTIf;
 import org.openrdf.query.parser.sparql.ast.ASTIn;
+import org.openrdf.query.parser.sparql.ast.ASTInfix;
 import org.openrdf.query.parser.sparql.ast.ASTIsBlank;
 import org.openrdf.query.parser.sparql.ast.ASTIsIRI;
 import org.openrdf.query.parser.sparql.ast.ASTIsLiteral;
@@ -116,9 +116,12 @@ import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -131,6 +134,8 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @see FunctionRegistry
  */
 public class ValueExprBuilder extends BigdataASTVisitorBase {
+
+    private static final Logger log = Logger.getLogger(ValueExprBuilder.class);
 
     public ValueExprBuilder(final BigdataASTContext context) {
 
@@ -642,30 +647,74 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         return ternary(node, FunctionRegistry.REGEX);
     }
 
-    // FIXME EXISTS(GroupGraphPattern) is basically an ASK subquery.
+    /**
+     * Note: EXISTS is basically an ASK subquery.
+     * 
+     * @see ExistsNode
+     * 
+     *      TODO Do we need to pass in the GroupGraphPattern (in order to have
+     *      the proper scope for the EXISTS's inner graph pattern)?
+     */
     @Override
-    public Exists visit(ASTExistsFunc node, Object data)
-        throws VisitorException
-    {
-        Exists e = new Exists();
+    public ExistsNode visit(final ASTExistsFunc node, Object data)
+            throws VisitorException {
 
-        node.jjtGetChild(0).jjtAccept(this, e);
-        return e;
+        final VarNode anonvar = context.createAnonVar("-exists-"
+                + context.constantVarID++);
+
+        final GroupGraphPatternBuilder visitor = new GroupGraphPatternBuilder(
+                context);
+
+        final GroupNodeBase graphPattern = (GroupNodeBase) node.jjtGetChild(0)
+                .jjtAccept(visitor, null);
+
+        return new ExistsNode(context.lex, anonvar, graphPattern);
+
     }
 
-    // FIXME NOT EXISTS is NOT(EXISTS()).
+    /**
+     * See EXISTS above.
+     */
     @Override
-    public Not visit(ASTNotExistsFunc node, Object data)
+    public NotExistsNode visit(final ASTNotExistsFunc node, Object data)
         throws VisitorException
     {
-        Exists e = new Exists();
-        node.jjtGetChild(0).jjtAccept(this, e);
-        return new Not(e);
+
+        final VarNode anonvar = context.createAnonVar("-exists-"
+                + context.constantVarID++);
+
+        final GroupGraphPatternBuilder visitor = new GroupGraphPatternBuilder(
+                context);
+
+        final GroupNodeBase graphPattern = (GroupNodeBase) node.jjtGetChild(0)
+                .jjtAccept(visitor, null);
+
+        return new NotExistsNode(context.lex, anonvar, graphPattern);
+        
     }
 
     @Override
     public FunctionNode visit(ASTIf node, Object data) throws VisitorException {
         return ternary(node, FunctionRegistry.IF);
+    }
+
+    /**
+     * Unwrap an {@link ASTInfix} node, returning the inner {@link FunctionNode}
+     * constructed for it.
+     * 
+     * @see http://www.openrdf.org/issues/browse/SES-818
+     */
+    @Override
+    public FunctionNode visit(ASTInfix node, Object data) throws VisitorException {
+
+        final Node left = node.jjtGetChild(0);
+
+        final Node op = node.jjtGetChild(1);
+        
+        op.jjtInsertChild(left, 0);
+
+        return (FunctionNode) op.jjtAccept(this, data);
+
     }
 
     /**
@@ -680,50 +729,56 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * @see FunctionRegistry#IN
      * @see FunctionRegistry#NOT_IN
      * 
-     *      FIXME SELECT (?s IN (?p,?o) AS ?x) ... fails due to the handling of
-     *      the IN infix operator. It is producing:
-     * 
-     *      <pre>
-     * QueryContainer
-     *  SelectQuery
-     *   Select
-     *    ProjectionElem
-     *     Var (s)
-     *     In
-     *      Var (p)
-     *      Var (o)
-     *     Var (x)
-     * </pre>
-     * 
-     *      where Var(s), In, and Var(x) are siblings.
+     * @see http://www.openrdf.org/issues/browse/SES-818
      */
     @Override
     public ValueExpressionNode visit(ASTIn node, Object data)
         throws VisitorException
     {
 
-        final int nargs = node.jjtGetNumChildren();
-        
-        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
-
-        /*
-         * Reach up to the parent's 1st child for the left argument to the infix
-         * IN operator.
-         */
-        final ValueExpressionNode leftArg = (ValueExpressionNode) node
-                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
-        
-        args[0] = leftArg;
+//        final int nargs = node.jjtGetNumChildren();
+//        
+//        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
+//
+//        /*
+//         * Reach up to the parent's 1st child for the left argument to the infix
+//         * IN operator.
+//         */
+//        final ValueExpressionNode leftArg = (ValueExpressionNode) node
+//                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
+//        
+//        args[0] = leftArg;
+//
+//        /*
+//         * Handle the ArgList for IN.
+//         */
+//
+//        for (int i = 0; i < nargs; i++) {
+//
+//            final Node argNode = node.jjtGetChild(i);
+//
+//            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+//
+//        }
 
         /*
          * Handle the ArgList for IN.
+         * 
+         * Note: This assumes that the left argument of IN has been rotated into
+         * place as its first child.
+         * 
+         * @see InfixProcessor
          */
+
+        final int nargs = node.jjtGetNumChildren();
+
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs];
 
         for (int i = 0; i < nargs; i++) {
 
             final Node argNode = node.jjtGetChild(i);
 
-            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+            args[i] = (ValueExpressionNode) argNode.jjtAccept(this, null);
 
         }
 
@@ -738,29 +793,48 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     @Override
     public ValueExpressionNode visit(ASTNotIn node, Object data)
             throws VisitorException {
+//
+//        final int nargs = node.jjtGetNumChildren();
+//
+//        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
+//
+//        /*
+//         * Reach up to the parent's 1st child for the left argument to the infix
+//         * NOT IN operator.
+//         */
+//        final ValueExpressionNode leftArg = (ValueExpressionNode) node
+//                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
+//
+//        args[0] = leftArg;
+//
+//        /*
+//         * Handle the ArgList for NOT IN.
+//         */
+//
+//        for (int i = 0; i < nargs; i++) {
+//
+//            final Node argNode = node.jjtGetChild(i);
+//
+//            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+//
+//        }
+        
+        /*
+         * Handle the ArgList for NOT_IN.
+         * 
+         * Note: This assumes that the left argument of the NOT_IN has been
+         * rotated into place as its first child.
+         */
 
         final int nargs = node.jjtGetNumChildren();
 
-        final ValueExpressionNode[] args = new ValueExpressionNode[nargs + 1];
-
-        /*
-         * Reach up to the parent's 1st child for the left argument to the infix
-         * NOT IN operator.
-         */
-        final ValueExpressionNode leftArg = (ValueExpressionNode) node
-                .jjtGetParent().jjtGetChild(0).jjtAccept(this, null);
-
-        args[0] = leftArg;
-
-        /*
-         * Handle the ArgList for NOT IN.
-         */
+        final ValueExpressionNode[] args = new ValueExpressionNode[nargs];
 
         for (int i = 0; i < nargs; i++) {
 
             final Node argNode = node.jjtGetChild(i);
 
-            args[i + 1] = (ValueExpressionNode) argNode.jjtAccept(this, null);
+            args[i] = (ValueExpressionNode) argNode.jjtAccept(this, null);
 
         }
 

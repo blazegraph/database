@@ -25,7 +25,8 @@ public class ASTProjectionElem extends SimpleNode {
 
 	public String getAlias() {
 		if (children.size() >= 2) {
-			Node aliasNode = children.get(1);
+		    // @see http://www.openrdf.org/issues/browse/SES-818
+			Node aliasNode = children.get(children.size()-1);
 
 			if (aliasNode instanceof ASTString) {
 				return ((ASTString)aliasNode).getValue();
