@@ -313,6 +313,14 @@ public class BOpContext<E> extends BOpContextBase {
 
             } else {
 
+                /*
+                 * Note: A variable which is bound outside of the query to a
+                 * constant gets turned into a Constant with that variable as
+                 * its annotation. This code path causes the binding to be
+                 * created for the variable and the constant when the constant
+                 * is JOINed.
+                 */
+                
                 final IVariable<?> var = (IVariable<?>) t
                         .getProperty(Constant.Annotations.VAR);
 
