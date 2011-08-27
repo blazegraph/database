@@ -52,15 +52,20 @@ public class BigdataASTContext {
     protected final AbstractTripleStore tripleStore;
 
     protected final LexiconRelation lexicon;
-    
+
+    /**
+     * The namespace of the {@link #lexicon}.
+     */
     protected final String lex;
 
     protected final ILexiconConfiguration<BigdataValue> conf;
 
     protected final BigdataValueFactory valueFactory;
 
-    // TODO make private by folding into #createAnonVar(), but check uses 1st.
-    protected int constantVarID = 1;
+    /**
+     * Counter used to generate unique (within query) variable names.
+     */
+    private int constantVarID = 1;
 
     public BigdataASTContext(final AbstractTripleStore tripleStore) {
 
@@ -76,10 +81,26 @@ public class BigdataASTContext {
 
     }
 
+    /**
+     * Create an anonymous variable. The variable name will be unique (within
+     * the scope of the query parser) and {@link VarNode#isAnonymous()} will
+     * return <code>true</code>.
+     * 
+     * @param varName
+     *            The prefix of the name of an anonymous variable. This should
+     *            have the pattern <code>-foo-</code>. An unique (within query)
+     *            variable identifier will be appended to the prefix.
+     * 
+     * @return The anonymous variable.
+     */
     protected VarNode createAnonVar(final String varName) {
-        final VarNode var = new VarNode(varName);
+
+        final VarNode var = new VarNode(varName + constantVarID++);
+        
         var.setAnonymous(true);
+        
         return var;
+        
     }
 
 }

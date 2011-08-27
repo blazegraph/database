@@ -56,6 +56,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -130,6 +131,28 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
     }
 
+    /**
+     * Return an anonymous variable having exactly the given variable name.
+     * <p>
+     * Note: This avoids a side-effect on the counter, which is part of the
+     * {@link BigdataASTContext} against which the parse tree is being
+     * interpreted.
+     * 
+     * @param varname
+     *            The exact variable name (NOT a prefix).
+     * 
+     * @return The anonymous variable.
+     */
+    protected VarNode mockAnonVar(final String varname) {
+        
+        final VarNode var = new VarNode(varname);
+        
+        var.setAnonymous(true);
+        
+        return var;
+        
+    }
+    
     /**
      * Note: makeIV() in the tests can leave the IV as a MockIV since we will
      * never have anything in the database (unless there is a Vocabulary or it

@@ -63,7 +63,7 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
     protected final BigdataASTContext context;
 
-    public BigdataASTVisitorBase(final BigdataASTContext context) {
+    protected BigdataASTVisitorBase(final BigdataASTContext context) {
 
         this.context = context;
 
@@ -78,7 +78,7 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
      * @return The depth of that node.
      */
-    protected int depth(Node node) {
+    final protected int depth(Node node) {
         
         int i = 0;
         
@@ -101,8 +101,10 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
      *            
      * @return The indent string.
      */
-    protected String indent(final Node node) {
+    final protected String indent(final Node node) {
+
         return indent(depth(node));
+        
     }
     
     /**
@@ -172,31 +174,38 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
      * this step.
      */
     @Override
-    public VarNode visit(final ASTVar node, Object data) throws VisitorException {
+    final public VarNode visit(final ASTVar node, Object data)
+            throws VisitorException {
 
         final VarNode var = new VarNode(node.getName());
-        
+
         if (node.isAnonymous())
             var.setAnonymous(true);
-        
+
         return var;
-        
+
     }
 
     @Override
-    public Object visit(ASTQName node, Object data) throws VisitorException {
+    final public Object visit(ASTQName node, Object data)
+            throws VisitorException {
+ 
         throw new VisitorException(
                 "QNames must be resolved before building the query model");
+        
     }
 
     @Override
-    public Object visit(ASTBlankNode node, Object data) throws VisitorException {
+    final public Object visit(ASTBlankNode node, Object data)
+            throws VisitorException {
+        
         throw new VisitorException(
                 "Blank nodes must be replaced with variables before building the query model");
+    
     }
 
     @Override
-    public ConstantNode visit(final ASTIRI node, Object data)
+    final public ConstantNode visit(final ASTIRI node, Object data)
             throws VisitorException {
         
         return new ConstantNode(makeIV((BigdataValue)node.getRDFValue()));
@@ -204,7 +213,7 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     }
 
     @Override
-    public ConstantNode visit(final ASTRDFLiteral node, Object data)
+    final public ConstantNode visit(final ASTRDFLiteral node, Object data)
             throws VisitorException {
         
         return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
@@ -212,34 +221,35 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
     }
 
     @Override
-    public ConstantNode visit(ASTNumericLiteral node, Object data)
+    final public ConstantNode visit(ASTNumericLiteral node, Object data)
             throws VisitorException {
 
-        return new ConstantNode(makeIV((BigdataValue)node.getRDFValue()));
-        
-    }
-
-    @Override
-    public ConstantNode visit(ASTTrue node, Object data)
-            throws VisitorException {
-        
-        return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
-        
-    }
-
-    @Override
-    public ConstantNode visit(ASTFalse node, Object data)
-            throws VisitorException {
-        
         return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
 
     }
 
     @Override
-    public String visit(ASTString node, Object data) throws VisitorException {
+    final public ConstantNode visit(ASTTrue node, Object data)
+            throws VisitorException {
+
+        return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
+
+    }
+
+    @Override
+    final public ConstantNode visit(ASTFalse node, Object data)
+            throws VisitorException {
+
+        return new ConstantNode(makeIV((BigdataValue) node.getRDFValue()));
+
+    }
+
+    @Override
+    final public String visit(ASTString node, Object data)
+            throws VisitorException {
 
         return node.getValue();
-        
+
     }
-    
+
 }

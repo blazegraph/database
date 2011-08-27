@@ -32,8 +32,11 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -50,6 +53,15 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
  */
 class GroupGraphPattern {
 
+    private static final Logger log = Logger.getLogger(GroupGraphPattern.class);
+    
+    private boolean invalid = false;
+    
+    private void assertValid() {
+        if (invalid)
+            throw new IllegalStateException();
+    }
+
     /**
      * The context of this graph pattern.
      */
@@ -63,7 +75,7 @@ class GroupGraphPattern {
     /**
      * This is all direct children of the group.
      */
-    private List<IGroupMemberNode> children = new LinkedList<IGroupMemberNode>();
+    private final List<IGroupMemberNode> children = new LinkedList<IGroupMemberNode>();
 
     /**
      * Creates a new graph pattern.
@@ -81,31 +93,53 @@ class GroupGraphPattern {
     }
 
     public void setContextVar(final TermNode context) {
+        assertValid();
         this.context = context;
     }
 
     public TermNode getContext() {
+        assertValid();
         return context;
     }
 
     public void setStatementPatternScope(final StatementPattern.Scope spScope) {
+        assertValid();
         this.spScope = spScope;
     }
 
     public StatementPattern.Scope getStatementPatternScope() {
+        assertValid();
         return spScope;
     }
 
-    public void add(final IGroupMemberNode te) {
-        children.add(te);
+    public void add(final IGroupMemberNode child) {
+        
+        assertValid();
+
+        log.error("child=" + BOpUtility.toString((BOp)child));
+
+        children.add(child);
+
     }
 
     public void addSP(final TermNode s, final TermNode p, final TermNode o) {
+
+        assertValid();
+
+        log.error("pattern= ( " + s + " " + p + " " + o + " )");
+
         children.add(new StatementPatternNode(s, p, o, context, spScope));
+
     }
 
     public void addConstraint(final ValueExpressionNode constraint) {
+
+        assertValid();
+
+        log.error("constraint=" + constraint);
+
         children.add(new FilterNode(constraint));
+
     }
 
     /**
@@ -117,12 +151,20 @@ class GroupGraphPattern {
      * @return The group node supplied by the caller with the data attached.
      */
     public <T extends GroupNodeBase> T buildGroup(final T groupNode) {
-        
-        for (IGroupMemberNode child : children)
+
+        assertValid();
+
+        // mark the GroupGraphPattern as consumed.
+        invalid = true;
+
+        for (IGroupMemberNode child : children) {
+         
             groupNode.addChild(child);
+            
+        }
 
         return groupNode;
-                
+
     }
 
     public String toString() {
@@ -141,5 +183,5 @@ class GroupGraphPattern {
         sb.append("]}");
         return sb.toString();
     }
-    
+
 }

@@ -695,12 +695,15 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * CONSTRUCT ?s where {?s ?p ?o}
      * </pre>
      * 
-     * FIXME CONSTRUCT has two forms which we need to test. In the first form a
+     * TODO CONSTRUCT has two forms which we need to test. In the first form a
      * ConstructTemplate appears before the DatasetClause. In the second form a
      * TriplesTemplate appears after the WhereClause and before the optional
      * SolutionModifier. Both forms allow the SolutionModifier. However, openrdf
-     * has not yet implemented the 2nd form.  Also, Anzo has an extension of
-     * CONSTRUCT for quads.
+     * has not yet implemented the 2nd form.
+     * 
+     * TODO Anzo has an extension of CONSTRUCT for quads which we should also
+     * support. It allows a GRAPH graph pattern to be mixed in with the triple
+     * patterns.
      */
     public void test_construct() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -747,6 +750,9 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      *         INCLUDE %namedSet1
      * }
      * </pre>
+     * 
+     * TODO Unit test to verify no recursion through the named subquery into a
+     * named subquery.
      */
     public void test_namedSubquery() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -761,20 +767,23 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 "\n          }" + //
                 "\n } AS %namedSet1" + //
                 "\n WHERE {" + //
-                "\n        ?p rdfs:subPropertyOf ?p2" + //
-//                "\n        INCLUDE %namedSet1" + //
+                "\n        bind ( rdfs:subPropertyOf as ?x )"+//
+                "\n        ?p ?x ?p2" + //
+//                "\n        ?p rdfs:subPropertyOf ?p2" + //
+                "\n        INCLUDE %namedSet1" + //
                 "\n}"//
         ;
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
-            final String namedSet = "namedSet1";
+            final String namedSet = "%namedSet1";
             
             final VarNode s = new VarNode("s");
             final VarNode p = new VarNode("p");
             final VarNode o = new VarNode("o");
             final VarNode p2 = new VarNode("p2");
+            final VarNode x = new VarNode("x");
 
             final TermNode subPropertyOf = new ConstantNode(
                     makeIV(valueFactory.createURI(RDFS.SUBPROPERTYOF
@@ -809,8 +818,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
             
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
-            whereClause.addChild(new StatementPatternNode(p, subPropertyOf, p2,
+            whereClause.addChild(new AssignmentNode(x,subPropertyOf));
+            whereClause.addChild(new StatementPatternNode(p, x, p2,
                     null/* c */, Scope.DEFAULT_CONTEXTS));
+//            whereClause.addChild(new StatementPatternNode(p, subPropertyOf, p2,
+//                    null/* c */, Scope.DEFAULT_CONTEXTS));
             whereClause.addChild(new NamedSubqueryInclude(namedSet));
             
         }

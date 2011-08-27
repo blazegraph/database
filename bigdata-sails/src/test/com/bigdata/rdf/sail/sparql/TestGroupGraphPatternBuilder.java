@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
@@ -114,39 +115,7 @@ public class TestGroupGraphPatternBuilder extends
         assertSameAST(sparql, expected, actual);
 
     }
- 
-    /**
-     * Unit test for simple triple pattern in the default context.
-     * 
-     * <pre>
-     * SELECT ?s where {?s ?p ?o}
-     * </pre>
-     */
-    public void test_simple_triple_pattern() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o}";
-
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            expected.setWhereClause(whereClause);
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
-   
+    
     /**
      * Unit test for named graph triple pattern where the graph is a variable.
      * 
@@ -212,41 +181,6 @@ public class TestGroupGraphPatternBuilder extends
                             graphConst), Scope.NAMED_CONTEXTS));
             whereClause.addChild(graphGroup);
             expected.setWhereClause(whereClause);
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
-
-    /**
-     * Unit test for simple join of two triple patterns.
-     * 
-     * <pre>
-     * select ?s where {?s ?p ?o . ?o ?p2 ?s}
-     * </pre>
-     */
-    public void test_simple_join() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o . ?o ?p2 ?s}";
-
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            whereClause.addChild(new StatementPatternNode(new VarNode("o"),
-                    new VarNode("p2"), new VarNode("s"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
         }
 
         final QueryRoot actual = parse(sparql, baseURI);
@@ -734,128 +668,6 @@ public class TestGroupGraphPatternBuilder extends
         assertSameAST(sparql, expected, actual);
 
     }
-
-    /**
-     * Unit test for a triples block using a predicate list. 
-     * <pre>
-     * select ?s where {?s ?p ?o ; ?p2 ?o2 }
-     * </pre>
-     */
-    public void test_predicate_list() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o ; ?p2 ?o2 }";
-
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p2"), new VarNode("o2"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-            
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
-
-    /**
-     * Unit test for an object list
-     * 
-     * <pre>
-     * select ?s where {?s ?p ?o , ?o2 , ?o3 . }
-     * </pre>
-     */
-    public void test_object_list() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o , ?o2 , ?o3 . }";
-
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o2"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o3"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
-
-    /**
-     * Unit test for a complex triples block using both a predicate list and an
-     * object list.
-     * 
-     * <pre>
-     * select ?s where {?s ?p ?o ; ?p2 ?o2 , ?o3}
-     * </pre>
-     */
-    public void test_complex_triples_block() throws MalformedQueryException,
-            TokenMgrError, ParseException {
-
-        final String sparql = "select ?s where {?s ?p ?o ; ?p2 ?o2 , ?o3}";
-
-        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {
-
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
-
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p2"), new VarNode("o2"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-
-            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p2"), new VarNode("o3"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
-        
-        }
-
-        final QueryRoot actual = parse(sparql, baseURI);
-
-        assertSameAST(sparql, expected, actual);
-
-    }
     
     /**
      * Unit test for simple subquery without anything else in the outer join
@@ -918,20 +730,15 @@ public class TestGroupGraphPatternBuilder extends
      * join group.
      * 
      * <pre>
-     * SELECT ?s where { (?s <http://www.w3.org/2000/01/rdf-schema#label> ?o) . {SELECT ?s where {?s ?p ?o}}}
+     * SELECT ?s where { (?s ?x ?o) . {SELECT ?s where {?s ?p ?o}}}
      * </pre>
-     * 
-     * Note: This requires recursion back in through the
-     * {@link BigdataExprBuilder}.
-     * 
-     * FIXME This is dropping the triple pattern in the outer whereClause.
      */
     public void test_triplePattern_join_subSelect() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
         final String sparql = "select ?s " //
                 + "where {"//
-                + " (?s <http://www.w3.org/2000/01/rdf-schema#label> ?o) ."
+                + " ?s ?x ?o "
                 + " {"//
                 + "   select ?s where { ?s ?p ?o }" //
                 +"  }"//
@@ -953,10 +760,11 @@ public class TestGroupGraphPatternBuilder extends
                 whereClause
                         .addChild(new StatementPatternNode(
                                 new VarNode("s"),
-                                new ConstantNode(
-                                        makeIV(valueFactory
-                                                .createURI("http://www.w3.org/2000/01/rdf-schema#label"))),
-                                new VarNode("o")));
+                                new VarNode("x"),
+                                new VarNode("o"),
+                                null/*c*/,
+                                StatementPattern.Scope.DEFAULT_CONTEXTS
+                                ));
                 
                 final JoinGroupNode wrapperGroup = new JoinGroupNode();
                 whereClause.addChild(wrapperGroup);
@@ -1000,7 +808,14 @@ public class TestGroupGraphPatternBuilder extends
     public void test_bind_join_subSelect() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-        final String sparql = "select ?s where { bind(<http://www.bigdata.com> as ?o) {select ?s where { ?s ?p ?o  } } }";
+        final String sparql//
+              = "select ?s" +//
+        		" where {" +//
+        		"   bind( <http://www.bigdata.com> as ?o )" +//
+        		"   {" +//
+        		"     select ?s where { ?s ?p ?o  }" +//
+        		"   }" +//
+        		"}";
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         final SubqueryRoot subSelect;

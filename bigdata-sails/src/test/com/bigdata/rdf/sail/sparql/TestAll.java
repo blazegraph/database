@@ -61,6 +61,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestValueExprBuilder.class);
 
         /*
+         * Test suite for building up triple patterns, including those which are
+         * covered by the property paths extension in SPARQL 1.1 (a triple
+         * pattern which a constant in the predicate position is treated by the
+         * sesame SPARQL grammar as a degenerate case of a property path.)
+         */
+        suite.addTestSuite(TestTriplePatternBuilder.class);
+        
+        /*
          * Test suite for group graph patterns (join groups, unions, optional,
          * subquery, etc) and filters in those graph patterns.
          */

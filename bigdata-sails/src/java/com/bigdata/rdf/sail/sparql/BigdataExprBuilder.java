@@ -71,6 +71,7 @@ import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -93,28 +94,13 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataExprBuilder extends BigdataASTVisitorBase {
+public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
     private static final Logger log = Logger.getLogger(BigdataExprBuilder.class);
-    
-    /**
-     * Used to build up {@link IValueExpressionNode}s.
-     */
-    private final ValueExprBuilder valueExprBuilder;
-    
-    /**
-     * Used to build up {@link IGroupNode}s.
-     */
-    private final GroupGraphPatternBuilder groupGraphPatternBuilder;
 
     public BigdataExprBuilder(final BigdataASTContext context) {
 
         super(context);
-
-        this.groupGraphPatternBuilder = new GroupGraphPatternBuilder(
-                context);
-
-        this.valueExprBuilder = new ValueExprBuilder(context);
 
     }
 
@@ -129,41 +115,6 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      * {@link ASTAskQuery}, {@link ASTConstructQuery}, {@link ASTDescribeQuery},
      * and {@link ASTSelectQuery}. This method will wind up delegating to the
      * visitor method for the appropriate concrete {@link ASTQuery} instance.
-     * 
-     * <pre>
-     * ASTQueryContainer QueryContainer():
-     * {}
-     * {
-     *     Prolog() Query() <EOF>
-     *     { return jjtThis; }
-     * }
-     * 
-     * void Prolog() #void :
-     * {}
-     * {
-     *     [ BaseDecl() ] ( PrefixDecl() )*
-     * }
-     * 
-     * void BaseDecl() :
-     * { Token t; }
-     * {
-     *     <BASE> t = <Q_IRI_REF> {jjtThis.setIRI(_trimString(t.image, 1));}
-     * }
-     * 
-     * void PrefixDecl() :
-     * { Token prefix; }
-     * {
-     *     <PREFIX> prefix = <PNAME_NS> IRI()
-     * }
-     * void Query() #void :
-     * {}
-     * {
-     *     SelectQuery()
-     * |   ConstructQuery()
-     * |   DescribeQuery()
-     * |   AskQuery()
-     * }
-     * </pre>
      */
     @Override
     public QueryRoot visit(final ASTQueryContainer node, final Object data)
@@ -331,7 +282,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
                  */
 
                 final TermNode resource = (TermNode) node.jjtGetChild(i)
-                        .jjtAccept(valueExprBuilder, null);
+                        .jjtAccept(this, null);
 
                 if (resource instanceof VarNode) {
 
@@ -339,8 +290,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
 
                 } else {
 
-                    final VarNode anonVar = context.createAnonVar("-iri-"
-                            + context.constantVarID);
+                    final VarNode anonVar = context.createAnonVar("-iri-");
 
                     projection.addExpr(new AssignmentNode(anonVar, resource));
 
@@ -390,7 +340,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
         final ASTConstruct constructNode = node.getConstruct();
 
         final ConstructNode tmp = (ConstructNode) constructNode.jjtAccept(
-                groupGraphPatternBuilder, null/* data */);
+                this, null/* data */);
 
         queryRoot.setConstruct(tmp);
 
@@ -413,7 +363,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     //
     
     @Override
-    public GroupByNode visit(final ASTGroupClause node, Object data)
+    final public GroupByNode visit(final ASTGroupClause node, Object data)
             throws VisitorException {
         
         final GroupByNode groupBy = new GroupByNode();
@@ -427,7 +377,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
              */
 
             final AssignmentNode expr = (AssignmentNode) node.jjtGetChild(i)
-                    .jjtAccept(valueExprBuilder, null/* data */);
+                    .jjtAccept(this, null/* data */);
 
             groupBy.addExpr((AssignmentNode) expr);
             
@@ -438,7 +388,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
-    public List<OrderByExpr> visit(final ASTOrderClause node, Object data)
+    final public List<OrderByExpr> visit(final ASTOrderClause node, Object data)
             throws VisitorException {
 
         final int childCount = node.jjtGetNumChildren();
@@ -464,24 +414,24 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      * Note: Delegate to the {@link ValueExprBuilder}.
      */
     @Override
-    public OrderByExpr visit(final ASTOrderCondition node, Object data)
+    final public OrderByExpr visit(final ASTOrderCondition node, Object data)
         throws VisitorException
     {
 
         final ValueExpressionNode valueExpr = (ValueExpressionNode) node
-                .jjtGetChild(0).jjtAccept(valueExprBuilder, null);
+                .jjtGetChild(0).jjtAccept(this, null);
 
         return new OrderByExpr(valueExpr, node.isAscending());
         
     }
 
     @Override
-    public Long visit(ASTLimit node, Object data) throws VisitorException {
+    final public Long visit(ASTLimit node, Object data) throws VisitorException {
         return node.getValue();
     }
 
     @Override
-    public Long visit(ASTOffset node, Object data) throws VisitorException {
+    final public Long visit(ASTOffset node, Object data) throws VisitorException {
         return node.getValue();
     }
 
@@ -552,7 +502,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             
             // Accept the Subquery
             final SubqueryRoot subquery = (SubqueryRoot) aNamedSubquery
-                    .jjtAccept(groupGraphPatternBuilder, queryRoot/* data */);
+                    .jjtAccept(this, queryRoot/* data */);
 
             // Create instance of the right class.
             final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(
@@ -592,14 +542,21 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
     private QueryBase getQueryBase(final ASTQuery node, final Object data,
             final QueryType queryType) {
 
-        if (data instanceof QueryBase)
-            return new SubqueryRoot(queryType);
+        final Node p = node.jjtGetParent();
+        
+        // FIXME comment out.
+        log.error("parent=" + p + ", data="
+                + (data == null ? "null" : data.getClass().getSimpleName()));
 
-        if (data instanceof GroupGraphPattern)
-            return new SubqueryRoot(queryType);
-        
-        return new QueryRoot(queryType);
-        
+//        if (data instanceof QueryBase || data instanceof GroupGraphPattern) {
+        if (p instanceof ASTQueryContainer) {
+
+            return new QueryRoot(queryType);
+
+        }
+
+        return new SubqueryRoot(queryType);
+
     }
 
     /**
@@ -661,11 +618,9 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
                     final SimpleNode expr = (SimpleNode) e.jjtGetChild(0);
                     
                     final IValueExpressionNode ve = (IValueExpressionNode) expr
-                            .jjtAccept(valueExprBuilder, null/* data */);
+                            .jjtAccept(this, null/* data */);
                     
                     final String varname = e.getAlias();
-//                    final ASTVar aVar = (ASTVar) e.jjtGetChild(1/* index */);
-//                    final String varname = aVar.getName();
                     
                     projection.addProjectionExpression(new AssignmentNode(
                             new VarNode(varname), ve));
@@ -691,6 +646,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
      * @param queryRoot
      *            The bigdata query root.
      */
+    @SuppressWarnings("unchecked")
     private void handleWhereClause(final ASTQuery astQuery,
             final QueryBase queryRoot) throws VisitorException {
 
@@ -701,8 +657,11 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
             final ASTGraphPatternGroup graphPatternGroup = whereClause
                     .getGraphPatternGroup();
 
-            queryRoot.setWhereClause((IGroupNode) graphPatternGroup.jjtAccept(
-                    groupGraphPatternBuilder, null/* data */));
+            graphPattern = new GroupGraphPattern();
+            
+            queryRoot
+                    .setWhereClause((IGroupNode<IGroupMemberNode>) graphPatternGroup
+                            .jjtAccept(this, null/* data */));
 
         }
 
@@ -762,8 +721,7 @@ public class BigdataExprBuilder extends BigdataASTVisitorBase {
                  * expression.
                  */
                 final IValueExpressionNode ve = (IValueExpressionNode) havingClause
-                        .jjtGetChild(i).jjtAccept(groupGraphPatternBuilder,
-                                null/* data */);
+                        .jjtGetChild(i).jjtAccept(this, null/* data */);
 
                 havingNode.addExpr(ve);
 
