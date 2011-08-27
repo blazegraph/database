@@ -134,9 +134,6 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
     /**
      * This is the entry point for both a top-level SELECT and a SubSelect.
      * 
-     * @param data
-     *            Non-<code>null</code> iff this is a SubSelect.
-     * 
      * @return The method returns either a {@link QueryRoot} or a
      *         {@link SubqueryRoot} depending on whether or not the
      *         {@link ASTSelectQuery} appears as a top-level query or a
@@ -524,19 +521,18 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
     }
     
     /**
-     * Return the appropriate {@link QueryBase} instance.
+     * Return the appropriate {@link QueryBase} instance. If the parent of the
+     * {@link ASTQuery} is an {@link ASTQueryContainer} then this will return
+     * {@link QueryRoot}. Otherwise it will return {@link SubqueryRoot}.
      * 
      * @param node
      *            The {@link ASTQuery} node.
      * @param data
      *            The data. This can be bound to some things other than a
-     *            {@link QueryBase}. Such bindings are ignored. When it is a
-     *            {@link QueryBase}, then the returned object will be some kind
-     *            of {@link SubqueryBase}. Otherwise it will be a
-     *            {@link QueryRoot}.
+     *            {@link QueryBase}. Such bindings are ignored.
      * @param queryType
      *            The type of the {@link ASTQuery}.
-     *            
+     * 
      * @return Some kind of {@link QueryBase} object.
      */
     private QueryBase getQueryBase(final ASTQuery node, final Object data,
@@ -544,11 +540,10 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
         final Node p = node.jjtGetParent();
         
-        // FIXME comment out.
-        log.error("parent=" + p + ", data="
-                + (data == null ? "null" : data.getClass().getSimpleName()));
+        if (log.isInfoEnabled())
+            log.info("parent=" + p + ", data="
+                    + (data == null ? "null" : data.getClass().getSimpleName()));
 
-//        if (data instanceof QueryBase || data instanceof GroupGraphPattern) {
         if (p instanceof ASTQueryContainer) {
 
             return new QueryRoot(queryType);
@@ -659,9 +654,10 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
             graphPattern = new GroupGraphPattern();
             
-            queryRoot
-                    .setWhereClause((IGroupNode<IGroupMemberNode>) graphPatternGroup
-                            .jjtAccept(this, null/* data */));
+            final IGroupNode<IGroupMemberNode> ret = (IGroupNode<IGroupMemberNode>) graphPatternGroup
+                    .jjtAccept(this, null/* data */);
+
+            queryRoot.setWhereClause(ret);
 
         }
 

@@ -697,10 +697,11 @@ public class TestGroupGraphPatternBuilder extends
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
 
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+//                whereClause.addChild(subSelect);
+
                 final JoinGroupNode wrapperGroup = new JoinGroupNode();
                 whereClause.addChild(wrapperGroup);
-                
-                subSelect = new SubqueryRoot(QueryType.SELECT);
                 wrapperGroup.addChild(subSelect);
             }
             {
@@ -730,7 +731,7 @@ public class TestGroupGraphPatternBuilder extends
      * join group.
      * 
      * <pre>
-     * SELECT ?s where { (?s ?x ?o) . {SELECT ?s where {?s ?p ?o}}}
+     * SELECT ?s where { (?s ?x ?o) . {SELECT ?x where {?x ?p ?x}}}
      * </pre>
      */
     public void test_triplePattern_join_subSelect() throws MalformedQueryException,
@@ -740,7 +741,7 @@ public class TestGroupGraphPatternBuilder extends
                 + "where {"//
                 + " ?s ?x ?o "
                 + " {"//
-                + "   select ?s where { ?s ?p ?o }" //
+                + "   select ?x where { ?x ?p ?x }" //
                 +"  }"//
                 + "}"//
         ;
@@ -766,23 +767,25 @@ public class TestGroupGraphPatternBuilder extends
                                 StatementPattern.Scope.DEFAULT_CONTEXTS
                                 ));
                 
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+                
+//                whereClause.addChild(subSelect);
+                
                 final JoinGroupNode wrapperGroup = new JoinGroupNode();
                 whereClause.addChild(wrapperGroup);
-                
-                subSelect = new SubqueryRoot(QueryType.SELECT);
                 wrapperGroup.addChild(subSelect);
             }
             {
 
                 final ProjectionNode projection2 = new ProjectionNode();
-                projection2.addProjectionVar(new VarNode("s"));
+                projection2.addProjectionVar(new VarNode("x"));
                 subSelect.setProjection(projection2);
 
                 final JoinGroupNode whereClause2 = new JoinGroupNode();
                 subSelect.setWhereClause(whereClause2);
 
                 whereClause2.addChild(new StatementPatternNode(
-                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        new VarNode("x"), new VarNode("p"), new VarNode("x"),
                         null/* c */, Scope.DEFAULT_CONTEXTS));
 
             }
@@ -866,12 +869,97 @@ public class TestGroupGraphPatternBuilder extends
     /**
      * Unit test for sub-SubSelect. There is a top-level query. It uses a
      * subquery. The subquery uses a subquery. The purpose of this is to test
-     * for the correct nexting of the generated AST.
+     * for the correct nesting of the generated AST.
      */
     public void test_subSubSelect() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-        fail("write test");
+        final String sparql//
+              = "select ?s \n" +//
+                " where { \n" +//
+                "   bind( <http://www.bigdata.com> as ?o ) \n" +//
+                "   { \n" +//
+                "     select ?s \n" +//
+                "      where { \n" +//
+                "        ?s ?p ?o . \n" +//
+                "        { select ?o { bind( 12 as ?o ) } } \n" +//
+                "      } \n" +//
+                "   }\n" +//
+                "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final SubqueryRoot subSelect1;
+        final SubqueryRoot subSelect2;
+        {
+
+            final VarNode s = new VarNode("s");
+            final VarNode p = new VarNode("p");
+            final VarNode o = new VarNode("o");
+            
+            final ConstantNode const1 = new ConstantNode(
+                    makeIV(valueFactory.createURI("http://www.bigdata.com")));
+            
+            final ConstantNode const2 = new ConstantNode(
+                    makeIV(valueFactory.createLiteral("12", XSD.INTEGER)));
+            
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(s);
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new AssignmentNode(o, const1));
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                whereClause.addChild(wrapperGroup);
+                
+                subSelect1 = new SubqueryRoot(QueryType.SELECT);
+                wrapperGroup.addChild(subSelect1);
+                
+            }
+
+            // subSelect2
+            {
+                
+                subSelect2 = new SubqueryRoot(QueryType.SELECT);
+                
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(o);
+                subSelect2.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                subSelect2.setWhereClause(whereClause);
+
+                whereClause.addChild(new AssignmentNode(o, const2));
+
+            }
+            
+            // subSelect1
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(s);
+                subSelect1.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                subSelect1.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(s, p, o,
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                wrapperGroup.addChild(subSelect2);
+                whereClause.addChild(wrapperGroup);
+                
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
 
     }
 

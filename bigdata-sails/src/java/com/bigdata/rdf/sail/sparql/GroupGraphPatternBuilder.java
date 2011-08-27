@@ -46,6 +46,7 @@ import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
+import org.openrdf.query.parser.sparql.ast.ASTWhereClause;
 import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
@@ -111,14 +112,28 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
     //
 
     /**
+     * <code>( SelectQuery | GraphPattern )</code> - this is the common path for
+     * SubSelect and graph patterns.
+     * <p>
      * Note: (NOT) EXISTS uses a temporary graph pattern in order to avoid the
      * side-effect on the parent's graph pattern. Other value functions with
      * inner graph patterns should do this as well.
+     * <p>
+     * Note: Filters are scoped to the graph pattern group and do not affect
+     * bindings external to the group.
+     * 
+     * @return The {@link GroupNodeBase}. This return value is used by the
+     *         visitor method for the {@link ASTWhereClause}. If the child was a
+     *         SubSelect, then the immediate parent is NOT an
+     *         {@link ASTWhereClause} and the return value is ignored.
+     * 
+     *         FIXME There is a problem around here when handling a SubSelect
+     *         such that at least the projection clause of the SubSelect is
+     *         being lost. There are 2-3 unit tests which are failing for this.
      */
     @Override
-    final public/* GroupNodeBase<?> */Object visit(
-            final ASTGraphPatternGroup node, Object data)
-            throws VisitorException {
+    final public GroupNodeBase<?> visit(final ASTGraphPatternGroup node,
+            Object data) throws VisitorException {
 
         if (log.isInfoEnabled()) {
             log.info("\ndepth=" + depth(node) + ", parentGP(in)="
@@ -126,42 +141,34 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         }
 
         final GroupGraphPattern parentGP = graphPattern;
-        
+
         graphPattern = new GroupGraphPattern(parentGP);
 
-//        if(node.jjtGetChild(0) instanceof ASTSelectQuery) {
-//            
-//            // visit the children of the node (default behavior).
-//            final SubqueryRoot obj = (SubqueryRoot) super.visit(node, null);
-//
-//            // Attach the SubSelect.
-//            graphPattern.add(obj);
-//            
-//            if (log.isInfoEnabled())
-//                log.info("\ndepth=" + depth(node) + ", graphPattern(out)="
-//                        + graphPattern);
-//
-//            graphPattern = parentGP;
-//
-//            return obj;
-//            
-//        } else {
+        // visit the children of the node (default behavior).
+        final Object ret = super.visit(node, null);
+        GroupNodeBase<?> ret2 = null; 
 
-        /*
-         * FIXME There is a problem around here when handling a SubSelect such
-         * that at least the projection clause of the SubSelect is being lost.
-         * There are 2-3 unit tests which are failing for this.
-         */
-        
-            // visit the children of the node (default behavior).
-            super.visit(node, null);
+        if (ret instanceof SubqueryRoot) {
 
-            // Filters are scoped to the graph pattern group and do not affect
-            // bindings external to the group
+            final SubqueryRoot subqueryRoot = (SubqueryRoot) ret;
 
             final JoinGroupNode joinGroup = new JoinGroupNode();
 
+            joinGroup.addChild(subqueryRoot);
+
+            parentGP.add(joinGroup);
+
+        } else {
+            
+            final JoinGroupNode joinGroup = new JoinGroupNode();
+
             if (node.jjtGetParent() instanceof ASTGraphGraphPattern) {
+
+                /*
+                 * TODO Should we reach up to the first GRAPH graph pattern in
+                 * case it is more than one level above us and pull in its
+                 * context? Or should that be handled by an AST Optimizer?
+                 */
 
                 joinGroup.setContext(parentGP.getContext());
 
@@ -172,17 +179,17 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
             parentGP.add(group);
 
-            if (log.isInfoEnabled())
-                log.info("\ndepth=" + depth(node) + ", graphPattern(out)="
-                        + graphPattern);
+            ret2 = group;
+            
+        }
 
-            graphPattern = parentGP;
+        if (log.isInfoEnabled())
+            log.info("\ndepth=" + depth(node) + ", graphPattern(out)="
+                    + graphPattern);
 
-            return group;
-  
-//        }
-        
-//        return null;
+        graphPattern = parentGP;
+
+        return ret2;
 
     }
 
