@@ -40,6 +40,9 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
 	public IGroupNode<E> addChild(final E child) {
 		
+	    if(child == this)
+	        throw new IllegalArgumentException();
+	    
         addArg((BOp) child);
 
 		child.setParent(this);
@@ -49,7 +52,13 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 	}
 	
 	public IGroupNode<E> removeChild(final E child) {
-		
+
+        if (child == null)
+            throw new IllegalArgumentException();
+
+        if (child == this)
+            throw new IllegalArgumentException();
+
         if (removeArg((BOp) child))
             child.setParent(null);
 		

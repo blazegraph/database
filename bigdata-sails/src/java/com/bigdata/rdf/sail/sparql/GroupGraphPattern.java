@@ -88,35 +88,51 @@ class GroupGraphPattern {
      * parent graph pattern.
      */
     public GroupGraphPattern(final GroupGraphPattern parent) {
+
         context = parent.context;
+        
         spScope = parent.spScope;
+        
     }
 
     public void setContextVar(final TermNode context) {
+
         assertValid();
+        
         this.context = context;
+        
     }
 
     public TermNode getContext() {
+        
         assertValid();
+        
         return context;
+        
     }
 
     public void setStatementPatternScope(final StatementPattern.Scope spScope) {
+        
         assertValid();
+        
         this.spScope = spScope;
+        
     }
 
     public StatementPattern.Scope getStatementPatternScope() {
+        
         assertValid();
+        
         return spScope;
+        
     }
 
     public void add(final IGroupMemberNode child) {
         
         assertValid();
-
-        log.error("child=" + BOpUtility.toString((BOp)child));
+        
+        if (log.isInfoEnabled())
+            log.info("child=" + BOpUtility.toString((BOp)child));
 
         children.add(child);
 
@@ -126,7 +142,8 @@ class GroupGraphPattern {
 
         assertValid();
 
-        log.error("pattern= ( " + s + " " + p + " " + o + " )");
+        if (log.isInfoEnabled())
+            log.info("pattern= ( " + s + " " + p + " " + o + " )");
 
         children.add(new StatementPatternNode(s, p, o, context, spScope));
 
@@ -136,7 +153,8 @@ class GroupGraphPattern {
 
         assertValid();
 
-        log.error("constraint=" + constraint);
+        if (log.isInfoEnabled())
+            log.info("constraint=" + constraint);
 
         children.add(new FilterNode(constraint));
 
