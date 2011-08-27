@@ -30,12 +30,15 @@ package com.bigdata.rdf.sparql.ast;
 import org.openrdf.model.URI;
 
 /**
- * A special function node for modeling EXISTS and NOT EXISTS.
+ * A special function node for modeling value expression nodes which are
+ * evaluated against an inner graph expression, such as EXISTS and NOT EXISTS.
+ * Another possibility is IN(subSelect), where IN is evaluated against the
+ * subquery result.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ExistsNodeBase extends FunctionNode {
+abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
     /**
      * 
@@ -55,7 +58,7 @@ abstract public class ExistsNodeBase extends FunctionNode {
      * @param graphPattern
      *            The inner value of the EXISTS function.
      */
-    protected ExistsNodeBase(String lex, URI functionURI, VarNode anonvar,
+    protected SubqueryFunctionNodeBase(String lex, URI functionURI, VarNode anonvar,
             GroupNodeBase graphPattern) {
 
         super(lex, functionURI, null/* scalarValues */,

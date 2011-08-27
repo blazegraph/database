@@ -33,7 +33,7 @@ package com.bigdata.rdf.sparql.ast;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ExistsNode extends ExistsNodeBase {
+public class ExistsNode extends SubqueryFunctionNodeBase {
 
     /**
      * 

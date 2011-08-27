@@ -619,8 +619,6 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * SELECT (?s IN() as ?x) where {?s ?p ?o}
      * </pre>
      * 
-     * TODO There is an issue for this against the SPARQL grammar.
-     * 
      * @see http://www.openrdf.org/issues/browse/SES-818
      */
     public void test_select_foo_IN_none() throws MalformedQueryException,
@@ -658,8 +656,6 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * <pre>
      * SELECT (?s IN(?p,?o) as ?x) where {?s ?p ?o}
      * </pre>
-     * 
-     * TODO There is an issue for this against the SPARQL grammar.
      * 
      * @see http://www.openrdf.org/issues/browse/SES-818
      */
@@ -710,6 +706,10 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * </pre>
      * 
      * TODO Also unit test EXISTS.
+     * 
+     * TODO Once the constant in the predicate position issue is resolved,
+     * modify this test to reflect the original example (get rid of ?foo and
+     * ?bar, replacing them with rdf:type and foaf:name respectively).
      */
     public void test_not_exists() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -719,8 +719,10 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
                 + "PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> \n"//
                 + "SELECT ?person \n"//
                 + " WHERE { \n"//
-                + "       ?person rdf:type  foaf:Person . \n"//
-                + "       FILTER NOT EXISTS { ?person foaf:name ?name } \n"//
+                + "       ?person ?foo  foaf:Person . \n"//
+//                + "       ?person rdf:type  foaf:Person . \n"//
+                + "       FILTER NOT EXISTS { ?person ?bar ?name } \n"//
+//                + "       FILTER NOT EXISTS { ?person foaf:name ?name } \n"//
                 + "}"//
         ;
 
@@ -729,19 +731,20 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final ConstantNode rdfType = new ConstantNode(
                     makeIV(valueFactory.createURI(RDF.TYPE.stringValue())));
+            final VarNode foo = new VarNode("foo");// Note: subs in for rdfType
 
             final ConstantNode foafPerson = new ConstantNode(
                     makeIV(valueFactory.createURI(FOAF.PERSON.stringValue())));
 
             final ConstantNode foafName = new ConstantNode(
                     makeIV(valueFactory.createURI(FOAF.NAME.stringValue())));
+            final VarNode bar = new VarNode("bar");// Note: subs in for foafName
 
             final VarNode person = new VarNode("person");
 
             final VarNode name = new VarNode("name");
 
-            final VarNode anonvar = context.createAnonVar("-exists-"
-                    + context.constantVarID++);
+            final VarNode anonvar = mockAnonVar("-exists-1");
 
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
@@ -749,11 +752,11 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
-            whereClause.addChild(new StatementPatternNode(person, rdfType,
+            whereClause.addChild(new StatementPatternNode(person, foo, // was rdfType,
                     foafPerson, null/* c */, Scope.DEFAULT_CONTEXTS));
 
             final JoinGroupNode existsPattern = new JoinGroupNode();
-            existsPattern.addChild(new StatementPatternNode(person, foafName,
+            existsPattern.addChild(new StatementPatternNode(person, bar, // was foafName,
                     name, null/* c */, Scope.DEFAULT_CONTEXTS));
 
             whereClause.addChild(new FilterNode(new NotExistsNode(lex, anonvar,

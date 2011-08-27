@@ -45,7 +45,6 @@ import org.openrdf.query.parser.sparql.ast.ASTAggregate;
 import org.openrdf.query.parser.sparql.ast.ASTAnd;
 import org.openrdf.query.parser.sparql.ast.ASTAvg;
 import org.openrdf.query.parser.sparql.ast.ASTBNodeFunc;
-import org.openrdf.query.parser.sparql.ast.ASTBind;
 import org.openrdf.query.parser.sparql.ast.ASTBound;
 import org.openrdf.query.parser.sparql.ast.ASTCeil;
 import org.openrdf.query.parser.sparql.ast.ASTCoalesce;
@@ -136,6 +135,15 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     private static final Logger log = Logger.getLogger(ValueExprBuilder.class);
+
+    /**
+     * Used to manage collection and nesting of graph patterns. This is mostly
+     * handled by {@link GroupGraphPatternBuilder}.
+     * <p>
+     * Note: Both {@link ASTExistsFunc} and {@link ASTNotExistsFunc} have an
+     * inner graph pattern by they appear within value expressions.
+     */
+    protected GroupGraphPattern graphPattern;
 
     public ValueExprBuilder(final BigdataASTContext context) {
 
@@ -266,34 +274,34 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     //
     //
     
-    @Override
-    public Object visit(ASTBind node, Object data) throws VisitorException {
-        return new AssignmentNode((VarNode) right(node), left(node));
-    }
+//    @Override
+//    final public FunctionNode visit(ASTBind node, Object data) throws VisitorException {
+//        return new AssignmentNode((VarNode) right(node), left(node));
+//    }
 
     @Override
-    public FunctionNode visit(ASTOr node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTOr node, Object data) throws VisitorException {
         return binary(node, FunctionRegistry.OR);
     }
 
     @Override
-    public Object visit(ASTAnd node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTAnd node, Object data) throws VisitorException {
         return binary(node, FunctionRegistry.AND);
     }
 
     @Override
-    public FunctionNode visit(ASTNot node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTNot node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.NOT);
     }
 
     @Override
-    public FunctionNode visit(ASTCoalesce node, Object data)
+    final public FunctionNode visit(ASTCoalesce node, Object data)
             throws VisitorException {
         return nary(node, FunctionRegistry.COALESCE);
     }
 
     @Override
-    public FunctionNode visit(ASTCompare node, Object data)
+    final public FunctionNode visit(ASTCompare node, Object data)
         throws VisitorException
     {
 
@@ -327,60 +335,60 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
-    public FunctionNode visit(ASTSubstr node, Object data)
+    final public FunctionNode visit(ASTSubstr node, Object data)
             throws VisitorException {
         return nary(node, FN.SUBSTRING);
     }
 
     @Override
-    public FunctionNode visit(ASTConcat node, Object data)
+    final public FunctionNode visit(ASTConcat node, Object data)
             throws VisitorException {
         return nary(node, FN.CONCAT);
     }
 
     @Override
-    public FunctionNode visit(ASTAbs node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTAbs node, Object data) throws VisitorException {
         return unary(node, FN.NUMERIC_ABS);
     }
 
     @Override
-    public FunctionNode visit(ASTCeil node, Object data)
+    final public FunctionNode visit(ASTCeil node, Object data)
             throws VisitorException {
         return unary(node, FN.NUMERIC_CEIL);
     }
 
     @Override
-    public FunctionNode visit(ASTContains node, Object data)
+    final public FunctionNode visit(ASTContains node, Object data)
             throws VisitorException {
         return binary(node, FN.CONTAINS);
     }
 
     @Override
-    public FunctionNode visit(ASTFloor node, Object data)
+    final public FunctionNode visit(ASTFloor node, Object data)
             throws VisitorException {
         return unary(node, FN.NUMERIC_FLOOR);
     }
 
     @Override
-    public FunctionNode visit(ASTRound node, Object data)
+    final public FunctionNode visit(ASTRound node, Object data)
             throws VisitorException {
         return unary(node, FN.NUMERIC_ROUND);
     }
 
     @Override
-    public FunctionNode visit(ASTRand node, Object data)
+    final public FunctionNode visit(ASTRand node, Object data)
             throws VisitorException {
         return noneary(node, FunctionRegistry.RAND);
     }
 
     @Override
-    public FunctionNode visit(ASTSameTerm node, Object data)
+    final public FunctionNode visit(ASTSameTerm node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.SAME_TERM);
     }
 
     @Override
-    public FunctionNode visit(ASTMath node, Object data)
+    final public FunctionNode visit(ASTMath node, Object data)
         throws VisitorException
     {
 
@@ -409,7 +417,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
     /** ASTFunctionCall (IRIRef, ArgList). */
     @Override
-    public Object visit(ASTFunctionCall node, Object data)
+    final public FunctionNode visit(ASTFunctionCall node, Object data)
         throws VisitorException
     {
 
@@ -436,201 +444,201 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
-    public FunctionNode visit(ASTEncodeForURI node, Object data)
+    final public FunctionNode visit(ASTEncodeForURI node, Object data)
         throws VisitorException
     {
         return unary(node, FN.ENCODE_FOR_URI);
     }
 
     @Override
-    public FunctionNode visit(ASTStr node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTStr node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.STR);
     }
 
     @Override
-    public FunctionNode visit(ASTStrDt node, Object data)
+    final public FunctionNode visit(ASTStrDt node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.STR_DT);
     }
 
     @Override
-    public FunctionNode visit(ASTStrStarts node, Object data)
+    final public FunctionNode visit(ASTStrStarts node, Object data)
             throws VisitorException {
         return binary(node, FN.STARTS_WITH);
     }
 
     @Override
-    public FunctionNode visit(ASTStrEnds node, Object data)
+    final public FunctionNode visit(ASTStrEnds node, Object data)
             throws VisitorException {
         return binary(node, FN.ENDS_WITH);
     }
 
     @Override
-    public FunctionNode visit(ASTStrLen node, Object data)
+    final public FunctionNode visit(ASTStrLen node, Object data)
             throws VisitorException {
         return unary(node, FN.STRING_LENGTH);
     }
 
     @Override
-    public FunctionNode visit(ASTUpperCase node, Object data)
+    final public FunctionNode visit(ASTUpperCase node, Object data)
             throws VisitorException {
         return unary(node, FN.UPPER_CASE);
     }
 
     @Override
-    public FunctionNode visit(ASTLowerCase node, Object data)
+    final public FunctionNode visit(ASTLowerCase node, Object data)
             throws VisitorException {
         return unary(node, FN.LOWER_CASE);
     }
 
     @Override
-    public FunctionNode visit(ASTStrLang node, Object data)
+    final public FunctionNode visit(ASTStrLang node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.STR_LANG);
     }
 
     @Override
-    public FunctionNode visit(ASTNow node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTNow node, Object data) throws VisitorException {
         return noneary(node, FunctionRegistry.NOW);
     }
 
     @Override
-    public FunctionNode visit(ASTYear node, Object data)
+    final public FunctionNode visit(ASTYear node, Object data)
             throws VisitorException {
         return unary(node, FN.YEAR_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTMonth node, Object data)
+    final public FunctionNode visit(ASTMonth node, Object data)
             throws VisitorException {
         return unary(node, FN.MONTH_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTDay node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTDay node, Object data) throws VisitorException {
         return unary(node, FN.DAY_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTHours node, Object data)
+    final public FunctionNode visit(ASTHours node, Object data)
             throws VisitorException {
         return unary(node, FN.HOURS_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTMinutes node, Object data)
+    final public FunctionNode visit(ASTMinutes node, Object data)
             throws VisitorException {
         return unary(node, FN.MINUTES_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTSeconds node, Object data)
+    final public FunctionNode visit(ASTSeconds node, Object data)
             throws VisitorException {
         return unary(node, FN.SECONDS_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTTimezone node, Object data)
+    final public FunctionNode visit(ASTTimezone node, Object data)
             throws VisitorException {
         return unary(node, FN.TIMEZONE_FROM_DATETIME);
     }
 
     @Override
-    public FunctionNode visit(ASTTz node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTTz node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.TIMEZONE);
     }
 
     @Override
-    public FunctionNode visit(ASTMD5 node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTMD5 node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.MD5);
     }
 
     @Override
-    public FunctionNode visit(ASTSHA1 node, Object data)
+    final public FunctionNode visit(ASTSHA1 node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.SHA1);
     }
 
     @Override
-    public FunctionNode visit(ASTSHA224 node, Object data)
+    final public FunctionNode visit(ASTSHA224 node, Object data)
         throws VisitorException
  {
         return unary(node, FunctionRegistry.SHA224);
     }
 
     @Override
-    public FunctionNode visit(ASTSHA256 node, Object data)
+    final public FunctionNode visit(ASTSHA256 node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.SHA256);
     }
 
     @Override
-    public FunctionNode visit(ASTSHA384 node, Object data)
+    final public FunctionNode visit(ASTSHA384 node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.SHA384);
     }
 
     @Override
-    public FunctionNode visit(ASTSHA512 node, Object data)
+    final public FunctionNode visit(ASTSHA512 node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.SHA512);
     }
 
     @Override
-    public FunctionNode visit(ASTIRIFunc node, Object data)
+    final public FunctionNode visit(ASTIRIFunc node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IRI);
     }
 
     @Override
-    public FunctionNode visit(ASTLang node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTLang node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.LANG);
     }
 
     @Override
-    public FunctionNode visit(ASTDatatype node, Object data)
+    final public FunctionNode visit(ASTDatatype node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.DATATYPE);
     }
 
     @Override
-    public FunctionNode visit(ASTLangMatches node, Object data)
+    final public FunctionNode visit(ASTLangMatches node, Object data)
             throws VisitorException {
         return binary(node, FunctionRegistry.LANG_MATCHES);
     }
 
     @Override
-    public FunctionNode visit(ASTBound node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTBound node, Object data) throws VisitorException {
         return unary(node, FunctionRegistry.BOUND);
     }
 
     @Override
-    public FunctionNode visit(ASTIsIRI node, Object data)
+    final public FunctionNode visit(ASTIsIRI node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IS_IRI);
     }
 
     @Override
-    public FunctionNode visit(ASTIsBlank node, Object data)
+    final public FunctionNode visit(ASTIsBlank node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IS_BLANK);
     }
 
     @Override
-    public FunctionNode visit(ASTIsLiteral node, Object data)
+    final public FunctionNode visit(ASTIsLiteral node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IS_LITERAL);
     }
 
     @Override
-    public FunctionNode visit(ASTIsNumeric node, Object data)
+    final public FunctionNode visit(ASTIsNumeric node, Object data)
             throws VisitorException {
         return unary(node, FunctionRegistry.IS_NUMERIC);
     }
 
     /** TODO Same functionURI for BNode() and BNode(Literal)? */
     @Override
-    public FunctionNode visit(ASTBNodeFunc node, Object data)
+    final public FunctionNode visit(ASTBNodeFunc node, Object data)
             throws VisitorException {
         if (node.jjtGetNumChildren() == 0) {
             return noneary(node, FunctionRegistry.BNODE);
@@ -639,7 +647,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     }
 
     @Override
-    public FunctionNode visit(ASTRegexExpression node, Object data)
+    final public FunctionNode visit(ASTRegexExpression node, Object data)
             throws VisitorException {
         if (node.jjtGetNumChildren() == 2) {
             return binary(node, FunctionRegistry.REGEX);
@@ -651,50 +659,70 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * Note: EXISTS is basically an ASK subquery.
      * 
      * @see ExistsNode
-     * 
-     *      TODO Do we need to pass in the GroupGraphPattern (in order to have
-     *      the proper scope for the EXISTS's inner graph pattern)?
      */
     @Override
-    public ExistsNode visit(final ASTExistsFunc node, Object data)
+    final public ExistsNode visit(final ASTExistsFunc node, Object data)
             throws VisitorException {
 
-        final VarNode anonvar = context.createAnonVar("-exists-"
-                + context.constantVarID++);
+        final VarNode anonvar = context.createAnonVar("-exists-");
 
-        final GroupGraphPatternBuilder visitor = new GroupGraphPatternBuilder(
-                context);
+        /*
+         * Use a new (empty) graph pattern to prevent the accept of the child
+         * from being attached into the parent's graph pattern context.
+         */
 
-        final GroupNodeBase graphPattern = (GroupNodeBase) node.jjtGetChild(0)
-                .jjtAccept(visitor, null);
+        final GroupGraphPattern parentGP = graphPattern;
 
-        return new ExistsNode(context.lex, anonvar, graphPattern);
+        graphPattern = new GroupGraphPattern();
+
+        final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
+                .jjtGetChild(0).jjtAccept(this/* visitor */, null);
+
+        final ExistsNode fn = new ExistsNode(context.lex, anonvar,
+                innerGraphPattern);
+
+        // Restore the parent's context.
+        graphPattern = parentGP;
+
+        return fn;
 
     }
 
     /**
      * See EXISTS above.
+     * 
+     * @see NotExistsNode
      */
     @Override
-    public NotExistsNode visit(final ASTNotExistsFunc node, Object data)
-        throws VisitorException
-    {
+    final public NotExistsNode visit(final ASTNotExistsFunc node, Object data)
+            throws VisitorException {
 
-        final VarNode anonvar = context.createAnonVar("-exists-"
-                + context.constantVarID++);
+        final VarNode anonvar = context.createAnonVar("-exists-");
 
-        final GroupGraphPatternBuilder visitor = new GroupGraphPatternBuilder(
-                context);
+        /*
+         * Use a new (empty) graph pattern to prevent the accept of the child
+         * from being attached into the parent's graph pattern context.
+         */
 
-        final GroupNodeBase graphPattern = (GroupNodeBase) node.jjtGetChild(0)
-                .jjtAccept(visitor, null);
+        final GroupGraphPattern parentGP = graphPattern;
 
-        return new NotExistsNode(context.lex, anonvar, graphPattern);
-        
+        graphPattern = new GroupGraphPattern();
+
+        final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
+                .jjtGetChild(0).jjtAccept(this/* visitor */, null);
+
+        final NotExistsNode fn = new NotExistsNode(context.lex, anonvar,
+                innerGraphPattern);
+
+        // Restore the parent's context.
+        graphPattern = parentGP;
+
+        return fn;
+
     }
 
     @Override
-    public FunctionNode visit(ASTIf node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTIf node, Object data) throws VisitorException {
         return ternary(node, FunctionRegistry.IF);
     }
 
@@ -705,7 +733,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * @see http://www.openrdf.org/issues/browse/SES-818
      */
     @Override
-    public FunctionNode visit(ASTInfix node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTInfix node, Object data) throws VisitorException {
 
         final Node left = node.jjtGetChild(0);
 
@@ -732,7 +760,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * @see http://www.openrdf.org/issues/browse/SES-818
      */
     @Override
-    public ValueExpressionNode visit(ASTIn node, Object data)
+    final public FunctionNode visit(ASTIn node, Object data)
         throws VisitorException
     {
 
@@ -791,7 +819,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * See IN above.
      */
     @Override
-    public ValueExpressionNode visit(ASTNotIn node, Object data)
+    final public FunctionNode visit(ASTNotIn node, Object data)
             throws VisitorException {
 //
 //        final int nargs = node.jjtGetNumChildren();
@@ -852,7 +880,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * {@link FunctionNode} will bind an anonymous variable.
      */
     @Override
-    public AssignmentNode visit(final ASTGroupCondition node, Object data)
+    final public AssignmentNode visit(final ASTGroupCondition node, Object data)
             throws VisitorException {
         
         final IValueExpressionNode ve = (IValueExpressionNode) node.jjtGetChild(0)
@@ -888,8 +916,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         }
 
         // Wrap with assignment to an anonymous variable.
-        return new AssignmentNode(context.createAnonVar("-groupBy-"
-                + context.constantVarID++), ve);
+        return new AssignmentNode(context.createAnonVar("-groupBy-"), ve);
 
 //        TupleExpr arg = group.getArg();
 //
@@ -930,33 +957,33 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      */
     
     @Override
-    public FunctionNode visit(ASTCount node, Object data)
+    final public FunctionNode visit(ASTCount node, Object data)
             throws VisitorException {
         return aggregate(node, FunctionRegistry.COUNT);
     }
 
     @Override
-    public Object visit(ASTMax node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTMax node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.MAX);
     }
 
     @Override
-    public Object visit(ASTMin node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTMin node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.MIN);
     }
 
     @Override
-    public Object visit(ASTSum node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTSum node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.SUM);
     }
 
     @Override
-    public Object visit(ASTAvg node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTAvg node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.AVERAGE);
     }
 
     @Override
-    public Object visit(ASTSample node, Object data) throws VisitorException {
+    final public FunctionNode visit(ASTSample node, Object data) throws VisitorException {
         return aggregate(node, FunctionRegistry.SAMPLE);
     }
 
@@ -967,7 +994,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
      * Expression for separator rather than a quoted string (per the W3C draft).
      */
     @Override
-    public Object visit(ASTGroupConcat node, Object data)
+    final public FunctionNode visit(ASTGroupConcat node, Object data)
         throws VisitorException
     {
 
