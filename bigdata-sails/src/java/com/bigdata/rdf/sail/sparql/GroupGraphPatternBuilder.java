@@ -41,9 +41,9 @@ import org.openrdf.query.parser.sparql.ast.ASTConstraint;
 import org.openrdf.query.parser.sparql.ast.ASTConstruct;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
+import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
 import org.openrdf.query.parser.sparql.ast.ASTNamedSubqueryInclude;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
-import org.openrdf.query.parser.sparql.ast.ASTSelectQuery;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTVar;
 import org.openrdf.query.parser.sparql.ast.ASTWhereClause;
@@ -126,10 +126,6 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      *         visitor method for the {@link ASTWhereClause}. If the child was a
      *         SubSelect, then the immediate parent is NOT an
      *         {@link ASTWhereClause} and the return value is ignored.
-     * 
-     *         FIXME There is a problem around here when handling a SubSelect
-     *         such that at least the projection clause of the SubSelect is
-     *         being lost. There are 2-3 unit tests which are failing for this.
      */
     @Override
     final public GroupNodeBase<?> visit(final ASTGraphPatternGroup node,
@@ -329,13 +325,14 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
     }
     
     /**
-     * A FILTER.
+     * A FILTER. The filter is attached to the {@link #graphPattern}. However,
+     * it is also returned from this method. The {@link ASTHavingClause} uses
+     * the return value.
      * 
-     * TODO The FILTER is attached to the graph pattern. Who uses the return
-     * value? If no one, then consider a Void return instead.
+     * @return The constraint.
      */
     @Override
-    final public Object visit(final ASTConstraint node, Object data)
+    final public ValueExpressionNode visit(final ASTConstraint node, Object data)
             throws VisitorException {
 
         final ValueExpressionNode valueExpr = (ValueExpressionNode) node
@@ -344,7 +341,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         graphPattern.addConstraint(valueExpr);
 
         return valueExpr;
-        
+
     }
 
     /**

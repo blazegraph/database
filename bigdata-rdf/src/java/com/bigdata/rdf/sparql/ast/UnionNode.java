@@ -30,28 +30,26 @@ public class UnionNode extends GroupNodeBase<IGroupMemberNode> {
 		
 	}
 
-	/**
-	 * This method will throw an IllegalArgumentException if you try to add
-	 * something other than a JoinGroupNode as a child.
-	 */
-	@Override
-	public UnionNode addChild(final IGroupMemberNode child) {
-		
-		// can only add non-optional join groups as children to union
-		if (!(child instanceof JoinGroupNode)) {
-			throw new IllegalArgumentException();
-		}
-		
-		final JoinGroupNode group = (JoinGroupNode) child;
-		
-		// can only add non-optional join groups as children to union
-		if (group.isOptional()) {
-			log.warn("optional tag on child will be ignored");
-		}
-		
-		return (UnionNode) super.addChild(child);
-		
-	}
+    @Override
+    public UnionNode addChild(final IGroupMemberNode child) {
+
+        // can only add non-optional join groups as children to union
+        if (child instanceof JoinGroupNode) {
+
+            final JoinGroupNode group = (JoinGroupNode) child;
+
+            // can only add non-optional join groups as children to union
+            if (group.isOptional()) {
+
+                log.warn("optional tag on child will be ignored");
+
+            }
+
+        }
+
+        return (UnionNode) super.addChild(child);
+
+    }
 	
 	public String toString(final int indent) {
 		

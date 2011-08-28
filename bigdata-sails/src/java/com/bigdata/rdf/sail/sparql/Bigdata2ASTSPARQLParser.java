@@ -48,7 +48,6 @@ import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
 import org.openrdf.query.parser.sparql.StringEscapesProcessor;
 import org.openrdf.query.parser.sparql.UpdateExprBuilder;
 import org.openrdf.query.parser.sparql.ast.ASTPrefixDecl;
-import org.openrdf.query.parser.sparql.ast.ASTQuery;
 import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ASTUpdate;
 import org.openrdf.query.parser.sparql.ast.ASTUpdateContainer;
@@ -60,7 +59,9 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -168,7 +169,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      *         Additional information is available by casting the returned
      *         object to that interface.
      */
-    public ParsedQuery parseQuery(final String queryStr, final String baseURI)
+    public BigdataParsedQuery parseQuery(final String queryStr, final String baseURI)
             throws MalformedQueryException {
         try {
             final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
@@ -177,7 +178,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
 //            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
-//            InfixProcessor.process(qc);
             /*
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
@@ -186,61 +186,74 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             /*
              * Build the bigdata AST from the parse tree.
              */
-            final IQueryNode queryRoot = buildQueryModel(qc, context);
+            final QueryRoot queryRoot = buildQueryModel(qc, context);
 
-            ParsedQuery query;
-
-            // Note: Bigdata override.
             final Properties queryHints = getQueryHints(qc);
+
+            if (queryHints != null) {
+
+                queryRoot.setQueryHints(queryHints);
+
+            }
             
-            // Note: Constructors in if then else are overridden too.
-            ASTQuery queryNode = qc.getQuery();
-//            if (queryNode instanceof ASTSelectQuery) {
-//                query = new BigdataParsedTupleQuery(tupleExpr,
-//                        QueryType.SELECT, queryHints);
-//            }
-//            else if (queryNode instanceof ASTConstructQuery) {
-//                query = new BigdataParsedGraphQuery(tupleExpr, prefixes,
-//                        QueryType.CONSTRUCT, queryHints);
-//            }
-//            else if (queryNode instanceof ASTAskQuery) {
-//                query = new BigdataParsedBooleanQuery(tupleExpr, QueryType.ASK,
-//                        queryHints);
-//            }
-//            else if (queryNode instanceof ASTDescribeQuery) {
-//                query = new BigdataParsedGraphQuery(tupleExpr, prefixes,
-//                        QueryType.DESCRIBE, queryHints);
-//            }
-//            else {
-//                throw new RuntimeException("Unexpected query type: " + queryNode.getClass());
-//            }
-//
-//            // Handle dataset declaration
-//            Dataset dataset = DatasetDeclProcessor.process(qc);
-//            if (dataset != null) {
-//                query.setDataset(dataset);
-//            }
-//
-//            return query;
-            throw new RuntimeException("Finished parse.");
-        }
-        catch (ParseException e) {
+            /*
+             * Handle dataset declaration
+             * 
+             * Note: Filters can be attached in order to impose ACLs on the
+             * query. This has to be done at the application layer at this
+             * point, but it might be possible to extend the grammar for this.
+             * The SPARQL end point would have to be protected from external
+             * access if this were done. Perhaps the better way to do this is to
+             * have the NanoSparqlServer impose the ACL filters. There also
+             * needs to be an authenticated identity to make this work and that
+             * could be done via an integration within the NanoSparqlServer web
+             * application container.
+             */
+            final Dataset dataset = DatasetDeclProcessor.process(qc);
+            
+            if (dataset != null) {
+            
+                queryRoot.setDataset(new DatasetNode(dataset));
+                
+            }
+
+            return new BigdataParsedQuery(queryRoot);
+
+        } catch (ParseException e) {
+        
             throw new MalformedQueryException(e.getMessage(), e);
-        }
-        catch (TokenMgrError e) {
+            
+        } catch (TokenMgrError e) {
+            
             throw new MalformedQueryException(e.getMessage(), e);
+            
         }
+
     }
 
-    private IQueryNode buildQueryModel(final ASTQueryContainer qc,
+    /**
+     * IApplies the {@link BigdataExprBuilder} visitor to interpret the parse
+     * tree, building up a bigdata {@link ASTBase AST}.
+     * 
+     * @param qc
+     *            The root of the parse tree.
+     * @param context
+     *            The context used to interpret that parse tree.
+     * 
+     * @return The root of the bigdata AST generated by interpreting the parse
+     *         tree.
+     * 
+     * @throws MalformedQueryException
+     */
+    private QueryRoot buildQueryModel(final ASTQueryContainer qc,
             final BigdataASTContext context) throws MalformedQueryException {
 
         final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
 
         try {
 
-            return (IQueryNode) qc.jjtAccept(exprBuilder, null);
-            
+            return (QueryRoot) qc.jjtAccept(exprBuilder, null);
+
         } catch (VisitorException e) {
 
             throw new MalformedQueryException(e.getMessage(), e);
@@ -249,6 +262,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
+    /**
+     * TODO This should be handled by an AST visitor. It is just much simpler.
+     * That will also allow us to handle query hints embeded into commetns 
+     */
     static private Properties getQueryHints(final ASTQueryContainer qc)
             throws MalformedQueryException {
         
@@ -285,7 +302,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             }
         }
      
-        return queryHints; // Note: MAY be null.
+        return queryHints;
         
     }
     

@@ -43,33 +43,53 @@ abstract public class QueryBase extends QueryNodeBase {
     private static final long serialVersionUID = 1L;
 
     interface Annotations extends QueryNodeBase.Annotations {
-        
+
+        /**
+         * The {@link QueryType}.
+         */
         String QUERY_TYPE = "queryType";
 
+        /**
+         * The {@link ConstructNode} (optional).
+         */
         String CONSTRUCT = "construct";
 
+        /**
+         * The {@link ProjectionNode} (optional). This is also used for DESCRIBE
+         * queries to capture the list of variables and IRIs which are then used
+         * to rewrite the DESCRIBE query into what amounts to a CONSTRUCT query.
+         * The resulting CONSTRUCT query will have a different
+         * {@link ProjectionNode} suitable for use with the generated
+         * {@link ConstructNode}.
+         */
         String PROJECTION = "projection";
 
+        /**
+         * The top-level {@link IGroupNode} (optional).
+         */
         String WHERE_CLAUSE = "whereClause";
 
+        /**
+         * The {@link GroupByNode} (optional).
+         */
         String GROUP_BY = "groupBy";
 
+        /**
+         * The {@link HavingNode} (optional).
+         */
         String HAVING = "having";
 
+        /**
+         * The {@link OrderByNode} (optional).
+         */
         String ORDER_BY = "orderBy";
 
+        /**
+         * The {@link SliceNode} (optional).
+         */
         String SLICE = "slice";
         
     }
-
-//    private QueryType queryType;
-//    private ConstructNode construct;
-//    private ProjectionNode projection;
-//    private IGroupNode<IGroupMemberNode> whereClause;
-//    private GroupByNode groupBy;
-//    private HavingNode having;
-//    private OrderByNode orderBy;
-//    private SliceNode slice;
 
     /**
      * Constructor is hidden to force people to declare the {@link QueryType}.

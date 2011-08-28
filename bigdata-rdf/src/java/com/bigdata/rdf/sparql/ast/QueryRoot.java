@@ -23,6 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Enumeration;
+import java.util.Properties;
+
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -44,18 +48,27 @@ public class QueryRoot extends QueryBase {
     private static final long serialVersionUID = 1L;
 
     interface Annotations extends QueryBase.Annotations {
-        
+
+        /**
+         * Query hints (optional). When present, this is a {@link Properties}
+         * object.
+         * 
+         * @see QueryHints
+         */
+        String QUERY_HINTS = "queryHints";
+
+        /**
+         * The {@link DatasetNode}.
+         */
         String DATASET = "dataset";
         
+        /**
+         * The {@link NamedSubqueriesNode} (optional).
+         */
         String NAMED_SUBQUERIES = "namedSubqueries";
         
     }
 
-//    private DatasetNode dataset;
-//    
-//    // optional list of subqueries (if any).
-//    private NamedSubqueriesNode namedSubqueries;
-    
     public QueryRoot(final QueryType queryType) {
         
         super(queryType);
@@ -72,13 +85,46 @@ public class QueryRoot extends QueryBase {
         throw new UnsupportedOperationException();
         
     }
+
+    /**
+     * Return the optional query hints.
+     * 
+     * @see QueryHints
+     */
+    public Properties getQueryHints() {
+        
+        return (Properties) getProperty(Annotations.QUERY_HINTS);
+        
+    }
     
+    /**
+     * Set the query hints.
+     * 
+     * @param queryHints
+     *            The query hints (may be <code>null</code>).
+     *            
+     * @see QueryHints
+     */
+    public void setQueryHints(final Properties queryHints) {
+
+        setProperty(Annotations.QUERY_HINTS, queryHints);
+        
+    }
+
+    /**
+     * Set the dataset.
+     * 
+     * @param dataset
+     */
     public void setDataset(final DatasetNode dataset) {
 
         setProperty(Annotations.DATASET, dataset);
 
     }
 
+    /**
+     * Return the dataset.
+     */
     public DatasetNode getDataset() {
 
         return (DatasetNode) getProperty(Annotations.DATASET);
@@ -113,14 +159,39 @@ public class QueryRoot extends QueryBase {
         
         final StringBuilder sb = new StringBuilder();
 
+        final Properties queryHints = getQueryHints();
+        
         final DatasetNode dataset = getDataset();
 
         final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
+
+        if (queryHints != null) {
+
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            final Enumeration<String> eitr = (Enumeration) queryHints
+                    .propertyNames();
+            
+            while(eitr.hasMoreElements()) {
+                
+                final String key = eitr.nextElement();
+
+                sb.append("\n");
+                sb.append(s);
+                sb.append("hint: [" + key + "]=[" + queryHints.getProperty(key)
+                        + "]");
+                
+            }
+            
+        }
         
         if (dataset != null) {
+
             sb.append("\n");
+            
             sb.append(s);
+            
             sb.append(dataset.toString());
+            
         }
 
         if (namedSubqueries != null && !namedSubqueries.isEmpty()) {

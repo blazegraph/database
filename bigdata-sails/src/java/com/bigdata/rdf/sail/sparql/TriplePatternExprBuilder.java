@@ -31,11 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
-import org.openrdf.query.parser.sparql.ast.ASTCollection;
 import org.openrdf.query.parser.sparql.ast.ASTObjectList;
-import org.openrdf.query.parser.sparql.ast.ASTPathAlternative;
-import org.openrdf.query.parser.sparql.ast.ASTPathOneInPropertySet;
-import org.openrdf.query.parser.sparql.ast.ASTPathSequence;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
@@ -121,7 +117,22 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
              * more complex path. This is handled by the aspect of the visitor
              * which deals with property paths, even in the case where the
              * triple pattern is as simple as (var const var).
+             * 
+             * FIXME This code block should be empty when we incorporate support
+             * for property paths from the Sesame visitor methods. It currently
+             * duplicates the code block above and provides handling for the
+             * case when the predicate is a constant.
              */
+
+            @SuppressWarnings("unchecked")
+            final List<TermNode> objectList = (List<TermNode>) propListNode
+                    .getObjectList().jjtAccept(this, null);
+
+            for (TermNode object : objectList) {
+
+                graphPattern.addSP(subject, verbPath, object);
+                
+            }
 
         }
 
@@ -171,25 +182,25 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
     // FIXME Property paths (Implement).
     //
 
-    final public VarNode visit(final ASTCollection node, Object data)
-            throws VisitorException {
-        throw new UnsupportedOperationException("property path");
-    }
-
-    final public VarNode visit(final ASTPathAlternative node, Object data)
-            throws VisitorException {
-        throw new UnsupportedOperationException("property path");
-    }
-
-    final public VarNode visit(final ASTPathOneInPropertySet node, Object data)
-            throws VisitorException {
-        throw new UnsupportedOperationException("property path");
-    }
-
-    final public VarNode visit(final ASTPathSequence node,
-            Object data) throws VisitorException {
-        throw new UnsupportedOperationException("property path");
-    }      
+//    final public VarNode visit(final ASTCollection node, Object data)
+//            throws VisitorException {
+//        throw new UnsupportedOperationException("property path");
+//    }
+//
+//    final public VarNode visit(final ASTPathAlternative node, Object data)
+//            throws VisitorException {
+//        throw new UnsupportedOperationException("property path");
+//    }
+//
+//    final public VarNode visit(final ASTPathOneInPropertySet node, Object data)
+//            throws VisitorException {
+//        throw new UnsupportedOperationException("property path");
+//    }
+//
+//    final public VarNode visit(final ASTPathSequence node,
+//            Object data) throws VisitorException {
+//        throw new UnsupportedOperationException("property path");
+//    }      
 
 //  @Override
 //  public Var visit(ASTCollection node, Object data)

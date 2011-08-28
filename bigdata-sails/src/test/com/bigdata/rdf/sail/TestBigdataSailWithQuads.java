@@ -33,6 +33,7 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.tck.Bigdata2ASTSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLSyntaxTest;
@@ -147,8 +148,14 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
             try {
 
-                // SPARQL parser compliance test.
-                tckSuite.addTest(BigdataSPARQLSyntaxTest.suite());
+                /*
+                 * SPARQL parser compliance test
+                 * 
+                 * TODO Drop the Sesame parser version when we are doing
+                 * integrating the bigdata AST.
+                 */
+                tckSuite.addTest(BigdataSPARQLSyntaxTest.suite()); // sesame parser
+                tckSuite.addTest(Bigdata2ASTSPARQLSyntaxTest.suite()); // bigdata parser
 
                 /*
                  * suite() will call suiteLTSWithPipelineJoins() and then
