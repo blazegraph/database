@@ -304,7 +304,11 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      */
     public ModifiableBOpBase setProperty(final String name, final Object value) {
 
-        annotations.put(name, value);
+        if (value == null) {
+            annotations.remove(name);
+        } else {
+            annotations.put(name, value);
+        }
 
         return this;
         

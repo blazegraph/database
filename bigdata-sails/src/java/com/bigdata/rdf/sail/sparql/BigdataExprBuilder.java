@@ -82,7 +82,6 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SliceNode;
-import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -710,12 +709,6 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
             for (int i = 0; i < nchildren; i++) {
 
-                /*
-                 * Delegate children to the GroupGraphPatternBuilder (it handles
-                 * ASTConstraint, which is also used in FILTER). It will
-                 * delegate to the ValueExprBuilder to handle the inner value
-                 * expression.
-                 */
                 final IValueExpressionNode ve = (IValueExpressionNode) havingClause
                         .jjtGetChild(i).jjtAccept(this, null/* data */);
 

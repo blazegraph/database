@@ -772,9 +772,18 @@ public class FunctionRegistry {
         
 		final Factory f = factories.get(functionURI);
 
-		if (f == null) {
-			throw new IllegalArgumentException("unknown function: " + functionURI);
-		}
+        if (f == null) {
+            /*
+             * TODO If we eagerly translate FunctionNodes in the AST to IV value
+             * expressions then we should probably attach a function which will
+             * result in a runtime type error when it encounters value
+             * expression for a function URI which was not known to the backend.
+             * However, if we handle this translation lazily then this might not
+             * be an issue.
+             */
+            throw new IllegalArgumentException("unknown function: "
+                    + functionURI);
+        }
 
 		return f.create(lex, scalarValues, args);
 

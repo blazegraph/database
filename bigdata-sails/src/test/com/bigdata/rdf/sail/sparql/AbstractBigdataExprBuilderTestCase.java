@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.Map;
 import java.util.Properties;
 
 import junit.framework.AssertionFailedError;
@@ -35,15 +34,8 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
-import org.openrdf.query.parser.sparql.BaseDeclProcessor;
-import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
-import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
-import org.openrdf.query.parser.sparql.StringEscapesProcessor;
-import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
 import org.openrdf.query.parser.sparql.ast.ParseException;
-import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
-import org.openrdf.query.parser.sparql.ast.VisitorException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -222,50 +214,38 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     }
 
     /**
-     * Mocks up the parser and jjtree AST => bigdata AST translator.
+     * Applies the {@link Bigdata2ASTSPARQLParser}.
      */
     protected QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException, TokenMgrError, ParseException {
 
-        final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
-        StringEscapesProcessor.process(qc);
-        BaseDeclProcessor.process(qc, baseURI);
-        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-//        WildcardProjectionProcessor.process(qc); // No. We use "*" as a variable name.
-        BlankNodeVarProcessor.process(qc);
-//        InfixProcessor.process(qc);
-        /*
-         * Batch resolve ASTRDFValue to BigdataValues with their associated
-         * IVs.
-         */
-        new BatchRDFValueResolver(context).process(qc);
-        /*
-         * Build the bigdata AST from the parse tree.
-         */
-        final IQueryNode queryRoot = buildQueryModel(qc, context);
-        return (QueryRoot) queryRoot;
+        return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(queryStr,
+                baseURI).getQueryRoot();
 
-    }
-
-    private IQueryNode buildQueryModel(final ASTQueryContainer qc,
-            final BigdataASTContext context) throws MalformedQueryException {
-
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
-        
-        try {
-        
-            return (IQueryNode) qc.jjtAccept(exprBuilder, null);
-            
-        } catch (VisitorException e) {
-            
-            throw new MalformedQueryException(e.getMessage(), e);
-        
-        }
-        
     }
 
     protected static void assertSameAST(final String queryStr,
             final IQueryNode expected, final IQueryNode actual) {
+
+        if (expected instanceof QueryRoot) {
+            
+            if (((QueryRoot) expected).getQueryHints() == null) {
+                /*
+                 * Note: Discard the query hints since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setQueryHints(null);
+            }
+            
+            if (((QueryRoot) expected).getDataset() == null) {
+                /*
+                 * Note: Discard the data set since the unit tests are not
+                 * building those up from the AST at this time.
+                 */
+                ((QueryRoot) actual).setDataset(null);
+            }
+            
+        }
 
         if (!expected.equals(actual)) {
 
