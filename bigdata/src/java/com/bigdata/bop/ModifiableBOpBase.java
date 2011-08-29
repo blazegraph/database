@@ -361,4 +361,78 @@ public class ModifiableBOpBase extends CoreBaseBOp {
 
     }
     
+//    public ModifiableBOpBase deepCopy() {
+//        
+//        final ModifiableBOpBase bop = (ModifiableBOpBase) this.clone();
+//
+//        deepCopyArgs(bop.args);
+//        
+//        deepCopyAnnotations(bop.annotations);
+//        
+//        return bop;
+//        
+//    }
+//    
+//    /**
+//     * Deep copy the arguments.
+//     * <p>
+//     * Note: As long as we stick to the immutable semantics for bops, we can
+//     * just make a shallow copy of the arguments in the "copy" constructor and
+//     * then modify them within the specific operator constructor before
+//     * returning control to the caller. This would result in less heap churn.
+//     */
+//    private void deepCopyArgs() {
+//        final ArrayList<BOp> tmp = new ArrayList<BOp>(args);
+//        
+//        if (a == BOp.NOARGS || a.length == 0) {
+//            // fast path for zero arity operators.
+//            return BOp.NOARGS;
+//        }
+//        final BOp[] t = new BOp[a.length];
+//        for (int i = 0; i < a.length; i++) {
+//            t[i] = a[i] == null ? null : a[i].clone();
+//        }
+//        return t;
+//    }
+//
+//    /**
+//     * Deep copy the annotations.
+//     * <p>
+//     * Note: This does not know how to deep copy annotations which are not
+//     * {@link BOp}s or immutable objects such as {@link String}s or
+//     * {@link Number}s. Such objects should not be used as annotations.
+//     * 
+//     * @todo When attaching large data sets to a query plan they should be
+//     *       attached using a light weight reference object which allows them to
+//     *       be demanded by a node so deep copy remains a light weight
+//     *       operation. This also has the advantage that the objects are
+//     *       materialized on a node only when they are needed, which keeps the
+//     *       query plan small. Examples would be sending a temporary graph
+//     *       containing an ontology or some conditional assertions with a query
+//     *       plan.
+//     */
+//    static protected Map<String, Object> deepCopy(final Map<String, Object> a) {
+//        if (a == BOp.NOANNS) {
+//            // Fast past for immutable, empty annotations.
+//            return a;
+//        }
+//        // allocate map.
+//        final Map<String, Object> t = new LinkedHashMap<String, Object>(a
+//                .size());
+//        // copy map's entries.
+//        final Iterator<Map.Entry<String, Object>> itr = a.entrySet().iterator();
+//        while (itr.hasNext()) {
+//            final Map.Entry<String, Object> e = itr.next();
+//            if (e.getValue() instanceof BOp) {
+//                // deep copy bop annotations.
+//                t.put(e.getKey(), ((BOp) e.getValue()).clone());
+//            } else {
+//                // shallow copy anything else.
+//                t.put(e.getKey(), e.getValue());
+//            }
+//        }
+//        // return the copy.
+//        return t;
+//    }
+
 }

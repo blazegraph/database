@@ -68,7 +68,7 @@ public class BOpUtility {
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
         return new Striterator(new SingleValueIterator(op))
-                .append(preOrderIterator2(0,op));
+                .append(preOrderIterator2(0, op));
 
     }
 
@@ -103,7 +103,7 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
-                if (child.arity() > 0) {
+                if (child != null && child.arity() > 0) {
 
                     /*
                      * The child is a Node (has children).

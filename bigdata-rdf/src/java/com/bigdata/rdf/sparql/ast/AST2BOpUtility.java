@@ -98,6 +98,11 @@ import com.bigdata.striterator.IKeyOrder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
+ *          variable bindings during query evaluation).
+ *          
+ *          FIXME 
  */
 public class AST2BOpUtility {
 
