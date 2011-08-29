@@ -47,6 +47,13 @@ public class ValueExpressionNode extends ASTBase implements
 
     }
 	
+    @SuppressWarnings({ "rawtypes" })
+    public void setValueExpression(IValueExpression<? extends IV> ve) {
+
+        setProperty(Annotations.VALUE_EXPR, ve);
+
+    }
+    
     public String toString() {
 
         return getClass().getSimpleName() + "(" + getValueExpression() + ")";

@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
@@ -42,9 +44,23 @@ public class VarNode extends TermNode {
 		
 	}
 	
-	public IVariable<IV> getVar() {
-		
-		return (IVariable<IV>) getValueExpression();
+    public IVariable<IV> getVar() {
+
+        final IValueExpression e = getValueExpression();
+
+        if (e instanceof Constant) {
+
+            /*
+             * Note: This is an ugly hack. We should be preserving the original
+             * term and not just the ValueExpression.
+             */
+
+            return (IVariable<IV>) ((Constant) e)
+                    .getProperty(Constant.Annotations.VAR);
+
+        }
+
+        return (IVariable<IV>) e;
 
     }
 

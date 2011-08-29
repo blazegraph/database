@@ -307,6 +307,23 @@ public class BOpBase extends CoreBaseBOp {
         return a;
     }
 
+//    /**
+//     * Deep copy of a {@link BOpBase}.
+//     * 
+//     * @return The deep copy.
+//     */
+//    public BOpBase deepCopy() {
+//        
+//        final BOpBase bop = (BOpBase) this.clone();
+//
+//        bop.args = deepCopy(bop.args);
+//        
+//        bop.annotations = deepCopy(bop.annotations);
+//        
+//        return bop;
+//        
+//    }
+    
     /**
      * Deep copy the arguments.
      * <p>

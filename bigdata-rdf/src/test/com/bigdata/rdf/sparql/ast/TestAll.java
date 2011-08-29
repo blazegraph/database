@@ -59,6 +59,12 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestAST.class);
 
+        /*
+         * Test suite for AST rewrite which replaces a variable bound to a
+         * constant in an input solution with that constant.
+         */
+        suite.addTestSuite(TestASTBindingAssigner.class);
+        
         suite.addTestSuite(TestASTTriplesModeEvaluation.class);
         
         return suite;
