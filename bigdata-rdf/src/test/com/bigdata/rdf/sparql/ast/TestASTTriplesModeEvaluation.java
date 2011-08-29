@@ -5,8 +5,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.TestCase2;
-
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
@@ -14,7 +12,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.XMLSchema;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
@@ -22,19 +19,13 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
-import com.bigdata.rdf.internal.constraints.StrdtBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
@@ -44,7 +35,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestASTTriplesModeEvaluation extends TestCase2 {
+public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase {
 
     /**
      *
@@ -507,10 +498,11 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         }
 
     }
+
     /**
-     * Unit test developed to identify a problem where a query with 3 solutions
-     * passes through those solutions but a query with one does not.
-     *
+     * Unit test developed to demonstrate a problem where the incorrect
+     * materialization requirements are computed.
+     * 
      * @throws Exception
      */
     public void testProjectedGroupByWithNestedVars() throws Exception {
@@ -529,7 +521,6 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
             final Literal one= new LiteralImpl("1",XMLSchema.INT);
             final Literal two= new LiteralImpl("2",XMLSchema.INT);
             final Literal three= new LiteralImpl("three",XMLSchema.STRING);
-
 
             // add statements using the URIs declared above.
             store.addStatement(x, rdfType, C);
@@ -619,44 +610,21 @@ public class TestASTTriplesModeEvaluation extends TestCase2 {
         }
 
     }
+
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!
         final Properties properties = (Properties) super.getProperties().clone();
 
-//        // turn on quads.
-//        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        // not quads.
+        properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
 
         // override the default vocabulary.
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
                 NoVocabulary.class.getName());
 
-        // turn off axioms.
-        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
-                NoAxioms.class.getName());
-
-        // no persistence.
-        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-                BufferMode.Transient.toString());
-        
         return properties;
-
+        
     }
-
-    protected AbstractTripleStore getStore(final Properties properties) {
-
-        final String namespace = "kb";
-
-        // create/re-open journal.
-        final Journal journal = new Journal(properties);
-
-        final LocalTripleStore lts = new LocalTripleStore(journal, namespace,
-                ITx.UNISOLATED, properties);
-
-        lts.create();
-
-        return lts;
-
-    }
-
+    
 }

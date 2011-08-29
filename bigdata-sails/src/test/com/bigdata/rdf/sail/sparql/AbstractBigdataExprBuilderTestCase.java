@@ -245,6 +245,13 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
                 ((QueryRoot) actual).setDataset(null);
             }
             
+            if (((QueryRoot) expected).getQueryString() == null) {
+                /*
+                 * Note: Discard the query string since the unit tests are not
+                 * setting that attribute at this time.
+                 */
+                ((QueryRoot) actual).setQueryString(null);
+            }
         }
 
         if (!expected.equals(actual)) {
