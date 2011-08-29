@@ -65,7 +65,11 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestASTBindingAssigner.class);
         
+        // Unit tests for query evaluation written to the AST layer.
         suite.addTestSuite(TestASTTriplesModeEvaluation.class);
+
+        // Unit tests for sub-query evaluation written to the AST layer.
+        suite.addTestSuite(TestSubqueryEvaluation.class);
         
         return suite;
         
