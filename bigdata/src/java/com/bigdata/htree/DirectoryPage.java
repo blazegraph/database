@@ -149,7 +149,10 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         if (bucketPage.isPersistent()) {
             htree.deleteNodeOrLeaf(bucketPage.getIdentity());
         }
+        
+        // remove original page and correct leaf count
         bucketPage.delete();
+		((HTree) htree).nleaves--;
 	}
 
 	/**
@@ -1995,7 +1998,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		} else {
 			final BucketPage bp = new BucketPage((HTree) htree, depth);
 			bp.parent = (Reference<DirectoryPage>) self;
-			((HTree) htree).nleaves++; // Note: only +1 since we will delete the oldPage.
+			((HTree) htree).nleaves++;
 
 			for (int s = 0; s < length; s++) {
 				if (isReadOnly())
