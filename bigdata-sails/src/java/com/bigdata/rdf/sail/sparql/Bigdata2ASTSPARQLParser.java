@@ -175,7 +175,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
             StringEscapesProcessor.process(qc);
             BaseDeclProcessor.process(qc, baseURI);
-            final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+            /*final Map<String, String> prefixes = */PrefixDeclProcessor.process(qc);
 //            WildcardProjectionProcessor.process(qc);
             BlankNodeVarProcessor.process(qc);
             /*
@@ -188,6 +188,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              */
             final QueryRoot queryRoot = buildQueryModel(qc, context);
 
+            // Set the query string on the AST.
+            queryRoot.setQueryString(queryStr);
+            
             final Properties queryHints = getQueryHints(qc);
 
             if (queryHints != null) {

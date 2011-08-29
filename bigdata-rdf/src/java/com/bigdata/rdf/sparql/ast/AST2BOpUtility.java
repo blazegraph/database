@@ -14,6 +14,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
+import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
+import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
+import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
@@ -131,12 +138,48 @@ public class AST2BOpUtility {
      * replaceValues(dataset, tupleExpr, bindings);
      * </pre>
      * 
-     * FIXME We should be able to bind a constant on a Variable in order to do
-     * the BindingAssigner optimization and in order to do the optimization for
-     * a named graph access pattern in which there is only one graph in the db
-     * which could be visited so it gets bound to a constant (a bug reported
-     * by matt). [We can perhaps do this using an AssignmentNode which bind a
-     * ConstantNode onto a VarNode?]
+     * FIXME {@link BindingAssigner}. Propagates bindings from an input solution
+     * into the query, replacing variables with constants while retaining the
+     * constant/variable association. See {@link ASTBindingAssigner}.
+     * 
+     * FIXME {@link ConstantOptimizer}. Rewrites the query replacing any aspect
+     * which can be statically evaluated to a constant with that constant. The
+     * implementation considers variables, functions, and constants.
+     * 
+     * FIXME {@link CompareOptimizer}. Replaces Compare with SameTerm whenever
+     * possible. (I think that we handle this in the {@link FunctionRegistry},
+     * but that should be verified and documented here.
+     * 
+     * FIXME {@link ConjunctiveConstraintSplitter}. Takes a FILTER with an AND
+     * of constraints and replaces it with one filter per left or right hand
+     * side of the AND. This flattens the value expression hierarchy. It also
+     * might allow us to reject some solutions earlier in the pipeline since we
+     * do not have to wait for all of the variables to become bound and we can
+     * potentially evaluate some of the individual constraints earlier than
+     * others.
+     * 
+     * FIXME {@link SameTermFilterOptimizer}. Optimizes SameTerm(X,Y) by
+     * renaming one of the variables to the other variable. Optimizes
+     * SameTerm(X,aURI) by assigning the constant to the variable.
+     * 
+     * FIXME {@link FilterOptimizer}. Pushes filters as far down in the query
+     * model as possible.
+     * 
+     * FIXME Sesame has define a bunch of IQueryOptimizers that we are not using
+     * (even before this refactor). Many of them apply to their SQL backends. A
+     * few might be relevant to us:
+     * <ul>
+     * <li>{@link DisjunctiveConstraintOptimizer} - moves SameTerm closer to
+     * joins for queries involving UNIONs.</li>
+     * <li>{@link IterativeEvaluationOptimizer} - ???</li>
+     * <li>{@link OrderLimitOptimizer} - moves the ORDER node above the
+     * PROJECTION node. [This optimizer does not make sense for us as we handle
+     * the relative position of the ORDER_BY and the PROJECTION when generating
+     * the pipeline, not in the AST.]</li>
+     * <li>{@link QueryModelNormalizer} - various simplifications of their tuple
+     * expression query model. I am not sure whether or not there is anything
+     * here we could leverage.</li>
+     * </ul>
      * 
      * TODO Optimize away empty join groups and optimize those containing just a
      * single child by lifting the child into the parent whenever possible.

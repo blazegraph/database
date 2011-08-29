@@ -50,6 +50,11 @@ public class QueryRoot extends QueryBase {
     interface Annotations extends QueryBase.Annotations {
 
         /**
+         * The original query from which this AST was generated.
+         */
+        String QUERY_STRING = "queryString";
+        
+        /**
          * Query hints (optional). When present, this is a {@link Properties}
          * object.
          * 
@@ -85,7 +90,26 @@ public class QueryRoot extends QueryBase {
         throw new UnsupportedOperationException();
         
     }
+    
+    /**
+     * Return the original query from which this AST model was generated.
+     */
+    public String getQueryString() {
 
+        return (String) getProperty(Annotations.QUERY_STRING);
+
+    }
+
+    /**
+     * Set the query string used to generate the AST model.
+     * @param queryString The query string.
+     */
+    public void setQueryString(String queryString) {
+        
+        setProperty(Annotations.QUERY_STRING, queryString);
+        
+    }
+    
     /**
      * Return the optional query hints.
      * 
