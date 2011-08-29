@@ -47,6 +47,9 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
     interface Annotations extends FunctionNode.Annotations {
 
+        /**
+         * The graph pattern associated with the subquery.
+         */
         String GRAPH_PATTERN = "graphPattern";
 
     }
