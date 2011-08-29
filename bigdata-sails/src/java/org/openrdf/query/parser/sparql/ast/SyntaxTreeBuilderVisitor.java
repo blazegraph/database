@@ -17,6 +17,7 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTDescribeQuery node, Object data) throws VisitorException;
   public Object visit(ASTDescribe node, Object data) throws VisitorException;
   public Object visit(ASTAskQuery node, Object data) throws VisitorException;
+  public Object visit(ASTNamedSubquery node, Object data) throws VisitorException;
   public Object visit(ASTDatasetClause node, Object data) throws VisitorException;
   public Object visit(ASTWhereClause node, Object data) throws VisitorException;
   public Object visit(ASTGroupClause node, Object data) throws VisitorException;
@@ -28,6 +29,7 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTOffset node, Object data) throws VisitorException;
   public Object visit(ASTGraphPatternGroup node, Object data) throws VisitorException;
   public Object visit(ASTBasicGraphPattern node, Object data) throws VisitorException;
+  public Object visit(ASTNamedSubqueryInclude node, Object data) throws VisitorException;
   public Object visit(ASTOptionalGraphPattern node, Object data) throws VisitorException;
   public Object visit(ASTGraphGraphPattern node, Object data) throws VisitorException;
   public Object visit(ASTUnionGraphPattern node, Object data) throws VisitorException;
@@ -51,6 +53,7 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTOr node, Object data) throws VisitorException;
   public Object visit(ASTAnd node, Object data) throws VisitorException;
   public Object visit(ASTCompare node, Object data) throws VisitorException;
+  public Object visit(ASTInfix node, Object data) throws VisitorException;
   public Object visit(ASTMath node, Object data) throws VisitorException;
   public Object visit(ASTNot node, Object data) throws VisitorException;
   public Object visit(ASTNumericLiteral node, Object data) throws VisitorException;
@@ -135,4 +138,4 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTInsertClause node, Object data) throws VisitorException;
   public Object visit(ASTModify node, Object data) throws VisitorException;
 }
-/* JavaCC - OriginalChecksum=5ff9c1affabb7a887a28ebe55ab39c3a (do not edit this line) */
+/* JavaCC - OriginalChecksum=1c2c1e5c02272015cb03ca6ddc92dae8 (do not edit this line) */
