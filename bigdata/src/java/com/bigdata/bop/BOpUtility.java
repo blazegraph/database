@@ -35,6 +35,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 
 import org.apache.log4j.Logger;
 
@@ -46,6 +47,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IContextMgr;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -57,7 +59,35 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BOpUtility {
 
-    private static transient final Logger log = Logger
+    static private class NodeOrAttribute implements INodeOrAttribute {
+    	final BOp bop;
+    	final NV nv;
+    	
+		public NodeOrAttribute(BOp bop) {
+			this.bop = bop;
+			this.nv = null;
+		}
+
+		public NodeOrAttribute(NV nv) {
+			this.bop = null;
+			this.nv = nv;
+		}
+
+		public BOp getNode() {
+			return bop;
+		}
+
+		public NV getValue() {
+			return nv;
+		}
+
+		public boolean isNode() {
+			return bop != null;
+		}
+
+	}
+
+	private static transient final Logger log = Logger
             .getLogger(BOpUtility.class);
     
     /**
@@ -67,17 +97,27 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
+        return preOrderIterator(op, null);
+
+    }
+    
+    /**
+     * Passes in the Stack context to be maintained by the preOrderIterator
+     */
+    public static Iterator<BOp> preOrderIterator(final BOp op, final Stack<INodeOrAttribute> context) {
+
         return new Striterator(new SingleValueIterator(op))
-                .append(preOrderIterator2(0, op));
+                .append(preOrderIterator2(0,op, context));
 
     }
 
     /**
      * Visits the children (recursively) using pre-order traversal, but does
      * NOT visit this node.
+     * @param stack 
      */
     @SuppressWarnings("unchecked")
-	static private Iterator<BOp> preOrderIterator2(final int depth, final BOp op) {
+	static private Iterator<BOp> preOrderIterator2(final int depth, final BOp op, final Stack<INodeOrAttribute> context) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -103,7 +143,7 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
-                if (child != null && child.arity() > 0) {
+                if (child.arity() > 0) {
 
                     /*
                      * The child is a Node (has children).
@@ -117,7 +157,7 @@ public class BOpUtility {
                             new SingleValueIterator(child));
 
                     // append this node in post-order position.
-                    itr.append(preOrderIterator2(depth + 1, child));
+                    itr.append(preOrderIterator2(depth + 1, child, context));
 
                     return itr;
 
@@ -135,6 +175,26 @@ public class BOpUtility {
                 }
 
             }
+            
+            /**
+             * Callback from Expanderator when the iteration from the previous
+             * call to expand is complete.
+             */
+            public void popContext() {
+            	if (context != null) {
+            		context.pop();
+            	}
+            }
+            
+            public void pushContext(Object obj) {
+               	if (context != null) {
+            		context.add(new NodeOrAttribute((BOp) obj));
+            	}         	         	
+            }
+            
+            protected IContextMgr getContextMgr() {
+            	return this;
+            }
         });
 
     }
@@ -146,7 +206,14 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     public static Iterator<BOp> postOrderIterator(final BOp op) {
 
-        return new Striterator(postOrderIterator2(op))
+        return postOrderIterator(op, null);
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Iterator<BOp> postOrderIterator(final BOp op, final Stack<INodeOrAttribute> context) {
+
+        return new Striterator(postOrderIterator2(op, context))
                 .append(new SingleValueIterator(op));
 
     }
@@ -154,9 +221,10 @@ public class BOpUtility {
     /**
      * Visits the children (recursively) using post-order traversal, but does
      * NOT visit this node.
+     * @param context 
      */
     @SuppressWarnings("unchecked")
-    static private Iterator<BOp> postOrderIterator2(final BOp op) {
+    static private Iterator<BOp> postOrderIterator2(final BOp op, final Stack<INodeOrAttribute> context) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -187,7 +255,7 @@ public class BOpUtility {
                      */
 
                     final Striterator itr = new Striterator(
-                            postOrderIterator2(child));
+                            postOrderIterator2(child, context));
 
                     // append this node in post-order position.
                     itr.append(new SingleValueIterator(child));
@@ -204,6 +272,26 @@ public class BOpUtility {
                     return new SingleValueIterator(child);
 
                 }
+            }
+            
+            /**
+             * Callback from Expanderator when the iteration from the previous
+             * call to expand is complete.
+             */
+            public void popContext() {
+            	if (context != null) {
+            		context.pop();
+            	}
+            }
+            
+            public void pushContext(Object obj) {
+               	if (context != null) {
+            		context.add(new NodeOrAttribute((BOp) obj));
+            	}         	         	
+            }
+            
+            protected IContextMgr getContextMgr() {
+            	return this;
             }
         });
 
@@ -265,6 +353,10 @@ public class BOpUtility {
 //        
 //    }
     
+    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op) {
+    	return preOrderIteratorWithAnnotations(op, null);
+    }
+   
     /**
      * Recursive pre-order traversal of the operator tree with visitation of all
      * operator annotations. The annotations for an operator are visited before
@@ -278,7 +370,7 @@ public class BOpUtility {
      * @return The iterator.
      */
     @SuppressWarnings("unchecked")
-    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op) {
+    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op, final Stack<INodeOrAttribute> context) {
        
         return new Striterator(preOrderIterator(op)).addFilter(new Expander(){
 
@@ -303,7 +395,27 @@ public class BOpUtility {
 
                     @Override
                     protected Iterator expand(final Object ann) {
-                        return preOrderIteratorWithAnnotations((BOp) ann);
+                        return preOrderIteratorWithAnnotations((BOp) ann, context);
+                    }
+                    
+                    /**
+                     * Callback from Expanderator when the iteration from the previous
+                     * call to expand is complete.
+                     */
+                    public void popContext() {
+                    	if (context != null) {
+                    		context.pop();
+                    	}
+                    }
+                    
+                    public void pushContext(Object obj) {
+                       	if (context != null) {
+                    		context.add(new NodeOrAttribute((BOp) obj));
+                    	}         	         	
+                    }
+                    
+                    protected IContextMgr getContextMgr() {
+                    	return this;
                     }
                 });
                 
@@ -903,8 +1015,6 @@ public class BOpUtility {
 
     /**
      * Copy binding sets from the source to the sink(s).
-     * <p>
-     * Note: The caller is responsible for flush()ing the sink(s).
      * 
      * @param source
      *            The source.

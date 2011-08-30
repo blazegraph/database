@@ -33,9 +33,14 @@ import java.util.Iterator;
  * Used with Expanderator by Striterator to expand returned objects.
  *
  * Derivations must implement expand method.
+ * 
+ * If an Expander wants to track the context it should return a non-null
+ * value for getContextMgr.  This ensures that the Expanderator will not
+ * optimize itself away in a tail recursion operation that would prevent
+ * the correct protocol implementation.
  */
 
-public abstract class Expander extends FilterBase {
+public abstract class Expander extends FilterBase implements IContextMgr {
 
 	public Expander()	{	}
 
@@ -49,4 +54,19 @@ public abstract class Expander extends FilterBase {
     // -------------------------------------------------------------
 
     protected abstract Iterator expand(Object obj);
+
+    /**
+     * callback to implementation when expansion is complete
+     */
+	public void popContext() {
+		// NOP
+	}
+	
+	public void pushContext(Object context) {
+		// NOP
+	}
+	
+	protected IContextMgr getContextMgr() {
+		return null;
+	}
 }
