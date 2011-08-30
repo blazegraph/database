@@ -1,6 +1,10 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -13,14 +17,29 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 public abstract class TermNode extends ValueExpressionNode {
 
-	/**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+    /**
+	 * 
+	 */
+	private static final long serialVersionUID = 2050144811725774174L;
 
-    public TermNode(final IVariableOrConstant<IV> term) {
+//    interface Annotations extends ASTBase.Annotations {
+//  	  
+//        /**
+//         * The term's value, if it has one.
+//         */
+//        String VAL = TermNode.class.getName() + ".val";
+//        
+//        /**
+//         * The term's var name, if it has one.
+//         */
+//        String VAR = TermNode.class.getName() + ".var";
+//
+//    }
+
+
+	public TermNode(final BOp[] args, final Map<String, Object> anns) {
 		
-		super(term);
+		super(args, anns);
 		
 	}
 	
@@ -31,26 +50,39 @@ public abstract class TermNode extends ValueExpressionNode {
 	public IVariableOrConstant<IV> getValueExpression() {
 		
 		return (IVariableOrConstant<IV>) super.getValueExpression();
+		
 	}
+	
+//	public IVariable<IV> getVar() {
+//		
+//		return (IVariable<IV>) getProperty(TermNode.Annotations.VAR);
+//		
+//	}
+//	
+//	public IConstant<IV> getVal() {
+//		
+//		return (IConstant<IV>) getProperty(TermNode.Annotations.VAL);
+//		
+//	}
 	
     public BigdataValue getValue() {
-		
-		final IVariableOrConstant<IV> ve = getValueExpression();
-		
-		if (ve instanceof IConstant) {
-			
-			final IV iv = ((IConstant<IV>) ve).get();
-			
-			if (iv.hasValue()) {
-				
-				return iv.getValue();
-				
-			}
-			
-		}
-		
-		return null;
-		
-	}
 	
+    	final IVariableOrConstant<IV> val = getValueExpression();
+    	
+    	if (val != null && val instanceof IConstant) {
+    		
+    		final IV iv = val.get();
+    		
+    		if (iv.hasValue()) {
+    			
+    			return iv.getValue();
+    			
+    		}
+    		
+    	}
+    	
+    	return null;
+
+    }
+    
 }

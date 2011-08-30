@@ -224,10 +224,10 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements IAggregate<IV> {
         }
 
         if (aggregated == null)
-            return DummyConstantNode.dummyIV(vf.createLiteral(""));
+            return DummyConstantNode.toDummyIV(vf.createLiteral(""));
 
         return DummyConstantNode
-                .dummyIV(vf.createLiteral(aggregated.toString()));
+                .toDummyIV(vf.createLiteral(aggregated.toString()));
 
     }
 

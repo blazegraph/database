@@ -1,8 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.bop.Constant;
-import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 
@@ -19,51 +19,34 @@ import com.bigdata.rdf.internal.IV;
 public class VarNode extends TermNode {
 
     /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
+	 * 
+	 */
+	private static final long serialVersionUID = 2368082533964951789L;
 
-    //    private boolean anonymous;
+	
+	//    private boolean anonymous;
     interface Annotations extends TermNode.Annotations {
         
-        String ANONYMOUS = "anonymous";
+        String ANONYMOUS = VarNode.class.getName() + ".anonymous";
         
         boolean DEFAULT_ANONYMOUS = false;
         
     }
     
+    public VarNode(final String var) {
+    	
+    	this(Var.var(var));
+    	
+    }
+    
 	public VarNode(final IVariable<IV> var) {
 		
-		super(var);
+		super(BOpBase.NOARGS, null);
+		
+		setValueExpression(var);
 		
 	}
 	
-	public VarNode(final String var) {
-		
-		super(Var.var(var));
-		
-	}
-	
-    public IVariable<IV> getVar() {
-
-        final IValueExpression e = getValueExpression();
-
-        if (e instanceof Constant) {
-
-            /*
-             * Note: This is an ugly hack. We should be preserving the original
-             * term and not just the ValueExpression.
-             */
-
-            return (IVariable<IV>) ((Constant) e)
-                    .getProperty(Constant.Annotations.VAR);
-
-        }
-
-        return (IVariable<IV>) e;
-
-    }
-
     /**
      * Return <code>true</code> if this is an anonymous variable (anonymous
      * variables are introduced during a rewrite of the query in which blank
@@ -94,8 +77,18 @@ public class VarNode extends TermNode {
 	 */
 	public boolean isWildcard() {
 
-        return ((Var<?>) getValueExpression()).isWildcard();
+		return getValueExpression().isWildcard();
 	    
+	}
+	
+	/**
+	 * Strengthen return type.
+	 */
+	@Override
+	public IVariable<IV> getValueExpression() {
+		
+		return (IVariable<IV>) super.getValueExpression();
+		
 	}
 	
     /**
@@ -106,7 +99,7 @@ public class VarNode extends TermNode {
     @Override
     public String toString() {
 
-        return "VarNode(" + getVar() + ")"
+        return "VarNode(" + getValueExpression() + ")"
                 + (isAnonymous() ? "[anonymous]" : "");
 
     }

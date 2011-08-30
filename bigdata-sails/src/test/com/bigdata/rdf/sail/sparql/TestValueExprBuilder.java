@@ -118,7 +118,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.ADD,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -155,7 +155,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.LT,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -308,7 +308,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.COUNT,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -342,7 +342,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.COUNT,//
                                     Collections.singletonMap(
                                             AggregateBase.Annotations.DISTINCT,
@@ -379,7 +379,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.COUNT,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -413,7 +413,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.COUNT,//
                                     Collections.singletonMap(
                                             AggregateBase.Annotations.DISTINCT,
@@ -451,7 +451,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.ADD,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -486,7 +486,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.COALESCE,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -522,7 +522,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.IF,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -558,7 +558,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.REGEX,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -593,7 +593,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.REGEX,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -633,7 +633,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.IN,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args
@@ -671,7 +671,7 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
             projection.addProjectionExpression(//
                     new AssignmentNode(//
                             new VarNode("x"), //
-                            new FunctionNode(lex, //
+                            new FunctionNode( //
                                     FunctionRegistry.IN,//
                                     null, // scalarValues
                                     new ValueExpressionNode[] {// args

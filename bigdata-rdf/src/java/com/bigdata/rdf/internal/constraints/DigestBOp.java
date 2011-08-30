@@ -161,7 +161,7 @@ public class DigestBOp extends AbstractLiteralBOp {
                     md.update(bytes);
                     byte[] digest = md.digest();
                     final BigdataLiteral str = vf.createLiteral(toHexString(digest));
-                    return DummyConstantNode.dummyIV(str);
+                    return DummyConstantNode.toDummyIV(str);
                 } catch (Exception e) {
                     throw new SparqlTypeErrorException();
                 }

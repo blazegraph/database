@@ -111,7 +111,7 @@ public class StrBOp extends IVValueExpression<IV>
         	BigdataValueFactoryImpl.getInstance(namespace);
 
         if (iv.isInline() && !iv.isExtension()) {
-            return DummyConstantNode.dummyIV(vf.createLiteral(iv
+            return DummyConstantNode.toDummyIV(vf.createLiteral(iv
                     .getInlineValue().toString()));
         }
 
@@ -119,7 +119,7 @@ public class StrBOp extends IVValueExpression<IV>
             // return new simple literal using URI label
             final URI uri = (URI) iv.getValue();
             final BigdataLiteral str = vf.createLiteral(uri.toString());
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         } else if (iv.isLiteral()) {
             final BigdataLiteral lit = (BigdataLiteral) iv.getValue();
             if (lit.getDatatype() == null && lit.getLanguage() == null) {
@@ -129,7 +129,7 @@ public class StrBOp extends IVValueExpression<IV>
         	else {
                 // else return new simple literal using Literal.getLabel
                 final BigdataLiteral str = vf.createLiteral(lit.getLabel());
-                return DummyConstantNode.dummyIV(str);
+                return DummyConstantNode.toDummyIV(str);
             }
         } else {
             throw new SparqlTypeErrorException();

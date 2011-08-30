@@ -2,7 +2,6 @@ package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
  * An AST node which models a value expression.
@@ -10,13 +9,14 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 public interface IValueExpressionNode {
 
     /**
-     * Return the {@link IValueExpression}.
-     * 
-     * @deprecated This needs to be replaced by the conversion of the
-     *             {@link IValueExpressionNode}s by {@link AST2BOpUtility},
-     *             which will have to provide sufficient context to resolve the
-     *             {@link LexiconRelation}'s namespace as well.
+     * Return the cached {@link IValueExpression} if it exists on the node,
+     * otherwise return null.
      */
 	IValueExpression<? extends IV> getValueExpression();
+	
+	/**
+	 * Cache the translated value expression on the node.
+	 */
+	void setValueExpression(final IValueExpression<? extends IV> ve);
 	
 }

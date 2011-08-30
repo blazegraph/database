@@ -8,8 +8,8 @@ import com.bigdata.rdf.internal.IV;
 /**
  * AST node models the assignment of a value expression to a variable.
  */
-public class AssignmentNode extends GroupMemberValueExpressionNodeBase implements
-        IValueExpressionNode {
+public class AssignmentNode extends GroupMemberValueExpressionNodeBase 
+		implements IValueExpressionNode {
 
     /**
      * 
@@ -37,7 +37,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase implement
 
     public IVariable<IV> getVar() {
 
-        return getVarNode().getVar();
+        return getVarNode().getValueExpression();
         
     }
 
@@ -52,6 +52,12 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase implement
         return getValueExpressionNode().getValueExpression();
         
     }
+    
+    public void setValueExpression(final IValueExpression<? extends IV> ve) {
+    	
+    	getValueExpressionNode().setValueExpression(ve);
+    	
+    }
 
     public String toString(final int indent) {
 
@@ -65,7 +71,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase implement
 
             sb.append("?");
             
-            sb.append(var.getVar().toString());
+            sb.append(var.getValueExpression().toString());
             
         } else {
             

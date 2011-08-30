@@ -62,57 +62,57 @@ public class ASTBindingAssigner implements IASTOptimizer {
             final IQueryNode queryNode, final DatasetNode dataset,
             final IBindingSet[] bindingSet) {
 
-        if (bindingSet == null || bindingSet.length > 1) {
-            // used iff there is only one input solution.
-            return queryNode;
-        }
-
-        if (!(queryNode instanceof QueryRoot))
-            return queryNode;
-
-        // consider only the first solution.
-        final IBindingSet bset = bindingSet[0];
-
-        final QueryRoot queryRoot = (QueryRoot) queryNode;
-
-        // Only transform the WHERE clause.
-        final IGroupNode<?> whereClause = queryRoot.getWhereClause();
-
-        if (whereClause == null)
-            return queryNode;
-
-        final Iterator<BOp> itr = BOpUtility
-                .preOrderIterator((BOp) whereClause);
-
-        while (itr.hasNext()) {
-
-            final BOp node = (BOp) itr.next();
-
-            if (!(node instanceof VarNode))
-                continue;
-
-            final VarNode varNode = (VarNode) node;
-
-            final IVariable<IV> var = varNode.getVar();
-
-            if (bset.isBound(var)) {
-
-                /*
-                 * Replace the variable with the constant from the binding set,
-                 * but preserve the reference to the variable on the Constant.
-                 */
-
-                final IV asBound = (IV) bset.get(var).get();
-
-                if (log.isInfoEnabled())
-                    log.info("Replacing: var=" + var + " with " + asBound
-                            + " (" + asBound.getClass() + ")");
-
-                varNode.setValueExpression(new Constant<IV>(var, asBound));
-
-            }
-
-        }
+//        if (bindingSet == null || bindingSet.length > 1) {
+//            // used iff there is only one input solution.
+//            return queryNode;
+//        }
+//
+//        if (!(queryNode instanceof QueryRoot))
+//            return queryNode;
+//
+//        // consider only the first solution.
+//        final IBindingSet bset = bindingSet[0];
+//
+//        final QueryRoot queryRoot = (QueryRoot) queryNode;
+//
+//        // Only transform the WHERE clause.
+//        final IGroupNode<?> whereClause = queryRoot.getWhereClause();
+//
+//        if (whereClause == null)
+//            return queryNode;
+//
+//        final Iterator<BOp> itr = BOpUtility
+//                .preOrderIterator((BOp) whereClause);
+//
+//        while (itr.hasNext()) {
+//
+//            final BOp node = (BOp) itr.next();
+//
+//            if (!(node instanceof VarNode))
+//                continue;
+//
+//            final VarNode varNode = (VarNode) node;
+//
+//            final IVariable<IV> var = varNode.getVar();
+//
+//            if (bset.isBound(var)) {
+//
+//                /*
+//                 * Replace the variable with the constant from the binding set,
+//                 * but preserve the reference to the variable on the Constant.
+//                 */
+//
+//                final IV asBound = (IV) bset.get(var).get();
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Replacing: var=" + var + " with " + asBound
+//                            + " (" + asBound.getClass() + ")");
+//
+//                varNode.setValueExpression(new Constant<IV>(var, asBound));
+//
+//            }
+//
+//        }
 
         return queryNode;
 

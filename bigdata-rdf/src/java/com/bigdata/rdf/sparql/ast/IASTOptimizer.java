@@ -51,7 +51,7 @@ public interface IASTOptimizer {
      * 
      * @return The optimized AST.
      */
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
+    IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             DatasetNode dataset, IBindingSet[] bindingSet);
 
 }

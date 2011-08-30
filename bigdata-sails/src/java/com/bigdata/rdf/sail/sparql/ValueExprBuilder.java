@@ -171,7 +171,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     protected FunctionNode noneary(final SimpleNode node, final URI functionURI)
             throws VisitorException {
 
-        return new FunctionNode(context.lex, functionURI,
+        return new FunctionNode(functionURI,
                 null/* scalarValues */, new ValueExpressionNode[] {});
 
     }
@@ -183,7 +183,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     protected FunctionNode unary(final SimpleNode node, final URI functionURI)
             throws VisitorException {
 
-        return new FunctionNode(context.lex, functionURI,
+        return new FunctionNode(functionURI,
                 null/* scalarValues */,
                 new ValueExpressionNode[] { left(node) });
 
@@ -196,7 +196,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     protected FunctionNode binary(final SimpleNode node, final URI functionURI)
             throws VisitorException {
 
-        return new FunctionNode(context.lex, functionURI,
+        return new FunctionNode(functionURI,
                 null/* scalarValues */, new ValueExpressionNode[] { left(node),
                         right(node) });
 
@@ -209,7 +209,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     protected FunctionNode ternary(final SimpleNode node, final URI functionURI)
             throws VisitorException {
 
-        return new FunctionNode(context.lex, functionURI,
+        return new FunctionNode(functionURI,
                 null/* scalarValues */, new ValueExpressionNode[] {
                         left(node),
                         right(node),
@@ -237,7 +237,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        return new FunctionNode(context.lex, FunctionRegistry.COALESCE,
+        return new FunctionNode(FunctionRegistry.COALESCE,
                 null/* scalarValues */, args);
 
     }
@@ -260,12 +260,12 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
              * Note: The wildcard is dropped by openrdf.
              */
             
-            return new FunctionNode(context.lex, functionURI, scalarValues,
+            return new FunctionNode(functionURI, scalarValues,
                     new ValueExpressionNode[] { new VarNode("*") });
 
         }
 
-        return new FunctionNode(context.lex, functionURI, scalarValues,
+        return new FunctionNode(functionURI, scalarValues,
                 new ValueExpressionNode[] { left(node) });
 
     }
@@ -438,7 +438,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
             
         }
 
-        return new FunctionNode(context.lex, functionURI,
+        return new FunctionNode(functionURI,
                 null/* scalarValues */, args);
 
     }
@@ -678,7 +678,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
                 .jjtGetChild(0).jjtAccept(this/* visitor */, null);
 
-        final ExistsNode fn = new ExistsNode(context.lex, anonvar,
+        final ExistsNode fn = new ExistsNode(anonvar,
                 innerGraphPattern);
 
         // Restore the parent's context.
@@ -711,7 +711,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
         final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
                 .jjtGetChild(0).jjtAccept(this/* visitor */, null);
 
-        final NotExistsNode fn = new NotExistsNode(context.lex, anonvar,
+        final NotExistsNode fn = new NotExistsNode(anonvar,
                 innerGraphPattern);
 
         // Restore the parent's context.
@@ -810,7 +810,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        return new FunctionNode(context.lex, FunctionRegistry.IN,
+        return new FunctionNode(FunctionRegistry.IN,
                 null/* scalarValues */, args);
 
     }
@@ -866,7 +866,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        return new FunctionNode(context.lex, FunctionRegistry.NOT_IN,
+        return new FunctionNode(FunctionRegistry.NOT_IN,
                 null/* scalarValues */, args);
 
     }
@@ -1016,7 +1016,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        return new FunctionNode(context.lex, FunctionRegistry.GROUP_CONCAT,
+        return new FunctionNode(FunctionRegistry.GROUP_CONCAT,
                 scalarValues, new ValueExpressionNode[] { left(node) });
 
     }

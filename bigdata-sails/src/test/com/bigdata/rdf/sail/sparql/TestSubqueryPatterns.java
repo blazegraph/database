@@ -434,7 +434,7 @@ public class TestSubqueryPatterns extends
             existsPattern.addChild(new StatementPatternNode(person, foafName,
                     name, null/* c */, Scope.DEFAULT_CONTEXTS));
 
-            whereClause.addChild(new FilterNode(new NotExistsNode(lex, anonvar,
+            whereClause.addChild(new FilterNode(new NotExistsNode(anonvar,
                     existsPattern)));
 
         }

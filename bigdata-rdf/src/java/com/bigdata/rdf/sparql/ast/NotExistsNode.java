@@ -41,16 +41,14 @@ public class NotExistsNode extends SubqueryFunctionNodeBase {
     private static final long serialVersionUID = 1L;
 
     /**
-     * @param lex
      * @param anonvar
      *            An anonymous variable which will be bound by an ASK subquery.
      * @param graphPattern
      *            The inner value of the NOT EXISTS function.
      */
-    public NotExistsNode(String lex, VarNode anonvar,
-            GroupNodeBase<?> graphPattern) {
+    public NotExistsNode(final VarNode anonvar, final GroupNodeBase<?> graphPattern) {
 
-        super(lex, FunctionRegistry.NOT_EXISTS, anonvar, graphPattern);
+        super(FunctionRegistry.NOT_EXISTS, anonvar, graphPattern);
 
     }
 
