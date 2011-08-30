@@ -1263,6 +1263,8 @@ public class Rule2BOpUtility {
              * binding onto the variable for solutions which join.
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/359
+             * 
+             * Fixed by changing to the two-arg constructor for Constant.
              */
 
             pred = pred.asBound((IVariable<?>) pred.get(3),

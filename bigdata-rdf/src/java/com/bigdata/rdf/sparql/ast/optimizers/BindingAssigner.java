@@ -25,51 +25,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 24, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Collection;
-import java.util.LinkedHashSet;
+import java.util.Iterator;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.IASTOptimizer;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
- * Optimizer to turn a describe query into a construct query.
+ * Assigns values to variables based on a supplied set of bindings.
+ * <p>
+ * Based on {@link org.openrdf.query.algebra.evaluation.impl.BindingAssigner}.
  */
-public class DescribeOptimizer implements IASTOptimizer {
+public class BindingAssigner implements IASTOptimizer {
 
-	/**
-	 * Change this:
-	 * 
-	 * describe term1 term2 ...
-	 * where {
-	 *    whereClause .
-	 * }
-	 * 
-	 * Into this:
-	 * 
-	 * construct {
-	 *   term1 ?p1a ?o1 .
-	 *   ?s1   ?p1b term1 .
-	 *   term2 ?p2a ?o2 .
-	 *   ?s2   ?p2b term2 .
-	 * }
-	 * where {
-	 *   whereClause .
-	 *   {
-	 *     term1 ?p1a ?o1 .
-	 *   } union {
-	 *     ?s1   ?p1b term1 .
-	 *   } union {
-	 *     term2 ?p2a ?o2 .
-	 *   } union {
-	 *     ?s2   ?p2b term2 .
-	 *   }
-	 */
+	@SuppressWarnings("unchecked")
 	@Override
 	public IQueryNode optimize(final AST2BOpContext context, 
 			final IQueryNode queryNode, final DatasetNode dataset, 
-			final IBindingSet[] bindingSet) {
+			final IBindingSet[] bindingSets) {
 		
 //        final String sparql = "describe <http://www.bigdata.com>";
 //
@@ -105,86 +91,48 @@ public class DescribeOptimizer implements IASTOptimizer {
 //                    Scope.DEFAULT_CONTEXTS));
 //        }
 
-		final QueryRoot describe = (QueryRoot) queryNode;
-		
-		if (describe.getQueryType() != QueryType.DESCRIBE) {
-			throw new IllegalArgumentException();
+		// only works when there is exactly one incoming binding set
+		if (bindingSets == null || bindingSets.length != 1) {
+			
+			return queryNode;
+			
 		}
 		
-		final IGroupNode<IGroupMemberNode> where = describe.getWhereClause();
+		final IBindingSet bs = bindingSets[0];
 		
-		final UnionNode union = new UnionNode();
+		final QueryRoot root = (QueryRoot) queryNode;
 		
-		where.addChild(union);
-
-        final ConstructNode construct = new ConstructNode();
-
-		final ProjectionNode projection = describe.getProjection();
-		
-		describe.setProjection(null);
-		describe.setConstruct(construct);
-		
-		final Collection<TermNode> terms = new LinkedHashSet<TermNode>();
-		
-		if (projection.isWildcard()) {
-		
-			/* 
-			 * Visit all variable nodes in where clause and add them
-			 * into the terms collections.
-			 */
-			throw new RuntimeException("implement me");
+		if (!root.hasWhereClause()) {
 			
-		} else {
+			return root;
+			
+		}
 		
-			int i = 0;
-			for (AssignmentNode n : projection) {
-				
-				// can only have variables and constants in describe projections
-				terms.add((TermNode) n.getValueExpressionNode());
-	
-			}
-				
-		}		
+		final IGroupNode<IGroupMemberNode> where = root.getWhereClause();
 		
-		int i = 0;
+		/* 
+		 * Visit all variable nodes and set their value if it is available
+		 * in the supplied binding set.
+		 */
+		final Iterator<IVariable<?>> it = 
+			BOpUtility.getSpannedVariables((BOp) where);
 		
-		for (TermNode term : terms) {
+		while (it.hasNext()) {
 			
-			final int termNum = i++;
+			final IVariable<IV> v = (IVariable<IV>) it.next();
 			
-			{ // <term> ?pN-a ?oN
+			final IConstant<IV> val = bs.get(v);
 			
-				final StatementPatternNode sp = new StatementPatternNode(
-						term, 
-						new VarNode("p"+termNum+"a"),
-						new VarNode("o"+termNum)
-						); 
-
-				construct.addChild(sp);
+			if (val != null) {
 				
-				union.addChild(sp);
-				
-			}
-				
-			
-			{ // ?sN ?pN-b <term>
-			
-				final StatementPatternNode sp = new StatementPatternNode(
-					new VarNode("s"+termNum),
-					new VarNode("p"+termNum+"b"),
-					term
-					);
-
-				construct.addChild(sp);
-				
-				union.addChild(sp);
+//				v.setValue(val);
 				
 			}
 			
 		}
 		
-		return describe;
-		
+		return queryNode;
+			
 	}
 	
 }

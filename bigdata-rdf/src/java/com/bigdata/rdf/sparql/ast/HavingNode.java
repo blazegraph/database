@@ -70,7 +70,6 @@ public class HavingNode extends
         return exprs;
 
     }
-    
 
     public String toString(final int indent) {
 

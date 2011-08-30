@@ -15,9 +15,16 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * @author mikepersonick
  */
-public class DummyConstantNode extends TermNode {
+public class DummyConstantNode extends ConstantNode {
 
-	public static final IV dummyIV(final BigdataValue val) {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1393730362383536411L;
+
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static final IV toDummyIV(final BigdataValue val) {
 		
 		final IV dummy = TermId.mockIV(VTE.valueOf(val));
 		
@@ -31,7 +38,7 @@ public class DummyConstantNode extends TermNode {
 	
 	public DummyConstantNode(final BigdataValue val) {
 		
-		super(new Constant<IV>(dummyIV(val)));
+		super(new Constant<IV>(toDummyIV(val)));
 		
 	}
 	

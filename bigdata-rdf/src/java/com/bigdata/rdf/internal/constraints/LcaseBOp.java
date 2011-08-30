@@ -66,13 +66,13 @@ public class LcaseBOp extends AbstractLiteralBOp {
 
         if (lit.getLanguage() != null) {
             final BigdataLiteral str = vf.createLiteral(lit.getLabel().toLowerCase(), lit.getLanguage());
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         } else if (lit.getDatatype() != null) {
             final BigdataLiteral str = vf.createLiteral(lit.getLabel().toLowerCase(), lit.getDatatype());
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         } else {
             final BigdataLiteral str = vf.createLiteral(lit.getLabel().toLowerCase());
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         }
     }
 

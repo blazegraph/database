@@ -583,7 +583,7 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
-            final ValueExpressionNode ve = new FunctionNode(lex,
+            final ValueExpressionNode ve = new FunctionNode(
                     FunctionRegistry.EQ, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("s"),
                             new VarNode("o") });
@@ -628,7 +628,7 @@ public class TestGroupGraphPatternBuilder extends
             whereClause.addChild(new AssignmentNode(new VarNode("x"),
                     new VarNode("o")));
             
-            final ValueExpressionNode ve = new FunctionNode(lex,
+            final ValueExpressionNode ve = new FunctionNode(
                     FunctionRegistry.EQ, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("s"),
                             new VarNode("o") });
@@ -671,7 +671,7 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
-            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+            whereClause.addChild(new FilterNode(new FunctionNode( //
                     FunctionRegistry.IN,//
                     null, // scalarValues
                     new ValueExpressionNode[] {// args
@@ -712,7 +712,7 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
-            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+            whereClause.addChild(new FilterNode(new FunctionNode( //
                     FunctionRegistry.IN,//
                     null, // scalarValues
                     new ValueExpressionNode[] {// args
@@ -755,7 +755,7 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
-            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+            whereClause.addChild(new FilterNode(new FunctionNode( //
                     FunctionRegistry.IN,//
                     null, // scalarValues
                     new ValueExpressionNode[] {// args
@@ -799,7 +799,7 @@ public class TestGroupGraphPatternBuilder extends
                     new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
-            whereClause.addChild(new FilterNode(new FunctionNode(lex, //
+            whereClause.addChild(new FilterNode(new FunctionNode( //
                     FunctionRegistry.IN,//
                     null, // scalarValues
                     new ValueExpressionNode[] {// args

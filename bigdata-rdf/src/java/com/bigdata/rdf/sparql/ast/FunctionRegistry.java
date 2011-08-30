@@ -215,7 +215,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//                final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+                
                 return new com.bigdata.bop.rdf.aggregate.AVERAGE(new BOp[]{ve}, scalarValues);
 
             }
@@ -227,7 +229,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//                final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
                 return new com.bigdata.bop.rdf.aggregate.COUNT(new BOp[]{ve}, scalarValues);
 
             }
@@ -241,7 +245,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
                 return new com.bigdata.bop.rdf.aggregate.MAX(new BOp[]{ve}, scalarValues);
 
             }
@@ -253,7 +259,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
                 return new com.bigdata.bop.rdf.aggregate.MIN(new BOp[]{ve}, scalarValues);
 
             }
@@ -265,7 +273,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
                 return new com.bigdata.bop.rdf.aggregate.SAMPLE(false,ve);
 
             }
@@ -277,7 +287,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression ve = args[0].getValueExpression();
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
                 return new com.bigdata.bop.rdf.aggregate.SUM(false,ve);
 
             }
@@ -290,7 +302,7 @@ public class FunctionRegistry {
 
 				checkArgs(args, VarNode.class);
 
-				final IVariable<IV> var = ((VarNode)args[0]).getVar();
+				final IVariable<IV> var = ((VarNode)args[0]).getValueExpression();
 				return new IsBoundBOp(var);
 
 			}
@@ -302,8 +314,10 @@ public class FunctionRegistry {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-				return new IsLiteralBOp(var);
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+				return new IsLiteralBOp(ve);
 
 			}
 		});
@@ -314,8 +328,10 @@ public class FunctionRegistry {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-				return new IsBNodeBOp(var);
+//              final IValueExpression ve = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+				return new IsBNodeBOp(ve);
 
 			}
 		});
@@ -326,8 +342,10 @@ public class FunctionRegistry {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-				return new IsURIBOp(var);
+//				final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+                return new IsURIBOp(ve);
 
 			}
 		});
@@ -337,8 +355,10 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-				return new IsURIBOp(var);
+//                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+				return new IsURIBOp(ve);
 
 			}
 		});
@@ -348,8 +368,10 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                return new IsNumericBOp(var);
+//                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+                return new IsNumericBOp(ve);
 
             }
         });
@@ -360,8 +382,10 @@ public class FunctionRegistry {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-				return new StrBOp(var, lex);
+//				final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+				return new StrBOp(ve, lex);
 
 			}
 		});
@@ -372,8 +396,10 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                return new EncodeForURIBOp(var, lex);
+//                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+                return new EncodeForURIBOp(ve, lex);
 
             }
         });
@@ -384,8 +410,8 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                return new LcaseBOp(var, lex);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(lex, args[0]);
+                return new LcaseBOp(ve, lex);
 
             }
         });
@@ -396,8 +422,8 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                return new UcaseBOp(var, lex);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(lex, args[0]);
+                return new UcaseBOp(ve, lex);
 
             }
         });
@@ -407,9 +433,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression<? extends IV> type = args[1].getValueExpression();
-                return new StrdtBOp(var,type ,lex);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(lex, args[0]);
+                final IValueExpression<? extends IV> type = AST2BOpUtility.toVE(lex, args[1]);
+                return new StrdtBOp(ve,type ,lex);
 
             }
         });
@@ -419,8 +445,8 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression<? extends IV> lang = args[1].getValueExpression();
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(lex, args[0]);
+                final IValueExpression<? extends IV> lang = AST2BOpUtility.toVE(lex, args[1]);
                 return new StrlangBOp(var,lang ,lex);
 
             }
@@ -431,7 +457,7 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(lex, args[0]);
                 return new StrlenBOp(var,lex);
 
             }
@@ -442,9 +468,9 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression<? extends IV> start = args[1].getValueExpression();
-                final IValueExpression<? extends IV> length = args.length>2?args[2].getValueExpression():null;
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(lex, args[0]);
+                final IValueExpression<? extends IV> start = AST2BOpUtility.toVE(lex, args[1]);
+                final IValueExpression<? extends IV> length = args.length>2?AST2BOpUtility.toVE(lex, args[2]):null;
                 return new SubstrBOp(var,start ,length,lex);
 
             }
@@ -456,7 +482,7 @@ public class FunctionRegistry {
 				checkArgs(args, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> ve =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				return new LangBOp(ve, lex);
 
 			}
@@ -492,9 +518,9 @@ public class FunctionRegistry {
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class,ValueExpressionNode.class);
-                final IValueExpression<? extends IV> conditional = args[0].getValueExpression();
-                final IValueExpression<? extends IV> expression1 = args[1].getValueExpression();
-                final IValueExpression<? extends IV> expression2 = args[2].getValueExpression();
+                final IValueExpression<? extends IV> conditional = AST2BOpUtility.toVE(lex, args[0]);
+                final IValueExpression<? extends IV> expression1 = AST2BOpUtility.toVE(lex, args[1]);
+                final IValueExpression<? extends IV> expression2 = AST2BOpUtility.toVE(lex, args[2]);
                 return new IfBOp(conditional,expression1,expression2);
             }
         });
@@ -505,7 +531,7 @@ public class FunctionRegistry {
 				checkArgs(args, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> ve =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				return new DatatypeBOp(ve, lex);
 
 			}
@@ -530,9 +556,9 @@ public class FunctionRegistry {
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> left =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				final IValueExpression<? extends IV> right =
-					args[1].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[1]);
 				return new LangMatchesBOp(left, right);
 
 			}
@@ -546,9 +572,9 @@ public class FunctionRegistry {
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> var =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				final IValueExpression<? extends IV> pattern =
-					args[1].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[1]);
 
 				if (args.length == 2) {
 
@@ -557,7 +583,7 @@ public class FunctionRegistry {
 				} else {
 
 					final IValueExpression<? extends IV> flags =
-						args[2].getValueExpression();
+						AST2BOpUtility.toVE(lex, args[2]);
 
 					return new RegexBOp(var, pattern, flags);
 
@@ -574,12 +600,12 @@ public class FunctionRegistry {
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				IValueExpression<? extends IV> left =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				if (!(left instanceof XSDBooleanIVValueExpression)) {
 					left = new EBVBOp(left);
 				}
 				IValueExpression<? extends IV> right =
-					args[1].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[1]);
 				if (!(right instanceof XSDBooleanIVValueExpression)) {
 					right = new EBVBOp(right);
 				}
@@ -597,12 +623,12 @@ public class FunctionRegistry {
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				IValueExpression<? extends IV> left =
-					args[0].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[0]);
 				if (!(left instanceof XSDBooleanIVValueExpression)) {
 					left = new EBVBOp(left);
 				}
 				IValueExpression<? extends IV> right =
-					args[1].getValueExpression();
+					AST2BOpUtility.toVE(lex, args[1]);
 				if (!(right instanceof XSDBooleanIVValueExpression)) {
 					right = new EBVBOp(right);
 				}
@@ -838,9 +864,9 @@ public class FunctionRegistry {
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				args[0].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[0]);
 			final IValueExpression<? extends IV> right =
-				args[1].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[1]);
 
 
             if (left.equals(right)
@@ -994,10 +1020,10 @@ public class FunctionRegistry {
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				args[0].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[0]);
 			
 			final IValueExpression<? extends IV> right =
-				args[1].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[1]);
 
 			/*
 			 * If a constant operand in the SameTerm op uses a value not found in
@@ -1078,9 +1104,9 @@ public class FunctionRegistry {
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				args[0].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[0]);
 			final IValueExpression<? extends IV> right =
-				args[1].getValueExpression();
+				AST2BOpUtility.toVE(lex, args[1]);
 
 			return new MathBOp(left, right, op);
 
@@ -1103,7 +1129,7 @@ public class FunctionRegistry {
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                args[0].getValueExpression();
+                AST2BOpUtility.toVE(lex, args[0]);
 
             return new NumericBOp(left,  op);
 
@@ -1125,7 +1151,7 @@ public class FunctionRegistry {
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                args[0].getValueExpression();
+                AST2BOpUtility.toVE(lex, args[0]);
 
             return new DigestBOp(left,  op, lex);
 
@@ -1148,7 +1174,7 @@ public class FunctionRegistry {
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                args[0].getValueExpression();
+                AST2BOpUtility.toVE(lex, args[0]);
 
             return new DateBOp(left,  op);
 
@@ -1196,7 +1222,7 @@ public class FunctionRegistry {
                 throw new IllegalArgumentException("missing scalar value:"+Annotations.SEPARATOR);
             }
 
-            final IValueExpression ve = args[0].getValueExpression();
+            final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
             return new com.bigdata.bop.rdf.aggregate.GROUP_CONCAT(new BOp[]{ve},scalarValues);
 
@@ -1285,7 +1311,7 @@ public class FunctionRegistry {
 
                 for (int i = 1; i < args.length; i++) {
 
-                    set[i - 1] = ((ConstantNode) args[i]).getVal();
+                    set[i - 1] = ((ConstantNode) args[i]).getValueExpression();
 
                 }
 
@@ -1355,7 +1381,7 @@ public class FunctionRegistry {
 
             final VarNode anonvar = (VarNode) args[0];
 
-            return exists ? anonvar.getVar() : new NotBOp(anonvar.getVar());
+            return exists ? anonvar.getValueExpression() : new NotBOp(anonvar.getValueExpression());
 
         }
 

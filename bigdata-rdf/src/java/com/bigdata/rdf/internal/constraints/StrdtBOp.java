@@ -81,7 +81,7 @@ public class StrdtBOp extends AbstractLiteralBOp {
         final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         final BigdataLiteral str = vf.createLiteral(label, dt);
-        return DummyConstantNode.dummyIV(str);
+        return DummyConstantNode.toDummyIV(str);
 
     }
 

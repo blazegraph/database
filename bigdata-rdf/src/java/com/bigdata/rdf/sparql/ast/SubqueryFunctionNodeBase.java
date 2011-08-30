@@ -55,16 +55,17 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
     }
 
     /**
-     * @param lex
      * @param anonvar
      *            An anonymous variable which will be bound by an ASK subquery.
      * @param graphPattern
      *            The inner value of the EXISTS function.
      */
-    protected SubqueryFunctionNodeBase(String lex, URI functionURI, VarNode anonvar,
-            GroupNodeBase graphPattern) {
+    protected SubqueryFunctionNodeBase( 
+    		final URI functionURI, 
+    		final VarNode anonvar,
+            final GroupNodeBase graphPattern) {
 
-        super(lex, functionURI, null/* scalarValues */,
+        super(functionURI, null/* scalarValues */,
                 new ValueExpressionNode[] { anonvar });
 
         if (anonvar == null)

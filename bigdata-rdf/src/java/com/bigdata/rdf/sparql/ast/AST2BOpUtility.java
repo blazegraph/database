@@ -7,12 +7,14 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
@@ -92,6 +94,7 @@ import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.sparql.ast.optimizers.DescribeOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
@@ -227,7 +230,7 @@ public class AST2BOpUtility {
      */
     static {
         optimizers = new IASTOptimizer[] {
-
+        		new DescribeOptimizer()
         };
     }
 
@@ -385,6 +388,26 @@ public class AST2BOpUtility {
     private static PipelineOp convert(final QueryBase query,
             final AST2BOpContext ctx) {
 
+    	
+    	final String lex = ctx.db.getLexiconRelation().getNamespace();
+    	
+    	/*
+    	 * Visit all the value expression nodes and convert them into value
+    	 * expressions.
+    	 */
+    	final Iterator<ValueExpressionNode> it = 
+    		BOpUtility.visitAll(query, ValueExpressionNode.class);
+    	
+    	while (it.hasNext()) {
+    		
+    		/*
+    		 * Convert and cache the value expression on the node as a 
+    		 * side-effect.
+    		 */
+    		toVE(lex, it.next());
+    		
+    	}
+    	
         final IGroupNode root = query.getWhereClause();
 
         if (root == null)
@@ -1996,7 +2019,7 @@ public class AST2BOpUtility {
                             "Context position is a statement identifier and may not be bound in the original query: "
                                     + sp);
                 }
-                c = ((VarNode) cTerm).getVar();
+                c = ((VarNode) cTerm).getValueExpression();
             }
         } else {
             /*
@@ -2163,6 +2186,64 @@ public class AST2BOpUtility {
 //                filter, // filter on elements visited by the access path.
 //                expander // free text search expander or named graphs expander
 //                );
+    	
+    }
+    
+    
+    public static final IValueExpression<? extends IV> toVE(
+    		final String lex, final IValueExpressionNode node) {
+
+    	/*
+    	 * Check to see if value expression has already been created and
+    	 * cached on node.
+    	 */
+    	if (node.getValueExpression() != null) {
+    		
+    		return node.getValueExpression();
+    		
+    	}
+    	
+    	if (node instanceof VarNode) {
+    		
+    		return node.getValueExpression();
+    		
+    	} else if (node instanceof ConstantNode) {
+    		
+    		return node.getValueExpression();
+    		
+    	} else if (node instanceof AssignmentNode) {
+    		
+    		final AssignmentNode assignment = (AssignmentNode) node;
+    		
+    		final IValueExpressionNode child = assignment.getValueExpressionNode();
+    		
+    		final IValueExpression<? extends IV> ve = toVE(lex, child);
+    		
+    		return ve;
+    		
+    	} else if (node instanceof FunctionNode) {
+    		
+    		final FunctionNode function = (FunctionNode) node;
+    		
+    		final URI functionURI = function.getFunctionURI();
+    		
+    		final Map<String,Object> scalarValues = function.getScalarValues();
+    		
+    		final ValueExpressionNode[] args = 
+    			function.args().toArray(new ValueExpressionNode[function.arity()]); 
+    		
+    		final IValueExpression<? extends IV> ve =
+    			FunctionRegistry.toVE(lex, functionURI, scalarValues, args);
+    		
+    		node.setValueExpression(ve);
+    		
+    		return ve;
+    		
+    	} else {
+    		
+    		throw new IllegalArgumentException();
+    		
+    	}
     	
     }
 	

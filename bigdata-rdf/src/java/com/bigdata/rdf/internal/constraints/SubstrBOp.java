@@ -87,14 +87,14 @@ public class SubstrBOp extends AbstractLiteralBOp {
         if (lang != null) {
             // else return new simple literal using Literal.getLabel
             final BigdataLiteral str = vf.createLiteral(label, lang);
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         } else if (dt != null) {
             // else return new simple literal using Literal.getLabel
             final BigdataLiteral str = vf.createLiteral(label, dt);
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         }else{
             final BigdataLiteral str = vf.createLiteral(label);
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         }
     }
 

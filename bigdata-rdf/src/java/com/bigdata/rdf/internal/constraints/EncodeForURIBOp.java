@@ -64,7 +64,7 @@ public class EncodeForURIBOp extends AbstractLiteralBOp {
         final BigdataLiteral lit =literalValue(iv);
         try {
             final BigdataLiteral str = vf.createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8"));
-            return DummyConstantNode.dummyIV(str);
+            return DummyConstantNode.toDummyIV(str);
         } catch (UnsupportedEncodingException uee) {
             throw new SparqlTypeErrorException();
         }

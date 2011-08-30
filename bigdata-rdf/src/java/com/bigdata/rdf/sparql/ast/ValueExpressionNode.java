@@ -1,7 +1,10 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
 
 public class ValueExpressionNode extends ASTBase implements
@@ -32,11 +35,21 @@ public class ValueExpressionNode extends ASTBase implements
     
 //    private final IValueExpression<? extends IV> ve;
 
-    public ValueExpressionNode(final IValueExpression<? extends IV> valueExpr) {
-
+    /**
+     * FIXME Just for compatibility with SOp2ASTUtility. Remove when done
+     * with AST -> AST direct translation.
+     */
+    public ValueExpressionNode(final IValueExpression<? extends IV> ve) {
+    	
         super(BOp.NOARGS, null/* anns */);
 
-        setProperty(Annotations.VALUE_EXPR, valueExpr);
+        setProperty(Annotations.VALUE_EXPR, ve);
+        
+    }
+    
+    public ValueExpressionNode(final BOp[] args, final Map<String, Object> anns) {
+
+    	super(args, anns);
 
     }
 
@@ -47,6 +60,10 @@ public class ValueExpressionNode extends ASTBase implements
 
     }
 	
+    /**
+     * Called by AST2BOpUtility to populate the value expression nodes
+     * with value expressions. 
+     */
     @SuppressWarnings({ "rawtypes" })
     public void setValueExpression(IValueExpression<? extends IV> ve) {
 

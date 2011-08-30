@@ -116,19 +116,19 @@ public class StatementPatternNode extends GroupMemberNodeBase {
             final TermNode c = c();
             
 	        if (s instanceof VarNode) {
-	            producedBindings.add(((VarNode) s).getVar());
+	            producedBindings.add(((VarNode) s).getValueExpression());
 	        }
 	        
 	        if (p instanceof VarNode) {
-	            producedBindings.add(((VarNode) p).getVar());
+	            producedBindings.add(((VarNode) p).getValueExpression());
 	        }
 	        
 	        if (o instanceof VarNode) {
-	            producedBindings.add(((VarNode) o).getVar());
+	            producedBindings.add(((VarNode) o).getValueExpression());
 	        }
 	        
 	        if (c != null && c instanceof VarNode) {
-	            producedBindings.add(((VarNode) c).getVar());
+	            producedBindings.add(((VarNode) c).getValueExpression());
 	        }
 	        
 //	    }

@@ -279,7 +279,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final GroupByNode groupBy = new GroupByNode();
             expected.setGroupBy(groupBy);
-            final FunctionNode funct = new FunctionNode(lex,
+            final FunctionNode funct = new FunctionNode(
                     FunctionRegistry.STR, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("o") });
             // Note: anonymous variable.
@@ -323,7 +323,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final HavingNode having = new HavingNode();
             expected.setHaving(having);
-            having.addExpr(new FunctionNode(lex, //
+            having.addExpr(new FunctionNode( //
                     FunctionRegistry.GT,//
                     null, // scalarValues
                     new ValueExpressionNode[] {// args
@@ -404,7 +404,7 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
             final OrderByNode orderBy = new OrderByNode();
             expected.setOrderBy(orderBy);
-            final FunctionNode funct = new FunctionNode(lex,
+            final FunctionNode funct = new FunctionNode(
                     FunctionRegistry.STR, null/* scalarValues */,
                     new ValueExpressionNode[] { new VarNode("s") });
             orderBy.addExpr(new OrderByExpr(funct, false/* ascending */));

@@ -191,6 +191,15 @@ abstract public class QueryBase extends QueryNodeBase {
     }
     
     /**
+     * Return true if this query has a WHERE clause, false if not.
+     */
+    public boolean hasWhereClause() {
+    	
+    	return getProperty(Annotations.WHERE_CLAUSE) != null;
+    	
+    }
+    
+    /**
      * Return the {@link GroupByNode} -or- <code>null</code> if there is none.
      */
     public GroupByNode getGroupBy() {

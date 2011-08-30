@@ -143,7 +143,7 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
-                if (child.arity() > 0) {
+                if (child != null && child.arity() > 0) {
 
                     /*
                      * The child is a Node (has children).
@@ -447,6 +447,21 @@ public class BOpUtility {
                     }
                 }).makeUnique();
 
+    }
+    
+    @SuppressWarnings("unchecked")
+	public static <C> Iterator<C> visitAll(final BOp op, final Class<C> clas) {
+    	
+        return new Striterator(preOrderIteratorWithAnnotations(op))
+		        .addFilter(new Filter() {
+		            private static final long serialVersionUID = 1L;
+		
+		            @Override
+		            public boolean isValid(Object arg0) {
+		                return clas.isAssignableFrom(arg0.getClass());
+		            }
+		        }).makeUnique();
+        
     }
 
     /**
