@@ -11,11 +11,13 @@ public class Expanderator extends Prefetch implements ITailOp {
 	private Iterator m_child = null;
 	protected final Object m_context;
 	private final Expander m_expander;
+	private final IContextMgr m_contextMgr;
 
 	public Expanderator(Iterator src, Object context, Expander expander) {
 		m_src = src;
 		m_context = context;
 		m_expander = expander;
+		m_contextMgr = m_expander.getContextMgr();
 	}
 
 	// -------------------------------------------------------------
@@ -30,12 +32,21 @@ public class Expanderator extends Prefetch implements ITailOp {
 			}
 
 			return ret;
-		} else if (m_src.hasNext()) {
-			m_child = m_expander.expand(m_src.next());
-
-			return getNext();
 		} else {
-			return null;
+			if (m_child != null && m_contextMgr != null)
+				m_contextMgr.popContext();
+			
+			if (m_src.hasNext()) {
+				final Object nxt = m_src.next();
+				if (m_contextMgr != null)
+					m_contextMgr.pushContext(nxt);
+				
+				m_child = m_expander.expand(nxt);
+
+				return getNext();
+			} else {
+				return null;
+			}
 		}
 	}
 
@@ -46,7 +57,8 @@ public class Expanderator extends Prefetch implements ITailOp {
 	}
 
 	public Iterator availableTailOp() {
-		if ((!ready()) && !m_src.hasNext()) {
+		// do NOT optimize if m_contextMhr is non null
+		if (m_contextMgr == null && (!ready()) && !m_src.hasNext()) {
 			return m_child;
 		} else {
 			return this;

@@ -29,6 +29,7 @@ package com.bigdata.bop.util;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Stack;
 import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
@@ -41,6 +42,7 @@ import com.bigdata.bop.BadBOpIdTypeException;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.DuplicateBOpIdException;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.INodeOrAttribute;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.NotPipelineOpException;
@@ -133,7 +135,9 @@ public class TestBOpUtility extends TestCase2 {
      */
     public void test_preOrderIterator() {
 
-        final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, null/* annotations */);
+    	final Stack<INodeOrAttribute> context = new Stack<INodeOrAttribute>();
+
+    	final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, null/* annotations */);
 
         // root
         final BOp root = new BOpBase(new BOp[] { // root args[]
@@ -147,7 +151,7 @@ public class TestBOpUtility extends TestCase2 {
                 Var.var("x"),//
         };
         int i = 0;
-        final Iterator<BOp> itr = BOpUtility.preOrderIterator(root);
+        final Iterator<BOp> itr = BOpUtility.preOrderIterator(root, context);
         while (itr.hasNext()) {
             final BOp t = itr.next();
             if (log.isInfoEnabled())
@@ -157,8 +161,8 @@ public class TestBOpUtility extends TestCase2 {
             i++;
         }
         assertEquals(i, expected.length);
-
-        assertSameIterator(expected, BOpUtility.preOrderIterator(root));
+        
+        assertSameIterator(expected, BOpUtility.preOrderIterator(root, context));
        
     }
     
@@ -166,6 +170,8 @@ public class TestBOpUtility extends TestCase2 {
      * Unit test for {@link BOpUtility#postOrderIterator(BOp)}.
      */
     public void test_postOrderIterator() {
+    	
+    	final Stack<INodeOrAttribute> context = new Stack<INodeOrAttribute>();
 
         final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, null/* annotations */);
 
@@ -181,7 +187,7 @@ public class TestBOpUtility extends TestCase2 {
                 root,//
         };
         int i = 0;
-        final Iterator<BOp> itr = BOpUtility.postOrderIterator(root);
+        final Iterator<BOp> itr = BOpUtility.postOrderIterator(root, context);
         while (itr.hasNext()) {
             final BOp t = itr.next();
             if (log.isInfoEnabled())
@@ -192,7 +198,7 @@ public class TestBOpUtility extends TestCase2 {
         }
         assertEquals(i, expected.length);
 
-        assertSameIterator(expected, BOpUtility.postOrderIterator(root));
+        assertSameIterator(expected, BOpUtility.postOrderIterator(root, context));
         
     }
 
@@ -331,6 +337,8 @@ public class TestBOpUtility extends TestCase2 {
      */
     public void test_preOrderIteratorWithAnnotations() {
 
+    	final Stack<INodeOrAttribute> context = new Stack<INodeOrAttribute>();
+
         final BOp a1 = new BOpBase(new BOp[]{Var.var("a")},null/*annotations*/);
         final BOp a2 = new BOpBase(new BOp[]{Var.var("b")},null/*annotations*/);
         // Note: [a3] tests recursion (annotations of annotations).
@@ -367,7 +375,7 @@ public class TestBOpUtility extends TestCase2 {
         };
         int i = 0;
         final Iterator<BOp> itr = BOpUtility
-                .preOrderIteratorWithAnnotations(root);
+                .preOrderIteratorWithAnnotations(root, context);
         while (itr.hasNext()) {
             final BOp t = itr.next();
             if(log.isInfoEnabled())
