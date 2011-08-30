@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.controller.SubqueryHashJoinOp;
 
 /**
  * Annotations for hash joins.
@@ -54,6 +53,6 @@ public interface HashJoinAnnotations {
      * fails and the join is optional). In general, we are not unit testing for
      * the case of an unconstrained join.
      */
-    String JOIN_VARS = SubqueryHashJoinOp.class.getName() + ".joinVars";
+    String JOIN_VARS = HashJoinAnnotations.class.getName() + ".joinVars";
 
 }

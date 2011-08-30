@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -45,6 +46,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -53,6 +55,7 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.MemStore;
@@ -78,7 +81,8 @@ public class NamedSubqueryOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryAnnotations, HTreeAnnotations {
+    public interface Annotations extends SubqueryAnnotations, HTreeAnnotations,
+            HashJoinAnnotations {
 
         /**
          * The name of the subquery solution set. The result set is "published"
@@ -87,6 +91,39 @@ public class NamedSubqueryOp extends PipelineOp {
          */
         final String NAMED_SET = "namedSet";
         
+    }
+
+    /**
+     * Return the {@link IQueryAttributes} key for a given named set having the
+     * specified join variables.
+     * 
+     * @param namedSet
+     *            The named set.
+     * @param joinvars
+     *            The join variables.
+     * 
+     * @return The key.
+     */
+    public static String getSolutionSetName(final String namedSet,
+            final VarNode[] joinvars) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append("namedSet{name=" + namedSet + ",joinvars=[");
+
+        for (int i = 0; i < joinvars.length; i++) {
+
+            if (i > 0)
+                sb.append(",");
+
+            sb.append(joinvars[i].getValueExpression().getName());
+
+        }
+
+        sb.append("])");
+
+        return sb.toString();
+
     }
 
     /**
@@ -122,6 +159,8 @@ public class NamedSubqueryOp extends PipelineOp {
         getRequiredProperty(Annotations.SUBQUERY);
 
         getRequiredProperty(Annotations.NAMED_SET);
+
+        getRequiredProperty(Annotations.JOIN_VARS);
 
     }
 
@@ -168,8 +207,35 @@ public class NamedSubqueryOp extends PipelineOp {
 
     }
 
+    /**
+     * Adds reporting for the size of the named solution set.
+     */
     private static class NamedSolutionSetStats extends BOpStats {
         
+        private static final long serialVersionUID = 1L;
+        
+        final AtomicLong solutionSetSize = new AtomicLong();
+
+        public void add(final BOpStats o) {
+
+            super.add(o);
+
+            if (o instanceof NamedSolutionSetStats) {
+
+                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
+
+                solutionSetSize.addAndGet(t.solutionSetSize.get());
+
+            }
+
+        }
+
+        @Override
+        protected void toString(final StringBuilder sb) {
+            super.toString(sb);
+            sb.append(",solutionSetSize=" + solutionSetSize.get());
+        }
+
     }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
@@ -345,7 +411,7 @@ public class NamedSubqueryOp extends PipelineOp {
         /**
          * Run a subquery.
          */
-        private class SubqueryTask implements Callable<IRunningQuery> {
+        private class SubqueryTask implements Callable<Void> {
 
             /**
              * The evaluation context for the parent query.
@@ -373,7 +439,7 @@ public class NamedSubqueryOp extends PipelineOp {
 
             }
 
-            public IRunningQuery call() throws Exception {
+            public Void call() throws Exception {
 
             	// The subquery
                 IRunningQuery runningSubquery = null;
@@ -409,7 +475,11 @@ public class NamedSubqueryOp extends PipelineOp {
 						
 						// wait for the subquery to halt / test for errors.
 						runningSubquery.get();
-						
+
+                        // Report the #of solutions in the named solution set.
+                        ((NamedSolutionSetStats) context.getStats()).solutionSetSize
+                                .addAndGet(ncopied);
+
 					} catch (InterruptedException ex) {
 
 						// this thread was interrupted, so cancel the subquery.
@@ -421,9 +491,6 @@ public class NamedSubqueryOp extends PipelineOp {
 						
 					}
 					
-                    // done.
-                    return runningSubquery;
-                    
                 } catch (Throwable t) {
 
 					if (runningSubquery == null
@@ -445,8 +512,6 @@ public class NamedSubqueryOp extends PipelineOp {
                                                 : runningSubquery.getCause()));
                     }
 					
-					return runningSubquery;
-                    
                 } finally {
 
 					try {
@@ -466,6 +531,9 @@ public class NamedSubqueryOp extends PipelineOp {
 					
                 }
 
+                // Done.
+                return null;
+                
             }
 
         } // SubqueryTask
