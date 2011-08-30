@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
  * that a named solution set should be joined with the solutions in the group.
@@ -37,13 +36,30 @@ package com.bigdata.rdf.sparql.ast;
  * 
  * @see NamedSubqueryRoot
  */
-public class NamedSubqueryInclude extends GroupMemberNodeBase {
+public class NamedSubqueryInclude extends
+        GroupMemberNodeBase<NamedSubqueryInclude> {
 
     private static final long serialVersionUID = 1L;
 
     interface Annotations extends SubqueryRoot.Annotations {
-        
+
+        /**
+         * The name of the temporary solution set.
+         */
         String SUBQUERY_NAME = "subqueryName";
+        
+        /**
+         * A {@link VarNode}[] specifying the join variables that will be used
+         * when the named result set is join with the query. The join variables
+         * MUST be bound for a solution to join.
+         * 
+         * TODO This can be different for each context in the query in which a
+         * given named result set is included. When there are different join
+         * variables for different INCLUDEs, then we need to build a hash index
+         * for each set of join variable context that will be consumed within
+         * the query.
+         */
+        String JOIN_VARS = "joinVars";
         
     }
 
@@ -78,10 +94,62 @@ public class NamedSubqueryInclude extends GroupMemberNodeBase {
         
     }
 
+    /**
+     * The join variables to be used when the named result set is included into
+     * the query.
+     */
+    public VarNode[] getJoinVars() {
+
+        return (VarNode[]) getProperty(Annotations.JOIN_VARS);
+
+    }
+
+    /**
+     * Set the join variables.
+     * 
+     * @param joinVars
+     *            The join variables.
+     */
+    public void setJoinVars(final VarNode[] joinVars) {
+
+        setProperty(Annotations.JOIN_VARS, joinVars);
+
+    }
+
     @Override
     public String toString(int indent) {
 
-        return indent(indent) + "INCLUDE %" + getName();
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(indent(indent));
+
+        sb.append("INCLUDE ").append(getName());
+
+        final VarNode[] joinVars = getJoinVars();
+
+        if (joinVars != null) {
+
+            sb.append(" JOIN ON (");
+
+            boolean first = false;
+
+            for (VarNode var : joinVars) {
+
+                if (!first)
+                    sb.append(",");
+
+                sb.append(var);
+
+                first = false;
+
+            }
+
+            sb.append(")");
+
+        }
+
+        return sb.toString();
 
     }
+
 }

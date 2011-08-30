@@ -246,7 +246,7 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
-                if (child.arity() > 0) {
+                if (child != null && child.arity() > 0) {
 
                     /*
                      * The child is a Node (has children).

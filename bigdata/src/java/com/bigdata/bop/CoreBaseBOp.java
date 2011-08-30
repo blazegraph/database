@@ -109,7 +109,9 @@ abstract public class CoreBaseBOp implements BOp {
             final BOp t = itr.next();
             if (nwritten > 0)
                 sb.append(',');
-            if(t instanceof IValueExpression<?>) {
+            if(t == null) {
+                sb.append("<null>");
+            } else if (t instanceof IValueExpression<?>) {
                 sb.append(t.toString());
             } else {
                 sb.append(t.getClass().getSimpleName());

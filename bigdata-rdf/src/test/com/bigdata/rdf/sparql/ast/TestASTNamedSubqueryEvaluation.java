@@ -237,7 +237,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
             /*
              * Build up the AST for the query.
              */
-            final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+            QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
             {
 
                 final VarNode o = new VarNode("o");
@@ -258,8 +258,14 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                 final NamedSubqueryRoot namedSubqueryRoot;
                 {
 
+                    final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+
+                    queryRoot.setNamedSubqueries(namedSubqueries);
+
                     namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
                             "%namedSet1");
+                    
+                    namedSubqueries.add(namedSubqueryRoot);
 
                     final ProjectionNode projection2 = new ProjectionNode();
                     projection2.addProjectionVar(x);
@@ -294,7 +300,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                 }
             
             }
-
+            
             if(log.isInfoEnabled())
                 log.info("AST: " + queryRoot);
 
@@ -307,6 +313,10 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
 
             final AST2BOpContext ctx = new AST2BOpContext(queryRoot, idFactory,
                     store, queryEngine, queryHints);
+
+            // run optimizer for named subqueries.
+            queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
+                    ctx, queryRoot, null/* dataset */, null/* bindingSet */);
 
             // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
