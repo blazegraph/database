@@ -57,7 +57,7 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -234,7 +234,7 @@ public class TestSliceOp extends TestCase2 {
         
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -329,7 +329,7 @@ public class TestSliceOp extends TestCase2 {
         
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -404,7 +404,7 @@ public class TestSliceOp extends TestCase2 {
         ft.get(); // verify nothing thrown.
         sink.close(); // close the sink so the iterator will terminate!
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator());
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
@@ -499,7 +499,7 @@ public class TestSliceOp extends TestCase2 {
         ft.get(); // verify nothing thrown.
         sink.close(); // close the sink so the iterator will terminate!
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator());
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
@@ -565,7 +565,7 @@ public class TestSliceOp extends TestCase2 {
         ft.get(); // verify nothing thrown.
         sink.close(); // close the sink so the iterator will terminate!
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator());
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());

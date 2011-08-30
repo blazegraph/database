@@ -236,16 +236,118 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         return null;
     }
 
+    /**
+     * Given
+     * 
+     * <pre>
+     * select ?s where { { ?s ?p1 ?o } UNION  { ?s ?p2 ?o } UNION  { ?s ?p3 ?o } }
+     * </pre>
+     * 
+     * The parse tree looks like:
+     * 
+     * <pre>
+     * QueryContainer
+     *  SelectQuery
+     *   Select
+     *    ProjectionElem
+     *     Var (s)
+     *   WhereClause
+     *    GraphPatternGroup
+     *     UnionGraphPattern
+     *      GraphPatternGroup
+     *       BasicGraphPattern
+     *        TriplesSameSubjectPath
+     *         Var (s)
+     *         PropertyListPath
+     *          Var (p1)
+     *          ObjectList
+     *           Var (o)
+     *      UnionGraphPattern
+     *       GraphPatternGroup
+     *        BasicGraphPattern
+     *         TriplesSameSubjectPath
+     *          Var (s)
+     *          PropertyListPath
+     *           Var (p2)
+     *           ObjectList
+     *            Var (o)
+     *       GraphPatternGroup
+     *        BasicGraphPattern
+     *         TriplesSameSubjectPath
+     *          Var (s)
+     *          PropertyListPath
+     *           Var (p3)
+     *           ObjectList
+     *            Var (o)
+     * </pre>
+     * 
+     * That is, UNION in a binary operator in the parse tree. If the right hand
+     * argument is also a UNION, then you are looking at a sequence of UNIONs at
+     * the same level. Such sequences should be turned into a single
+     * {@link UnionNode} in the bigdata AST.
+     * 
+     * In contrast, this is a UNION of two groups with another UNION embedded in
+     * the 2nd group.
+     * 
+     * <pre>
+     * select ?s where { { ?s ?p1 ?o } UNION  { { ?s ?p2 ?o } UNION  { ?s ?p3 ?o } }  }
+     * </pre>
+     * 
+     * The 2nd child of the first union is a GraphPatternGroup, not a
+     * UnionGraphPattern.
+     * 
+     * <pre>
+     * QueryContainer
+     *  SelectQuery
+     *   Select
+     *    ProjectionElem
+     *     Var (s)
+     *   WhereClause
+     *    GraphPatternGroup
+     *     UnionGraphPattern
+     *      GraphPatternGroup
+     *       BasicGraphPattern
+     *        TriplesSameSubjectPath
+     *         Var (s)
+     *         PropertyListPath
+     *          Var (p1)
+     *          ObjectList
+     *           Var (o)
+     *      GraphPatternGroup
+     *       UnionGraphPattern
+     *        GraphPatternGroup
+     *         BasicGraphPattern
+     *          TriplesSameSubjectPath
+     *           Var (s)
+     *           PropertyListPath
+     *            Var (p2)
+     *            ObjectList
+     *             Var (o)
+     *        GraphPatternGroup
+     *         BasicGraphPattern
+     *          TriplesSameSubjectPath
+     *           Var (s)
+     *           PropertyListPath
+     *            Var (p3)
+     *            ObjectList
+     *             Var (o)
+     * </pre>
+     */
     @Override
     final public Void visit(final ASTUnionGraphPattern node, Object data)
             throws VisitorException {
-        
+
         final GroupGraphPattern parentGP = graphPattern;
 
         graphPattern = new GroupGraphPattern(parentGP);
-        
+
+        // left arg is a some kind of group.
         node.jjtGetChild(0).jjtAccept(this, null);
         
+        /*
+         * The right arg is also a kind of group. If it is a ASTUnion, then this
+         * is really a chain of UNIONs and they can all be flattened out.
+         */
         node.jjtGetChild(1).jjtAccept(this, null);
         
         parentGP.add(graphPattern.buildGroup(new UnionNode()));
@@ -275,27 +377,6 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 //        return null;
 //    }
 //
-
-//    /**
-//     * A SubSelect can appear in an {@link ASTGraphPatternGroup}.
-//     * <p>
-//     * Note: Delegated to an anonymous {@link BigdataExprBuilder}. The
-//     * {@link GroupGraphPattern} is passed into the delegate so it can recognize
-//     * that the {@link ASTSelectQuery} is appearing as a subquery rather than as
-//     * the top-level query.
-//     */
-//    @Override
-//    final public SubqueryRoot visit(final ASTSelectQuery node, Object data)
-//            throws VisitorException {
-//
-//        final SubqueryRoot subSelect = (SubqueryRoot) node.jjtAccept(
-//                new BigdataExprBuilder(context), graphPattern/* not-null */);
-//
-//        graphPattern.add(subSelect);
-//
-//        return subSelect;
-//
-//    }
 
     /**
      * A BIND (or FILTER) can appear in an {@link ASTBasicGraphPattern}.

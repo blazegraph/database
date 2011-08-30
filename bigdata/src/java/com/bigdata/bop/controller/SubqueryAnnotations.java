@@ -22,46 +22,22 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 25, 2011
+ * Created on Aug 30, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
-
-import java.util.Map;
-
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.ModifiableBOpBase;
+package com.bigdata.bop.controller;
 
 /**
- * Base class for the AST.
+ * Common annotations for subquery operators.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ASTBase extends ModifiableBOpBase {
+public interface SubqueryAnnotations {
 
     /**
-     * 
+     * The subquery to be evaluated.
      */
-    private static final long serialVersionUID = 1L;
-
-    public interface Annotations extends ModifiableBOpBase.Annotations {
-        
-    }
-
-    /**
-     * @param op
-     */
-    public ASTBase(ASTBase op) {
-        super(op);
-    }
-
-    /**
-     * @param args
-     * @param annotations
-     */
-    public ASTBase(BOp[] args, Map<String, Object> annotations) {
-        super(args, annotations);
-    }
+    String SUBQUERY = SubqueryOp.class.getName() + ".subquery";
 
 }

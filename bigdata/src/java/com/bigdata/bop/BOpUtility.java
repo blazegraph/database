@@ -903,6 +903,8 @@ public class BOpUtility {
 
     /**
      * Copy binding sets from the source to the sink(s).
+     * <p>
+     * Note: The caller is responsible for flush()ing the sink(s).
      * 
      * @param source
      *            The source.

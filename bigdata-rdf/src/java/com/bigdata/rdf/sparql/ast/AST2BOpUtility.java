@@ -20,6 +20,9 @@ import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.OrderLimitOptimizer;
+import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.bop.BOp;
@@ -34,6 +37,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IPredicate.Annotations;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -46,6 +50,8 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.controller.NamedSubqueryOp;
+import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.join.PipelineJoin;
@@ -108,8 +114,6 @@ import com.bigdata.striterator.IKeyOrder;
  * 
  *          FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
  *          variable bindings during query evaluation).
- * 
- *          FIXME
  */
 public class AST2BOpUtility {
 
@@ -399,7 +403,8 @@ public class AST2BOpUtility {
             if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
                 // WITH ... AS [name] ... INCLUDE style subquery declarations.
-                left = addNamedSubqueries(left, namedSubqueries, root, ctx);
+                left = addNamedSubqueries(left, namedSubqueries,
+                        (QueryRoot) query, ctx);
 
             }
 
@@ -516,35 +521,70 @@ public class AST2BOpUtility {
      * Add pipeline operators for named subquery solution sets. The solution
      * sets will be computed before the rest of the query plan runs. They may be
      * referenced from other parts of the query plan.
+     * <p>
+     * The main use case for WITH AS INCLUDE is a heavy subquery which should be
+     * run first. However, in principle, we could run these where the INCLUDE
+     * appears rather than up front as long as we are careful not to project
+     * bindings into the subquery (other than those it projects out). Whether or
+     * not this is more efficient depends on the subquery and how it is combined
+     * into the rest of the query. (Running it first should be the default
+     * policy.)
      * 
      * @param left
-     * @param subqueries
-     * @param root
-     *            The top-level {@link IGroupNode} for the query. This is
-     *            required because we need to understand the join variables
-     *            which will be used when the subquery result is joined back
-     *            into the query For WITH AS INCLUDE style subqueries.
+     * @param namedSubquerieNode
+     * @param queryRoot
+     *            The top-level query. This is required because we need to
+     *            understand the join variables which will be used when the
+     *            subquery result is joined back into the query for WITH AS
+     *            INCLUDE style subqueries.
      * @param ctx
      * @return
      * 
-     *         FIXME Integrate named subquery support here. We need to examine
-     *         the places where the named subquery is used to identify the best
-     *         join vars to use when buffering the temporary solution set. The
-     *         named subquery solutions will be joined into the query by a
-     *         {@link NamedSubqueryInclude} within one or more
-     *         {@link IGroupNode}s. The main use case for WITH AS INCLUDE is a
-     *         heavy subquery which should be run first. However, in priciple,
-     *         we could run these where the INCLUDE appears rather than up front
-     *         as long as we are careful not to project bindings into the
-     *         subquery (other than those it projects out). Whether or not this
-     *         is more efficient depends on the subquery and how it is combined
-     *         into the rest of the query. (Running it first should be the
-     *         default policy.)
+     *         FIXME Integrate named subquery support here. We need to pump the
+     *         solutions from the subquery into a named result set (hash set or
+     *         htree) associated with the running query. The data should be made
+     *         accessible using {@link IQueryAttributes} so they can be accessed
+     *         by an INCLUDE later in the query.
+     * 
+     *         TODO We should examine the places where the named subquery is
+     *         used to identify the best join vars to use when buffering the
+     *         temporary solution set. The named subquery solutions will be
+     *         joined into the query by a {@link NamedSubqueryInclude} within
+     *         one or more {@link IGroupNode}s.
+     * 
+     *         TODO It is possible to run the named subqueries in parallel since
+     *         the do not have any mutual dependencies. {@link Steps} could be
+     *         used to do this. Whether this is a wise use of resources is
+     *         another matter. It probably is on a cluster. It might not be on a
+     *         single machine depending on how heavy the subqueries are and what
+     *         the concurrent workload is on the machine.
+     * 
+     *         TODO We should include a prefix for the named set to help avoid
+     *         attribute name conflicts. E.g., <code>namedSet-%foo</code>, where
+     *         <code>%foo</code> was the given name of the named set. This needs
+     *         to be a consistent policy used by both the operator which
+     *         evaluates the subquery (WITH AS named) and the operator which
+     *         joins the subquery results back into the query (INCLUDE).
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
-            NamedSubqueriesNode subqueries, IGroupNode root, AST2BOpContext ctx) {
+            final NamedSubqueriesNode namedSubquerieNode,
+            final QueryRoot queryRoot, final AST2BOpContext ctx) {
 
-        log.error("NAMED SUBQUERY NOT SUPPORTED YET: " + subqueries);
+        for(NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+            
+            final PipelineOp subqueryPlan = convert(subqueryRoot, ctx);
+            
+            if (log.isInfoEnabled())
+                log.info("\nsubquery: " + subqueryRoot + "\nplan="
+                        + subqueryPlan);
+
+            left = new NamedSubqueryOp(new BOp[]{left}, //
+                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                    new NV(NamedSubqueryOp.Annotations.NAMED_SET, subqueryRoot.getName())//
+            );
+
+        }
         
         return left;
         
@@ -577,7 +617,7 @@ public class AST2BOpUtility {
      * and the join happens in the parent (SubqueryOp) based on only those
      * variables projected out of the subquery.
      */
-    private static PipelineOp addSparqlSubquery(PipelineOp left,
+    private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
 
         /*
@@ -851,7 +891,7 @@ public class AST2BOpUtility {
          */
         for (IQueryNode child : joinGroup) {
             if (child instanceof SubqueryRoot)
-                left = addSparqlSubquery(left, (SubqueryRoot) child, ctx);
+                left = addSparql11Subquery(left, (SubqueryRoot) child, ctx);
         }
         
         /*
@@ -1595,19 +1635,19 @@ public class AST2BOpUtility {
         
     }
 
-    public static PipelineOp addMaterializationSteps(
+    /**
+     * If the value expression that needs the materialized variables can run
+     * without a NotMaterializedException then just bypass the pipeline.
+     * This happens in the case of a value expression that only "sometimes"
+     * needs materialized values, but not always (i.e. materialization
+     * requirement depends on the data flowing through). A good example of
+     * this is CompareBOp, which can sometimes work on internal values and
+     * sometimes can't.
+     */
+    private static PipelineOp addMaterializationSteps(
     		PipelineOp left, final int rightId, final IValueExpression ve,
     		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
-		/*
-		 * If the value expression that needs the materialized variables can run
-		 * without a NotMaterializedException then just bypass the pipeline.
-		 * This happens in the case of a value expression that only "sometimes"
-		 * needs materialized values, but not always (i.e. materialization
-		 * requirement depends on the data flowing through). A good example of
-		 * this is CompareBOp, which can sometimes work on internal values and
-		 * sometimes can't.
-		 */
 		final IConstraint c2 = 
     			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
 		
@@ -1652,7 +1692,7 @@ public class AST2BOpUtility {
      * @return
      * 			the final bop added to the pipeline by this method
      */
-    public static PipelineOp addMaterializationSteps(
+    private static PipelineOp addMaterializationSteps(
     		PipelineOp left, final int rightId,
     		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 

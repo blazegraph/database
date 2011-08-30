@@ -15,6 +15,10 @@ public abstract class QueryNodeBase extends ASTBase implements
      */
     private static final long serialVersionUID = 1L;
 
+    public interface Annotations extends ASTBase.Annotations {
+        
+    }
+    
     public QueryNodeBase() {
 
         super(BOp.NOARGS, null/* anns */);

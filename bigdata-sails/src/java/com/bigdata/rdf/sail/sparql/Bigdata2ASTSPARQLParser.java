@@ -190,7 +190,10 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
             // Set the query string on the AST.
             queryRoot.setQueryString(queryStr);
-            
+
+            // Set the parse tree on the AST.
+            queryRoot.setParseTree(qc);
+
             final Properties queryHints = getQueryHints(qc);
 
             if (queryHints != null) {
@@ -267,7 +270,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     /**
      * TODO This should be handled by an AST visitor. It is just much simpler.
-     * That will also allow us to handle query hints embeded into commetns 
+     * That will also allow us to handle query hints embedded into comments. 
      */
     static private Properties getQueryHints(final ASTQueryContainer qc)
             throws MalformedQueryException {

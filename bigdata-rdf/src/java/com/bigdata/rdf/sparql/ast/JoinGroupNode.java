@@ -410,69 +410,80 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 		
 	}
 	
-	public String toString(final int indent) {
-		
-		final String _indent = indent(indent);
-		
-		final StringBuilder sb = new StringBuilder(_indent);
-		
-		if (isOptional()) {
-		
-		    sb.append(_indent).append("optional {\n");
-		    
-		} else {
-
-		    sb.append(_indent).append("{\n");
-		    
-		}
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof StatementPatternNode)) {
-                continue;
-            }
-            sb.append(n.toString(indent + 1)).append("\n");
-        }
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof FilterNode)) {
-                continue;
-            }
-            sb.append(n.toString(indent + 1)).append("\n");
-        }
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof UnionNode)) {
-                continue;
-            }
-            sb.append(((UnionNode) n).toString(indent + 1)).append("\n");
-        }
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof JoinGroupNode)) {
-                continue;
-            }
-            sb.append(((JoinGroupNode) n).toString(indent + 1)).append("\n");
-        }
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof SubqueryRoot)) {
-                continue;
-            }
-            sb.append(((SubqueryRoot) n).toString(indent + 1)).append("\n");
-        }
-
-        for (IQueryNode n : this) {
-            if (!(n instanceof AssignmentNode)) {
-                continue;
-            }
-            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
-        }
-
-        sb.append(_indent).append("}");
-
-        return sb.toString();
-
-	}
+	/*
+	 * Note: I took this out and put a simpler version of toString(indent) into
+	 * the base class.  The multiple passes over the AST when rendering it into
+	 * a String were hiding order differences within the group node which were
+	 * making it difficult to identify test failures.  The filters also make it
+	 * likely that we were failing to show some children of the AST because they
+	 * did not match any of the tested interfaces.
+	 * 
+	 * BBT 8/30/2011
+	 */
+	
+//	public String toString(final int indent) {
+//		
+//		final String _indent = indent(indent);
+//		
+//		final StringBuilder sb = new StringBuilder(_indent);
+//		
+//		if (isOptional()) {
+//		
+//		    sb.append(_indent).append("optional {\n");
+//		    
+//		} else {
+//
+//		    sb.append(_indent).append("{\n");
+//		    
+//		}
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof StatementPatternNode)) {
+//                continue;
+//            }
+//            sb.append(n.toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof FilterNode)) {
+//                continue;
+//            }
+//            sb.append(n.toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof UnionNode)) {
+//                continue;
+//            }
+//            sb.append(((UnionNode) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof JoinGroupNode)) {
+//                continue;
+//            }
+//            sb.append(((JoinGroupNode) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof SubqueryRoot)) {
+//                continue;
+//            }
+//            sb.append(((SubqueryRoot) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof AssignmentNode)) {
+//                continue;
+//            }
+//            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        sb.append(_indent).append("}");
+//
+//        return sb.toString();
+//
+//	}
 
 //	@Override
 //    public boolean equals(final Object o) {

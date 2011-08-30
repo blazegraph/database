@@ -328,16 +328,24 @@ public class TestGroupGraphPatternBuilder extends
     }
 
     /**
-     * Test union of two join groups.
+     * Test union of two groups.
      * 
      * <pre>
      * select ?s where { { ?s ?p ?o } UNION  { ?o ?p2 ?s } }
      * </pre>
      */
-    public void test_union_two_join_groups() throws MalformedQueryException,
+    public void test_union_two_groups() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-        final String sparql = "select ?s where { { ?s ?p ?o } UNION  { ?o ?p2 ?s } }";
+        final String sparql = "" +
+                "select ?s" +
+                " where {" +
+                "   {" +
+                "     ?s ?p ?o" +
+                "   } UNION {" +
+                "     ?o ?p2 ?s" +
+                "   } " +
+                "}";
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
@@ -361,6 +369,146 @@ public class TestGroupGraphPatternBuilder extends
 
             group2.addChild(new StatementPatternNode(new VarNode("o"),
                     new VarNode("p2"), new VarNode("s"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Test union of three groups.
+     * 
+     * <pre>
+     * select ?s where { { ?s ?p1 ?o } UNION  { ?s ?p2 ?o } UNION  { ?s ?p3 ?o } }
+     * </pre>
+     */
+    public void test_union_three_groups() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "select ?s" +
+                " where {" +
+                "   {" +
+                "     ?s ?p1 ?o" +
+                "   } UNION {" +
+                "     ?s ?p2 ?o" +
+                "   } UNION {" +
+                "     ?s ?p3 ?o" +
+                "   } " +
+                "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final VarNode s = new VarNode("s");
+            final VarNode p1 = new VarNode("p1");
+            final VarNode p2 = new VarNode("p2");
+            final VarNode p3 = new VarNode("p3");
+            final VarNode o = new VarNode("o");
+            
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            final UnionNode union1 = new UnionNode();
+            whereClause.addChild(union1);
+            final JoinGroupNode group1 = new JoinGroupNode();
+            final JoinGroupNode group2 = new JoinGroupNode();
+            final JoinGroupNode group3 = new JoinGroupNode();
+            union1.addChild(group1);
+            final UnionNode union2 = new UnionNode();
+            union1.addChild(union2);
+            union2.addChild(group2);
+            union2.addChild(group3);
+
+            group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Test union of two groups with an embedded union in the third group. 
+     * 
+     * <pre>
+     * select ?s where { { ?s ?p1 ?o } UNION  { { ?s ?p2 ?o } UNION  { ?s ?p3 ?o } }  }
+     * </pre>
+     */
+    public void test_union_two_groups_with_embedded_union()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "select ?s" +
+                " where {" +
+                "   {" +
+                "     ?s ?p1 ?o" +   // group1
+                "   } UNION {" +     // union1
+                "       {" +         // group4
+                "       ?s ?p2 ?o" + // group2
+                "       } UNION {" + // union2
+                "       ?s ?p3 ?o" + // group3
+                "       }" +
+                "   } " +
+                "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final VarNode s = new VarNode("s");
+            final VarNode p1 = new VarNode("p1");
+            final VarNode p2 = new VarNode("p2");
+            final VarNode p3 = new VarNode("p3");
+            final VarNode o = new VarNode("o");
+            
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            final UnionNode union1 = new UnionNode();
+            final UnionNode union2 = new UnionNode();
+            
+            final JoinGroupNode group1 = new JoinGroupNode();
+            final JoinGroupNode group2 = new JoinGroupNode();
+            final JoinGroupNode group3 = new JoinGroupNode();
+            final JoinGroupNode group4 = new JoinGroupNode();
+            
+            whereClause.addChild(union1);
+            
+            union1.addChild(group1);
+            union1.addChild(group4);
+
+            group4.addChild(union2);
+            
+            union2.addChild(group2);
+            union2.addChild(group3);
+
+            group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
                     Scope.DEFAULT_CONTEXTS));
 
         }

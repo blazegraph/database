@@ -42,7 +42,7 @@ abstract public class QueryBase extends QueryNodeBase {
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends QueryNodeBase.Annotations {
+    public interface Annotations extends QueryNodeBase.Annotations {
 
         /**
          * The {@link QueryType}.

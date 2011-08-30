@@ -59,6 +59,7 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -410,7 +411,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             new HashBindingSet() //
             };
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         }
@@ -464,7 +465,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         newBindingSetIterator(expected)));
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -614,7 +615,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -771,7 +772,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         }
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -900,7 +901,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -1087,7 +1088,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                             new Constant<String>("Mary") }//
             )};
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
 //          // partition0
@@ -1329,7 +1330,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 //            ),
             };
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
         
 //            // partition0

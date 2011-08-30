@@ -50,7 +50,7 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -331,7 +331,7 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
             // jnl.getExecutorService().execute(ft);
             ft.run();
 
-            TestQueryEngine.assertSameSolutionsAnyOrder("", expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder("", expected,
                     sink.iterator(), ft);
 
             // assertTrue(ft.isDone());
