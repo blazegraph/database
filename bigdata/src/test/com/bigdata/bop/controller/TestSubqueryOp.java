@@ -60,7 +60,7 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -245,7 +245,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         final IRunningQuery runningQuery = queryEngine.eval(query,
                 initialBindingSets);
 
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
 
         {
             final BOpStats stats = runningQuery.getStats().get(
@@ -355,7 +355,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         final IRunningQuery runningQuery = queryEngine.eval(query,
                 initialBindingSets);
 
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
 
         {
             final BOpStats stats = runningQuery.getStats().get(
@@ -459,7 +459,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         final IRunningQuery runningQuery = queryEngine.eval(query,
                 initialBindingSets);
 
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
 
         {
             final BOpStats stats = runningQuery.getStats().get(
@@ -718,7 +718,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
              * many objects: reminder(3)=[{ a=John, b=Brad }, { a=Mary, b=Brad
              * }, { a=Paul, b=Brad }].
              */
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,runningQuery);
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,runningQuery);
         
         }
 
@@ -964,7 +964,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             )
             };
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
 
         }
 
@@ -1230,7 +1230,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             )
             };
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected, runningQuery);
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
 
         }
 

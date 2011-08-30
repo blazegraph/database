@@ -50,7 +50,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -199,7 +199,7 @@ public class TestUnion extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(query);
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -253,7 +253,7 @@ public class TestUnion extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(query, bset);
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -340,7 +340,7 @@ public class TestUnion extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(query);
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.

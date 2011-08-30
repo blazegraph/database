@@ -70,10 +70,16 @@ public class TestAll extends TestCase {
         
         /*
          * Test suite for group graph patterns (join groups, unions, optional,
-         * subquery, etc) and filters in those graph patterns.
+         * etc.) and filters in those graph patterns. Subquery is tested in a
+         * separate test suite.
          */
         suite.addTestSuite(TestGroupGraphPatternBuilder.class);
 
+        /*
+         * Test suite for various kinds of subquery patterns.
+         */
+        suite.addTestSuite(TestSubqueryPatterns.class);
+        
         /*
          * Test suite for basic query types (SELECT|ASK|DESCRIBE|CONSTRUCT),
          * including DISTINCT/REDUCED, GROUP BY, HAVING, ORDER BY, and

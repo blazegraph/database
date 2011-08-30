@@ -181,11 +181,12 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
                     + "=" + getMaxParallel());
 
-        // shared state is used to share the hash table.
-        if (!isSharedState()) {
-            throw new UnsupportedOperationException(Annotations.SHARED_STATE
-                    + "=" + isSharedState());
-        }
+        // Note: This is no longer true. It is now shared via the IQueryAttributes.
+//        // shared state is used to share the hash table.
+//        if (!isSharedState()) {
+//            throw new UnsupportedOperationException(Annotations.SHARED_STATE
+//                    + "=" + isSharedState());
+//        }
 
         // Must be positive.  May be max long for unbounded memory.
         if (getMaxMemory() <= 0L)

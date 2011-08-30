@@ -51,7 +51,7 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -288,7 +288,7 @@ public class TestDistinctBindingSets extends TestCase2 {
 
             ft.run();
 
-            TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
 
             assertEquals(1L, stats.chunksIn.get());
             assertEquals(6L, stats.unitsIn.get());

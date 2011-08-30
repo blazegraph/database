@@ -27,10 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.JoinAnnotations;
-import com.bigdata.bop.join.PipelineJoin;
 
 /**
  * Annotations for joins against a subquery.
@@ -38,15 +35,7 @@ import com.bigdata.bop.join.PipelineJoin;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface SubqueryJoinAnnotations extends JoinAnnotations {
-
-    /**
-     * The subquery to be evaluated for each binding sets presented to the
-     * {@link SubqueryOp} (required). This should be a {@link PipelineOp}. (It
-     * is basically the equivalent of the {@link IPredicate} for a
-     * {@link PipelineJoin}).
-     */
-    String SUBQUERY = SubqueryOp.class.getName() + ".subquery";
+public interface SubqueryJoinAnnotations extends JoinAnnotations, SubqueryAnnotations {
 
     /**
      * When <code>true</code> the subquery has optional semantics (if the

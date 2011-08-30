@@ -47,7 +47,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -199,7 +199,7 @@ public class TestMemorySortOp extends TestCase2 {
 		}
 
 		// Check the solutions.
-		TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+		AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;
@@ -308,7 +308,7 @@ public class TestMemorySortOp extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;
@@ -421,7 +421,7 @@ public class TestMemorySortOp extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;

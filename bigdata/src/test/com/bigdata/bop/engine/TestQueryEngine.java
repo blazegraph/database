@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +36,9 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -51,12 +46,12 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
@@ -76,10 +71,8 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -101,7 +94,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * @todo write a unit and stress tests for deadlines.
  */
-public class TestQueryEngine extends TestCase2 {
+public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
     /**
      * 
@@ -184,50 +177,6 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * Return an {@link IAsynchronousIterator} that will read a single,
-     * empty {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSets
-     *            the binding sets.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[] bindingSets) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bindingSets });
-
-    }
-
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single, chunk
-     * containing all of the specified {@link IBindingSet}s.
-     * 
-     * @param bindingSetChunks
-     *            the chunks of binding sets.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet[][] bindingSetChunks) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
-
-    }
-
-    /**
      * Starts and stops the {@link QueryEngine}, but does not validate the
      * semantics of shutdown() versus shutdownNow() since we need to be
      * evaluating query mixes in order to verify the semantics of those
@@ -261,7 +210,7 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1/* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // Wait until the query is done.
         runningQuery.get();
@@ -295,7 +244,7 @@ public class TestQueryEngine extends TestCase2 {
             new HashBindingSet() //
             };
 
-            assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
         }
         
     }
@@ -358,10 +307,10 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         joinId, -1 /* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
         runningQuery.get();
@@ -436,10 +385,10 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
         runningQuery.get();
@@ -612,12 +561,12 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
-                        newBindingSetIterator(sources)));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
 
 //        runningQuery.get();
         
         // verify solutions.
-        assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
                 runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -760,7 +709,7 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
-                        newBindingSetIterator(sources)));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
 
         assertFalse(runningQuery.isDone());
         
@@ -880,7 +829,7 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
-                        newBindingSetIterator(sources)));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(sources)));
 
         //
         //
@@ -890,7 +839,7 @@ public class TestQueryEngine extends TestCase2 {
         final IBindingSet[] expected = source;
 
         // verify solutions.
-        assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
                 runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -1027,10 +976,10 @@ public class TestQueryEngine extends TestCase2 {
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
+                        AbstractQueryEngineTestCase.newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        assertSameSolutions(expected, runningQuery.iterator());
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
         runningQuery.get();
@@ -1206,11 +1155,11 @@ public class TestQueryEngine extends TestCase2 {
                     new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                             startId,//
                             -1, /* partitionId */
-                            newBindingSetIterator(initialBindingSet)));
+                            AbstractQueryEngineTestCase.newBindingSetIterator(initialBindingSet)));
         }
 
         // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
@@ -1332,7 +1281,7 @@ public class TestQueryEngine extends TestCase2 {
             initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
                     queryId, startId,//
                     -1, // partitionId
-                    newBindingSetIterator(initialBindings));
+                    AbstractQueryEngineTestCase.newBindingSetIterator(initialBindings));
         }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
@@ -1349,7 +1298,7 @@ public class TestQueryEngine extends TestCase2 {
                             new Constant<String>("Leon") }//
             ) };
 
-            assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
         
         }
 
@@ -1649,7 +1598,7 @@ public class TestQueryEngine extends TestCase2 {
             initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
                     queryId, startId,//
                     -1, // partitionId
-                    newBindingSetIterator(initialBindings));
+                    AbstractQueryEngineTestCase.newBindingSetIterator(initialBindings));
         }
         final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
                 initialChunkMessage);
@@ -1692,7 +1641,7 @@ public class TestQueryEngine extends TestCase2 {
 //            )
             };
 
-            assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
         
 //            new E("John", "Mary"),// [0]
@@ -1794,7 +1743,7 @@ public class TestQueryEngine extends TestCase2 {
                             new Constant<String>("Leon")}//
             ) };
 
-            assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
         
         }
 
@@ -1875,7 +1824,7 @@ public class TestQueryEngine extends TestCase2 {
                     new IConstant[] { new Constant<String>("Mary")}//
             ) };
 
-            assertSameSolutions(expected, runningQuery.iterator());
+            AbstractQueryEngineTestCase.assertSameSolutions(expected, runningQuery.iterator());
         
         }
 
@@ -2017,374 +1966,12 @@ public class TestQueryEngine extends TestCase2 {
             initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
                     queryId, startId,//
                     -1, // partitionId
-                    newBindingSetIterator(initialBindings));
+                    AbstractQueryEngineTestCase.newBindingSetIterator(initialBindings));
         }
         
         IRunningQuery runningQuery = queryEngine.eval(queryId, query,initialChunkMessage);
         
         return runningQuery;
-    }
-
-    /**
-     * Verify the expected solutions.
-     * 
-     * @param expected
-     * @param itr
-     * 
-     * @deprecated by {@link #assertSameSolutions(Future, IBindingSet[], IAsynchronousIterator)}
-     */
-    static public void assertSameSolutions(final IBindingSet[] expected,
-            final IAsynchronousIterator<IBindingSet[]> itr) {
-        
-        try {
-            int n = 0;
-            while (itr.hasNext()) {
-                final IBindingSet[] e = itr.next();
-                if (log.isInfoEnabled())
-                    log.info(n + " : chunkSize=" + e.length);
-                for (int i = 0; i < e.length; i++) {
-                    if (log.isInfoEnabled())
-                        log.info(n + " : " + e[i]);
-                    if (n >= expected.length) {
-                        fail("Willing to deliver too many solutions: n=" + n
-                                + " : " + e[i]);
-                    }
-                    if (!expected[n].equals(e[i])) {
-                        fail("n=" + n + ", expected=" + expected[n]
-                                + ", actual=" + e[i]);
-                    }
-                    n++;
-                }
-            }
-            assertEquals("Wrong number of solutions", expected.length, n);
-        } finally {
-            itr.close();
-        }
-
-    }
-
-    /**
-     * Verify the expected solutions.
-     * 
-     * @param expected
-     *            The expected solutions.
-     * @param runningQuery
-     *            The running query whose solutions will be verified.
-     */
-    static public void assertSameSolutions(
-            final IBindingSet[] expected,
-            final IRunningQuery runningQuery) {
-        assertSameSolutions(expected, runningQuery.iterator(), runningQuery);
-    }
-
-    /**
-     * Verify the expected solutions.
-     * 
-     * @param expected
-     *            The expected solutions.
-     * @param itr
-     *            The iterator draining the query.
-     * @param ft
-     *            The future of the query.
-     */
-    static public void assertSameSolutions(
-                final IBindingSet[] expected,
-                final IAsynchronousIterator<IBindingSet[]> itr,
-                final Future<Void> ft
-            ) {
-        try {
-            int n = 0;
-            if(ft!=null&&ft.isDone()) ft.get();
-            while (itr.hasNext()) {
-                if(ft!=null&&ft.isDone()) ft.get();
-                final IBindingSet[] e = itr.next();
-                if(ft!=null&&ft.isDone()) ft.get();
-                if (log.isInfoEnabled())
-                    log.info(n + " : chunkSize=" + e.length);
-                for (int i = 0; i < e.length; i++) {
-                    if (log.isInfoEnabled())
-                        log.info(n + " : " + e[i]);
-                    if (n >= expected.length) {
-                        fail("Willing to deliver too many solutions: n=" + n
-                                + " : " + e[i]);
-                    }
-                    if (!expected[n].equals(e[i])) {
-                        fail("n=" + n + ", expected=" + expected[n]
-                                + ", actual=" + e[i]);
-                    }
-                    n++;
-                }
-            }
-            if(ft!=null) ft.get();
-            assertEquals("Wrong number of solutions", expected.length, n);
-        } catch (InterruptedException ex) {
-            throw new RuntimeException("Query evaluation was interrupted: "
-                    + ex, ex);
-        } catch(ExecutionException ex) {
-            throw new RuntimeException("Error during query evaluation: " + ex,
-                    ex);
-        } finally {
-            itr.close();
-        }
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     * 
-     * @deprecated by the version which passes the {@link IRunningQuery}
-     */
-    static public <T> void assertSameSolutionsAnyOrder(final T[] expected,
-            final Iterator<T> actual) {
-
-        assertSameSolutionsAnyOrder("", expected, actual);
-
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     * 
-     * @deprecated by the version which passes the {@link IRunningQuery}
-     */
-    static public <T> void assertSameSolutionsAnyOrder(final String msg,
-            final T[] expected, final Iterator<T> actual) {
-
-        try {
-
-            /*
-             * Populate a map that we will use to realize the match and
-             * selection without replacement logic. The map uses counters to
-             * handle duplicate keys. This makes it possible to write tests in
-             * which two or more binding sets which are "equal" appear.
-             */
-
-            final int nrange = expected.length;
-
-            final java.util.Map<T, AtomicInteger> range = new java.util.LinkedHashMap<T, AtomicInteger>();
-
-            for (int j = 0; j < nrange; j++) {
-
-                AtomicInteger count = range.get(expected[j]);
-
-                if (count == null) {
-
-                    count = new AtomicInteger();
-
-                }
-
-                range.put(expected[j], count);
-
-                count.incrementAndGet();
-                
-            }
-
-            // Do selection without replacement for the objects visited by
-            // iterator.
-
-            for (int j = 0; j < nrange; j++) {
-
-                if (!actual.hasNext()) {
-
-                    fail(msg
-                            + ": Iterator exhausted while expecting more object(s)"
-                            + ": index=" + j);
-
-                }
-
-                final T actualObject = actual.next();
-
-                if (log.isInfoEnabled())
-                    log.info("visting: " + actualObject);
-
-                AtomicInteger counter = range.get(actualObject);
-
-                if (counter == null || counter.get() == 0) {
-
-                    fail("Object not expected" + ": index=" + j + ", object="
-                            + actualObject);
-
-                }
-
-                counter.decrementAndGet();
-                
-            }
-
-            if (actual.hasNext()) {
-
-                fail("Iterator will deliver too many objects.");
-
-            }
-
-        } finally {
-
-            if (actual instanceof ICloseableIterator<?>) {
-
-                ((ICloseableIterator<T>) actual).close();
-
-            }
-
-        }
-
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     */
-    static public void assertSameSolutionsAnyOrder(final IBindingSet[] expected,
-            final IRunningQuery runningQuery) {
-
-        assertSameSolutionsAnyOrder("", expected, runningQuery);
-
-    }
-
-    /**
-     * Verifies that the iterator visits the specified objects in some arbitrary
-     * ordering and that the iterator is exhausted once all expected objects
-     * have been visited. The implementation uses a selection without
-     * replacement "pattern".
-     * <p>
-     * Note: If the objects being visited do not correctly implement hashCode()
-     * and equals() then this can fail even if the desired objects would be
-     * visited. When this happens, fix the implementation classes.
-     */
-    static public void assertSameSolutionsAnyOrder(final String msg,
-            final IBindingSet[] expected, final IRunningQuery runningQuery) {
-
-		final IAsynchronousIterator<IBindingSet[]> itr = runningQuery
-				.iterator();
-
-		assertSameSolutionsAnyOrder(msg, expected, itr, runningQuery/* future */);
-        
-    }
-    
-    static public void assertSameSolutionsAnyOrder(
-            final IBindingSet[] expected,
-            final IAsynchronousIterator<IBindingSet[]> itr,
-            final Future<?> future) {
-
-        assertSameSolutionsAnyOrder("", expected, itr, future);
-        
-    }
-    
-    static public void assertSameSolutionsAnyOrder(final String msg,
-			final IBindingSet[] expected,
-			final IAsynchronousIterator<IBindingSet[]> itr,
-			final Future<?> runningQuery) {
-
-        try {
-
-            final Iterator<IBindingSet> actual = new Dechunkerator<IBindingSet>(
-                    itr);
-
-            /*
-             * Populate a map that we will use to realize the match and
-             * selection without replacement logic. The map uses counters to
-             * handle duplicate keys. This makes it possible to write tests in
-             * which two or more binding sets which are "equal" appear.
-             */
-
-            final int nrange = expected.length;
-
-            final java.util.Map<IBindingSet, AtomicInteger> range = new java.util.LinkedHashMap<IBindingSet, AtomicInteger>();
-
-            for (int j = 0; j < nrange; j++) {
-
-                AtomicInteger count = range.get(expected[j]);
-
-                if (count == null) {
-
-                    count = new AtomicInteger();
-
-                }
-
-                range.put(expected[j], count);
-
-                count.incrementAndGet();
-                
-            }
-
-            // Do selection without replacement for the objects visited by
-            // iterator.
-
-            for (int j = 0; j < nrange; j++) {
-
-                if (!actual.hasNext()) {
-
-                    if(runningQuery.isDone()) runningQuery.get();
-                    
-                    fail(msg
-                            + ": Iterator exhausted while expecting more object(s)"
-                            + ": index=" + j);
-
-                }
-
-                if(runningQuery.isDone()) runningQuery.get();
-
-                final IBindingSet actualObject = actual.next();
-
-                if(runningQuery.isDone()) runningQuery.get();
-
-                if (log.isInfoEnabled())
-                    log.info("visting: " + actualObject);
-
-                final AtomicInteger counter = range.get(actualObject);
-
-                if (counter == null || counter.get() == 0) {
-
-                    fail("Object not expected" + ": index=" + j + ", object="
-                            + actualObject);
-
-                }
-
-                counter.decrementAndGet();
-                
-            }
-
-            if (actual.hasNext()) {
-
-                fail("Iterator will deliver too many objects.");
-
-            }
-            
-            // The query should be done. Check its Future.
-            runningQuery.get();
-
-        } catch (InterruptedException ex) {
-            
-            throw new RuntimeException("Query evaluation was interrupted: "
-                    + ex, ex);
-            
-        } catch(ExecutionException ex) {
-        
-            throw new RuntimeException("Error during query evaluation: " + ex,
-                    ex);
-
-        } finally {
-
-            itr.close();
-            
-        }
-
     }
 
 }

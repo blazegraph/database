@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,12 +36,18 @@ import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
 import com.bigdata.rdf.model.BigdataURI;
@@ -55,47 +60,82 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
- * Unit tests for subquery evaluation based on an AST input model.
+ * Unit tests for named subquery evaluation based on an AST input model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * TODO Unit test when the named result set is consumed more than once.
  */
-public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
+public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCase {
 
-    public TestSubqueryEvaluation() {
+    public TestASTNamedSubqueryEvaluation() {
     }
 
-    public TestSubqueryEvaluation(final String name) {
+    public TestASTNamedSubqueryEvaluation(final String name) {
         super(name);
     }
 
     /**
-     * Unit test for an AST modeling a sub-select. A sub-select may be evaluated
-     * at any point in the pipeline. Only variables which are projected by the
-     * sub-select are in scope when it runs. Those variables are projected into
-     * the subquery.
+     * Unit test for an AST modeling a named subquery. A named subquery is
+     * introduced by a {@link NamedSubqueryRoot}, which is attached to the
+     * {@link QueryRoot}. The named subquery always runs before the WHERE clause
+     * of the query. When it runs, the named subquery produces a named temporary
+     * solution set. The temporary solution set is scoped by the name on the
+     * {@link IQueryAttributes} of the {@link IRunningQuery}. A
+     * {@link NamedSubqueryInclude} is used to join against the temporary
+     * solution set elsewhere in the query.
      * 
      * <pre>
-     * SELECT ?s
+     * WITH {
+     *   SELECT ?x WHERE {?x rdf:type foaf:Person}
+     * } AS %namedSet1
+     * SELECT ?x ?o
      *  WHERE {
-     *    ?s ?x ?o .
-     *    {
-     *      SELECT ?x WHERE {?x rdf:subPropertyOf ?x}
-     *    }
+     *    ?x rdfs:label ?o .
+     *    INCLUDE %namedSet1
      * }
      * </pre>
-     * @throws Exception 
+     * 
+     * Data:
+     * 
+     * <pre>
+     * http://www.bigdata.com/Mike rdf:type foaf:Person
+     * http://www.bigdata.com/Bryan rdf:type foaf:Person
+     * http://www.bigdata.com/Mike rdfs:label "Mike"
+     * http://www.bigdata.com/Bryan rdfs:label "Bryan"
+     * http://www.bigdata.com/DC rdfs:label "DC"
+     * </pre>
+     * 
+     * Subquery solutions:
+     * 
+     * <pre>
+     * {x=http://www.bigdata.com/Mike}
+     * {x=http://www.bigdata.com/Bryan}
+     * </pre>
+     * 
+     * Solutions:
+     * 
+     * <pre>
+     * {x=http://www.bigdata.com/Mike; o="Mike"}
+     * {x=http://www.bigdata.com/Bryan; o="Bryan"}
+     * </pre>
+     * 
+     * @throws Exception
      */
-    public void test_subSelect() throws Exception {
+    public void test_namedSubquery() throws Exception {
 
         final String sparql = ""//
+                + "PREFIX rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"//
                 + "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"//
                 + "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n"//
-                + "select ?s ?o \n" //
-                + "where {\n"//
-                + " ?x rdfs:label ?o " + " {\n"//
+                + "select ?x ?o \n" //
+                + "with {\n" //
                 + "   select ?x where { ?x rdf:type foaf:Person }\n" //
-                + " }\n"//
+                + "} AS %namedSet1\n" //
+                + "where {\n"//
+                + " ?x rdfs:label ?o \n"//
+                + " INCLUDE %namedSet1 \n"//
                 + "}"//
         ;
 
@@ -111,7 +151,7 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                 final BigdataStatement[] stmts = new BigdataStatement[] {//
 
                         new BigdataStatementImpl(
-                                f.createURI("http:/www.bigdata.com/Mike"),
+                                f.createURI("http://www.bigdata.com/Mike"),
                                 f.createURI(RDF.TYPE.toString()),
                                 f.createURI(FOAFVocabularyDecl.Person.toString()),
                                 null, // context
@@ -120,7 +160,7 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                         ),
 
                         new BigdataStatementImpl(
-                                f.createURI("http:/www.bigdata.com/Bryan"),
+                                f.createURI("http://www.bigdata.com/Bryan"),
                                 f.createURI(RDF.TYPE.toString()),
                                 f.createURI(FOAFVocabularyDecl.Person.toString()),
                                 null, // context
@@ -129,7 +169,7 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                         ),
 
                         new BigdataStatementImpl(
-                                f.createURI("http:/www.bigdata.com/Mike"),
+                                f.createURI("http://www.bigdata.com/Mike"),
                                 f.createURI(RDFS.LABEL.toString()),
                                 f.createLiteral("Mike"),
                                 null, // context
@@ -138,9 +178,18 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                         ),
 
                         new BigdataStatementImpl(
-                                f.createURI("http:/www.bigdata.com/Bryan"),
+                                f.createURI("http://www.bigdata.com/Bryan"),
                                 f.createURI(RDFS.LABEL.toString()),
                                 f.createLiteral("Bryan"),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/DC"),
+                                f.createURI(RDFS.LABEL.toString()),
+                                f.createLiteral("DC"),
                                 null, // context
                                 StatementEnum.Explicit,//
                                 false// userFlag
@@ -168,9 +217,18 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
 
             final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
                     .toString());
-            
+
+            final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
+
+            final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
+
+            final BigdataLiteral mikeLabel = f.createLiteral("Mike");
+
+            final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
+
             final BigdataValue[] values = new BigdataValue[] { rdfType,
-                    rdfsLabel, foafPerson };
+                    rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
+                    bryanLabel };
 
             // resolve IVs.
             store.getLexiconRelation()
@@ -180,10 +238,7 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
              * Build up the AST for the query.
              */
             final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
-            final SubqueryRoot subSelect;
             {
-
-                final VarNode s = new VarNode("s");
 
                 final VarNode o = new VarNode("o");
 
@@ -199,10 +254,30 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                         foafPerson.getIV());
 
                 queryRoot.setQueryHints(new Properties());
+
+                final NamedSubqueryRoot namedSubqueryRoot;
+                {
+
+                    namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
+                            "%namedSet1");
+
+                    final ProjectionNode projection2 = new ProjectionNode();
+                    projection2.addProjectionVar(x);
+                    namedSubqueryRoot.setProjection(projection2);
+
+                    final JoinGroupNode whereClause2 = new JoinGroupNode();
+                    namedSubqueryRoot.setWhereClause(whereClause2);
+
+                    whereClause2.addChild(new StatementPatternNode(x,
+                            rdfTypeConst, foafPersonConst, null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+
+                }
                 
                 {
+
                     final ProjectionNode projection = new ProjectionNode();
-                    projection.addProjectionVar(s);
+                    projection.addProjectionVar(x);
                     projection.addProjectionVar(o);
                     queryRoot.setProjection(projection);
 
@@ -213,40 +288,20 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
                             o, null/* c */,
                             StatementPattern.Scope.DEFAULT_CONTEXTS));
 
-                    /*
-                     * TODO Test with the sub-select in its own join group and
-                     * with it in the top-level group. I assume that the
-                     * sub-select in its own join group will translate into a
-                     * sub-sub-query unless that otherwise empty join group is
-                     * detected by an optimizer.
-                     */
-                    subSelect = new SubqueryRoot(QueryType.SELECT);
-                    // whereClause.addChild(subSelect);
-
-                    final JoinGroupNode wrapperGroup = new JoinGroupNode();
-                    whereClause.addChild(wrapperGroup);
-                    wrapperGroup.addChild(subSelect);
-                }
-                {
-
-                    final ProjectionNode projection2 = new ProjectionNode();
-                    projection2.addProjectionVar(x);
-                    subSelect.setProjection(projection2);
-
-                    final JoinGroupNode whereClause2 = new JoinGroupNode();
-                    subSelect.setWhereClause(whereClause2);
-
-                    whereClause2.addChild(new StatementPatternNode(x, rdfTypeConst,
-                            foafPersonConst, null/* c */, Scope.DEFAULT_CONTEXTS));
+                    whereClause
+                            .addChild(new NamedSubqueryInclude("%namedSet1"));
 
                 }
             
             }
 
-            log.error("AST: " + queryRoot);
+            if(log.isInfoEnabled())
+                log.info("AST: " + queryRoot);
 
             final Properties queryHints = queryRoot.getQueryHints();
+
             final AtomicInteger idFactory = new AtomicInteger(0);
+            
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
 
@@ -256,34 +311,22 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
             // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
 
-            log.error("plan:\n" + BOpUtility.toString(queryPlan));
+            if(log.isInfoEnabled())
+                log.info("plan:\n" + BOpUtility.toString(queryPlan));
 
-            final IRunningQuery runningQuery = queryEngine.eval(queryPlan);
-            
-            final Iterator<IBindingSet[]> itr = runningQuery.iterator();
-            
-            while(itr.hasNext()) {
-                
-                final IBindingSet[] chunk = itr.next();
-                
-                for(IBindingSet bs : chunk) {
-                    
-                    log.error("bset: "+bs);
-                    
-                }
-                
-            }
-
-            // Check Future for errors.
-            runningQuery.get();
-            
-            /*
-             * FIXME Add some triples which would not be selected and verify
-             * that the expected solutions were reported (assert same solutions
-             * any order).
-             */
-
-            fail("write test");
+            final IBindingSet[] expected = new IBindingSet[] {
+                    new ListBindingSet(//
+                            new IVariable[] { Var.var("x"), Var.var("o") },//
+                            new IConstant[] { new Constant(mikeURI.getIV()),
+                                    new Constant(mikeLabel.getIV()) }),//
+                    new ListBindingSet(//
+                            new IVariable[] { Var.var("x"), Var.var("o") },//
+                            new IConstant[] { new Constant(bryanURI.getIV()),
+                                    new Constant(bryanLabel.getIV()) }),//
+           // { x=TermId(1U), o=TermId(3L) }
+            // { x=TermId(2U), o=TermId(4L) }
+            };
+            assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
         } finally {
 
@@ -291,31 +334,6 @@ public class TestSubqueryEvaluation extends AbstractASTEvaluationTestCase {
             
         }
 
-    }
-
-    /**
-     * Unit test for an AST modeling an EXISTS filter. The EXISTS filter is
-     * modeled as an ASK sub-query which projects an anonymous variable and a
-     * simple test of the truth state of that anonymous variable.
-     */
-    public void test_existsSubquery() {
-        fail("write test");
-    }
-
-    /**
-     * Unit test for an AST modeling a named subquery. A named subquery is
-     * introduced by a {@link NamedSubqueryRoot}, which is attached to the
-     * {@link QueryRoot}. The named subquery always run before the WHERE clause
-     * of the query. When it runs, the named subquery produces a named temporary
-     * solution set. The temporary solution set is scoped by the name on the
-     * {@link IQueryAttributes} of the {@link IRunningQuery}. A
-     * {@link NamedSubqueryInclude} is used to join against the temporary
-     * solution set elsewhere in the query.
-     * 
-     * TODO Filter to remove any named subquery whose result set is not used?
-     */
-    public void test_namedSubquery() {
-        fail("write test");
     }
 
 }

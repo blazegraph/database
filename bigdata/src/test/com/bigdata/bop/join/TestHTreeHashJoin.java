@@ -62,7 +62,7 @@ import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -464,7 +464,7 @@ public class TestHTreeHashJoin extends TestCase2 {
             // execute task.
             jnl.getExecutorService().execute(ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
 
             // join task
@@ -581,7 +581,7 @@ public class TestHTreeHashJoin extends TestCase2 {
             // execute task.
             jnl.getExecutorService().execute(ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
 
             // join task
@@ -698,7 +698,7 @@ public class TestHTreeHashJoin extends TestCase2 {
             // execute task.
             jnl.getExecutorService().execute(ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
 
             // join task
@@ -857,7 +857,7 @@ public class TestHTreeHashJoin extends TestCase2 {
             // execute task.
             jnl.getExecutorService().execute(ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
 
             // join task
@@ -1035,10 +1035,10 @@ public class TestHTreeHashJoin extends TestCase2 {
             // execute task.
             jnl.getExecutorService().execute(ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
 
-            TestQueryEngine.assertSameSolutionsAnyOrder(expected2,
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected2,
                     sink2.iterator(), ft);
 
             // join task

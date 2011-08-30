@@ -150,6 +150,7 @@ public class MemorySortOp extends SortOp {
             
         }
         
+        // TODO Refactor the hash table onto IQueryAttributes and move this method.
         void release() {
 
             if (log.isInfoEnabled())

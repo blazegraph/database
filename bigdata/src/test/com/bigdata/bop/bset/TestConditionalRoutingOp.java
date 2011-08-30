@@ -49,7 +49,7 @@ import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -201,8 +201,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
-        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected2, sink2.iterator(), ft);
         
 //        assertTrue(ft.isDone());
 //        assertFalse(ft.isCancelled());

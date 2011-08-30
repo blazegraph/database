@@ -29,21 +29,24 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Properties;
 
-import junit.framework.TestCase2;
+import org.apache.log4j.Logger;
 
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class AbstractASTEvaluationTestCase extends TestCase2 {
+public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
+
+    protected static final Logger log = Logger
+            .getLogger(AbstractASTEvaluationTestCase.class);
 
     /**
      * 

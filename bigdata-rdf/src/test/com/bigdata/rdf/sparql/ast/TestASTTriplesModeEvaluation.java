@@ -21,6 +21,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -502,6 +503,22 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
     /**
      * Unit test developed to demonstrate a problem where the incorrect
      * materialization requirements are computed.
+     * <p>
+     * I just happened to run into an issue dealing with materialization. Say I
+     * have a constraint that needs materialization, <code>Str(...)</code> If
+     * that constraint has as its arg another constraint:
+     * <code>Coalesce (?x,?y)</code> [this returns the first none null value in
+     * the list of ?x,?y]
+     * <p>
+     * Its seems that the logic that determines the extra materialization steps
+     * doesn't handle the fact that Coalesce (?x,?y) doesn't need any
+     * materialization, so never sets the {@link INeedsMaterialization}
+     * interface, so the result of that valueExpression is going to be either ?x
+     * or ?y, and Str does need those variables materialized, but the
+     * materialization steps would never have seem that lists of terms(?x,?y) as
+     * something that needs materialization. Does the fact that a
+     * ValueExpression returns a non computed IV value, ie returns one of its
+     * arguments, have to be captured in order to somehow handle this?
      * 
      * @throws Exception
      */

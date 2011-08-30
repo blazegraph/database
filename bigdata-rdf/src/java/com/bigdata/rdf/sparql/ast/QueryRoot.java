@@ -26,6 +26,8 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Enumeration;
 import java.util.Properties;
 
+import org.openrdf.query.parser.sparql.ast.SimpleNode;
+
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
@@ -47,13 +49,26 @@ public class QueryRoot extends QueryBase {
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends QueryBase.Annotations {
+    public interface Annotations extends QueryBase.Annotations {
 
         /**
          * The original query from which this AST was generated.
          */
         String QUERY_STRING = "queryString";
-        
+
+        /**
+         * The parse tree generated from the query string (optional). For the
+         * default integration, this is the parse tree assembled by the Sesame
+         * <code>sparql.jjt</code> grammar. Other integrations may produce
+         * different parse trees using different object models.
+         * <p>
+         * Note: There is no guarantee that the parse tree is a serializable
+         * object. It may not need to be stripped off of the {@link QueryRoot}
+         * if the {@link QueryRoot} is persisted or shipped to another node in a
+         * cluster.
+         */
+        String PARSE_TREE = "parseTree";
+
         /**
          * Query hints (optional). When present, this is a {@link Properties}
          * object.
@@ -107,6 +122,27 @@ public class QueryRoot extends QueryBase {
     public void setQueryString(String queryString) {
         
         setProperty(Annotations.QUERY_STRING, queryString);
+        
+    }
+
+    /**
+     * Return the parse tree generated from the query string. 
+     */
+    public Object getParseTree() {
+
+        return getProperty(Annotations.PARSE_TREE);
+        
+    }
+
+    /**
+     * Set the parse tree generated from the query string.
+     * 
+     * @param parseTree
+     *            The parse tree (may be <code>null</code>).
+     */
+    public void setParseTree(Object parseTree) {
+        
+        setProperty(Annotations.PARSE_TREE, parseTree);
         
     }
     
@@ -183,12 +219,45 @@ public class QueryRoot extends QueryBase {
         
         final StringBuilder sb = new StringBuilder();
 
+        final String queryString = getQueryString();
+        
+        final Object parseTree = getParseTree();
+        
         final Properties queryHints = getQueryHints();
         
         final DatasetNode dataset = getDataset();
 
         final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
 
+        if (queryString != null) {
+
+            sb.append(s);
+            sb.append(queryString);
+            sb.append("\n");
+
+        }
+        
+        if (parseTree != null) {
+
+            if(parseTree instanceof SimpleNode) {
+
+                // Dump parse tree for sparql.jjt grammar.
+                sb.append(((SimpleNode)parseTree).dump(s));
+                
+            } else {
+            
+                /*
+                 * Dump some other parse tree, assuming it implements toString()
+                 * as pretty print.
+                 */
+                sb.append(s);
+                sb.append(parseTree.toString());
+                sb.append("\n");
+                
+            }
+
+        }
+        
         if (queryHints != null) {
 
             @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -235,38 +304,5 @@ public class QueryRoot extends QueryBase {
         return sb.toString();
         
     }
-
-//    public boolean equals(final Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!(o instanceof QueryRoot))
-//            return false;
-//
-//        if (!super.equals(o))
-//            return false;
-//
-//        final QueryRoot t = (QueryRoot) o;
-//
-//        if (dataset == null) {
-//            if (t.dataset != null)
-//                return false;
-//        } else {
-//            if (!dataset.equals(t.dataset))
-//                return false;
-//        }
-//
-//        if (namedSubqueries == null) {
-//            if (t.namedSubqueries != null)
-//                return false;
-//        } else {
-//            if (!namedSubqueries.equals(t.namedSubqueries))
-//                return false;
-//        }
-//
-//        return true;
-//
-//    }
 
 }

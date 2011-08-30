@@ -34,7 +34,9 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.parser.sparql.ast.Node;
 import org.openrdf.query.parser.sparql.ast.ParseException;
+import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
 import com.bigdata.journal.BufferMode;
@@ -227,8 +229,25 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected static void assertSameAST(final String queryStr,
             final IQueryNode expected, final IQueryNode actual) {
 
+        // Get a reference to the parse tree.
+        Node parseTree = null;
+        
         if (expected instanceof QueryRoot) {
+
+            if (((QueryRoot) expected).getQueryString() == null) {
+                /*
+                 * Note: Discard the query string since the unit tests are not
+                 * setting that attribute at this time.
+                 */
+                ((QueryRoot) actual).setQueryString(null);
+            }
+        
+            // Grab a reference to the parse tree.
+            parseTree = (Node) ((QueryRoot) actual).getParseTree();
             
+            // Clear parse tree annotation since it is not on [expected].
+            ((QueryRoot) actual).setParseTree(null);
+
             if (((QueryRoot) expected).getQueryHints() == null) {
                 /*
                  * Note: Discard the query hints since the unit tests are not
@@ -245,18 +264,12 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
                 ((QueryRoot) actual).setDataset(null);
             }
             
-            if (((QueryRoot) expected).getQueryString() == null) {
-                /*
-                 * Note: Discard the query string since the unit tests are not
-                 * setting that attribute at this time.
-                 */
-                ((QueryRoot) actual).setQueryString(null);
-            }
         }
 
         if (!expected.equals(actual)) {
 
             log.error("queryStr:\n" + queryStr);
+            log.error("parseTree:\n" + ((SimpleNode) parseTree).dump(""));
             log.error("expected: " + expected);
             log.error("actual  :" + actual);
 

@@ -138,4 +138,81 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
     }
 
+    /**
+     * Simple but robust version of to-String 
+     */
+    public String toString(final int indent) {
+        
+        final String s = indent(indent);
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(sb.append(s));
+        
+        sb.append(getClass().getSimpleName());
+        
+        if (isOptional()) {
+        
+            sb.append(" optional {\n");
+            
+        } else {
+
+            sb.append(" {\n");
+            
+        }
+
+        for (IQueryNode n : this) {
+
+            sb.append(n.toString(indent + 1)).append("\n");
+
+        }
+
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof StatementPatternNode)) {
+//                continue;
+//            }
+//            sb.append(n.toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof FilterNode)) {
+//                continue;
+//            }
+//            sb.append(n.toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof UnionNode)) {
+//                continue;
+//            }
+//            sb.append(((UnionNode) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof JoinGroupNode)) {
+//                continue;
+//            }
+//            sb.append(((JoinGroupNode) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof SubqueryRoot)) {
+//                continue;
+//            }
+//            sb.append(((SubqueryRoot) n).toString(indent + 1)).append("\n");
+//        }
+//
+//        for (IQueryNode n : this) {
+//            if (!(n instanceof AssignmentNode)) {
+//                continue;
+//            }
+//            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
+//        }
+
+        sb.append(s).append("}");
+
+        return sb.toString();
+
+    }
+
 }

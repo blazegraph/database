@@ -47,7 +47,7 @@ import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -166,7 +166,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
 
 //        assertTrue(ft.isDone());
 //        assertFalse(ft.isCancelled());
@@ -215,8 +215,8 @@ public class TestCopyBindingSets extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator(), ft);
-        TestQueryEngine.assertSameSolutions(expected, altSink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, sink.iterator(), ft);
+        AbstractQueryEngineTestCase.assertSameSolutions(expected, altSink.iterator(), ft);
 
 //        assertTrue(ft.isDone());
 //        assertFalse(ft.isCancelled());
@@ -283,7 +283,7 @@ public class TestCopyBindingSets extends TestCase2 {
         // execute task.
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected
+        AbstractQueryEngineTestCase.assertSameSolutions(expected
                 .toArray(new IBindingSet[] {}), sink.iterator(), ft);
 
 //        assertTrue(ft.isDone());

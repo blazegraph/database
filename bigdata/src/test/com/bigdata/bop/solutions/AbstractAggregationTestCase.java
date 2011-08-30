@@ -53,7 +53,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.rdf.aggregate.COUNT;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.rdf.internal.IV;
@@ -251,7 +251,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -350,7 +350,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -515,7 +515,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -686,7 +686,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -859,7 +859,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1030,7 +1030,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1198,7 +1198,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1363,7 +1363,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1512,7 +1512,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1674,7 +1674,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -1851,7 +1851,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2009,7 +2009,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2185,7 +2185,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2373,7 +2373,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2567,7 +2567,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2748,7 +2748,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());
@@ -2937,7 +2937,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         }
 
         // Check the solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected, sink.iterator(),
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, sink.iterator(),
                 ft);
 
         assertEquals(1, stats.chunksIn.get());

@@ -46,7 +46,7 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.HashBindingSet;
-import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -413,7 +413,7 @@ public class TestMapBindingSetsOverShards extends
 //                    assertEquals("#of binding sets", partition0.size(),
 //                            bundle0.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(
                             expectedPartition0.toArray(new IBindingSet[0]),
                             new Dechunkerator<IBindingSet>(actualPartition0
                                     .iterator()));
@@ -430,7 +430,7 @@ public class TestMapBindingSetsOverShards extends
 //                    assertEquals("#of binding sets", partition1.size(),
 //                            bundle1.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(
                             expectedPartition1.toArray(new IBindingSet[0]),
                             new Dechunkerator<IBindingSet>(actualPartition1
                                     .iterator()));
@@ -561,7 +561,7 @@ public class TestMapBindingSetsOverShards extends
 //                    assertEquals("#of binding sets", partition0.size(),
 //                            bundle0.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(
                             expectedPartition0.toArray(new IBindingSet[0]),
                             new Dechunkerator<IBindingSet>(actualPartition0
                                     .iterator()));
@@ -578,7 +578,7 @@ public class TestMapBindingSetsOverShards extends
 //                    assertEquals("#of binding sets", partition1.size(),
 //                            bundle1.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(
                             expectedPartition1.toArray(new IBindingSet[0]),
                             new Dechunkerator<IBindingSet>(actualPartition1
                                     .iterator()));
@@ -671,7 +671,7 @@ public class TestMapBindingSetsOverShards extends
                     assertEquals("#of binding sets", partition0.size(),
                             bundle0.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(partition0
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(partition0
                             .toArray(new IBindingSet[0]), Arrays.asList(
                             bundle0.bindingSets).iterator());
 
@@ -687,7 +687,7 @@ public class TestMapBindingSetsOverShards extends
                     assertEquals("#of binding sets", partition1.size(),
                             bundle1.bindingSets.length);
 
-                    TestQueryEngine.assertSameSolutionsAnyOrder(partition1
+                    AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(partition1
                             .toArray(new IBindingSet[0]), Arrays.asList(
                             bundle1.bindingSets).iterator());
                 }
