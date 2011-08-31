@@ -40,7 +40,6 @@ import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -88,7 +87,7 @@ public class DescribeOptimizer implements IASTOptimizer {
 	 */
 	@Override
 	public IQueryNode optimize(final AST2BOpContext context, 
-			final IQueryNode queryNode, final DatasetNode dataset, 
+			final IQueryNode queryNode, //final DatasetNode dataset, 
 			final IBindingSet[] bindingSet) {
 		
 //        final String sparql = "describe <http://www.bigdata.com>";
@@ -128,7 +127,10 @@ public class DescribeOptimizer implements IASTOptimizer {
 		final QueryRoot describe = (QueryRoot) queryNode;
 		
 		if (describe.getQueryType() != QueryType.DESCRIBE) {
-			throw new IllegalArgumentException();
+			
+		    // Not a query that we will rewrite.
+		    return describe;
+		    
 		}
 
 		final IGroupNode<IGroupMemberNode> where;

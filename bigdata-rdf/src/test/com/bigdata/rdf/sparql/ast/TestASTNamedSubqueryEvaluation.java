@@ -318,7 +318,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
 
             // run optimizer for named subqueries.
             queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
-                    ctx, queryRoot, null/* dataset */, null/* bindingSet */);
+                    ctx, queryRoot, null/* bindingSet */);
 
             // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
@@ -549,7 +549,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
 
             // run optimizer for named subqueries.
             queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
-                    ctx, queryRoot, null/* dataset */, null/* bindingSet */);
+                    ctx, queryRoot, null/* bindingSet */);
 
             // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);

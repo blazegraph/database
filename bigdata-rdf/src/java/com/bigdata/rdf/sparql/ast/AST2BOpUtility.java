@@ -243,11 +243,24 @@ public class AST2BOpUtility {
      */
     public static PipelineOp convert(final AST2BOpContext ctx) {
 
+        /*
+         * FIXME Pass in zero or more binding sets to use when optimizing the
+         * query. This is mainly for rewriting variables as constants (when
+         * there is one source binding set) or for adding IN filters (where
+         * there are several and we can constrain a variable to the known values
+         * which it can take on). This could be passed through using the [ctx]
+         * or directly.
+         */
+        final IBindingSet[] bindingSets = null;
+        
         // The AST query model.
         final QueryRoot query = ctx.query;
         
+        final QueryRoot optimizedQuery = (QueryRoot) optimize(ctx, query,
+                bindingSets); 
+        
         // The executable query plan.
-        final PipelineOp queryPlan = convert(query, ctx);
+        final PipelineOp queryPlan = convert(optimizedQuery, ctx);
 
         /*
          * Set the queryId on the top-level of the query plan.
@@ -262,6 +275,32 @@ public class AST2BOpUtility {
 
     }
 
+    /**
+     * Run the optimizers.
+     * 
+     * @param ctx
+     * @param node
+     * @param bindingSets
+     * 
+     * @return The optimized AST model.
+     * 
+     *         TODO Put into an executable list pattern and pass the set of
+     *         optimizers into the {@link AST2BOpContext} so we can unit test
+     *         this stuff more readily.
+     */
+    static IQueryNode optimize(final AST2BOpContext ctx,
+            IQueryNode node, final IBindingSet[] bindingSets) {
+
+        for (IASTOptimizer opt : optimizers) {
+
+            node = opt.optimize(ctx, node, bindingSets);
+
+        }
+        
+        return node;
+
+    }
+    
     /**
      * Convert a query (or subquery) into a query plan (pipeline).
      * 

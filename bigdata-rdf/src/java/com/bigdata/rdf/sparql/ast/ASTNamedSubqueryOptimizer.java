@@ -66,7 +66,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      */
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            DatasetNode dataset, IBindingSet[] bindingSet) {
+            /*DatasetNode dataset,*/ IBindingSet[] bindingSet) {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
