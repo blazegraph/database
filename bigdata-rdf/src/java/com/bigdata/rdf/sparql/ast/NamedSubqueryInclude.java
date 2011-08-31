@@ -41,7 +41,7 @@ public class NamedSubqueryInclude extends
 
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends SubqueryRoot.Annotations {
+    public interface Annotations extends SubqueryRoot.Annotations {
 
         /**
          * The name of the temporary solution set.
@@ -52,12 +52,18 @@ public class NamedSubqueryInclude extends
          * A {@link VarNode}[] specifying the join variables that will be used
          * when the named result set is join with the query. The join variables
          * MUST be bound for a solution to join.
-         * 
-         * TODO This can be different for each context in the query in which a
+         * <p>
+         * Note: This can be different for each context in the query in which a
          * given named result set is included. When there are different join
          * variables for different INCLUDEs, then we need to build a hash index
          * for each set of join variable context that will be consumed within
          * the query.
+         * <p>
+         * Note: If no join variables are specified, then the join will consider
+         * the N x M cross product, filtering for solutions which join. This is
+         * very expensive. Whenever possible you should identify one or more
+         * variables which must be bound for the join and specify those as the
+         * join variables.
          */
         String JOIN_VARS = "joinVars";
         
@@ -85,7 +91,7 @@ public class NamedSubqueryInclude extends
      * 
      * @param name
      */
-    public void setName(String name) {
+    public void setName(final String name) {
      
         if(name == null)
             throw new IllegalArgumentException();
@@ -131,7 +137,7 @@ public class NamedSubqueryInclude extends
 
             sb.append(" JOIN ON (");
 
-            boolean first = false;
+            boolean first = true;
 
             for (VarNode var : joinVars) {
 

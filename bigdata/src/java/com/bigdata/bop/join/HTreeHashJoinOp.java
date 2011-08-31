@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -38,9 +39,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IShardwisePipelineOp;
@@ -48,24 +47,19 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.ITuple;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
-import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.rwstore.sector.MemStore;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A hash join based on the {@link HTree} and suitable for very large
@@ -121,10 +115,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO If no join variables, then join is full cross product
- *          (constraints are still applied and optional solutions must be
- *          reported if a constraint fails and the join is optional).
  */
 public class HTreeHashJoinOp<E> extends PipelineOp implements
         IShardwisePipelineOp<E> {
@@ -199,8 +189,8 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
-        if (joinVars.length == 0)
-            throw new IllegalArgumentException(Annotations.JOIN_VARS);
+//        if (joinVars.length == 0)
+//            throw new IllegalArgumentException(Annotations.JOIN_VARS);
 
         for (IVariable<?> var : joinVars) {
 
@@ -303,88 +293,6 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
     }
 
     /**
-     * Create an ordered array of the as-bound values of the given variables.
-     * 
-     * @param vars
-     *            The join variables.
-     * @param bset
-     *            A binding set used to resolve the as-bound values of the
-     *            join variables.
-     * @param asBound
-     *            An array having the same dimension as <i>vars</i> whose
-     *            elements will be set to the as-bound values of the each
-     *            variable.
-     *            
-     * @return The caller's array.
-     */
-    static private IConstant<?>[] makeKey(final IVariable<?>[] vars,
-            final IBindingSet bset, final IConstant<?>[] asBound) {
-
-        assert asBound.length == vars.length;
-
-        for (int i = 0; i < vars.length; i++) {
-
-            asBound[i] = bset.get(vars[i]);
-
-        }
-
-        return asBound;
-
-    }
-
-    /**
-     * Return the hash code which will be used as the key for the {@link HTree}
-     * given the ordered as-bound values for the join variables.
-     * 
-     * @param asBound
-     *            The ordered as bound values for the join variables.
-     *            
-     * @return The hash code which will be used as the key for the {@link HTree}
-     *         .
-     */
-    static private int hashCode(final IConstant<?>[] asBound) {
-        
-        return java.util.Arrays.hashCode(asBound);
-        
-    }
-    
-    /**
-     * Return <code>true</code> iff the as-bound values for the join variables
-     * are consistent with the given {@link IConstant}[].
-     * 
-     * @param vars
-     *            The join variables (ordered array).
-     * @param bset
-     *            The binding set whose as bound values will be compared.
-     * @param asBound
-     *            The constants.
-     * 
-     * @return <code>true</code> iff the as-bound values of the join variables
-     *         are consistent with the given {@link IConstant}[].
-     */
-    static private boolean sameAsBoundValues(final IVariable<?>[] vars,
-            final IBindingSet bset, final IConstant<?>[] asBound) {
-
-        assert vars.length == asBound.length;
-
-        for (int i = 0; i < vars.length; i++) {
-
-            final IVariable<?> var = vars[i];
-
-            final Object a = var.get(bset);
-
-            final Object b = asBound[i].get();
-
-            if (!a.equals(b))
-                return false;
-
-        }
-
-        return true;
-
-    }
-    
-    /**
      * Task executing on the node.
      */
     private static class ChunkTask<E> implements Callable<Void> {
@@ -418,7 +326,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          * Note: The map is shared state and can not be discarded or cleared
          * until the last invocation!!!
          */
-        private final HTree sourceSolutions;
+        private final HTree rightSolutions;
 
         /**
          * The set of distinct source solutions which joined. This set is
@@ -470,11 +378,11 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 final Object joinSetKey = op.getId() + ".joinSet";
 
-                HTree sourceSolutions = (HTree) attrs.get(sourceSolutionsKey);
+                HTree rightSolutions = (HTree) attrs.get(sourceSolutionsKey);
 
                 HTree joinSet = (HTree) attrs.get(joinSetKey);
 
-                if (sourceSolutions == null) {
+                if (rightSolutions == null) {
 
                     /*
                      * Create the map(s).
@@ -520,13 +428,13 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                             .createAllocationContext());
 
                     // Will support incremental eviction and persistence.
-                    sourceSolutions = HTree.create(store, metadata);
+                    rightSolutions = HTree.create(store, metadata);
 
                     // Used to handle optionals.
                     joinSet = op.isOptional() ? HTree.create(store,
                             metadata.clone()) : null;
 
-                    if (attrs.putIfAbsent(sourceSolutionsKey, sourceSolutions) != null)
+                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
                         throw new AssertionError();
 
                     if (joinSet != null) {
@@ -538,7 +446,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 // The map is shared state across invocations of this operator
                 // task.
-                this.sourceSolutions = sourceSolutions;
+                this.rightSolutions = rightSolutions;
 
                 // defined iff the join is optional.
                 this.joinSet = joinSet;
@@ -560,11 +468,11 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                 
             }
 
-            if (sourceSolutions != null) {
+            if (rightSolutions != null) {
 
-                final IRawStore store = sourceSolutions.getStore();
+                final IRawStore store = rightSolutions.getStore();
 
-                sourceSolutions.close();
+                rightSolutions.close();
                 
 //                sourceSolutions = null;
                 
@@ -582,7 +490,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 final long maxMemory = op.getMaxMemory();
 
-                final long usedMemory = sourceSolutions.getStore().size();
+                final long usedMemory = rightSolutions.getStore().size();
                 
                 if (context.isLastInvocation() || usedMemory >= maxMemory) {
 
@@ -615,64 +523,28 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          */
         private void acceptSolutions() {
 
-            // Array of the as-bound values; reused for each source solution.
-            final IConstant<?>[] asBound = new IConstant<?>[joinVars.length];
-
-            final IAsynchronousIterator<IBindingSet[]> itr = context
-                    .getSource();
-
-            while (itr.hasNext()) {
-
-                final IBindingSet[] a = itr.next();
-
-                stats.chunksIn.increment();
-                stats.unitsIn.add(a.length);
-
-                for (IBindingSet bset : a) {
-                
-                    // Build key from the as-bound join variables.
-                    makeKey(joinVars, bset, asBound);
-                    
-                    final int hashCode = HTreeHashJoinOp.hashCode(asBound);
-
-                    // Insert binding set under hash code for that key.
-                    sourceSolutions.insert(hashCode,
-                            SerializerUtil.serialize(bset));
-                   
-                }
-                
-            }
+            HashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+                    stats, rightSolutions, optional);
 
         }
 
         /**
-         * Scan the {@link IAccessPath} once, probing the {@link HTree} for each
-         * as-bound {@link IPredicate} read from that {@link IAccessPath} and
-         * output solutions which join.
-         * <p>
-         * Note: the {@link HTree} may have many entries for the same as-bound
-         * {@link #joinVars}.
+         * Do a hash join of the buffered solutions with the access path.
          */
         private void doHashJoin() {
 
-            if (sourceSolutions.getEntryCount() == 0)
+            if (rightSolutions.getEntryCount() == 0)
                 return;
             
             final IAccessPath<?> accessPath = context.getAccessPath(relation,
                     pred);
 
             if (log.isDebugEnabled()) {
-                log.debug("sourceSolutions=" + sourceSolutions.getEntryCount());
-                log.debug("joinVars=" + joinVars);
+                log.debug("rightSolutions=" + rightSolutions.getEntryCount());
+                log.debug("joinVars=" + Arrays.toString(joinVars));
                 log.debug("accessPath=" + accessPath);
             }
 
-            handleJoin(accessPath);
-
-        }
-        
-        private void handleJoin(final IAccessPath<?> accessPath) {
-            
             stats.accessPathCount.increment();
 
             stats.accessPathRangeCount.add(accessPath
@@ -681,145 +553,20 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            // Array of the as-bound values; reused for each visited tuple.
-            final IConstant<?>[] asBound = new IConstant<?>[joinVars.length];
+            HashJoinUtility.hashJoin(BOpContext.solutions(
+                    accessPath.iterator(), pred, joinVars, stats),
+                    unsyncBuffer, joinVars, selectVars, constraints,
+                    rightSolutions, joinSet, optional);
 
-            final IChunkedOrderedIterator<?> itr = accessPath.iterator();
+            if (optional) {
 
-            try {
-
-                while (itr.hasNext()) {
-
-                    final Object[] chunk = itr.nextChunk();
-
-                    stats.accessPathChunksIn.increment();
-
-                    stats.accessPathUnitsIn.add(chunk.length);
-
-                    for (Object e : chunk) {
-
-                        // overwrite with values copied from the access path.
-                        BOpContext.copyValues((IElement) e, pred, joinVars,
-                                asBound);
-
-                        // visit all source solutions having the same hash code
-                        @SuppressWarnings("unchecked")
-                        final ITupleIterator<IBindingSet> titr = sourceSolutions
-                                .lookupAll(HTreeHashJoinOp.hashCode(asBound));
-
-                        while (titr.hasNext()) {
-
-                            final ITuple<IBindingSet> t = titr.next();
-
-                            /*
-                             * Note: The map entries must be the full source
-                             * binding set, not just the join variables, even
-                             * though the key and equality in the key is defined
-                             * in terms of just the join variables.
-                             */
-                            final IBindingSet sourceSolution = t.getObject();
-
-                            if (!sameAsBoundValues(joinVars, sourceSolution, asBound)) {
-                                /*
-                                 * Same hash code, but not the same as-bound
-                                 * values for the join variables.
-                                 */
-                                continue;
-                            }
-
-                            /*
-                             * Join.
-                             */
-
-                            // Note: we can not modify the source solution if
-                            // the join is optional.
-                            IBindingSet bset = optional ? sourceSolution
-                                    .clone() : sourceSolution;
-                            
-                            // propagate bindings from the visited element.
-                            if (!context.bind(pred, constraints, e, bset)) {
-
-                                // solution rejected by constraint(s).
-
-                                if (log.isDebugEnabled())
-                                    log.debug("Join fails constraint(s): "
-                                            + bset);
-                                
-                                continue;
-
-                            }
-
-                            // strip off unnecessary variables.
-                            bset = selectVars == null ? bset : bset
-                                    .copy(selectVars);
-
-                            if (log.isDebugEnabled())
-                                log.debug("Joined solution: " + bset);
-
-                            // Accept this binding set.
-                            unsyncBuffer.add(bset);
-
-                            if (optional) {
-
-                                /*
-                                 * Add to 2nd hash tree of all solutions which
-                                 * join. Note that the hash key is based on the
-                                 * entire solution for this htree.
-                                 */
-                                joinSet.insert(sourceSolution);
-
-                           }
-
-                        } // next solution with the same hash code.
-                        
-                    } // next chunk
-
-                } // while(itr.hasNext()
-
-            } finally {
-
-                itr.close();
-
-            }
-
-            if(optional) {
-                
-                // where to write the optional solutions. 
+                // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
-                
-                // Visit all source solutions.
-                @SuppressWarnings("unchecked")
-                final ITupleIterator<IBindingSet> sitr = sourceSolutions
-                        .rangeIterator();
-                
-                while(sitr.hasNext()) {
-                    
-                    final ITuple<IBindingSet> t = sitr.next();
-                    
-                    final IBindingSet sourceSolution = t.getObject();
 
-                    // The hash code is based on the entire solution for the
-                    // joinSet.
-                    final int hashCode = sourceSolution.hashCode();
-                    
-                    // Probe the join set for this source solution.
-                    @SuppressWarnings("unchecked")
-                    final ITupleIterator<IBindingSet> jitr = joinSet
-                            .lookupAll(hashCode);
-
-                    if (!jitr.hasNext()) {
-
-                        /*
-                         * Since the source solution is not in the join set,
-                         * output it as an optional solution.
-                         */
-                        unsyncBuffer2.add(sourceSolution);
-
-                    }
-
-                }
+                HashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
+                        joinSet);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)
@@ -830,10 +577,8 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             unsyncBuffer.flush();
             sink.flush();
 
-            return;
-
-        } // handleJoin
-
+        }
+        
     } // class ChunkTask
 
 }

@@ -135,7 +135,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                 + "} AS %namedSet1\n" //
                 + "where {\n"//
                 + " ?x rdfs:label ?o \n"//
-                + " INCLUDE %namedSet1 \n"//
+                + " INCLUDE %namedSet1 JOIN ON (?x) \n"//
                 + "}"//
         ;
 
@@ -294,8 +294,241 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                             o, null/* c */,
                             StatementPattern.Scope.DEFAULT_CONTEXTS));
 
-                    whereClause
-                            .addChild(new NamedSubqueryInclude("%namedSet1"));
+                    final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                            "%namedSet1");
+                    includeNode.setJoinVars(new VarNode[] {x}); // NO JOIN VARS!
+                    whereClause.addChild(includeNode);
+
+                }
+            
+            }
+            
+            if(log.isInfoEnabled())
+                log.info("AST: " + queryRoot);
+
+            final Properties queryHints = queryRoot.getQueryHints();
+
+            final AtomicInteger idFactory = new AtomicInteger(0);
+            
+            final QueryEngine queryEngine = QueryEngineFactory
+                    .getQueryController(store.getIndexManager());
+
+            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, idFactory,
+                    store, queryEngine, queryHints);
+
+            // run optimizer for named subqueries.
+            queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
+                    ctx, queryRoot, null/* dataset */, null/* bindingSet */);
+
+            // Generate the query plan.
+            final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
+
+            if(log.isInfoEnabled())
+                log.info("plan:\n" + BOpUtility.toString(queryPlan));
+
+            final IBindingSet[] expected = new IBindingSet[] {
+                    new ListBindingSet(//
+                            new IVariable[] { Var.var("x"), Var.var("o") },//
+                            new IConstant[] { new Constant(mikeURI.getIV()),
+                                    new Constant(mikeLabel.getIV()) }),//
+                    new ListBindingSet(//
+                            new IVariable[] { Var.var("x"), Var.var("o") },//
+                            new IConstant[] { new Constant(bryanURI.getIV()),
+                                    new Constant(bryanLabel.getIV()) }),//
+           // { x=TermId(1U), o=TermId(3L) }
+            // { x=TermId(2U), o=TermId(4L) }
+            };
+            assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
+
+        } finally {
+
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    /**
+     * Variant test in which no join variables are used. This should produce the
+     * same solutions, but do more work to identify them.
+     * 
+     * @throws Exception
+     */
+    public void test_namedSubquery_noJoinVars() throws Exception {
+
+        final String sparql = ""//
+                + "PREFIX rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"//
+                + "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"//
+                + "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n"//
+                + "select ?x ?o \n" //
+                + "with {\n" //
+                + "   select ?x where { ?x rdf:type foaf:Person }\n" //
+                + "} AS %namedSet1\n" //
+                + "where {\n"//
+                + " ?x rdfs:label ?o \n"//
+                + " INCLUDE %namedSet1 JOIN ON () \n"//
+                + "}"//
+        ;
+
+        final AbstractTripleStore store = getStore(getProperties());
+
+        try {
+        
+            final BigdataValueFactory f = store.getValueFactory();
+
+            // Add some data.
+            {
+
+                final BigdataStatement[] stmts = new BigdataStatement[] {//
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/Mike"),
+                                f.createURI(RDF.TYPE.toString()),
+                                f.createURI(FOAFVocabularyDecl.Person.toString()),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/Bryan"),
+                                f.createURI(RDF.TYPE.toString()),
+                                f.createURI(FOAFVocabularyDecl.Person.toString()),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/Mike"),
+                                f.createURI(RDFS.LABEL.toString()),
+                                f.createLiteral("Mike"),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/Bryan"),
+                                f.createURI(RDFS.LABEL.toString()),
+                                f.createLiteral("Bryan"),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                        new BigdataStatementImpl(
+                                f.createURI("http://www.bigdata.com/DC"),
+                                f.createURI(RDFS.LABEL.toString()),
+                                f.createLiteral("DC"),
+                                null, // context
+                                StatementEnum.Explicit,//
+                                false// userFlag
+                        ),
+
+                };
+
+                final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
+                        store, 10/* capacity */);
+
+                for(BigdataStatement stmt : stmts) {
+                
+                    buf.add(stmt);
+                    
+                }
+                
+                // write on the database.
+                buf.flush();
+                
+            }
+
+            final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
+
+            final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
+
+            final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
+                    .toString());
+
+            final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
+
+            final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
+
+            final BigdataLiteral mikeLabel = f.createLiteral("Mike");
+
+            final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
+
+            final BigdataValue[] values = new BigdataValue[] { rdfType,
+                    rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
+                    bryanLabel };
+
+            // resolve IVs.
+            store.getLexiconRelation()
+                    .addTerms(values, values.length, true/* readOnly */);
+            
+            /*
+             * Build up the AST for the query.
+             */
+            QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+            {
+
+                final VarNode o = new VarNode("o");
+
+                final VarNode x = new VarNode("x");
+
+                final ConstantNode rdfsLabelConst = new ConstantNode(
+                        rdfsLabel.getIV());
+
+                final ConstantNode rdfTypeConst = new ConstantNode(
+                        rdfType.getIV());
+
+                final ConstantNode foafPersonConst = new ConstantNode(
+                        foafPerson.getIV());
+
+                queryRoot.setQueryHints(new Properties());
+
+                final NamedSubqueryRoot namedSubqueryRoot;
+                {
+
+                    final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+
+                    queryRoot.setNamedSubqueries(namedSubqueries);
+
+                    namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
+                            "%namedSet1");
+                    
+                    namedSubqueries.add(namedSubqueryRoot);
+
+                    final ProjectionNode projection2 = new ProjectionNode();
+                    projection2.addProjectionVar(x);
+                    namedSubqueryRoot.setProjection(projection2);
+
+                    final JoinGroupNode whereClause2 = new JoinGroupNode();
+                    namedSubqueryRoot.setWhereClause(whereClause2);
+
+                    whereClause2.addChild(new StatementPatternNode(x,
+                            rdfTypeConst, foafPersonConst, null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+
+                }
+                
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(x);
+                    projection.addProjectionVar(o);
+                    queryRoot.setProjection(projection);
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    queryRoot.setWhereClause(whereClause);
+
+                    whereClause.addChild(new StatementPatternNode(x, rdfsLabelConst,
+                            o, null/* c */,
+                            StatementPattern.Scope.DEFAULT_CONTEXTS));
+
+                    final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                            "%namedSet1");
+                    includeNode.setJoinVars(new VarNode[] {}); // NO JOIN VARS!
+                    whereClause.addChild(includeNode);
 
                 }
             

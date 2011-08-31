@@ -536,7 +536,111 @@ public class TestSubqueryPatterns extends
                     null/* c */, Scope.DEFAULT_CONTEXTS));
 //            whereClause.addChild(new StatementPatternNode(p, subPropertyOf, p2,
 //                    null/* c */, Scope.DEFAULT_CONTEXTS));
-            whereClause.addChild(new NamedSubqueryInclude(namedSet));
+            final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                    namedSet);
+            whereClause.addChild(includeNode);
+
+        }
+        
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * Unit test for WITH {subquery} AS "name" and INCLUDE. The WITH must be in
+     * the top-level query. This example tests the use of the JOIN ON query
+     * hint. For example:
+     * 
+     * <pre>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * SELECT ?p2
+     * WITH {
+     *         SELECT DISTINCT ?p
+     *         WHERE {
+     *                 ?s ?p ?o
+     *         }
+     * } AS %namedSet1
+     *  WHERE {
+     *         ?p rdfs:subPropertyOf ?p2
+     *         INCLUDE %namedSet1 JOIN ON (?p2)
+     * }
+     * </pre>
+     */
+    public void test_namedSubquery_joinOn() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = //
+                "\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>" + //
+                "\nSELECT ?p2" + //
+                "\n WITH {" + //
+                "\n         SELECT DISTINCT ?p" + //
+                "\n         WHERE {" + //
+                "\n                 ?s ?p ?o" + //
+                "\n          }" + //
+                "\n } AS %namedSet1" + //
+                "\n WHERE {" + //
+                "\n        bind ( rdfs:subPropertyOf as ?x )"+//
+                "\n        ?p ?x ?p2" + //
+//                "\n        INCLUDE %namedSet1" + //
+                "\n        INCLUDE %namedSet1 JOIN ON ( ?p2 )" + //
+                "\n}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final String namedSet = "%namedSet1";
+            
+            final VarNode s = new VarNode("s");
+            final VarNode p = new VarNode("p");
+            final VarNode o = new VarNode("o");
+            final VarNode p2 = new VarNode("p2");
+            final VarNode x = new VarNode("x");
+
+            final TermNode subPropertyOf = new ConstantNode(
+                    makeIV(valueFactory.createURI(RDFS.SUBPROPERTYOF
+                            .stringValue())));
+            
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(p2);
+                expected.setProjection(projection);
+            }
+            
+            final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+            expected.setNamedSubqueries(namedSubqueries);
+            {
+
+                final NamedSubqueryRoot namedSubqueryRoot = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet);
+                
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubqueryRoot.setProjection(projection);
+                projection.addProjectionVar(p);
+                projection.setDistinct(true);
+                
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                namedSubqueryRoot.setWhereClause(whereClause);
+                whereClause.addChild(new StatementPatternNode(s, p, o,
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+                namedSubqueries.add(namedSubqueryRoot);
+                
+            }
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new AssignmentNode(x,subPropertyOf));
+            whereClause.addChild(new StatementPatternNode(p, x, p2,
+                    null/* c */, Scope.DEFAULT_CONTEXTS));
+//            whereClause.addChild(new StatementPatternNode(p, subPropertyOf, p2,
+//                    null/* c */, Scope.DEFAULT_CONTEXTS));
+            final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                    namedSet);
+            includeNode.setJoinVars(new VarNode[] { p2 });
+            whereClause.addChild(includeNode);
             
         }
         
@@ -545,5 +649,5 @@ public class TestSubqueryPatterns extends
         assertSameAST(sparql, expected, actual);
 
     }
-    
+
 }

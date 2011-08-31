@@ -77,10 +77,6 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinOp.java 5033 2011-08-16 19:02:04Z thompsonbry $
- * 
- *          TODO If no join variables, then join is full cross product
- *          (constraints are still applied and optional solutions must be
- *          reported if a constraint fails and the join is optional).
  */
 public class SubqueryHashJoinOp extends PipelineOp {
 
@@ -117,8 +113,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
-        if (joinVars.length == 0)
-            throw new IllegalArgumentException(Annotations.JOIN_VARS);
+//        if (joinVars.length == 0)
+//            throw new IllegalArgumentException(Annotations.JOIN_VARS);
 
         for (IVariable<?> var : joinVars) {
 
@@ -392,44 +388,29 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                     log.debug("Join with " + src);
 
                                 /*
-                                 * Clone the source binding set since it is
-                                 * tested for each element visited.
+                                 * Clone this binding set since it is tested for
+                                 * each element visited and would otherwise be
+                                 * modified by a side-effect of the join.
                                  */
-                                IBindingSet bset = src.solution.clone();
+                                final IBindingSet outSolution = src.solution
+                                        .clone();
 
                                 // propagate bindings from the subquery
-                                BOpContext
-                                        .copyValues(subquerySolution/* src */,
-                                                bset/* dst */);
-
-                                if (log.isDebugEnabled())
-                                    log.debug("Joined solution: " + bset);
-
-                                if (constraints != null
-                                        && !BOpUtility.isConsistent(
-                                                constraints, bset)) {
-
-                                    // solution rejected by constraint(s).
-
-                                    if (log.isDebugEnabled())
-                                        log.debug("Join fails constraint(s): "
-                                                + bset);
-                                    
+                                if (!BOpContext
+                                        .bind(subquerySolution/* src */,
+                                                constraints, selectVars,
+                                                outSolution/* dst */)) {
+                                    // Join failed.
                                     continue;
-
                                 }
 
-                                src.nhits++;
-                                
-                                // strip off unnecessary variables.
-                                bset = selectVars == null ? bset : bset
-                                        .copy(selectVars);
-
                                 if (log.isDebugEnabled())
-                                    log.debug("Output solution: " + bset);
+                                    log.debug("Output solution: " + outSolution);
+
+                                src.nhits++;
 
                                 // Accept this binding set.
-                                unsyncBuffer.add(bset);
+                                unsyncBuffer.add(outSolution);
 
                             }
 

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import com.bigdata.bop.IVariable;
 
 /**
  * Annotations for hash joins.
@@ -38,20 +37,20 @@ import com.bigdata.bop.IVariable;
 public interface HashJoinAnnotations {
 
     /**
-     * The join variables (required). This is an {@link IVariable}[] with at
-     * least one variable. The order of the entries is used when forming the
-     * as-bound keys for the hash table. Duplicate elements and null elements
-     * are not permitted.
+     * The {@link IVariable[]} specifying the join variables (required). The
+     * order of the entries is used when forming the as-bound keys for the hash
+     * table. Duplicate elements and null elements are not permitted.
      * <p>
      * Note: The source solutions presented to a hash join MUST have bindings
      * for the {@link #JOIN_VARS} in order to join (source solutions can still
-     * be pass on as optionals,but they will not join with the access path if
-     * the join variables are not bound).
-     * 
-     * FIXME If no join variables, then join is full cross product (constraints
-     * are still applied and optional solutions must be reported if a constraint
-     * fails and the join is optional). In general, we are not unit testing for
-     * the case of an unconstrained join.
+     * be pass on as optionals, but they will not join unless the join variables
+     * are not bound).
+     * <p>
+     * Note: If no join variables are specified, then the join will consider the
+     * N x M cross product, filtering for solutions which join. This is very
+     * expensive when compared to a hash join. Whenever possible you should
+     * identify one or more variables which must be bound for the join and
+     * specify those as the join variables.
      */
     String JOIN_VARS = HashJoinAnnotations.class.getName() + ".joinVars";
 

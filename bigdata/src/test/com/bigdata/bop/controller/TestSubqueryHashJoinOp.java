@@ -361,6 +361,114 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
     }
 	
     /**
+     * Unit test for a simple join, but without any join variables. This should
+     * produce the same solutions. It just does more work since it hash to
+     * compare each solution from the subquery with all solutions in the hash
+     * index.
+     */
+    public void test_join_noJoinVars() throws Exception {
+
+//        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int subqueryHashJoinId = 4;
+        
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> predOp = new Predicate<E>(//
+                new IVariableOrConstant[] { //
+                new Constant<String>("John"), x }, //
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        // the subquery (basically, an access path read with "x" unbound).
+        final PipelineJoin<E> subquery = new PipelineJoin<E>(
+                new BOp[] { },//
+                new NV(Predicate.Annotations.BOP_ID, joinId),//
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+
+        // the hash-join against the subquery.
+        final SubqueryHashJoinOp subqueryHashJoin = new SubqueryHashJoinOp(
+                new BOp[] {},//
+                new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{/*x*/}),//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                );
+
+        final PipelineOp query = subqueryHashJoin;
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final IRunningQuery runningQuery = queryEngine.eval(query,
+                initialBindingSets);
+
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected, runningQuery);
+
+        {
+            final BOpStats stats = runningQuery.getStats().get(
+                    subqueryHashJoinId);
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+        {
+            // // access path
+            // assertEquals(0L, stats.accessPathDups.get());
+            // assertEquals(1L, stats.accessPathCount.get());
+            // assertEquals(1L, stats.accessPathChunksIn.get());
+            // assertEquals(2L, stats.accessPathUnitsIn.get());
+        }
+        
+        assertTrue(runningQuery.isDone());
+        assertFalse(runningQuery.isCancelled());
+        runningQuery.get(); // verify nothing thrown.
+
+    }
+    
+    /**
      * Unit test for simple join with a constraint.
      */
     public void test_joinWithConstraint() throws Exception {

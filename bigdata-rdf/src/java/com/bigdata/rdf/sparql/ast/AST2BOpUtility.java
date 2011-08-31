@@ -38,7 +38,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -52,6 +51,7 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
@@ -230,7 +230,9 @@ public class AST2BOpUtility {
      */
     static {
         optimizers = new IASTOptimizer[] {
-        		new DescribeOptimizer()
+        		new DescribeOptimizer(),
+        		new ASTBindingAssigner(),
+        		new ASTNamedSubqueryOptimizer(),
         };
     }
 
@@ -577,13 +579,6 @@ public class AST2BOpUtility {
      *         another matter. It probably is on a cluster. It might not be on a
      *         single machine depending on how heavy the subqueries are and what
      *         the concurrent workload is on the machine.
-     * 
-     *         TODO We should include a prefix for the named set to help avoid
-     *         attribute name conflicts. E.g., <code>namedSet-%foo</code>, where
-     *         <code>%foo</code> was the given name of the named set. This needs
-     *         to be a consistent policy used by both the operator which
-     *         evaluates the subquery (WITH AS named) and the operator which
-     *         joins the subquery results back into the query (INCLUDE).
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             final NamedSubqueriesNode namedSubquerieNode,
@@ -597,30 +592,12 @@ public class AST2BOpUtility {
                 log.info("\nsubquery: " + subqueryRoot + "\nplan="
                         + subqueryPlan);
 
-            /*
-             * Find each INCLUDE for this named subquery and identify the join
-             * variables in use for that INCLUDE. The join variables for the
-             * first such INCLUDE are specified to the subquery which generates
-             * the named solution set.
-             * 
-             * FIXME For each INCLUDE which has incompatible join variables, we
-             * need to generate another copy of the temporary solution set using
-             * those join variables. Develop a data structure to model the
-             * (namedSet,joinvar[]) and give it a unique name. The INCLUDE
-             * operator will refer to the data set by that name in order to make
-             * sure it is using the hash index which was built with the right
-             * join variables.
-             */
-
-            final IVariable[] joinVars = subqueryRoot.getProjection()
-                    .getProjectionVars();
-
             left = new NamedSubqueryOp(new BOp[]{/*left*/}, //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, ASTUtil.convert(subqueryRoot.getJoinVars())),//
                     new NV(NamedSubqueryOp.Annotations.NAMED_SET, subqueryRoot.getName())//
             );
 
@@ -633,21 +610,12 @@ public class AST2BOpUtility {
     /**
      * Add a join against a pre-computed temporary solution set into a join
      * group.
-     * 
-     * FIXME This will be a hash join against the named materialized solution
-     * set (which will be on an {@link HTree}). However, unlike the existing
-     * hash joins, we have a materialized solution set on the right hand side
-     * and the join is never optional. The hash join logic should be isolated
-     * enough that we can reuse outside of the context of the operators for
-     * which it was originally written.
      */
     private static PipelineOp addSubqueryInclude(PipelineOp left,
             final NamedSubqueryInclude subqueryInclude, final AST2BOpContext ctx) {
 
         if (log.isInfoEnabled())
             log.info("include: solutionSet=" + subqueryInclude.getName());
-
-//        log.error("UNSUPPORTED OPERATION : solutionSet=" + subqueryInclude.getName());
 
         final VarNode[] joinvars = subqueryInclude.getJoinVars();
         
@@ -662,21 +630,25 @@ public class AST2BOpUtility {
             
         }
 
-        final IVariable[] tmp = new IVariable[joinvars.length];
-
-        for (int i = 0; i < joinvars.length; i++) {
-
-            tmp[i] = Var.var(joinvars[i].getValueExpression().getName());
-
+        if (joinvars.length == 0) {
+            
+            /*
+             * Note: If there are no join variables then the join will examine
+             * the full N x M cross product of solutions. That is very
+             * inefficient, so we are logging a warning.
+             */
+            
+            log.warn("No join variables: " + subqueryInclude.getName());
+            
         }
         
-//        left = new NamedSubqueryIncludeOp(//
-//                (left == null ? BOp.NOARGS : new BOp[] { left }), //
-//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
-//                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET, subqueryInclude.getName()),//
-//                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET, joinvars)//
-//        );
+        left = new NamedSubqueryIncludeOp(//
+                (left == null ? BOp.NOARGS : new BOp[] { left }), //
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET, subqueryInclude.getName()),//
+                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, ASTUtil.convert(joinvars))//
+        );
 
         return left;
 
@@ -684,26 +656,22 @@ public class AST2BOpUtility {
     
     /**
      * Add an explicit SPARQL 1.1 subquery into a join group.
+     * <p>
+     * Note: We currently evaluate SPARQL 1.1 style sub-queries using a
+     * pipelined subquery join. For each solution which flows through the
+     * pipeline, we issue the sub-query for the as-bound solution and join the
+     * subquery results against that as-bound solution.
      * 
-     * FIXME That's basically how we need to run the SPARQL 1.1 subqueries. We
-     * can handle the bottom up evaluation semantics by stripping out any
-     * bindings which are not being projected out of the subquery with the first
-     * operator in the subquery. That way the original bindings flow through the
-     * parent, the subquery runs with only those things bound which it projects,
-     * and the join happens in the parent (SubqueryOp) based on only those
-     * variables projected out of the subquery.
+     * FIXME We need to handle the bottom up evaluation semantics. Only
+     * variables which are projected out of the subquery are visible to it. Any
+     * other variables MUST be filtered out of the solutions as they flow into
+     * the subquery. That might be handled by a list of the variables to be
+     * projected/accepted by the subquery as a SubqueryOp.Annotation.
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
 
-        /*
-         * FIXME Only variables which are projected out of the subquery are
-         * visible to it. Any other variables MUST be filtered out of the
-         * solutions as they flow into the subquery. That might be handled by a
-         * list of the variables to be projected/accepted by the subquery as a
-         * SubqueryOp.Annotation.
-         */
-        final ProjectionNode projection = subquery.getProjection();
+        //final ProjectionNode projection = subquery.getProjection();
         
         final PipelineOp subqueryPlan = convert(subquery, ctx);
         

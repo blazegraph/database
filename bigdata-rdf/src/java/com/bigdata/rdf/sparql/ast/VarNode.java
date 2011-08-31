@@ -2,7 +2,6 @@ package com.bigdata.rdf.sparql.ast;
 
 import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 
@@ -23,12 +22,10 @@ public class VarNode extends TermNode {
 	 */
 	private static final long serialVersionUID = 2368082533964951789L;
 
-	
-	//    private boolean anonymous;
-    interface Annotations extends TermNode.Annotations {
+    public interface Annotations extends TermNode.Annotations {
         
         String ANONYMOUS = VarNode.class.getName() + ".anonymous";
-        
+
         boolean DEFAULT_ANONYMOUS = false;
         
     }
@@ -103,26 +100,5 @@ public class VarNode extends TermNode {
                 + (isAnonymous() ? "[anonymous]" : "");
 
     }
- 
-//    @Override
-//    public boolean equals(Object obj) {
-//        
-//        if (obj == this)
-//            return true;
-//        
-//        if (!(obj instanceof VarNode))
-//            return false;
-//
-//        final VarNode t = (VarNode) obj;
-//
-//        if (!getVar().equals(t.getVar()))
-//            return false;
-//
-//        if (anonymous != t.anonymous)
-//            return false;
-//        
-//        return true;
-//        
-//    }
 	
 }

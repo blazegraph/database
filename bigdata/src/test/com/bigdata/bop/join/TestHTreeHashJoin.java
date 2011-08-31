@@ -285,24 +285,24 @@ public class TestHTreeHashJoin extends TestCase2 {
                 log.info("Ignoring expected exception: " + ex);
         }
         
-        // shared state not specified.
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.SHARDED),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
+//        // shared state not specified.
+//        try {
+//            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+//                    new NV(BOp.Annotations.BOP_ID, joinId),//
+//                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
+//                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+//                                    BOpEvaluationContext.SHARDED),//
+//                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
+////                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+//                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+//                            new NV(PipelineOp.Annotations.MAX_MEMORY,
+//                                    Bytes.megabyte),//
+//                    }));
+//            fail("Expecting: " + UnsupportedOperationException.class);
+//        } catch (UnsupportedOperationException ex) {
+//            if (log.isInfoEnabled())
+//                log.info("Ignoring expected exception: " + ex);
+//        }
         
         // maxParallel not set to ONE (1).
         try {
@@ -388,6 +388,129 @@ public class TestHTreeHashJoin extends TestCase2 {
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("John"), x }, NV
 				.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+
+        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp);
+
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Brad"),
+                                          new Constant<String>("Fred"),
+                                }//
+                ),//
+        };
+
+        /*
+         * Setup the input binding sets. Each input binding set MUST provide
+         * binding for the join variable(s).
+         */
+        final IBindingSet[] initialBindingSets;
+        {
+            final List<IBindingSet> list = new LinkedList<IBindingSet>();
+            
+            IBindingSet tmp;
+
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Brad"));
+            tmp.set(y, new Constant<String>("Fred"));
+            list.add(tmp);
+            
+            tmp = new HashBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            list.add(tmp);
+            
+            initialBindingSets = list.toArray(new IBindingSet[0]);
+            
+        }
+
+        final UUID queryId = UUID.randomUUID();
+        final MockQueryContext queryContext = new MockQueryContext(queryId);
+        try {
+            
+            final BaseJoinStats stats = (BaseJoinStats) query.newStats();
+
+            final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] { initialBindingSets });
+
+            final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                    query, stats);
+
+            final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                            queryContext), -1/* partitionId */, stats, source,
+                    sink, null/* sink2 */);
+
+            /*
+             * Note: Since the operator relies on the isLastInvocation() test to
+             * run the hash join, this is signal is required in order to have
+             * the operator produce output. Otherwise it will just buffer the
+             * source solutions until it exceeds its memory budget.
+             */
+            context.setLastInvocation();
+
+            // get task.
+            final FutureTask<Void> ft = query.eval(context);
+
+            // execute task.
+            jnl.getExecutorService().execute(ft);
+
+            AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
+                    sink.iterator(), ft);
+
+            // join task
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+            // access path
+            assertEquals(0L, stats.accessPathDups.get());
+            assertEquals(1L, stats.accessPathCount.get());
+            assertEquals(1L, stats.accessPathChunksIn.get());
+            assertEquals(2L, stats.accessPathUnitsIn.get());
+
+        } finally {
+
+            queryContext.close();
+            
+        }
+
+    }
+
+    /**
+     * Unit test for a simple join. There are two source solutions. Each binds
+     * the join variable (there is only one join variable, which is [x]). The
+     * access path is run once and visits two elements, yielding as-bound
+     * solutions. The hash map containing the buffered source solutions is
+     * probed and the as-bound solutions which join are written out.
+     * <p>
+     * For this variant, there are no join variables. We should get exactly the
+     * same solutions but the join will do more work.
+     */
+    public void test_join_simple_noJoinVars()
+            throws InterruptedException, ExecutionException {
+
+        final int joinId = 2;
+        final int predId = 3;
+        @SuppressWarnings("unchecked")
+        final IVariable<E> x = Var.var("x");
+        @SuppressWarnings("unchecked")
+        final IVariable<E> y = Var.var("y");
+        @SuppressWarnings("unchecked")
+        final IVariable<E>[] joinVars = new IVariable[] { /* x */};
+        
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                new Constant<String>("John"), x }, NV
+                .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
@@ -736,7 +859,8 @@ public class TestHTreeHashJoin extends TestCase2 {
         final Var<E> x = Var.var("x");
         @SuppressWarnings("unchecked")
         final IVariable<E>[] joinVars = new IVariable[]{x};
-        
+
+        // AP("Paul" ?x)
         final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
                 new Constant<String>("Paul"), x }, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.RELATION_NAME,
@@ -772,19 +896,6 @@ public class TestHTreeHashJoin extends TestCase2 {
          * solution because it is an optional solution.
          * 
          * bset3: This has x:=Mary, which joins and is output as a solution.
-         *  
-         * <pre>
-         *                 new E("Paul", "Mary"),// [0]
-         *                 new E("Paul", "Brad"),// [1]
-         *                 
-         *                 new E("John", "Mary"),// [2]
-         *                 new E("John", "Brad"),// [3]
-         *                 
-         *                 new E("Mary", "Brad"),// [4]
-         *                 
-         *                 new E("Brad", "Fred"),// [5]
-         *                 new E("Brad", "Leon"),// [6]
-         * </pre>
          */
         final IAsynchronousIterator<IBindingSet[]> source;
         {

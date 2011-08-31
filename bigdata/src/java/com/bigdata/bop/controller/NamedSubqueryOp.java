@@ -33,6 +33,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -40,6 +42,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -47,6 +50,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.HashJoinUtility;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -72,9 +76,14 @@ import com.bigdata.rwstore.sector.MemStore;
  * synchronization for the "run-once" contract of the subquery. The operator
  * MUST be run on the query controller.
  * 
+ * @see NamedSubqueryIncludeOp
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class NamedSubqueryOp extends PipelineOp {
+
+    static private final transient Logger log = Logger
+            .getLogger(NamedSubqueryOp.class);
 
     /**
      * 
@@ -85,9 +94,11 @@ public class NamedSubqueryOp extends PipelineOp {
             HashJoinAnnotations {
 
         /**
-         * The name of the subquery solution set. The result set is "published"
-         * under this name on the {@link IQueryAttributes} associated with the
-         * {@link IRunningQuery}.
+         * The name of the attribute under which the hash index is stored. This
+         * incorporates both the given name of the solution set and the join
+         * variables, which identify how the solution set was indexed.
+         * 
+         * @see NamedSubqueryOp#getSolutionSetName(String, VarNode[])
          */
         final String NAMED_SET = "namedSet";
         
@@ -155,12 +166,23 @@ public class NamedSubqueryOp extends PipelineOp {
                     PipelineOp.Annotations.MAX_PARALLEL + "="
                             + getMaxParallel());
         }
-        
+
         getRequiredProperty(Annotations.SUBQUERY);
 
         getRequiredProperty(Annotations.NAMED_SET);
 
-        getRequiredProperty(Annotations.JOIN_VARS);
+        // Join variables must be specified.
+        final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
+
+//        if (joinVars.length == 0)
+//            throw new IllegalArgumentException(Annotations.JOIN_VARS);
+
+        for (IVariable<?> var : joinVars) {
+
+            if (var == null)
+                throw new IllegalArgumentException(Annotations.JOIN_VARS);
+
+        }
 
     }
 
@@ -253,6 +275,8 @@ public class NamedSubqueryOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
+        private final NamedSolutionSetStats stats;
+        
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
         
@@ -260,13 +284,21 @@ public class NamedSubqueryOp extends PipelineOp {
         private final String namedSet;
 
         /**
+         * The join variables.
+         */
+        private final IVariable[] joinVars;
+        
+        /**
          * <code>true</code> iff this is the first time the task is being
          * invoked, in which case we will evaluate the subquery and save its
          * result set on {@link #solutions}.
          */
         private final boolean first;
         
-        /** The generated solution set. */
+        /**
+         * The generated solution set (hash index using the specified join
+         * variables).
+         */
         private final HTree solutions;
         
         public ControllerTask(final NamedSubqueryOp op,
@@ -280,12 +312,17 @@ public class NamedSubqueryOp extends PipelineOp {
 
             this.context = context;
 
+            this.stats = ((NamedSolutionSetStats) context.getStats());
+            
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
             this.namedSet = (String) op
                     .getRequiredProperty(Annotations.NAMED_SET);
 
+            this.joinVars = (IVariable[]) op
+                    .getRequiredProperty(Annotations.JOIN_VARS);
+            
             {
 
                 /*
@@ -453,32 +490,25 @@ public class NamedSubqueryOp extends PipelineOp {
                     runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
                             bset);
 
-					long ncopied = 0L;
 					try {
 						
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
 
-						while(subquerySolutionItr.hasNext()) {
+						// Buffer the solutions on the hash index.
+                        final long ncopied = HashJoinUtility.acceptSolutions(
+                                subquerySolutionItr, joinVars, stats,
+                                solutions, false/* optional */);
 
-						    final IBindingSet[] chunk = subquerySolutionItr.next();
-						    
-						    for(IBindingSet bs : chunk) {
-						        
-						        solutions.insert(bs);
-						        
-						    }
-
-						    ncopied += chunk.length;
-						    
-						}
-						
-						// wait for the subquery to halt / test for errors.
+						// Wait for the subquery to halt / test for errors.
 						runningSubquery.get();
 
                         // Report the #of solutions in the named solution set.
-                        ((NamedSolutionSetStats) context.getStats()).solutionSetSize
-                                .addAndGet(ncopied);
+                        stats.solutionSetSize.addAndGet(ncopied);
+                        
+                        if (log.isInfoEnabled())
+                            log.info("Solution set " + namedSet + " has "
+                                    + ncopied + " solutions.");
 
 					} catch (InterruptedException ex) {
 
