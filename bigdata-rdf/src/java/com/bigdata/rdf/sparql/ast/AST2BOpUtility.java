@@ -1,10 +1,10 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -52,11 +52,13 @@ import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
@@ -75,7 +77,6 @@ import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.htree.HTree;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
@@ -129,7 +130,7 @@ public class AST2BOpUtility {
      * FIXME Capture the openrdf optimizer patterns here:
      * 
      * <pre>
-     * optimizerList.add(new BindingAssigner());
+     * optimizerList.add(new BindingAssigner()); // yes.
      * optimizerList.add(new ConstantOptimizer(strategy));
      * optimizerList.add(new CompareOptimizer());
      * optimizerList.add(new ConjunctiveConstraintSplitter());
@@ -236,143 +237,28 @@ public class AST2BOpUtility {
         };
     }
 
-    // FIXME Incorporate this in place of the Sesame DESCRIBE query generation.
-    // protected void optimizeDescribe() {
-    // try {
-    // ParsedQuery parsedQuery = getParsedQuery();
-    // TupleExpr node = parsedQuery.getTupleExpr();
-    // if (log.isInfoEnabled())
-    // log.info(node);
-    // node = ((Reduced) node).getArg();
-    // node = ((Projection) node).getArg();
-    // ValueExpr ve = ((Filter) node).getCondition();
-    // node = ((Filter) node).getArg();
-    // if (node instanceof Join) {
-    // node = ((Join) node).getLeftArg();
-    // final Set<Var> vars = new HashSet<Var>();
-    // ve.visitChildren(new QueryModelVisitorBase() {
-    // @Override
-    // public void meet(SameTerm same) throws Exception {
-    // Var var = (Var) same.getRightArg();
-    // vars.add(var);
-    // }
-    // });
-    // Collection<StatementPattern> sps = new LinkedList<StatementPattern>();
-    // Collection<ProjectionElemList> projElemLists =
-    // new LinkedList<ProjectionElemList>();
-    // for (Var v : vars) {
-    // {
-    // Var p = createAnonVar("-p" + v.getName() + "-1");
-    // Var o = createAnonVar("-o" + v.getName());
-    // StatementPattern sp = new StatementPattern(v, p, o);
-    // sps.add(sp);
-    // ProjectionElemList projElemList = new ProjectionElemList();
-    // projElemList.addElement(new ProjectionElem(v.getName(), "subject"));
-    // projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
-    // projElemList.addElement(new ProjectionElem(o.getName(), "object"));
-    // projElemLists.add(projElemList);
-    // }
-    // {
-    // Var s = createAnonVar("-s" + v.getName());
-    // Var p = createAnonVar("-p" + v.getName() + "-2");
-    // StatementPattern sp = new StatementPattern(s, p, v);
-    // sps.add(sp);
-    // ProjectionElemList projElemList = new ProjectionElemList();
-    // projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
-    // projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
-    // projElemList.addElement(new ProjectionElem(v.getName(), "object"));
-    // projElemLists.add(projElemList);
-    // }
-    // }
-    // Iterator<StatementPattern> it = sps.iterator();
-    // Union union = new Union(it.next(), it.next());
-    // while (it.hasNext()) {
-    // union = new Union(union, it.next());
-    // }
-    // node = new Join(node, union);
-    // node = new MultiProjection(node, projElemLists);
-    // node = new Reduced(node);
-    // parsedQuery.setTupleExpr(node);
-    // } else {
-    // final Set<ValueConstant> vals = new HashSet<ValueConstant>();
-    // ve.visitChildren(new QueryModelVisitorBase() {
-    // @Override
-    // public void meet(SameTerm same) throws Exception {
-    // ValueConstant val = (ValueConstant) same.getRightArg();
-    // vals.add(val);
-    // }
-    // });
-    // Collection<StatementPattern> joins = new LinkedList<StatementPattern>();
-    // Collection<ProjectionElemList> projElemLists =
-    // new LinkedList<ProjectionElemList>();
-    // Collection<ExtensionElem> extElems = new LinkedList<ExtensionElem>();
-    // int i = 0;
-    // int constVarID = 1;
-    // for (ValueConstant v : vals) {
-    // {
-    // Var s = createConstVar(v.getValue(), constVarID++);
-    // Var p = createAnonVar("-p" + i + "-1");
-    // Var o = createAnonVar("-o" + i);
-    // StatementPattern sp = new StatementPattern(s, p, o);
-    // joins.add(sp);
-    // ProjectionElemList projElemList = new ProjectionElemList();
-    // projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
-    // projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
-    // projElemList.addElement(new ProjectionElem(o.getName(), "object"));
-    // projElemLists.add(projElemList);
-    // extElems.add(new ExtensionElem(v, s.getName()));
-    // }
-    // {
-    // Var s = createAnonVar("-s" + i);
-    // Var p = createAnonVar("-p" + i + "-2");
-    // Var o = createConstVar(v.getValue(), constVarID++);
-    // StatementPattern sp = new StatementPattern(s, p, o);
-    // joins.add(sp);
-    // ProjectionElemList projElemList = new ProjectionElemList();
-    // projElemList.addElement(new ProjectionElem(s.getName(), "subject"));
-    // projElemList.addElement(new ProjectionElem(p.getName(), "predicate"));
-    // projElemList.addElement(new ProjectionElem(o.getName(), "object"));
-    // projElemLists.add(projElemList);
-    // extElems.add(new ExtensionElem(v, o.getName()));
-    // }
-    // i++;
-    // }
-    // Iterator<StatementPattern> it = joins.iterator();
-    // node = it.next();
-    // while (it.hasNext()) {
-    // StatementPattern j = it.next();
-    // node = new Union(j, node);
-    // }
-    // node = new Extension(node, extElems);
-    // node = new MultiProjection(node, projElemLists);
-    // node = new Reduced(node);
-    // parsedQuery.setTupleExpr(node);
-    // }
-    // } catch (Exception ex) {
-    // throw new RuntimeException(ex);
-    // }
-    // }
-    //
-    // private Var createConstVar(Value value, int constantVarID) {
-    // Var var = createAnonVar("-const-" + constantVarID);
-    // var.setValue(value);
-    // return var;
-    // }
-    //
-    // private Var createAnonVar(String varName) {
-    // Var var = new Var(varName);
-    // var.setAnonymous(true);
-    // return var;
-    // }
-
     /**
-     * Convert an AST query plan into a set of executable pipeline operators.
+     * Top-level entry point converts an AST query model into an executable
+     * query plan.
      */
     public static PipelineOp convert(final AST2BOpContext ctx) {
 
+        // The AST query model.
         final QueryRoot query = ctx.query;
         
-        return convert(query, ctx);
+        // The executable query plan.
+        final PipelineOp queryPlan = convert(query, ctx);
+
+        /*
+         * Set the queryId on the top-level of the query plan.
+         * 
+         * Note: The queryId is necessary to coordinate access to named subquery
+         * result sets when they are consumed within a subquery rather than the
+         * main query.
+         */
+
+        return (PipelineOp) queryPlan.setProperty(
+                QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
     }
 
@@ -400,8 +286,7 @@ public class AST2BOpUtility {
     	final Iterator<IValueExpressionNode> it =
     		BOpUtility.visitAll(query, IValueExpressionNode.class);
 
-    	ArrayList<IValueExpressionNode> allNodes=new ArrayList<IValueExpressionNode>();
-
+        final ArrayList<IValueExpressionNode> allNodes = new ArrayList<IValueExpressionNode>();
     	
     	while (it.hasNext()) {
     		
@@ -409,7 +294,7 @@ public class AST2BOpUtility {
 
     	}
 
-    	for(IValueExpressionNode ven:allNodes){
+        for (IValueExpressionNode ven : allNodes) {
 
     		/*
     		 * Convert and cache the value expression on the node as a 
@@ -419,7 +304,7 @@ public class AST2BOpUtility {
     		
     	}
     	
-        final IGroupNode root = query.getWhereClause();
+        final IGroupNode<?> root = query.getWhereClause();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");
@@ -601,13 +486,19 @@ public class AST2BOpUtility {
                 log.info("\nsubquery: " + subqueryRoot + "\nplan="
                         + subqueryPlan);
 
+            final IVariable[] joinVars = ASTUtil.convert(subqueryRoot
+                    .getJoinVars());
+
+            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                    ctx.queryId, subqueryRoot.getName(), joinVars);
+
             left = new NamedSubqueryOp(new BOp[]{/*left*/}, //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, ASTUtil.convert(subqueryRoot.getJoinVars())),//
-                    new NV(NamedSubqueryOp.Annotations.NAMED_SET, subqueryRoot.getName())//
+                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
 
         }
@@ -650,13 +541,18 @@ public class AST2BOpUtility {
             log.warn("No join variables: " + subqueryInclude.getName());
             
         }
-        
+
+        final IVariable[] joinVars = ASTUtil.convert(joinvars);
+
+        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
+                ctx.queryId, subqueryInclude.getName(), joinVars);
+
         left = new NamedSubqueryIncludeOp(//
                 (left == null ? BOp.NOARGS : new BOp[] { left }), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
-                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET, subqueryInclude.getName()),//
-                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, ASTUtil.convert(joinvars))//
+                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF, namedSolutionSetRef),//
+                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
         );
 
         return left;
@@ -765,10 +661,10 @@ public class AST2BOpUtility {
             final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
             if(arg!=null){
             
-	            if(isObviousAggregate(arg)) // recursion.
-	                return true;
-	            
-	        }
+            if(isObviousAggregate(arg)) // recursion.
+                return true;
+            
+        }
         }
         
         return false;
@@ -810,11 +706,29 @@ public class AST2BOpUtility {
      * @param unionNode
      * @param ctx
      * @return
+     * 
+     *         TODO Could recognize
+     * 
+     *         <pre>
+     * optional {
+     *   { a } union { b }
+     * }     *
+     * </pre>
+     * 
+     *         as an optional union, but we are not handling the optional
+     *         property for a union right now.
      */
 	private static PipelineOp convertUnion(PipelineOp left,
 	        final UnionNode unionNode,
 			final AST2BOpContext ctx) {
-		
+
+        if (unionNode.isOptional()) {
+            /*
+             * This in fact shows up in the TCK which is a bit weird.
+             */
+            log.warn("Optional union? : " + ctx.query.getQueryString());
+        }
+	    
         final int arity = unionNode.size();
         
 		if (arity == 0) {
@@ -1221,8 +1135,9 @@ public class AST2BOpUtility {
     }
 
     /**
-     * Adds subqueries for join groups to the pipeline (this is NOT SPARQL 1.1
-     * subquery).
+     * Adds subqueries for join groups ({@link JoinGroupNode}) and unions (
+     * {@link UnionNode}) to the pipeline (this is NOT SPARQL 1.1 subquery).
+     * Non-optional group groups and unions are handled first, then optionals.
      * 
      * @param left
      * @param joinGroup
@@ -1237,7 +1152,8 @@ public class AST2BOpUtility {
     	 */
     	for (IQueryNode child : joinGroup) {
     		
-    		if (!(child instanceof IGroupNode)) {
+            if (!(child instanceof JoinGroupNode)
+                    && !(child instanceof UnionNode)) {
     			continue;
     		}
     		
@@ -1262,7 +1178,8 @@ public class AST2BOpUtility {
     	 */
     	for (IQueryNode child : joinGroup) {
     		
-    		if (!(child instanceof IGroupNode)) {
+            if (!(child instanceof JoinGroupNode)
+                    && !(child instanceof UnionNode)) {
     			continue;
     		}
     		
@@ -1272,9 +1189,14 @@ public class AST2BOpUtility {
     			continue;
     		}
     		
-    		if (subgroup instanceof JoinGroupNode &&
-    				((JoinGroupNode) subgroup).isSimpleOptional()) {
-    			
+            if (subgroup instanceof JoinGroupNode
+                    && ((JoinGroupNode) subgroup).isSimpleOptional()) {
+
+                /*
+                 * Optimize a simple join group as an optional join rather than
+                 * a subquery.
+                 */
+    		    
     			final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
     			
     			final StatementPatternNode sp = subJoinGroup.getSimpleOptional();
@@ -1291,9 +1213,9 @@ public class AST2BOpUtility {
     			
     		} else {
     		
-                final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */, subgroup,
-                        ctx);
-	    		
+                final PipelineOp subquery = convertJoinGroupOrUnion(
+                        null/* left */, subgroup, ctx);
+
 	    		left = new SubqueryOp(new BOp[]{left}, 
 	                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
 	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),

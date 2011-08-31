@@ -42,6 +42,7 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.HashJoinUtility;
@@ -73,11 +74,16 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             HashJoinAnnotations {
 
         /**
-         * The name of the subquery solution set.
+         * The {@link NamedSolutionSetRef} used to locate the {@link HTree}
+         * having the data for the named solution set. The query UUID must be
+         * extracted and used to lookup the {@link IRunningQuery} to which the
+         * solution set was attached. The {@link HTree} is then resolved against
+         * the {@link IQueryAttributes} on that {@link IRunningQuery}.
          * 
-         * @see NamedSubqueryOp.Annotations#NAMED_SET
+         * @see NamedSolutionSetRef
+         * @see NamedSubqueryOp.Annotations#NAMED_SET_REF
          */
-        final String NAMED_SET = NamedSubqueryOp.Annotations.NAMED_SET;
+        final String NAMED_SET_REF = NamedSubqueryOp.Annotations.NAMED_SET_REF;
 
         /**
          * An optional {@link IVariable}[] identifying the variables to be
@@ -146,7 +152,7 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
 
         private final boolean optional = false;
         
-        private final String namedSet;
+//        private final String namedSet;
         
         private final BaseJoinStats stats;
 
@@ -192,19 +198,44 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
 
             this.op = op;
 
-            this.namedSet = (String) op
-                    .getRequiredProperty(Annotations.NAMED_SET);
+            // The name of the attribute used to discover the solution set.
+            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                    .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            final IQueryAttributes attrs = context.getRunningQuery()
-                    .getAttributes();
+//            // Parse that name into {queryId, namedSet, joinVar[]).
+//            final NamedSolutionSetRef namedSetRef2 = NamedSolutionSetRef
+//                    .valueOf(namedSetRef);
 
-            rightSolutions = (HTree) attrs.get(namedSet);
+            // Lookup the query that generated the solution set.
+            final IRunningQuery runningQuery;
+            try {
+                runningQuery = context.getRunningQuery().getQueryEngine()
+                        .getRunningQuery(namedSetRef.queryId);
+
+            } catch (RuntimeException ex) {
+                throw new RuntimeException("Query halted? : " + ex, ex);
+            }
+
+            if (runningQuery == null) {
+                // We could not locate the query which generated this solution
+                // set.
+                throw new RuntimeException("Query not found.");
+            }
+
+            // The attributes for that query.
+            final IQueryAttributes attrs = runningQuery.getAttributes();
+            
+//            final IQueryAttributes attrs = context.getRunningQuery()
+//                    .getAttributes();
+
+            // The HTree holding the solutions.
+            rightSolutions = (HTree) attrs.get(namedSetRef);
 
             if (rightSolutions == null) {
              
                 // The solution set was not found!
                 
-                throw new RuntimeException("Not found: " + namedSet);
+                throw new RuntimeException("Not found: " + namedSetRef);
                 
             }
 

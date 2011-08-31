@@ -1,12 +1,14 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -25,6 +27,14 @@ public class AST2BOpContext {
 	public final QueryEngine queryEngine;
 	
     public final Properties queryHints;
+    
+    /**
+     * The unique identifier assigned to this query.
+     * 
+     * @see QueryHints#QUERYID
+     * @see QueryEngine.Annotations#QUERY_ID
+     */
+    public final UUID queryId;
 
     /**
      * 
@@ -55,12 +65,21 @@ public class AST2BOpContext {
 	public AST2BOpContext(final QueryRoot query,
 			final AtomicInteger idFactory, final AbstractTripleStore db,
     		final QueryEngine queryEngine, final Properties queryHints) {
-		
-		this.query = query;
-		this.idFactory = idFactory;
-		this.db = db;
-		this.queryEngine = queryEngine;
-		this.queryHints = queryHints;
+
+        this.query = query;
+        this.idFactory = idFactory;
+        this.db = db;
+        this.queryEngine = queryEngine;
+        this.queryHints = queryHints;
+
+        // Use either the caller's UUID or a random UUID.
+        final String queryIdStr = queryHints == null ? null : queryHints
+                .getProperty(QueryHints.QUERYID);
+
+        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
+                .fromString(queryIdStr);
+
+        this.queryId = queryId;
 		
 	}
 	

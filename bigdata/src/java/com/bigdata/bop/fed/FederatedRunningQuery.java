@@ -45,6 +45,7 @@ import com.bigdata.bop.engine.IChunkHandler;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.service.IBigdataFederation;
@@ -157,19 +158,13 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
         
     }
 
-    /**
-     * @param queryEngine
-     * @param queryId
-     * @param controller
-     * @param clientProxy
-     * @param query
-     */
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
             final UUID queryId, final boolean controller,
             final IQueryClient clientProxy, final PipelineOp query,
             final IChunkMessage<IBindingSet> realSource) {
 
-        super(queryEngine, queryId, /*begin, */controller, clientProxy, query, realSource);
+        super(queryEngine, queryId, /* begin, */controller, clientProxy, query,
+                realSource);
 
         /*
          * Note: getServiceUUID() should be a smart proxy method and thus not

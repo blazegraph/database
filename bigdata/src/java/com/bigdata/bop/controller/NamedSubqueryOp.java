@@ -59,7 +59,6 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.MemStore;
@@ -94,48 +93,50 @@ public class NamedSubqueryOp extends PipelineOp {
             HashJoinAnnotations {
 
         /**
-         * The name of the attribute under which the hash index is stored. This
-         * incorporates both the given name of the solution set and the join
-         * variables, which identify how the solution set was indexed.
+         * The name of {@link IQueryAttributes} attribute under which the
+         * subquery solution set is stored (a {@link HTree} reference). The
+         * attribute name includes the query UUID. The query UUID must be
+         * extracted and used to lookup the {@link IRunningQuery} to which the
+         * solution set was attached.
          * 
-         * @see NamedSubqueryOp#getSolutionSetName(String, VarNode[])
+         * @see NamedSolutionSetRef
          */
-        final String NAMED_SET = "namedSet";
+        final String NAMED_SET_REF = "namedSetRef";
         
     }
 
-    /**
-     * Return the {@link IQueryAttributes} key for a given named set having the
-     * specified join variables.
-     * 
-     * @param namedSet
-     *            The named set.
-     * @param joinvars
-     *            The join variables.
-     * 
-     * @return The key.
-     */
-    public static String getSolutionSetName(final String namedSet,
-            final VarNode[] joinvars) {
-
-        final StringBuilder sb = new StringBuilder();
-
-        sb.append("namedSet{name=" + namedSet + ",joinvars=[");
-
-        for (int i = 0; i < joinvars.length; i++) {
-
-            if (i > 0)
-                sb.append(",");
-
-            sb.append(joinvars[i].getValueExpression().getName());
-
-        }
-
-        sb.append("])");
-
-        return sb.toString();
-
-    }
+//    /**
+//     * Return the {@link IQueryAttributes} key for a given named set having the
+//     * specified join variables.
+//     * 
+//     * @param namedSet
+//     *            The named set.
+//     * @param joinvars
+//     *            The join variables.
+//     * 
+//     * @return The key.
+//     */
+//    public static String getSolutionSetName(final String namedSet,
+//            final VarNode[] joinvars) {
+//
+//        final StringBuilder sb = new StringBuilder();
+//
+//        sb.append("namedSet{name=" + namedSet + ",joinvars=[");
+//
+//        for (int i = 0; i < joinvars.length; i++) {
+//
+//            if (i > 0)
+//                sb.append(",");
+//
+//            sb.append(joinvars[i].getValueExpression().getName());
+//
+//        }
+//
+//        sb.append("])");
+//
+//        return sb.toString();
+//
+//    }
 
     /**
      * Deep copy constructor.
@@ -169,7 +170,7 @@ public class NamedSubqueryOp extends PipelineOp {
 
         getRequiredProperty(Annotations.SUBQUERY);
 
-        getRequiredProperty(Annotations.NAMED_SET);
+        getRequiredProperty(Annotations.NAMED_SET_REF);
 
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
@@ -280,8 +281,8 @@ public class NamedSubqueryOp extends PipelineOp {
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
         
-        /** The name of the named result set. */
-        private final String namedSet;
+        /** Metadata to identify the named solution set. */
+        private final NamedSolutionSetRef namedSetRef;
 
         /**
          * The join variables.
@@ -317,8 +318,8 @@ public class NamedSubqueryOp extends PipelineOp {
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
-            this.namedSet = (String) op
-                    .getRequiredProperty(Annotations.NAMED_SET);
+            this.namedSetRef = (NamedSolutionSetRef) op
+                    .getRequiredProperty(Annotations.NAMED_SET_REF);
 
             this.joinVars = (IVariable[]) op
                     .getRequiredProperty(Annotations.JOIN_VARS);
@@ -334,7 +335,7 @@ public class NamedSubqueryOp extends PipelineOp {
                 final IQueryAttributes attrs = context.getRunningQuery()
                         .getAttributes();
 
-                HTree solutions = (HTree) attrs.get(namedSet);
+                HTree solutions = (HTree) attrs.get(namedSetRef);
 
                 if (solutions == null) {
 
@@ -384,7 +385,7 @@ public class NamedSubqueryOp extends PipelineOp {
                     // Will support incremental eviction and persistence.
                     solutions = HTree.create(store, metadata);
 
-                    if (attrs.putIfAbsent(namedSet, solutions) != null)
+                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
                         throw new AssertionError();
 
                     this.first = true;
@@ -507,7 +508,7 @@ public class NamedSubqueryOp extends PipelineOp {
                         stats.solutionSetSize.addAndGet(ncopied);
                         
                         if (log.isInfoEnabled())
-                            log.info("Solution set " + namedSet + " has "
+                            log.info("Solution set " + namedSetRef + " has "
                                     + ncopied + " solutions.");
 
 					} catch (InterruptedException ex) {

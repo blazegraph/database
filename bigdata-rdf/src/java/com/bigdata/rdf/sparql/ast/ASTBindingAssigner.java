@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
+import java.util.Stack;
 
 import org.apache.log4j.Logger;
 
@@ -35,6 +36,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.INodeOrAttribute;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 
@@ -62,57 +64,69 @@ public class ASTBindingAssigner implements IASTOptimizer {
             final IQueryNode queryNode, final DatasetNode dataset,
             final IBindingSet[] bindingSet) {
 
-//        if (bindingSet == null || bindingSet.length > 1) {
-//            // used iff there is only one input solution.
-//            return queryNode;
-//        }
-//
-//        if (!(queryNode instanceof QueryRoot))
-//            return queryNode;
-//
-//        // consider only the first solution.
-//        final IBindingSet bset = bindingSet[0];
-//
-//        final QueryRoot queryRoot = (QueryRoot) queryNode;
-//
-//        // Only transform the WHERE clause.
-//        final IGroupNode<?> whereClause = queryRoot.getWhereClause();
-//
-//        if (whereClause == null)
-//            return queryNode;
-//
-//        final Iterator<BOp> itr = BOpUtility
-//                .preOrderIterator((BOp) whereClause);
-//
-//        while (itr.hasNext()) {
-//
-//            final BOp node = (BOp) itr.next();
-//
-//            if (!(node instanceof VarNode))
-//                continue;
-//
-//            final VarNode varNode = (VarNode) node;
-//
-//            final IVariable<IV> var = varNode.getVar();
-//
-//            if (bset.isBound(var)) {
-//
-//                /*
-//                 * Replace the variable with the constant from the binding set,
-//                 * but preserve the reference to the variable on the Constant.
-//                 */
-//
-//                final IV asBound = (IV) bset.get(var).get();
-//
-//                if (log.isInfoEnabled())
-//                    log.info("Replacing: var=" + var + " with " + asBound
-//                            + " (" + asBound.getClass() + ")");
-//
+        if (bindingSet == null || bindingSet.length > 1) {
+            // used iff there is only one input solution.
+            return queryNode;
+        }
+
+        if (!(queryNode instanceof QueryRoot))
+            return queryNode;
+
+        // consider only the first solution.
+        final IBindingSet bset = bindingSet[0];
+
+        final QueryRoot queryRoot = (QueryRoot) queryNode;
+
+        // Only transform the WHERE clause.
+        final IGroupNode<?> whereClause = queryRoot.getWhereClause();
+
+        if (whereClause == null)
+            return queryNode;
+
+        final Stack<INodeOrAttribute> stack = new Stack<INodeOrAttribute>();
+
+        final Iterator<BOp> itr = BOpUtility.preOrderIterator(
+                (BOp) whereClause, stack);
+
+        while (itr.hasNext()) {
+
+            final BOp node = (BOp) itr.next();
+
+            if (!(node instanceof VarNode))
+                continue;
+
+            final VarNode varNode = (VarNode) node;
+
+            final IVariable<IV> var = varNode.getValueExpression();
+
+            if (bset.isBound(var)) {
+
+                /*
+                 * Replace the variable with the constant from the binding set,
+                 * but preserve the reference to the variable on the Constant.
+                 */
+
+                final IV asBound = (IV) bset.get(var).get();
+
+                if (log.isInfoEnabled())
+                    log.info("Replacing: var=" + var + " with " + asBound
+                            + " (" + asBound.getClass() + ")");
+
+                final ConstantNode constNode = new ConstantNode(
+                        new Constant<IV>(var, asBound));
+
 //                varNode.setValueExpression(new Constant<IV>(var, asBound));
-//
-//            }
-//
-//        }
+
+                final INodeOrAttribute x = stack.peek();
+
+                x.getNode();
+                
+                // FIXME replace varNode on parent with constNode.
+                ASTUtil.replaceWith(x.getNode(), varNode,constNode);
+                
+            }
+
+        }
 
         return queryNode;
 

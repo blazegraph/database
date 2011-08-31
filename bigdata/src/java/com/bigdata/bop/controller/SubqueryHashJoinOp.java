@@ -310,9 +310,9 @@ public class SubqueryHashJoinOp extends PipelineOp {
                  * this can be reconciled with "at-once" evaluation]
                  */
 
-                final IRunningQuery runningSubquery = queryEngine
-                        .eval((PipelineOp) subquery);
-                
+                final IRunningQuery runningSubquery = queryEngine.eval(
+                        (PipelineOp) subquery);
+
                 try {
 
                     if (log.isDebugEnabled())

@@ -479,7 +479,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      *            the original message used to kick off the query on the query
      *            controller MUST be provided so we can ensure that the source
      *            iteration is always closed when the query is cancelled.
-     * 
+     *            
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.
      * @throws IllegalArgumentException
@@ -518,7 +518,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         this.query = query;
 
         this.realSource = realSource;
-
+        
         this.bopIndex = BOpUtility.getIndex(query);
 
         /*
