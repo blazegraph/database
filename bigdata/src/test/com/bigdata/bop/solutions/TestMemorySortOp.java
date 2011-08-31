@@ -338,7 +338,7 @@ public class TestMemorySortOp extends TestCase2 {
         final IConstant<IV> _5 = new Constant<IV>(new XSDNumericIV(5));
 
         final ISortOrder<?> sors[] = new ISortOrder[] { //
-                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS)), false/* asc */),//
+                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,getName())), false/* asc */),//
                 new SortOrder(y, false/* asc */) //
         };
 

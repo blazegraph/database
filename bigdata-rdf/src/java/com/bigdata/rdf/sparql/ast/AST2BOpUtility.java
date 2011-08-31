@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -81,7 +82,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
@@ -397,16 +397,25 @@ public class AST2BOpUtility {
     	 * Visit all the value expression nodes and convert them into value
     	 * expressions.
     	 */
-    	final Iterator<ValueExpressionNode> it = 
-    		BOpUtility.visitAll(query, ValueExpressionNode.class);
+    	final Iterator<IValueExpressionNode> it =
+    		BOpUtility.visitAll(query, IValueExpressionNode.class);
+
+    	ArrayList<IValueExpressionNode> allNodes=new ArrayList<IValueExpressionNode>();
+
     	
     	while (it.hasNext()) {
     		
+    	    allNodes.add(it.next());
+
+    	}
+
+    	for(IValueExpressionNode ven:allNodes){
+
     		/*
     		 * Convert and cache the value expression on the node as a 
     		 * side-effect.
     		 */
-    		toVE(lex, it.next());
+    		toVE(lex, ven);
     		
     	}
     	
@@ -754,10 +763,12 @@ public class AST2BOpUtility {
         while (itr.hasNext()) {
             
             final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
+            if(arg!=null){
             
-            if(isObviousAggregate(arg)) // recursion.
-                return true;
-            
+	            if(isObviousAggregate(arg)) // recursion.
+	                return true;
+	            
+	        }
         }
         
         return false;
@@ -1044,7 +1055,8 @@ public class AST2BOpUtility {
 
             final ConditionalBind b = new ConditionalBind(
                     assignmentNode.getVar(),
-                    assignmentNode.getValueExpression());
+                    assignmentNode.getValueExpression(),
+                    projection);
 
             IConstraint c = projection ? new ProjectedConstraint(b)
                     : new BindingConstraint(b);
@@ -1447,9 +1459,9 @@ public class AST2BOpUtility {
 
                     vars.add((IVariable<IV>) expr);
 
-                } else if (expr instanceof INeedsMaterialization) {
+                } else {
 
-                    vars.addAll(((INeedsMaterialization) expr).getVarsToMaterialize());
+                    ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
 
                 }
             }
@@ -1466,9 +1478,9 @@ public class AST2BOpUtility {
 
                     vars.add((IVariable<IV>) expr);
 
-                } else if (expr instanceof INeedsMaterialization) {
+                } else{
 
-                    vars.addAll(((INeedsMaterialization) expr).getVarsToMaterialize());
+                    ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
 
                 }
             }
@@ -1577,10 +1589,9 @@ public class AST2BOpUtility {
 
                 vars.add((IVariable<IV>) expr);
 
-            } else if (expr instanceof INeedsMaterialization) {
+            } else  {
 
-                vars.addAll(((INeedsMaterialization) expr)
-                        .getVarsToMaterialize());
+                ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
                 
             }
 

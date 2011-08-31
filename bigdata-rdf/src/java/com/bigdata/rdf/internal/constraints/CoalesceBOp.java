@@ -39,7 +39,7 @@ import com.bigdata.rdf.internal.NotMaterializedException;
  * Coalesce BOp The COALESCE function form returns the RDF term value of the first expression that evaluates without error. In
  * SPARQL, evaluating an unbound variable raises an error.
  */
-public class CoalesceBOp extends IVValueExpression<IV> {
+public class CoalesceBOp extends IVValueExpression<IV> implements IPassesMaterialization {
 
     private static final long             serialVersionUID = 7391999162162545704L;
 

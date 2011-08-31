@@ -159,7 +159,7 @@ public class TestMIN extends TestCase2 {
 
         // MIN(lprice+1)
         final MIN op = new MIN(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,getName()));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

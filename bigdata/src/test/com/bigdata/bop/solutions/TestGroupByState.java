@@ -427,7 +427,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<?> mathExpr = new Bind(index, //
                 new MathBOp(o, new Constant(new XSDNumericIV(1)),
-                        MathBOp.MathOp.PLUS));
+                        MathBOp.MathOp.PLUS,getName()));
 
         final IValueExpression<?>[] select = new IValueExpression[] { new Bind(
                 index, index) };
@@ -567,7 +567,7 @@ public class TestGroupByState extends TestCase2 {
                 new SUM(false/* distinct */,
                         (IValueExpression<IV>) new MathBOp(x, new MIN(
                                 false/* distinct */, (IValueExpression<IV>) y),
-                                MathOp.PLUS)));
+                                MathOp.PLUS,getName())));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { zExpr };
 
@@ -619,7 +619,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
                 new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) x), z, MathOp.PLUS));
+                        (IValueExpression<IV>) x), z, MathOp.PLUS,getName()));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { zExpr, aExpr };
 
@@ -670,7 +670,7 @@ public class TestGroupByState extends TestCase2 {
 
         final IValueExpression<IV> aExpr = new /* Conditional */Bind(a,
                 new MathBOp(new SUM(false/* distinct */,
-                        (IValueExpression<IV>) x), z, MathOp.PLUS));
+                        (IValueExpression<IV>) x), z, MathOp.PLUS,getName()));
 
         final IValueExpression<IV>[] select = new IValueExpression[] { aExpr, zExpr };
 

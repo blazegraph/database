@@ -49,8 +49,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * @author thompsonbry
  */
-public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
-        INeedsMaterialization {
+public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
 
 //    private static final transient Logger log = Logger.getLogger(SUM.class);
 
@@ -67,8 +66,8 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
         super(args, annotations);
     }
 
-    public SUM(boolean distinct, IValueExpression<IV> expr) {
-        super(/*FunctionCode.SUM, */distinct, expr);
+    public SUM(boolean distinct, IValueExpression...expr) {
+        super(distinct, expr);
     }
 
     /**
@@ -127,8 +126,8 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     private IV doGet(final IBindingSet bindingSet) {
-        
-        final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
+        for(int i=0;i<arity();i++){
+            final IValueExpression<IV> expr = (IValueExpression<IV>) get(i);
 
         final IV iv = expr.get(bindingSet);
 
@@ -166,7 +165,7 @@ public class SUM extends AggregateBase<IV> implements IAggregate<IV>,
             }
 
         }
-
+        }
         return aggregated;
 
     }

@@ -611,7 +611,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS), CompareOp.GT))
+                        			new SPARQLConstraint(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS,SPO), CompareOp.GT))
                                 });
                 
                 try {

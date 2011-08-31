@@ -189,24 +189,4 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
         return Requirement.SOMETIMES;
     }
     
-    volatile transient Set<IVariable<IV>> terms;
-
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-
-        if (terms == null) {
-
-            terms = new LinkedHashSet<IVariable<IV>>();
-
-            for (BOp bop : args()) {
-
-                if (bop instanceof IVariable){
-                    terms.add((IVariable<IV>) bop);
-                }
-
-            }
-
-        }
-        return terms;
-
-    }
 }

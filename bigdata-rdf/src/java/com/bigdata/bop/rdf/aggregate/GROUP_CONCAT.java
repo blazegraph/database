@@ -47,7 +47,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
  *
  * @author thompsonbry
  */
-public class GROUP_CONCAT extends AggregateBase<IV> implements IAggregate<IV> {
+public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterialization {
 
     /**
 	 *

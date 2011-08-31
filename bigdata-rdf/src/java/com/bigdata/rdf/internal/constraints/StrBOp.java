@@ -38,6 +38,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.AbstractInlineIV;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -46,7 +48,7 @@ import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 /**
  * Convert the {@link IV} to a <code>xsd:string</code>.
  */
-public class StrBOp extends IVValueExpression<IV> 
+public class StrBOp extends IVValueExpression<IV>
 		implements INeedsMaterialization {
 
     /**
@@ -64,7 +66,7 @@ public class StrBOp extends IVValueExpression<IV>
 
     public StrBOp(final IValueExpression<? extends IV> x, final String lex) {
 
-        this(new BOp[] { x }, 
+        this(new BOp[] { x },
         		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
 
     }
@@ -107,12 +109,17 @@ public class StrBOp extends IVValueExpression<IV>
         	getRequiredProperty(Annotations.NAMESPACE);
 
         // use to create my simple literals
-        final BigdataValueFactory vf = 
+        final BigdataValueFactory vf =
         	BigdataValueFactoryImpl.getInstance(namespace);
 
         if (iv.isInline() && !iv.isExtension()) {
-            return DummyConstantNode.toDummyIV(vf.createLiteral(iv
-                    .getInlineValue().toString()));
+            if(iv.isLiteral()){
+                return DummyConstantNode.toDummyIV(vf.createLiteral(
+                        ((AbstractLiteralIV)iv).getLabel()));
+            }else{
+                return DummyConstantNode.toDummyIV(vf.createLiteral(iv
+                        .getInlineValue().toString()));
+            }
         }
 
         if (iv.isURI()) {
@@ -143,25 +150,6 @@ public class StrBOp extends IVValueExpression<IV>
     public Requirement getRequirement() {
 
         return INeedsMaterialization.Requirement.ALWAYS;
-
-    }
-
-    private volatile transient Set<IVariable<IV>> terms;
-
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-
-        if (terms == null) {
-
-            terms = new LinkedHashSet<IVariable<IV>>(1);
-            if (get(0) instanceof IVariable) {
-
-                terms.add((IVariable<IV>) get(0));
-
-            }
-
-        }
-
-        return terms;
 
     }
 

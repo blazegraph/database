@@ -37,16 +37,6 @@ public interface IAggregate<E> extends IValueExpression<E>{
 	boolean isWildcard();
 	
 	/**
-	 * Return the {@link IValueExpression} to be computed by the aggregate. For
-	 * example, is the aggregate function is <code>SUM(i+2)</code>, then this
-	 * expression would be <code>i+2</code>. For <code>COUNT</code> this may be
-	 * the special variable <code>*</code>, which is interpreted to mean all
-	 * variables declared in the source solutions. The "DISTINCT" keyword is
-	 * reported separately by {@link #isDistinct()}.
-	 */
-	IValueExpression<E> getExpr();
-	
-    /**
      * Reset the aggregate's internal state.
      */
     void reset();

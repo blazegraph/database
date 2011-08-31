@@ -95,6 +95,7 @@ import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexPredicate;
+import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
@@ -119,7 +120,7 @@ import com.bigdata.striterator.IKeyOrder;
  * queries and verify the standalone {@link QueryEngine} while we develop a
  * direct translation from Sesame's SPARQL operator tree onto {@link BOp}s and
  * work on the scale-out query buffer transfer mechanisms.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -128,7 +129,7 @@ public class Rule2BOpUtility {
     protected static final Logger log = Logger.getLogger(Rule2BOpUtility.class);
 
 //    private static final transient IConstraint[][] NO_ASSIGNED_CONSTRAINTS = new IConstraint[0][];
-    
+
     /**
      * Flag to conditionally enable the new named and default graph support.
      * <p>
@@ -147,11 +148,11 @@ public class Rule2BOpUtility {
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
      * filter to subquery for each graph in the data set.
-     * 
+     *
      * @todo Add query hint to override this default.
      */
     private static final int SAMPLE_LIMIT = 100;
-    
+
     /**
      * Annotations used by the {@link BigdataEvaluationStrategyImpl} to
      * communicate with the {@link Rule2BOpUtility}.
@@ -188,7 +189,7 @@ public class Rule2BOpUtility {
         /**
          * The {@link Scope} of the access path (quads mode only). In quads mode
          * the {@link Scope} is always provided by openrdf.
-         * 
+         *
          * @see Scope#NAMED_CONTEXTS
          * @see Scope#DEFAULT_CONTEXTS
          */
@@ -245,10 +246,10 @@ public class Rule2BOpUtility {
      * Convert an {@link IStep} into an operator tree. This should handle
      * {@link IRule}s and {@link IProgram}s as they are currently implemented
      * and used by the {@link BigdataSail}.
-     * 
+     *
      * @param step
      *            The step.
-     * 
+     *
      * @return
      */
     public static PipelineOp convert(final IStep step,
@@ -279,25 +280,25 @@ public class Rule2BOpUtility {
             }
 
             return applyQueryHints(tmp, queryHints);
-            
+
         }
-        
+
         return convert((IProgram) step, idFactory, db, queryEngine, queryHints);
 
     }
 
     /**
      * Apply any query hints to the operator as annotations of that operator.
-     * 
+     *
      * @param op
      *            The operator.
      * @param queryHints
      *            The query hints.
-     * 
+     *
      * @return A copy of that operator to which the query hints (if any) have
      *         been applied. If there are no query hints then the original
      *         operator is returned.
-     * 
+     *
      * @todo It would be nice if this would only apply those query hints to an
      *       operator which are known to be annotations understood by that
      *       operator. This information is basically available from the inner
@@ -326,14 +327,14 @@ public class Rule2BOpUtility {
         }
 
         return op;
-        
+
     }
-    
+
     /**
      * Convert a rule into an operator tree.
-     * 
+     *
      * @param rule
-     * 
+     *
      * @return
      */
     public static PipelineOp convert(final IRule<?> rule,
@@ -347,18 +348,18 @@ public class Rule2BOpUtility {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                 })),queryHints);
-        
+
         if (rule.getTailCount() == 0) {
         	return startOp;
         }
 
-    	return convert(rule, 
-    			startOp, 
-    			null/* known bound variables */, 
+    	return convert(rule,
+    			startOp,
+    			null/* known bound variables */,
     			idFactory, db, queryEngine, queryHints);
-    	
+
     }
-    
+
     public static PipelineOp convert(final IRule<?> rule,
     		final PipelineOp pipelineOp,
     		final Set<IVariable<?>> knownBound,
@@ -367,7 +368,7 @@ public class Rule2BOpUtility {
 
 //        // true iff the database is in quads mode.
 //        final boolean isQuadsQuery = db.isQuads();
-        
+
 //        final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
 //                NV.asMap(new NV[] {//
 //                        new NV(Predicate.Annotations.BOP_ID, idFactory
@@ -375,13 +376,13 @@ public class Rule2BOpUtility {
 //                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 //                                BOpEvaluationContext.CONTROLLER),//
 //                })),queryHints);
-//        
+//
 //        if (rule.getTailCount() == 0) {
 //        	return startOp;
 //        }
 //
 //        PipelineOp left = startOp;
-//        
+//
 //        if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
 //        	for (IConstraint c : conditionals) {
 //        		final int condId = idFactory.incrementAndGet();
@@ -399,11 +400,11 @@ public class Rule2BOpUtility {
 //        }
 
     	PipelineOp left = pipelineOp;
-    	
+
         /*
          * First put the tails in the correct order based on the logic in
          * DefaultEvaluationPlan2.
-         * 
+         *
          * @todo Consider making order[] disappear such that all of the arrays
          * (preds[], cardinality[], keyOrder[]) are indexed directly by the
          * array index rather than by order[i]. Alternatively, make sure that
@@ -412,7 +413,7 @@ public class Rule2BOpUtility {
          * given joins and the evaluation order.
          */
         final BOpContextBase context = new BOpContextBase(queryEngine);
-        
+
         final QueryOptimizerEnum optimizer = queryHints == null ? QueryOptimizerEnum.Static
                 : QueryOptimizerEnum.valueOf(queryHints.getProperty(
                         QueryHints.OPTIMIZER, QueryOptimizerEnum.Static
@@ -422,14 +423,14 @@ public class Rule2BOpUtility {
         final int[] order;
         // The estimated cardinality of each tail (if the optimizer provides it)
         final long[] cardinality;
-        // The index assigned to each tail of the rule by static analysis. 
+        // The index assigned to each tail of the rule by static analysis.
         final IKeyOrder[] keyOrder;
 
         switch(optimizer) {
         case None: {
             /*
              * Do not run the join optimizer.
-             * 
+             *
              * @todo Do we need to move any of the joins to the front, e.g.,
              * magic search, or should everything just be left the way it is?
              */
@@ -467,7 +468,7 @@ public class Rule2BOpUtility {
              * solutions. A different index will often be chosen for access
              * paths using the unbound variable.
              */
-                
+
             // the #of variables in each tail of the rule (set by side-effect).
             final int[] nvars = new int[rule.getTailCount()];
 
@@ -484,12 +485,12 @@ public class Rule2BOpUtility {
         case Runtime: {
             /*
              * The runtime query optimizer.
-             * 
+             *
              * FIXME MikeP: I have modified the JoinGraph so that it can report
              * the permutation order. However, the code here needs to isolate
              * the join graph rather than running against all predicates in the
              * tail. As it is, it will reorder optionals.
-             * 
+             *
              * FIXME We can not optimize quads here using the runtime query
              * optimizer since we have not yet generated the full query plan. In
              * order to get the runtime query optimizer working for quads we
@@ -500,11 +501,11 @@ public class Rule2BOpUtility {
              * another problem, especially in scale-out. Both of these issues
              * need to be resolved before quads can be used with the runtime
              * query optimizer.
-             * 
+             *
              * @todo In fact, we should be able to write in a JoinGraph operator
              * which optimizes the join graph and then evaluates it rather than
              * explicitly doing the optimization and evaluation steps here.
-             * 
+             *
              * FIXME The runtime query optimizer can not be run against an
              * IPredicate[] extracted from the IRule, even for triples, because
              * those IPredicates lack some critical annotations, such as the
@@ -514,14 +515,14 @@ public class Rule2BOpUtility {
              * at runtime). [This all runs into trouble because we are creating
              * the JOIN operators in the code below rather than inferring the
              * correct JOIN annotations based on the IPredicates.]
-             * 
+             *
              * @todo Make sure that a summary of the information collected by
              * the runtime query optimizer is attached as an annotation to the
              * query.
-             * 
+             *
              * @todo query hints for [limit] and [nedges].
              */
-            
+
 //            // The initial sampling limit.
 //            final int limit = 100;
 //
@@ -533,9 +534,9 @@ public class Rule2BOpUtility {
 //            for (int i = 0; i < preds.length; i++) {
 //                preds[i] = rule.getTail(i);
 //            }
-//            
+//
 //            final JGraph g = new JGraph(preds);
-//            
+//
 //            final Path p;
 //            try {
 //                p = g.runtimeOptimizer(queryEngine, limit, nedges);
@@ -545,11 +546,11 @@ public class Rule2BOpUtility {
 //
 //            // the permutation order.
 //            order = g.getOrder(p);
-//            
+//
 //            keyOrder = null;
-//            
+//
 //            cardinality = null;
-//            
+//
 //            break;
 
             throw new UnsupportedOperationException("Runtime optimizer is not supported yet.");
@@ -558,22 +559,22 @@ public class Rule2BOpUtility {
         default:
             throw new AssertionError("Unknown option: " + optimizer);
         }
-        
+
         // the variables to be retained for each join.
 //        final IVariable<?>[][] selectVars = RuleState
 //                .computeRequiredVarsForEachTail(rule, order);
-        
+
         /*
          * Create an array of predicates in the decided evaluation with various
          * annotations providing details from the query optimizer.
          */
         final Predicate<?>[] preds = new Predicate[rule.getTailCount()];
         for (int i = 0; i < order.length; i++) {
-            
+
             // assign a bop id to the predicate
             Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
                     idFactory.incrementAndGet());
-            
+
             /*
              * Decorate the predicate with the assigned index (this is purely
              * informative).
@@ -590,10 +591,10 @@ public class Rule2BOpUtility {
                         Annotations.ESTIMATED_CARDINALITY,
                         cardinality[order[i]]);
             }
-            
+
             // save reference into array in evaluation order.
             preds[i] = pred;
-            
+
         }
 
         /*
@@ -614,152 +615,152 @@ public class Rule2BOpUtility {
 			}
 
 			final int nknownBound = knownBound != null ? knownBound.size() : 0;
-			
+
 			// figure out which constraints are attached to which
 			// predicates.
 			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
 					preds, constraints,
 					nknownBound == 0 ? IVariable.EMPTY : knownBound
-							.toArray(new IVariable<?>[nknownBound]), 
+							.toArray(new IVariable<?>[nknownBound]),
 					true// pathIsComplete
 					);
 		}
 
 		/*
-         * 
+         *
          */
         for (int i = 0; i < preds.length; i++) {
-            
+
             // assign a bop id to the predicate
             final Predicate<?> pred = (Predicate<?>) preds[i];
 
             // need to make a modifiable collection
             final Collection<IConstraint> c = new LinkedList<IConstraint>
             	(Arrays.asList(assignedConstraints[i]));
-            
+
             left = join(db, queryEngine, left, pred,//
                     c, context, idFactory, queryHints);
 
         }
-        
+
         if (log.isInfoEnabled()) {
             // just for now while i'm debugging
             log.info("rule: " + rule);
             log.info("query:\n" + BOpUtility.toString(left));
         }
-        
+
         return left;
-        
+
     }
-    
+
     public static PipelineOp join(final AbstractTripleStore db,
-    		final QueryEngine queryEngine, 
-			final PipelineOp left, final Predicate pred, 
+    		final QueryEngine queryEngine,
+			final PipelineOp left, final Predicate pred,
 			final AtomicInteger idFactory, final Properties queryHints) {
-    	
-		return join(db, queryEngine, left, pred, null, 
+
+		return join(db, queryEngine, left, pred, null,
 				idFactory, queryHints);
-    	
+
     }
-    
+
     public static PipelineOp join(final AbstractTripleStore db,
-    		final QueryEngine queryEngine, 
-			final PipelineOp left, final Predicate pred, 
-			final Collection<IConstraint> constraints, 
+    		final QueryEngine queryEngine,
+			final PipelineOp left, final Predicate pred,
+			final Collection<IConstraint> constraints,
 			final AtomicInteger idFactory, final Properties queryHints) {
-    	
-		return join(db, queryEngine, left, pred, constraints, 
+
+		return join(db, queryEngine, left, pred, constraints,
 				new BOpContextBase(queryEngine), idFactory, queryHints);
-    	
+
     }
-    
+
     public static PipelineOp join(final AbstractTripleStore db,
-    		final QueryEngine queryEngine, 
-    		PipelineOp left, Predicate pred, 
-    		final Collection<IConstraint> constraints, 
-    		final BOpContextBase context, final AtomicInteger idFactory, 
+    		final QueryEngine queryEngine,
+    		PipelineOp left, Predicate pred,
+    		final Collection<IConstraint> constraints,
+    		final BOpContextBase context, final AtomicInteger idFactory,
     		final Properties queryHints) {
-    	
+
         final int joinId = idFactory.incrementAndGet();
-        
+
         // annotations for this join.
         final List<NV> anns = new LinkedList<NV>();
-        
+
         anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
 
 //        anns.add(new NV(PipelineJoin.Annotations.SELECT,
 //                selectVars[order[i]]));
-        
+
         // No. The join just looks at the Predicate's optional annotation.
 //        if (pred.isOptional())
 //            anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
 //                    .isOptional()));
-        
+
         /*
          * Some constraints need to be detached from the join so that we can
          * add a materialization step in between the join and the constraint
          * evaluation.
          */
-        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = 
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization =
         	new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
-        
+
         if (constraints != null && !constraints.isEmpty()) {
 //			// decorate the predicate with any constraints.
 //			pred = (Predicate<?>) pred.setProperty(
 //					IPredicate.Annotations.CONSTRAINTS, constraints
 //							.toArray(new IConstraint[constraints.size()]));
-			
+
     		// create a mutable version
     		final Collection<IConstraint> tmp = new LinkedList<IConstraint>();
     		tmp.addAll(constraints);
-    		
-    		final Collection<IConstraint> tryBeforeMaterialization = 
+
+    		final Collection<IConstraint> tryBeforeMaterialization =
     			new LinkedList<IConstraint>();
-    		
+
 			final Iterator<IConstraint> it = tmp.iterator();
-			
+
 			while (it.hasNext()) {
-				
+
 				final IConstraint c = it.next();
-				
+
 				// if this constraint needs materialized variables, remove it
 				// from the join and run it as a ConditionalRoutingOp later
-				
-				final Set<IVariable<IV>> terms = 
+
+				final Set<IVariable<IV>> terms =
 					new LinkedHashSet<IVariable<IV>>();
-				
-				final Requirement req = gatherTermsToMaterialize(c, terms); 
-				
+
+				final Requirement req = gatherTermsToMaterialize(c, terms);
+
 				if (req != Requirement.NEVER) {
-					
+
 					it.remove();
 
 					if (req == Requirement.SOMETIMES) {
-						
+
 						tryBeforeMaterialization.add(c);
-						
+
 					}
-					
+
 					needsMaterialization.put(c, terms);
-					
+
 				}
 
 			}
 
 			for (IConstraint c : tryBeforeMaterialization) {
-				
+
 				// need to make a clone so that BOpUtility doesn't complain
 				c = (IConstraint) c.clone();
-				
+
 				tmp.add(new TryBeforeMaterializationConstraint(c));
-				
+
 			}
-			
+
 			// add constraints to the join for that predicate.
 			anns.add(new NV(
 					PipelineJoin.Annotations.CONSTRAINTS,
 					tmp.toArray(new IConstraint[tmp.size()])));
-			
+
 		}
 
         /*
@@ -805,7 +806,7 @@ public class Rule2BOpUtility {
                 default:
                     throw new AssertionError();
                 }
-                
+
             } else {
 
                 /*
@@ -813,11 +814,11 @@ public class Rule2BOpUtility {
                  * using expanders which were attached by
                  * BigdataEvaluationStrategyImpl.
                  */
-                
+
                 final boolean scaleOut = queryEngine.isScaleOut();
                 if (scaleOut)
                     throw new UnsupportedOperationException();
-                
+
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
 
@@ -837,61 +838,61 @@ public class Rule2BOpUtility {
             left = triplesModeJoin(queryEngine, left, anns, pred, queryHints);
 
         }
-        
+
 		if (needsMaterialization.size() > 0) {
 
-			final Set<IVariable<IV>> alreadyMaterialized = 
+			final Set<IVariable<IV>> alreadyMaterialized =
 				new LinkedHashSet<IVariable<IV>>();
-			
-			for (Map.Entry<IConstraint, Set<IVariable<IV>>> e : 
+
+			for (Map.Entry<IConstraint, Set<IVariable<IV>>> e :
 				needsMaterialization.entrySet()) {
-				
+
 				final IConstraint c = e.getKey();
-				
+
 				final Set<IVariable<IV>> terms = e.getValue();
-				
+
 				// remove any terms already materialized
 				terms.removeAll(alreadyMaterialized);
-				
+
 				// add any new terms to the list of already materialized
 				alreadyMaterialized.addAll(terms);
-				
+
 				final int condId = idFactory.incrementAndGet();
 
 				// we might have already materialized everything we need
 				if (terms.size() > 0) {
-					
-					left = addMaterializationSteps(db, queryEngine, left, 
+
+					left = addMaterializationSteps(db, queryEngine, left,
 							condId, c, terms, idFactory, queryHints);
-				
+
 				}
-			
+
 				left = Rule2BOpUtility.applyQueryHints(
 	              	    new ConditionalRoutingOp(new BOp[]{left},
 	                        NV.asMap(new NV[]{//
 	                            new NV(BOp.Annotations.BOP_ID, condId),
 	                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
 	                        })), queryHints);
-				
+
 			}
-			
+
 		}
-        
+
         return left;
-    	
+
     }
-    
+
     /**
      * Use the {@link INeedsMaterialization} interface to find and collect
      * variables that need to be materialized for this constraint.
      */
     public static boolean requiresMaterialization(
-    		final IConstraint c) { 
+    		final IConstraint c) {
 
     	return gatherTermsToMaterialize(c, new HashSet<IVariable<IV>>()) != Requirement.NEVER;
-    	
+
     }
- 
+
     /**
      * Use the {@link INeedsMaterialization} interface to find and collect
      * variables that need to be materialized for this constraint.
@@ -901,57 +902,57 @@ public class Rule2BOpUtility {
 
     	boolean materialize = false;
     	boolean always = false;
-    	
+
 		final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
-		
+
 		while (it.hasNext()) {
-			
+
 			final BOp bop = it.next();
-			
+
 			if (log.isDebugEnabled()) {
 				log.debug(bop);
 			}
-			
+
 			if (bop instanceof INeedsMaterialization) {
-				
+
 				final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
-				
-				final Set<IVariable<IV>> t = bop2.getVarsToMaterialize();
-				
+
+				final Set<IVariable<IV>> t = ComputedMaterializationRequirement.getVarsFromArguments(bop);
+
 				if (t.size() > 0) {
-					
+
 					terms.addAll(t);
-					
+
 					materialize = true;
-					
+
 					// if any bops have terms that always needs materialization
 					// then mark the whole constraint as such
 					if (bop2.getRequirement() == Requirement.ALWAYS) {
-						
+
 						always = true;
-						
+
 					}
-					
+
 				}
-				
+
 			}
-			
+
 		}
-		
+
 		return materialize ?
 				(always ? Requirement.ALWAYS : Requirement.SOMETIMES) :
 					Requirement.NEVER;
-    	
+
     }
- 
+
     /**
      * Adds a series of materialization steps to materialize terms needed
      * downstream.
-     * 
+     *
      * To materialize the variable ?term, the pipeline looks as follows:
-     * 
-     * left 
-     * -> 
+     *
+     * left
+     * ->
      * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
      * ->
      * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
@@ -961,7 +962,7 @@ public class Rule2BOpUtility {
      * PipelineJoin (predicate=LexPredicate(?term))
      * ->
      * right
-     * 
+     *
      * @param db
      * 			the database
      * @param queryEngine
@@ -997,12 +998,12 @@ public class Rule2BOpUtility {
 		 * bypass the pipeline
 		 */
     	{
-    		
+
 			final IValueExpression ve = (IValueExpression) c.get(0);
-    		
-    		final IConstraint c2 = 
+
+    		final IConstraint c2 =
     			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
-    		
+
     		left = Rule2BOpUtility.applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{left},
                         NV.asMap(new NV[]{//
@@ -1010,21 +1011,21 @@ public class Rule2BOpUtility {
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
                             new NV(PipelineOp.Annotations.ALT_SINK_REF, right),
                         })), queryHints);
-    		
+
     	}
-    	
+
     	final Iterator<IVariable<IV>> it = varsToMaterialize.iterator();
-    	
+
     	int firstId = idFactory.incrementAndGet();
     	while (it.hasNext()) {
-    		
+
     		final IVariable<IV> v = it.next();
-    		
+
     		final int condId1 = firstId;
     		final int condId2 = idFactory.incrementAndGet();
     		final int inlineMaterializeId = idFactory.incrementAndGet();
             final int lexJoinId = idFactory.incrementAndGet();
-            
+
             final int endId;
     		if (!it.hasNext()) {
 				/*
@@ -1034,16 +1035,16 @@ public class Rule2BOpUtility {
 				 */
     			endId = right;
     		} else {
-    			/* 
+    			/*
     			 * If there are more terms, the terminus of this materialization
     			 * pipeline is the 1st operator of the next materialization
     			 * pipeline.
     			 */
-    			endId = firstId = idFactory.incrementAndGet(); 
+    			endId = firstId = idFactory.incrementAndGet();
     		}
-    		
+
     		final IConstraint c1 = new SPARQLConstraint(new IsMaterializedBOp(v, false));
-    		
+
             final PipelineOp condOp1 = Rule2BOpUtility.applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{left},
                         NV.asMap(new NV[]{//
@@ -1052,13 +1053,13 @@ public class Rule2BOpUtility {
                             new NV(PipelineOp.Annotations.SINK_REF, condId2),
                             new NV(PipelineOp.Annotations.ALT_SINK_REF, endId),
                         })), queryHints);
-         
+
             if (log.isDebugEnabled()) {
           	    log.debug("adding 1st conditional routing op: " + condOp1);
             }
-        	
+
     		final IConstraint c2 = new SPARQLConstraint(new IsInlineBOp(v, true));
-    		
+
             final PipelineOp condOp2 = Rule2BOpUtility.applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{condOp1},
                         NV.asMap(new NV[]{//
@@ -1067,11 +1068,11 @@ public class Rule2BOpUtility {
                             new NV(PipelineOp.Annotations.SINK_REF, inlineMaterializeId),
                             new NV(PipelineOp.Annotations.ALT_SINK_REF, lexJoinId),
                         })), queryHints);
-         
+
             if (log.isDebugEnabled()) {
           	    log.debug("adding 2nd conditional routing op: " + condOp2);
             }
-            
+
 			final Predicate lexPred;
 			{
 				/*
@@ -1086,11 +1087,11 @@ public class Rule2BOpUtility {
 				lexPred = LexPredicate.reverseInstance(db.getLexiconRelation()
 						.getNamespace(), timestamp, v);
 			}
-            
+
             if (log.isDebugEnabled()) {
           	    log.debug("lex pred: " + lexPred);
             }
-            
+
             final PipelineOp inlineMaterializeOp = Rule2BOpUtility.applyQueryHints(
               	    new InlineMaterializeOp(new BOp[]{condOp2},
                         NV.asMap(new NV[]{//
@@ -1102,7 +1103,7 @@ public class Rule2BOpUtility {
             if (log.isDebugEnabled()) {
           	    log.debug("adding inline materialization op: " + inlineMaterializeOp);
             }
-            
+
             final PipelineOp lexJoinOp = Rule2BOpUtility.applyQueryHints(
 		      	    new PipelineJoin(new BOp[]{inlineMaterializeOp},
 		                NV.asMap(new NV[]{//
@@ -1114,23 +1115,23 @@ public class Rule2BOpUtility {
             if (log.isDebugEnabled()) {
           	    log.debug("adding lex join op: " + lexJoinOp);
             }
-            
+
             left = lexJoinOp;
-            
+
     	}
-        
+
     	return left;
-    	
+
     }
 
     /**
      * Generate a {@link PipelineJoin} for a triples mode access path.
-     * 
+     *
      * @param queryEngine
      * @param left
      * @param anns
      * @param pred
-     * 
+     *
      * @return The join operator.
      */
     private static PipelineOp triplesModeJoin(final QueryEngine queryEngine,
@@ -1160,18 +1161,18 @@ public class Rule2BOpUtility {
 
     /**
      * Generate a named graph join (quads mode).
-     * 
+     *
      * @param queryEngine
      * @param left
      * @param anns
      * @param pred
      * @param cvar
      * @return
-     * 
+     *
      * @todo If the context position is shared by some other variable which we
      *       know to be bound based on the selected join order, then we need to
      *       treat the context variable as during this analysis.
-     * 
+     *
      * @todo Since we do not know the specific asBound values, but only that
      *       they will be bound, we should defer the SCAN versus SUBQUERY
      *       decision until we actually evaluate that access path. This is
@@ -1213,7 +1214,7 @@ public class Rule2BOpUtility {
         if (pred.get(3/* c */).isConstant()) {
 
             /*
-             * C is already bound.  The unmodified access path is used. 
+             * C is already bound.  The unmodified access path is used.
              */
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
@@ -1256,14 +1257,14 @@ public class Rule2BOpUtility {
 
             /*
              * The dataset contains exactly one graph. Bind C.
-             * 
+             *
              * Note: This uses the 2 argument Constant constructor, which
              * accepts the name of the variable bound to the constant as its
              * first argument. BOpContext#bind() takes care of propagating the
              * binding onto the variable for solutions which join.
-             * 
+             *
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/359
-             * 
+             *
              * Fixed by changing to the two-arg constructor for Constant.
              */
 
@@ -1280,11 +1281,11 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SCAN with C unbound.
-         * 
+         *
          * Note: We need to use global index view in order to estimate the cost
          * of the scan even though the scan will be shard-wise when we actually
          * run the query.
-         * 
+         *
          * @todo must pass estimateCost() to the underlying access path plus
          * layer on any cost for the optional expander.
          */
@@ -1298,7 +1299,7 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SUBQUERY with C bound (sampling).
-         * 
+         *
          * Note: Again, we need to use a remote index view in order to estimate
          * the cost of the subqueries even though we will use sharded joins when
          * actually running the query.
@@ -1336,12 +1337,12 @@ public class Rule2BOpUtility {
 
             /*
              * Setup the data set join.
-             * 
+             *
              * @todo When the #of named graphs is large we need to do something
              * special to avoid sending huge graph sets around with the query.
              * For example, we should create named data sets and join against
              * them rather than having an in-memory DataSetJoin.
-             * 
+             *
              * @todo The historical approach performed parallel subquery using
              * an expander pattern rather than a data set join. The data set
              * join should have very much the same effect, but it may need to
@@ -1382,13 +1383,13 @@ public class Rule2BOpUtility {
 
     /**
      * Generate a default graph join (quads mode).
-     * 
+     *
      * @param queryEngine
      * @param left
      * @param anns
      * @param pred
      * @return
-     * 
+     *
      * @todo Since we do not know the specific asBound values, but only that
      *       they will be bound, we should defer the SCAN versus SUBQUERY
      *       decision until we actually evaluate that access path. This is
@@ -1420,7 +1421,7 @@ public class Rule2BOpUtility {
             return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
                     .toArray(new NV[anns.size()])), queryHints);
         }
-        
+
         if (summary != null && summary.nknown == 0) {
 
             /*
@@ -1439,7 +1440,7 @@ public class Rule2BOpUtility {
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
-        
+
         if (summary != null && summary.nknown == 1) {
 
             /*
@@ -1461,7 +1462,7 @@ public class Rule2BOpUtility {
 
             // Strip of the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
-            
+
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
             return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
@@ -1485,7 +1486,7 @@ public class Rule2BOpUtility {
 //             * strip off the context position. Distinct filter is not required
 //             * since the advancer pattern used will not report duplicates.
 //             */
-//            
+//
 //            // Set the CURSOR flag.
 //            pred = (Predicate<?>) pred.setProperty(IPredicate.Annotations.FLAGS,
 //                    pred.getProperty(IPredicate.Annotations.FLAGS,
@@ -1494,7 +1495,7 @@ public class Rule2BOpUtility {
 //
 //            // Set Advancer (runs at the index).
 //            pred = pred.addIndexLocalFilter(new ContextAdvancer());
-//            
+//
 //            // Filter to strip off the context position.
 //            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 //
@@ -1540,7 +1541,7 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SCAN with C unbound.
-         * 
+         *
          * Note: We need to use the global index view in order to estimate the
          * cost of the scan regardless of whether the query runs with
          * partitioned or global index views when it is evaluated.
@@ -1554,7 +1555,7 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SUBQUERY with C bound (sampling).
-         * 
+         *
          * Note: We need to use the global index view in order to estimate the
          * cost of the scan regardless of whether the query runs with
          * partitioned or global index views when it is evaluated.
@@ -1576,7 +1577,7 @@ public class Rule2BOpUtility {
              */
 
             if (dataset != null) {
-                
+
                 // IN filter for the named graphs.
                 final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
                         summary.nknown, summary.graphs);
@@ -1606,7 +1607,7 @@ public class Rule2BOpUtility {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
             }
-            
+
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
 			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
@@ -1620,17 +1621,17 @@ public class Rule2BOpUtility {
              * pattern and layer on a filter to strip off the context position.
              * The asBound access paths write on a shared buffer. That shared
              * buffer is read from by the expander.
-             * 
+             *
              * Scale-out: JOIN is ANY or HASHED. AP is REMOTE.
              */
 
             final long estimatedRangeCount = subqueryCostReport.rangeCount;
 
             final Set<IV> graphs = summary.getGraphs();
-            
+
             // @todo default with query hint to override and relate to ClientIndexView limit in scale-out.
             final int maxParallel = 10;
-            
+
             // Set subquery expander.
             pred = (Predicate<?>) pred.setUnboundProperty(
                     IPredicate.Annotations.ACCESS_PATH_EXPANDER,
@@ -1642,7 +1643,7 @@ public class Rule2BOpUtility {
 
             // Filter for distinct SPOs.
             pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
-            
+
             if (scaleOut) {
                 /*
                  * Use the global index view so we can impose the distinct
@@ -1656,7 +1657,7 @@ public class Rule2BOpUtility {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
             }
-            
+
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
 			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
@@ -1669,12 +1670,12 @@ public class Rule2BOpUtility {
     /**
      * Convert a program into an operator tree. Programs can be either UNIONs or
      * STEPS. They can also be STARs (transitive closure) of a UNION or STEPS.
-     * 
+     *
      * @param program
      *            The program.
-     * 
+     *
      * @return The operator tree.
-     * 
+     *
      * @todo This does not handle STAR ({@link IProgram#isClosure()}). However,
      *       that is not currently generated by the SAIL. STAR is used for truth
      *       maintenance and could also be useful for property path queries.
@@ -1685,12 +1686,12 @@ public class Rule2BOpUtility {
 
         // When parallel, the program is translated to a UNION. Else STEPS.
         final boolean isParallel = program.isParallel();
-        
+
         // The bopId for the UNION or STEP.
         final int thisId = idFactory.incrementAndGet();
 
        final IStep[] steps = program.toArray();
-        
+
         final BOp[] subqueries = new BOp[steps.length];
 
         for (int i = 0; i < steps.length; i++) {
@@ -1708,11 +1709,11 @@ public class Rule2BOpUtility {
 //            tmp = tmp.setProperty(PipelineOp.Annotations.SINK_REF, thisId);
 
             subqueries[i] = tmp;
-            
+
         }
-        
+
         final LinkedList<NV> anns = new LinkedList<NV>();
-        
+
         anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
 
         // the subqueries.
@@ -1720,9 +1721,9 @@ public class Rule2BOpUtility {
 
 //        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
 //                BOpEvaluationContext.CONTROLLER));
-//        
+//
 //        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-        
+
         if (!isParallel)
             anns.add(new NV(Union.Annotations.MAX_PARALLEL_SUBQUERIES, 1));
 
@@ -1744,13 +1745,13 @@ public class Rule2BOpUtility {
      * reading on each of the tail predicates. The array is formed using a
      * private {@link IBindingSet} and propagating fake bindings to each
      * predicate in turn using the given evaluation order.
-     * 
+     *
      * @param order
      *            The evaluation order.
      * @param nvars
      *            The #of unbound variables for each tail predicate is assigned
      *            by side-effect.
-     * 
+     *
      * @return An array of the {@link IKeyOrder}s for each tail predicate. The
      *         array is correlated with the predicates index in the tail of the
      *         rule NOT its evaluation order.
@@ -1768,9 +1769,9 @@ public class Rule2BOpUtility {
         final int tailCount = rule.getTailCount();
 
         final IKeyOrder[] a = new IKeyOrder[tailCount];
-        
+
         final IBindingSet bindingSet = new HashBindingSet();
-        
+
         for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
 
             final int tailIndex = order[orderIndex];
@@ -1778,9 +1779,9 @@ public class Rule2BOpUtility {
             final IPredicate pred = rule.getTail(tailIndex);
 
             final IRelation rel = context.getRelation(pred);
-            
+
             final IPredicate asBound = pred.asBound(bindingSet);
-            
+
             final IKeyOrder keyOrder = context.getAccessPath(
                     rel, asBound).getKeyOrder();
 
@@ -1809,9 +1810,9 @@ public class Rule2BOpUtility {
                         log.debug("Propagating binding: pred=" + pred
                                         + ", var=" + var + ", bindingSet="
                                         + bindingSet);
-                        
+
                     }
-                    
+
                     bindingSet.set(var, fakeTermId);
 
                 }
@@ -1834,9 +1835,9 @@ public class Rule2BOpUtility {
     /**
      * A fake value that is propagated when we compute the {@link IKeyOrder} for
      * a series of joins based on an assigned join evaluation order.
-     * 
+     *
      * @todo This has to be of the appropriate data type or we run into class
-     * cast exceptions. 
+     * cast exceptions.
      */
     final private static transient IConstant<IV> fakeTermId = new Constant<IV>(
             TermId.mockIV(VTE.URI)

@@ -274,7 +274,7 @@ public class SliceOp extends PipelineOp {
             if (offset < 0)
                 throw new IllegalArgumentException(Annotations.OFFSET);
 
-            if (limit <= 0)
+            if (limit < 0)
                 throw new IllegalArgumentException(Annotations.LIMIT);
 
             this.stats = (SliceStats) context.getStats();

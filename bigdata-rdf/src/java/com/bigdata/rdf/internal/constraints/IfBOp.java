@@ -38,7 +38,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 /**
  * Conditional if BOp
  */
-public class IfBOp extends IVValueExpression<IV> {
+public class IfBOp extends IVValueExpression<IV> implements IPassesMaterialization {
 
 	/**
 	 *

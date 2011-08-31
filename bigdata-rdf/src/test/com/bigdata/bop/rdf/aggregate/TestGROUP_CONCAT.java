@@ -332,7 +332,7 @@ public class TestGROUP_CONCAT extends TestCase2 {
                 false, // distinct
                 new StrBOp(
                         new MathBOp(lprice, new Constant<IV>(new XSDNumericIV(1)),
-                                MathBOp.MathOp.PLUS), namespace), //
+                                MathBOp.MathOp.PLUS,namespace), namespace), //
                 namespace,// namespace
                 ","// separator
         );
@@ -411,7 +411,7 @@ public class TestGROUP_CONCAT extends TestCase2 {
         final GROUP_CONCAT op = new GROUP_CONCAT(//
                 false,// distinct
                 new MathBOp(lprice, new Constant<IV>(new XSDNumericIV(1)),
-                        MathBOp.MathOp.PLUS), namespace, // namespace
+                        MathBOp.MathOp.PLUS,namespace), namespace, // namespace
                 ","// separator
         );
         

@@ -369,7 +369,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IValueExpression<?> expr = new /* Conditional */Bind(y,
                 new MathBOp(new Constant<IV>(new XSDNumericIV(1)), new SUM(
                         false/* distinct */, (IValueExpression<IV>) x),
-                        MathBOp.MathOp.PLUS));
+                        MathBOp.MathOp.PLUS,getName()));
 
         /*
          * Set up the expected answer.
@@ -381,7 +381,7 @@ public class TestGroupByRewriter extends TestCase2 {
         final IVariable<IV> _0 = Var.var("_0");
 
         final IValueExpression<IV> expectedExpr = new Bind(y, new MathBOp(
-                new Constant<IV>(new XSDNumericIV(1)), _0, MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), _0, MathBOp.MathOp.PLUS,getName()));
 
         final LinkedHashMap<IAggregate<?>, IVariable<?>> expectedAggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
         expectedAggExpr.put(_sumX, _0);
@@ -419,7 +419,7 @@ public class TestGroupByRewriter extends TestCase2 {
 
         final IValueExpression<IV> sumX = new /* Conditional */Bind(y, new SUM(
                 false/* distinct */, new MathBOp(x, new MIN(
-                        false/* distinct */, x), MathBOp.MathOp.PLUS)));
+                        false/* distinct */, x), MathBOp.MathOp.PLUS,getName())));
 
         /*
          * Set up the expected answer.
@@ -430,7 +430,7 @@ public class TestGroupByRewriter extends TestCase2 {
 
         final IAggregate<IV> _minX = new MIN(false/* distinct */, x);
         final IAggregate<IV> _sumX = new SUM(false/* distinct */, new MathBOp(
-                x, _0, MathBOp.MathOp.PLUS));
+                x, _0, MathBOp.MathOp.PLUS,getName()));
 
         final IValueExpression<IV> expectedExpr = new Bind(y, _1);
 

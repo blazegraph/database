@@ -23,20 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.rdf.aggregate;
 
+import java.math.BigInteger;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Operator computes the number of non-null values over the presented binding
@@ -49,7 +46,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  *
  * @author thompsonbry
  */
-public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
+public class COUNT extends AggregateBase<IV> {
 
 	/**
 	 *
@@ -147,7 +144,8 @@ public class COUNT extends AggregateBase<IV> implements IAggregate<IV> {
 
         }
 
-        return new XSDNumericIV<BigdataLiteral>(aggregated);
+        return new com.bigdata.rdf.internal.impl.literal.XSDIntegerIV(new BigInteger(Long.toString(aggregated)));
+        //return new XSDNumericIV<BigdataLiteral>(aggregated);
 
     }
 

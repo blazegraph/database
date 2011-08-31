@@ -120,7 +120,7 @@ public class TestProjectionOp extends TestCase2 {
         final IConstant<IV> __6 = new Constant<IV>(new XSDIntegerIV(BigInteger.valueOf(6)));
 
         final IValueExpression<?> exprs[] = new IValueExpression[] { //
-                new Bind(z, new MathBOp(x, y, MathBOp.MathOp.PLUS)),//
+                new Bind(z, new MathBOp(x, y, MathBOp.MathOp.PLUS,getName())),//
                 y //
         };
 

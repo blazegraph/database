@@ -470,7 +470,7 @@ public class BOpUtility {
 		            public boolean isValid(Object arg0) {
 		                return clas.isAssignableFrom(arg0.getClass());
 		            }
-		        }).makeUnique();
+		        });
         
     }
 

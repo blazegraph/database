@@ -25,20 +25,16 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.util.ValueComparator;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
  * Operator reports the minimum observed value over the presented binding sets
@@ -53,7 +49,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  *
  *         TODO What is reported if there are no non-null observations?
  */
-public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
+public class MAX extends AggregateBase<IV> implements INeedsMaterialization{
 
 //    private static final transient Logger log = Logger.getLogger(MAX.class);
 
@@ -70,8 +66,8 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
         super(args, annotations);
     }
 
-    public MAX(boolean distinct, IValueExpression<IV> expr) {
-        super(/*FunctionCode.MAX,*/distinct, expr);
+    public MAX(boolean distinct, IValueExpression...expr) {
+        super(distinct, expr);
     }
 
     /**
@@ -107,8 +103,9 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     private IV doGet(final IBindingSet bindingSet) {
+        for (int i = 0; i < arity(); i++) {
 
-        final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
+            final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(i);
 
         final IV iv = expr.get(bindingSet);
 
@@ -141,7 +138,7 @@ public class MAX extends AggregateBase<IV> implements IAggregate<IV> {
             }
 
         }
-
+        }
         return max;
 
     }

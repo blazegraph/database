@@ -159,7 +159,7 @@ public class TestMAX extends TestCase2 {
 
         // MAX(lprice+1)
         final MAX op = new MAX(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,"test"));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

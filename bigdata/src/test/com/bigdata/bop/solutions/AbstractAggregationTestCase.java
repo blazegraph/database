@@ -2273,7 +2273,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
         final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
-                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS));
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS,getName()));
 
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
                 nestedExpr);
@@ -2463,7 +2463,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // SUM(?lprice+SUM(?lprice))
         // Note: This is a nested aggregation!!!
         final IValueExpression<IV> nestedExpr = new SUM(false/* distinct */,
-                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS));
+                new MathBOp(lprice, sumLPrice, MathBOp.MathOp.PLUS,getName()));
 
         final IValueExpression<IV> totalPriceExpr = new Bind(totalPrice,
                 nestedExpr);
@@ -2664,7 +2664,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Note: This has a dependency on SUM(?lprice)
         final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
                 new MathBOp(totalPrice, new Constant(new XSDNumericIV(2)),
-                        MathBOp.MathOp.MULTIPLY));
+                        MathBOp.MathOp.MULTIPLY,getName()));
 
         final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
                 new CompareBOp(
@@ -2847,7 +2847,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
         // Note: This has a dependency on SUM(?lprice)
         final IValueExpression<IV> inflatedPriceExpr = new Bind(inflatedPrice,
                 new MathBOp(totalPrice, new Constant(new XSDNumericIV(2)),
-                        MathBOp.MathOp.MULTIPLY));
+                        MathBOp.MathOp.MULTIPLY,getName()));
 
 //        final IConstraint totalPriceConstraint = new SPARQLConstraint<XSDBooleanIV>(
 //                new CompareBOp(
