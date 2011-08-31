@@ -59,6 +59,13 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BOpUtility {
 
+    private static transient final Logger log = Logger
+            .getLogger(BOpUtility.class);
+    
+    /**
+     * Used to maintain a stack which reports on the path through the bop
+     * tree during pre-order or post-order traversal.
+     */
     static private class NodeOrAttribute implements INodeOrAttribute {
     	final BOp bop;
     	final NV nv;
@@ -87,9 +94,6 @@ public class BOpUtility {
 
 	}
 
-	private static transient final Logger log = Logger
-            .getLogger(BOpUtility.class);
-    
     /**
      * Pre-order recursive visitation of the operator tree (arguments only, no
      * annotations).

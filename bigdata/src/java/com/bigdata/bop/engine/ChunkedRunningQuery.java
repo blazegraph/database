@@ -196,11 +196,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             final PipelineOp query, final IChunkMessage<IBindingSet> realSource) {
 
         super(queryEngine, queryId, controller, clientProxy, query, realSource);
-        
-        this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask,ChunkFutureTask>>();
-        
+
+        this.operatorFutures = new ConcurrentHashMap<BSBundle, ConcurrentHashMap<ChunkFutureTask, ChunkFutureTask>>();
+
         this.operatorQueues = new ConcurrentHashMap<BSBundle, BlockingQueue<IChunkMessage<IBindingSet>>>();
-        
+
     }
 
     /**

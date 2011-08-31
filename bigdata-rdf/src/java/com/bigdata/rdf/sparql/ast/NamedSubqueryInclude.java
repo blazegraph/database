@@ -46,7 +46,7 @@ public class NamedSubqueryInclude extends
         /**
          * The name of the temporary solution set.
          */
-        String SUBQUERY_NAME = "subqueryName";
+        String NAMED_SET = "namedSet";
         
         /**
          * A {@link VarNode}[] specifying the join variables that will be used
@@ -82,7 +82,7 @@ public class NamedSubqueryInclude extends
      */
     public String getName() {
         
-        return (String) getProperty(Annotations.SUBQUERY_NAME);
+        return (String) getProperty(Annotations.NAMED_SET);
                 
     }
 
@@ -96,7 +96,7 @@ public class NamedSubqueryInclude extends
         if(name == null)
             throw new IllegalArgumentException();
         
-        setProperty(Annotations.SUBQUERY_NAME, name);
+        setProperty(Annotations.NAMED_SET, name);
         
     }
 

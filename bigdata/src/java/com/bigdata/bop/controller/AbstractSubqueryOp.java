@@ -359,7 +359,7 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                     final QueryEngine queryEngine = parentContext.getRunningQuery()
                             .getQueryEngine();
 
-					runningSubquery = queryEngine.eval(subQueryOp, bset);
+                    runningSubquery = queryEngine.eval(subQueryOp, bset);
 
                     // Iterator visiting the subquery solutions.
                     subquerySolutionItr = runningSubquery.iterator();

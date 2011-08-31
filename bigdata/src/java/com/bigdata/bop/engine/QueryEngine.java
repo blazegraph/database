@@ -225,8 +225,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * running query instance. It is an error if there is a query already
          * running with the same {@link UUID}.
          */
-        String QUERY_ID = (QueryEngine.class.getName() + ".runningQueryClass")
-                .intern();
+        String QUERY_ID = QueryEngine.class.getName() + ".queryId";
         
         /**
          * The name of the {@link IRunningQuery} implementation class which will
@@ -241,11 +240,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * </pre>
          * 
          * Note that classes derived from {@link QueryEngine} may override
-         * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp, IChunkMessage)}
+         * {@link QueryEngine#newRunningQuery(QueryEngine, UUID, boolean, IQueryClient, PipelineOp, IChunkMessage, IRunningQuery)}
          * in which case they might not support this option.
          */
-        String RUNNING_QUERY_CLASS = (QueryEngine.class.getName()
-                + ".runningQueryClass").intern();
+        String RUNNING_QUERY_CLASS = QueryEngine.class.getName()
+                + ".runningQueryClass";
 
 //        String DEFAULT_RUNNING_QUERY_CLASS = StandaloneChainedRunningQuery.class.getName();
         String DEFAULT_RUNNING_QUERY_CLASS = ChunkedRunningQuery.class.getName();
@@ -970,11 +969,21 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * Return an {@link IAsynchronousIterator} that will read a single, empty
      * {@link IBindingSet}.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator() {
+
+        return newBindingSetIterator(new ListBindingSet());
+
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single
+     * {@link IBindingSet}.
      * 
      * @param bindingSet
      *            the binding set.
      */
-    private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
             final IBindingSet bindingSet) {
 
         return new ThickAsynchronousIterator<IBindingSet[]>(
@@ -982,6 +991,64 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
+    /**
+     * Return an {@link IAsynchronousIterator} that will read the source
+     * {@link IBindingSet}s.
+     * 
+     * @param bsets
+     *            The source binding sets.
+     */
+    private static ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bsets) {
+     
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bsets });
+        
+    }
+    
+    /** Use a random UUID unless the UUID was specified on the query. */
+    private static UUID getQueryUUID(final BOp op) {
+
+        return op.getProperty(QueryEngine.Annotations.QUERY_ID,
+                UUID.randomUUID());
+        
+    }
+
+    /**
+     * Return the starting point for pipeline evaluation/
+     */
+    private int getStartId(final BOp op) {
+
+        final BOp startOp = BOpUtility.getPipelineStart(op);
+
+        final int startId = startOp.getId();
+
+        return startId;
+        
+    }
+
+    /**
+     * Return a {@link LocalChunkMessage} for the query wrapping the specified
+     * source.
+     * 
+     * @param queryId
+     *            The query's {@link UUID}.
+     * @param op
+     *            The query.
+     * @param src
+     *            The source to be wrapped.
+     *            
+     * @return The message.
+     */
+    private LocalChunkMessage<IBindingSet> newLocalChunkMessage(
+            final UUID queryId, final BOp op,
+            final IAsynchronousIterator<IBindingSet[]> src) {
+
+        return new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
+                queryId, getStartId(op), -1 /* partitionId */, src);
+
+    }
+    
     /**
      * Evaluate a query. This node will serve as the controller for the query.
      * 
@@ -1016,12 +1083,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public AbstractRunningQuery eval(final BOp op, final IBindingSet bset)
             throws Exception {
-        
-        // Use a random UUID unless the UUID was specified on the query.
-        final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
-                UUID.randomUUID());
 
-        return eval(queryId, op, newBindingSetIterator(bset));
+        return eval(getQueryUUID(op), op, newBindingSetIterator(bset));
 
     }
 
@@ -1042,12 +1105,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     public AbstractRunningQuery eval(final BOp op, final IBindingSet[] bsets)
             throws Exception {
 
-        // Use a random UUID unless the UUID was specified on the query.
-        final UUID queryId = op.getProperty(QueryEngine.Annotations.QUERY_ID,
-                UUID.randomUUID());
-
-        return eval(queryId, op, new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { bsets }));
+        return eval(getQueryUUID(op), op, newBindingSetIterator(bsets));
 
     }
 
@@ -1070,13 +1128,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     public AbstractRunningQuery eval(final UUID queryId, final BOp op,
             final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
 
-        final BOp startOp = BOpUtility.getPipelineStart(op);
-
-        final int startId = startOp.getId();
-
         return eval(queryId, (PipelineOp) op,
-                new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
-                        queryId, startId, -1 /* partitionId */, bsets));
+                newLocalChunkMessage(queryId, op, bsets));
 
     }
 
@@ -1099,10 +1152,41 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
      */
-    public AbstractRunningQuery eval(final UUID queryId,
-            final PipelineOp query,
-            final IChunkMessage<IBindingSet> msg) throws Exception {
+    public AbstractRunningQuery eval(//
+            final UUID queryId,//
+            final PipelineOp query,//
+            final IChunkMessage<IBindingSet> msg//
+            ) throws Exception {
 
+        return startEval(queryId, query, msg);
+
+    }
+    
+    /**
+     * Begin to evaluate a query (core impl). This node will serve as the
+     * controller for the query. The {@link IBindingSet}s made available by the
+     * {@link IChunkMessage} will be pushed into the query.
+     * 
+     * @param queryId
+     *            The unique identifier for the query.
+     * @param query
+     *            The query to evaluate.
+     * @param msg
+     *            A message providing access to the initial {@link IBindingSet
+     *            binding set(s)} used to begin query evaluation.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    private AbstractRunningQuery startEval(//
+            final UUID queryId,//
+            final PipelineOp query,//
+            final IChunkMessage<IBindingSet> msg//
+            ) throws Exception {
+        
         if (queryId == null)
             throw new IllegalArgumentException();
 
@@ -1115,9 +1199,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
-        final AbstractRunningQuery runningQuery = newRunningQuery(
-                /* this, */queryId, true/* controller */,
-                getProxy()/* queryController */, query, msg/*realSource*/);
+        final AbstractRunningQuery runningQuery = newRunningQuery(queryId,
+                true/* controller */, getProxy()/* queryController */, query,
+                msg/* realSource */);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -1278,11 +1362,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * 
      * @return The {@link AbstractRunningQuery} -or- <code>null</code> if there
      *         is no query associated with that query identifier.
-     *         
-     * @throws InterruptedException
-     *             if the query halted normally.
+     * 
      * @throws RuntimeException
-     *             if the query halted with an error.
+     *             if the query halted with an error (if the query halted
+     *             normally this will wrap an {@link InterruptedException}).
      */
     public /*protected*/ AbstractRunningQuery getRunningQuery(final UUID queryId) {
 
@@ -1446,7 +1529,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             final Constructor<? extends IRunningQuery> ctor = cls
                     .getConstructor(new Class[] { QueryEngine.class,
                             UUID.class, Boolean.TYPE, IQueryClient.class,
-                            PipelineOp.class, IChunkMessage.class });
+                            PipelineOp.class, IChunkMessage.class});
 
             // save reference.
             runningQuery = ctor.newInstance(new Object[] { this, queryId,

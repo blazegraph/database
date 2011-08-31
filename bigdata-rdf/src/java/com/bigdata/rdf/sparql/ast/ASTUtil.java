@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * Some utility methods for AST/IV conversions.
@@ -75,6 +77,44 @@ public class ASTUtil {
 
         return b;
 
+    }
+
+    /**
+     * Replace a child of a node with another reference (destructive
+     * modification). All arguments which point to the oldChild will be replaced
+     * by references to the newChild.
+     * 
+     * @param p
+     * @param oldChild
+     * @param newChild
+     * 
+     * @return The #of references which were replaced.
+     */
+    public static int replaceWith(BOp p, BOp oldChild, BOp newChild) {
+
+        if (!(p instanceof ModifiableBOpBase))
+            throw new UnsupportedOperationException();
+
+        final int arity = p.arity();
+
+        int nmods = 0;
+        
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = p.get(i);
+            
+            if(child == oldChild) {
+                
+                ((ModifiableBOpBase)p).setArg(i, newChild);
+                
+                nmods++;
+                
+            }
+            
+        }
+
+        return nmods;
+        
     }
 
 }

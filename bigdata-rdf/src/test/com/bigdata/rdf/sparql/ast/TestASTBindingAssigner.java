@@ -117,16 +117,8 @@ public class TestASTBindingAssigner extends TestCase2 {
             expected.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
-            /*
-             * TODO Note: This is a distinct VarNode instance! This is an ugly
-             * hack which requires us to be aware of the details of what is
-             * shared structure and what is immutable with a copy-on-write
-             * contract. (Without this, the change will also be made to the [p]
-             * VarNode in the expected AST.)
-             */
-            final VarNode p1 = new VarNode("p");
-            p1.setValueExpression(new Constant((IVariable) Var.var("p"), const1));
-            whereClause.addChild(new StatementPatternNode(s, p1, o,
+            whereClause.addChild(new StatementPatternNode(s, new ConstantNode(
+                    new Constant((IVariable) Var.var("p"), const1)), o,
                     null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
@@ -198,19 +190,10 @@ public class TestASTBindingAssigner extends TestCase2 {
             expected.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
-            /*
-             * TODO Note: This is a distinct VarNode instance! This is an ugly
-             * hack which requires us to be aware of the details of what is
-             * shared structure and what is immutable with a copy-on-write
-             * contract. (We do not want the VarNode whose state will be
-             * modified to be the same VarNode instance which is in the expected
-             * AST.)
-             */
-            final VarNode s1 = new VarNode("s1");
-//            final VarNode s2 = new VarNode("s2");
-            s1.setValueExpression(new Constant((IVariable) Var.var("s"), const1));
-//            s2.setValueExpression(new Constant((IVariable) Var.var("s"), const1));
-            whereClause.addChild(new StatementPatternNode(s1, p, s1,
+            whereClause.addChild(new StatementPatternNode(//
+                    new ConstantNode(new Constant((IVariable) Var.var("s"), const1)), //
+                    p,//
+                    new ConstantNode(new Constant((IVariable) Var.var("s"), const1)), //
                     null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
