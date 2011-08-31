@@ -400,8 +400,6 @@ public class GroupByState implements IGroupByState, Serializable {
         boolean isAggregate = aggregationContext;
         {
             final BOp t = op;
-//            if (t instanceof IConstant)
-//                return true;
             if (t instanceof IVariable<?>) {
                 final IVariable<?> v = (IVariable<?>) t;
                 if (aggregationContext) {

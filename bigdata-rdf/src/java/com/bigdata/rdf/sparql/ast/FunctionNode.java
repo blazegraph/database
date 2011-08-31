@@ -186,9 +186,12 @@ public class FunctionNode extends ValueExpressionNode {
 	public ModifiableBOpBase setProperty(final String name, final Object value) {
 		
 		final ModifiableBOpBase bop = super.setProperty(name, value);
+		if(!(Annotations.VALUE_EXPR.equals(name))){
 		
 		super.clearProperty(Annotations.VALUE_EXPR);
 		
+		}
+
 		return bop;
 		
 	}
@@ -202,8 +205,11 @@ public class FunctionNode extends ValueExpressionNode {
 		
 		final ModifiableBOpBase bop = super.setUnboundProperty(name, value);
 		
+		if(!(Annotations.VALUE_EXPR.equals(name))){
+
 		super.clearProperty(Annotations.VALUE_EXPR);
 		
+		}
 		return bop;
 		
 	}

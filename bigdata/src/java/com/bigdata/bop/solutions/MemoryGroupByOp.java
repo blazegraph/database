@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.solutions;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -51,7 +52,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.util.InnerCause;
@@ -717,10 +720,9 @@ public class MemoryGroupByOp extends GroupByOp {
         
         try {
 
-            final IConstant<?> c;
+            IConstant<?> c=null;
 
             if (expr.isWildcard() && expr.isDistinct()) {
-            
                 /**
                  * For a wildcard we basically need to operate on solution
                  * multisets. For example, COUNT(*) is the size of the solution
@@ -755,7 +757,10 @@ public class MemoryGroupByOp extends GroupByOp {
 
                 }
                 
-                c = new Constant(expr.done());
+                Object result=expr.done();
+                if(result!=null){
+                    c = new Constant(result);
+                }
                 
             } else if (expr.isDistinct()) {
                 
@@ -765,18 +770,22 @@ public class MemoryGroupByOp extends GroupByOp {
                  */
                 
                 // Set used to impose "DISTINCT" on value expression results.
-                final Set<Object> set = new LinkedHashSet<Object>();
-                
-                // The inner value expression.
-                final IValueExpression<?> innerExpr = expr.getExpr();
+                final Set<Solution> set = new LinkedHashSet<Solution>();
                 
                 expr.reset();
                 
                 for (IBindingSet bset : solutions) {
+                    Object constants[]=new Object[expr.arity()];
+
+                    for (int i=0;i<expr.arity();i++){
+
+                        constants[i] = ((IValueExpression)expr.get(i)).get(bset);
+
+                    }
                 
-                    final Object val = innerExpr.get(bset);
+                    final Solution sol=new Solution(constants);
                     
-                    if (set.add(val)) {
+                    if (set.add(sol)) {
                         
                         if (selectDependency)
                             propagateAggregateBindings(aggregates, bset);
@@ -788,7 +797,10 @@ public class MemoryGroupByOp extends GroupByOp {
 
                 }
                 
-                c = new Constant(expr.done());
+                Object result=expr.done();
+                if(result!=null){
+                    c = new Constant(result);
+                }
             
             } else {
                 
@@ -806,8 +818,10 @@ public class MemoryGroupByOp extends GroupByOp {
                     expr.get(bset);
                     
                 }
-
-                c = new Constant(expr.done());
+                Object result=expr.done();
+                if(result!=null){
+                    c = new Constant(result);
+                }
 
             }
 
@@ -859,5 +873,68 @@ public class MemoryGroupByOp extends GroupByOp {
         }
 
     }
+    /**
+     * Wrapper used for as bound solutions in the {@link HTree}.
+     * <p>
+     * Note: A similar class appears in different operators which use the
+     * {@link HTree}. However, these classes differ in what bindings are
+     * conceptually part of the key in the {@link HTree}, in how they compute
+     * the hash code under which the solution will be indexed, and in how they
+     * compare the solutions for equality.
+     * <p>
+     * This implementation relies on an ordered {@link IVariable}[] which
+     * defines the bindings that are part of the key and permits a simpler
+     * {@link #equals(Object)}s method that would be used if an entire
+     * {@link IBindingSet} was being tested for equality (binding sets do not
+     * consider order of the bindings when testing for equality).
+     */
+    private static class Solution implements Serializable {
 
+        private static final long serialVersionUID = 1L;
+
+        private final int hash;
+
+        private final Object[] vals;
+
+        /**
+         * Solution whose hash code is the hash code of the {@link IConstant}[].
+         *
+         * @param vals
+         *            The values.
+         */
+        public Solution(final Object[] vals) {
+
+            this.vals = vals;
+
+            this.hash = java.util.Arrays.hashCode(vals);
+
+        }
+
+        public int hashCode() {
+
+            return hash;
+
+        }
+
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof Solution)) {
+                return false;
+            }
+            final Solution t = (Solution) o;
+            if (vals.length != t.vals.length)
+                return false;
+            for (int i = 0; i < vals.length; i++) {
+                if (vals[i] == t.vals[i])
+                    continue;
+                if (vals[i] == null)
+                    return false;
+                if (!vals[i].equals(t.vals[i]))
+                    return false;
+            }
+            return true;
+        }
+
+    } // class Solution
 }

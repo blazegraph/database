@@ -381,7 +381,7 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 		}
 		
 		// if we've made it this far, we are simple optional 
-		return true;
+		return sp!=null;
 		
 	}
 	

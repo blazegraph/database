@@ -104,23 +104,6 @@ public class RegexBOp extends XSDBooleanIVValueExpression
     	
     }
     
-    private volatile transient Set<IVariable<IV>> terms;
-    
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-    
-    	if (terms == null) {
-    		
-    		terms = new LinkedHashSet<IVariable<IV>>(1);
-    		
-    		if (get(0) instanceof IVariable)
-    			terms.add((IVariable<IV>) get(0));
-    		
-    	}
-    	
-    	return terms;
-    	
-    }
-
     public boolean accept(final IBindingSet bs) {
         
         final IV var = get(0).get(bs);

@@ -53,7 +53,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  *
  * TODO What is reported if there are no non-null observations?
  */
-public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
+public class MIN extends AggregateBase<IV> implements INeedsMaterialization{
 
 //    private static final transient Logger log = Logger.getLogger(MIN.class);
 
@@ -70,8 +70,8 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
         super(args, annotations);
     }
 
-    public MIN(boolean distinct, IValueExpression<IV> expr) {
-        super(/*FunctionCode.MIN,*/ distinct, expr);
+    public MIN(boolean distinct, IValueExpression...expr) {
+        super(distinct, expr);
     }
 
     /**
@@ -107,8 +107,9 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
     }
 
     private IV doGet(final IBindingSet bindingSet) {
+        for(int i=0;i<arity();i++){
 
-        final IValueExpression<IV> expr = (IValueExpression<IV>) get(0);
+            final IValueExpression<IV> expr = (IValueExpression<IV>) get(i);
 
         final IV iv = expr.get(bindingSet);
 
@@ -141,7 +142,7 @@ public class MIN extends AggregateBase<IV> implements IAggregate<IV> {
             }
 
         }
-
+        }
         return min;
 
     }

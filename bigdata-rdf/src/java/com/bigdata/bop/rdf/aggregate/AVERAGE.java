@@ -33,7 +33,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -51,8 +50,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * @author thompsonbry
  */
-public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
-        INeedsMaterialization {
+public class AVERAGE extends AggregateBase<IV> implements  INeedsMaterialization {
 
 //    private static final transient Logger log = Logger.getLogger(AVERAGE.class);
 
@@ -70,7 +68,8 @@ public class AVERAGE extends AggregateBase<IV> implements IAggregate<IV>,
     }
 
     public AVERAGE(boolean distinct, IValueExpression<IV> expr) {
-        super(/*FunctionCode.SUM,*/ distinct, expr);
+
+        super( distinct, expr);
     }
 
     /**

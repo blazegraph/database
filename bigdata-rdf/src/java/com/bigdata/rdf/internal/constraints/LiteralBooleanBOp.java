@@ -118,28 +118,5 @@ public abstract class LiteralBooleanBOp extends XSDBooleanIVValueExpression impl
 
     abstract boolean _accept(final BigdataValueFactory vf, final IV iv,final IBindingSet bs) throws SparqlTypeErrorException;
 
-    volatile transient Set<IVariable<IV>> terms;
-
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-
-        if (terms == null) {
-
-            terms = new LinkedHashSet<IVariable<IV>>();
-
-            for (BOp bop : args()) {
-
-                if (bop instanceof IVariable){
-                    terms.add((IVariable<IV>) bop);
-                }
-
-            }
-
-        }
-        return terms;
-
-    }
-
-
-
 
 }

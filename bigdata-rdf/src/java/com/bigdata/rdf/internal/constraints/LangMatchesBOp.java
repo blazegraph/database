@@ -148,25 +148,4 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
     	
     }
     
-    private volatile transient Set<IVariable<IV>> terms;
-    
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-    
-    	if (terms == null) {
-    		
-    		terms = new LinkedHashSet<IVariable<IV>>();
-    		
-    		for (BOp bop : args()) {
-    			
-    			if (bop instanceof IVariable)
-    				terms.add((IVariable<IV>) bop);
-    		
-    		}
-    		
-    	}
-    	
-    	return terms;
-    	
-    }
-    
 }

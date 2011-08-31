@@ -95,7 +95,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     }
 
-    public INeedsMaterialization getMaterializationRequirement() {
+    public ComputedMaterializationRequirement getMaterializationRequirement() {
 
         return new ComputedMaterializationRequirement(getValueExpression());
 

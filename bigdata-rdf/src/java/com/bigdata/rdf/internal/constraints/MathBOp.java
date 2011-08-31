@@ -49,8 +49,12 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp.Annotations;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 
 /**
  * A math expression involving a left and right IValueExpression operand. The
@@ -67,6 +71,7 @@ final public class MathBOp extends IVValueExpression
 	
 	private static final transient Logger log = Logger.getLogger(MathBOp.class);
 	
+	private transient BigdataValueFactory vf;
     
     public interface Annotations extends ImmutableBOp.Annotations {
 
@@ -79,6 +84,7 @@ final public class MathBOp extends IVValueExpression
          */
         String OP = (MathBOp.class.getName() + ".op").intern();
 
+        public String NAMESPACE = (MathBOp.class.getName() + ".namespace").intern();
     }
     
 	public enum MathOp {
@@ -111,9 +117,9 @@ final public class MathBOp extends IVValueExpression
      *            those operands.
      */
     public MathBOp(final IValueExpression<? extends IV> left, 
-    		final IValueExpression<? extends IV> right, final MathOp op) {
+    		final IValueExpression<? extends IV> right, final MathOp op,final String lex) {
 
-        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op)));
+        this(new BOp[] { left, right }, NV.asMap(new NV(Annotations.OP, op),new NV(Annotations.NAMESPACE, lex)));
 
     }
 
@@ -130,7 +136,8 @@ final public class MathBOp extends IVValueExpression
         super(args,anns);
 
 		if (args.length != 2 || args[0] == null || args[1] == null
-				|| getProperty(Annotations.OP) == null) {
+				|| getProperty(Annotations.OP) == null
+				|| getProperty(Annotations.NAMESPACE)==null) {
 
 			throw new IllegalArgumentException();
 		
@@ -185,10 +192,13 @@ final public class MathBOp extends IVValueExpression
         		if (!(val1 instanceof Literal) || !(val2 instanceof Literal)) {
         			throw new SparqlTypeErrorException();
         		}
-        		
+        		try{
         		return IVUtility.literalMath((Literal) val1, (Literal) val2,
         				op());
-        		
+        		}catch(IllegalArgumentException iae){
+        		    return DateTimeUtility.dateTimeMath((Literal)val1, left,
+        		            (Literal)val2, right, op(), vf());
+        		}
         	}
         	
         } catch (IllegalArgumentException ex) {
@@ -215,6 +225,17 @@ final public class MathBOp extends IVValueExpression
     	return (MathOp) getRequiredProperty(Annotations.OP);
     }
     
+    public BigdataValueFactory vf(){
+        if (vf == null) {
+            synchronized (this) {
+                if (vf == null) {
+                    final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
+                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+                }
+            }
+        }
+        return vf;
+    }
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
@@ -288,26 +309,4 @@ final public class MathBOp extends IVValueExpression
     	
     }
     
-    private volatile transient Set<IVariable<IV>> terms;
-    
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-    
-    	if (terms == null) {
-    		
-    		terms = new LinkedHashSet<IVariable<IV>>();
-    		
-    		for (BOp bop : args()) {
-    			
-    			if (bop instanceof IVariable)
-    				terms.add((IVariable<IV>) bop);
-    		
-    		}
-    		
-    	}
-    	
-    	return terms;
-    	
-    }
-    
-	
 }

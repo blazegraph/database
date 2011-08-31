@@ -158,7 +158,7 @@ public class TestSUM extends TestCase2 {
 
         // SUM(lprice+1)
         final SUM op = new SUM(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,getName()));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

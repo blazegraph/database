@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.rdf.aggregate;
 
+import java.math.BigInteger;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.Constant;
@@ -37,6 +39,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
@@ -46,7 +49,7 @@ import com.bigdata.util.InnerCause;
 
 /**
  * Unit tests for {@link COUNT}.
- * 
+ *
  * @author thompsonbry
  */
 public class TestCOUNT extends TestCase2 {
@@ -59,7 +62,7 @@ public class TestCOUNT extends TestCase2 {
 	}
 
     public void test_count() {
-        
+
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
         final IVariable<IV> book = Var.var("book");
@@ -83,7 +86,7 @@ public class TestCOUNT extends TestCase2 {
 
         /**
          * The test data:
-         * 
+         *
          * <pre>
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
@@ -99,7 +102,7 @@ public class TestCOUNT extends TestCase2 {
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
-        
+
         final COUNT op = new COUNT(false/* distinct */, lprice);
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
@@ -108,12 +111,12 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDNumericIV((long) data.length), op.done());
+        assertEquals(new XSDIntegerIV(new BigInteger(Long.toString((long) data.length))), op.done());
 
     }
 
     public void test_count_with_complex_inner_value_expression() {
-        
+
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
         final IVariable<IV> book = Var.var("book");
@@ -137,7 +140,7 @@ public class TestCOUNT extends TestCase2 {
 
         /**
          * The test data:
-         * 
+         *
          * <pre>
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
@@ -156,7 +159,7 @@ public class TestCOUNT extends TestCase2 {
 
         // COUNT(lprice+1)
         final COUNT op = new COUNT(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS,getName()));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
@@ -164,12 +167,12 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDNumericIV((long) data.length), op.done());
+        assertEquals(new XSDIntegerIV(new BigInteger(Long.toString((long) data.length))), op.done());
 
     }
 
     public void test_count_with_null() {
-        
+
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
         final IVariable<IV> book = Var.var("book");
@@ -191,7 +194,7 @@ public class TestCOUNT extends TestCase2 {
 
         /**
          * The test data:
-         * 
+         *
          * <pre>
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
@@ -207,7 +210,7 @@ public class TestCOUNT extends TestCase2 {
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
           , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
         };
-        
+
         final COUNT op = new COUNT(false/* distinct */, lprice);
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
@@ -216,14 +219,14 @@ public class TestCOUNT extends TestCase2 {
         for (IBindingSet bs : data) {
             op.get(bs);
         }
-        assertEquals(new XSDNumericIV(3L), op.done());
+        assertEquals(new XSDIntegerIV(new BigInteger(Long.toString(3L))), op.done());
 
     }
 
     public void test_count_with_errors() {
-        
+
         final BigdataValueFactory f = BigdataValueFactoryImpl.getInstance(getName());
-        
+
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
         final IVariable<IV> book = Var.var("book");
@@ -249,7 +252,7 @@ public class TestCOUNT extends TestCase2 {
 
         /**
          * The test data:
-         * 
+         *
          * <pre>
          * ?org  ?auth  ?book  ?lprice
          * org1  auth1  book1  9
@@ -274,7 +277,7 @@ public class TestCOUNT extends TestCase2 {
 
         // Note: Formula will produce an error for non-numeric data.
         final COUNT op = new COUNT(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(ZERO), MathBOp.MathOp.PLUS));
+                new Constant<IV>(ZERO), MathBOp.MathOp.PLUS,getName()));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

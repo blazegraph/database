@@ -1,6 +1,7 @@
 package com.bigdata.bop.aggregate;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -122,15 +123,6 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 
 		boolean DEFAULT_DISTINCT = false;
 		
-//		/**
-//         * Optional boolean property indicates whether the aggregate
-//         * uses star argument like COUNT(*)
-//         * (default {@value #DEFAULT_STAR}).
-//         */
-//        String STAR = AggregateBase.class.getName() + ".star";
-//
-//        boolean DEFAULT_STAR = false;
-
 	}
 
 	public AggregateBase(AggregateBase<E> op) {
@@ -165,9 +157,9 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 //    *            The type safe value identifying the desired aggregate
 //    *            function.
 	public AggregateBase(//final FunctionCode functionCode,
-			final boolean distinct, final IValueExpression<E> expr) {
+			final boolean distinct, final IValueExpression<E>...expr) {
 
-		this(new BOp[] { expr }, NV.asMap(//
+		this(expr, NV.asMap(//
 //				new NV(Annotations.FUNCTION_CODE, functionCode), //
 				new NV(Annotations.DISTINCT, distinct))//
 		);
@@ -179,13 +171,6 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 		return getProperty(Annotations.DISTINCT, Annotations.DEFAULT_DISTINCT);
 
 	}
-
-	@SuppressWarnings("unchecked")
-	final public IValueExpression<E> getExpr() {
-
-		return (IValueExpression<E>) get(0);
-
-    }
 
     public boolean isWildcard() {
 
@@ -210,24 +195,6 @@ abstract public class AggregateBase<E> extends ImmutableBOp implements IAggregat
 		throw new UnsupportedOperationException();
 	}
 	
-	private volatile transient Set<IVariable<E>> terms;
-
-    final public Set<IVariable<E>> getVarsToMaterialize() {
-
-        if (terms == null) {
-
-            final IValueExpression<E> e = getExpr();
-
-            if (e instanceof IVariable<?>)
-                terms = Collections.singleton((IVariable<E>) e);
-            else
-                terms = Collections.emptySet();
-
-        }
-
-        return terms;
-
-    }
 
     /** A ZERO. */
     protected static final transient IV ZERO = new XSDNumericIV<BigdataLiteral>(0);

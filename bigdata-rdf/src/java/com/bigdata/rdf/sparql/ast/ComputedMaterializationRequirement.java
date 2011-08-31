@@ -37,6 +37,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 
 /**
  * Computed {@link INeedsMaterialization} metadata for an
@@ -73,11 +74,25 @@ public class ComputedMaterializationRequirement implements
         
     }
 
+    public static Set<IVariable<IV>> getVarsFromArguments(BOp c) {
+        Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>(c.arity());
+        for (int i = 0; i < c.arity(); i++) {
+            BOp arg = c.get(i);
+            if (arg != null) {
+                if (arg instanceof IValueExpression && arg instanceof IPassesMaterialization) {
+                    terms.addAll(getVarsFromArguments( arg));
+                } else if (arg instanceof IVariable) {
+                    terms.add((IVariable) arg);
+                }
+            }
+        }
+        return terms;
+    }
+
     /**
      * Static helper used to determine materialization requirements.
      */
-    static INeedsMaterialization.Requirement gatherVarsToMaterialize(
-            final IValueExpression<?> c, final Set<IVariable<IV>> terms) {
+    static INeedsMaterialization.Requirement gatherVarsToMaterialize(final IValueExpression<?> c, final Set<IVariable<IV>> terms) {
      
         boolean materialize = false;
         boolean always = false;
@@ -92,7 +107,7 @@ public class ComputedMaterializationRequirement implements
                 
                 final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
                 
-                final Set<IVariable<IV>> t = bop2.getVarsToMaterialize();
+                final Set<IVariable<IV>> t = getVarsFromArguments(bop);
                 
                 if (t.size() > 0) {
                     
@@ -114,8 +129,7 @@ public class ComputedMaterializationRequirement implements
             
         }
 
-        return materialize ? (always ? Requirement.ALWAYS
-                : Requirement.SOMETIMES) : Requirement.NEVER;
+        return materialize ? (always ? Requirement.ALWAYS : Requirement.SOMETIMES) : Requirement.NEVER;
 
     }
     

@@ -158,7 +158,7 @@ public class TestSAMPLE extends TestCase2 {
         };
 
         final IValueExpression<IV> expr = new MathBOp(lprice, new Constant<IV>(
-                new XSDNumericIV(1)), MathBOp.MathOp.PLUS);
+                new XSDNumericIV(1)), MathBOp.MathOp.PLUS,getName());
 
         // SAMPLE(lprice+1)
         final SAMPLE op = new SAMPLE(false/* distinct */, expr);

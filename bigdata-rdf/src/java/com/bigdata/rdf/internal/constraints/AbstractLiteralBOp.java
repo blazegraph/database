@@ -75,25 +75,6 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
         return INeedsMaterialization.Requirement.SOMETIMES;
     }
 
-    private volatile transient Set<IVariable<IV>> terms;
-
-    public Set<IVariable<IV>> getVarsToMaterialize() {
-
-        if (terms == null) {
-            terms = new LinkedHashSet<IVariable<IV>>(1);
-            for (int i = 0; i < arity(); i++) {
-                IValueExpression<? extends IV> v = get(i);
-                if (get(i) instanceof IVariable) {
-                    terms.add((IVariable<IV>) get(i));
-                }
-            }
-
-        }
-
-        return terms;
-
-    }
-
     final public IV get(final IBindingSet bs) {
 
         if (vf == null) {

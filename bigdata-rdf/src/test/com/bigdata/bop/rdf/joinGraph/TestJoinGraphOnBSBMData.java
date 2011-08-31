@@ -392,10 +392,10 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 							origProperty1,// FIXME verify correct var w/ MikeP
 							new MathBOp(origProperty1, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(120))),
-									MathOp.MINUS),//
+									MathOp.MINUS,getName()),//
 							new MathBOp(origProperty1, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(120))),
-									MathOp.PLUS)//
+									MathOp.PLUS,getName())//
 							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
@@ -423,10 +423,10 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
 							origProperty2,// FIXME verify correct var with MikeP
 							new MathBOp(origProperty2, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(170))),
-									MathOp.MINUS),//
+									MathOp.MINUS,getName()),//
 							new MathBOp(origProperty2, new Constant(
 									new XSDIntegerIV(BigInteger.valueOf(170))),
-									MathOp.PLUS)//
+									MathOp.PLUS,getName())//
 							)),//
                     new NV(IPredicate.Annotations.RELATION_NAME, spoRelation)//
             );
@@ -454,14 +454,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDNumericIV(120)), MathOp.PLUS) }, NV
+                                    new XSDNumericIV(120)), MathOp.PLUS,getName()) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty1,
                             new MathBOp(origProperty1, new Constant(
-                                    new XSDNumericIV(120)), MathOp.MINUS) }, NV
+                                    new XSDNumericIV(120)), MathOp.MINUS,getName()) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 
@@ -472,14 +472,14 @@ public class TestJoinGraphOnBSBMData extends AbstractJoinGraphTestCase {
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDNumericIV(170)), MathOp.PLUS) }, NV
+                                    new XSDNumericIV(170)), MathOp.PLUS,getName()) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.LT) })),//
 
                     new CompareBOp(new BOp[] {
                             simProperty2,
                             new MathBOp(origProperty2, new Constant(
-                                    new XSDNumericIV(170)), MathOp.MINUS) }, NV
+                                    new XSDNumericIV(170)), MathOp.MINUS,getName()) }, NV
                             .asMap(new NV[] { new NV(CompareBOp.Annotations.OP,
                                     CompareOp.GT) })),//
 

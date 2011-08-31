@@ -158,7 +158,7 @@ public class TestAVERAGE extends TestCase2 {
 
         // AVERAGE(lprice*2)
         final AVERAGE op = new AVERAGE(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY));
+                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY,getName()));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 

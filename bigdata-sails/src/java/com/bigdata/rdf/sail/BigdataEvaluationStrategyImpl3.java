@@ -1448,7 +1448,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				if (from == null)
 					from = ve;
 				else
-					from = new MathBOp(ve, from, MathOp.MAX);
+					from = new MathBOp(ve, from, MathOp.MAX,this.tripleSource.getDatabase().getNamespace());
 			}
 
 			IValueExpression to = null;
@@ -1456,7 +1456,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 				if (to == null)
 					to = ve;
 				else
-					to = new MathBOp(ve, to, MathOp.MIN);
+					to = new MathBOp(ve, to, MathOp.MIN,this.tripleSource.getDatabase().getNamespace());
 			}
 			
 			final RangeBOp rangeBOp = new RangeBOp(v, from, to); 
@@ -2508,7 +2508,7 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     	final MathOp op = MathOp.valueOf(mathExpr.getOperator());
     	final IValueExpression<? extends IV> iv1 = toVE(left);
     	final IValueExpression<? extends IV> iv2 = toVE(right);
-        return new MathBOp(iv1, iv2, op);
+        return new MathBOp(iv1, iv2, op,this.tripleSource.getDatabase().getNamespace());
     }
     
     /**

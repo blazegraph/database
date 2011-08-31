@@ -457,7 +457,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
                 
                 final MathBOp op = new MathBOp(o.getValueExpression(),
                         new Constant<IV>(new XSDNumericIV(1)),
-                        MathBOp.MathOp.PLUS);//, store.getNamespace());
+                        MathBOp.MathOp.PLUS, store.getNamespace());
                 
                 final ValueExpressionNode ven = new ValueExpressionNode(op);
 
@@ -615,7 +615,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
 
                 runningQuery.get(); // check the future.
 
-                assertEquals("Baseline", 1, i);
+                assertEquals("Baseline", 5, i);
 
             }
 
