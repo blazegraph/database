@@ -36,13 +36,11 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Assigns values to variables based on a supplied set of bindings.
@@ -54,7 +52,7 @@ public class BindingAssigner implements IASTOptimizer {
 	@SuppressWarnings("unchecked")
 	@Override
 	public IQueryNode optimize(final AST2BOpContext context, 
-			final IQueryNode queryNode, final DatasetNode dataset, 
+			final IQueryNode queryNode, //final DatasetNode dataset, 
 			final IBindingSet[] bindingSets) {
 		
 //        final String sparql = "describe <http://www.bigdata.com>";

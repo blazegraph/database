@@ -61,7 +61,7 @@ public class ASTBindingAssigner implements IASTOptimizer {
     
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final DatasetNode dataset,
+            final IQueryNode queryNode, //final DatasetNode dataset,
             final IBindingSet[] bindingSet) {
 
         if (bindingSet == null || bindingSet.length > 1) {

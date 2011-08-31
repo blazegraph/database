@@ -127,7 +127,7 @@ public class TestASTBindingAssigner extends TestCase2 {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                expected/* queryNode */, null/* dataset */, bsets);
+                expected/* queryNode */, bsets);
 
         assertEquals(expected, actual);
 
@@ -202,7 +202,7 @@ public class TestASTBindingAssigner extends TestCase2 {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                expected/* queryNode */, null/* dataset */, bsets);
+                expected/* queryNode */, bsets);
 
         assertEquals(expected, actual);
 

@@ -44,14 +44,14 @@ public interface IASTOptimizer {
      *            The evaluation context.
      * @param queryNode
      *            The AST (in).
-     * @param dataset
-     *            The data set against which the AST will be evaluated.
      * @param bindingSet
      *            Optional array of zero or more input solutions.
      * 
      * @return The optimized AST.
      */
+//    * @param dataset
+//    *            The data set against which the AST will be evaluated.
     IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            DatasetNode dataset, IBindingSet[] bindingSet);
+            /*DatasetNode dataset, */IBindingSet[] bindingSets);
 
 }
