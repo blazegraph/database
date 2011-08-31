@@ -242,10 +242,8 @@ abstract public class CoreBaseBOp implements BOp {
             final BOp y = o.get(i);
 
             /*
-             *    X      Y
-             * same   same : continue (includes null == null);
-             * null  other : return false;
-             * !null other : if(!x.equals(y)) return false.
+             * X Y same same : continue (includes null == null); null other :
+             * return false; !null other : if(!x.equals(y)) return false.
              */
             if (x != y && x != null && !(x.equals(y))) {
 
@@ -255,8 +253,71 @@ abstract public class CoreBaseBOp implements BOp {
 
         }
 
-        return annotations().equals(o.annotations());
+        return annotationsEqual(annotations(), o.annotations());
 
+    }
+
+    /**
+     * Compares two maps. If the value under a key is an array, then uses
+     * {@link Arrays#equals(Object[], Object[])} to compare the values rather
+     * than {@link Object#equals(Object)}. Without this, two bops having array
+     * annotation values which have the same data but different array instances
+     * will not compare as equal.
+     * 
+     * @param m1
+     *            One set of annotations.
+     * @param m2
+     *            Another set of annotations.
+     *            
+     * @return <code>true</code> iff the annotations have the same data.
+     */
+    private static final boolean annotationsEqual(final Map<String, Object> m1,
+            final Map<String, Object> m2) {
+
+        if (m1 == m2)
+            return true;
+
+        if (m1 != null && m2 == null)
+            return false;
+
+        if (m1.size() != m2.size())
+            return false;
+        
+        final Iterator<Map.Entry<String,Object>> itr = m1.entrySet().iterator();
+        
+        while(itr.hasNext()) {
+
+            final Map.Entry<String,Object> e = itr.next();
+            
+            final String name = e.getKey();
+            
+            final Object v1 = e.getValue();
+            
+            final Object v2 = m2.get(name);
+            
+            if(v1 == v2)
+                continue;
+
+            if (v1 != null && v2 == null)
+                return false;
+
+            if (v1.getClass().isArray()) {
+                // Arrays.equals(v1,v2).
+                if (!v2.getClass().isArray())
+                    return false;
+                if (!Arrays.equals((Object[]) v1, (Object[]) v2)) {
+                    return false;
+                }
+            } else {
+                // Object.equals().
+                if(!v1.equals(v2))
+                    return false;
+            }
+            
+        }
+        
+        return true;
+        
     }
 
     /**

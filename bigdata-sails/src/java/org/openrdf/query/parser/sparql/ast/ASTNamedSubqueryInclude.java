@@ -2,6 +2,8 @@
 /* JavaCCOptions:MULTI=true,NODE_USES_PARSER=false,VISITOR=true,TRACK_TOKENS=false,NODE_PREFIX=AST,NODE_EXTENDS=,NODE_FACTORY=,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package org.openrdf.query.parser.sparql.ast;
 
+import com.bigdata.rdf.sparql.ast.VarNode;
+
 public
 class ASTNamedSubqueryInclude extends SimpleNode {
   public ASTNamedSubqueryInclude(int id) {
@@ -26,5 +28,19 @@ class ASTNamedSubqueryInclude extends SimpleNode {
       return name;
   }
 
+    private VarNode[] args;
+
+    public VarNode[] getArgs() {
+     
+        return args;
+        
+    }
+    
+    public void setArgs(VarNode[] args) {
+        
+        this.args = args;
+        
+    }
+  
 }
 /* JavaCC - OriginalChecksum=3c3697c969e7c8627c4e939334b4599f (do not edit this line) */

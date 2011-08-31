@@ -271,10 +271,10 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             log.error("queryStr:\n" + queryStr);
             log.error("parseTree:\n" + ((SimpleNode) parseTree).dump(""));
             log.error("expected: " + expected);
-            log.error("actual  :" + actual);
+            log.error("actual: " + actual);
 
-            throw new AssertionFailedError("expected:<" + expected
-                    + "> but was: <" + actual + ">");
+            throw new AssertionFailedError("expected:\n" + expected
+                    + "\nbut was:\n" + actual);
 
         }
         

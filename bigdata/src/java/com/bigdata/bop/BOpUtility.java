@@ -143,6 +143,11 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
+                /*
+                 * TODO The null child reference which can occur here is the [c]
+                 * of the StatementPatternNode. We might want to make [c] an
+                 * anonymous variable instead of having a [null].
+                 */
                 if (child != null && child.arity() > 0) {
 
                     /*
@@ -246,6 +251,11 @@ public class BOpUtility {
 
                 final BOp child = (BOp) childObj;
 
+                /*
+                 * TODO The null child reference which can occur here is the [c]
+                 * of the StatementPatternNode. We might want to make [c] an
+                 * anonymous variable instead of having a [null].
+                 */
                 if (child != null && child.arity() > 0) {
 
                     /*

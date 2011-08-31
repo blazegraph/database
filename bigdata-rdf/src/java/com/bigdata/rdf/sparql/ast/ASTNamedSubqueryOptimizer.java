@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -82,106 +83,18 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
         final NamedSubqueryInclude[] allIncludes = findAllIncludes(queryRoot);
 
         // Verify that a named subquery exists for each INCLUDE.
-        for (NamedSubqueryInclude anInclude : allIncludes) {
-
-            final String namedSet = anInclude.getName();
-
-            if (namedSet == null || namedSet.trim().length() == 0)
-                throw new RuntimeException(
-                        "Missing or illegal name for include.");
-            
-            boolean found = false;
-
-            for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
-
-                if (aNamedSubquery.getName().equals(namedSet)) {
-                    found = true;
-                    break;
-                }
-
-            }
-            
-            if (!found)
-                throw new RuntimeException(
-                        "No subquery produces that solution set: " + namedSet);
-
-        }
+        assertNamedSubqueryForEachInclude(namedSubqueries, allIncludes);
 
         /*
          * Verify that each named subquery is consumed by at least one include
          * somewhere in the WHERE clause of the query.
          */
+        assertEachNamedSubqueryIsUsed(namedSubqueries, allIncludes);
 
-        // The set of all named solution sets produced by this query.
-        final Set<String> namedSets = new LinkedHashSet<String>();
-        
-        for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
-
-            final String namedSet = aNamedSubquery.getName();
-
-            if (!namedSets.add(namedSet)) {
-
-                throw new RuntimeException("NamedSet declared more than once: "
-                        + namedSet);
-
-            }
-            
-            if (namedSet == null || namedSet.trim().length() == 0)
-                throw new RuntimeException(
-                        "Missing or illegal name for named subquery.");
-
-            final List<NamedSubqueryInclude> includes = new LinkedList<NamedSubqueryInclude>();
-
-            for (NamedSubqueryInclude anInclude : allIncludes) {
-
-                if (namedSet.equals(anInclude.getName())) {
-
-                    includes.add(anInclude);
-
-                }
-
-            }
-
-            if (includes.isEmpty()) {
-                throw new RuntimeException(
-                        "Named subquery results are not used by this query: "
-                                + namedSet);
-            }
-
-            /*
-             * Figure out the join variables for each place in the query where
-             * the named result set is included and rewrite the include operator
-             * (or just annotate it) to specify the join variables for that
-             * include.
-             * 
-             * FIXME This assumes that we will always use all variables
-             * projected by the subquery as the join variables. We need to
-             * figure out which variables "must" be bound and then use just
-             * those variables for the hash join.
-             * 
-             * FIXME If there are no such variables then we have to do a nested
-             * loop join without an index! Personally, I think that such cases
-             * should be rejected since performance will suck.
-             */
-
-            final IVariable[] projected = aNamedSubquery.getProjection()
-                    .getProjectionVars();
-
-            final VarNode[] proj = new VarNode[projected.length];
-
-            for (int i = 0; i < projected.length; i++) {
-
-                proj[i] = new VarNode(projected[i].getName());
-
-            }
-
-            for (NamedSubqueryInclude anInclude : includes) {
-
-                anInclude.setJoinVars(proj);
-
-            }
-
-        }
+        /*
+         * Figure out the join variables for each INCLUDE.
+         */
+        assignJoinVars(queryRoot, namedSubqueries, allIncludes);
 
         return queryRoot;
 
@@ -210,4 +123,289 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
     }
 
+    /**
+     * Verify that a named subquery exists for each INCLUDE.
+     * 
+     * @param namedSubqueries
+     * @param allIncludes
+     */
+    private void assertNamedSubqueryForEachInclude(
+            final NamedSubqueriesNode namedSubqueries,
+            final NamedSubqueryInclude[] allIncludes) {
+
+        for (NamedSubqueryInclude anInclude : allIncludes) {
+
+            final String namedSet = anInclude.getName();
+
+            if (namedSet == null || namedSet.trim().length() == 0)
+                throw new RuntimeException(
+                        "Missing or illegal name for include.");
+
+            boolean found = false;
+
+            for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
+
+                if (aNamedSubquery.getName().equals(namedSet)) {
+                    found = true;
+                    break;
+                }
+
+            }
+
+            if (!found)
+                throw new RuntimeException(
+                        "No subquery produces that solution set: " + namedSet);
+
+        }
+
+    }
+
+    /**
+     * Verify that each named subquery is consumed by at least one include
+     * somewhere in the WHERE clause of the query.
+     * 
+     * @param namedSubqueries
+     * @param allIncludes
+     */
+    private void assertEachNamedSubqueryIsUsed(
+            final NamedSubqueriesNode namedSubqueries,
+            final NamedSubqueryInclude[] allIncludes) {
+
+        // The set of all named solution sets produced by this query.
+        final Set<String> namedSets = new LinkedHashSet<String>();
+
+        for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
+
+            final String namedSet = aNamedSubquery.getName();
+
+            if (!namedSets.add(namedSet)) {
+
+                throw new RuntimeException("NamedSet declared more than once: "
+                        + namedSet);
+
+            }
+
+            if (namedSet == null || namedSet.trim().length() == 0)
+                throw new RuntimeException(
+                        "Missing or illegal name for named subquery.");
+
+            final List<NamedSubqueryInclude> includes = new LinkedList<NamedSubqueryInclude>();
+
+            for (NamedSubqueryInclude anInclude : allIncludes) {
+
+                if (namedSet.equals(anInclude.getName())) {
+
+                    includes.add(anInclude);
+
+                }
+
+            }
+
+            if (includes.isEmpty()) {
+                throw new RuntimeException(
+                        "Named subquery results are not used by this query: "
+                                + namedSet);
+            }
+
+        }
+
+    }
+
+    /**
+     * Figure out the join variables for each INCLUDE. If the join variables
+     * were already assigned to a {@link NamedSubqueryInclude}, then we just
+     * make sure that the {@link NamedSubqueryRoot} will produce a suitable hash
+     * index. If an INCLUDE does not have its join variables pre-assigned, then
+     * we do a static analysis of the query and figure out which shared
+     * variables MUST be bound. The set of shared variables is assigned as the
+     * join variables. Again, we verify that a suitable hash index will be
+     * produced for that INCLUDE.
+     * <p>
+     * Note: If the join variables were not pre-assigned (by a query hint) and
+     * no join variables are identified by a static analysis then a full N x M
+     * cross product of the solutions must be tested and filtered for those
+     * solutions which join. This is a lot of effort when compared with a hash
+     * join. Having the right join variables is very important for performance.
+     * 
+     * @param namedSubqueries
+     * @param allIncludes
+     */
+    private void assignJoinVars(//
+            final QueryRoot queryRoot,
+            final NamedSubqueriesNode namedSubqueries,
+            final NamedSubqueryInclude[] allIncludes) {
+
+        for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
+
+            final String namedSet = aNamedSubquery.getName();
+
+            // Collect each INCLUDE for this named subquery.
+            final List<NamedSubqueryInclude> includes = new LinkedList<NamedSubqueryInclude>();
+            {
+
+                for (NamedSubqueryInclude anInclude : allIncludes) {
+
+                    if (namedSet.equals(anInclude.getName())) {
+
+                        includes.add(anInclude);
+
+                    }
+
+                }
+                
+            }
+            
+            /*
+             * Collect each distinct joinvar[] combination for those includes.
+             * 
+             * Note: Since having the distinct joinvar[] combinations is
+             * important, we sort each joinvar[] to ensure that they have a
+             * common order.
+             */
+            final Set<JoinVars> distinctJoinVarsSet = new LinkedHashSet<JoinVars>();
+
+            for (NamedSubqueryInclude anInclude : includes) {
+
+                final IVariable[] joinvars;
+                
+                if (anInclude.getJoinVars() == null) {
+
+                    /*
+                     * Since no query hint was used, then figure out the join
+                     * variables using a static analysis of the query.
+                     */
+
+                    joinvars = staticAnalysis(queryRoot, aNamedSubquery,
+                            anInclude);
+                    
+                    // Sort.
+                    Arrays.sort(joinvars);
+                    
+                    // Set those join variables on the include.
+                    anInclude.setJoinVars(ASTUtil.convert(joinvars));
+
+                } else {
+                    
+                    // Get the user specified join variables.
+                    joinvars = ASTUtil.convert(anInclude.getJoinVars());
+                    
+                    // Sort.
+                    Arrays.sort(joinvars);
+                    
+                    // Set them back on the include in sorted order.
+                    anInclude.setJoinVars(ASTUtil.convert(joinvars));
+                    
+                }
+
+                distinctJoinVarsSet.add(new JoinVars(joinvars));
+
+            }
+
+            /*
+             * Figure out the join variables for each place in the query where
+             * the named result set is included and annotate the include
+             * operator to specify the join variables for that include.
+             */
+
+            final int nhashIndices = distinctJoinVarsSet.size();
+            
+            if (nhashIndices > 1) {
+             
+                /*
+                 * Since there is more than one set of join variables required
+                 * by the INCLUDEs, we just use no join variables and let the
+                 * performance suffer.
+                 * 
+                 * FIXME {@link NamedSubqueryOp} should be modified to populate
+                 * more than one hash index if necessary so we can have high
+                 * performance on each INCLUDE join.
+                 */
+                final VarNode[] NO_VARS = new VarNode[] {};
+                
+                aNamedSubquery.setJoinVars(NO_VARS);
+                
+                for(NamedSubqueryInclude anInclude : includes) {
+                
+                    anInclude.setJoinVars(NO_VARS);
+                    
+                }
+                
+            } else {
+
+                /*
+                 * Since there is just one set of join variables we will use
+                 * that.
+                 */
+                aNamedSubquery.setJoinVars(ASTUtil.convert(distinctJoinVarsSet
+                        .iterator().next().a));
+
+            }
+            
+        }
+
+    }
+
+    /**
+     * Identify the join variables for the specified INCLUDE for the position
+     * within the query in which it appears.
+     * 
+     * @param queryRoot
+     * @param aNamedSubquery
+     * @param anInclude
+     * @return
+     * 
+     *         FIXME This code must figure out which variables "must" be bound
+     *         by both the the subquery and context in which the INCLUDE appears
+     *         and return just those variables. [It is currently returning an
+     *         empty {@link IVariable}[]. While a hash join using an empty array
+     *         of join variables will always produce the correct solutions, it
+     *         is not very efficient.]
+     */
+    private IVariable[] staticAnalysis(QueryRoot queryRoot,
+            NamedSubqueryRoot aNamedSubquery, NamedSubqueryInclude anInclude) {
+
+//        final IVariable[] projected = aNamedSubquery.getProjection()
+//                .getProjectionVars();
+//
+//        return projected;
+        
+        return new IVariable[]{};
+        
+    }
+
+    /**
+     * Wrapper class used to inflict Arrays.equals() rather than Object.equals()
+     * when an array is used in a Collection.
+     */
+    private static class JoinVars {
+        
+        public final IVariable[] a;
+
+        private final int hashCode;
+        
+        public JoinVars(final IVariable[] a) {
+
+            this.a = a;
+            
+            this.hashCode = Arrays.hashCode(a);
+            
+        }
+        
+        @Override
+        public int hashCode() {
+            return hashCode;
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof JoinVars))
+                return false;
+            final JoinVars t = (JoinVars) o;
+            return Arrays.equals(a, t.a);
+        }
+        
+    }
+    
 }

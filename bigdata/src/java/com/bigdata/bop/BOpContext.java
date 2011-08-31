@@ -33,14 +33,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.BaseJoinStats;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.striterator.ChunkedFilter;
+import com.bigdata.striterator.CloseableIteratorWrapper;
+import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * The evaluation context for the operator (NOT serializable).
@@ -259,7 +266,7 @@ public class BOpContext<E> extends BOpContextBase {
      * @throws NullPointerException
      *             if an argument is <code>null</code>.
      */
-    final public boolean bind(final IPredicate<?> pred,
+    final static public boolean bind(final IPredicate<?> pred,
             final IConstraint[] constraints, final Object e,
             final IBindingSet bindings) {
 
@@ -281,6 +288,11 @@ public class BOpContext<E> extends BOpContextBase {
     /**
      * Copy the values for variables in the predicate from the element, applying
      * them to the caller's {@link IBindingSet}.
+     * <p>
+     * Note: A variable which is bound outside of the query to a constant gets
+     * turned into a {@link Constant} with that variable as its annotation. This
+     * method causes the binding to be created for the variable and the constant
+     * when the constant is JOINed.
      * 
      * @param e
      *            The element.
@@ -288,8 +300,6 @@ public class BOpContext<E> extends BOpContextBase {
      *            The predicate.
      * @param bindingSet
      *            The binding set, which is modified as a side-effect.
-     *            
-     *            @todo move to {@link BOpUtility}?
      */
     @SuppressWarnings("unchecked")
     static public void copyValues(final IElement e, final IPredicate<?> pred,
@@ -342,59 +352,138 @@ public class BOpContext<E> extends BOpContextBase {
 
     }
 
+//    /**
+//     * Copy the as-bound values for the named variables out of the
+//     * {@link IElement} and into the caller's array.
+//     * 
+//     * @return The caller's array. If a variable was resolved to a bound value,
+//     *         then it was set on the corresponding index of the array. If not,
+//     *         then that index of the array was cleared to <code>null</code>.
+//     * 
+//     * @param e
+//     *            The element.
+//     * @param pred
+//     *            The predicate.
+//     * @param vars
+//     *            The variables whose values are desired. They are located
+//     *            within the element by examining the arguments of the
+//     *            predicate.
+//     * @param out
+//     *            The array into which the values are copied.
+//     * 
+//     *            TODO Unit tests.
+//     * 
+//     * @deprecated This fails to propagate the binding for a variable which was
+//     *             replaced by Constant/2 from the predicate. Use the variant
+//     *             method which copies things into an {@link IBindingSet}
+//     *             instead.
+//     */
+//    @SuppressWarnings({ "rawtypes", "unchecked" })
+//    static public void copyValues(final IElement e, final IPredicate<?> pred,
+//            final IVariable<?>[] vars, final IConstant<?>[] out) {
+//
+//        final int arity = pred.arity();
+//
+//        for (int i = 0; i < vars.length; i++) {
+//            
+//            out[i] = null; // clear old value (if any).
+//
+//            boolean found = false;
+//            
+//            for (int j = 0; j < arity && !found; j++) {
+//
+//                final IVariableOrConstant<?> t = pred.get(j);
+//
+//                if (t.isVar()) {
+//
+//                    final IVariable<?> var = (IVariable<?>) t;
+//
+//                    if (var.equals(vars[i])) {
+//
+//                        // the as-bound value of the predicate given that
+//                        // element.
+//                        final Object val = e.get(j);
+//
+//                        if (val != null) {
+//
+//                            out[i] = new Constant(val);
+//
+//                            found = true;
+//
+//                        }
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//    }
+
     /**
-     * Copy the as-bound values for the named variables out of the
-     * {@link IElement} and into the caller's array.
+     * Copy the values for variables from the source {@link IBindingSet} to the
+     * destination {@link IBindingSet}. It is an error if a binding already
+     * exists in the destination {@link IBindingSet} which is not consistent
+     * with a binding in the source {@link IBindingSet}.
+     * <p>
+     * Note: The bindings are propagated before the constraints are verified so
+     * this method will have a side-effect on the bindings even if the
+     * constraints were not satisfied. Therefore you should clone the
+     * destination {@link IBindingSet} before calling this method.
      * 
-     * @return The caller's array. If a variable was resolved to a bound value,
-     *         then it was set on the corresponding index of the array. If not,
-     *         then that index of the array was cleared to <code>null</code>.
-     * 
-     * @param e
-     *            The element.
-     * @param pred
-     *            The predicate.
+     * @param src
+     *            The source binding set.
+     * @param constraints
+     *            An array of constraints (optional). When given, destination
+     *            {@link IBindingSet} will be validated <em>after</em> mutation.
      * @param vars
-     *            The variables whose values are desired. They are located
-     *            within the element by examining the arguments of the
-     *            predicate.
-     * @param out
-     *            The array into which the values are copied.
-     *            
-     *            TODO Unit tests.
+     *            An array of variables whose bindings will be retained. The
+     *            bindings are not stripped out until after the constraint(s)
+     *            (if any) have been tested.
+     * @param dst
+     *            The target binding set, which is modified as a side-effect.
+     * 
+     * @return <code>true</code> iff the bindings were consistent and the
+     *         constraints were not violated.
+     * 
+     * @todo unit tests.
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    static public void copyValues(final IElement e, final IPredicate<?> pred,
-            final IVariable<?>[] vars, final IConstant<?>[] out) {
+    static public boolean bind(final IBindingSet src,
+            final IConstraint[] constraints, final IVariable[] vars,
+            final IBindingSet dst) {
 
-        final int arity = pred.arity();
+        // Propagate bindings from src => dst
+        {
 
-        for (int i = 0; i < vars.length; i++) {
-            
-            out[i] = null; // clear old value (if any).
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = src
+                    .iterator();
 
-            boolean found = false;
-            for (int j = 0; j < arity && !found; j++) {
+            while (itr.hasNext()) {
 
-                final IVariableOrConstant<?> t = pred.get(j);
+                final Map.Entry<IVariable, IConstant> e = itr.next();
 
-                if (t.isVar()) {
+                final IVariable<?> var = (IVariable<?>) e.getKey();
 
-                    final IVariable<?> var = (IVariable<?>) t;
+                final IConstant<?> val = e.getValue();
 
-                    if (var.equals(vars[i])) {
+                if (val != null) {
 
-                        // the as-bound value of the predicate given that
-                        // element.
-                        final Object val = e.get(j);
+                    final IConstant<?> oval = dst.get(var);
 
-                        if (val != null) {
+                    if (oval != null) {
 
-                            out[i] = new Constant(val);
+                        if (!val.equals(oval)) {
 
-                            found = true;
+                            // Bindings are not consistent.
+                            return false;
 
-                        }
+                        } // else already bound to the same value.
+
+                    } else {
+
+                        dst.set(var, val);
 
                     }
 
@@ -404,95 +493,141 @@ public class BOpContext<E> extends BOpContextBase {
 
         }
 
-    }
+        // Test constraint(s)
+        if (constraints != null && !BOpUtility.isConsistent(constraints, dst)) {
 
-    /**
-     * Copy the values for variables in the predicate from the element, applying
-     * them to the caller's {@link IBindingSet}.
-     * 
-     * @param src
-     *            The source binding set.
-     * @param dst
-     *            The target binding set, which is modified as a side-effect.
-     *            
-     * @todo move to {@link BOpUtility}?
-     * @todo unit tests.
-     * @todo only copy / retain SELECTed variables within this method?
-     */
-    @SuppressWarnings("unchecked")
-    static public void copyValues(final IBindingSet src, final IBindingSet dst) {
+            return false;
 
-        final Iterator<Map.Entry<IVariable, IConstant>> itr = src.iterator();
+        }
 
-        while (itr.hasNext()) {
+        // strip off unnecessary variables.
+        if (vars != null && vars.length > 0) {
 
-            final Map.Entry<IVariable, IConstant> e = itr.next();
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = dst
+                    .iterator();
 
-            final IVariable<?> var = (IVariable<?>) e.getKey();
+            while (itr.hasNext()) {
 
-            final IConstant<?> val = e.getValue();
+                final Map.Entry<IVariable, IConstant> e = itr.next();
 
-            if (val != null) {
+                final IVariable<?> var = (IVariable<?>) e.getKey();
 
-                dst.set(var, val);
+                boolean found = false;
+                for (int i = 0; i < vars.length; i++) {
+
+                    if (var == vars[i]) {
+                        
+                        found = true;
+                        
+                        break;
+                        
+                    }
+
+                }
+
+                if (!found) {
+
+                    // strip out this binding.
+                    dst.clear(var);
+                    
+                }
 
             }
 
         }
 
+        // Bindings are consistent. Constraints (if any) were not violated.
+        return true;
+
     }
 
-//    /**
-//     * Copy the bound values from the element into a binding set using the
-//     * caller's variable names.
-//     * 
-//     * @param vars
-//     *            The ordered list of variables.
-//     * @param e
-//     *            The element.
-//     * @param bindingSet
-//     *            The binding set, which is modified as a side-effect.
-//     * 
-//     * @todo This appears to be unused, in which case it should be dropped. 
-//     */
-//    final public void bind(final IVariable<?>[] vars, final IElement e,
-//            final IBindingSet bindingSet) {
-//
-//        for (int i = 0; i < vars.length; i++) {
-//
-//            final IVariable<?> var = vars[i];
-//
-//            @SuppressWarnings("unchecked")
-//            final Constant<?> newval = new Constant(e.get(i));
-//
-//            bindingSet.set(var, newval);
-//
-//        }
-//
-//    }
+    /**
+     * Convert an {@link IAccessPath#iterator()} into a stream of
+     * {@link IBindingSet}s.
+     * 
+     * @param src
+     *            The iterator draining the {@link IAccessPath}. This will visit
+     *            {@link IElement}s.
+     * @param pred
+     *            The predicate for that {@link IAccessPath}
+     * @param vars
+     *            The array of distinct variables (no duplicates) to be
+     *            extracted from the visited {@link IElement}s.
+     * @param stats
+     *            Statistics to be updated as elements and chunks are consumed
+     *            (optional).
+     * 
+     * @return The dechunked iterator visiting the solutions. The order of the
+     *         original {@link IElement}s is preserved.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (AccessPath
+     *      should visit binding sets rather than elements when used for high
+     *      level query.)
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Inline access
+     *      path).
+     * 
+     *      TODO Move to {@link IAccessPath}? {@link AccessPath}?
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    static public ICloseableIterator<IBindingSet> solutions(
+            final IChunkedIterator<?> src, final IPredicate<?> pred,
+            final IVariable<?>[] vars, final BaseJoinStats stats) {
 
-//    /**
-//     * Cancel the running query (normal termination).
-//     * <p>
-//     * Note: This method provides a means for an operator to indicate that the
-//     * query should halt immediately. It used used by {@link SliceOp}, which
-//     * needs to terminate the entire query once the slice has been satisfied.
-//     * (If {@link SliceOp} just jumped out of its own evaluation loop then the
-//     * query would not produce more results, but it would continue to run and
-//     * the over produced results would just be thrown away.)
-//     * <p>
-//     * Note: When an individual {@link BOp} evaluation throws an exception, the
-//     * {@link QueryEngine} will catch that exception and halt query evaluation
-//     * with that thrown cause.
-//     * 
-//     * @see IRunningQuery#halt()
-//     */
-//    public void halt() {
-//
-//        runningQuery.halt();
-//        
-//    }
-    
+        return new CloseableIteratorWrapper(
+                new com.bigdata.striterator.ChunkedStriterator(src).addFilter(
+                        new ChunkedFilter() {
+
+                            private static final long serialVersionUID = 1L;
+
+                            /**
+                             * Count AP chunks and units consumed.
+                             */
+                            @Override
+                            protected Object[] filterChunk(final Object[] chunk) {
+
+                                stats.accessPathChunksIn.increment();
+
+                                stats.accessPathUnitsIn.add(chunk.length);
+
+                                return chunk;
+
+                            }
+
+                        }).addFilter(new com.bigdata.striterator.Resolver() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    /**
+                     * Resolve IElements to IBindingSets.
+                     */
+                    @Override
+                    protected Object resolve(final Object obj) {
+
+                        final IElement e = (IElement) obj;
+
+                        final IBindingSet bset = new ListBindingSet();
+
+                        // propagate bindings from the element to the bset.
+                        copyValues(e, pred, bset);
+
+                        return bset;
+
+                    }
+
+                })) {
+
+            /**
+             * Close the real source if the caller closes the returned iterator.
+             */
+            @Override
+            public void close() {
+                super.close();
+                src.close();
+            }
+        };
+
+    }
+
 /*
  * I've replaced this with AbstractSplitter for the moment.
  */

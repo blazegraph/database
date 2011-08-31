@@ -227,6 +227,7 @@ TOKEN [IGNORE_CASE] :
 TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 {
     <INCLUDE: "include">
+|   <JOIN_ON: "join on">
 }
 
 TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
@@ -581,7 +582,11 @@ void NamedSubqueryInclude() :
 {Token t;}
 {
      <INCLUDE> t = <VAR3>
-     { jjtThis.setName(t.image); }}
+     { jjtThis.setName(t.image); }
+     [ // Note: query hint in case static analysis can not figure this out.
+       <JOIN_ON > <LPAREN> Var() ( <COMMA> Var() )* <RPAREN> 
+     ]
+}
 
 void TriplesBlock() #void :
 {}
