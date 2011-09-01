@@ -112,31 +112,32 @@ public interface SyntaxTreeBuilderTreeConstants
   public int JJTSTRDT = 106;
   public int JJTSTRLANG = 107;
   public int JJTBIND = 108;
-  public int JJTREGEXEXPRESSION = 109;
-  public int JJTEXISTSFUNC = 110;
-  public int JJTNOTEXISTSFUNC = 111;
-  public int JJTRDFLITERAL = 112;
-  public int JJTTRUE = 113;
-  public int JJTFALSE = 114;
-  public int JJTSTRING = 115;
-  public int JJTQNAME = 116;
-  public int JJTBLANKNODE = 117;
-  public int JJTGRAPHREFALL = 118;
-  public int JJTGRAPHORDEFAULT = 119;
-  public int JJTQUADSNOTTRIPLES = 120;
-  public int JJTLOAD = 121;
-  public int JJTCLEAR = 122;
-  public int JJTDROP = 123;
-  public int JJTADD = 124;
-  public int JJTMOVE = 125;
-  public int JJTCOPY = 126;
-  public int JJTCREATE = 127;
-  public int JJTINSERTDATA = 128;
-  public int JJTDELETEDATA = 129;
-  public int JJTDELETEWHERE = 130;
-  public int JJTDELETECLAUSE = 131;
-  public int JJTINSERTCLAUSE = 132;
-  public int JJTMODIFY = 133;
+  public int JJTLET = 109;
+  public int JJTREGEXEXPRESSION = 110;
+  public int JJTEXISTSFUNC = 111;
+  public int JJTNOTEXISTSFUNC = 112;
+  public int JJTRDFLITERAL = 113;
+  public int JJTTRUE = 114;
+  public int JJTFALSE = 115;
+  public int JJTSTRING = 116;
+  public int JJTQNAME = 117;
+  public int JJTBLANKNODE = 118;
+  public int JJTGRAPHREFALL = 119;
+  public int JJTGRAPHORDEFAULT = 120;
+  public int JJTQUADSNOTTRIPLES = 121;
+  public int JJTLOAD = 122;
+  public int JJTCLEAR = 123;
+  public int JJTDROP = 124;
+  public int JJTADD = 125;
+  public int JJTMOVE = 126;
+  public int JJTCOPY = 127;
+  public int JJTCREATE = 128;
+  public int JJTINSERTDATA = 129;
+  public int JJTDELETEDATA = 130;
+  public int JJTDELETEWHERE = 131;
+  public int JJTDELETECLAUSE = 132;
+  public int JJTINSERTCLAUSE = 133;
+  public int JJTMODIFY = 134;
 
 
   public String[] jjtNodeName = {
@@ -249,6 +250,7 @@ public interface SyntaxTreeBuilderTreeConstants
     "StrDt",
     "StrLang",
     "Bind",
+    "Let",
     "RegexExpression",
     "ExistsFunc",
     "NotExistsFunc",
@@ -276,4 +278,4 @@ public interface SyntaxTreeBuilderTreeConstants
     "Modify",
   };
 }
-/* JavaCC - OriginalChecksum=de53ec51545dc48f4e6efdc6fbee1753 (do not edit this line) */
+/* JavaCC - OriginalChecksum=a1482fa48a1352066a3d356f454ee573 (do not edit this line) */
