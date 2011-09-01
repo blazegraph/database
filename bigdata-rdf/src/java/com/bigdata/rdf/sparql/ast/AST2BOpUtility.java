@@ -62,7 +62,6 @@ import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemoryGroupByOp;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
-import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
@@ -310,10 +309,10 @@ public class AST2BOpUtility {
         
         /*
          * TODO Do we need to add operators for materialization of any remaining
-         * variables which are being projected out of the query?
-         * 
-         * TODO We do not want to force materialization for subqueries.  They
-         * should stay as IVs.
+         * variables which are being projected out of the query? Note that we do
+         * not want to force materialization for subqueries. They should stay as
+         * IVs. (I think that materialization is still handled by the bulk IV
+         * resolution iterators).
          */
         
         if (log.isInfoEnabled()) {
@@ -715,13 +714,6 @@ public class AST2BOpUtility {
      * </pre>
      * 
      * TODO Think about how hash joins fit into this.
-     * 
-     * FIXME Integrate support for references to the named solution set. Those
-     * references are {@link NamedSubqueryInclude}s. They may appear within any
-     * {@link IGroupNode}.
-     * 
-     * FIXME Integrate support for SPARQL 1.1 style subqueries. Those are
-     * modeled by {@link SubqueryRoot} (versus {@link NamedSubqueryRoot}).
      */
 	private static PipelineOp convertJoinGroup(PipelineOp left,
 	        final JoinGroupNode joinGroup,
@@ -806,29 +798,16 @@ public class AST2BOpUtility {
 	
     /**
      * Project select expressions (non-aggregation case).
-     * 
-     * TODO Should we use or discard the {@link ProjectionOp} here? Does it
-     * offer any advantage?
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
 	        final List<AssignmentNode> assignments,
 	        final AST2BOpContext ctx){
 	    
-//	    PipelineOp subq=left;
-        
-//        left=addStartOp(ctx);
-//        
-//        left = new SubqueryOp(new BOp[]{left}, 
-//                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
-//                new NV(SubqueryOp.Annotations.SUBQUERY, subq),
-//                new NV(SubqueryOp.Annotations.OPTIONAL, false));
-//   
         left = addAssignments(left, assignments, ctx, true/* projection */);
         
-//        left = addEndOp(left, ctx);
-        
         return left;
-	}
+
+    }
 	
 	private static final PipelineOp addAssignments(PipelineOp left,    		
     		final List<AssignmentNode> assignments,
@@ -1171,7 +1150,7 @@ public class AST2BOpUtility {
 		final int bopId = ctx.nextId();
 		
 		final PipelineOp op;
-		if(true) {
+		if(ctx.nativeDistinct) {
 		    /*
 		     * DISTINCT on the JVM heap.
 		     */
@@ -1255,8 +1234,9 @@ public class AST2BOpUtility {
 
         final GroupByOp op;
         
-        /* FIXME Review. I believe that AssignmentNode.getValueExpression() should
-         * always return the Bind().
+        /*
+         * TODO Review. I believe that AssignmentNode.getValueExpression()
+         * should always return the Bind().
          */
         final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
@@ -1363,10 +1343,6 @@ public class AST2BOpUtility {
     
 
     /**
-     * NOT YET TESTED.
-     * 
-     * TODO TEST
-     * 
      * TODO Minor optimization: A bare constant in the ORDER BY value expression
      * list should be dropped. If there are no remaining value expressions, then
      * the entire ORDER BY operation should be dropped.
@@ -1468,15 +1444,15 @@ public class AST2BOpUtility {
      *         been applied. If there are no query hints then the original
      *         operator is returned.
      * 
-     * @todo It would be nice if this would only apply those query hints to an
-     *       operator which are known to be annotations understood by that
-     *       operator. This information is basically available from the inner
-     *       Annotation interface for a given operator class, but that is not
-     *       really all that accessible. [The way it is now, the query hints get
-     *       sprayed onto every operator and that will make the query much
-     *       fatter for NIO on a cluster.]
+     *         TODO It would be nice if this would only apply those query hints
+     *         to an operator which are known to be annotations understood by
+     *         that operator. This information is basically available from the
+     *         inner Annotation interface for a given operator class, but that
+     *         is not really all that accessible. [The way it is now, the query
+     *         hints get sprayed onto every operator and that will make the
+     *         query much fatter for NIO on a cluster.]
      */
-    public static PipelineOp applyQueryHints(PipelineOp op,
+    private static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {
 
         if (queryHints == null)
