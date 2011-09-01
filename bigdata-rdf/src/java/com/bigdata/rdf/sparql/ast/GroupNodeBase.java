@@ -138,7 +138,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         
         if (isOptional()) {
         
-            sb.append(" optional {\n");
+            sb.append("[optional] {\n");
             
         } else {
 

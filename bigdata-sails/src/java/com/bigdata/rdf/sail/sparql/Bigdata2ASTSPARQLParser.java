@@ -171,6 +171,28 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      */
     public BigdataParsedQuery parseQuery(final String queryStr, final String baseURI)
             throws MalformedQueryException {
+
+        final QueryRoot queryRoot = parseQuery2(queryStr, baseURI);
+        
+        return new BigdataParsedQuery(queryRoot);
+        
+    }
+
+    /**
+     * Parse a SPARQL query.
+     * 
+     * @param queryStr
+     *            The query.
+     * @param baseURI
+     *            The base URI.
+     * 
+     * @return The AST model for that query.
+     * 
+     * @throws MalformedQueryException
+     */
+    public QueryRoot parseQuery2(final String queryStr, final String baseURI)
+            throws MalformedQueryException {
+        
         try {
             final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
             StringEscapesProcessor.process(qc);
@@ -223,7 +245,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
             }
 
-            return new BigdataParsedQuery(queryRoot);
+            return queryRoot;
 
         } catch (ParseException e) {
         

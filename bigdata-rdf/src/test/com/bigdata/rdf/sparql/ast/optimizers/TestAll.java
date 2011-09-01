@@ -63,11 +63,17 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestASTBindingAssigner.class);
         
-        // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT idiom.
+        // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT.
         suite.addTestSuite(TestDescribeOptimizer.class);
+
+        // Unit tests for AST rewrite of the PROJECTION for a CONSTRUCT query.
+        suite.addTestSuite(TestDescribeOptimizer.class);
+
+        // Unit tests for identifying badly designed left joins.
+        suite.addTestSuite(TestBadlyDesignedLeftJoinUtil.class);
         
         return suite;
-        
+
     }
-    
+
 }

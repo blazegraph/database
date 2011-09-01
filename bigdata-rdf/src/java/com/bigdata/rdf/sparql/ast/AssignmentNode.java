@@ -41,6 +41,10 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         
     }
 
+    /**
+     * TODO Review. I believe that AssignmentNode.getValueExpression() should
+     * always return the Bind(). Right now it only returns the RIGHT argument.
+     */
     public IValueExpressionNode getValueExpressionNode() {
      
         return (IValueExpressionNode) get(1);

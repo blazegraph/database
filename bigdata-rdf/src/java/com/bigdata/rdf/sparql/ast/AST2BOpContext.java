@@ -62,7 +62,14 @@ public class AST2BOpContext implements IdFactory {
      * and query rewrites for performance optimizations).
      */
     public final OptimizerList optimizers;
-    
+
+    /**
+     * When <code>true</code>, will use the version of DISTINCT which operators
+     * on the native heap (assuming that the query is not of such obvious low
+     * cardinality that the JVM heap version will do better).
+     */
+    boolean nativeDistinct = false;
+
     /**
      * 
      * @param query
