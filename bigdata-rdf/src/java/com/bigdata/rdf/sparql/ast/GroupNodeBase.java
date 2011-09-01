@@ -131,24 +131,21 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         final String s = indent(indent);
         
         final StringBuilder sb = new StringBuilder();
-        
-        sb.append(sb.append(s));
-        
-        sb.append(getClass().getSimpleName());
-        
-        if (isOptional()) {
-        
-            sb.append("[optional] {\n");
-            
-        } else {
 
-            sb.append(" {\n");
-            
+        sb.append("\n").append(s).append(getClass().getSimpleName());
+
+        if (isOptional()) {
+
+            sb.append("[optional]");
+
         }
+
+        sb.append(" {");
 
         for (IQueryNode n : this) {
 
-            sb.append(n.toString(indent + 1)).append("\n");
+//            sb.append(n.toString(indent + 1)).append("\n");
+            sb.append(n.toString(indent+1));
 
         }
 
@@ -194,7 +191,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 //            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
 //        }
 
-        sb.append(s).append("}");
+        sb.append("\n").append(s).append("}");
 
         return sb.toString();
 

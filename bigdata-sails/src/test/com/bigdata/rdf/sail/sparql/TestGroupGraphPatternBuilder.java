@@ -644,6 +644,51 @@ public class TestGroupGraphPatternBuilder extends
     }
 
     /**
+     * Unit test for simple triple pattern in the default context with a LET
+     * and a FILTER (LET is an alternative syntax for BIND).
+     * 
+     * <pre>
+     * SELECT ?s where {?s ?p ?o LET(?x := ?o) FILTER (?s = ?x) }
+     * </pre>
+     */
+    public void test_simple_triple_pattern_with_let_and_filter()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "select ?s where {?s ?p ?o . LET(?x := ?o) FILTER (?s = ?o) }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new AssignmentNode(new VarNode("x"),
+                    new VarNode("o")));
+            
+            final ValueExpressionNode ve = new FunctionNode(
+                    FunctionRegistry.EQ, null/* scalarValues */,
+                    new ValueExpressionNode[] { new VarNode("s"),
+                            new VarNode("o") });
+
+            whereClause.addChild(new FilterNode(ve));
+           
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
      * IN with empty arg list in a FILTER. This should be turned into a FALSE
      * constraint.
      * 

@@ -73,9 +73,9 @@ public class HavingNode extends
 
     public String toString(final int indent) {
 
-        final StringBuilder sb = new StringBuilder(indent(indent));
+        final StringBuilder sb = new StringBuilder();
 
-        sb.append("having ");
+        sb.append("\n").append(indent(indent)).append("having ");
 
         for (IValueExpressionNode v : this) {
 

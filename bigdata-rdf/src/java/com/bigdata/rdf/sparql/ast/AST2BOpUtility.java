@@ -619,8 +619,15 @@ public class AST2BOpUtility {
 	    
         final int arity = unionNode.size();
         
-		if (arity == 0) {
-			throw new IllegalArgumentException();
+        if (arity == 0) {
+            /*
+             * TODO We can probably just return [left]. The old evaluation
+             * strategy code would translate an empty union into an empty
+             * iterator. That could be captured by a rewrite of the AST
+             * which recognizes and removes empty UNION nodes.
+             */
+		    throw new IllegalArgumentException();
+		    
 		}
 		
         // The bopId for the UNION or STEP.

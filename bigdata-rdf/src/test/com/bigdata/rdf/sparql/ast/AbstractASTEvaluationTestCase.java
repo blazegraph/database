@@ -60,6 +60,30 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         super(name);
     }
 
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        store = getStore(getProperties());
+        
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        if (store != null) {
+        
+            store.__tearDownUnitTest();
+            
+            store = null;
+        
+        }
+        
+        super.tearDown();
+        
+    }
+
+    protected AbstractTripleStore store = null;
+
     public Properties getProperties() {
 
         // Note: clone to avoid modifying!!!

@@ -25,7 +25,7 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * @deprecated by the AST integration.
+ * @deprecated by the AST integration.  The new version should 
  */
 public class BigdataConstructIterator implements
         CloseableIteration<Statement, QueryEvaluationException> {

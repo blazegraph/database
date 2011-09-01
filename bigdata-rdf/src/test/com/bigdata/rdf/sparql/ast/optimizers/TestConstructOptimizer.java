@@ -89,281 +89,275 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
      */
     public void test_construct_rewrite() {
 
-        final com.bigdata.rdf.store.AbstractTripleStore store = getStore(getProperties());
-        try {
+        final BigdataValueFactory f = store.getValueFactory();
 
-            final BigdataValueFactory f = store.getValueFactory();
+        // Add some data.
+        {
 
-            // Add some data.
-            {
+            final BigdataStatement[] stmts = new BigdataStatement[] {//
 
-                final BigdataStatement[] stmts = new BigdataStatement[] {//
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person
+                                    .toString()), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person
-                                        .toString()), null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person
+                                    .toString()), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person
-                                        .toString()), null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Mike"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Mike"), null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Bryan"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Bryan"), null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/DC"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("DC"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/DC"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("DC"), null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+            };
 
-                };
+            final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
+                    store, 10/* capacity */);
 
-                final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
-                        store, 10/* capacity */);
+            for (BigdataStatement stmt : stmts) {
 
-                for (BigdataStatement stmt : stmts) {
-
-                    buf.add(stmt);
-
-                }
-
-                // write on the database.
-                buf.flush();
+                buf.add(stmt);
 
             }
 
-            final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
-
-            final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
-
-            final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
-                    .toString());
-
-            final BigdataURI mikeURI = f
-                    .createURI("http://www.bigdata.com/Mike");
-
-            final BigdataURI bryanURI = f
-                    .createURI("http://www.bigdata.com/Bryan");
-
-            final BigdataLiteral mikeLabel = f.createLiteral("Mike");
-
-            final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
-
-            final BigdataURI dcURI = f.createURI("http://www.bigdata.com/DC");
-
-            final BigdataValue[] values = new BigdataValue[] { rdfType,
-                    rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
-                    bryanLabel, dcURI };
-
-            // resolve IVs.
-            store.getLexiconRelation()
-                    .addTerms(values, values.length, true/* readOnly */);
-
-            /*
-             * Setup the starting point for the AST model.
-             */
-            final QueryRoot queryRoot = new QueryRoot(QueryType.DESCRIBE);
-            {
-                /*
-                 * Setup the CONSTRUCT node.
-                 */
-                // term1 ?p1a ?o1 .
-                // ?s1 ?p1b term1 .
-                final ConstructNode constructNode = new ConstructNode();
-                queryRoot.setConstruct(constructNode);
-
-                // DC
-                final ConstantNode term0 = new ConstantNode(dcURI.getIV());
-                final VarNode p0a = new VarNode("p0a");
-                final VarNode p0b = new VarNode("p0b");
-                final VarNode o0 = new VarNode("o0");
-                final VarNode s0 = new VarNode("s0");
-                constructNode
-                        .addChild(new StatementPatternNode(term0, p0a, o0));
-                constructNode
-                        .addChild(new StatementPatternNode(s0, p0b, term0));
-
-                // ?x
-                final VarNode term1 = new VarNode("x");
-                final VarNode p1a = new VarNode("p1a");
-                final VarNode p1b = new VarNode("p1b");
-                final VarNode o1 = new VarNode("o1");
-                final VarNode s1 = new VarNode("s1");
-                constructNode
-                        .addChild(new StatementPatternNode(term1, p1a, o1));
-                constructNode
-                        .addChild(new StatementPatternNode(s1, p1b, term1));
-
-                /*
-                 * Setup the WHERE clause.
-                 * 
-                 * Note: The original WHERE clause is preserved and we add a
-                 * union of two statement patterns for each term (variable or
-                 * constant) in the DESCRIBE clause.
-                 */
-                // {
-                // term1 ?p1a ?o1 .
-                // } union {
-                // ?s1 ?p1b term1 .
-                // }
-                final JoinGroupNode whereClause = new JoinGroupNode();
-                queryRoot.setWhereClause(whereClause);
-
-                // original WHERE clause.
-                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
-                        new ConstantNode(rdfType.getIV()), new ConstantNode(
-                                foafPerson.getIV()), null/* c */,
-                        Scope.DEFAULT_CONTEXTS));
-
-                // union of 2 statement patterns per described term.
-                final UnionNode union = new UnionNode();
-                whereClause.addChild(union);
-
-                union.addChild(new StatementPatternNode(term0, p0a, o0));
-                union.addChild(new StatementPatternNode(s0, p0b, term0));
-
-                union.addChild(new StatementPatternNode(term1, p1a, o1));
-                union.addChild(new StatementPatternNode(s1, p1b, term1));
-
-            }
-
-            /*
-             * Setup the expected AST model.
-             * 
-             * Note: The query type is not changed by the DESCRIBE rewrite. This
-             * makes it easier to figure out what type of query we are looking
-             * at.
-             */
-            final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
-            {
-                /*
-                 * Setup the CONSTRUCT node.
-                 */
-                // term1 ?p1a ?o1 .
-                // ?s1 ?p1b term1 .
-                final ConstructNode constructNode = new ConstructNode();
-                expected.setConstruct(constructNode);
-
-                // DC
-                final ConstantNode term0 = new ConstantNode(dcURI.getIV());
-                final VarNode p0a = new VarNode("p0a");
-                final VarNode p0b = new VarNode("p0b");
-                final VarNode o0 = new VarNode("o0");
-                final VarNode s0 = new VarNode("s0");
-                constructNode
-                        .addChild(new StatementPatternNode(term0, p0a, o0));
-                constructNode
-                        .addChild(new StatementPatternNode(s0, p0b, term0));
-
-                // ?x
-                final VarNode term1 = new VarNode("x");
-                final VarNode p1a = new VarNode("p1a");
-                final VarNode p1b = new VarNode("p1b");
-                final VarNode o1 = new VarNode("o1");
-                final VarNode s1 = new VarNode("s1");
-                constructNode
-                        .addChild(new StatementPatternNode(term1, p1a, o1));
-                constructNode
-                        .addChild(new StatementPatternNode(s1, p1b, term1));
-
-                /*
-                 * Setup the WHERE clause.
-                 * 
-                 * Note: The original WHERE clause is preserved and we add a
-                 * union of two statement patterns for each term (variable or
-                 * constant) in the DESCRIBE clause.
-                 */
-                // {
-                // term1 ?p1a ?o1 .
-                // } union {
-                // ?s1 ?p1b term1 .
-                // }
-                final JoinGroupNode whereClause = new JoinGroupNode();
-                expected.setWhereClause(whereClause);
-
-                // original WHERE clause.
-                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
-                        new ConstantNode(rdfType.getIV()), new ConstantNode(
-                                foafPerson.getIV()), null/* c */,
-                        Scope.DEFAULT_CONTEXTS));
-
-                // union of 2 statement patterns per described term.
-                final UnionNode union = new UnionNode();
-                whereClause.addChild(union);
-
-                union.addChild(new StatementPatternNode(term0, p0a, o0));
-                union.addChild(new StatementPatternNode(s0, p0b, term0));
-
-                union.addChild(new StatementPatternNode(term1, p1a, o1));
-                union.addChild(new StatementPatternNode(s1, p1b, term1));
-
-                /*
-                 * Setup the PROJECTION node. 
-                 * 
-                 * This is the only thing which should differ from the code
-                 * block above. 
-                 */
-                final ProjectionNode projection = new ProjectionNode();
-                expected.setProjection(projection);
-                
-                projection.addProjectionVar(p0a);
-                projection.addProjectionVar(p0b);
-                projection.addProjectionVar(s0);
-                projection.addProjectionVar(o0);
-                
-                projection.addProjectionVar(p1a);
-                projection.addProjectionVar(p1b);
-                projection.addProjectionVar(s1);
-                projection.addProjectionVar(o1);
-                
-            }
-
-            /*
-             * Rewrite the query and verify that the expected AST was produced.
-             */
-            {
-
-                final AST2BOpContext context = new AST2BOpContext(queryRoot,
-                        store);
-
-                final IQueryNode actual = new ConstructOptimizer().optimize(
-                        context, queryRoot, null/* bindingSet */);
-
-                assertSameAST(queryRoot, actual);
-
-            }
-
-        } finally {
-
-            store.__tearDownUnitTest();
+            // write on the database.
+            buf.flush();
 
         }
 
+        final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
+
+        final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
+
+        final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
+                .toString());
+
+        final BigdataURI mikeURI = f
+                .createURI("http://www.bigdata.com/Mike");
+
+        final BigdataURI bryanURI = f
+                .createURI("http://www.bigdata.com/Bryan");
+
+        final BigdataLiteral mikeLabel = f.createLiteral("Mike");
+
+        final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
+
+        final BigdataURI dcURI = f.createURI("http://www.bigdata.com/DC");
+
+        final BigdataValue[] values = new BigdataValue[] { rdfType,
+                rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
+                bryanLabel, dcURI };
+
+        // resolve IVs.
+        store.getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+
+        /*
+         * Setup the starting point for the AST model.
+         */
+        final QueryRoot queryRoot = new QueryRoot(QueryType.DESCRIBE);
+        {
+            /*
+             * Setup the CONSTRUCT node.
+             */
+            // term1 ?p1a ?o1 .
+            // ?s1 ?p1b term1 .
+            final ConstructNode constructNode = new ConstructNode();
+            queryRoot.setConstruct(constructNode);
+
+            // DC
+            final ConstantNode term0 = new ConstantNode(dcURI.getIV());
+            final VarNode p0a = new VarNode("p0a");
+            final VarNode p0b = new VarNode("p0b");
+            final VarNode o0 = new VarNode("o0");
+            final VarNode s0 = new VarNode("s0");
+            constructNode
+                    .addChild(new StatementPatternNode(term0, p0a, o0));
+            constructNode
+                    .addChild(new StatementPatternNode(s0, p0b, term0));
+
+            // ?x
+            final VarNode term1 = new VarNode("x");
+            final VarNode p1a = new VarNode("p1a");
+            final VarNode p1b = new VarNode("p1b");
+            final VarNode o1 = new VarNode("o1");
+            final VarNode s1 = new VarNode("s1");
+            constructNode
+                    .addChild(new StatementPatternNode(term1, p1a, o1));
+            constructNode
+                    .addChild(new StatementPatternNode(s1, p1b, term1));
+
+            /*
+             * Setup the WHERE clause.
+             * 
+             * Note: The original WHERE clause is preserved and we add a
+             * union of two statement patterns for each term (variable or
+             * constant) in the DESCRIBE clause.
+             */
+            // {
+            // term1 ?p1a ?o1 .
+            // } union {
+            // ?s1 ?p1b term1 .
+            // }
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            // original WHERE clause.
+            whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                    new ConstantNode(rdfType.getIV()), new ConstantNode(
+                            foafPerson.getIV()), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            // union of 2 statement patterns per described term.
+            final UnionNode union = new UnionNode();
+            whereClause.addChild(union);
+
+            union.addChild(new StatementPatternNode(term0, p0a, o0));
+            union.addChild(new StatementPatternNode(s0, p0b, term0));
+
+            union.addChild(new StatementPatternNode(term1, p1a, o1));
+            union.addChild(new StatementPatternNode(s1, p1b, term1));
+
+        }
+
+        /*
+         * Setup the expected AST model.
+         * 
+         * Note: The query type is not changed by the DESCRIBE rewrite. This
+         * makes it easier to figure out what type of query we are looking
+         * at.
+         */
+        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        {
+            /*
+             * Setup the CONSTRUCT node.
+             */
+            // term1 ?p1a ?o1 .
+            // ?s1 ?p1b term1 .
+            final ConstructNode constructNode = new ConstructNode();
+            expected.setConstruct(constructNode);
+
+            // DC
+            final ConstantNode term0 = new ConstantNode(dcURI.getIV());
+            final VarNode p0a = new VarNode("p0a");
+            final VarNode p0b = new VarNode("p0b");
+            final VarNode o0 = new VarNode("o0");
+            final VarNode s0 = new VarNode("s0");
+            constructNode
+                    .addChild(new StatementPatternNode(term0, p0a, o0));
+            constructNode
+                    .addChild(new StatementPatternNode(s0, p0b, term0));
+
+            // ?x
+            final VarNode term1 = new VarNode("x");
+            final VarNode p1a = new VarNode("p1a");
+            final VarNode p1b = new VarNode("p1b");
+            final VarNode o1 = new VarNode("o1");
+            final VarNode s1 = new VarNode("s1");
+            constructNode
+                    .addChild(new StatementPatternNode(term1, p1a, o1));
+            constructNode
+                    .addChild(new StatementPatternNode(s1, p1b, term1));
+
+            /*
+             * Setup the WHERE clause.
+             * 
+             * Note: The original WHERE clause is preserved and we add a
+             * union of two statement patterns for each term (variable or
+             * constant) in the DESCRIBE clause.
+             */
+            // {
+            // term1 ?p1a ?o1 .
+            // } union {
+            // ?s1 ?p1b term1 .
+            // }
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            // original WHERE clause.
+            whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                    new ConstantNode(rdfType.getIV()), new ConstantNode(
+                            foafPerson.getIV()), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            // union of 2 statement patterns per described term.
+            final UnionNode union = new UnionNode();
+            whereClause.addChild(union);
+
+            union.addChild(new StatementPatternNode(term0, p0a, o0));
+            union.addChild(new StatementPatternNode(s0, p0b, term0));
+
+            union.addChild(new StatementPatternNode(term1, p1a, o1));
+            union.addChild(new StatementPatternNode(s1, p1b, term1));
+
+            /*
+             * Setup the PROJECTION node. 
+             * 
+             * This is the only thing which should differ from the code
+             * block above. 
+             */
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(p0a);
+            projection.addProjectionVar(p0b);
+            projection.addProjectionVar(s0);
+            projection.addProjectionVar(o0);
+            
+            projection.addProjectionVar(p1a);
+            projection.addProjectionVar(p1b);
+            projection.addProjectionVar(s1);
+            projection.addProjectionVar(o1);
+            
+        }
+
+        /*
+         * Rewrite the query and verify that the expected AST was produced.
+         */
+        {
+
+            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+                    store);
+
+            final IQueryNode actual = new ConstructOptimizer().optimize(
+                    context, queryRoot, null/* bindingSet */);
+
+            if (log.isInfoEnabled())
+                log.info("expected:" + queryRoot);
+            
+            assertSameAST(queryRoot, actual);
+
+        }
+        
     }
 
 }

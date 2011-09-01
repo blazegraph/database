@@ -57,15 +57,14 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("AST");
 
+        // Test suite for AST manipulation (mainly for use by hand).
         suite.addTestSuite(TestAST.class);
 
+        // Test suite for AST query rewriters/optimizers.
         suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());
-        
-        // Unit tests for DESCRIBE query.
-//        suite.addTestSuite(TestDescribeQuery.class);
-//
-//        // Unit tests for CONSTRUCT query.
-//        suite.addTestSuite(TestConstructQuery.class);
+
+        // Test suite for AST evaluation helpers.
+        suite.addTest(com.bigdata.rdf.sparql.ast.eval.TestAll.suite());
 
         // Unit tests for query evaluation written to the AST layer.
         suite.addTestSuite(TestASTTriplesModeEvaluation.class);
