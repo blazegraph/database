@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 29, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Iterator;
 import java.util.Stack;
@@ -39,6 +39,13 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.INodeOrAttribute;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Examines the source {@link IBindingSet}[]. If there is a single binding set

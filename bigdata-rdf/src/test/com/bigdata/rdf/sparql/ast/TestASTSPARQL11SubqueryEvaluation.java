@@ -290,8 +290,7 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
 
-            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, idFactory,
-                    store, queryEngine, queryHints);
+            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
 
             // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);

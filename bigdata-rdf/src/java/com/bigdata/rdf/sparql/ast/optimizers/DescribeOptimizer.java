@@ -40,7 +40,6 @@ import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
-import com.bigdata.rdf.sparql.ast.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -57,16 +56,18 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  */
 public class DescribeOptimizer implements IASTOptimizer {
 
+//    private static final Logger log = Logger.getLogger(DescribeOptimizer.class); 
+    
 	/**
 	 * Change this:
-	 * 
+	 * <pre>
 	 * describe term1 term2 ...
 	 * where {
-	 *    whereClause .
+	 *    whereClause ...
 	 * }
-	 * 
+	 * </pre>
 	 * Into this:
-	 * 
+	 * <pre>
 	 * construct {
 	 *   term1 ?p1a ?o1 .
 	 *   ?s1   ?p1b term1 .
@@ -74,7 +75,7 @@ public class DescribeOptimizer implements IASTOptimizer {
 	 *   ?s2   ?p2b term2 .
 	 * }
 	 * where {
-	 *   whereClause .
+	 *   whereClause ...
 	 *   {
 	 *     term1 ?p1a ?o1 .
 	 *   } union {
@@ -84,78 +85,55 @@ public class DescribeOptimizer implements IASTOptimizer {
 	 *   } union {
 	 *     ?s2   ?p2b term2 .
 	 *   }
+	 * </pre>
 	 */
 	@Override
 	public IQueryNode optimize(final AST2BOpContext context, 
 			final IQueryNode queryNode, //final DatasetNode dataset, 
 			final IBindingSet[] bindingSet) {
 		
-//        final String sparql = "describe <http://www.bigdata.com>";
-//
-//        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
-//        {
-//
-//            final ProjectionNode projection = new ProjectionNode();
-//            expected.setProjection(projection);
-//            
-//            final VarNode anonvar = new VarNode("-iri-1");
-//            anonvar.setAnonymous(true);
-//            projection.addProjectionExpression(new AssignmentNode(anonvar,
-//                    new ConstantNode(makeIV(valueFactory
-//                            .createURI("http://www.bigdata.com")))));
-//
-//        }
-
-//        final String sparql = "construct { ?s ?p ?o } where {?s ?p ?o}";
-//
-//        final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
-//        {
-//
-//            final ConstructNode construct = new ConstructNode();
-//            expected.setConstruct(construct);
-//            construct.addChild(new StatementPatternNode(new VarNode("s"),
-//                    new VarNode("p"), new VarNode("o"), null/* c */,
-//                    Scope.DEFAULT_CONTEXTS));
-//            
-//            final JoinGroupNode whereClause = new JoinGroupNode();
-//            expected.setWhereClause(whereClause);
-//            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
-//                    new VarNode("p"), new VarNode("o"), null/* c */,
-//                    Scope.DEFAULT_CONTEXTS));
-//        }
-
-		final QueryRoot describe = (QueryRoot) queryNode;
+		final QueryRoot queryRoot = (QueryRoot) queryNode;
 		
-		if (describe.getQueryType() != QueryType.DESCRIBE) {
+		if (queryRoot.getQueryType() != QueryType.DESCRIBE) {
 			
 		    // Not a query that we will rewrite.
-		    return describe;
+		    return queryRoot;
 		    
 		}
 
+        // Change the query type. This helps prevent multiple rewrites.
+		queryRoot.setQueryType(QueryType.CONSTRUCT);
+		
 		final IGroupNode<IGroupMemberNode> where;
 		
-		if (describe.hasWhereClause()) {
+		if (queryRoot.hasWhereClause()) {
 			
-			where = describe.getWhereClause();
+		    // start with the existing WHERE clause.
+			where = queryRoot.getWhereClause();
 			
 		} else {
 			
 			// some describe queries don't have where clauses
-			describe.setWhereClause(where = new JoinGroupNode());
+			queryRoot.setWhereClause(where = new JoinGroupNode());
 			
 		}
 		
 		final UnionNode union = new UnionNode();
 		
-		where.addChild(union);
+		where.addChild(union); // append UNION to WHERE clause.
 
         final ConstructNode construct = new ConstructNode();
 
-		final ProjectionNode projection = describe.getProjection();
+		final ProjectionNode projection = queryRoot.getProjection();
 		
-		describe.setProjection(null);
-		describe.setConstruct(construct);
+		if(projection == null) {
+
+            throw new RuntimeException("No projection?");
+		    
+		}
+		
+		queryRoot.setProjection(null); // remove the projection.
+		queryRoot.setConstruct(construct); // add CONSTRUCT node.
 		
 		final Collection<TermNode> terms = new LinkedHashSet<TermNode>();
 		
@@ -178,6 +156,10 @@ public class DescribeOptimizer implements IASTOptimizer {
 				
 			}
 			
+            if (terms.isEmpty())
+                throw new RuntimeException(
+                        "DESCRIBE *, but no variables in this query");
+
 		} else {
 		
 			for (AssignmentNode n : projection) {
@@ -201,7 +183,7 @@ public class DescribeOptimizer implements IASTOptimizer {
 						term, 
 						new VarNode("p"+termNum+"a"),
 						new VarNode("o"+termNum)
-						); 
+						);
 
 				construct.addChild(sp);
 				
@@ -226,7 +208,7 @@ public class DescribeOptimizer implements IASTOptimizer {
 			
 		}
 		
-		return describe;
+		return queryRoot;
 		
 	}
 	

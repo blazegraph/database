@@ -41,6 +41,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -461,6 +464,31 @@ public class BOpUtility {
                     }
                 }).makeUnique();
 
+    }
+
+    /**
+     * Return an array containing the {@link IVariable}s visited by the
+     * iterator.
+     * 
+     * @param it
+     *            The iterator.
+     */
+    public static IVariable[] toArray(final Iterator<IVariable<?>> it) {
+
+        final List<TermNode> terms = new LinkedList<TermNode>();
+
+        while (it.hasNext()) {
+
+            final IVariable<IV> v = (IVariable<IV>) it.next();
+
+            final VarNode var = new VarNode(v);
+
+            terms.add(var);
+
+        }
+
+        return terms.toArray(new IVariable[] {});
+        
     }
     
     @SuppressWarnings("unchecked")

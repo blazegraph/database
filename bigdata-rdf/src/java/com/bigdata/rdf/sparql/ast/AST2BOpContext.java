@@ -5,10 +5,13 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.QueryHints;
+import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.OptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -16,17 +19,34 @@ import com.bigdata.service.IBigdataFederation;
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
  */
-public class AST2BOpContext {
+public class AST2BOpContext implements IdFactory {
 
+    /**
+     * The original {@link QueryRoot} to be evaluated.
+     */
 	public final QueryRoot query;
 	
-	public final AtomicInteger idFactory;
+	/**
+	 * Factory for assigning unique within query identifiers to {@link BOp}s.
+	 * 
+	 * @see #nextId()
+	 */
+	final AtomicInteger idFactory;
 	
+	/**
+	 * The KB instance.
+	 */
 	public final AbstractTripleStore db;
 	
+	/**
+	 * The {@link QueryEngine}. 
+	 */
 	public final QueryEngine queryEngine;
 	
-    public final Properties queryHints;
+	/**
+	 * The query hints from the original {@link #query}.
+	 */
+    final Properties queryHints;
     
     /**
      * The unique identifier assigned to this query.
@@ -36,6 +56,13 @@ public class AST2BOpContext {
      */
     public final UUID queryId;
 
+    /**
+     * The query optimizers (this includes both query rewrites for correct
+     * semantics, such as a rewrite of a DESCRIBE query into a CONSTRUCT query,
+     * and query rewrites for performance optimizations).
+     */
+    public final OptimizerList optimizers;
+    
     /**
      * 
      * @param query
@@ -49,18 +76,7 @@ public class AST2BOpContext {
      * @param queryHints
      *            The query hints.
      * 
-     *            TODO We should be passing in the {@link IIndexManager} rather
-     *            than the {@link AbstractTripleStore} in order to support cross
-     *            kb queries. The AST can be annotated with the namespace of the
-     *            default KB instance, which can then be resolved from the
-     *            {@link IIndexManager}.
-     * 
-     *            TODO The queryHints are available from the AST (as generated
-     *            from the parseTree) and should be dropped from this class.
-     * 
-     *            TODO The {@link QueryEngine} can be discovered from the
-     *            {@link IIndexManager} using {@link QueryEngineFactory} and
-     *            does not really need to be passed in here.
+     * @deprecated by the other constructor.
      */
 	public AST2BOpContext(final QueryRoot query,
 			final AtomicInteger idFactory, final AbstractTripleStore db,
@@ -81,17 +97,76 @@ public class AST2BOpContext {
 
         this.queryId = queryId;
 		
-	}
-	
-	public int nextId() {
-		
-		return idFactory.incrementAndGet();
-		
+        this.optimizers = new DefaultOptimizerList();
+
 	}
 
-	/**
-	 * Return <code>true</code> if we are running on a cluster.
-	 */
+    /**
+     * 
+     * @param queryRoot The root of the query.
+     * @param db The KB instance.
+     * 
+     *            TODO We should be passing in the {@link IIndexManager} rather
+     *            than the {@link AbstractTripleStore} in order to support cross
+     *            kb queries. The AST can be annotated with the namespace of the
+     *            default KB instance, which can then be resolved from the
+     *            {@link IIndexManager}.
+     */
+    public AST2BOpContext(final QueryRoot queryRoot,
+            final AbstractTripleStore db) {
+
+        if (queryRoot == null)
+            throw new IllegalArgumentException();
+
+        if (db == null)
+            throw new IllegalArgumentException();
+
+        this.query = queryRoot;
+
+        this.db = db;
+
+        /*
+         * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
+         * first id that will be assigned when we pass in ZERO (0) as the
+         * initial state of the AtomicInteger.
+         */
+        this.idFactory = new AtomicInteger(0);
+        
+        this.queryEngine = QueryEngineFactory.getQueryController(db
+                .getIndexManager());
+
+        this.queryHints = queryRoot.getQueryHints();
+
+        /*
+         * Figure out the query UUID that will be used. This will be bound onto
+         * the query plan when it is generated. We figure out what it will be up
+         * front so we can refer to its UUID in parts of the query plan. For
+         * example, this is used to coordinate access to bits of state on a
+         * parent IRunningQuery.
+         */
+        
+        // Use either the caller's UUID or a random UUID.
+        final String queryIdStr = queryHints == null ? null : queryHints
+                .getProperty(QueryHints.QUERYID);
+
+        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
+                .fromString(queryIdStr);
+
+        this.queryId = queryId;
+        
+        this.optimizers = new DefaultOptimizerList();
+
+    }
+
+    public int nextId() {
+
+        return idFactory.incrementAndGet();
+
+    }
+
+    /**
+     * Return <code>true</code> if we are running on a cluster.
+     */
     public boolean isCluster() {
 
         return db.getIndexManager() instanceof IBigdataFederation<?>;
@@ -102,9 +177,9 @@ public class AST2BOpContext {
      * Return the namespace of the lexicon relation.
      */
     public String getLexiconNamespace() {
-        
+
         return db.getLexiconRelation().getNamespace();
-        
+
     }
-    
+
 }

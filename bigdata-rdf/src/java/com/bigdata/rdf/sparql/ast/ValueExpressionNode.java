@@ -65,9 +65,10 @@ public class ValueExpressionNode extends ASTBase implements
         setProperty(Annotations.VALUE_EXPR, ve);
 
     }
-    
-    public String toString() {
 
+    public String toShortString() {
+
+//        return super.toString();
         return getClass().getSimpleName() + "(" + getValueExpression() + ")";
 
     }

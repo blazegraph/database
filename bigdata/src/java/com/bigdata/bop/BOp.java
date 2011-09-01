@@ -180,6 +180,17 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
     BOp clone();
 
     /**
+     * Return a short (non-recursive) representation of the {@link BOp}.
+     */
+    String toShortString();
+
+    /**
+     * Return a 
+     * @return
+     */
+    String toString();
+    
+    /**
      * Return the {@link Annotations#BOP_ID}.
      * 
      * @throws IllegalStateException

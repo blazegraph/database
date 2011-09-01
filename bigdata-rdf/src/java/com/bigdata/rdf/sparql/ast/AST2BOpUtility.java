@@ -11,22 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
-import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.OrderLimitOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
-import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
@@ -95,7 +84,6 @@ import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
-import com.bigdata.rdf.sparql.ast.optimizers.DescribeOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
@@ -124,119 +112,6 @@ public class AST2BOpUtility {
     private static final transient Logger log = Logger
             .getLogger(AST2BOpUtility.class);
 
-    private static final IASTOptimizer[] optimizers;
-
-    /**
-     * FIXME Capture the openrdf optimizer patterns here:
-     * 
-     * <pre>
-     * optimizerList.add(new BindingAssigner()); // yes.
-     * optimizerList.add(new ConstantOptimizer(strategy));
-     * optimizerList.add(new CompareOptimizer());
-     * optimizerList.add(new ConjunctiveConstraintSplitter());
-     * optimizerList.add(new SameTermFilterOptimizer());
-     * // only need to optimize the join order this way if we are not
-     * // using native joins
-     * if (nativeJoins == false) {
-     *     optimizerList.add(new QueryJoinOptimizer(new BigdataEvaluationStatistics(
-     *             this)));
-     * }
-     * optimizerList.add(new FilterOptimizer());
-     * optimizerList.optimize(tupleExpr, dataset, bindings);
-     * replaceValues(dataset, tupleExpr, bindings);
-     * </pre>
-     * 
-     * FIXME {@link BindingAssigner}. Propagates bindings from an input solution
-     * into the query, replacing variables with constants while retaining the
-     * constant/variable association. See {@link ASTBindingAssigner}.
-     * 
-     * FIXME {@link ConstantOptimizer}. Rewrites the query replacing any aspect
-     * which can be statically evaluated to a constant with that constant. The
-     * implementation considers variables, functions, and constants.
-     * 
-     * FIXME {@link CompareOptimizer}. Replaces Compare with SameTerm whenever
-     * possible. (I think that we handle this in the {@link FunctionRegistry},
-     * but that should be verified and documented here.
-     * 
-     * FIXME {@link ConjunctiveConstraintSplitter}. Takes a FILTER with an AND
-     * of constraints and replaces it with one filter per left or right hand
-     * side of the AND. This flattens the value expression hierarchy. It also
-     * might allow us to reject some solutions earlier in the pipeline since we
-     * do not have to wait for all of the variables to become bound and we can
-     * potentially evaluate some of the individual constraints earlier than
-     * others.
-     * 
-     * FIXME {@link SameTermFilterOptimizer}. Optimizes SameTerm(X,Y) by
-     * renaming one of the variables to the other variable. Optimizes
-     * SameTerm(X,aURI) by assigning the constant to the variable.
-     * 
-     * FIXME {@link FilterOptimizer}. Pushes filters as far down in the query
-     * model as possible.
-     * 
-     * FIXME Sesame has define a bunch of IQueryOptimizers that we are not using
-     * (even before this refactor). Many of them apply to their SQL backends. A
-     * few might be relevant to us:
-     * <ul>
-     * <li>{@link DisjunctiveConstraintOptimizer} - moves SameTerm closer to
-     * joins for queries involving UNIONs.</li>
-     * <li>{@link IterativeEvaluationOptimizer} - ???</li>
-     * <li>{@link OrderLimitOptimizer} - moves the ORDER node above the
-     * PROJECTION node. [This optimizer does not make sense for us as we handle
-     * the relative position of the ORDER_BY and the PROJECTION when generating
-     * the pipeline, not in the AST.]</li>
-     * <li>{@link QueryModelNormalizer} - various simplifications of their tuple
-     * expression query model. I am not sure whether or not there is anything
-     * here we could leverage.</li>
-     * </ul>
-     * 
-     * TODO Optimize away empty join groups and optimize those containing just a
-     * single child by lifting the child into the parent whenever possible.
-     * 
-     * TODO Recognize OR of constraints and rewrite as IN. We can then optimize
-     * the IN operator in a variety of ways.
-     * 
-     * TODO Optimize IN and named graph and default graph queries with inline
-     * access path.
-     * 
-     * TODO Optimize when you have a nested graph pattern with an eventual
-     * parent graph pattern by placing a SameTerm filter to ensure that the
-     * nested graph pattern only find solutions which are not allowed by the
-     * outer graph.
-     * 
-     * TODO StatementPatternNode should inherit the context dynamically from the
-     * parent rather than requiring the context to be specified explicitly. This
-     * is also true for a subquery. If it specifies a GRAPH pattern, then you
-     * MUST put a FILTER on it. (An IASTOptimizer could take care of that.)
-     * 
-     * FIXME Either handle via AST rewrites or verify that AST2BOpUtility
-     * handles this during convert().
-     * <p>
-     * An empty {} matches a single empty solution.
-     * <p>
-     * GRAPH ?g {} matches the distinct named graphs in the named graph portion
-     * of the data set (special case). This should be translated into a distinct
-     * term advancer on CSPO if there is no data set. If the named graphs are
-     * listed explicitly, then just return that list. Third case: Anzo supports
-     * a FILTER on the named graph or default graphs for ACLs.
-     * <p>
-     * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure on
-     * this one.)
-     * 
-     * FIXME Add rewrite for DESCRIBE (see the code inline below). Note that
-     * openrdf used "REDUCED" in their projection. We might want to do the same
-     * in the rewritten query.
-     * 
-     * FIXME "describe <http://www.bigdata.com>" does not have a whereClause.
-     * The rewrite must supply an appropriate one.
-     */
-    static {
-        optimizers = new IASTOptimizer[] {
-        		new DescribeOptimizer(),
-        		new ASTBindingAssigner(),
-        		new ASTNamedSubqueryOptimizer(),
-        };
-    }
-
     /**
      * Top-level entry point converts an AST query model into an executable
      * query plan.
@@ -256,8 +131,9 @@ public class AST2BOpUtility {
         // The AST query model.
         final QueryRoot query = ctx.query;
         
-        final QueryRoot optimizedQuery = (QueryRoot) optimize(ctx, query,
-                bindingSets); 
+        // Run the AST query rewrites / query optimizers.
+        final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(
+                ctx, query, bindingSets);
         
         // The executable query plan.
         final PipelineOp queryPlan = convert(optimizedQuery, ctx);
@@ -272,32 +148,6 @@ public class AST2BOpUtility {
 
         return (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
-
-    }
-
-    /**
-     * Run the optimizers.
-     * 
-     * @param ctx
-     * @param node
-     * @param bindingSets
-     * 
-     * @return The optimized AST model.
-     * 
-     *         TODO Put into an executable list pattern and pass the set of
-     *         optimizers into the {@link AST2BOpContext} so we can unit test
-     *         this stuff more readily.
-     */
-    static IQueryNode optimize(final AST2BOpContext ctx,
-            IQueryNode node, final IBindingSet[] bindingSets) {
-
-        for (IASTOptimizer opt : optimizers) {
-
-            node = opt.optimize(ctx, node, bindingSets);
-
-        }
-        
-        return node;
 
     }
     
@@ -775,7 +625,7 @@ public class AST2BOpUtility {
 		}
 		
         // The bopId for the UNION or STEP.
-        final int thisId = ctx.idFactory.incrementAndGet();
+        final int thisId = ctx.nextId();
         
         final BOp[] subqueries = new BOp[arity];
 
@@ -945,7 +795,7 @@ public class AST2BOpUtility {
         		new StartOp(BOp.NOARGS,
 			        NV.asMap(new NV[] {//
 			              new NV(Predicate.Annotations.BOP_ID, 
-			            		  ctx.idFactory.incrementAndGet()),
+			            		  ctx.nextId()),
 			              new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 			                      BOpEvaluationContext.CONTROLLER),
 			        })), ctx.queryHints);
@@ -1004,7 +854,7 @@ public class AST2BOpUtility {
 			 */
 			vars.removeAll(done);
 			
-            final int bopId = ctx.idFactory.incrementAndGet();
+            final int bopId = ctx.nextId();
 
             final ConditionalBind b = new ConditionalBind(
                     assignmentNode.getVar(),
@@ -1068,7 +918,7 @@ public class AST2BOpUtility {
 			 */
 			vars.removeAll(done);
 			
-			final int bopId = ctx.idFactory.incrementAndGet();
+			final int bopId = ctx.nextId();
 
 			/*
 			 * We might have already materialized everything we need for this filter.
@@ -1318,7 +1168,7 @@ public class AST2BOpUtility {
     private static final PipelineOp addDistinct(PipelineOp left,
             final IVariable<?>[] vars, final AST2BOpContext ctx) {
 		
-		final int bopId = ctx.idFactory.incrementAndGet();
+		final int bopId = ctx.nextId();
 		
 		final PipelineOp op;
 		if(true) {
@@ -1401,7 +1251,7 @@ public class AST2BOpUtility {
         final IGroupByRewriteState groupByRewrite = new GroupByRewriter(
                 groupByState);
 
-        final int bopId = ctx.idFactory.incrementAndGet();
+        final int bopId = ctx.nextId();
 
         final GroupByOp op;
         
@@ -1560,7 +1410,7 @@ public class AST2BOpUtility {
     		
 		}
 		
-		final int sortId = ctx.idFactory.incrementAndGet();
+		final int sortId = ctx.nextId();
 		
 		left = addMaterializationSteps(left, sortId, vars, ctx);
 		
@@ -1588,7 +1438,7 @@ public class AST2BOpUtility {
     private static final PipelineOp addSlice(PipelineOp left,
             final SliceNode slice, final AST2BOpContext ctx) {
 
-		final int bopId = ctx.idFactory.incrementAndGet();
+		final int bopId = ctx.nextId();
 		
     	left = applyQueryHints(new SliceOp(new BOp[] { left },
     			NV.asMap(new NV[] { 
@@ -1712,20 +1562,18 @@ public class AST2BOpUtility {
     		PipelineOp left, final int rightId,
     		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
-    	final AtomicInteger idFactory = ctx.idFactory;
-    	
     	final Iterator<IVariable<IV>> it = vars.iterator();
     	
-    	int firstId = idFactory.incrementAndGet();
+    	int firstId = ctx.nextId();
     	
     	while (it.hasNext()) {
     		
     		final IVariable<IV> v = it.next();
     	
     		final int condId1 = firstId;
-    		final int condId2 = idFactory.incrementAndGet();
-    		final int inlineMaterializeId = idFactory.incrementAndGet();
-            final int lexJoinId = idFactory.incrementAndGet();
+    		final int condId2 = ctx.nextId();
+    		final int inlineMaterializeId = ctx.nextId();
+            final int lexJoinId = ctx.nextId();
             
             final int endId;
             
@@ -1745,7 +1593,7 @@ public class AST2BOpUtility {
     			 * pipeline is the 1st operator of the next materialization
     			 * pipeline.
     			 */
-    			endId = firstId = idFactory.incrementAndGet();
+    			endId = firstId = ctx.nextId();
     			
     		}
     		

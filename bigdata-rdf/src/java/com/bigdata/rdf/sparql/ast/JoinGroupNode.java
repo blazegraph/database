@@ -33,14 +33,12 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
         
     }
     
-//    private TermNode context;
-    
     /**
      * Construct a non-optional join group.
      */
     public JoinGroupNode() {
 
-        this(false/* optional */);
+        super();
 
     }
 
@@ -72,7 +70,7 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
     @Override
     public TermNode getContext() {
 
-        TermNode context = (TermNode) getProperty(Annotations.CONTEXT);
+        final TermNode context = (TermNode) getProperty(Annotations.CONTEXT);
 
         if (context != null)
             return context;
@@ -484,31 +482,5 @@ public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
 //        return sb.toString();
 //
 //	}
-
-//	@Override
-//    public boolean equals(final Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!(o instanceof JoinGroupNode))
-//            return false;
-//
-//        if(!super.equals(o))
-//            return false;
-//
-//        final JoinGroupNode t = (JoinGroupNode) o;
-//        
-//        if (context == null) {
-//            if (t.context != null)
-//                return false;
-//        } else {
-//            if (!context.equals(context))
-//                return false;
-//        }
-//            
-//        return true;
-//
-//    }
 
 }

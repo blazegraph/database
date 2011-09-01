@@ -56,6 +56,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
@@ -313,8 +314,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
 
-            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, idFactory,
-                    store, queryEngine, queryHints);
+            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
 
             // run optimizer for named subqueries.
             queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
@@ -544,8 +544,7 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
 
-            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, idFactory,
-                    store, queryEngine, queryHints);
+            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
 
             // run optimizer for named subqueries.
             queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(

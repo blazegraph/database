@@ -35,7 +35,6 @@ public abstract class TermNode extends ValueExpressionNode {
 //
 //    }
 
-
 	public TermNode(final BOp[] args, final Map<String, Object> anns) {
 		
 		super(args, anns);
