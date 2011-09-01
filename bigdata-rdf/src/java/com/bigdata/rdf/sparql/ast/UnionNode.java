@@ -51,53 +51,38 @@ public class UnionNode extends GroupNodeBase<IGroupMemberNode> {
 
     }
 	
-	public String toString(final int indent) {
-		
-		final String _indent = indent(indent);
-		
-		final StringBuilder sb = new StringBuilder();
-
-        boolean first = true;
-
-        for (IQueryNode n : this) {
-
-            if (!(n instanceof JoinGroupNode)) {
-        
-                continue;
-                
-            }
-
-            if (first) {
-
-                first = false;
-                
-            } else {
-                
-                sb.append(_indent).append("union\n");
-                
-            }
-
-            sb.append(((JoinGroupNode) n).toString(indent)).append("\n");
-
-        }
-
-        return sb.toString();
-
-    }
-
-    public boolean equals(final Object o) {
-
-        if (this == o)
-            return true;
-
-        if (!(o instanceof UnionNode))
-            return false;
-
-        if(!super.equals(o))
-            return false;
-        
-        return true;
-
-    }
+//	public String toString(final int indent) {
+//		
+//		final String _indent = indent(indent);
+//		
+//		final StringBuilder sb = new StringBuilder();
+//
+//        boolean first = true;
+//
+//        for (IQueryNode n : this) {
+//
+//            if (!(n instanceof JoinGroupNode)) {
+//        
+//                continue;
+//                
+//            }
+//
+//            if (first) {
+//
+//                first = false;
+//                
+//            } else {
+//                
+//                sb.append(_indent).append("union\n");
+//                
+//            }
+//
+//            sb.append(((JoinGroupNode) n).toString(indent)).append("\n");
+//
+//        }
+//
+//        return sb.toString();
+//
+//    }
 
 }

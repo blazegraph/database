@@ -57,7 +57,6 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -139,212 +138,196 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                 + " INCLUDE %namedSet1 JOIN ON (?x) \n"//
                 + "}"//
         ;
-
-        final AbstractTripleStore store = getStore(getProperties());
-
-        try {
         
-            final BigdataValueFactory f = store.getValueFactory();
+        final BigdataValueFactory f = store.getValueFactory();
 
-            // Add some data.
-            {
+        // Add some data.
+        {
 
-                final BigdataStatement[] stmts = new BigdataStatement[] {//
+            final BigdataStatement[] stmts = new BigdataStatement[] {//
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person.toString()),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person.toString()),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Mike"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Mike"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Bryan"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Bryan"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/DC"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("DC"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/DC"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("DC"), null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                };
-
-                final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
-                        store, 10/* capacity */);
-
-                for(BigdataStatement stmt : stmts) {
-                
-                    buf.add(stmt);
-                    
-                }
-                
-                // write on the database.
-                buf.flush();
-                
-            }
-
-            final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
-
-            final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
-
-            final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
-                    .toString());
-
-            final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
-
-            final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
-
-            final BigdataLiteral mikeLabel = f.createLiteral("Mike");
-
-            final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
-
-            final BigdataValue[] values = new BigdataValue[] { rdfType,
-                    rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
-                    bryanLabel };
-
-            // resolve IVs.
-            store.getLexiconRelation()
-                    .addTerms(values, values.length, true/* readOnly */);
-            
-            /*
-             * Build up the AST for the query.
-             */
-            QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
-            {
-
-                final VarNode o = new VarNode("o");
-
-                final VarNode x = new VarNode("x");
-
-                final ConstantNode rdfsLabelConst = new ConstantNode(
-                        rdfsLabel.getIV());
-
-                final ConstantNode rdfTypeConst = new ConstantNode(
-                        rdfType.getIV());
-
-                final ConstantNode foafPersonConst = new ConstantNode(
-                        foafPerson.getIV());
-
-                queryRoot.setQueryHints(new Properties());
-
-                final NamedSubqueryRoot namedSubqueryRoot;
-                {
-
-                    final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
-
-                    queryRoot.setNamedSubqueries(namedSubqueries);
-
-                    namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
-                            "%namedSet1");
-                    
-                    namedSubqueries.add(namedSubqueryRoot);
-
-                    final ProjectionNode projection2 = new ProjectionNode();
-                    projection2.addProjectionVar(x);
-                    namedSubqueryRoot.setProjection(projection2);
-
-                    final JoinGroupNode whereClause2 = new JoinGroupNode();
-                    namedSubqueryRoot.setWhereClause(whereClause2);
-
-                    whereClause2.addChild(new StatementPatternNode(x,
-                            rdfTypeConst, foafPersonConst, null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-
-                }
-                
-                {
-
-                    final ProjectionNode projection = new ProjectionNode();
-                    projection.addProjectionVar(x);
-                    projection.addProjectionVar(o);
-                    queryRoot.setProjection(projection);
-
-                    final JoinGroupNode whereClause = new JoinGroupNode();
-                    queryRoot.setWhereClause(whereClause);
-
-                    whereClause.addChild(new StatementPatternNode(x, rdfsLabelConst,
-                            o, null/* c */,
-                            StatementPattern.Scope.DEFAULT_CONTEXTS));
-
-                    final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
-                            "%namedSet1");
-                    includeNode.setJoinVars(new VarNode[] {x}); // NO JOIN VARS!
-                    whereClause.addChild(includeNode);
-
-                }
-            
-            }
-            
-            if(log.isInfoEnabled())
-                log.info("AST: " + queryRoot);
-
-            final Properties queryHints = queryRoot.getQueryHints();
-
-            final AtomicInteger idFactory = new AtomicInteger(0);
-            
-            final QueryEngine queryEngine = QueryEngineFactory
-                    .getQueryController(store.getIndexManager());
-
-            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
-
-            // run optimizer for named subqueries.
-            queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
-                    ctx, queryRoot, null/* bindingSet */);
-
-            // Generate the query plan.
-            final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
-
-            if(log.isInfoEnabled())
-                log.info("plan:\n" + BOpUtility.toString(queryPlan));
-
-            final IBindingSet[] expected = new IBindingSet[] {
-                    new ListBindingSet(//
-                            new IVariable[] { Var.var("x"), Var.var("o") },//
-                            new IConstant[] { new Constant(mikeURI.getIV()),
-                                    new Constant(mikeLabel.getIV()) }),//
-                    new ListBindingSet(//
-                            new IVariable[] { Var.var("x"), Var.var("o") },//
-                            new IConstant[] { new Constant(bryanURI.getIV()),
-                                    new Constant(bryanLabel.getIV()) }),//
-           // { x=TermId(1U), o=TermId(3L) }
-            // { x=TermId(2U), o=TermId(4L) }
             };
-            assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
-        } finally {
+            final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
+                    store, 10/* capacity */);
 
-            store.__tearDownUnitTest();
-            
+            for (BigdataStatement stmt : stmts) {
+
+                buf.add(stmt);
+
+            }
+
+            // write on the database.
+            buf.flush();
+
         }
+
+        final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
+
+        final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
+
+        final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
+                .toString());
+
+        final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
+
+        final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
+
+        final BigdataLiteral mikeLabel = f.createLiteral("Mike");
+
+        final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
+
+        final BigdataValue[] values = new BigdataValue[] { rdfType, rdfsLabel,
+                foafPerson, mikeURI, bryanURI, mikeLabel, bryanLabel };
+
+        // resolve IVs.
+        store.getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+
+        /*
+         * Build up the AST for the query.
+         */
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        {
+
+            final VarNode o = new VarNode("o");
+
+            final VarNode x = new VarNode("x");
+
+            final ConstantNode rdfsLabelConst = new ConstantNode(
+                    rdfsLabel.getIV());
+
+            final ConstantNode rdfTypeConst = new ConstantNode(rdfType.getIV());
+
+            final ConstantNode foafPersonConst = new ConstantNode(
+                    foafPerson.getIV());
+
+            queryRoot.setQueryHints(new Properties());
+
+            final NamedSubqueryRoot namedSubqueryRoot;
+            {
+
+                final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+
+                queryRoot.setNamedSubqueries(namedSubqueries);
+
+                namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
+                        "%namedSet1");
+
+                namedSubqueries.add(namedSubqueryRoot);
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(x);
+                namedSubqueryRoot.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                namedSubqueryRoot.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(x, rdfTypeConst,
+                        foafPersonConst, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(x);
+                projection.addProjectionVar(o);
+                queryRoot.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(x,
+                        rdfsLabelConst, o, null/* c */,
+                        StatementPattern.Scope.DEFAULT_CONTEXTS));
+
+                final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                        "%namedSet1");
+                includeNode.setJoinVars(new VarNode[] { x }); // NO JOIN VARS!
+                whereClause.addChild(includeNode);
+
+            }
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("AST: " + queryRoot);
+
+        final Properties queryHints = queryRoot.getQueryHints();
+
+        final AtomicInteger idFactory = new AtomicInteger(0);
+
+        final QueryEngine queryEngine = QueryEngineFactory
+                .getQueryController(store.getIndexManager());
+
+        final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
+
+        // run optimizer for named subqueries.
+        queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(ctx,
+                queryRoot, null/* bindingSet */);
+
+        // Generate the query plan.
+        final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
+
+        if (log.isInfoEnabled())
+            log.info("plan:\n" + BOpUtility.toString(queryPlan));
+
+        final IBindingSet[] expected = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("o") },//
+                        new IConstant[] { new Constant(mikeURI.getIV()),
+                                new Constant(mikeLabel.getIV()) }),//
+                new ListBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("o") },//
+                        new IConstant[] { new Constant(bryanURI.getIV()),
+                                new Constant(bryanLabel.getIV()) }),//
+        // { x=TermId(1U), o=TermId(3L) }
+        // { x=TermId(2U), o=TermId(4L) }
+        };
+        assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
     }
 
@@ -370,211 +353,201 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
                 + "}"//
         ;
 
-        final AbstractTripleStore store = getStore(getProperties());
+        final BigdataValueFactory f = store.getValueFactory();
 
-        try {
-        
-            final BigdataValueFactory f = store.getValueFactory();
+        // Add some data.
+        {
 
-            // Add some data.
-            {
+            final BigdataStatement[] stmts = new BigdataStatement[] {//
 
-                final BigdataStatement[] stmts = new BigdataStatement[] {//
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person.toString()),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDF.TYPE.toString()),
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDF.TYPE.toString()),
-                                f.createURI(FOAFVocabularyDecl.Person.toString()),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Mike"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Mike"),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Mike"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Mike"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/Bryan"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("Bryan"),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/Bryan"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("Bryan"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
+                    new BigdataStatementImpl(
+                            f.createURI("http://www.bigdata.com/DC"),
+                            f.createURI(RDFS.LABEL.toString()),
+                            f.createLiteral("DC"),
+                            null, // context
+                            StatementEnum.Explicit,//
+                            false// userFlag
+                    ),
 
-                        new BigdataStatementImpl(
-                                f.createURI("http://www.bigdata.com/DC"),
-                                f.createURI(RDFS.LABEL.toString()),
-                                f.createLiteral("DC"),
-                                null, // context
-                                StatementEnum.Explicit,//
-                                false// userFlag
-                        ),
-
-                };
-
-                final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
-                        store, 10/* capacity */);
-
-                for(BigdataStatement stmt : stmts) {
-                
-                    buf.add(stmt);
-                    
-                }
-                
-                // write on the database.
-                buf.flush();
-                
-            }
-
-            final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
-
-            final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
-
-            final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
-                    .toString());
-
-            final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
-
-            final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
-
-            final BigdataLiteral mikeLabel = f.createLiteral("Mike");
-
-            final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
-
-            final BigdataValue[] values = new BigdataValue[] { rdfType,
-                    rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
-                    bryanLabel };
-
-            // resolve IVs.
-            store.getLexiconRelation()
-                    .addTerms(values, values.length, true/* readOnly */);
-            
-            /*
-             * Build up the AST for the query.
-             */
-            QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
-            {
-
-                final VarNode o = new VarNode("o");
-
-                final VarNode x = new VarNode("x");
-
-                final ConstantNode rdfsLabelConst = new ConstantNode(
-                        rdfsLabel.getIV());
-
-                final ConstantNode rdfTypeConst = new ConstantNode(
-                        rdfType.getIV());
-
-                final ConstantNode foafPersonConst = new ConstantNode(
-                        foafPerson.getIV());
-
-                queryRoot.setQueryHints(new Properties());
-
-                final NamedSubqueryRoot namedSubqueryRoot;
-                {
-
-                    final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
-
-                    queryRoot.setNamedSubqueries(namedSubqueries);
-
-                    namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
-                            "%namedSet1");
-                    
-                    namedSubqueries.add(namedSubqueryRoot);
-
-                    final ProjectionNode projection2 = new ProjectionNode();
-                    projection2.addProjectionVar(x);
-                    namedSubqueryRoot.setProjection(projection2);
-
-                    final JoinGroupNode whereClause2 = new JoinGroupNode();
-                    namedSubqueryRoot.setWhereClause(whereClause2);
-
-                    whereClause2.addChild(new StatementPatternNode(x,
-                            rdfTypeConst, foafPersonConst, null/* c */,
-                            Scope.DEFAULT_CONTEXTS));
-
-                }
-                
-                {
-
-                    final ProjectionNode projection = new ProjectionNode();
-                    projection.addProjectionVar(x);
-                    projection.addProjectionVar(o);
-                    queryRoot.setProjection(projection);
-
-                    final JoinGroupNode whereClause = new JoinGroupNode();
-                    queryRoot.setWhereClause(whereClause);
-
-                    whereClause.addChild(new StatementPatternNode(x, rdfsLabelConst,
-                            o, null/* c */,
-                            StatementPattern.Scope.DEFAULT_CONTEXTS));
-
-                    final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
-                            "%namedSet1");
-                    includeNode.setJoinVars(new VarNode[] {}); // NO JOIN VARS!
-                    whereClause.addChild(includeNode);
-
-                }
-            
-            }
-            
-            if(log.isInfoEnabled())
-                log.info("AST: " + queryRoot);
-
-            final Properties queryHints = queryRoot.getQueryHints();
-
-            final AtomicInteger idFactory = new AtomicInteger(0);
-            
-            final QueryEngine queryEngine = QueryEngineFactory
-                    .getQueryController(store.getIndexManager());
-
-            final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
-
-            // run optimizer for named subqueries.
-            queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
-                    ctx, queryRoot, null/* bindingSet */);
-
-            // Generate the query plan.
-            final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
-
-            if(log.isInfoEnabled())
-                log.info("plan:\n" + BOpUtility.toString(queryPlan));
-
-            final IBindingSet[] expected = new IBindingSet[] {
-                    new ListBindingSet(//
-                            new IVariable[] { Var.var("x"), Var.var("o") },//
-                            new IConstant[] { new Constant(mikeURI.getIV()),
-                                    new Constant(mikeLabel.getIV()) }),//
-                    new ListBindingSet(//
-                            new IVariable[] { Var.var("x"), Var.var("o") },//
-                            new IConstant[] { new Constant(bryanURI.getIV()),
-                                    new Constant(bryanLabel.getIV()) }),//
-           // { x=TermId(1U), o=TermId(3L) }
-            // { x=TermId(2U), o=TermId(4L) }
             };
-            assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
-        } finally {
+            final StatementBuffer<BigdataStatement> buf = new StatementBuffer<BigdataStatement>(
+                    store, 10/* capacity */);
 
-            store.__tearDownUnitTest();
+            for(BigdataStatement stmt : stmts) {
+            
+                buf.add(stmt);
+                
+            }
+            
+            // write on the database.
+            buf.flush();
             
         }
+
+        final BigdataURI rdfType = f.createURI(RDF.TYPE.toString());
+
+        final BigdataURI rdfsLabel = f.createURI(RDFS.LABEL.toString());
+
+        final BigdataURI foafPerson = f.createURI(FOAFVocabularyDecl.Person
+                .toString());
+
+        final BigdataURI mikeURI = f.createURI("http://www.bigdata.com/Mike");
+
+        final BigdataURI bryanURI = f.createURI("http://www.bigdata.com/Bryan");
+
+        final BigdataLiteral mikeLabel = f.createLiteral("Mike");
+
+        final BigdataLiteral bryanLabel = f.createLiteral("Bryan");
+
+        final BigdataValue[] values = new BigdataValue[] { rdfType,
+                rdfsLabel, foafPerson, mikeURI, bryanURI, mikeLabel,
+                bryanLabel };
+
+        // resolve IVs.
+        store.getLexiconRelation()
+                .addTerms(values, values.length, true/* readOnly */);
+        
+        /*
+         * Build up the AST for the query.
+         */
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        {
+
+            final VarNode o = new VarNode("o");
+
+            final VarNode x = new VarNode("x");
+
+            final ConstantNode rdfsLabelConst = new ConstantNode(
+                    rdfsLabel.getIV());
+
+            final ConstantNode rdfTypeConst = new ConstantNode(
+                    rdfType.getIV());
+
+            final ConstantNode foafPersonConst = new ConstantNode(
+                    foafPerson.getIV());
+
+            queryRoot.setQueryHints(new Properties());
+
+            final NamedSubqueryRoot namedSubqueryRoot;
+            {
+
+                final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
+
+                queryRoot.setNamedSubqueries(namedSubqueries);
+
+                namedSubqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,
+                        "%namedSet1");
+                
+                namedSubqueries.add(namedSubqueryRoot);
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(x);
+                namedSubqueryRoot.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                namedSubqueryRoot.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(x,
+                        rdfTypeConst, foafPersonConst, null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+            }
+            
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(x);
+                projection.addProjectionVar(o);
+                queryRoot.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(x, rdfsLabelConst,
+                        o, null/* c */,
+                        StatementPattern.Scope.DEFAULT_CONTEXTS));
+
+                final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
+                        "%namedSet1");
+                includeNode.setJoinVars(new VarNode[] {}); // NO JOIN VARS!
+                whereClause.addChild(includeNode);
+
+            }
+        
+        }
+        
+        if(log.isInfoEnabled())
+            log.info("AST: " + queryRoot);
+
+        final Properties queryHints = queryRoot.getQueryHints();
+
+        final AtomicInteger idFactory = new AtomicInteger(0);
+        
+        final QueryEngine queryEngine = QueryEngineFactory
+                .getQueryController(store.getIndexManager());
+
+        final AST2BOpContext ctx = new AST2BOpContext(queryRoot, store);
+
+        // run optimizer for named subqueries.
+        queryRoot = (QueryRoot) new ASTNamedSubqueryOptimizer().optimize(
+                ctx, queryRoot, null/* bindingSet */);
+
+        // Generate the query plan.
+        final PipelineOp queryPlan = AST2BOpUtility.convert(ctx);
+
+        if(log.isInfoEnabled())
+            log.info("plan:\n" + BOpUtility.toString(queryPlan));
+
+        final IBindingSet[] expected = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("o") },//
+                        new IConstant[] { new Constant(mikeURI.getIV()),
+                                new Constant(mikeLabel.getIV()) }),//
+                new ListBindingSet(//
+                        new IVariable[] { Var.var("x"), Var.var("o") },//
+                        new IConstant[] { new Constant(bryanURI.getIV()),
+                                new Constant(bryanLabel.getIV()) }),//
+       // { x=TermId(1U), o=TermId(3L) }
+        // { x=TermId(2U), o=TermId(4L) }
+        };
+        assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
     }
 

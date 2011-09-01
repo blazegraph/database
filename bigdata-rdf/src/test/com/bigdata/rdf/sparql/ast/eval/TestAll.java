@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast.optimizers;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,27 +55,13 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("AST Optimizers");
+        final TestSuite suite = new TestSuite("AST Evaluation");
 
-        /*
-         * Test suite for AST rewrite which replaces a variable bound to a
-         * constant in an input solution with that constant.
-         */
-        suite.addTestSuite(TestASTBindingAssigner.class);
-        
-        // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT.
-        suite.addTestSuite(TestDescribeOptimizer.class);
-
-        // Unit tests for AST rewrite of the PROJECTION for a CONSTRUCT query.
-        suite.addTestSuite(TestDescribeOptimizer.class);
-
-        suite.addTestSuite(TestASTVariableScopeAnalysis.class);
-        
-        // Unit tests for identifying badly designed left joins.
-        suite.addTestSuite(TestBadlyDesignedLeftJoinUtil.class);
+        // Test suite for the iterator which interprets the CONSTRUCT clause.
+        suite.addTestSuite(TestASTConstructIterator.class);
         
         return suite;
-
+        
     }
-
+    
 }

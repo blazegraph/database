@@ -181,17 +181,13 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append("\n");
-        
-        sb.append(indent(indent));
-        
-        sb.append("select ");
+        sb.append("\n").append(indent(indent)).append("SELECT ");
 
         if (isDistinct())
-            sb.append("distinct ");
+            sb.append("DISTINCT ");
 
         if (isReduced())
-            sb.append("reduced ");
+            sb.append("REDUCED ");
 
         if (isWildcard()) {
 
@@ -218,25 +214,5 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         return sb.toString();
 
     }
-
-//    public boolean equals(final Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!super.equals(o))
-//            return false;
-//
-//        if (!(o instanceof ProjectionNode))
-//            return false;
-//
-//        final ProjectionNode t = (ProjectionNode) o;
-//
-//        if (distinct != t.distinct)
-//            return false;
-//
-//        return true;
-//
-//    }
 
 }

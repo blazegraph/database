@@ -312,11 +312,11 @@ abstract public class QueryBase extends QueryNodeBase {
 
         if (whereClause != null) {
 
-            sb.append("\n");
-            
-            sb.append(s);
-
-            sb.append("where\n");
+//            sb.append("\n");
+//            
+//            sb.append(s);
+//
+//            sb.append("where\n");
 
             sb.append(whereClause.toString(indent));
 
@@ -330,11 +330,7 @@ abstract public class QueryBase extends QueryNodeBase {
 
         if (having != null && !having.isEmpty()) {
 
-            sb.append("\n");
-
-            sb.append(s);
-
-            sb.append(having.toString());
+            sb.append(having.toString(indent));
 
         }
 

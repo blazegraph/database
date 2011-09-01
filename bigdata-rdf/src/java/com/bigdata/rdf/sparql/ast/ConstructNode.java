@@ -62,26 +62,18 @@ public class ConstructNode extends GroupNodeBase<StatementPatternNode> {
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append("\n");
-
-        sb.append(indent(indent));
-
-        sb.append("construct ");
-
-        boolean first = true;
+        final String s = indent(indent);
+        
+        sb.append("\n").append(s).append("CONSTRUCT {");
 
         for (StatementPatternNode v : this) {
 
-            if (first) {
-                first = false;
-            } else {
-                sb.append(". ");
-            }
-
-            sb.append(v);
+            sb.append(v.toString(indent+1));
 
         }
 
+        sb.append("\n").append(s).append("}");
+        
         return sb.toString();
 
     }

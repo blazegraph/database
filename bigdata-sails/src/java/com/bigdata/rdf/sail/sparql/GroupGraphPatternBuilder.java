@@ -42,6 +42,7 @@ import org.openrdf.query.parser.sparql.ast.ASTConstruct;
 import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
+import org.openrdf.query.parser.sparql.ast.ASTLet;
 import org.openrdf.query.parser.sparql.ast.ASTNamedSubqueryInclude;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
@@ -403,6 +404,35 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         graphPattern.add(bind);
 
         return bind;
+        
+    }
+    
+    /**
+     * A LET is just an alternative syntax for BIND
+     * 
+     * @return The {@link AssignmentNode}.
+     */
+    @Override
+    final public AssignmentNode visit(final ASTLet node, Object data)
+            throws VisitorException {
+
+        if (node.jjtGetNumChildren() != 2)
+            throw new AssertionError("Expecting two children, not "
+                    + node.jjtGetNumChildren() + ", node=" + node.dump(">>>"));
+
+        final ValueExpressionNode ve = (ValueExpressionNode) node
+                .jjtGetChild(1).jjtAccept(this, data);
+
+        final Node aliasNode = node.jjtGetChild(0);
+
+        final String alias = ((ASTVar) aliasNode).getName();
+
+        final AssignmentNode bind = new AssignmentNode(new VarNode(alias), ve);
+
+        graphPattern.add(bind);
+
+        return bind;
+
     }
     
     /**

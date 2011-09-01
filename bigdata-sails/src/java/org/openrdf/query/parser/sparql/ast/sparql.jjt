@@ -228,11 +228,9 @@ TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
 {
     <INCLUDE: "include">
 |   <JOIN_ON: "join on">
-}
-
-TOKEN [IGNORE_CASE] :	// Bigdata extension specific tokens
-{
-	<VAR3: "%" <VARNAME>>
+|   <LET: "let">
+|	<ASSIGN: ":=">
+| 	<VAR3: "%" <VARNAME>>
 }
 
 TOKEN [IGNORE_CASE] :	// SPARQL 1.1 Update-specific tokens
@@ -576,6 +574,8 @@ void FilterOrBind() #void :
     NamedSubqueryInclude()
     | 
     Bind()
+    |
+    Let() 
 }
 
 void NamedSubqueryInclude() :
@@ -1407,6 +1407,13 @@ void Bind() :
 {}
 {
 	<BIND> <LPAREN> Expression() <AS> Var() <RPAREN>
+}
+
+// LET ( ?x := expr ) is an alternative for BIND( expr AS ?x). They do the same thing.
+void Let() :
+{}
+{
+	<LET> <LPAREN> Var() <ASSIGN> Expression() <RPAREN>
 }
 
 void RegexExpression() :

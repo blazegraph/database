@@ -215,4 +215,5 @@ public class TestASTBindingAssigner extends TestCase2 {
         assertEquals(expected, actual);
 
     }
+
 }
