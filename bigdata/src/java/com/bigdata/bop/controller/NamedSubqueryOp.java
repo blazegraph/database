@@ -51,6 +51,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.HashJoinUtility;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -385,8 +386,13 @@ public class NamedSubqueryOp extends PipelineOp {
                     // Will support incremental eviction and persistence.
                     solutions = HTree.create(store, metadata);
 
-                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
-                        throw new AssertionError();
+                    /*
+                     * Note: This is done once the subquery has been run so we
+                     * can checkpoint the HTree first and put the read-only
+                     * reference on the attribute.
+                     */ 
+//                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
+//                        throw new AssertionError();
 
                     this.first = true;
                     
@@ -447,6 +453,30 @@ public class NamedSubqueryOp extends PipelineOp {
         }
 
         /**
+         * Checkpoint the {@link HTree} containing the results of the subquery,
+         * re-load the {@link HTree} in a read-only mode from that checkpoint
+         * and then set the reference to the read-only view of the {@link HTree}
+         * on the {@link IQueryAttributes}. This exposes a view of the
+         * {@link HTree} which is safe for concurrent readers.
+         */
+        private void saveSolutionSet() {
+            
+            // Checkpoint the HTree.
+            final Checkpoint checkpoint = solutions.writeCheckpoint2();
+            
+            // Get a read-only view of the HTree.
+            final HTree readOnly = HTree.load(solutions.getStore(),
+                    checkpoint.getCheckpointAddr(), true/* readOnly */);
+
+            final IQueryAttributes attrs = context.getRunningQuery()
+                    .getAttributes();
+
+            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
+                throw new AssertionError();
+
+        }
+        
+        /**
          * Run a subquery.
          */
         private class SubqueryTask implements Callable<Void> {
@@ -506,11 +536,14 @@ public class NamedSubqueryOp extends PipelineOp {
 
                         // Report the #of solutions in the named solution set.
                         stats.solutionSetSize.addAndGet(ncopied);
-                        
+
+                        // Publish the solution set on the query context.
+                        saveSolutionSet();
+
                         if (log.isInfoEnabled())
                             log.info("Solution set " + namedSetRef + " has "
                                     + ncopied + " solutions.");
-
+                        
 					} catch (InterruptedException ex) {
 
 						// this thread was interrupted, so cancel the subquery.
