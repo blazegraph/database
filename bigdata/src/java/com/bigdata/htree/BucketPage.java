@@ -818,7 +818,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			if (!hasNext())
 				throw new NoSuchElementException();
 			// Copy the data for the current tuple into the Tuple buffer.
-			tuple.copy(nextNonEmptySlot, data);
+			tuple.copy(nextNonEmptySlot, BucketPage.this);
 			/*
 			 * Advance to the next slot on the current page. if there is non,
 			 * then the current page reference will be cleared and we will need
