@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.optimizers;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,32 +55,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("AST");
+        final TestSuite suite = new TestSuite("AST Optimizers");
 
-        suite.addTestSuite(TestAST.class);
-
-        suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());
+        /*
+         * Test suite for AST rewrite which replaces a variable bound to a
+         * constant in an input solution with that constant.
+         */
+        suite.addTestSuite(TestASTBindingAssigner.class);
         
-        // Unit tests for DESCRIBE query.
-//        suite.addTestSuite(TestDescribeQuery.class);
-//
-//        // Unit tests for CONSTRUCT query.
-//        suite.addTestSuite(TestConstructQuery.class);
-
-        // Unit tests for query evaluation written to the AST layer.
-        suite.addTestSuite(TestASTTriplesModeEvaluation.class);
-
-        // Unit tests for sub-query evaluation.
-        suite.addTestSuite(TestASTSPARQL11SubqueryEvaluation.class);
-
-        // Unit tests for named solution set references.
-        suite.addTestSuite(TestNamedSolutionSetRef.class);
-        
-        // Unit tests for sub-query evaluation.
-        suite.addTestSuite(TestASTNamedSubqueryEvaluation.class);
-        
-        // Unit tests for EXISTS sub-query evaluation.
-        suite.addTestSuite(TestASTExistsSubqueryEvaluation.class);
+        // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT idiom.
+        suite.addTestSuite(TestDescribeOptimizer.class);
         
         return suite;
         

@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.btree.Tuple;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 
 /**
  * Base class with some common methods for mutable and copy-on-write {@link BOp}
@@ -93,6 +94,35 @@ abstract public class CoreBaseBOp implements BOp {
         }
     }
 
+    /**
+     * General contract is a short (non-recursive) representation of the
+     * {@link BOp}.
+     */
+    public String toShortString() {
+        final BOp t = this;
+        if (t instanceof IValueExpression<?>
+                || t instanceof IValueExpressionNode) {
+            /*
+             * Note: toString() is intercepted for a few bops, mainly those with
+             * a pretty simple structure. This delegates to toString() in those
+             * cases.
+             */
+            return t.toString();
+        } else {
+            final StringBuilder sb = new StringBuilder();
+            sb.append(t.getClass().getSimpleName());
+            final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
+            if (tid != null) {
+                sb.append("[" + tid + "]");
+            }
+            return sb.toString();
+        }
+    }
+    
+    /**
+     * Return a non-recursive representation of the arguments and annotations
+     * for this {@link BOp}.
+     */
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
@@ -109,16 +139,10 @@ abstract public class CoreBaseBOp implements BOp {
             final BOp t = itr.next();
             if (nwritten > 0)
                 sb.append(',');
-            if(t == null) {
+            if (t == null) {
                 sb.append("<null>");
-            } else if (t instanceof IValueExpression<?>) {
-                sb.append(t.toString());
             } else {
-                sb.append(t.getClass().getSimpleName());
-                final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
-                if (tid != null) {
-                    sb.append("[" + tid + "]");
-                }
+                sb.append(t.toShortString());
             }
             nwritten++;
         }

@@ -296,10 +296,10 @@ public class QueryEngineFactory {
      */
     private static class FederatedQueryController extends FederatedQueryEngine {
 
-        /** The local persistence store for the {@link #queryEngine}. */
+        /** The local persistence store for the query engine. */
         final Journal queryEngineStore;
 
-        /** The local {@link ResourceService} for the {@link #queryEngine}. */
+        /** The local {@link ResourceService} for the query engine. */
         final ManagedResourceService queryEngineResourceService;
 
         /**

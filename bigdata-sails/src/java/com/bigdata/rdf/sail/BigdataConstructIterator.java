@@ -24,6 +24,9 @@ import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
+/**
+ * @deprecated by the AST integration.
+ */
 public class BigdataConstructIterator implements
         CloseableIteration<Statement, QueryEvaluationException> {
     private final BigdataStatementIterator stmtIt;

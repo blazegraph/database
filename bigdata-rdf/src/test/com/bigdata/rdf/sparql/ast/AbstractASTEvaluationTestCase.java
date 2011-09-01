@@ -31,6 +31,8 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -95,6 +97,20 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         lts.create();
 
         return lts;
+
+    }
+
+    protected void assertSameAST(final IQueryNode expected, final IQueryNode actual) {
+
+        if (!expected.equals(actual)) {
+
+            log.error("expected: "+BOpUtility.toString((BOp) expected));
+            log.error("actual  : "+BOpUtility.toString((BOp) actual));
+            
+            fail("expected:\n" + BOpUtility.toString((BOp) expected)
+                    + "\nactual:\n" + BOpUtility.toString((BOp) actual));
+
+        }
 
     }
 

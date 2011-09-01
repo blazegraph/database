@@ -23,8 +23,13 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
     }
 
-//    private final List<E> children;
-	
+    /**
+     * Note: Uses the default for the "optional" annotation.
+     */
+    protected GroupNodeBase() {
+        
+    }
+
 	protected GroupNodeBase(final boolean optional) {
 		
 		setOptional( optional );
@@ -90,26 +95,6 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 	    
 	}
 	
-//    public boolean equals(final Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!(o instanceof GroupNodeBase))
-//            return false;
-//
-//        final GroupNodeBase<?> t = (GroupNodeBase<?>) o;
-//
-//        if (optional != t.optional)
-//            return false;
-//
-//        if (!children.equals(t.children))
-//            return false;
-//        
-//        return true;
-//
-//    }
-
     /**
      * {@inheritDoc}
      * <p>

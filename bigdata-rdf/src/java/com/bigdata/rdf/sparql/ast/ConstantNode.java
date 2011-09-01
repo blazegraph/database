@@ -41,4 +41,11 @@ public class ConstantNode extends TermNode {
 		
 	}
 	
+    @Override
+    public String toString() {
+
+        return "ConstantNode(" + getValueExpression().get() + ")";
+
+    }
+
 }

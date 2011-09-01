@@ -49,10 +49,6 @@ public class OrderByExpr extends ASTBase {
         
     }
     
-//	private final IValueExpressionNode ve;
-	
-//	private final boolean ascending;
-	
     public OrderByExpr(final IValueExpressionNode ve, final boolean ascending) {
 
         super(new BOp[] { (BOp) ve }, null/* anns */);
@@ -85,48 +81,27 @@ public class OrderByExpr extends ASTBase {
 
     }
 
-    public String toString() {
-
-        final StringBuilder sb = new StringBuilder();
-
-        final boolean ascending = isAscending();
-        
-        if (!ascending) {
-
-            sb.append("desc(");
-            
-        }
-
-        sb.append(getValueExpressionNode().toString());
-
-        if (!ascending) {
-            
-            sb.append(")");
-            
-        }
-
-        return sb.toString();
-
-    }
-
-//    @Override
-//    public boolean equals(final Object o) {
+//    public String toString() {
 //
-//        if (this == o)
-//            return true;
+//        final StringBuilder sb = new StringBuilder();
 //
-//        if (!(o instanceof OrderByExpr))
-//            return false;
-//
-//        final OrderByExpr t = (OrderByExpr) o;
-//
-//        if (ascending != t.ascending)
-//            return false;
-//
-//        if (!ve.equals(t.ve))
-//            return false;
+//        final boolean ascending = isAscending();
 //        
-//        return true;
+//        if (!ascending) {
+//
+//            sb.append("desc(");
+//            
+//        }
+//
+//        sb.append(getValueExpressionNode().toString());
+//
+//        if (!ascending) {
+//            
+//            sb.append(")");
+//            
+//        }
+//
+//        return sb.toString();
 //
 //    }
 

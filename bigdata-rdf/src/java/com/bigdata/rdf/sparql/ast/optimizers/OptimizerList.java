@@ -22,67 +22,60 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 24, 2011
+ * Created on Sep 1, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.optimizers;
+
+import java.util.LinkedList;
+
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 
 /**
- * A template for the construction of one or more graphs based on the solutions
- * projected by a query.
+ * An executable list of query optimizers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ConstructNode extends GroupNodeBase<StatementPatternNode> {
+public class OptimizerList extends LinkedList<IASTOptimizer> implements
+        IASTOptimizer {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public ConstructNode() {
-        super();
+    public OptimizerList() {
+        
     }
 
-    @Override
-    public IGroupNode<StatementPatternNode> addChild(
-            final StatementPatternNode child) {
-
-        if (!(child instanceof StatementPatternNode))
-            throw new UnsupportedOperationException();
+    public boolean add(final IASTOptimizer opt) {
         
-        super.addChild(child);
+        if(opt == null)
+            throw new IllegalArgumentException();
         
-        return this;
+        if(opt == this)
+            throw new IllegalArgumentException();
+        
+        return super.add(opt);
+        
     }
-    
-    @Override
-    public String toString(final int indent) {
 
-        final StringBuilder sb = new StringBuilder();
+    /**
+     * Run all the optimizers in the list.
+     */
+    public IQueryNode optimize(final AST2BOpContext context,
+            IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-        sb.append("\n");
+        for (IASTOptimizer opt : this) {
 
-        sb.append(indent(indent));
-
-        sb.append("construct ");
-
-        boolean first = true;
-
-        for (StatementPatternNode v : this) {
-
-            if (first) {
-                first = false;
-            } else {
-                sb.append(". ");
-            }
-
-            sb.append(v);
+            queryNode = opt.optimize(context, queryNode, bindingSets);
 
         }
 
-        return sb.toString();
+        return queryNode;
 
     }
 

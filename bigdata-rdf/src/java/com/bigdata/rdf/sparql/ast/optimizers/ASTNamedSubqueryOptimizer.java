@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 30, 2011
  */
 
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -37,6 +37,14 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 import cutthecrap.utils.striterators.Striterator;
 

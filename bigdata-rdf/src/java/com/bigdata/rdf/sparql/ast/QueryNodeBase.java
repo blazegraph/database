@@ -40,7 +40,8 @@ public abstract class QueryNodeBase extends ASTBase implements
     @Override
     public final String toString() {
 
-        return toString(0/* indent */);
+        return super.toString(); 
+//        return toString(0/* indent */);
         
     }
 
