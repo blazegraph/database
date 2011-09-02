@@ -30,6 +30,24 @@ import com.bigdata.rdf.sail.QueryType;
  */
 public class SubqueryRoot extends SubqueryBase {
 
+    public interface Annotations extends SubqueryBase.Annotations {
+        
+        /**
+         * Annotation provides a query hint that the subquery should be
+         * transformed into a named subquery, lifting its evaluation out of the
+         * main body of the query and replacing the subquery with an INCLUDE.
+         * 
+         * FIXME This annotation is not yet interpreted by anything. Another way
+         * to handle this would be to pair the {@link NamedSubqueryRoot} and the
+         * {@link NamedSubqueryInclude} together where the {@link SubqueryRoot}
+         * appears such that we do the work only once.
+         */
+        String RUN_ONCE = "runOnce";
+        
+        boolean DEFAULT_RUN_ONCE = false;
+        
+    }
+    
     /**
      * 
      */
@@ -47,4 +65,14 @@ public class SubqueryRoot extends SubqueryBase {
 
     }
 
+    public void setRunOnce(boolean runOnce) {
+        setProperty(Annotations.RUN_ONCE,runOnce);
+    }
+
+    public boolean isRunOnce() {
+
+        return getProperty(Annotations.RUN_ONCE, Annotations.DEFAULT_RUN_ONCE);
+        
+    }
+    
 }

@@ -36,7 +36,6 @@ import org.openrdf.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 
 /**
@@ -177,6 +176,7 @@ public class DefaultOptimizerList extends OptimizerList {
          * FIXME If a subquery does not share ANY variables which MUST be bound
          * in the parent's context then rewrite the subquery into a
          * named/include pattern so it will run exactly once.
+         * {@link SubqueryRoot.Annotations#RUN_ONCE}.
          */
         add(new ASTSubqueryVariableScopeRewrite());
         

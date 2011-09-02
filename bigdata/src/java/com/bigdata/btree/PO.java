@@ -202,10 +202,10 @@ abstract public class PO implements IIdentityAccess, IDirty {
             
         }
         
-        return ws.substring(0, height * 4);
+        return ws.substring(0, Math.min(ws.length(), height * 4));
 
     }
 
-    private static final transient String ws = "                                                                                                                                                                                                                  ";
+    private static final transient String ws = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
 
 }

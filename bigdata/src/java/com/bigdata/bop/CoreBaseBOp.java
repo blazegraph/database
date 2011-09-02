@@ -377,6 +377,8 @@ abstract public class CoreBaseBOp implements BOp {
     /**
      * Returns a string that may be used to indent a dump of the nodes in the
      * tree.
+     * <p>
+     * Note: The string is capped out after a maximum supported depth.
      * 
      * @param depth
      *            The indentation depth.
@@ -391,10 +393,10 @@ abstract public class CoreBaseBOp implements BOp {
 
         }
 
-        return ws.substring(0, depth *2);
+        return ws.substring(0, Math.min(ws.length(), depth * 2));
 
     }
 
-    private static final transient String ws = "                                                                                                                                                                                                                  ";
+    private static final transient String ws = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
 
 }
