@@ -130,6 +130,11 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         if (value == null)
             throw new IllegalArgumentException();
 
+        if(value instanceof IConstant<?>) {
+            // Recursive nesting of Constant is not allowed.
+            throw new IllegalArgumentException();
+        }
+        
         this.value = value;
 
     }
@@ -147,6 +152,11 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
         if (value == null)
             throw new IllegalArgumentException();
 
+        if(value instanceof IConstant<?>) {
+            // Recursive nesting of Constant is not allowed.
+            throw new IllegalArgumentException();
+        }
+
         this.value = value;
 
     }
@@ -161,6 +171,15 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
     }
 
     public String toString() {
+        
+        final IVariable<E> var = (IVariable<E>) getProperty(Annotations.VAR);
+
+        if(var != null) {
+            
+            // A constant which is really an as-bound variable.
+            return value.toString() + "[var=" + var + "]";
+            
+        }
         
         return value.toString();
         

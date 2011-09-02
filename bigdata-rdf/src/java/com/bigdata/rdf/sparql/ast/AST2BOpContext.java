@@ -68,7 +68,9 @@ public class AST2BOpContext implements IdFactory {
      * on the native heap (assuming that the query is not of such obvious low
      * cardinality that the JVM heap version will do better).
      */
-    boolean nativeDistinct = false;
+    boolean nativeDistinct = true;
+
+    private int varIdFactory = 0;
 
     /**
      * 
@@ -110,14 +112,18 @@ public class AST2BOpContext implements IdFactory {
 
     /**
      * 
-     * @param queryRoot The root of the query.
-     * @param db The KB instance.
+     * @param queryRoot
+     *            The root of the query.
+     * @param db
+     *            The KB instance.
      * 
      *            TODO We should be passing in the {@link IIndexManager} rather
      *            than the {@link AbstractTripleStore} in order to support cross
      *            kb queries. The AST can be annotated with the namespace of the
      *            default KB instance, which can then be resolved from the
-     *            {@link IIndexManager}.
+     *            {@link IIndexManager}. This would also allow us to clear up
+     *            the [lex] namespace parameter to the {@link FunctionNode} and
+     *            {@link FunctionRegistry}.
      */
     public AST2BOpContext(final QueryRoot queryRoot,
             final AbstractTripleStore db) {
@@ -186,6 +192,21 @@ public class AST2BOpContext implements IdFactory {
     public String getLexiconNamespace() {
 
         return db.getLexiconRelation().getNamespace();
+
+    }
+
+    /**
+     * Create a new variable name which is unique within the scope of this
+     * {@link AST2BOpContext}.
+     * 
+     * @param prefix
+     *            The prefix.  The general pattern for a prefix is "-foo-".
+     *            
+     * @return The unique name.
+     */
+    public final String createVar(final String prefix) {
+
+        return prefix + (varIdFactory++);
 
     }
 

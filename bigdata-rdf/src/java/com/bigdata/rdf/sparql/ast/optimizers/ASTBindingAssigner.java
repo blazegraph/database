@@ -28,7 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Iterator;
-import java.util.Stack;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -36,11 +37,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.INodeOrAttribute;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -55,11 +55,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO Other optimizations are possible when the {@link IBindingSet}[]
- *          has multiple solutions. In particular, the possible values which a
- *          variable may take on can be written into an IN constraint and
- *          associated with the query in the appropriate scope.
  */
 public class ASTBindingAssigner implements IASTOptimizer {
 
@@ -90,10 +85,14 @@ public class ASTBindingAssigner implements IASTOptimizer {
         if (whereClause == null)
             return queryNode;
 
-        final Stack<INodeOrAttribute> stack = new Stack<INodeOrAttribute>();
-
-        final Iterator<BOp> itr = BOpUtility.preOrderIterator(
-                (BOp) whereClause, stack);
+        /*
+         * Gather the VarNodes for variables which have bindings.
+         */
+        
+        final Map<VarNode,ConstantNode> replacements = new LinkedHashMap<VarNode, ConstantNode>();
+        
+        final Iterator<BOp> itr = BOpUtility
+                .preOrderIterator((BOp) whereClause);
 
         while (itr.hasNext()) {
 
@@ -104,6 +103,9 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
             final VarNode varNode = (VarNode) node;
 
+            if(replacements.containsKey(varNode))
+                continue;
+            
             final IVariable<IV> var = varNode.getValueExpression();
 
             if (bset.isBound(var)) {
@@ -115,25 +117,42 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
                 final IV asBound = (IV) bset.get(var).get();
 
-                if (log.isInfoEnabled())
-                    log.info("Replacing: var=" + var + " with " + asBound
-                            + " (" + asBound.getClass() + ")");
-
                 final ConstantNode constNode = new ConstantNode(
                         new Constant<IV>(var, asBound));
 
-//                varNode.setValueExpression(new Constant<IV>(var, asBound));
+                if (log.isInfoEnabled())
+                    log.info("Will replace: var=" + var + " with " + asBound
+                            + " (" + constNode + ")");
 
-                final INodeOrAttribute x = stack.peek();
-
-                x.getNode();
-                
-                // FIXME replace varNode on parent with constNode.
-                ASTUtil.replaceWith(x.getNode(), varNode,constNode);
+                replacements.put(varNode, constNode);
                 
             }
 
         }
+
+        int ntotal = 0;
+        
+        for(Map.Entry<VarNode, ConstantNode> e : replacements.entrySet()) {
+
+            final VarNode oldVal = e.getKey();
+            final ConstantNode newVal = e.getValue();
+
+            final int nmods = ((ASTBase) whereClause).replaceAllWith(oldVal,
+                    newVal);
+
+            if (log.isInfoEnabled())
+                log.info("Replaced " + nmods + " instances of " + oldVal
+                        + " with " + newVal);
+
+            assert nmods > 0; // Failed to replace something.
+
+            ntotal += nmods;
+            
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Replaced " + ntotal + " instances of "
+                    + replacements.size() + " bound variables with constants");
 
         return queryNode;
 

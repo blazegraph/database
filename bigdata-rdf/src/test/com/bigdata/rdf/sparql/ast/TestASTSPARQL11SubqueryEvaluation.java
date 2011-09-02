@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -244,9 +243,10 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
             {
 
                 final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
                 projection.addProjectionVar(x);
                 projection.addProjectionVar(o);
-                queryRoot.setProjection(projection);
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 queryRoot.setWhereClause(whereClause);
@@ -278,10 +278,6 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
         if(log.isInfoEnabled())
             log.info("AST: " + queryRoot);
 
-        final Properties queryHints = queryRoot.getQueryHints();
-
-        final AtomicInteger idFactory = new AtomicInteger(0);
-        
         final QueryEngine queryEngine = QueryEngineFactory
                 .getQueryController(store.getIndexManager());
 

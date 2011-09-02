@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 
 /**
@@ -149,6 +151,14 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     }
 
     /**
+     * Invoked automatically any time a mutation operation occurs. The default
+     * implementation is a NOP.
+     */
+    protected void mutation() {
+        // NOP
+    }
+    
+    /**
      * Replace the value of the argument at the specified index (destructive
      * mutation).
      * 
@@ -166,6 +176,8 @@ public class ModifiableBOpBase extends CoreBaseBOp {
 
         args.set(index, newArg);
 
+        mutation();
+        
         return this;
 
     }
@@ -182,6 +194,8 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         
         args.add(newArg);
         
+        mutation();
+        
     }
 
     /**
@@ -192,8 +206,13 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      */
     public void addArgIfAbsent(final BOp arg) {
         
-        if(!args.contains(arg))
+        if(!args.contains(arg)) {
+
             args.add(arg);
+         
+            mutation();
+
+        }
         
     }
     
@@ -207,8 +226,52 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      */
     public boolean removeArg(final BOp arg) {
         
-        return args.remove(arg);
+        if (args.remove(arg)) {
+         
+            mutation();
+            
+            return true;
+            
+        }
+
+        return false;
         
+    }
+    
+    /**
+     * Replace a child of a node with another reference (destructive
+     * modification). All arguments which point to the oldChild will be replaced
+     * by references to the newChild.
+     * 
+     * @param oldChild
+     * @param newChild
+     * 
+     * @return The #of references which were replaced.
+     */
+    public int replaceWith(final BOp oldChild, final BOp newChild) {
+
+        final ModifiableBOpBase p = this;
+
+        final int arity = p.arity();
+
+        int nmods = 0;
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = p.get(i);
+
+            if (child == oldChild) {
+
+                ((ModifiableBOpBase) p).setArg(i, newChild);
+
+                nmods++;
+
+            }
+
+        }
+
+        return nmods;
+
     }
     
     public int arity() {
@@ -218,11 +281,183 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     }
 
     /**
-     * The list of arguments (aka children) of this node.
+     * An unmodifiable view of the list of arguments (aka children) of this
+     * node.
+     * <p>
+     * Note: The view is not modifiable in order to preserve the contract that
+     * {@link #mutation()} will be invoked if there is change in the state of
+     * this {@link BOp}.
      */
     final public List<BOp> args() {
 
-        return args;
+        return new NotifyingList<BOp>(this);
+        
+    }
+    
+    /**
+     * Class provides notice on mutation events.
+     */
+    static private class NotifyingList<T> implements List<T> {
+        
+        private final ModifiableBOpBase bop;
+        
+        private final List<T> delegate;
+        
+        NotifyingList(final ModifiableBOpBase bop) {
+            this(bop,(List)bop.args);
+        }
+
+        NotifyingList(final ModifiableBOpBase bop, final List<T> subList) {
+            this.bop = bop;
+            this.delegate = subList;
+        }
+
+        private boolean mutation(boolean modified) {
+            if(modified) {
+                bop.mutation();
+            }
+            return modified;
+        }
+        public int size() {
+            return delegate.size();
+        }
+        public boolean isEmpty() {
+            return delegate.isEmpty();
+        }
+        public boolean contains(Object o) {
+            return delegate.contains(o);
+        }
+
+        public Iterator<T> iterator() {
+            return new NotifyingListIterator<T>(bop, delegate.listIterator());
+        }
+        public Object[] toArray() {
+            return delegate.toArray();
+        }
+        public <T> T[] toArray(T[] a) {
+            return delegate.toArray(a);
+        }
+        public boolean add(T e) {
+            return mutation(delegate.add(e));
+        }
+        public boolean remove(Object o) {
+            return mutation(delegate.remove(o));
+        }
+        public boolean containsAll(Collection<?> c) {
+            return delegate.containsAll(c);
+        }
+        public boolean addAll(Collection<? extends T> c) {
+            return mutation (delegate.addAll(c));
+        }
+        public boolean addAll(int index, Collection<? extends T> c) {
+            return mutation(delegate.addAll(index, c));
+        }
+        public boolean removeAll(Collection<?> c) {
+            return mutation(delegate.removeAll(c));
+        }
+        public boolean retainAll(Collection<?> c) {
+            return mutation(delegate.retainAll(c));
+        }
+        public void clear() {
+            delegate.clear();
+            bop.mutation();
+        }
+        public boolean equals(Object o) {
+            return delegate.equals(o);
+        }
+        public int hashCode() {
+            return delegate.hashCode();
+        }
+        public T get(int index) {
+            return delegate.get(index);
+        }
+        public T set(int index, T element) {
+            final T ret = delegate.set(index, element);
+            bop.mutation();
+            return ret;
+        }
+        public void add(int index, T element) {
+            delegate.add(index, element);
+            bop.mutation();
+        }
+        public T remove(int index) {
+            final T ret = delegate.remove(index);
+            bop.mutation();
+            return ret;
+        }
+        public int indexOf(Object o) {
+            return delegate.indexOf(o);
+        }
+        public int lastIndexOf(Object o) {
+            return delegate.lastIndexOf(o);
+        }
+        public ListIterator<T> listIterator() {
+            return new NotifyingListIterator<T>(bop, delegate.listIterator());
+        }
+        public ListIterator<T> listIterator(int index) {
+            return new NotifyingListIterator<T>(bop, delegate.listIterator(index));
+        }
+
+        public List<T> subList(int fromIndex, int toIndex) {
+            return new NotifyingList<T>(bop, delegate.subList(fromIndex,
+                    toIndex));
+        }
+
+    }
+
+    /**
+     * Iterator with mutation notify pattern.
+     */
+    private static class NotifyingListIterator<T> implements ListIterator<T> {
+
+        private final ModifiableBOpBase bop;
+
+        private final ListIterator<T> delegate;
+
+        NotifyingListIterator(ModifiableBOpBase bop,
+                ListIterator<T> listIterator) {
+            this.bop = bop;
+            this.delegate = listIterator;
+        }
+
+        public boolean hasNext() {
+            return delegate.hasNext();
+        }
+
+        public T next() {
+            return delegate.next();
+        }
+
+        public boolean hasPrevious() {
+            return delegate.hasPrevious();
+        }
+
+        public T previous() {
+            return delegate.previous();
+        }
+
+        public int nextIndex() {
+            return delegate.nextIndex();
+        }
+
+        public int previousIndex() {
+            return delegate.previousIndex();
+        }
+
+        public void remove() {
+            delegate.remove();
+            bop.mutation();
+        }
+
+        public void set(T e) {
+            delegate.set(e);
+            bop.mutation();
+        }
+
+        public void add(T e) {
+            delegate.add(e);
+            bop.mutation();
+        }
         
     }
 
@@ -233,8 +468,8 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      */
     final public Iterator<BOp> argIterator() {
         
-        return args.iterator();
-        
+        return new NotifyingList<BOp>(this, args).iterator();
+
     }
 
     // shallow copy
@@ -305,9 +540,12 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     public ModifiableBOpBase setProperty(final String name, final Object value) {
 
         if (value == null) {
-            annotations.remove(name);
+            if (annotations.remove(name) != null) {
+                mutation();
+            }
         } else {
             annotations.put(name, value);
+            mutation();
         }
 
         return this;
@@ -355,7 +593,11 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         if (name == null)
             throw new IllegalArgumentException();
 
-        annotations.remove(name);
+        if (annotations.remove(name) != null) {
+
+            mutation();
+            
+        }
         
         return this;
 

@@ -1,6 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
@@ -25,9 +25,7 @@ public class ConstantNode extends TermNode {
 	
 	public ConstantNode(final IConstant<IV> val) {
 		
-		super(BOpBase.NOARGS, null);
-		
-		setValueExpression(val);
+        super(new BOp[] { val }, null);
 		
 	}
 	
@@ -44,7 +42,9 @@ public class ConstantNode extends TermNode {
     @Override
     public String toString() {
 
-        return "ConstantNode(" + getValueExpression().get() + ")";
+        final IConstant<IV> c = getValueExpression();
+        
+        return "ConstantNode(" + c + ")";
 
     }
 

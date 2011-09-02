@@ -35,22 +35,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.IContextMgr;
 import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -66,65 +61,24 @@ public class BOpUtility {
             .getLogger(BOpUtility.class);
     
     /**
-     * Used to maintain a stack which reports on the path through the bop
-     * tree during pre-order or post-order traversal.
-     */
-    static private class NodeOrAttribute implements INodeOrAttribute {
-    	final BOp bop;
-    	final NV nv;
-    	
-		public NodeOrAttribute(BOp bop) {
-			this.bop = bop;
-			this.nv = null;
-		}
-
-		public NodeOrAttribute(NV nv) {
-			this.bop = null;
-			this.nv = nv;
-		}
-
-		public BOp getNode() {
-			return bop;
-		}
-
-		public NV getValue() {
-			return nv;
-		}
-
-		public boolean isNode() {
-			return bop != null;
-		}
-
-	}
-
-    /**
      * Pre-order recursive visitation of the operator tree (arguments only, no
      * annotations).
      */
-    @SuppressWarnings("unchecked")
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
-        return preOrderIterator(op, null);
-
-    }
-    
-    /**
-     * Passes in the Stack context to be maintained by the preOrderIterator
-     */
-    public static Iterator<BOp> preOrderIterator(final BOp op, final Stack<INodeOrAttribute> context) {
-
         return new Striterator(new SingleValueIterator(op))
-                .append(preOrderIterator2(0,op, context));
+                .append(preOrderIterator2(0,op));
 
     }
 
     /**
-     * Visits the children (recursively) using pre-order traversal, but does
-     * NOT visit this node.
-     * @param stack 
+     * Visits the children (recursively) using pre-order traversal, but does NOT
+     * visit this node.
+     * 
+     * @param stack
      */
     @SuppressWarnings("unchecked")
-	static private Iterator<BOp> preOrderIterator2(final int depth, final BOp op, final Stack<INodeOrAttribute> context) {
+    static private Iterator<BOp> preOrderIterator2(final int depth, final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -163,50 +117,28 @@ public class BOpUtility {
                      * Visit the children (recursive pre-order traversal).
                      */
 
-//            		System.err.println("Node["+depth+"]: "+op.getClass().getName());
-
+                    // append this node in pre-order position.
                     final Striterator itr = new Striterator(
                             new SingleValueIterator(child));
 
-                    // append this node in post-order position.
-                    itr.append(preOrderIterator2(depth + 1, child, context));
+                    // append children
+                    itr.append(preOrderIterator2(depth + 1, child));
 
                     return itr;
 
                 } else {
-
+                    
                     /*
                      * The child is a leaf.
                      */
 
-//                	System.err.println("Leaf["+depth+"]: "+op.getClass().getName());
-                	
                     // Visit the leaf itself.
                     return new SingleValueIterator(child);
-
+                    
                 }
 
             }
             
-            /**
-             * Callback from Expanderator when the iteration from the previous
-             * call to expand is complete.
-             */
-            public void popContext() {
-            	if (context != null) {
-            		context.pop();
-            	}
-            }
-            
-            public void pushContext(Object obj) {
-               	if (context != null) {
-            		context.add(new NodeOrAttribute((BOp) obj));
-            	}         	         	
-            }
-            
-            protected IContextMgr getContextMgr() {
-            	return this;
-            }
         });
 
     }
@@ -218,14 +150,7 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     public static Iterator<BOp> postOrderIterator(final BOp op) {
 
-        return postOrderIterator(op, null);
-
-    }
-
-    @SuppressWarnings("unchecked")
-    public static Iterator<BOp> postOrderIterator(final BOp op, final Stack<INodeOrAttribute> context) {
-
-        return new Striterator(postOrderIterator2(op, context))
+        return new Striterator(postOrderIterator2(op))
                 .append(new SingleValueIterator(op));
 
     }
@@ -233,10 +158,11 @@ public class BOpUtility {
     /**
      * Visits the children (recursively) using post-order traversal, but does
      * NOT visit this node.
-     * @param context 
+     * 
+     * @param context
      */
     @SuppressWarnings("unchecked")
-    static private Iterator<BOp> postOrderIterator2(final BOp op, final Stack<INodeOrAttribute> context) {
+    static private Iterator<BOp> postOrderIterator2(final BOp op) {
 
         /*
          * Iterator visits the direct children, expanding them in turn with a
@@ -271,8 +197,9 @@ public class BOpUtility {
                      * Visit the children (recursive post-order traversal).
                      */
 
+                    // visit children.
                     final Striterator itr = new Striterator(
-                            postOrderIterator2(child, context));
+                            postOrderIterator2(child));
 
                     // append this node in post-order position.
                     itr.append(new SingleValueIterator(child));
@@ -291,25 +218,6 @@ public class BOpUtility {
                 }
             }
             
-            /**
-             * Callback from Expanderator when the iteration from the previous
-             * call to expand is complete.
-             */
-            public void popContext() {
-            	if (context != null) {
-            		context.pop();
-            	}
-            }
-            
-            public void pushContext(Object obj) {
-               	if (context != null) {
-            		context.add(new NodeOrAttribute((BOp) obj));
-            	}         	         	
-            }
-            
-            protected IContextMgr getContextMgr() {
-            	return this;
-            }
         });
 
     }
@@ -338,42 +246,6 @@ public class BOpUtility {
         
     }
 
-//    /**
-//     * Pre-order traversal of the annotations of the operator which are
-//     * themselves operators without recursion through the children of the given
-//     * operator (the children of each annotation are visited, but the
-//     * annotations of annotations are not).
-//     * 
-//     * @param op
-//     *            An operator.
-//     * 
-//     * @return An iterator which visits the pre-order traversal or the operator
-//     *         annotations.
-//     */
-//    @SuppressWarnings("unchecked")
-//    public static Iterator<BOp> annotationOpPreOrderIterator(final BOp op) {
-//        
-//        // visit the node's operator annotations.
-//        final Striterator itr = new Striterator(annotationOpIterator(op));
-//
-//        // expand each operator annotation with a pre-order traversal.
-//        itr.addFilter(new Expander() {
-//            private static final long serialVersionUID = 1L;
-//
-//            @Override
-//            protected Iterator<?> expand(final Object ann) {
-//                return preOrderIterator((BOp) ann);
-//            }
-//        });
-//
-//        return (Iterator<BOp>) itr;
-//        
-//    }
-    
-    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op) {
-    	return preOrderIteratorWithAnnotations(op, null);
-    }
-   
     /**
      * Recursive pre-order traversal of the operator tree with visitation of all
      * operator annotations. The annotations for an operator are visited before
@@ -387,9 +259,70 @@ public class BOpUtility {
      * @return The iterator.
      */
     @SuppressWarnings("unchecked")
-    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op, final Stack<INodeOrAttribute> context) {
+    public static Iterator<BOp> preOrderIteratorWithAnnotations(final BOp op) {
+
+        return new Striterator(preOrderIterator(op)).addFilter(new Expander() {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected Iterator expand(final Object arg0) {
+
+                final BOp op = (BOp)arg0;
+
+                // visit the node.
+                final Striterator itr = new Striterator(
+                        new SingleValueIterator(op));
+
+                /*
+                 * FIXME In order to visit the annotations as NV pairs
+                 * we need to modify this part of the expander pattern,
+                 * perhaps just by pushing the appropriate NV object
+                 * onto the stack? Or maybe just push the attribute name
+                 * rather than the attribute name and value? Do this
+                 * for both of the XXXOrderIteratorwithAnnotation() methods.
+                 */
+                // visit the node's operator annotations.
+                final Striterator itr2 = new Striterator(
+                        annotationOpIterator(op));
+
+                // expand each operator annotation with a pre-order traversal.
+                itr2.addFilter(new Expander() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected Iterator expand(final Object ann) {
+                        return preOrderIteratorWithAnnotations((BOp) ann);
+                    }
+                    
+                });
+                
+                // append the pre-order traversal of each annotation.
+                itr.append(itr2);
+
+                return itr;
+            }
+            
+        });
+        
+    }
+
+    /**
+     * Recursive post-order traversal of the operator tree with visitation of
+     * all operator annotations. The annotations for an operator are visited
+     * before its children are visited. Only annotations whose values are
+     * {@link BOp}s are visited. Annotation {@link BOp}s are also recursively
+     * visited with the pre-order traversal.
+     * 
+     * @param op
+     *            An operator.
+     * 
+     * @return The iterator.
+     */
+    @SuppressWarnings("unchecked")
+    public static Iterator<BOp> postOrderIteratorWithAnnotations(final BOp op) {
        
-        return new Striterator(preOrderIterator(op)).addFilter(new Expander(){
+        return new Striterator(postOrderIterator(op)).addFilter(new Expander(){
 
             private static final long serialVersionUID = 1L;
 
@@ -412,28 +345,9 @@ public class BOpUtility {
 
                     @Override
                     protected Iterator expand(final Object ann) {
-                        return preOrderIteratorWithAnnotations((BOp) ann, context);
+                        return postOrderIteratorWithAnnotations((BOp) ann);
                     }
                     
-                    /**
-                     * Callback from Expanderator when the iteration from the previous
-                     * call to expand is complete.
-                     */
-                    public void popContext() {
-                    	if (context != null) {
-                    		context.pop();
-                    	}
-                    }
-                    
-                    public void pushContext(Object obj) {
-                       	if (context != null) {
-                    		context.add(new NodeOrAttribute((BOp) obj));
-                    	}         	         	
-                    }
-                    
-                    protected IContextMgr getContextMgr() {
-                    	return this;
-                    }
                 });
                 
                 // append the pre-order traversal of each annotation.
@@ -467,28 +381,41 @@ public class BOpUtility {
     }
 
     /**
+     * Return an {@link List} containing the {@link IVariable}s visited by the
+     * iterator.
+     * 
+     * @param it
+     *            The iterator.
+     */
+    @SuppressWarnings("rawtypes")
+    public static List<IVariable> toList(final Iterator<IVariable<?>> it) {
+
+        final List<IVariable> c = new LinkedList<IVariable>();
+
+        while (it.hasNext()) {
+
+            final IVariable v = it.next();
+
+            c.add(v);
+
+        }
+
+        return c;
+        
+    }
+    
+    /**
      * Return an array containing the {@link IVariable}s visited by the
      * iterator.
      * 
      * @param it
      *            The iterator.
      */
+    @SuppressWarnings("rawtypes")
     public static IVariable[] toArray(final Iterator<IVariable<?>> it) {
 
-        final List<TermNode> terms = new LinkedList<TermNode>();
+        return toList(it).toArray(new IVariable[] {});
 
-        while (it.hasNext()) {
-
-            final IVariable<IV> v = (IVariable<IV>) it.next();
-
-            final VarNode var = new VarNode(v);
-
-            terms.add(var);
-
-        }
-
-        return terms.toArray(new IVariable[] {});
-        
     }
     
     @SuppressWarnings("unchecked")

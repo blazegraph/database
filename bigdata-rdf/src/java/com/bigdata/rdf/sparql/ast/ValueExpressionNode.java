@@ -66,6 +66,12 @@ public class ValueExpressionNode extends ASTBase implements
 
     }
 
+    public void invalidate() {
+        
+        setProperty(Annotations.VALUE_EXPR, null);
+        
+    }
+    
     public String toShortString() {
 
 //        return super.toString();
