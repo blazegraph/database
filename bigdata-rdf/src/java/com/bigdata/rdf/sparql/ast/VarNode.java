@@ -1,6 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
@@ -38,9 +38,9 @@ public class VarNode extends TermNode {
     
 	public VarNode(final IVariable<IV> var) {
 		
-		super(BOpBase.NOARGS, null);
+		super(new BOp[]{var}, null);
 		
-		setValueExpression(var);
+//		setValueExpression(var);
 		
 	}
 	
@@ -54,7 +54,7 @@ public class VarNode extends TermNode {
     public boolean isAnonymous() {
 
         return getProperty(Annotations.ANONYMOUS, Annotations.DEFAULT_ANONYMOUS);
-        
+
 	}
 
     /**

@@ -57,16 +57,37 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * multiple instances of this operator may be run in parallel by the query
  * engine for parallel evaluation of different binding set chunks flowing
  * through the pipeline.
+ * <h3>Usage Notes</h3>
+ * 
+ * If there are no shared variables which must already be bound in the caller,
+ * then subquery join is (or may be if there are some "might" be bound
+ * variables) the full cross product (constraints are still applied and optional
+ * solutions must be reported if a constraint fails and the join is optional).
+ * Such subqueries should be run as named subqueries instead so they run once,
+ * rather than once per binding set.
+ * <p>
+ * If there are variables in scope in the parent query which are not projected
+ * by the subquery but which appear in the subquery as well, then such variables
+ * in the subquery are effectively distinct from those having the same name
+ * which appear in the parent query. In order to have correct bottom-up
+ * evaluation semantics under these conditions, such variables in the subquery
+ * MUST be renamed. The easiest way to handle this is to always rename such
+ * variables unless they are projected out of the subquery. (If a variable is
+ * projected out of the subquery then it should not be renamed in order to have
+ * the in scope bindings for that variable in the parent flow into the
+ * subquery.)
+ * <p>
+ * A BIND() used to rename a variable in the projection of the subquery should
+ * be interpreted as the projection of both the source and target variable,
+ * otherwise the bind is only imposed when leaving the subquery and a binding
+ * already available in the parent's context will not be utilized by the
+ * subquery, causing it to do more work.
  * 
  * @todo Rename as SubqueryPipelineJoinOp.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
  * @see AbstractSubqueryOp
- * 
- *      TODO If there are no shared variables, then subquery join is full cross
- *      product (constraints are still applied and optional solutions must be
- *      reported if a constraint fails and the join is optional).
  */
 public class SubqueryOp extends PipelineOp {
 

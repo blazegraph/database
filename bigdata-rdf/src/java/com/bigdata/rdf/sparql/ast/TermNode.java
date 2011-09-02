@@ -4,13 +4,16 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
  * Used to represent a variable or constant in the AST (a term in a statement
- * pattern for example).
+ * pattern for example). Unlike {@link FunctionNode}s, a {@link TermNode} models
+ * the {@link IValueExpression} directly as its sole child argument. This
+ * facilitates various rewrite patterns in which variables are renamed, etc.
  * 
  * @author mikepersonick
  */
@@ -20,20 +23,6 @@ public abstract class TermNode extends ValueExpressionNode {
 	 * 
 	 */
 	private static final long serialVersionUID = 2050144811725774174L;
-
-//    interface Annotations extends ASTBase.Annotations {
-//  	  
-//        /**
-//         * The term's value, if it has one.
-//         */
-//        String VAL = TermNode.class.getName() + ".val";
-//        
-//        /**
-//         * The term's var name, if it has one.
-//         */
-//        String VAR = TermNode.class.getName() + ".var";
-//
-//    }
 
 	public TermNode(final BOp[] args, final Map<String, Object> anns) {
 		
@@ -47,23 +36,30 @@ public abstract class TermNode extends ValueExpressionNode {
 	@Override
 	public IVariableOrConstant<IV> getValueExpression() {
 		
-		return (IVariableOrConstant<IV>) super.getValueExpression();
+		return (IVariableOrConstant<IV>) get(0);
 		
 	}
-	
-//	public IVariable<IV> getVar() {
-//		
-//		return (IVariable<IV>) getProperty(TermNode.Annotations.VAR);
-//		
-//	}
-//	
-//	public IConstant<IV> getVal() {
-//		
-//		return (IConstant<IV>) getProperty(TermNode.Annotations.VAL);
-//		
-//	}
-	
-    public BigdataValue getValue() {
+
+    /**
+     * Operation is not supported (could be modeled by changing args[0] if we
+     * still want to do this).
+     */
+    @Override
+    public void setValueExpression(IValueExpression<? extends IV> ve) {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * NOP.
+     */
+    @Override
+    final public void invalidate() {
+        // NOP
+    }
+
+    final public BigdataValue getValue() {
 	
     	final IVariableOrConstant<IV> val = getValueExpression();
     	

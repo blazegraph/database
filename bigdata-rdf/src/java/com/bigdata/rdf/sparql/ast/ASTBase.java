@@ -64,4 +64,56 @@ public class ASTBase extends ModifiableBOpBase {
         super(args, annotations);
     }
 
+    /**
+     * Replace all occurrences of the old value with the new value in both the
+     * arguments and annotations of this operator (recursive). A match is
+     * identified by reference {@link #equals(Object)}. 
+     * 
+     * @param oldVal
+     *            The old value.
+     * @param newVal
+     *            The new value.
+     * 
+     * @return The #of changes made.
+     */
+    public int replaceAllWith(final BOp oldVal, final BOp newVal) {
+
+        int n = 0;
+
+        final int arity = arity();
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = get(i);
+
+            if (child != null && child.equals(oldVal)) {
+
+                setArg(i, newVal);
+
+                n++;
+
+            }
+
+            if (child instanceof ASTBase) {
+
+                n += ((ASTBase) child).replaceAllWith(oldVal, newVal);
+
+            }
+
+        }
+
+        for (Map.Entry<String, Object> e : annotations().entrySet()) {
+
+            if (e.getValue() instanceof ASTBase) {
+
+                n += ((ASTBase) e.getValue()).replaceAllWith(oldVal, newVal);
+
+            }
+            
+        }
+        
+        return n;
+
+    }
+
 }

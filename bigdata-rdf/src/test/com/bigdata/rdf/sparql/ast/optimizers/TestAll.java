@@ -69,7 +69,7 @@ public class TestAll extends TestCase {
         // Unit tests for AST rewrite of the PROJECTION for a CONSTRUCT query.
         suite.addTestSuite(TestDescribeOptimizer.class);
 
-        suite.addTestSuite(TestASTVariableScopeAnalysis.class);
+        suite.addTestSuite(TestASTSubqueryVariableScopeRewrite.class);
         
         // Unit tests for identifying badly designed left joins.
         suite.addTestSuite(TestBadlyDesignedLeftJoinUtil.class);

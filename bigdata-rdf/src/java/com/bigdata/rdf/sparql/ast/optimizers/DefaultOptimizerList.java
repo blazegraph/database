@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.evaluation.impl.IterativeEvaluationOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 
 /**
@@ -145,10 +146,51 @@ public class DefaultOptimizerList extends OptimizerList {
     public DefaultOptimizerList() {
 
         /**
+         * Rule: A variable within a subquery is distinct from the same name
+         * variable outside of the subquery unless the variable is projected
+         * from the subquery.
+         * <p>
+         * This rewrites variable variable names within subqueries which are not
+         * projected out of the subquery such that they do not overlap with
+         * other variables in the query.
+         * <p>
+         * Note: This must be run before the {@link ASTBindingAssigner} since
+         * otherwise we could bind a variable in a subquery which was not being
+         * projected by that subquery.
+         * 
+         * FIXME What follows are some rules for static analysis of variable
+         * scope.
+         * <p>
+         * Rule: A variable bound within an OPTIONAL *MAY* be bound in the
+         * parent group.
+         * <p>
+         * Rule: A variable bound within a UNION *MAY* be bound in the parent
+         * group. Exception: if the variable is bound on all alternatives in the
+         * UNION, then it MUST be bound in the parent group.
+         * <p>
+         * A variable bound by a statement pattern or a let/bind MUST be bound
+         * within the parent group and within all contexts which are evaluated
+         * *after* it is bound. (This is the basis for propagation of bindings
+         * to the parent. Since SPARQL demands bottom up evaluation semantics a
+         * variable which MUST be bound in a group MUST be bound in its parent.)
+         * 
+         * FIXME If a subquery does not share ANY variables which MUST be bound
+         * in the parent's context then rewrite the subquery into a
+         * named/include pattern so it will run exactly once.
+         */
+        add(new ASTSubqueryVariableScopeRewrite());
+        
+        /**
          * Propagates bindings from an input solution into the query, replacing
          * variables with constants while retaining the constant / variable
          * association.
-         */
+         * 
+         * TODO Other optimizations are possible when the {@link IBindingSet}[]
+         * has multiple solutions. In particular, the possible values which a
+         * variable may take on can be written into an IN constraint and
+         * associated with the query in the appropriate scope. Those are not
+         * being handled yet.
+         */ 
         add(new ASTBindingAssigner());
 
         /**

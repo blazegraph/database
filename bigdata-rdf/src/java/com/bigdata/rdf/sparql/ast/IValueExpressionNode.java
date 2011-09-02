@@ -18,5 +18,10 @@ public interface IValueExpressionNode {
 	 * Cache the translated value expression on the node.
 	 */
 	void setValueExpression(final IValueExpression<? extends IV> ve);
+
+	/**
+	 * Invalidate the cached value.  It will be recomputed again on demand.
+	 */
+	void invalidate();
 	
 }

@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import junit.framework.TestCase2;
-
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.Constant;
@@ -41,6 +39,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -48,7 +47,6 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTBindingAssigner;
 
 /**
  * Test suite for {@link ASTBindingAssigner}.
@@ -56,7 +54,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTBindingAssigner;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestASTBindingAssigner extends TestCase2 {
+public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 
     /**
      * 
@@ -89,30 +87,36 @@ public class TestASTBindingAssigner extends TestCase2 {
      */
     public void test_astBindingAssigner() {
 
-        final VarNode s = new VarNode("s");
-        final VarNode p = new VarNode("p");
-        final VarNode o = new VarNode("o");
-        
-        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+//        final VarNode s = new VarNode("s");
+//        final VarNode p = new VarNode("p");
+//        final VarNode o = new VarNode("o");
+//        
+//        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
 
         final IBindingSet[] bsets = new IBindingSet[] { //
         new ListBindingSet(//
                 new IVariable[] { Var.var("p") },//
-                new IConstant[] { const1 }) //
+                new IConstant[] { new Constant<IV>(TermId.mockIV(VTE.URI)) }) //
         };
 
         // The source AST.
-        final QueryRoot input = new QueryRoot(QueryType.SELECT);
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
         {
 
             final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(s);
-            input.setProjection(projection);
-
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("s"));
+            
             final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(s, p, o, null/* c */,
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
-            input.setWhereClause(whereClause);
 
         }
 
@@ -121,13 +125,15 @@ public class TestASTBindingAssigner extends TestCase2 {
         {
 
             final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(s);
             expected.setProjection(projection);
 
+            projection.addProjectionVar(new VarNode("s"));
+
             final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(s, new ConstantNode(
-                    new Constant((IVariable) Var.var("p"), const1)), o,
-                    null/* c */, Scope.DEFAULT_CONTEXTS));
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new ConstantNode(new Constant((IVariable) Var.var("p"),
+                            TermId.mockIV(VTE.URI))),
+                    new VarNode("o"), null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
         }
@@ -135,9 +141,9 @@ public class TestASTBindingAssigner extends TestCase2 {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                expected/* queryNode */, bsets);
+                given/* queryNode */, bsets);
 
-        assertEquals(expected, actual);
+        assertSameAST(expected, actual);
 
     }
 
@@ -162,16 +168,19 @@ public class TestASTBindingAssigner extends TestCase2 {
      */
     public void test_astBindingAssigner2() {
 
-        final VarNode s = new VarNode("s");
-        final VarNode p = new VarNode("p");
+        /*
+         * Note: DO NOT SHARE STRUCTURES IN THIS TEST.
+         */
+//        final VarNode s = new VarNode("s");
+//        final VarNode p = new VarNode("p");
 //        final VarNode o = new VarNode("o");
-        
-        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
+//        
+//        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
 
         final IBindingSet[] bsets = new IBindingSet[] { //
         new ListBindingSet(//
                 new IVariable[] { Var.var("s") },//
-                new IConstant[] { const1 }) //
+                new IConstant[] { new Constant<IV>(TermId.mockIV(VTE.URI))}) //
         };
 
         // The source AST.
@@ -179,11 +188,12 @@ public class TestASTBindingAssigner extends TestCase2 {
         {
 
             final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(p);
+            projection.addProjectionVar(new VarNode("p"));
             input.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
-            whereClause.addChild(new StatementPatternNode(s, p, s, null/* c */,
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("s"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
             input.setWhereClause(whereClause);
 
@@ -194,14 +204,16 @@ public class TestASTBindingAssigner extends TestCase2 {
         {
 
             final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(p);
+            projection.addProjectionVar(new VarNode("p"));
             expected.setProjection(projection);
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(//
-                    new ConstantNode(new Constant((IVariable) Var.var("s"), const1)), //
-                    p,//
-                    new ConstantNode(new Constant((IVariable) Var.var("s"), const1)), //
+                    new ConstantNode(new Constant((IVariable) Var.var("s"),
+                            TermId.mockIV(VTE.URI))), //
+                    new VarNode("p"),//
+                    new ConstantNode(new Constant((IVariable) Var.var("s"),
+                            TermId.mockIV(VTE.URI))), //
                     null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
@@ -212,7 +224,7 @@ public class TestASTBindingAssigner extends TestCase2 {
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
                 expected/* queryNode */, bsets);
 
-        assertEquals(expected, actual);
+        assertSameAST(expected, actual);
 
     }
 

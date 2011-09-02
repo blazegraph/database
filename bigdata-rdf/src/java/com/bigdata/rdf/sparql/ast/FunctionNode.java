@@ -5,9 +5,7 @@ import java.util.Map;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
@@ -82,152 +80,148 @@ public class FunctionNode extends ValueExpressionNode {
 		
 	}
 	
-	/**
-	 * Sets the scalar values and clears the cached value expression.
-	 */
-	public void setScalarValues(final Map<String,Object> scalarValues) {
-		
-		setProperty(Annotations.SCALAR_VALS, scalarValues);
-		
-	}
-	
-//    @Override
-//    public boolean equals(final Object o) {
+//	/**
+//	 * Sets the scalar values and clears the cached value expression.
+//	 */
+//	public void setScalarValues(final Map<String,Object> scalarValues) {
+//		
+//		setProperty(Annotations.SCALAR_VALS, scalarValues);
+//		
+//	}
+//	
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public ModifiableBOpBase setArg(final int index, final BOp newArg) {
+//		
+//		final ModifiableBOpBase bop = super.setArg(index, newArg);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//		return bop;
+//		
+//	}
 //
-//        if (o == this)
-//            return true;
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public void addArg(final BOp newArg) {
+//		
+//		super.addArg(newArg);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//	}
 //
-//        if (!(o instanceof FunctionNode))
-//            return false;
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public void addArgIfAbsent(final BOp arg) {
+//		
+//		super.addArgIfAbsent(arg);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//	}
+//
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public boolean removeArg(final BOp arg) {
+//		
+//		final boolean b = super.removeArg(arg);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//		return b;
+//		
+//	}
+//
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public ModifiableBOpBase copyAll(final Map<String, Object> anns) {
+//		
+//		final ModifiableBOpBase bop = super.copyAll(anns);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//		return bop;
+//		
+//	}
+//
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//    public ModifiableBOpBase setProperty(final String name, final Object value) {
+//
+//        final ModifiableBOpBase bop = super.setProperty(name, value);
 //        
-//        if (!super.equals(o))
-//            return false;
+//        if (!(Annotations.VALUE_EXPR.equals(name))) {
 //
-//        return true;
+//            super.clearProperty(Annotations.VALUE_EXPR);
+//
+//        }
+//
+//        return bop;
 //
 //    }
+//
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public ModifiableBOpBase setUnboundProperty(final String name, final Object value) {
+//		
+//		final ModifiableBOpBase bop = super.setUnboundProperty(name, value);
+//		
+//		if(!(Annotations.VALUE_EXPR.equals(name))){
+//
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//		}
+//		return bop;
+//		
+//	}
+//
+//	/**
+//	 * If we destructively modify the AST node we also need to clear the
+//	 * cached value expression.
+//	 */
+//	@Override
+//	public ModifiableBOpBase clearProperty(final String name) {
+//		
+//		final ModifiableBOpBase bop = super.clearProperty(name);
+//		
+//		super.clearProperty(Annotations.VALUE_EXPR);
+//		
+//		return bop;
+//		
+//	}
 
 	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
+	 * Overridden to clear the cached value expression.
 	 */
 	@Override
-	public ModifiableBOpBase setArg(final int index, final BOp newArg) {
-		
-		final ModifiableBOpBase bop = super.setArg(index, newArg);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		return bop;
-		
+	public void invalidate() {
+	    
+	    super.clearProperty(Annotations.VALUE_EXPR);
+	    
+        super.invalidate();
+        
 	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public void addArg(final BOp newArg) {
-		
-		super.addArg(newArg);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public void addArgIfAbsent(final BOp arg) {
-		
-		super.addArgIfAbsent(arg);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public boolean removeArg(final BOp arg) {
-		
-		final boolean b = super.removeArg(arg);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		return b;
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public ModifiableBOpBase copyAll(final Map<String, Object> anns) {
-		
-		final ModifiableBOpBase bop = super.copyAll(anns);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		return bop;
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public ModifiableBOpBase setProperty(final String name, final Object value) {
-		
-		final ModifiableBOpBase bop = super.setProperty(name, value);
-		if(!(Annotations.VALUE_EXPR.equals(name))){
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		}
-
-		return bop;
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public ModifiableBOpBase setUnboundProperty(final String name, final Object value) {
-		
-		final ModifiableBOpBase bop = super.setUnboundProperty(name, value);
-		
-		if(!(Annotations.VALUE_EXPR.equals(name))){
-
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		}
-		return bop;
-		
-	}
-
-	/**
-	 * If we destructively modify the AST node we also need to clear the
-	 * cached value expression.
-	 */
-	@Override
-	public ModifiableBOpBase clearProperty(final String name) {
-		
-		final ModifiableBOpBase bop = super.clearProperty(name);
-		
-		super.clearProperty(Annotations.VALUE_EXPR);
-		
-		return bop;
-		
-	}
-
 	
 }

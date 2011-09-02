@@ -4,6 +4,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSubqueryVariableScopeRewrite;
 
 /**
  * AST node models the assignment of a value expression to a variable.
@@ -42,8 +43,12 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     }
 
     /**
+     * {@inheritDoc}
+     * 
      * TODO Review. I believe that AssignmentNode.getValueExpression() should
      * always return the Bind(). Right now it only returns the RIGHT argument.
+     * This assumption is build into the GROUP_BY handling in
+     * {@link AST2BOpUtility} and into {@link ASTSubqueryVariableScopeRewrite}.
      */
     public IValueExpressionNode getValueExpressionNode() {
      
@@ -62,6 +67,12 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     	getValueExpressionNode().setValueExpression(ve);
     	
     }
+    
+    public void invalidate() {
+        
+        getValueExpressionNode().invalidate();
+        
+    }
 
     public String toString(final int indent) {
 
@@ -73,46 +84,28 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         
         if (ve == var) {
 
-            sb.append("?");
-            
-            sb.append(var.getValueExpression().toString());
+//            sb.append("?");
+//            
+//            sb.append(var.getValueExpression().toString());
+            sb.append(ve.toString());
             
         } else {
             
-            sb.append("(LET ");
-
-            sb.append("?").append(getVar().toString());
-
-            sb.append(":=");
+            sb.append("( ");
 
             sb.append(ve.toString());
 
-            sb.append(")");
+            sb.append(" AS ");
+
+//            sb.append("?").append(getVar().toString());
+            sb.append(var.toString());
+
+            sb.append(" )");
 
         }
         
         return sb.toString();
         
     }
-
-//    public boolean equals(final Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!(o instanceof AssignmentNode))
-//            return false;
-//
-//        final AssignmentNode t = (AssignmentNode) o;
-//
-//        if (!var.equals(t.var))
-//            return false;
-//
-//        if (!ve.equals(t.ve))
-//            return false;
-//
-//        return true;
-//
-//    }
 
 }
