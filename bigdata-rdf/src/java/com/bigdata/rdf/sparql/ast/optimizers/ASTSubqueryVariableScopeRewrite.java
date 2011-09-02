@@ -72,9 +72,16 @@ public class ASTSubqueryVariableScopeRewrite implements IASTOptimizer {
         final IGroupNode<IGroupMemberNode> whereClause = queryRoot
                 .getWhereClause();
 
+        /*
+         * Note: This needs to be pre-order traversal since we have to rename
+         * variables not projected by an outer subquery first and the proceed to
+         * rename variables in an inner subquery.
+         * 
+         * FIXME Write a unit test for this.
+         */
         @SuppressWarnings("unchecked")
         final Iterator<SubqueryRoot> itr = new Striterator(
-                BOpUtility.postOrderIterator((BOp) whereClause))
+                BOpUtility.preOrderIterator((BOp) whereClause))
                 .addTypeFilter(SubqueryRoot.class);
 
         while (itr.hasNext()) {

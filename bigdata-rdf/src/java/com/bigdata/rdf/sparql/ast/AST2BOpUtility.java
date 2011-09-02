@@ -380,7 +380,7 @@ public class AST2BOpUtility {
             final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                     ctx.queryId, subqueryRoot.getName(), joinVars);
 
-            left = new NamedSubqueryOp(new BOp[]{/*left*/}, //
+            left = new NamedSubqueryOp(left==null?BOp.NOARGS:new BOp[]{left}, //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
@@ -805,6 +805,11 @@ public class AST2BOpUtility {
 	
     /**
      * Project select expressions (non-aggregation case).
+     * 
+     * FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
+     * variable bindings during query evaluation). This is basically the last
+     * place where we can pune out variables which are not being projected.
+     * We need to do that here, but also incrementally.
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
 	        final List<AssignmentNode> assignments,
