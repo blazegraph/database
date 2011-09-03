@@ -45,7 +45,9 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.Steps;
+import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.controller.SubqueryOp;
+import com.bigdata.bop.controller.SubqueryScopeOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
@@ -361,6 +363,12 @@ public class AST2BOpUtility {
      *         another matter. It probably is on a cluster. It might not be on a
      *         single machine depending on how heavy the subqueries are and what
      *         the concurrent workload is on the machine.
+     * 
+     *         TODO If a top-level {@link IBindingSet} is provided with the
+     *         query, should bindings which are projected by the named subquery
+     *         be passed into it from that top-level {@link IBindingSet}? (This
+     *         concern applies to both the {@link NamedSubqueryOp} and the
+     *         {@link SubqueryHashJoinOp}).
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             final NamedSubqueriesNode namedSubquerieNode,
@@ -374,13 +382,13 @@ public class AST2BOpUtility {
                 log.info("\nsubquery: " + subqueryRoot + "\nplan="
                         + subqueryPlan);
 
-            final IVariable[] joinVars = ASTUtil.convert(subqueryRoot
+            final IVariable<?>[] joinVars = ASTUtil.convert(subqueryRoot
                     .getJoinVars());
 
             final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                     ctx.queryId, subqueryRoot.getName(), joinVars);
 
-            left = new NamedSubqueryOp(left==null?BOp.NOARGS:new BOp[]{left}, //
+            left = new NamedSubqueryOp(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
@@ -398,6 +406,11 @@ public class AST2BOpUtility {
     /**
      * Add a join against a pre-computed temporary solution set into a join
      * group.
+     * <p>
+     * Note: Since the subquery solution set has already been computed and only
+     * contains bindings for solutions projected by the subquery, we do not need
+     * to adjust the visibility of bindings when we execute the hash join
+     * against the named solution set.
      */
     private static PipelineOp addSubqueryInclude(PipelineOp left,
             final NamedSubqueryInclude subqueryInclude, final AST2BOpContext ctx) {
@@ -430,18 +443,17 @@ public class AST2BOpUtility {
             
         }
 
-        final IVariable[] joinVars = ASTUtil.convert(joinvars);
+        final IVariable<?>[] joinVars = ASTUtil.convert(joinvars);
 
         final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
                 ctx.queryId, subqueryInclude.getName(), joinVars);
 
-        left = new NamedSubqueryIncludeOp(//
-                (left == null ? BOp.NOARGS : new BOp[] { left }), //
+        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
                 new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF, namedSolutionSetRef),//
                 new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
-        );
+                );
 
         return left;
 
@@ -450,32 +462,47 @@ public class AST2BOpUtility {
     /**
      * Add an explicit SPARQL 1.1 subquery into a join group.
      * <p>
+     * Rule: A variable within a subquery is distinct from the same name
+     * variable outside of the subquery unless the variable is projected from
+     * the subquery. This is handled by wrapping the subquery with a push / pop
+     * pattern in which variables in the parent context which are not projected
+     * by the subquery are hidden from view during its evaluation scope.
+     * <p>
      * Note: We currently evaluate SPARQL 1.1 style sub-queries using a
      * pipelined subquery join. For each solution which flows through the
      * pipeline, we issue the sub-query for the as-bound solution and join the
      * subquery results against that as-bound solution.
      * 
-     * FIXME We need to handle the bottom up evaluation semantics. Only
-     * variables which are projected out of the subquery are visible to it. Any
-     * other variables MUST be filtered out of the solutions as they flow into
-     * the subquery. That might be handled by a list of the variables to be
-     * projected/accepted by the subquery as a SubqueryOp.Annotation.
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
+     * @see IBindingSet#push(IVariable[])
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
 
-        //final ProjectionNode projection = subquery.getProjection();
+        final ProjectionNode projection = subquery.getProjection();
+        
+        final IVariable<?>[] vars = projection.getProjectionVars();
         
         final PipelineOp subqueryPlan = convert(subquery, ctx);
         
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subquery + "\nplan=" + subqueryPlan);
-        
-        left = new SubqueryOp(new BOp[]{left}, 
+
+        left = new SubqueryScopeOp(leftOrEmpty(left),// PUSH
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
+                new NV(SubqueryScopeOp.Annotations.PUSH, true)//
+                );
+        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                 new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
                 new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),
-                new NV(SubqueryOp.Annotations.OPTIONAL, false)
-        );
+                new NV(SubqueryOp.Annotations.OPTIONAL, false)//
+                );
+        left = new SubqueryScopeOp(leftOrEmpty(left),// POP
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
+                new NV(SubqueryScopeOp.Annotations.PUSH, false)//
+                );
 
         return left;
         
@@ -674,7 +701,7 @@ public class AST2BOpUtility {
 //      }
         
         final PipelineOp union = applyQueryHints(
-                new Union((left == null ? new BOp[] {} : new BOp[] { left }),
+                new Union(leftOrEmpty(left),
                         NV.asMap(anns.toArray(new NV[anns.size()]))),
                 ctx.queryHints);
         
@@ -2016,6 +2043,20 @@ public class AST2BOpUtility {
 //                expander // free text search expander or named graphs expander
 //                );
     	
+    }
+
+    /**
+     * Return either <i>left</i> wrapped as the sole member of an array or
+     * {@link BOp#NOARGS} iff <i>left</i> is <code>null</code>.
+     * 
+     * @param left
+     *            The prior operator in the pipeline (optional).
+     * @return The array.
+     */
+    static private BOp[] leftOrEmpty(final PipelineOp left) {
+
+        return left == null ? BOp.NOARGS : new BOp[] { left };
+        
     }
     
     /**

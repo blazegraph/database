@@ -157,6 +157,24 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     protected void mutation() {
         // NOP
     }
+
+    /**
+     * Replace the arguments.
+     * 
+     * @param args
+     *            The new arguments.
+     * @return <i>this</i>.
+     */
+    public ModifiableBOpBase setArgs(final BOp[] args) {
+        if (args == null)
+            throw new IllegalArgumentException();
+        this.args.clear();
+        for (BOp arg : args) {
+            this.args.add(arg);
+        }
+        mutation();
+        return this;
+    }
     
     /**
      * Replace the value of the argument at the specified index (destructive

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
+
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -88,12 +89,15 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
         /**
          * An optional {@link IVariable}[] identifying the variables to be
          * retained in the {@link IBindingSet}s written out by the operator. All
-         * variables are retained unless this annotation is specified.
+         * variables are retained unless this annotation is specified. This is
+         * normally set to the <em>projection</em> of the subquery, in which
+         * case the lexical scope of the variables is will be properly managed
+         * for the subquery INCLUDE join.
          * 
          * @see JoinAnnotations#SELECT
          */
         final String SELECT = JoinAnnotations.SELECT;
-        
+
     }
 
     /**
@@ -301,7 +305,7 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             }
 
         }
-
+        
         /**
          * Do a hash join of the buffered solutions with the access path.
          */
@@ -320,7 +324,7 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             stats.accessPathRangeCount.add(rightSolutions.getEntryCount());
 
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
-                    op.getChunkCapacity(), sink);
+                    op.getChunkCapacity(), sink);//, new PopFilter(selectVars));
 
             HashJoinUtility.hashJoin(
                     new Dechunkerator<IBindingSet>(context.getSource()),

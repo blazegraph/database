@@ -1969,8 +1969,11 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          * </pre>
          */
         
-        final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(4L));
+//        final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
+//                new XSDNumericIV<BigdataLiteral>(4L));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _totalCount = new Constant<XSDIntegerIV<BigdataLiteral>>(
+            new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(4L)));
+        
         final IBindingSet expected[] = new IBindingSet[]
         {
               new ListBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
@@ -2130,8 +2133,11 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          * </pre>
          */
         
-        final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(4L));
+//        final IConstant<XSDNumericIV<BigdataLiteral>> _totalCount = new Constant<XSDNumericIV<BigdataLiteral>>(
+//                new XSDNumericIV<BigdataLiteral>(4L));
+        final IConstant<XSDIntegerIV<BigdataLiteral>> _totalCount = new Constant<XSDIntegerIV<BigdataLiteral>>(
+                new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(4L)));
+        
         final IBindingSet expected[] = new IBindingSet[]
         {
               new ListBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )

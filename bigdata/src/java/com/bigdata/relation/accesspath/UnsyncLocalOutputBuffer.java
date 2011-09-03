@@ -28,8 +28,17 @@ public class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
      */
     public UnsyncLocalOutputBuffer(//final BOpStats stats,
             final int capacity, final IBlockingBuffer<E[]> syncBuffer) {
+        
+        this(capacity, syncBuffer, null/* filter */);
 
-        super(capacity);
+    }
+    
+    public UnsyncLocalOutputBuffer(
+            // final BOpStats stats,
+            final int capacity, final IBlockingBuffer<E[]> syncBuffer,
+            final IElementFilter<E> filter) {
+
+        super(capacity, filter);
 
 //        this.stats = stats;
         
