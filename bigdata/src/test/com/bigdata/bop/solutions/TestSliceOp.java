@@ -624,7 +624,7 @@ public class TestSliceOp extends TestCase2 {
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
                 new NV(SliceOp.Annotations.OFFSET, 1L),//
-                new NV(SliceOp.Annotations.LIMIT, 0L),//
+                new NV(SliceOp.Annotations.LIMIT, -1L),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
@@ -632,7 +632,8 @@ public class TestSliceOp extends TestCase2 {
 
         assertEquals("offset", 1L, query.getOffset());
 
-        assertEquals("limit", 0L, query.getLimit());
+        // Note: A limit of zero is a bad idea, but it is legal.
+        assertEquals("limit", -1L, query.getLimit());
 
         final BOpStats stats = query.newStats();
 

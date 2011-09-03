@@ -39,9 +39,8 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -96,7 +95,7 @@ public class HashJoinUtility {
      * @throws JoinVariableNotBoundException
      *             if there is no binding for a join variable.
      */
-    static private int hashCode(final IVariable[] joinVars,
+    static private int hashCode(final IVariable<?>[] joinVars,
             final IBindingSet bset) throws JoinVariableNotBoundException {
 
         int h = ONE;
@@ -246,9 +245,9 @@ public class HashJoinUtility {
      */
     static public void hashJoin(//
             final ICloseableIterator<IBindingSet> itr,//
-            final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer,//
-            final IVariable[] joinVars,//
-            final IVariable[] selectVars,//
+            final IBuffer<IBindingSet> unsyncBuffer,//
+            final IVariable<?>[] joinVars,//
+            final IVariable<?>[] selectVars,//
             final IConstraint[] constraints,//
             final HTree rightSolutions,//
             final HTree joinSet,//
@@ -259,6 +258,8 @@ public class HashJoinUtility {
             while (itr.hasNext()) {
 
                 final IBindingSet leftSolution = itr.next();
+                if(selectVars != null)
+                    leftSolution.push(selectVars);
 
                 // Compute hash code from bindings on the join vars.
                 int hashCode;
@@ -364,7 +365,7 @@ public class HashJoinUtility {
      *            maintained iff the join is optional.
      */
     static public void outputOptionals(
-            final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2,
+            final IBuffer<IBindingSet> unsyncBuffer2,
             final HTree rightSolutions, //
             final HTree joinSet//
             ) {

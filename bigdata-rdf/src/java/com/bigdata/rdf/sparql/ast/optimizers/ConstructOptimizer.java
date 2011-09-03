@@ -56,8 +56,8 @@ public class ConstructOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
@@ -82,6 +82,8 @@ public class ConstructOptimizer implements IASTOptimizer {
         final ProjectionNode projection = new ProjectionNode();
 
         queryRoot.setProjection(projection); // set on the query.
+        
+        projection.setReduced(true);
 
         // Visit the distinct variables in the CONSTRUCT clause.
         final Iterator<IVariable<?>> itr = BOpUtility

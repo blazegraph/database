@@ -27,10 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Arrays;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -73,7 +76,7 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
 
     /**
      * Unit test for the AST rewrite of a simple describe query involving an IRI
-     * and a variable bound by a WHERE clause. The IRI in this case was choosen
+     * and a variable bound by a WHERE clause. The IRI in this case was chosen
      * such that it would not be selected by the WHERE clause.
      * 
      * <pre>
@@ -184,7 +187,7 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
         /*
          * Setup the starting point for the AST model.
          */
-        final QueryRoot queryRoot = new QueryRoot(QueryType.DESCRIBE);
+        final QueryRoot queryRoot = new QueryRoot(QueryType.CONSTRUCT);
         {
             /*
              * Setup the CONSTRUCT node.
@@ -251,12 +254,8 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
 
         /*
          * Setup the expected AST model.
-         * 
-         * Note: The query type is not changed by the DESCRIBE rewrite. This
-         * makes it easier to figure out what type of query we are looking
-         * at.
          */
-        final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
+        final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
         {
             /*
              * Setup the CONSTRUCT node.
@@ -328,15 +327,23 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
             
+            projection.setReduced(true);
+            
             projection.addProjectionVar(p0a);
             projection.addProjectionVar(p0b);
             projection.addProjectionVar(s0);
             projection.addProjectionVar(o0);
             
+            projection.addProjectionVar(term1);
             projection.addProjectionVar(p1a);
             projection.addProjectionVar(p1b);
             projection.addProjectionVar(s1);
             projection.addProjectionVar(o1);
+
+            // Sort the args for comparison.
+            final BOp[] args = projection.args().toArray(new BOp[0]);
+            Arrays.sort(args);
+            projection.setArgs(args);
             
         }
 
@@ -348,13 +355,19 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
             final AST2BOpContext context = new AST2BOpContext(queryRoot,
                     store);
 
-            final IQueryNode actual = new ConstructOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+            final QueryRoot actual = (QueryRoot) new ConstructOptimizer()
+                    .optimize(context, queryRoot, null/* bindingSet */);
 
-            if (log.isInfoEnabled())
-                log.info("expected:" + queryRoot);
+            // Sort the args for comparison.
+            {
+                final ProjectionNode projection = actual.getProjection();
+                assertNotNull(projection);
+                final BOp[] args = projection.args().toArray(new BOp[0]);
+                Arrays.sort(args);
+                projection.setArgs(args);
+            }
             
-            assertSameAST(queryRoot, actual);
+            assertSameAST(expected, actual);
 
         }
         

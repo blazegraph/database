@@ -125,15 +125,27 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
  * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure on this
  * one.)
  * 
- * FIXME Add rewrite for DESCRIBE (see the code inline below). Note that openrdf
- * used "REDUCED" in their projection. We might want to do the same in the
- * rewritten query.
+ * FIXME What follows are some rules for static analysis of variable scope.
+ * <p>
+ * Rule: A variable bound within an OPTIONAL *MAY* be bound in the parent group.
+ * <p>
+ * Rule: A variable bound within a UNION *MAY* be bound in the parent group.
+ * Exception: if the variable is bound on all alternatives in the UNION, then it
+ * MUST be bound in the parent group.
+ * <p>
+ * A variable bound by a statement pattern or a let/bind MUST be bound within
+ * the parent group and within all contexts which are evaluated *after* it is
+ * bound. (This is the basis for propagation of bindings to the parent. Since
+ * SPARQL demands bottom up evaluation semantics a variable which MUST be bound
+ * in a group MUST be bound in its parent.)
  * 
- * FIXME "describe <http://www.bigdata.com>" does not have a whereClause. The
- * rewrite must supply an appropriate one.
+ * FIXME If a subquery does not share ANY variables which MUST be bound in the
+ * parent's context then rewrite the subquery into a named/include pattern so it
+ * will run exactly once. {@link SubqueryRoot.Annotations#RUN_ONCE}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z thompsonbry$
+ * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
+ *          thompsonbry$
  */
 public class DefaultOptimizerList extends OptimizerList {
 
@@ -144,41 +156,20 @@ public class DefaultOptimizerList extends OptimizerList {
 
     public DefaultOptimizerList() {
 
-        /**
-         * Rule: A variable within a subquery is distinct from the same name
-         * variable outside of the subquery unless the variable is projected
-         * from the subquery.
-         * <p>
-         * This rewrites variable variable names within subqueries which are not
-         * projected out of the subquery such that they do not overlap with
-         * other variables in the query.
-         * <p>
-         * Note: This must be run before the {@link ASTBindingAssigner} since
-         * otherwise we could bind a variable in a subquery which was not being
-         * projected by that subquery.
-         * 
-         * FIXME What follows are some rules for static analysis of variable
-         * scope.
-         * <p>
-         * Rule: A variable bound within an OPTIONAL *MAY* be bound in the
-         * parent group.
-         * <p>
-         * Rule: A variable bound within a UNION *MAY* be bound in the parent
-         * group. Exception: if the variable is bound on all alternatives in the
-         * UNION, then it MUST be bound in the parent group.
-         * <p>
-         * A variable bound by a statement pattern or a let/bind MUST be bound
-         * within the parent group and within all contexts which are evaluated
-         * *after* it is bound. (This is the basis for propagation of bindings
-         * to the parent. Since SPARQL demands bottom up evaluation semantics a
-         * variable which MUST be bound in a group MUST be bound in its parent.)
-         * 
-         * FIXME If a subquery does not share ANY variables which MUST be bound
-         * in the parent's context then rewrite the subquery into a
-         * named/include pattern so it will run exactly once.
-         * {@link SubqueryRoot.Annotations#RUN_ONCE}.
-         */
-        add(new ASTSubqueryVariableScopeRewrite());
+//        /**
+//         * Rule: A variable within a subquery is distinct from the same name
+//         * variable outside of the subquery unless the variable is projected
+//         * from the subquery.
+//         * <p>
+//         * This rewrites variable variable names within subqueries which are not
+//         * projected out of the subquery such that they do not overlap with
+//         * other variables in the query.
+//         * <p>
+//         * Note: This must be run before the {@link ASTBindingAssigner} since
+//         * otherwise we could bind a variable in a subquery which was not being
+//         * projected by that subquery.
+//         */
+//        add(new ASTSubqueryVariableScopeRewrite());
         
         /**
          * Propagates bindings from an input solution into the query, replacing

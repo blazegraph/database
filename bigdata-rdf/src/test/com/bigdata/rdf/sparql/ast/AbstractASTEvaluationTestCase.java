@@ -232,7 +232,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
             if (a2 == null) {
 
-                fail("Missing annotation for " + name + " : expecting=" + o1
+                fail("Missing annotation @ \"" + name + "\" : expecting=" + o1
                         + ", actual=" + o2);
 
             }

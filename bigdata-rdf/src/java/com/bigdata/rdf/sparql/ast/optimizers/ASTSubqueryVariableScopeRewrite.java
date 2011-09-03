@@ -57,7 +57,11 @@ import cutthecrap.utils.striterators.Striterator;
  * analysis.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTSubqueryVariableScopeRewrite.java 5122 2011-09-02 21:21:13Z
+ *          thompsonbry $
+ *          
+ * @deprecated By {@link IBindingSet#push(IVariable[])} and
+ *             {@link IBindingSet#pop(IVariable[])}.
  */
 public class ASTSubqueryVariableScopeRewrite implements IASTOptimizer {
 

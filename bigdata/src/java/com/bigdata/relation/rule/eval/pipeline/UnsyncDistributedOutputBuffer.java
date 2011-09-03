@@ -2,6 +2,8 @@ package com.bigdata.relation.rule.eval.pipeline;
 
 import java.util.Iterator;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.mdi.PartitionLocator;
@@ -21,6 +23,9 @@ import com.bigdata.service.IBigdataFederation;
  */
 class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
         AbstractUnsynchronizedArrayBuffer<E> {
+    
+    private static final Logger log = Logger
+            .getLogger(UnsyncDistributedOutputBuffer.class);
     
     private final DistributedJoinTask joinTask;
     

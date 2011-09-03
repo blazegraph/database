@@ -4,13 +4,12 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSubqueryVariableScopeRewrite;
 
 /**
  * AST node models the assignment of a value expression to a variable.
  */
 public class AssignmentNode extends GroupMemberValueExpressionNodeBase 
-		implements IValueExpressionNode {
+		implements IValueExpressionNode, Comparable<AssignmentNode> {
 
     /**
      * 
@@ -48,7 +47,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      * TODO Review. I believe that AssignmentNode.getValueExpression() should
      * always return the Bind(). Right now it only returns the RIGHT argument.
      * This assumption is build into the GROUP_BY handling in
-     * {@link AST2BOpUtility} and into {@link ASTSubqueryVariableScopeRewrite}.
+     * {@link AST2BOpUtility}.
      */
     public IValueExpressionNode getValueExpressionNode() {
      
@@ -105,6 +104,16 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         }
         
         return sb.toString();
+        
+    }
+
+    /**
+     * Orders {@link AssignmentNode}s by the variable names.
+     */
+    @Override
+    public int compareTo(AssignmentNode o) {
+
+        return getVar().getName().compareTo(o.getVar().getName());
         
     }
 

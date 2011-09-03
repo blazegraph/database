@@ -34,6 +34,8 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
  * Operator computes the number of non-null values over the presented binding
@@ -144,7 +146,7 @@ public class COUNT extends AggregateBase<IV> {
 
         }
 
-        return new com.bigdata.rdf.internal.impl.literal.XSDIntegerIV(new BigInteger(Long.toString(aggregated)));
+        return new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(aggregated));
         //return new XSDNumericIV<BigdataLiteral>(aggregated);
 
     }
