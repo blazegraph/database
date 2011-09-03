@@ -51,13 +51,13 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -185,32 +185,32 @@ public class TestSliceOp extends TestCase2 {
 
         // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("John"),
 //                                new Constant<String>("Mary"), }//
 //                ),
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("Mary"),
 //                                new Constant<String>("Paul"), }//
 //                ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Jane") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Leon") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("John") }//
                 ),
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("Leon"),
 //                                new Constant<String>("Paul") }//
@@ -296,17 +296,17 @@ public class TestSliceOp extends TestCase2 {
 
         // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Paul"), }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Jane") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Leon") }//
@@ -449,22 +449,22 @@ public class TestSliceOp extends TestCase2 {
 
         // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Jane") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Leon") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//

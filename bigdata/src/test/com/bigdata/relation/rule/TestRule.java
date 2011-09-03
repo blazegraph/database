@@ -36,8 +36,8 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
@@ -351,7 +351,7 @@ public class TestRule extends AbstractRuleTestCase {
              * Verify we can override a variable with a constant.
              */
 
-            final IBindingSet bindingSet = new ArrayBindingSet(//
+            final IBindingSet bindingSet = new ListBindingSet(//
                     new IVariable[] { Var.var("v") },//
                     new IConstant[] { rdfProperty }//
             );
@@ -374,7 +374,7 @@ public class TestRule extends AbstractRuleTestCase {
              * Verify we can override another variable with a constant.
              */
 
-            final IBindingSet bindingSet = new ArrayBindingSet(//
+            final IBindingSet bindingSet = new ListBindingSet(//
                     new IVariable[] { Var.var("x") },//
                     new IConstant[] { rdfProperty }//
             );

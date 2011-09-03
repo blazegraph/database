@@ -63,7 +63,6 @@ public class TestAll extends TestCase {
         // @todo test EmptyBindingSet
         
         // test binding set impls.
-        suite.addTestSuite(TestArrayBindingSet.class);
         suite.addTestSuite(TestHashBindingSet.class);
         suite.addTestSuite(TestListBindingSet.class);
 

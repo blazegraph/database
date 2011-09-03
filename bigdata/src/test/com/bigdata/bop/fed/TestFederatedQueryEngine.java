@@ -47,19 +47,19 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -448,11 +448,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("Paul") }//
                 ), //
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("John") }//
         ) };
@@ -567,31 +567,31 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { //
                                 new Constant<String>("John"),
                                 new Constant<String>("Mary") }//
                 ), //
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] {//
                                 new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ), // 
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { //
                                 new Constant<String>("Mary"),
                                 new Constant<String>("John") }//
                 ), //
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] {//
                                 new Constant<String>("Mary"),
                                 new Constant<String>("Paul") }//
                 ), //
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { //
                                 new Constant<String>("Paul"),
@@ -737,12 +737,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ), // 
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Paul") }//
@@ -884,11 +884,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("Paul") }//
                 ), //
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("John") }//
         ) };
@@ -1075,13 +1075,13 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(// partition1
+            new ListBindingSet(// partition1
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Paul"),
                             new Constant<String>("Leon") }//
             ),//
-            new ArrayBindingSet(// partition0
+            new ListBindingSet(// partition0
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("John"),
@@ -1289,25 +1289,25 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
             // solutions where the 2nd join succeeds.
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
                             new Constant<String>("John") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("John"),
                             new Constant<String>("Mary") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("Leon"),
                             new Constant<String>("Paul"),
                             new Constant<String>("Leon") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Leon"),
@@ -1323,7 +1323,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 //             * Plus anything we read from the first access path which
 //             * did not pass the 2nd join.
              */
-//            new ArrayBindingSet(//
+//            new ListBindingSet(//
 //                    new IVariable[] { Var.var("x"), Var.var("y") },//
 //                    new IConstant[] { new Constant<String>("Mary"),
 //                            new Constant<String>("Paul") }//

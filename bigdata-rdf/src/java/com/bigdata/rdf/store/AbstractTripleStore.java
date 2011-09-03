@@ -64,7 +64,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.btree.AbstractBTree;
@@ -4381,7 +4381,7 @@ abstract public class AbstractTripleStore extends
 
             final IV iv = ivIterator.next();
 
-            final IBindingSet constants = new ArrayBindingSet(1);
+            final IBindingSet constants = new ListBindingSet();//new ArrayBindingSet(1);
 
             constants.set(lit, new Constant<IV>(iv));
 

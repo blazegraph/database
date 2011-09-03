@@ -41,13 +41,12 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -138,16 +137,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
     	final IBindingSet data [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
-            , new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
+              new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
+            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
+            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
+            , new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
         } ;
 
         //
@@ -155,16 +154,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
     	final IBindingSet expected [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
-            , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
+              new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
+            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
+            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -247,16 +246,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
         final IBindingSet data [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
-            , new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
+              new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
+            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
+            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
+            , new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
         } ;
 
         //
@@ -264,16 +263,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
         final IBindingSet expected [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
-            , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
+              new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { a }    )
+            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, e } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, c } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { a, a } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, d } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { b, b } )
+            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { c }    )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, b } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { d, a } )
         } ;
 
         final BOpStats stats = query.newStats () ;
@@ -377,16 +376,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
         final IBindingSet expected [] = new IBindingSet []
         {
-//              new ArrayBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    ) // dropped by type error.
-//            , new ArrayBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )  // dropped by type error.
-//            , new ArrayBindingSet ( new IVariable<?> [] { x },    new IConstant [] { _3 }    ) // dropped by type error.
-              new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _5 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _4 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _2 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _1 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _3 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _2 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _1 } )
+//              new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    ) // dropped by type error.
+//            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )  // dropped by type error.
+//            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { _3 }    ) // dropped by type error.
+              new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _5 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _4 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _2 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _1 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _3 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _2 } )
+            , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _1 } )
         } ;
 
         final BOpStats stats = query.newStats () ;

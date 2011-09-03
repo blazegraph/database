@@ -47,13 +47,12 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableFactory;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.rdf.aggregate.COUNT;
 import com.bigdata.bop.rdf.aggregate.SUM;
 import com.bigdata.rdf.internal.IV;
@@ -198,10 +197,10 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         final IBindingSet data [] = new IBindingSet []
         {
-            new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
+            new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
         };
 
         /**
@@ -215,8 +214,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         final IBindingSet expected [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org1 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org2 } )
+              new ListBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org1 } )
+            , new ListBindingSet ( new IVariable<?> [] { org },  new IConstant [] { org2 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -297,10 +296,10 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         final IBindingSet data [] = new IBindingSet []
         {
-            new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
-          , new ArrayBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
+            new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org1 } )
+          , new ListBindingSet ( new IVariable<?> [] { org }, new IConstant [] { org2 } )
         };
 
         /**
@@ -314,8 +313,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
          */
         final IBindingSet expected [] = new IBindingSet []
         {
-              new ArrayBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org1 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org2 } )
+              new ListBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org1 } )
+            , new ListBindingSet ( new IVariable<?> [] { newVar },  new IConstant [] { org2 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -478,8 +477,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price21 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7  } )
+              new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price21 } )
+            , new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7  } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -648,8 +647,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org1, _price21, price12 } )
-            , new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org2, _price7 , price12 } )
+              new ListBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org1, _price21, price12 } )
+            , new ListBindingSet ( new IVariable<?> [] { org, totalPrice, z },  new IConstant [] { org2, _price7 , price12 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -822,7 +821,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price21 } )
+              new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price21 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -994,7 +993,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(7)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
+              new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -1160,8 +1159,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(7)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-                new ArrayBindingSet ( new IVariable<?> [] { org,            },  new IConstant [] { org1,         } ),
-                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
+                new ListBindingSet ( new IVariable<?> [] { org,            },  new IConstant [] { org1,         } ),
+                new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price7 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -1328,7 +1327,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(28)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
+              new ListBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -1639,7 +1638,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(28)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
+              new ListBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price28 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -1801,7 +1800,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(21)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price21 } )
+              new ListBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price21 } )
         };
 
         if (isPipelinedAggregationOp()) {
@@ -1974,7 +1973,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDNumericIV<BigdataLiteral>(4L));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
+              new ListBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -2135,7 +2134,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDNumericIV<BigdataLiteral>(4L));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
+              new ListBindingSet ( new IVariable<?> [] { totalCount },  new IConstant [] { _totalCount } )
         } ;
 
         if (isPipelinedAggregationOp()) {
@@ -2323,7 +2322,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(140)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price140 } )
+              new ListBindingSet ( new IVariable<?> [] { totalPrice },  new IConstant [] { _price140 } )
         } ;
 
         if (isPipelinedAggregationOp()) {
@@ -2516,8 +2515,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(14)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price84 } ),
-                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price14 } )
+                new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org1, _price84 } ),
+                new ListBindingSet ( new IVariable<?> [] { org, totalPrice },  new IConstant [] { org2, _price14 } )
         } ;
 
         if (isPipelinedAggregationOp()) {
@@ -2713,7 +2712,7 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(56)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-              new ArrayBindingSet ( new IVariable<?> [] { totalPrice, inflatedPrice },  new IConstant [] { _price28, _price56 } )
+              new ListBindingSet ( new IVariable<?> [] { totalPrice, inflatedPrice },  new IConstant [] { _price28, _price56 } )
         } ;
 
         final BOpStats stats = query.newStats();
@@ -2901,8 +2900,8 @@ abstract public class AbstractAggregationTestCase extends TestCase2 {
                 new XSDIntegerIV<BigdataLiteral>(BigInteger.valueOf(42)));
         final IBindingSet expected[] = new IBindingSet[]
         {
-                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org1, _price21, _price42 } ),
-                new ArrayBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org2, _price7,  _price14 } )
+                new ListBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org1, _price21, _price42 } ),
+                new ListBindingSet ( new IVariable<?> [] { org, totalPrice, inflatedPrice },  new IConstant [] { org2, _price7,  _price14 } )
         } ;
 
         final BOpStats stats = query.newStats();

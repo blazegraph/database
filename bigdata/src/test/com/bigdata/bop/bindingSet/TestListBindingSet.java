@@ -112,7 +112,7 @@ public class TestListBindingSet extends TestIBindingSet
 	}
 
 	@Override
-	protected IBindingSet newBindingSet(int size) {
+	protected IBindingSet newBindingSet(int sizeIsIgnored) {
 	
 		return new ListBindingSet();
 		

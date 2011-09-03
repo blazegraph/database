@@ -38,8 +38,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 
 /**
  * Test suite for {@link Predicate}.
@@ -183,11 +183,11 @@ public class TestPredicate extends TestCase2 {
         doAsBoundTest(p1, EmptyBindingSet.INSTANCE);
         
         // already bound on predicate, but has different value in binding set.
-        doAsBoundTest(p1, new ArrayBindingSet(new IVariable[] { u },
+        doAsBoundTest(p1, new ListBindingSet(new IVariable[] { u },
                 new IConstant[] { c3 }));
 
         // not bound on the predicate, found in the binding set.
-        doAsBoundTest(p1, new ArrayBindingSet(new IVariable[] { u },
+        doAsBoundTest(p1, new ListBindingSet(new IVariable[] { u },
                 new IConstant[] { c3 }));
 
         // correct rejection tests.
@@ -272,11 +272,11 @@ public class TestPredicate extends TestCase2 {
         assertEquals(c1.get(), p1.asBound(1, EmptyBindingSet.INSTANCE));
         
         // already bound on predicate, but has different value in binding set.
-        assertEquals(c1.get(), p1.asBound(1, new ArrayBindingSet(
+        assertEquals(c1.get(), p1.asBound(1, new ListBindingSet(
                 new IVariable[] { u }, new IConstant[] { c3 })));
 
         // not bound on the predicate, found in the binding set.
-        assertEquals(c3.get(), p1.asBound(0, new ArrayBindingSet(
+        assertEquals(c3.get(), p1.asBound(0, new ListBindingSet(
                 new IVariable[] { u }, new IConstant[] { c3 })));
 
         // not bound on the predicate, not found in the binding set.

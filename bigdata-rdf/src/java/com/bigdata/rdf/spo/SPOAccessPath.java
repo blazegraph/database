@@ -28,7 +28,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -255,7 +255,7 @@ public class SPOAccessPath extends AccessPath<ISPO> {
              * that variable in the predicate with the desired constant.
              */
 
-            p = getPredicate().asBound(new ArrayBindingSet(//
+            p = getPredicate().asBound(new ListBindingSet(//
                     new IVariable[] { (IVariable<IV>) var },//
                     new IConstant[] { new Constant<IV>(v) }//
                     ));

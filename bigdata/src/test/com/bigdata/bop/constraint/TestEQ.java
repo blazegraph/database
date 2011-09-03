@@ -34,7 +34,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 
 /**
  * Test suite for {@link EQ}.
@@ -89,7 +89,7 @@ public class TestEQ extends TestCase2 {
 
         final EQ op = new EQ(Var.var("x"), Var.var("y"));
 
-        final IBindingSet bs1 = new ArrayBindingSet(//
+        final IBindingSet bs1 = new ListBindingSet(//
                 new IVariable[] { Var.var("x"), Var.var("y") }, //
                 new IConstant[] { new Constant<String>("1"),
                         new Constant<String>("1") });
@@ -105,7 +105,7 @@ public class TestEQ extends TestCase2 {
 
         final EQ op = new EQ(Var.var("x"), Var.var("y"));
 
-        final IBindingSet bs1 = new ArrayBindingSet(//
+        final IBindingSet bs1 = new ListBindingSet(//
                 new IVariable[] { Var.var("x"), Var.var("y") }, //
                 new IConstant[] { new Constant<String>("1"),
                         new Constant<String>("2") });
@@ -118,7 +118,7 @@ public class TestEQ extends TestCase2 {
 
         final EQ op = new EQ(Var.var("x"), Var.var("y"));
 
-        final IBindingSet bs1 = new ArrayBindingSet(//
+        final IBindingSet bs1 = new ListBindingSet(//
                 new IVariable[] { Var.var("x") }, //
                 new IConstant[] { new Constant<String>("1") });
 
