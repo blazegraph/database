@@ -59,27 +59,97 @@ public class HashBindingSet implements IBindingSet {
 //  */
 // private final LinkedHashMap<IVariable, IConstant> map;
 
-//	/**
-//	 * The stack of symbol tables. Each symbol table is a mapping from an
-//	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
-//	 * The stack is initialized with an empty symbol table. Symbol tables may be
-//	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
-//	 * become empty.
-//	 */
-//	private final Stack<LinkedHashMap<IVariable, IConstant>> stack;
+	/**
+	 * The stack of symbol tables. Each symbol table is a mapping from an
+	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
+	 * The stack is initialized with an empty symbol table. Symbol tables may be
+	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
+	 * become empty.
+	 */
+	private final LightStack<LinkedHashMap<IVariable, IConstant>> stack;
 
-    final private LinkedHashMap<IVariable,IConstant> current;
+//    final private LinkedHashMap<IVariable,IConstant> current;
     
 	/**
 	 * Return the symbol table on the top of the stack.
 	 */
 	private LinkedHashMap<IVariable, IConstant> current() {
 
-	    return current;
+//	    return current;
 	    
-//		return stack.peek();
+		return stack.peek();
 		
 	}
+
+    public void push(final IVariable[] vars) {
+
+        // Create a new symbol table.
+        final LinkedHashMap<IVariable, IConstant> tmp = new LinkedHashMap<IVariable, IConstant>(
+                current().size());
+
+        /*
+         * For each variable which is to be projected into the new symbol table,
+         * look up its binding. If it is bound, then copy that binding into the
+         * new symbol table.
+         */
+        for (IVariable<?> var : vars) {
+
+            final IConstant<?> val = get(var);
+            
+            if (val != null)
+                tmp.put(var, val);
+
+        }
+
+        // Push the new symbol table onto the stack.
+        stack.push(tmp);
+
+        hash = 0;
+
+    }
+
+    public void pop(final IVariable[] vars) {
+        
+        if (stack.size() < 2) {
+            /*
+             * The stack may never become empty. Therefore there must be at
+             * least two symbol tables on the stack for a pop() request.
+             */
+            throw new IllegalStateException();
+        }
+        
+        // Pop the symbol table off of the top of the stack.
+        final LinkedHashMap<IVariable, IConstant> old = stack.pop();
+
+        /*
+         * Copy the current binding for any variable that was projected by the
+         * subquery.
+         * 
+         * Note: This does not enforce consistency between the existing binding
+         * (if any) for a variable on the nested symbol table and the binding
+         * from the symbol table which is being popped off of the stack. It is
+         * the responsibility of the JOINs, BIND, etc. to verify that bindings
+         * are consistent when they are made. If the operators are written
+         * correctly then a variable which was bound on entry to a subquery will
+         * have the same binding on exit and there will be no need to verify
+         * that the value, when bound, is consistent.
+         */
+        for (IVariable<?> var : vars) { // for each projected variable.
+
+            // The binding from the old symbol table.
+            final IConstant val = old.get(var);
+            
+            if (val != null) { // if the binding was projected
+
+                set(var, val); // then copy to revealed symbol table.
+
+            }
+
+        }
+
+        hash = 0;
+
+    }
 	
 //	public void push() {
 //
@@ -145,11 +215,14 @@ public class HashBindingSet implements IBindingSet {
      */
     public HashBindingSet() {
 
-//		stack = new Stack<LinkedHashMap<IVariable, IConstant>>();
-//
-//		stack.push(new LinkedHashMap<IVariable, IConstant>());
+        /*
+         * Start with a capacity of ONE (1) and expand only as required.
+         */
+		stack = new LightStack<LinkedHashMap<IVariable, IConstant>>(1);
+
+		stack.push(new LinkedHashMap<IVariable, IConstant>());
         
-        current = new LinkedHashMap<IVariable, IConstant>();
+//        current = new LinkedHashMap<IVariable, IConstant>();
         
     }
 
@@ -160,31 +233,31 @@ public class HashBindingSet implements IBindingSet {
      */
     protected HashBindingSet(final HashBindingSet src, final IVariable[] variablesToKeep) {
         
-//		stack = new Stack<LinkedHashMap<IVariable,IConstant>>();
-//
-//		final int stackSize = src.stack.size();
-//
-//		int depth = 1;
-//		
-//		for (LinkedHashMap<IVariable, IConstant> srcLst : src.stack) {
-//
-//			/*
-//			 * Copy the source bindings.
-//			 * 
-//			 * Note: If a restriction exists on the variables to be copied, then
-//			 * it is applied onto the the top level of the stack. If the symbol
-//			 * table is saved when it is pop()'d, then the modified bindings
-//			 * will replace the parent symbol table on the stack.
-//			 */
-//			final LinkedHashMap<IVariable,IConstant> tmp = copy(srcLst,
-//					depth == stackSize ? variablesToKeep : null);
-//
-//			// Push onto the stack.
-//			stack.push(tmp);
-//
-//		}
+        final int stackSize = src.stack.size();
 
-        current = copy(src.current, variablesToKeep);
+		stack = new LightStack<LinkedHashMap<IVariable,IConstant>>(stackSize);
+
+		int depth = 1;
+		
+		for (LinkedHashMap<IVariable, IConstant> srcLst : src.stack) {
+
+			/*
+			 * Copy the source bindings.
+			 * 
+			 * Note: If a restriction exists on the variables to be copied, then
+			 * it is applied onto the the top level of the stack. If the symbol
+			 * table is saved when it is pop()'d, then the modified bindings
+			 * will replace the parent symbol table on the stack.
+			 */
+			final LinkedHashMap<IVariable,IConstant> tmp = copy(srcLst,
+					depth == stackSize ? variablesToKeep : null);
+
+			// Push onto the stack.
+			stack.push(tmp);
+
+		}
+
+//        current = copy(src.current, variablesToKeep);
 
 	}
 
@@ -466,6 +539,10 @@ public class HashBindingSet implements IBindingSet {
         return hash;
 
     }
+    
+    /**
+     * Note: This hash code MUST be invalidate on mutation!
+     */
     private int hash;
 
 }

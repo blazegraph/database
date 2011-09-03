@@ -39,7 +39,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
@@ -746,8 +746,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                 final SPO expectedSPO = new SPO(V1, rdfType, X1,
                         StatementEnum.Inferred);
 
-                final IBindingSet expectedBindingSet = new ArrayBindingSet(rule
-                        .getVariableCount());
+                final IBindingSet expectedBindingSet =
+                        new ListBindingSet()
+//                        new ArrayBindingSet(rule.getVariableCount())
+                ;
                 expectedBindingSet.set(Var.var("u"), U1);
                 expectedBindingSet.set(Var.var("v"), V1);
                 expectedBindingSet.set(Var.var("x"), X1);

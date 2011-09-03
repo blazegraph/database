@@ -43,14 +43,13 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -326,11 +325,11 @@ public class TestUnion extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
             new IVariable[] { x },//
             new IConstant[] { new Constant<String>("Leon") }//
             ), //
-        new ArrayBindingSet(//
+        new ListBindingSet(//
             new IVariable[] { x, y },//
             new IConstant[] { new Constant<String>("Mary"), 
                 new Constant<String>("John") }//

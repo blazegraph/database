@@ -33,8 +33,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 
 
 /**
@@ -104,7 +102,7 @@ public class TestHashBindingSet extends TestIBindingSet
         IVariable<?> vars [] = new IVariable [] { var1, var2 } ;
         IConstant<?> vals [] = new IConstant [] { val1, val2 } ;
 
-        assertEqual ( new HashBindingSet ( new ArrayBindingSet ( vars, vals ) ), vars, vals ) ;
+        assertEqual ( new HashBindingSet ( new ListBindingSet ( vars, vals ) ), vars, vals ) ;
     }
 
     /**

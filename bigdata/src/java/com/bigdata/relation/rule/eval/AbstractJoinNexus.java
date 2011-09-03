@@ -41,7 +41,7 @@ import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.joinGraph.DefaultRangeCountFactory;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.IRangeCountFactory;
@@ -601,9 +601,10 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 
         final int nconstants = constants.size();
         
-        final IBindingSet bindingSet = new ArrayBindingSet(rule
-                .getVariableCount()
-                + nconstants);
+        final IBindingSet bindingSet =
+                new ListBindingSet()
+//                new ArrayBindingSet(rule.getVariableCount()+ nconstants)
+        ;
 
         if (nconstants > 0) {
         

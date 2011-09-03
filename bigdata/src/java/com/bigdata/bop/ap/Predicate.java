@@ -40,7 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -313,7 +313,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
    
     public Predicate<E> asBound(final IVariable<?> var, final IConstant<?> val) {
 
-        return asBound(new ArrayBindingSet(new IVariable[] { var },
+        return asBound(new ListBindingSet(new IVariable[] { var },
                 new IConstant[] { val }));
         
     }

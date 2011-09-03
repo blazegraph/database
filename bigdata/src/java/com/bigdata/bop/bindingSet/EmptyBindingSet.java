@@ -44,8 +44,6 @@ import cutthecrap.utils.striterators.EmptyIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test suite?
  */
 final public class EmptyBindingSet implements IBindingSet, Serializable {
 
@@ -161,12 +159,12 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         
     }
 
-//	public void push() {
-//		throw new IllegalStateException();
-//	}
-//    
-//	public void pop(boolean save) {
-//		throw new UnsupportedOperationException();
-//	}
+	public void push(IVariable[] vars) {
+        throw new UnsupportedOperationException();
+	}
+    
+	public void pop(IVariable[] vars) {
+        throw new IllegalStateException();
+	}
 
 }

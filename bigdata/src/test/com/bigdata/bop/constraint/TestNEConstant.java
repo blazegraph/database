@@ -34,7 +34,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 
 /**
  * Unit tests for {@link NEConstant}.
@@ -83,10 +83,10 @@ public class TestNEConstant extends TestCase2 {
 
         NEConstant op = new NEConstant ( var, val1 ) ;
 
-        IBindingSet eq = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val1 } ) ;
-        IBindingSet ne1 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val2 } ) ;
-        IBindingSet ne2 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val3 } ) ;
-        IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
+        IBindingSet eq = new ListBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val1 } ) ;
+        IBindingSet ne1 = new ListBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val2 } ) ;
+        IBindingSet ne2 = new ListBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val3 } ) ;
+        IBindingSet nb = new ListBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
 
         assertFalse ( op.get ( eq ) ) ;
         assertTrue ( op.get ( ne1 ) ) ;

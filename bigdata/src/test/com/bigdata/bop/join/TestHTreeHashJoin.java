@@ -54,7 +54,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
@@ -398,11 +398,11 @@ public class TestHTreeHashJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
                                           new Constant<String>("Fred"),
@@ -521,11 +521,11 @@ public class TestHTreeHashJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
                                           new Constant<String>("Fred"),
@@ -638,11 +638,11 @@ public class TestHTreeHashJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Mary") }//
 //                ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
                                           new Constant<String>("Fred"),
@@ -755,11 +755,11 @@ public class TestHTreeHashJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x/*, y*/ },//
                         new IConstant[] { new Constant<String>("Brad"),
 //                                          new Constant<String>("Fred"),
@@ -924,17 +924,17 @@ public class TestHTreeHashJoin extends TestCase2 {
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
                 // bset1: optional solution.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { },//
                         new IConstant[] {}//
                 ),//
                 // bset2: optional solution.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Luke") }//
                 ),//
                   // bset3: joins.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
@@ -1085,17 +1085,17 @@ public class TestHTreeHashJoin extends TestCase2 {
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
 //                // bset1: optional solution.
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { },//
 //                        new IConstant[] {}//
 //                ),//
 //                // bset2: optional solution.
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Luke") }//
 //                ),//
                   // bset3: joins.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
@@ -1104,12 +1104,12 @@ public class TestHTreeHashJoin extends TestCase2 {
         // the expected solutions for the alternative sink (the optional solutions).
         final IBindingSet[] expected2 = new IBindingSet[] {//
                 // bset1: optional solution.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { },//
                         new IConstant[] {}//
                 ),//
                 // bset2: optional solution.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Luke") }//
                 ),//

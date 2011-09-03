@@ -28,12 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.Properties;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
@@ -181,19 +182,19 @@ public class TestSlice extends AbstractRuleTestCase {
             final IVariable[] vars = new IVariable[] { Var.var("x"),
                     Var.var("y"), Var.var("z") };
             
-            final IBindingSet bs0 = new ArrayBindingSet(vars, new IConstant[] {//
+            final IBindingSet bs0 = new ListBindingSet(vars, new IConstant[] {//
                     new Constant<IV>(x0.getIV()),//
                     new Constant<IV>(y0.getIV()),//
                     new Constant<IV>(z0.getIV())//
                     }
             ); 
-            final IBindingSet bs1 = new ArrayBindingSet(vars, new IConstant[] {//
+            final IBindingSet bs1 = new ListBindingSet(vars, new IConstant[] {//
                     new Constant<IV>(x1.getIV()),//
                     new Constant<IV>(y1.getIV()),//
                     new Constant<IV>(z1.getIV())//
                     }
             ); 
-            final IBindingSet bs2 = new ArrayBindingSet(vars, new IConstant[] {//
+            final IBindingSet bs2 = new ListBindingSet(vars, new IConstant[] {//
                     new Constant<IV>(x2.getIV()),//
                     new Constant<IV>(y2.getIV()),//
                     new Constant<IV>(z2.getIV())//

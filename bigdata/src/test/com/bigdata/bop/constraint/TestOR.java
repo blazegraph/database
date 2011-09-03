@@ -35,7 +35,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 
 /**
  * Unit tests for {@link OR}.
@@ -90,9 +90,9 @@ public class TestOR extends TestCase2 {
 
         OR op = new OR ( eq, eqc ) ;
 
-        IBindingSet eqlhs = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val1 } ) ;
-        IBindingSet eqrhs = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val2 } ) ;
-        IBindingSet ne = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val2, val1 } ) ;
+        IBindingSet eqlhs = new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val1 } ) ;
+        IBindingSet eqrhs = new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val2 } ) ;
+        IBindingSet ne = new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val2, val1 } ) ;
 
         assertTrue ( op.get ( eqlhs ) ) ;
         assertTrue ( op.get ( eqrhs ) ) ;

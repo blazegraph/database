@@ -55,8 +55,8 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
@@ -298,7 +298,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("Paul") }//
         ) };
@@ -376,7 +376,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { Var.var("value") },//
                 new IConstant[] { new Constant<String>("Paul") }//
         ) };
@@ -511,15 +511,15 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
 			source = new IBindingSet[] {//
         		bset1,bset2,bset3
-//                new HashBindingSet(new ArrayBindingSet(//
+//                new HashBindingSet(new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Paul") }//
 //                )),//
-//                new HashBindingSet(new ArrayBindingSet(//
+//                new HashBindingSet(new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Leon") }//
 //                )),
-//                new HashBindingSet(new ArrayBindingSet(//
+//                new HashBindingSet(new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Mary") }//
 //                )),
@@ -540,17 +540,17 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         
         // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { x, y },//
                 new IConstant[] { //
                 new Constant<String>("Paul"), new Constant<String>("Leon") }//
         ),//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { x, y },//
                 new IConstant[] { //
                 new Constant<String>("Leon"), new Constant<String>("Paul") }//
         ),
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { x, y },//
                 new IConstant[] { //
                 new Constant<String>("Mary"), new Constant<String>("Paul") }//
@@ -676,22 +676,22 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         
         // the source data.
         final IBindingSet[] source = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("John"),
                                 new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Mark") }//
@@ -796,22 +796,22 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         
         // the source data.
         final IBindingSet[] source = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("John"),
                                 new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Paul"),
                                 new Constant<String>("Mark") }//
@@ -961,12 +961,12 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("John"),
                                 new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
@@ -1112,27 +1112,27 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("John"),
 //                                new Constant<String>("Mary") }//
 //                ), //
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ), // 
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("Mary"),
 //                                new Constant<String>("John") }//
 //                ), //
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Paul") }//
                 ), //
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("Paul"),
 //                                new Constant<String>("Leon") }//
@@ -1291,7 +1291,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
 
             // the expected solution.
             final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Paul"),
@@ -1609,13 +1609,13 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
             // two solutions where the 2nd join succeeds.
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("Leon"),
                             new Constant<String>("Paul"),
                             new Constant<String>("Leon") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { x, y, z },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Leon"),
@@ -1629,12 +1629,12 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
              * path.
              */
 //            // plus anything we read from the first access path which did not join.
-//            new ArrayBindingSet(//
+//            new ListBindingSet(//
 //                    new IVariable[] { Var.var("x"), Var.var("y") },//
 //                    new IConstant[] { new Constant<String>("John"),
 //                            new Constant<String>("Mary") }//
 //            ),
-//            new ArrayBindingSet(//
+//            new ListBindingSet(//
 //                    new IVariable[] { Var.var("x"), Var.var("y") },//
 //                    new IConstant[] { new Constant<String>("Mary"),
 //                            new Constant<String>("Paul") }//
@@ -1736,7 +1736,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         {
             // the expected solution.
             final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z")},//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Paul"),
@@ -1819,7 +1819,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
         {
             // the expected solution.
             final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { Var.var("x")},//
                     new IConstant[] { new Constant<String>("Mary")}//
             ) };

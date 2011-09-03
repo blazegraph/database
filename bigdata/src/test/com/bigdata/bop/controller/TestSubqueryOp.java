@@ -48,7 +48,7 @@ import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
@@ -207,11 +207,11 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
                                           new Constant<String>("Fred"),
@@ -317,11 +317,11 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-//                new ArrayBindingSet(//
+//                new ListBindingSet(//
 //                        new IVariable[] { x },//
 //                        new IConstant[] { new Constant<String>("Mary") }//
 //                ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
                                           new Constant<String>("Fred"),
@@ -421,11 +421,11 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Brad"),
 //                                          new Constant<String>("Fred"),
@@ -656,28 +656,28 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
             // four solutions where the optional join succeeds.
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
                     		new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
                     		new Constant<String>("Leon") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
                     		new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
@@ -686,27 +686,27 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             ),
             // plus anything we read from the first access path which did not 
             // pass the optional join
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Leon") }//
@@ -921,14 +921,14 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
             // two solutions where the optional join succeeds.
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
                     		new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
@@ -937,27 +937,27 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             ),
             // plus anything we read from the first access path which did not 
             // pass the optional join
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Leon") }//
@@ -1182,14 +1182,14 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
             // two solutions where the optional join succeeds.
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
                             new Constant<String>("Brad"),
                     		new Constant<String>("Leon") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b, c, d },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Mary"),
@@ -1198,32 +1198,32 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
             ),
             // plus anything we read from the first access path which did not 
             // pass the optional join
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Mary") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Paul"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("John"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Brad") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Fred") }//
             ),
-            new ArrayBindingSet(//
+            new ListBindingSet(//
                     new IVariable[] { a, b },//
                     new IConstant[] { new Constant<String>("Brad"),
                             new Constant<String>("Leon") }//

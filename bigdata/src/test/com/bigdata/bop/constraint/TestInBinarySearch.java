@@ -36,7 +36,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 
 /**
  * Unit tests for {@link INBinarySearch}.
@@ -79,10 +79,10 @@ public class TestInBinarySearch extends TestINConstraint {
 
         INConstraint op = new INBinarySearch ( x, vals ) ;
 
-        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 21 ) } ) ) ) ;
-        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 37 ) } ) ) ) ;
-        assertTrue ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 75 ) } ) ) ) ;
-        assertFalse ( op.get ( new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 101 ) } ) ) ) ;
+        assertTrue ( op.get ( new ListBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 21 ) } ) ) ) ;
+        assertTrue ( op.get ( new ListBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 37 ) } ) ) ) ;
+        assertTrue ( op.get ( new ListBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 75 ) } ) ) ) ;
+        assertFalse ( op.get ( new ListBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<Integer> ( 101 ) } ) ) ) ;
     }
 
     @Override protected INConstraint newINConstraint ( IVariable<?> var, IConstant<?> vals [] )

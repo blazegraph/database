@@ -9,7 +9,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.rdf.internal.IV;
@@ -270,7 +270,7 @@ public class FastClosure extends BaseClosure {
 
                     // empty binding set since we only specialize the
                     // constraints.
-                    final IBindingSet noBindings = new ArrayBindingSet(0/* capacity */);
+                    final IBindingSet noBindings = EmptyBindingSet.INSTANCE;//new ArrayBindingSet(0/* capacity */);
                     {
 
                         final Rule tmp = new RuleOwlSameAs2(db, vocab);

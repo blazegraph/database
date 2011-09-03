@@ -48,7 +48,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ArrayBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
@@ -197,11 +197,11 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),//
@@ -282,19 +282,19 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("y") },//
                         new IConstant[] { new Constant<String>("John"), new Constant<String>("Jack") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("y") },//
                         new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jack") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("z") },//
                         new IConstant[] { new Constant<String>("John"), new Constant<String>("Jill") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("z") },//
                         new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jill") }//
                 ),//
@@ -381,11 +381,11 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("y") },//
                         new IConstant[] { new Constant<String>("John"), new Constant<String>("Jack") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x"), Var.var("z") },//
                         new IConstant[] { new Constant<String>("Paul"), new Constant<String>("Jill") }//
                 ),//
@@ -474,19 +474,19 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions (each solution appears twice since we feed two empty binding sets in).
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("x") },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),//
@@ -583,7 +583,7 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solution (just one).
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
+        new ListBindingSet(//
                 new IVariable[] { Var.var("y") },//
                 new IConstant[] { new Constant<String>("John") }//
         ) };
@@ -671,23 +671,23 @@ public class TestPipelineJoin extends TestCase2 {
          * The expected solutions.
          */
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("y") },//
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("y") },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("y") },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("y") },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { Var.var("y") },//
                         new IConstant[] { new Constant<String>("Leon") }//
                 ),
@@ -789,15 +789,15 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Luke") }//
                 ),//
@@ -894,11 +894,11 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions for the default sink.
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Paul") }//
                 ),//
@@ -906,7 +906,7 @@ public class TestPipelineJoin extends TestCase2 {
 
         // the expected solutions for the alternative sink.
         final IBindingSet[] expected2 = new IBindingSet[] {//
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Luke") }//
                 ),//
@@ -1031,17 +1031,17 @@ public class TestPipelineJoin extends TestCase2 {
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
                 // bset1 : one join passes the constraint, so no optionals.
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("John") }//
                 ),//
                 // bset2 : join fails, but bset2 is output anyway as "optional".
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Luke") }//
                 ),//
               // bset3: join fails, but bset3 is  output anyway as "optional".
-                new ArrayBindingSet(//
+                new ListBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Paul") }//
               ),//
