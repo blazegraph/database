@@ -37,7 +37,8 @@ import cutthecrap.utils.striterators.Striterator;
  * the {@link IBindingSet} is more complex.  However, java default serialization
  * will do a good job by providing back references for the object graph.
  * 
- * @version $Id: HashBindingSet.java 3836 2010-10-22 11:59:15Z thompsonbry $
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id: HashBindingSet.java 5123 2011-09-03 10:48:24Z thompsonbry $
  */
 public class ListBindingSet implements IBindingSet {
 
