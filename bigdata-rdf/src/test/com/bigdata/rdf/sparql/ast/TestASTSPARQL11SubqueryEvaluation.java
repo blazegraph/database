@@ -298,11 +298,18 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
                         new IVariable[] { Var.var("x"), Var.var("o") },//
                         new IConstant[] { new Constant(bryanURI.getIV()),
                                 new Constant(bryanLabel.getIV()) }),//
-       // { x=TermId(1U), o=TermId(3L) }
-        // { x=TermId(2U), o=TermId(4L) }
         };
+
         assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
     }
 
+    public void test_verifyPushPopPattern() {
+        fail("write test");
+    }
+    
+    public void test_subSubSelect() {
+        fail("write test");
+    }
+    
 }

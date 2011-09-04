@@ -433,8 +433,18 @@ public class BOpContext<E> extends BOpContextBase {
      * constraints were not satisfied. Therefore you should clone the
      * destination {@link IBindingSet} before calling this method.
      * 
-     * @param src
-     *            The source binding set.
+     * @param left
+     *            The left binding set.
+     * @param right
+     *            The right binding set.
+     * @param leftIsPipeline
+     *            <code>true</code> iff <i>left</i> is a solution from upstream
+     *            in the query pipeline. Otherwise, <i>right</i> is the upstream
+     *            solution. The upstream solution may be associated with a
+     *            symbol table stack used to manage the visibility of variables
+     *            in SPARQL 1.1 subqueries. Therefore, this is the solution
+     *            which must be clone and into which the bindings must be
+     *            propagated.
      * @param constraints
      *            An array of constraints (optional). When given, destination
      *            {@link IBindingSet} will be validated <em>after</em> mutation.
@@ -442,17 +452,26 @@ public class BOpContext<E> extends BOpContextBase {
      *            An array of variables whose bindings will be retained. The
      *            bindings are not stripped out until after the constraint(s)
      *            (if any) have been tested.
-     * @param dst
-     *            The target binding set, which is modified as a side-effect.
      * 
-     * @return <code>true</code> iff the bindings were consistent and the
-     *         constraints were not violated.
-     * 
-     * @todo unit tests.
+     * @return The solution with the combined bindings and <code>null</code> if
+     *         the bindings were not consistent, if a constraint was violated,
+     *         etc.
      */
-    static public boolean bind(final IBindingSet src,
-            final IConstraint[] constraints, final IVariable[] vars,
-            final IBindingSet dst) {
+    @SuppressWarnings("rawtypes")
+    static public IBindingSet bind(final IBindingSet left,
+            final IBindingSet right, final boolean leftIsPipeline,
+            final IConstraint[] constraints, final IVariable[] vars) {
+
+        /*
+         * Note: The binding sets from the query pipeline are always chosen as
+         * the destination into which we will copy the bindings. This allows us
+         * to preserve the symbol table stack for nested SPARQL subquery.
+         * 
+         * Note: We clone the destination binding set in order to avoid the
+         * possibility of side effects on that binding set.
+         */
+        final IBindingSet src = leftIsPipeline ? right : left;
+        final IBindingSet dst = leftIsPipeline ? left.clone() : right.clone();
 
         // Propagate bindings from src => dst
         {
@@ -477,7 +496,7 @@ public class BOpContext<E> extends BOpContextBase {
                         if (!val.equals(oval)) {
 
                             // Bindings are not consistent.
-                            return false;
+                            return null;
 
                         } // else already bound to the same value.
 
@@ -496,7 +515,7 @@ public class BOpContext<E> extends BOpContextBase {
         // Test constraint(s)
         if (constraints != null && !BOpUtility.isConsistent(constraints, dst)) {
 
-            return false;
+            return null;
 
         }
 
@@ -537,7 +556,7 @@ public class BOpContext<E> extends BOpContextBase {
         }
 
         // Bindings are consistent. Constraints (if any) were not violated.
-        return true;
+        return dst;
 
     }
 

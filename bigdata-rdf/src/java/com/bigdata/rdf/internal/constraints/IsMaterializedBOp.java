@@ -48,7 +48,6 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
 
 	private static final transient Logger log = Logger.getLogger(IsMaterializedBOp.class);
 	
-	
     public interface Annotations extends PipelineOp.Annotations {
 
     	/**
@@ -56,7 +55,7 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
     	 * materialized RDF {@link BigdataValue}.  If false, only accept those
     	 * that don't. 
     	 */
-    	String MATERIALIZED = (IsMaterializedBOp.class.getName() + ".materialized").intern();
+    	String MATERIALIZED = IsMaterializedBOp.class.getName() + ".materialized";
     	
     }
     
@@ -100,7 +99,7 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
         final boolean materialized = 
         	(Boolean) getRequiredProperty(Annotations.MATERIALIZED); 
         
-        final IV iv = get(0).get(bs);
+        final IV<?,?> iv = get(0).get(bs);
         
         if (log.isDebugEnabled()) {
         	log.debug(iv);

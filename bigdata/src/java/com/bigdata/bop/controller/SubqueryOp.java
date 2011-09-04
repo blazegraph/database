@@ -57,6 +57,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * multiple instances of this operator may be run in parallel by the query
  * engine for parallel evaluation of different binding set chunks flowing
  * through the pipeline.
+ * 
  * <h3>Usage Notes</h3>
  * 
  * If there are no shared variables which must already be bound in the caller,

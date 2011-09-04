@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -18,14 +17,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IPredicate.Annotations;
@@ -37,7 +34,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
@@ -45,7 +41,6 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.Steps;
-import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.SubqueryScopeOp;
 import com.bigdata.bop.controller.Union;
@@ -70,8 +65,10 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
+import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
@@ -91,12 +88,10 @@ import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Query plan generator converts an AST into a query plan made up of
@@ -194,7 +189,7 @@ public class AST2BOpUtility {
     		
     	}
     	
-        final IGroupNode<?> root = query.getWhereClause();
+        final IGroupNode<IGroupMemberNode> root = query.getWhereClause();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");
@@ -363,12 +358,6 @@ public class AST2BOpUtility {
      *         another matter. It probably is on a cluster. It might not be on a
      *         single machine depending on how heavy the subqueries are and what
      *         the concurrent workload is on the machine.
-     * 
-     *         TODO If a top-level {@link IBindingSet} is provided with the
-     *         query, should bindings which are projected by the named subquery
-     *         be passed into it from that top-level {@link IBindingSet}? (This
-     *         concern applies to both the {@link NamedSubqueryOp} and the
-     *         {@link SubqueryHashJoinOp}).
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             final NamedSubqueriesNode namedSubquerieNode,
@@ -572,14 +561,16 @@ public class AST2BOpUtility {
         final Iterator<BOp> itr = expr.argIterator();
         
         while (itr.hasNext()) {
-            
+
             final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
-            if(arg!=null){
             
-            if(isObviousAggregate(arg)) // recursion.
-                return true;
-            
-        }
+            if (arg != null) {
+
+                if (isObviousAggregate(arg)) // recursion.
+                    return true;
+
+            }
+
         }
         
         return false;
@@ -597,7 +588,8 @@ public class AST2BOpUtility {
      * @return
      */
     private static PipelineOp convertJoinGroupOrUnion(final PipelineOp left,
-            final IGroupNode groupNode, final AST2BOpContext ctx) {
+            final IGroupNode<IGroupMemberNode> groupNode,
+            final AST2BOpContext ctx) {
 
 		if (groupNode instanceof UnionNode) {
 			
@@ -798,7 +790,7 @@ public class AST2BOpUtility {
          * Add the LET assignments to the pipeline.
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
-                
+
         /*
          * Add the post-conditionals to the pipeline.
          */
@@ -808,10 +800,10 @@ public class AST2BOpUtility {
          * Add the end operator if necessary.
          */
         if (joinGroup.getParent() != null) {
-        left = addEndOp(left, ctx);
+            left = addEndOp(left, ctx);
         }
-        
-		return left;
+
+        return left;
 		
 	}
 	
@@ -835,7 +827,7 @@ public class AST2BOpUtility {
      * 
      * FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
      * variable bindings during query evaluation). This is basically the last
-     * place where we can pune out variables which are not being projected.
+     * place where we can prune out variables which are not being projected.
      * We need to do that here, but also incrementally.
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
@@ -848,6 +840,7 @@ public class AST2BOpUtility {
 
     }
 	
+    @SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final PipelineOp addAssignments(PipelineOp left,    		
     		final List<AssignmentNode> assignments,
             final AST2BOpContext ctx,
@@ -913,6 +906,7 @@ public class AST2BOpUtility {
     	
     }
 	
+    @SuppressWarnings("rawtypes")
     private static final PipelineOp addConditionals(PipelineOp left,    		
     		final Collection<FilterNode> filters,
             final AST2BOpContext ctx) {
@@ -921,7 +915,9 @@ public class AST2BOpUtility {
 
 		for (FilterNode filter : filters) {
 
-			final IValueExpression ve = filter.getValueExpression();
+            @SuppressWarnings("unchecked")
+            final IValueExpression<IV> ve = (IValueExpression<IV>) filter
+                    .getValueExpression();
 			
 			final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 			
@@ -952,7 +948,8 @@ public class AST2BOpUtility {
 				
 			}
 		
-			final IConstraint c = new SPARQLConstraint(ve);
+            final IConstraint c = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    ve);
 			
 			left = applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{ left },
@@ -970,6 +967,7 @@ public class AST2BOpUtility {
     private static final PipelineOp addJoins(PipelineOp left,
     		final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
+        @SuppressWarnings("rawtypes")
     	final List<IPredicate> preds = new LinkedList<IPredicate>();
     	
     	for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
@@ -983,11 +981,15 @@ public class AST2BOpUtility {
     	
     	final List<IConstraint> constraints = new LinkedList<IConstraint>();
     	
-    	for (FilterNode filter : joinGroup.getJoinFilters()) {
-    		constraints.add(new SPARQLConstraint(filter.getValueExpression()));
-    	}
+        for (FilterNode filter : joinGroup.getJoinFilters()) {
+
+            constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    filter.getValueExpression()));
+            
+        }
     	
-    	final IRule rule = new Rule(
+    	@SuppressWarnings("rawtypes")
+        final IRule rule = new Rule(
     			"null", // name
     			null, // head
     			preds.toArray(new IPredicate[preds.size()]), // tails
@@ -1064,15 +1066,16 @@ public class AST2BOpUtility {
     			continue;
     		}
     		
-    		final IGroupNode subgroup = (IGroupNode) child;
-    		
+            @SuppressWarnings("unchecked")
+            final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
+
     		if (subgroup.isOptional()) {
     			continue;
     		}
     		
             final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */, subgroup, ctx);
     		
-    		left = new SubqueryOp(new BOp[]{left}, 
+    		left = new SubqueryOp(leftOrEmpty(left), 
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
                     new NV(SubqueryOp.Annotations.SUBQUERY, subquery),
                     new NV(SubqueryOp.Annotations.OPTIONAL, false)
@@ -1090,7 +1093,8 @@ public class AST2BOpUtility {
     			continue;
     		}
     		
-    		final IGroupNode subgroup = (IGroupNode) child;
+            @SuppressWarnings("unchecked")
+            final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
     		
     		if (!subgroup.isOptional()) {
     			continue;
@@ -1123,7 +1127,7 @@ public class AST2BOpUtility {
                 final PipelineOp subquery = convertJoinGroupOrUnion(
                         null/* left */, subgroup, ctx);
 
-	    		left = new SubqueryOp(new BOp[]{left}, 
+	    		left = new SubqueryOp(leftOrEmpty(left), 
 	                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
 	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),
 	                    new NV(SubqueryOp.Annotations.OPTIONAL, true)
@@ -1244,6 +1248,7 @@ public class AST2BOpUtility {
      * 
      * @return The left-most operator in the pipeline.
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addAggregation(PipelineOp left,
             final ProjectionNode projection, final GroupByNode groupBy,
             final HavingNode having, final AST2BOpContext ctx) {
@@ -1386,12 +1391,13 @@ public class AST2BOpUtility {
      * list should be dropped. If there are no remaining value expressions, then
      * the entire ORDER BY operation should be dropped.
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final PipelineOp addOrderBy(PipelineOp left,
 			final OrderByNode orderBy, final AST2BOpContext ctx) {
 		
 		final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 		
-		final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBy.size()];
+        final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBy.size()];
 		
 		final Iterator<OrderByExpr> it = orderBy.iterator();
 		
@@ -1518,20 +1524,21 @@ public class AST2BOpUtility {
 
     /**
      * If the value expression that needs the materialized variables can run
-     * without a NotMaterializedException then just bypass the pipeline.
+     * without a {@link NotMaterializedException} then just bypass the pipeline.
      * This happens in the case of a value expression that only "sometimes"
      * needs materialized values, but not always (i.e. materialization
-     * requirement depends on the data flowing through). A good example of
-     * this is CompareBOp, which can sometimes work on internal values and
+     * requirement depends on the data flowing through). A good example of this
+     * is {@link CompareBOp}, which can sometimes work on internal values and
      * sometimes can't.
      */
+    @SuppressWarnings("rawtypes")
     private static PipelineOp addMaterializationSteps(
-    		PipelineOp left, final int rightId, final IValueExpression ve,
+    		PipelineOp left, final int rightId, final IValueExpression<IV> ve,
     		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
-		final IConstraint c2 = 
-    			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
-		
+        final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                new NeedsMaterializationBOp(ve));
+
 		left = applyQueryHints(
           	    new ConditionalRoutingOp(new BOp[]{left},
                     NV.asMap(new NV[]{//
@@ -1546,10 +1553,10 @@ public class AST2BOpUtility {
     
     /**
      * Adds a series of materialization steps to materialize terms needed
-     * downstream.
+     * downstream. To materialize the variable <code>?term</code>, the pipeline
+     * looks as follows:
      * 
-     * To materialize the variable ?term, the pipeline looks as follows:
-     * 
+     * <pre>
      * left 
      * -> 
      * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
@@ -1561,18 +1568,20 @@ public class AST2BOpUtility {
      * PipelineJoin (predicate=LexPredicate(?term))
      * ->
      * right
+     * </pre>
      * 
      * @param left
-     * 			the left (upstream) operator that immediately proceeds the
-     * 			materialization steps
+     *            the left (upstream) operator that immediately proceeds the
+     *            materialization steps
      * @param rightId
-     * 			the id of the right (downstream) operator that immediately 
-     * 			follows the materialization steps
+     *            the id of the right (downstream) operator that immediately
+     *            follows the materialization steps
      * @param vars
-     * 			the terms to materialize
-     * @return
-     * 			the final bop added to the pipeline by this method
+     *            the terms to materialize
+     *            
+     * @return the final bop added to the pipeline by this method
      */
+    @SuppressWarnings("rawtypes")
     private static PipelineOp addMaterializationSteps(
     		PipelineOp left, final int rightId,
     		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
@@ -1612,7 +1621,8 @@ public class AST2BOpUtility {
     			
     		}
     		
-    		final IConstraint c1 = new SPARQLConstraint(new IsMaterializedBOp(v, false));
+            final IConstraint c1 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    new IsMaterializedBOp(v, false/* materialized */));
     		
             final PipelineOp condOp1 = applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{left},
@@ -1627,8 +1637,9 @@ public class AST2BOpUtility {
           	    log.debug("adding 1st conditional routing op: " + condOp1);
             }
         	
-    		final IConstraint c2 = new SPARQLConstraint(new IsInlineBOp(v, true));
-    		
+            final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                    new IsInlineBOp(v, true/* inline */));
+
             final PipelineOp condOp2 = applyQueryHints(
               	    new ConditionalRoutingOp(new BOp[]{condOp1},
                         NV.asMap(new NV[]{//
@@ -1698,102 +1709,103 @@ public class AST2BOpUtility {
     	
     }
 
-    /**
-     * Return an array indicating the {@link IKeyOrder} that will be used when
-     * reading on each of the tail predicates. The array is formed using a
-     * private {@link IBindingSet} and propagating fake bindings to each
-     * predicate in turn using the given evaluation order.
-     * 
-     * @param order
-     *            The evaluation order.
-     * @param nvars
-     *            The #of unbound variables for each tail predicate is assigned
-     *            by side-effect.
-     * 
-     * @return An array of the {@link IKeyOrder}s for each tail predicate. The
-     *         array is correlated with the predicates index in the tail of the
-     *         rule NOT its evaluation order.
-     */
-    @SuppressWarnings("unchecked")
-    static private IKeyOrder[] computeKeyOrderForEachTail(final List<Predicate> preds,
-            final BOpContextBase context, final int[] order, final int[] nvars) {
+//    /**
+//     * Return an array indicating the {@link IKeyOrder} that will be used when
+//     * reading on each of the tail predicates. The array is formed using a
+//     * private {@link IBindingSet} and propagating fake bindings to each
+//     * predicate in turn using the given evaluation order.
+//     * 
+//     * @param order
+//     *            The evaluation order.
+//     * @param nvars
+//     *            The #of unbound variables for each tail predicate is assigned
+//     *            by side-effect.
+//     * 
+//     * @return An array of the {@link IKeyOrder}s for each tail predicate. The
+//     *         array is correlated with the predicates index in the tail of the
+//     *         rule NOT its evaluation order.
+//     */
+//    @SuppressWarnings({ "rawtypes" })
+//    static private IKeyOrder[] computeKeyOrderForEachTail(final List<Predicate> preds,
+//            final BOpContextBase context, final int[] order, final int[] nvars) {
+//
+//        if (order == null)
+//            throw new IllegalArgumentException();
+//
+//        if (order.length != preds.size())
+//            throw new IllegalArgumentException();
+//
+//        final int tailCount = preds.size();
+//
+//        final IKeyOrder[] a = new IKeyOrder[tailCount];
+//        
+//        final IBindingSet bindingSet = new HashBindingSet();
+//        
+//        final IConstant<IV> fakeTermId = new Constant<IV>(TermId.mockIV(VTE.URI));
+//        
+//        for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
+//
+//            final int tailIndex = order[orderIndex];
+//
+//            final IPredicate pred = preds.get(tailIndex);
+//
+//            final IRelation rel = context.getRelation(pred);
+//            
+//            final IPredicate asBound = pred.asBound(bindingSet);
+//            
+//            final IKeyOrder keyOrder = context.getAccessPath(
+//                    rel, asBound).getKeyOrder();
+//
+//            if (log.isDebugEnabled())
+//                log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
+//                        + ", tailIndex=" + orderIndex + ", pred=" + pred
+//                        + ", bindingSet=" + bindingSet + ", preds=" +
+//                        Arrays.toString(preds.toArray()));
+//
+//            // save results.
+//            a[tailIndex] = keyOrder;
+//            nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
+//                    : asBound.getVariableCount((IKeyOrder) keyOrder);
+//
+//            final int arity = pred.arity();
+//
+//            for (int j = 0; j < arity; j++) {
+//
+//                final IVariableOrConstant<?> t = pred.get(j);
+//
+//                if (t.isVar()) {
+//
+//                    final IVariable<?> var = (IVariable<?>) t;
+//
+//                    if (log.isDebugEnabled()) {
+//
+//                        log.debug("Propagating binding: pred=" + pred
+//                                        + ", var=" + var + ", bindingSet="
+//                                        + bindingSet);
+//                        
+//                    }
+//                    
+//                    bindingSet.set(var, fakeTermId);
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//        if (log.isDebugEnabled()) {
+//
+//            log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
+//                    + Arrays.toString(nvars) + ", preds=" + 
+//                    Arrays.toString(preds.toArray()));
+//
+//        }
+//
+//        return a;
+//
+//    }
 
-        if (order == null)
-            throw new IllegalArgumentException();
-
-        if (order.length != preds.size())
-            throw new IllegalArgumentException();
-
-        final int tailCount = preds.size();
-
-        final IKeyOrder[] a = new IKeyOrder[tailCount];
-        
-        final IBindingSet bindingSet = new HashBindingSet();
-        
-        final IConstant<IV> fakeTermId = new Constant<IV>(TermId.mockIV(VTE.URI));
-        
-        for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
-
-            final int tailIndex = order[orderIndex];
-
-            final IPredicate pred = preds.get(tailIndex);
-
-            final IRelation rel = context.getRelation(pred);
-            
-            final IPredicate asBound = pred.asBound(bindingSet);
-            
-            final IKeyOrder keyOrder = context.getAccessPath(
-                    rel, asBound).getKeyOrder();
-
-            if (log.isDebugEnabled())
-                log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
-                        + ", tailIndex=" + orderIndex + ", pred=" + pred
-                        + ", bindingSet=" + bindingSet + ", preds=" +
-                        Arrays.toString(preds.toArray()));
-
-            // save results.
-            a[tailIndex] = keyOrder;
-            nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
-                    : asBound.getVariableCount((IKeyOrder) keyOrder);
-
-            final int arity = pred.arity();
-
-            for (int j = 0; j < arity; j++) {
-
-                final IVariableOrConstant<?> t = pred.get(j);
-
-                if (t.isVar()) {
-
-                    final IVariable<?> var = (IVariable<?>) t;
-
-                    if (log.isDebugEnabled()) {
-
-                        log.debug("Propagating binding: pred=" + pred
-                                        + ", var=" + var + ", bindingSet="
-                                        + bindingSet);
-                        
-                    }
-                    
-                    bindingSet.set(var, fakeTermId);
-
-                }
-
-            }
-
-        }
-
-        if (log.isDebugEnabled()) {
-
-            log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
-                    + Arrays.toString(nvars) + ", preds=" + 
-                    Arrays.toString(preds.toArray()));
-
-        }
-
-        return a;
-
-    }
-
+    @SuppressWarnings("rawtypes")
     private static final Predicate toPredicate(
     		final StatementPatternNode sp, final AST2BOpContext ctx) {
     	
@@ -1831,7 +1843,7 @@ public class AST2BOpUtility {
         if (expander == null) {
             p = sp.p().getValueExpression();
         } else {
-            p = new Constant(TermId.mockIV(VTE.BNODE));
+            p = new Constant<IV>(TermId.mockIV(VTE.BNODE));
         }
         if (p == null) {
             return null;
@@ -1841,7 +1853,7 @@ public class AST2BOpUtility {
         if (expander == null) {
             o = sp.o().getValueExpression();
         } else {
-            o = new Constant(TermId.mockIV(VTE.BNODE));
+            o = new Constant<IV>(TermId.mockIV(VTE.BNODE));
         }
         if (o == null) {
             return null;
@@ -2097,6 +2109,7 @@ public class AST2BOpUtility {
     		
     		final IValueExpressionNode child = assignment.getValueExpressionNode();
     		
+            @SuppressWarnings("rawtypes")
     		final IValueExpression<? extends IV> ve = toVE(lex, child);
     		
     		return ve;
@@ -2112,7 +2125,8 @@ public class AST2BOpUtility {
     		final ValueExpressionNode[] args = 
     			function.args().toArray(new ValueExpressionNode[function.arity()]); 
     		
-    		final IValueExpression<? extends IV> ve =
+    		@SuppressWarnings("rawtypes")
+            final IValueExpression<? extends IV> ve =
     			FunctionRegistry.toVE(lex, functionURI, scalarValues, args);
     		
     		node.setValueExpression(ve);

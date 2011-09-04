@@ -64,7 +64,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
  * 
  * FIXME {@link CompareOptimizer}. Replaces Compare with SameTerm whenever
  * possible. (I think that we handle this in the {@link FunctionRegistry}, but
- * that should be verified and documented here.
+ * that should be verified and documented here.)
  * 
  * FIXME {@link ConjunctiveConstraintSplitter}. Takes a FILTER with an AND of
  * constraints and replaces it with one filter per left or right hand side of
@@ -141,7 +141,9 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
  * 
  * FIXME If a subquery does not share ANY variables which MUST be bound in the
  * parent's context then rewrite the subquery into a named/include pattern so it
- * will run exactly once. {@link SubqueryRoot.Annotations#RUN_ONCE}.
+ * will run exactly once. {@link SubqueryRoot.Annotations#RUN_ONCE}. (If it does
+ * not share any variables at all then it will produce a cross product and,
+ * again, we want to run that subquery once.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
@@ -180,7 +182,8 @@ public class DefaultOptimizerList extends OptimizerList {
          * has multiple solutions. In particular, the possible values which a
          * variable may take on can be written into an IN constraint and
          * associated with the query in the appropriate scope. Those are not
-         * being handled yet.
+         * being handled yet. Also, if a variable takes on the same value in ALL
+         * source solutions, then it can be replaced by a constant.
          */ 
         add(new ASTBindingAssigner());
 
@@ -200,7 +203,7 @@ public class DefaultOptimizerList extends OptimizerList {
 
         /**
          * Validates named subquery / include patterns, identifies the join
-         * variables, and annotations the named subquery root and named subquery
+         * variables, and annotates the named subquery root and named subquery
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());

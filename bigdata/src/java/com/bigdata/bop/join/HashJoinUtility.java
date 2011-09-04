@@ -205,10 +205,10 @@ public class HashJoinUtility {
      * consistency and the constraints (if any) are applied. Solutions which
      * join are written on the caller's buffer.
      * 
-     * @param itr
+     * @param leftItr
      *            A stream of solutions to be joined against the hash index
      *            (left).
-     * @param unsyncBuffer
+     * @param outputBuffer
      *            Where to write the solutions which join.
      * @param joinVars
      *            The join variables (required). Solutions which do not have
@@ -236,6 +236,14 @@ public class HashJoinUtility {
      *            <code>true</code> iff the optional solutions must also be
      *            output, in which case the <i>joinSet</i> is required and will
      *            be populated by this method.
+     * @param leftIsPipeline
+     *            <code>true</code> iff <i>left</i> is a solution from upstream
+     *            in the query pipeline. Otherwise, <i>right</i> is the upstream
+     *            solution. The upstream solution may be associated with a
+     *            symbol table stack used to manage the visibility of variables
+     *            in SPARQL 1.1 subqueries. Therefore, this is the solution
+     *            which must be clone and into which the bindings must be
+     *            propagated.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Inline access
      *      path).
@@ -244,20 +252,22 @@ public class HashJoinUtility {
      *      com.bigdata.bop.IPredicate, IVariable[], BaseJoinStats)
      */
     static public void hashJoin(//
-            final ICloseableIterator<IBindingSet> itr,//
-            final IBuffer<IBindingSet> unsyncBuffer,//
+            final ICloseableIterator<IBindingSet> leftItr,//
+            final IBuffer<IBindingSet> outputBuffer,//
             final IVariable<?>[] joinVars,//
             final IVariable<?>[] selectVars,//
             final IConstraint[] constraints,//
             final HTree rightSolutions,//
             final HTree joinSet,//
-            final boolean optional) {
+            final boolean optional,//
+            final boolean leftIsPipeline//
+            ) {
 
         try {
 
-            while (itr.hasNext()) {
+            while (leftItr.hasNext()) {
 
-                final IBindingSet leftSolution = itr.next();
+                final IBindingSet leftSolution = leftItr.next();
                 if(selectVars != null)
                     leftSolution.push(selectVars);
 
@@ -292,21 +302,12 @@ public class HashJoinUtility {
                      */
                     final IBindingSet rightSolution = t.getObject();
 
-                    /*
-                     * Join.
-                     * 
-                     * Note: we can not modify the rightSolution (from the hash
-                     * index) if the join is optional. If the join is not
-                     * optional, then we a free to modify it since a new binding
-                     * set object will be delivered from the HTree each time we
-                     * visit this solution (it gets deserialized each time).
-                     */
+                    // Join.
+                    final IBindingSet outSolution = BOpContext.bind(
+                            leftSolution, rightSolution, leftIsPipeline,
+                            constraints, selectVars);
 
-                    final IBindingSet outSolution = optional ? rightSolution
-                            .clone() : rightSolution;
-
-                    if (!BOpContext.bind(leftSolution, constraints, selectVars,
-                            outSolution)) {
+                    if (outSolution == null) {
 
                         // Join failed.
                         continue;
@@ -317,7 +318,7 @@ public class HashJoinUtility {
                         log.debug("Output solution: " + outSolution);
 
                     // Accept this binding set.
-                    unsyncBuffer.add(outSolution);
+                    outputBuffer.add(outSolution);
 
                     if (optional) {
 
@@ -342,7 +343,7 @@ public class HashJoinUtility {
 
         } finally {
 
-            itr.close();
+            leftItr.close();
 
         }
 
@@ -356,7 +357,7 @@ public class HashJoinUtility {
      * the right solution did not join, then it is output now as an optional
      * join.
      * 
-     * @param unsyncBuffer2
+     * @param outputBuffer
      *            Where to write the optional solutions.
      * @param rightSolutions
      *            The hash index (right).
@@ -365,7 +366,7 @@ public class HashJoinUtility {
      *            maintained iff the join is optional.
      */
     static public void outputOptionals(
-            final IBuffer<IBindingSet> unsyncBuffer2,
+            final IBuffer<IBindingSet> outputBuffer,
             final HTree rightSolutions, //
             final HTree joinSet//
             ) {
@@ -396,7 +397,7 @@ public class HashJoinUtility {
                  * Since the source solution is not in the join set,
                  * output it as an optional solution.
                  */
-                unsyncBuffer2.add(rightSolution);
+                outputBuffer.add(rightSolution);
 
             }
 
