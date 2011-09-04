@@ -52,6 +52,7 @@ import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.Dechunkerator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator joins a named solution set into the pipeline.
@@ -326,10 +327,12 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);//, new PopFilter(selectVars));
 
-            HashJoinUtility.hashJoin(
-                    new Dechunkerator<IBindingSet>(context.getSource()),
-                    unsyncBuffer, joinVars, selectVars, constraints,
-                    rightSolutions, joinSet, optional);
+            final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
+                    context.getSource());
+
+            HashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
+                    selectVars, constraints, rightSolutions/* hashIndex */,
+                    joinSet, optional, true/* leftIsPipeline */);
 
 //            if (optional) {
 //

@@ -46,8 +46,8 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
 	 */
 	private static final long serialVersionUID = 3125106876006900339L;
 	
-	private static final transient Logger log = Logger.getLogger(IsInlineBOp.class);
-	
+    private static final transient Logger log = Logger
+            .getLogger(IsInlineBOp.class);
 
     public interface Annotations extends PipelineOp.Annotations {
 
@@ -58,7 +58,7 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
     	 * <p>
     	 * @see IV#isInline()
     	 */
-    	String INLINE = (IsInlineBOp.class.getName() + ".inline").intern();
+    	String INLINE = IsInlineBOp.class.getName() + ".inline";
     	
     }
 
@@ -101,7 +101,7 @@ public class IsInlineBOp extends XSDBooleanIVValueExpression {
         final boolean inline = 
         	(Boolean) getRequiredProperty(Annotations.INLINE); 
         
-        final IV iv = get(0).get(bs);
+        final IV<?,?> iv = get(0).get(bs);
         
         if (log.isDebugEnabled()) {
         	log.debug(iv);

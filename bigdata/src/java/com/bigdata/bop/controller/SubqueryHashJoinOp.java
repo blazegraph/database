@@ -354,14 +354,14 @@ public class SubqueryHashJoinOp extends PipelineOp {
                             log.debug("Considering chunk of " + chunk.length
                                     + " solutions from the subquery");
 
-                        for (IBindingSet subquerySolution : chunk) {
+                        for (IBindingSet right : chunk) {
 
 //                          stats.accessPathUnitsIn.increment();
 
                             if (log.isDebugEnabled())
-                                log.debug("Considering " + subquerySolution);
+                                log.debug("Considering " + right);
 
-                            final Key key = makeKey(subquerySolution);
+                            final Key key = makeKey(right);
 
                             // Probe the hash map.
                             Bucket b = map.get(key);
@@ -369,7 +369,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                             if (b == null)
                                 continue;
                          
-                            for(SolutionHit src : b.solutions) {
+                            for(SolutionHit left : b.solutions) {
 
                                 /*
                                  * #of elements accepted for this binding set.
@@ -385,21 +385,20 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                  */
 
                                 if (log.isDebugEnabled())
-                                    log.debug("Join with " + src);
-
-                                /*
-                                 * Clone this binding set since it is tested for
-                                 * each element visited and would otherwise be
-                                 * modified by a side-effect of the join.
-                                 */
-                                final IBindingSet outSolution = src.solution
-                                        .clone();
+                                    log.debug("Join with " + left);
 
                                 // propagate bindings from the subquery
-                                if (!BOpContext
-                                        .bind(subquerySolution/* src */,
-                                                constraints, selectVars,
-                                                outSolution/* dst */)) {
+                                final IBindingSet outSolution = //
+                                BOpContext.bind(//
+                                        left.solution,// pipelineSolutionsFromHashIndex
+                                        right,// subquerySolutionsFromItr
+                                        true,// leftIsPipeline
+                                        constraints,//
+                                        selectVars//
+                                        );
+
+                                if (outSolution == null) {
+                                
                                     // Join failed.
                                     continue;
                                 }
@@ -407,7 +406,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                                 if (log.isDebugEnabled())
                                     log.debug("Output solution: " + outSolution);
 
-                                src.nhits++;
+                                left.nhits++;
 
                                 // Accept this binding set.
                                 unsyncBuffer.add(outSolution);

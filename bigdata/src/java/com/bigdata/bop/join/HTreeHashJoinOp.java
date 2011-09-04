@@ -554,9 +554,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                     op.getChunkCapacity(), sink);
 
             HashJoinUtility.hashJoin(BOpContext.solutions(
-                    accessPath.iterator(), pred, joinVars, stats),
+                    accessPath.iterator()/*left*/, pred, joinVars, stats),
                     unsyncBuffer, joinVars, selectVars, constraints,
-                    rightSolutions, joinSet, optional);
+                    rightSolutions, joinSet, optional, false/*leftIsPipeline*/);
 
             if (optional) {
 
