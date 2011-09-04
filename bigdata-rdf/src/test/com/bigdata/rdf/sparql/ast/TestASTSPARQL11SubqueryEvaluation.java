@@ -303,13 +303,5 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
         assertSameSolutionsAnyOrder(expected, queryEngine.eval(queryPlan));
 
     }
-
-    public void test_verifyPushPopPattern() {
-        fail("write test");
-    }
-    
-    public void test_subSubSelect() {
-        fail("write test");
-    }
     
 }
