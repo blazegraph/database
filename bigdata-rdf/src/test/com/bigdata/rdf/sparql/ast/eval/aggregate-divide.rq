@@ -1,0 +1,33 @@
+prefix : <http://example.org/> 
+prefix xsd: <http://www.w3.org/2001/XMLSchema#> 
+SELECT ?_set17
+(<http://www.w3.org/2006/sparql-functions#coalesce>((COUNT(?_set16) /
+SAMPLE(?_set19)), 0) AS ?_set10)
+
+WITH {
+      SELECT DISTINCT ?_set12
+      WHERE {
+          ?_set13 :p1 ?_set12.
+      }
+      ORDER BY ?_set12
+      LIMIT 4
+} AS %_set15
+
+WHERE {
+      ?_set13 :i2d ?_set16.
+      {
+          SELECT (COUNT(?_set16) AS ?_set19)
+          WHERE {
+              ?_set13 :i2d  ?_set16.
+              ?_set13 :i2c  ?_set17.
+              ?_set13 :p1  ?_set12 
+              INCLUDE %_set15
+          }
+      }
+      ?_set13 :i2c ?_set17 .
+      ?_set13 :p1 ?_set12
+      INCLUDE %_set15
+
+}
+GROUP BY ?_set17
+ORDER BY DESC(?_set10)

@@ -725,18 +725,25 @@ public class AST2BOpUtility {
      *    
      * 2. Pipeline the preConditionals. Add materialization steps as needed.
      * 
-     * 3. Join the statement patterns. Use the static optimizer to attach
-     * constraints to joins. Lots of funky stuff with materialization and
-     * named / default graph joins.
+     * 3. Non-optional joins and non-optional subqueries.
      * 
-     * 4. Pipeline the non-optional sub-groups (unions). Make sure it's not
-     * an empty union.
+     *   3a. Join the statement patterns. Use the static optimizer to attach
+     *       constraints to joins. Lots of funky stuff with materialization and
+     *       named / default graph joins.
      * 
-     * 5. Pipeline the optional sub-groups (join groups). Lift single optional
+     *   3b. Pipeline the SPARQL 1.1 subquery.
+     * 
+     *   3c. Hash join for each named subquery include. 
+     * 
+     * 4. Pipeline the optional sub-groups (join groups). Lift single optional
      * statement patterns into this group (avoid the subquery op) per the
-     * instructions above regarding materialization and constraints.
+     * instructions above regarding materialization and constraints. Unions are
+     * handled here because they do not always produce bindings for a given
+     * variable and hence have semantics similar to optionals for the purposes
+     * of attaching constraints and reordering join graphs. For union, make sure 
+     * it's not an empty union.
      * 
-     * 6. Pipeline the postConditionals. Add materialization steps as needed.
+     * 5. Pipeline the postConditionals. Add materialization steps as needed.
      * </pre>
      * 
      * TODO Think about how hash joins fit into this.
@@ -745,41 +752,89 @@ public class AST2BOpUtility {
 	        final JoinGroupNode joinGroup,
 			final AST2BOpContext ctx) {
 
-		/*
-		 * Place the StartOp at the beginning of the pipeline.
-		 */
-//        PipelineOp left = addStartOp(ctx);
+        /*
+         * Place the StartOp at the beginning of the pipeline.
+         * 
+         * TODO We only need a start op on a cluster if there is a requirement
+         * to marshall all solutions from a parent's evaluation context onto the
+         * top-level query controller. I am not sure that we ever have to do
+         * this for a subquery, but there might be cases where it is required.
+         * For all other cases, we should begin with left := null. However,
+         * there are cases where getParent() is running into a null reference
+         * during query evaluation if [left := null] here. Look into and resolve
+         * those issues.
+         */
 	    if(left == null)
 	        left = addStartOp(ctx);
         
         /*
          * Add the pre-conditionals to the pipeline.
+         * 
+         * FIXME Does this force anything which will be needed by any filter in
+         * the query to become materialized before we do anything else? If so,
+         * then how do we ever handle materialization for filters against
+         * variables are not bound until we run a required join later in the
+         * group? Are those filters being moved to post-conditionals? If so,
+         * then that is very expensive. They should be tightly interwoven with
+         * the required joins such that we evaluate them as soon as possible to
+         * maximize the selectivity of the pipeline, right?
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
-        
-        /*
-         * Add the joins (statement patterns) and the filters on those joins.
-         */
-        left = addJoins(left, joinGroup, ctx);
 
         /*
-         * Add SPARQL 1.1 style subqueries. 
+         * Required joins and non-optional subqueries.
+         * 
+         * TODO SPARQL 1.1 style subqueries are currently always pipelined. Like
+         * named subquery includes, they are also never optional. However, there
+         * is no a-priori reason why we should run pipelined subqueries before
+         * named subquery includes and, really, no reason why we can not mix
+         * these with the required joins (above). I believe that this is being
+         * done solely for expediency (because the static query optimizer can
+         * not handle it).
+         * 
+         * Also, note that named subquery includes are hash joins. We have an
+         * index. If the operator supported cutoff evaluation then we could
+         * easily reorder them with the other required joins using the RTO.
+         * 
+         * Ditto for pipelined SPARQL 1.1 subquery. If it supported cutoff
+         * evaluation, then the RTO could reorder them with the required joins.
+         * This is even true when the subquery uses GROUP BY or ORDER BY, which
+         * imply the use of at once operators. While we must fully materialize
+         * the solutions for each evaluation of the subquery, the evaluation is
+         * based on the as-bound solutions flowing into the subquery. If the
+         * subquery is unselective, then clearly this will be painful and it
+         * might be better to lift such unselective subqueries into named
+         * subqueries in order to obtain a hash index over the entire subquery
+         * solution set when evaluated with an empty source binding set.
          */
-        for (IQueryNode child : joinGroup) {
-            if (child instanceof SubqueryRoot)
-                left = addSparql11Subquery(left, (SubqueryRoot) child, ctx);
+        {
+
+            /*
+             * Add the joins (statement patterns) and the filters on those
+             * joins.
+             */
+            left = addJoins(left, joinGroup, ctx);
+
+            /*
+             * Add SPARQL 1.1 style subqueries.
+             */
+            for (IQueryNode child : joinGroup) {
+                if (child instanceof SubqueryRoot)
+                    left = addSparql11Subquery(left, (SubqueryRoot) child, ctx);
+            }
+
+            /*
+             * Add joins against named solution sets from WITH AS INCLUDE style
+             * subqueries.
+             */
+            for (IQueryNode child : joinGroup) {
+                if (child instanceof NamedSubqueryInclude)
+                    left = addSubqueryInclude(left,
+                            (NamedSubqueryInclude) child, ctx);
+            }
+
         }
         
-        /*
-         * Add joins against named solution sets from WITH AS INCLUDE style
-         * subqueries. 
-         */
-        for (IQueryNode child : joinGroup) {
-            if (child instanceof NamedSubqueryInclude)
-                left = addSubqueryInclude(left, (NamedSubqueryInclude) child,
-                        ctx);
-        }
-
         /*
          * Add the subqueries (individual optional statement patterns, optional
          * join groups, and nested union).
@@ -788,6 +843,12 @@ public class AST2BOpUtility {
         
         /*
          * Add the LET assignments to the pipeline.
+         * 
+         * FIXME A LET/BIND for an expression should be run as soon as the
+         * variables for that expression are known bound. This is the same rule
+         * which is used for filters. Running them here could even cause
+         * incorrect evaluation depending on when assigned-to variable is being
+         * consumed.
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
 
@@ -1013,9 +1074,27 @@ public class AST2BOpUtility {
     	
     }
     
-    private static final PipelineOp addJoin(PipelineOp left,
-    		final Predicate<?> pred, final Collection<FilterNode> filters,
-    		final AST2BOpContext ctx) {
+    /**
+     * Adds an optional join (prepared by the caller) in place of an optional
+     * group having a join as its sole group member.
+     * 
+     * @param left
+     * @param pred
+     * @param filters
+     * @param ctx
+     * @return
+     * 
+     *         TODO This could be handled by an AST rewrite which replaces the
+     *         optional subquery with an optional {@link StatementPatternNode}.
+     *         There is no annotation for that at this time on the statement
+     *         pattern node. Also, if we allow that annotation then we have to
+     *         check statement pattern nodes to make sure that they are not
+     *         optional when they appear within a group which we currently do
+     *         not have to do as they are never optional.
+     */
+    private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
+            PipelineOp left, final Predicate<?> pred,
+            final Collection<FilterNode> filters, final AST2BOpContext ctx) {
     	
 //    	final Predicate pred = toPredicate(sp);
     	
@@ -1120,8 +1199,9 @@ public class AST2BOpUtility {
     			
 //    			final StatementPatternNode sp2 = new StatementPatternNode(pred);
     			
-    			left = addJoin(left, pred, filters, ctx);
-    			
+                left = addOptionalJoinForSingletonOptionalSubquery(left, pred,
+                        filters, ctx);
+
     		} else {
     		
                 final PipelineOp subquery = convertJoinGroupOrUnion(

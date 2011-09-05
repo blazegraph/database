@@ -24,21 +24,72 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Aug 29, 2011
  */
+/* Portions of this file are:
+ * 
+ * Copyright Aduna (http://www.aduna-software.com/) (c) 1997-2008.
+ *
+ * Licensed under the Aduna BSD-style license.
+ */
 
 package com.bigdata.rdf.sparql.ast;
 
+import info.aduna.iteration.Iterations;
+import info.aduna.text.StringUtil;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.LineNumberReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.model.util.ModelUtil;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryResultUtil;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.dawg.DAWGTestResultSetUtil;
+import org.openrdf.query.impl.MutableTupleQueryResult;
+import org.openrdf.query.impl.TupleQueryResultBuilder;
+import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.BooleanQueryResultParserRegistry;
+import org.openrdf.query.resultio.QueryResultIO;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultParser;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParser.DatatypeHandling;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.Rio;
+import org.openrdf.rio.helpers.RDFHandlerBase;
+import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -59,13 +110,19 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
     public AbstractASTEvaluationTestCase(String name) {
         super(name);
-    }
+    } 
+
+    protected AbstractTripleStore store = null;
+
+    protected String baseURI = null;
 
     protected void setUp() throws Exception {
         
         super.setUp();
         
         store = getStore(getProperties());
+        
+        baseURI = "";
         
     }
     
@@ -79,11 +136,11 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
         }
         
+        baseURI = null;
+        
         super.tearDown();
         
     }
-
-    protected AbstractTripleStore store = null;
 
     public Properties getProperties() {
 
@@ -287,7 +344,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
         if (!o1.equals(o2)) {
 
-//            o1.equals(o2); // FIXME Remove debug point.
+//            o1.equals(o2); // debug point.
             
             fail("Failed to detect difference reported by equals(): expected="
                     + o1 + ", actual=" + o2);

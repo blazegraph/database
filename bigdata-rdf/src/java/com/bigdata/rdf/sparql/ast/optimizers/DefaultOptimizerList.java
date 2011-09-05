@@ -188,6 +188,11 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTBindingAssigner());
 
         /**
+         * Imposes a LIMIT of ONE for a non-aggregation ASK query.
+         */
+        add(new AskOptimizer());
+
+        /**
          * Rewrites the projection node of a DESCRIBE query into, generating a
          * CONSTRUCT clause and extending the WHERE clause to capture the
          * semantics of the DESCRIBE query. The query type is also changed to

@@ -28,99 +28,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
-import info.aduna.iteration.EmptyIteration;
 
-import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.Filter;
-import org.openrdf.query.algebra.QueryModelNode;
-import org.openrdf.query.algebra.QueryRoot;
-import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.ValueExpr;
-import org.openrdf.query.algebra.Var;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.impl.TupleQueryResultImpl;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.constraints.CompareBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp;
-import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
-import com.bigdata.rdf.internal.constraints.RangeBOp;
-import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
-import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
-import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl3;
-//import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl3.UnrecognizedValueException;
-import com.bigdata.rdf.sail.BigdataTripleSource;
-import com.bigdata.rdf.sail.DataSetSummary;
-import com.bigdata.rdf.sail.FreeTextSearchExpander;
-import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
-import com.bigdata.rdf.sail.Sesame2BigdataIterator;
-import com.bigdata.rdf.sail.sop.SOp;
-import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
-import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
-import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
-import com.bigdata.rdf.sparql.ast.SOp2ASTUtility;
-import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
-import com.bigdata.rdf.spo.ExplicitSPOFilter;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
-import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
-import com.bigdata.rdf.store.BigdataOpenRDFBindingSetsResolverator;
-import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.relation.accesspath.WrappedAsynchronousIterator;
-import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -492,219 +430,274 @@ public class ASTEvalHelper {
 //        return result;
 //
 //    }
-//    
-//    /**
-//     * Return an {@link IAsynchronousIterator} that will read a single, empty
-//     * {@link IBindingSet}.
-//     * 
-//     * @param bindingSet
-//     *            the binding set.
-//     */
-//    private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-//            final IBindingSet bindingSet) {
-//
-//        return new ThickAsynchronousIterator<IBindingSet[]>(
-//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-//
-//    }
-//
-//    private CloseableIteration<BindingSet, QueryEvaluationException> 
-//        doEvaluateNatively(final PipelineOp query, final BindingSet bs,
-//            final QueryEngine queryEngine, final IVariable[] required
-//            ) 
-//            throws QueryEvaluationException {
-//        
-//        // Use either the caller's UUID or a random UUID.
-//        final String queryIdStr = queryHints == null ? null : queryHints
-//                .getProperty(QueryHints.QUERYID);
-//
-//        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
-//                .fromString(queryIdStr);
-//
-//        /*
-//         * Setup the input binding sets which will be fed into the query
-//         * pipeline.
-//         */
-//        final IAsynchronousIterator<IBindingSet[]> source;
-//        if (bs != null && bindingSets != null && bs.size() > 0)
-//            throw new QueryEvaluationException(
-//                    "BindingSet and BindingSets are mutually exclusive.");
-//        if (bindingSets != null) {
-//            /*
-//             * A stream of input binding sets will be fed into the query
-//             * pipeline (zero or more).
-//             */
-//            // align openrdf CloseableIteration with Bigdata IClosableIterator.
-//            final IChunkedOrderedIterator<BindingSet> src = new ChunkedWrappedIterator<BindingSet>(
-//                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-//                            bindingSets));
-//            // efficient resolution of Value[]s to IV[]s for binding set chunks.
-//            final ICloseableIterator<IBindingSet> src2 = new BigdataOpenRDFBindingSetsResolverator(
-//                    database, src).start(database.getExecutorService());
-//            // chunk up the binding sets. 
-//            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedWrappedIterator<IBindingSet>(
-//                    src2);
-//            // wrap as an asynchronous iterator.
-//            source = new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
-//                    src3);
-//        } else if (bs != null) {
-//            /*
-//             * A single input binding set will be fed into the query pipeline
-//             * using the supplied bindings.
-//             */
-//            source = newBindingSetIterator(toBindingSet(bs));
-//        } else {
-//            /*
-//             * A single empty input binding set will be fed into the query
-//             * pipeline.
-//             */
-//            source = newBindingSetIterator(new ListBindingSet());
-//        }
-//
-//        IRunningQuery runningQuery = null;
-//        try {
-//
-//            // Submit query for evaluation.
-//            runningQuery = queryEngine.eval(queryId, query, source);
-//
-//            /*
-//             * Wrap up the native bigdata query solution iterator as Sesame
-//             * compatible iteration with materialized RDF Values.
-//             */
-//            return iterator(runningQuery, database, required);
-//
-//        } catch (UnsupportedOperatorException t) {
-//            if (runningQuery != null) {
-//                // ensure query is halted.
-//                runningQuery.cancel(true/* mayInterruptIfRunning */);
-//            }
-//            // ensure source is closed on error path.
-//            source.close();
-//            /*
-//             * Note: Do not wrap as a different exception type. The caller is
-//             * looking for this.
-//             */
-//            throw new UnsupportedOperatorException(t);
-//        } catch (Throwable t) {
-//            if (runningQuery != null) {
-//                // ensure query is halted.
-//                runningQuery.cancel(true/* mayInterruptIfRunning */);
-//            }
-//            // ensure source is closed on error path.
-//            source.close();
-//            throw new QueryEvaluationException(t);
-//        }
-//        
-//    }
-//    
-//    private static IBindingSet toBindingSet(final BindingSet src) {
-//
-//        if (src == null)
-//            throw new IllegalArgumentException();
-//
-//        final ListBindingSet bindingSet = new ListBindingSet();
-//
-//        final Iterator<Binding> itr = src.iterator();
-//
-//        while(itr.hasNext()) {
-//
-//            final Binding binding = itr.next();
-//
-//            final IVariable var = com.bigdata.bop.Var.var(binding.getName());
-//            
-//            final IV iv = ((BigdataValue) binding.getValue()).getIV();
-//            
-//            final IConstant val = new Constant<IV>(iv);
-//            
-//            bindingSet.set(var, val);
-//            
-//        }
-//        
-//        return bindingSet;
-//        
-//    }
-//
-//
-//    /**
-//     * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
-//     * iteration which will visit Sesame binding sets having materialized RDF
-//     * Values.
-//     * 
-//     * @param runningQuery
-//     *            The query.
-//     * 
-//     * @return The iterator.
-//     * 
-//     * @throws QueryEvaluationException
-//     */
-//    private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
-//            final IRunningQuery runningQuery, final IVariable[] required
-//            ) throws QueryEvaluationException {
-//
-//        // The iterator draining the query solutions.
-//        final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
-//                .iterator();
-//
-//        // De-chunk the IBindingSet[] visited by that iterator.
-//        final IChunkedOrderedIterator<IBindingSet> it2 = 
-//            new ChunkedWrappedIterator<IBindingSet>(
-//                // Monitor IRunningQuery and cancel if Sesame iterator is closed.
-//                new RunningQueryCloseableIterator<IBindingSet>(runningQuery,
-//                        new Dechunkerator<IBindingSet>(it1)));
-//        
-//        // Materialize IVs as RDF Values.
-//        final CloseableIteration<BindingSet, QueryEvaluationException> result =
-//            // Convert bigdata binding sets to Sesame binding sets.
-//            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-//                // Materialize IVs as RDF Values.
-//                new BigdataBindingSetResolverator(database, it2, required).start(
-//                        database.getExecutorService()));
-//    
-//        return result;
-//
-//    }
-//    
-//    private static ICloseableIterator<IBindingSet> iterator(
-//            final IRunningQuery runningQuery) {
-//        
-//        // The iterator draining the query solutions.
-//        final IAsynchronousIterator<IBindingSet[]> it1 = 
-//            runningQuery.iterator();
-//
-//        // Dechunkify the original iterator
-//        final ICloseableIterator<IBindingSet> it2 = 
-//            new Dechunkerator<IBindingSet>(it1);
-//
-//        // Monitor IRunningQuery and cancel if Sesame iterator is closed.
-//        final ICloseableIterator<IBindingSet> it3 =
-//            new RunningQueryCloseableIterator<IBindingSet>(runningQuery, it2);
-//
-//        return it3;
-//        
-//    }
-//    
-//    private static CloseableIteration<BindingSet, QueryEvaluationException> 
-//        iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
-//            final IVariable[] required) {
-//    
-//        final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
-//        
-//        // Wrap in an IChunkedOrderedIterator
-//        final IChunkedOrderedIterator<IBindingSet> it2 = 
-//            new ChunkedWrappedIterator<IBindingSet>(it1);
-//        
-//        // Materialize IVs as RDF Values.
-//        final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
-//            // Convert bigdata binding sets to Sesame binding sets.
-//            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-//                // Materialize IVs as RDF Values.
-//                new BigdataBindingSetResolverator(db, it2, required).start(
-//                        db.getExecutorService()));
-//        
-//        return it3;
-//        
-//    }
-//    
+    
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single, empty
+     * {@link IBindingSet}.
+     * 
+     * @param bindingSet
+     *            the binding set.
+     */
+    static private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet bindingSet) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
+    }
+
+    /**
+     * Setup the input binding sets which will be fed into the query pipeline.
+     */
+    static private IAsynchronousIterator<IBindingSet[]> wrapSource(
+            final BindingSet bs) {
+
+        final IAsynchronousIterator<IBindingSet[]> source;
+        
+        if (bs != null) {
+        
+            /*
+             * A single input binding set will be fed into the query pipeline
+             * using the supplied bindings.
+             */
+            
+            source = newBindingSetIterator(toBindingSet(bs));
+            
+        } else {
+            
+            /*
+             * A single empty input binding set will be fed into the query
+             * pipeline.
+             */
+            
+            source = newBindingSetIterator(new ListBindingSet());
+            
+        }
+
+        return source;
+        
+    }
+    
+    /**
+     * Evaluate a boolean query.
+     * 
+     * @param store
+     *            The {@link AbstractTripleStore} having the data.
+     * @param queryPlan
+     *            The query plan.
+     * @param bs
+     *            The initial solution to kick things off.
+     * @param queryEngine
+     *            The query engine.
+     *            
+     * @return <code>true</code> if there are any solutions to the query.
+     * 
+     * @throws QueryEvaluationException
+     */
+    static public boolean evaluateBooleanQuery(
+            final AbstractTripleStore database, final PipelineOp queryPlan,
+            final BindingSet bs, final QueryEngine queryEngine)
+            throws QueryEvaluationException {
+
+        IRunningQuery runningQuery = null;
+        final IAsynchronousIterator<IBindingSet[]> source = wrapSource(bs); 
+        try {
+
+            // Submit query for evaluation.
+            runningQuery = queryEngine.eval(queryPlan, source);
+
+            // See if any solutions were produced.
+            return runningQuery.iterator().hasNext();
+
+        } catch (Exception e) {
+
+            throw new QueryEvaluationException(e);
+            
+        } finally {
+            
+            // Ensure source is closed.
+            source.close();
+            
+            if (runningQuery != null) {
+            
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+                
+                try {
+                    
+                    runningQuery.get();
+                    
+                } catch (Exception e) {
+            
+                    throw new QueryEvaluationException(e);
+                    
+                }
+        
+            }
+
+        }
+
+    }
+
+    /**
+     * Evaluate a SELECT query.
+     * 
+     * @param store
+     *            The {@link AbstractTripleStore} having the data.
+     * @param queryPlan
+     *            The query plan.
+     * @param bs
+     *            The initial solution to kick things off.
+     * @param queryEngine
+     *            The query engine.
+     * @param projected
+     *            The variables projected by the query.
+     *            
+     * @return An object from which the solutions may be drained.
+     * 
+     * @throws QueryEvaluationException
+     */
+    static public TupleQueryResult evaluateTupleQuery(
+            final AbstractTripleStore store, final PipelineOp queryPlan,
+            final BindingSet bs, final QueryEngine queryEngine,
+            final IVariable[] projected) throws QueryEvaluationException {
+
+        final List<String> projectedSet = new LinkedList<String>();
+
+        for (IVariable<?> var : projected)
+            projectedSet.add(var.getName());
+
+        return new TupleQueryResultImpl(projectedSet,
+                ASTEvalHelper.doEvaluateNatively(store, queryPlan,
+                        new QueryBindingSet(), queryEngine, projected));
+
+    }
+    
+    /**
+     * FIXME What is [required] for? It is probably where we are finally pruning
+     * off the variables which are not being projected. That should be done in
+     * {@link AST2BOpUtility}. (Yes, it gets passed through to
+     * {@link BigdataBindingSetResolverator}, but that will also accept a
+     * <code>null</code> and then just materialize all variables it finds, which
+     * is what it should be doing if we have already pruned the variables to
+     * just the projected variables in the query plan.)
+     * <p>
+     * There is a twist here. I believe that Sesame may allow the variables
+     * given in the initial binding set to flow through even if they were not
+     * projected.
+     * 
+     * TODO Rename as evaluate() (was doEvaluateNatively()).
+     */
+    static public CloseableIteration<BindingSet, QueryEvaluationException> doEvaluateNatively(
+            final AbstractTripleStore database, final PipelineOp queryPlan,
+            final BindingSet bs, final QueryEngine queryEngine,
+            final IVariable[] required) throws QueryEvaluationException {
+
+        IRunningQuery runningQuery = null;
+        final IAsynchronousIterator<IBindingSet[]> source = wrapSource(bs); 
+        try {
+
+            // Submit query for evaluation.
+            runningQuery = queryEngine.eval(queryPlan, source);
+
+            /*
+             * Wrap up the native bigdata query solution iterator as Sesame
+             * compatible iteration with materialized RDF Values.
+             */
+            return iterator(runningQuery, database, required);
+
+        } catch (UnsupportedOperatorException t) {
+            if (runningQuery != null) {
+                // ensure query is halted.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+            }
+            // ensure source is closed on error path.
+            source.close();
+            /*
+             * Note: Do not wrap as a different exception type. The caller is
+             * looking for this.
+             */
+            throw new UnsupportedOperatorException(t);
+        } catch (Throwable t) {
+            if (runningQuery != null) {
+                // ensure query is halted.
+                runningQuery.cancel(true/* mayInterruptIfRunning */);
+            }
+            // ensure source is closed on error path.
+            source.close();
+            throw new QueryEvaluationException(t);
+        }
+
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static IBindingSet toBindingSet(final BindingSet src) {
+
+        if (src == null)
+            throw new IllegalArgumentException();
+
+        final ListBindingSet bindingSet = new ListBindingSet();
+
+        final Iterator<Binding> itr = src.iterator();
+
+        while(itr.hasNext()) {
+
+            final Binding binding = itr.next();
+
+            final IVariable<IV> var = com.bigdata.bop.Var.var(binding.getName());
+            
+            final IV iv = ((BigdataValue) binding.getValue()).getIV();
+            
+            final IConstant<IV> val = new Constant<IV>(iv);
+            
+            bindingSet.set(var, val);
+            
+        }
+        
+        return bindingSet;
+        
+    }
+    
+    private static ICloseableIterator<IBindingSet> iterator(
+            final IRunningQuery runningQuery) {
+
+        // The iterator draining the query solutions.
+        final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+                .iterator();
+
+        // Dechunkify the original iterator
+        final ICloseableIterator<IBindingSet> it2 = 
+            new Dechunkerator<IBindingSet>(it1);
+
+        // Monitor IRunningQuery and cancel if Sesame iterator is closed.
+        final ICloseableIterator<IBindingSet> it3 =
+            new RunningQueryCloseableIterator<IBindingSet>(runningQuery, it2);
+
+        return it3;
+        
+    }
+    
+    private static CloseableIteration<BindingSet, QueryEvaluationException> 
+        iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
+            final IVariable[] required) {
+    
+        final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
+        
+        // Wrap in an IChunkedOrderedIterator
+        final IChunkedOrderedIterator<IBindingSet> it2 = 
+            new ChunkedWrappedIterator<IBindingSet>(it1);
+        
+        // Materialize IVs as RDF Values.
+        final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
+            // Convert bigdata binding sets to Sesame binding sets.
+            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                // Materialize IVs as RDF Values.
+                new BigdataBindingSetResolverator(db, it2, required).start(
+                        db.getExecutorService()));
+        
+        return it3;
+        
+    }
+    
 //    private void attachNamedGraphsFilterToSearches(final SOpTree sopTree) {
 //        
 //        /*
