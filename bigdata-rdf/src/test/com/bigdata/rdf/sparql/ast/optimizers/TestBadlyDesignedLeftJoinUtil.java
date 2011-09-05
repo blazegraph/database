@@ -27,12 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.TestASTNamedSubqueryEvaluation;
 import com.bigdata.rdf.sparql.ast.optimizers.BadlyDesignedLeftJoinsUtil.BadlyDesignedLeftJoinIteratorException;
 
 /**
@@ -42,6 +44,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.BadlyDesignedLeftJoinsUtil.BadlyDes
  * @version $Id$
  */
 public class TestBadlyDesignedLeftJoinUtil extends AbstractASTEvaluationTestCase {
+
+    private static final Logger log = Logger
+            .getLogger(TestBadlyDesignedLeftJoinUtil.class);
 
     /**
      * 

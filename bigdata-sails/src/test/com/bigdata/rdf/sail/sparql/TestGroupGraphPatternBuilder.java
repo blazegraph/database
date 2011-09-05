@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
@@ -102,6 +105,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -130,6 +138,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -169,6 +182,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -204,6 +222,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -252,6 +275,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+            
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -299,6 +327,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -349,6 +382,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -409,7 +447,12 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode p2 = new VarNode("p2");
             final VarNode p3 = new VarNode("p3");
             final VarNode o = new VarNode("o");
-            
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -476,7 +519,12 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode p2 = new VarNode("p2");
             final VarNode p3 = new VarNode("p3");
             final VarNode o = new VarNode("o");
-            
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -532,6 +580,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+            
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -571,6 +624,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -613,6 +671,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -659,6 +722,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -704,6 +772,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -745,6 +818,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -789,6 +867,11 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -832,6 +915,11 @@ public class TestGroupGraphPatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));

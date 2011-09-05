@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.MalformedQueryException;
@@ -53,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Test suite for translating queries which use subquery constructions,
@@ -98,6 +102,11 @@ public class TestSubqueryPatterns extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         final SubqueryRoot subSelect;
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             {
                 final ProjectionNode projection = new ProjectionNode();
@@ -161,6 +170,11 @@ public class TestSubqueryPatterns extends
         {
 
             {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
                 final ProjectionNode projection = new ProjectionNode();
                 projection.addProjectionVar(new VarNode("s"));
                 expected.setProjection(projection);
@@ -207,7 +221,6 @@ public class TestSubqueryPatterns extends
 
     }
 
-    
     /**
      * Unit test for simple subquery joined with a bind.
      * 
@@ -233,6 +246,11 @@ public class TestSubqueryPatterns extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         final SubqueryRoot subSelect;
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             {
 
@@ -312,6 +330,11 @@ public class TestSubqueryPatterns extends
             final ConstantNode const2 = new ConstantNode(
                     makeIV(valueFactory.createLiteral("12", XSD.INTEGER)));
             
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             {
 
                 final ProjectionNode projection = new ProjectionNode();
@@ -421,6 +444,13 @@ public class TestSubqueryPatterns extends
 
             final VarNode anonvar = mockAnonVar("-exists-1");
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdf", RDF.NAMESPACE);
+                prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
             projection.addProjectionVar(person);
@@ -501,6 +531,12 @@ public class TestSubqueryPatterns extends
             final TermNode subPropertyOf = new ConstantNode(
                     makeIV(valueFactory.createURI(RDFS.SUBPROPERTYOF
                             .stringValue())));
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdfs", RDFS.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
             
             {
                 final ProjectionNode projection = new ProjectionNode();
@@ -604,6 +640,12 @@ public class TestSubqueryPatterns extends
                             .stringValue())));
             
             {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdfs", RDFS.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
                 final ProjectionNode projection = new ProjectionNode();
                 projection.addProjectionVar(p2);
                 expected.setProjection(projection);
@@ -705,6 +747,12 @@ public class TestSubqueryPatterns extends
                     makeIV(valueFactory.createURI(RDFS.SUBPROPERTYOF
                             .stringValue())));
             
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdfs", RDFS.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             {
                 final ProjectionNode projection = new ProjectionNode();
                 projection.addProjectionVar(p2);

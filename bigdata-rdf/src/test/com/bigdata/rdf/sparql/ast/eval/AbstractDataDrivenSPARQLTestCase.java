@@ -44,9 +44,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryResultUtil;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
@@ -83,11 +85,19 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * Abstract base class for data driven test suites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: AbstractDataDrivenSPARQLTestCase.java 5130 2011-09-05 16:54:20Z
+ *          thompsonbry $
+ * 
+ *          TODO Add tests for triples-only and sids modes.
+ * 
+ *          TODO Support manifest driven test suite.
  */
 public class AbstractDataDrivenSPARQLTestCase extends
         AbstractASTEvaluationTestCase {
 
+    private static final Logger log = Logger
+            .getLogger(AbstractDataDrivenSPARQLTestCase.class);
+    
     /**
      * 
      */
@@ -131,20 +141,32 @@ public class AbstractDataDrivenSPARQLTestCase extends
          * @param testURI
          * @throws Exception
          * 
-         *             TODO Support triples/sids/quads (just quads right now
-         *             because of the assumed .trig extension).
-         *             
-         *             TODO Support manifest driven test suite.
          */
         public TestHelper(final String testURI) throws Exception {
+            
+            this(testURI, testURI + ".rq", testURI + ".trig", testURI + ".srx");
+            
+        }
+
+        /**
+         * 
+         * @param testURI
+         * @param queryFileURL
+         * @param dataFileURL
+         * @param resultFileURL
+         * @throws Exception
+         */
+        public TestHelper(final String testURI, final String queryFileURL,
+                final String dataFileURL, final String resultFileURL)
+                throws Exception {
 
             if (log.isInfoEnabled())
                 log.info("testURI:\n" + testURI);
             
             this.testURI = testURI;
-            this.queryFileURL = testURI + ".rq";
-            this.dataFileURL = testURI + ".trig";
-            this.resultFileURL = testURI + ".srx";
+            this.queryFileURL = queryFileURL;
+            this.dataFileURL = dataFileURL;
+            this.resultFileURL = resultFileURL;
 
             this.queryStr = getResourceAsString(queryFileURL);
 
@@ -208,20 +230,28 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
                 break;
             }
-//            case DESCRIBE:
-//            case CONSTRUCT: {
-//                
-//                final GraphQueryResult gqr = ((GraphQuery) query).evaluate();
-//                
-//                final Set<Statement> queryResult = Iterations.asSet(gqr);
-//
-//                final Set<Statement> expectedResult = readExpectedGraphQueryResult();
-//
-//                compareGraphs(queryResult, expectedResult);
-//                
-//                break;
-//                
-//            }
+            case DESCRIBE:
+            case CONSTRUCT: {
+                
+                final Set<Statement> expectedResult = readExpectedGraphQueryResult();
+
+                final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
+                        store, //
+                        queryPlan, //
+                        new QueryBindingSet(),//
+                        context.queryEngine, //
+                        queryRoot.getProjection().getProjectionVars(),
+                        queryRoot.getPrefixDecls(), //
+                        queryRoot.getConstruct()//
+                        );
+
+                final Set<Statement> queryResult = Iterations.asSet(gqr);
+
+                compareGraphs(queryResult, expectedResult);
+                
+                break;
+                
+            }
             case ASK: {
                 
                 final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
@@ -344,7 +374,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
             } else {
 
                 throw new RuntimeException(
-                        "Unable to determine file type of results file");
+                        "Unable to determine file type of results file: "
+                                + resultFileURL);
 
             }
             

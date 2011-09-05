@@ -90,10 +90,29 @@ public class StatementPatternNode extends
     }
 
     /**
+     * Return <code>true</code> if none of s, p, o, or c is a variable.
+     */
+    public boolean isGround() {
+
+        if (s() instanceof VarNode)
+            return false;
+
+        if (p() instanceof VarNode)
+            return false;
+        
+        if (o() instanceof VarNode)
+            return false;
+        
+        if (c() instanceof VarNode)
+            return false;
+        
+        return true;
+        
+    }
+
+    /**
      * Return the variables used by the predicate - i.e. what this node will
      * attempt to bind when run.
-     * <p>
-     * Note: Not cached since this is part of an immutable data structure.
      */
     public Set<IVariable<?>> getProducedBindings() {
 

@@ -26,11 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
@@ -38,11 +38,9 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -214,6 +212,11 @@ public class TestValueExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));

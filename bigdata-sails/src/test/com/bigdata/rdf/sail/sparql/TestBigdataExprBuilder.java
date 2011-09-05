@@ -25,6 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
@@ -85,6 +89,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -116,6 +125,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -150,6 +164,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+            
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             projection.setReduced(true);
@@ -183,6 +202,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -221,6 +245,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -261,6 +290,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -306,6 +340,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -348,6 +387,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+            
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -386,6 +430,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -427,6 +476,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("*"));
             expected.setProjection(projection);
@@ -461,6 +515,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -501,6 +560,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.ASK);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             /*
              * Note: No projection.
@@ -546,6 +610,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -582,6 +651,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("*"));
@@ -623,6 +697,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+            
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
             
@@ -661,6 +740,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         final QueryRoot expected = new QueryRoot(QueryType.DESCRIBE);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             expected.setProjection(projection);
             projection.addProjectionVar(new VarNode("s"));
@@ -693,8 +777,9 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      * TODO CONSTRUCT has two forms which we need to test. In the first form a
      * ConstructTemplate appears before the DatasetClause. In the second form a
      * TriplesTemplate appears after the WhereClause and before the optional
-     * SolutionModifier. Both forms allow the SolutionModifier. However, openrdf
-     * has not yet implemented the 2nd form.
+     * SolutionModifier (the second form is a short form where the construct
+     * template and the WHERE clause are identical). Openrdf has not yet
+     * implemented the 2nd form.
      * 
      * TODO Anzo has an extension of CONSTRUCT for quads which we should also
      * support. It allows a GRAPH graph pattern to be mixed in with the triple
@@ -707,6 +792,11 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
         final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ConstructNode construct = new ConstructNode();
             expected.setConstruct(construct);
@@ -721,6 +811,50 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
                     Scope.DEFAULT_CONTEXTS));
         }
         
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A construct query with some constants in the template.
+     * @throws MalformedQueryException
+     * @throws TokenMgrError
+     * @throws ParseException
+     */
+    public void test_construct_with_ground_terms()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "" +
+        		"PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
+        		"construct { ?s rdf:type ?o }\n" +
+        		"where {?s rdf:type ?o}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.CONSTRUCT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdf", RDF.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ConstructNode construct = new ConstructNode();
+            expected.setConstruct(construct);
+            construct.addChild(new StatementPatternNode(new VarNode("s"),
+                    new ConstantNode(makeIV(valueFactory.createURI(RDF.TYPE
+                            .toString()))), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new ConstantNode(makeIV(valueFactory.createURI(RDF.TYPE
+                            .toString()))), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+        }
+
         final QueryRoot actual = parse(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);

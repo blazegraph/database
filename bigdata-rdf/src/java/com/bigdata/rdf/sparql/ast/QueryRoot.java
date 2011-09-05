@@ -23,7 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.Properties;
 
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
@@ -78,6 +80,13 @@ public class QueryRoot extends QueryBase {
         String QUERY_HINTS = "queryHints";
 
         /**
+         * The namespace prefix declaration map. This is a {@link Map} with
+         * {@link String} keys (prefix) and {@link String} values (the uri
+         * associated with that prefix).
+         */
+        String PREFIX_DECLS = "prefixDecls";
+        
+        /**
          * The {@link DatasetNode}.
          */
         String DATASET = "dataset";
@@ -122,7 +131,40 @@ public class QueryRoot extends QueryBase {
     public void setQueryString(String queryString) {
         
         setProperty(Annotations.QUERY_STRING, queryString);
-        
+
+    }
+
+    /**
+     * The namespace prefix declarations map. This is a {@link Map} with
+     * {@link String} keys (prefix) and {@link String} values (the uri
+     * associated with that prefix).
+     * 
+     * @return The namespace prefix declarations map. If this annotation was not
+     *         set, then an empty map will be returned. The returned map is
+     *         immutable to preserve the general contract for notification on
+     *         mutation.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, String> getPrefixDecls() {
+
+        final Map<String, String> prefixDecls = (Map<String, String>) getProperty(Annotations.PREFIX_DECLS);
+
+        if (prefixDecls == null)
+            return Collections.emptyMap();
+
+        return Collections.unmodifiableMap(prefixDecls);
+
+    }
+
+    /**
+     * Set the namespace prefix declarations map. This is a {@link Map} with
+     * {@link String} keys (prefix) and {@link String} values (the uri
+     * associated with that prefix).
+     */
+    public void setPrefixDecls(final Map<String, String> prefixDecls) {
+
+        setProperty(Annotations.PREFIX_DECLS, prefixDecls);
+
     }
 
     /**
@@ -224,6 +266,8 @@ public class QueryRoot extends QueryBase {
         final Object parseTree = getParseTree();
         
         final Properties queryHints = getQueryHints();
+
+        final Map<String/* prefix */, String/* uri */> prefixDecls = getPrefixDecls();
         
         final DatasetNode dataset = getDataset();
 
@@ -275,6 +319,28 @@ public class QueryRoot extends QueryBase {
                 
             }
             
+        }
+
+        if(prefixDecls != null) {
+
+            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
+
+                sb.append("\n");
+
+                sb.append(s);
+                
+                sb.append("PREFIX ");
+                
+                sb.append(e.getKey());
+                
+                sb.append(": <");
+                
+                sb.append(e.getValue());
+                
+                sb.append(">");
+
+            }
+
         }
         
         if (dataset != null) {

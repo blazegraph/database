@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
@@ -82,6 +85,11 @@ public class TestTriplePatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -121,7 +129,12 @@ public class TestTriplePatternBuilder extends
             final VarNode p = new VarNode("p");
             
             final VarNode o = new VarNode("o");
-            
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(p);
             expected.setProjection(projection);
@@ -160,7 +173,12 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/p")));
 
             final VarNode o = new VarNode("o");
-            
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(s);
             expected.setProjection(projection);
@@ -199,6 +217,11 @@ public class TestTriplePatternBuilder extends
             
             final ConstantNode o = new ConstantNode(
                     makeIV(valueFactory.createURI("http://www.bigdata.com/o")));
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(s);
@@ -240,6 +263,11 @@ public class TestTriplePatternBuilder extends
             final ConstantNode o = new ConstantNode(
                     makeIV(valueFactory.createURI("http://www.bigdata.com/o")));
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(p);
             expected.setProjection(projection);
@@ -279,7 +307,12 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/p")));
 
             final VarNode o = new VarNode("o");
-            
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(o);
             expected.setProjection(projection);
@@ -323,6 +356,11 @@ public class TestTriplePatternBuilder extends
 
             final VarNode x = new VarNode("x");
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(x);
             expected.setProjection(projection);
@@ -353,6 +391,11 @@ public class TestTriplePatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -388,6 +431,11 @@ public class TestTriplePatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -440,6 +488,11 @@ public class TestTriplePatternBuilder extends
             final ConstantNode bar = new ConstantNode(
                     makeIV(valueFactory.createURI("http://www.bigdata.com/bar")));
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -479,6 +532,11 @@ public class TestTriplePatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -531,6 +589,11 @@ public class TestTriplePatternBuilder extends
             final ConstantNode goo = new ConstantNode(
                     makeIV(valueFactory.createURI("http://www.bigdata.com/goo")));
 
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
             expected.setProjection(projection);
@@ -576,6 +639,11 @@ public class TestTriplePatternBuilder extends
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));

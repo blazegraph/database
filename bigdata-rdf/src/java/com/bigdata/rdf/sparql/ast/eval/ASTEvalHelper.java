@@ -32,12 +32,15 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
 
 import com.bigdata.bop.Constant;
@@ -55,6 +58,7 @@ import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl3;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -573,6 +577,42 @@ public class ASTEvalHelper {
     }
     
     /**
+     * Evaluate a CONSTRUCT/DESCRIBE query.
+     * 
+     * @param store
+     *            The {@link AbstractTripleStore} having the data.
+     * @param queryPlan
+     *            The query plan.
+     * @param bs
+     *            The initial solution to kick things off.
+     * @param queryEngine
+     *            The query engine.
+     * @param projected
+     *            The variables projected by the query.
+     * @param prefixDecls
+     *            The namespace prefix declarations map. This is a {@link Map}
+     *            with {@link String} keys (prefix) and {@link String} values
+     *            (the uri associated with that prefix).
+     * @param construct
+     *            The construct template.
+     * 
+     * @throws QueryEvaluationException
+     */
+    public static GraphQueryResult evaluateGraphQuery(
+            final AbstractTripleStore store, final PipelineOp queryPlan,
+            final QueryBindingSet queryBindingSet,
+            final QueryEngine queryEngine, final IVariable[] projected,
+            final Map<String, String> prefixDecls, final ConstructNode construct)
+            throws QueryEvaluationException {
+
+        return new GraphQueryResultImpl(prefixDecls, new ASTConstructIterator(
+                store, construct, ASTEvalHelper.doEvaluateNatively(store,
+                        queryPlan, new QueryBindingSet(), queryEngine,
+                        projected)));
+
+    }
+    
+    /**
      * FIXME What is [required] for? It is probably where we are finally pruning
      * off the variables which are not being projected. That should be done in
      * {@link AST2BOpUtility}. (Yes, it gets passed through to
@@ -697,7 +737,7 @@ public class ASTEvalHelper {
         return it3;
         
     }
-    
+
 //    private void attachNamedGraphsFilterToSearches(final SOpTree sopTree) {
 //        
 //        /*

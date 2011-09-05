@@ -194,17 +194,26 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             throws MalformedQueryException {
         
         try {
+            
             final ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryStr);
+            
             StringEscapesProcessor.process(qc);
+            
             BaseDeclProcessor.process(qc, baseURI);
-            /*final Map<String, String> prefixes = */PrefixDeclProcessor.process(qc);
+            
+            final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+            
 //            WildcardProjectionProcessor.process(qc);
+
             BlankNodeVarProcessor.process(qc);
+            
             /*
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
              */
+            
             new BatchRDFValueResolver(context).process(qc);
+            
             /*
              * Build the bigdata AST from the parse tree.
              */
@@ -223,6 +232,11 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 queryRoot.setQueryHints(queryHints);
 
             }
+
+            /*
+             * Attach namespace declarations.
+             */
+            queryRoot.setPrefixDecls(prefixes);
             
             /*
              * Handle dataset declaration
