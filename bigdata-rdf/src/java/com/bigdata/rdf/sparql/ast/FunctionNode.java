@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
 
@@ -26,12 +27,14 @@ public class FunctionNode extends ValueExpressionNode {
         /**
          * The function URI from the {@link FunctionRegistry}.
          */
-        String FUNCTION_URI = FunctionNode.class.getName() + "functionURI";
+        String FUNCTION_URI = FunctionNode.class.getName() + ".functionURI";
 
         /**
-         * The scalar values needed to construct the IValueExpression.
+         * The scalar values needed to construct the {@link IValueExpression}.
+         * This is a {@link Serializable} {@link Map} with {@link String} keys
+         * and {@link Object} values.
          */
-        String SCALAR_VALS = FunctionNode.class.getName() + "scalarVals";
+        String SCALAR_VALS = FunctionNode.class.getName() + ".scalarVals";
 
     }
 
@@ -44,20 +47,16 @@ public class FunctionNode extends ValueExpressionNode {
      *            One or more scalar values that are passed to the function
      * @param args
      *            the arguments to the function.
-     * 
-     *            FIXME Drop the [lex] argument and move the conversion from a
-     *            {@link FunctionNode} into an {@link IValueExpression} into
-     *            {@link AST2BOpContext}.
      */
-	public FunctionNode(//final String lex, 
+	public FunctionNode(// 
 			final URI functionURI, 
 	        final Map<String,Object> scalarValues,
 			final ValueExpressionNode... args) {
 		
-//		super(FunctionRegistry.toVE(lex, functionURI, scalarValues, args));
-		super(args, null);
+		super(args, null/*anns*/);
 		
 		super.setProperty(Annotations.SCALAR_VALS, scalarValues);
+		
 		super.setProperty(Annotations.FUNCTION_URI, functionURI);
 		
 	}
@@ -67,151 +66,27 @@ public class FunctionNode extends ValueExpressionNode {
 		return (URI) getRequiredProperty(Annotations.FUNCTION_URI);
 		
 	}
-	
-	/**
-	 * Returns an unmodifiable map because if the scalar values are modified,
-	 * we need to clear the value expression cache.  This is handled correctly
-	 * by {@link #setScalarValues(Map)}.
-	 */
-	public Map<String,Object> getScalarValues() {
-		
-		return Collections.unmodifiableMap(
-				(Map<String,Object>) getRequiredProperty(Annotations.SCALAR_VALS));
-		
+
+    /**
+     * Returns an unmodifiable map because if the scalar values are modified, we
+     * need to clear the value expression cache. This is handled correctly by
+     * {@link #setScalarValues(Map)}.
+     */
+    public Map<String, Object> getScalarValues() {
+
+        @SuppressWarnings("unchecked")
+        final Map<String, Object> scalarValues = (Map<String, Object>) getProperty(Annotations.SCALAR_VALS);
+
+        if (scalarValues == null) {
+
+            return Collections.emptyMap();
+
+        }
+
+        return Collections.unmodifiableMap(scalarValues);
+
 	}
 	
-//	/**
-//	 * Sets the scalar values and clears the cached value expression.
-//	 */
-//	public void setScalarValues(final Map<String,Object> scalarValues) {
-//		
-//		setProperty(Annotations.SCALAR_VALS, scalarValues);
-//		
-//	}
-//	
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public ModifiableBOpBase setArg(final int index, final BOp newArg) {
-//		
-//		final ModifiableBOpBase bop = super.setArg(index, newArg);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//		return bop;
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public void addArg(final BOp newArg) {
-//		
-//		super.addArg(newArg);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public void addArgIfAbsent(final BOp arg) {
-//		
-//		super.addArgIfAbsent(arg);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public boolean removeArg(final BOp arg) {
-//		
-//		final boolean b = super.removeArg(arg);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//		return b;
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public ModifiableBOpBase copyAll(final Map<String, Object> anns) {
-//		
-//		final ModifiableBOpBase bop = super.copyAll(anns);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//		return bop;
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//    public ModifiableBOpBase setProperty(final String name, final Object value) {
-//
-//        final ModifiableBOpBase bop = super.setProperty(name, value);
-//        
-//        if (!(Annotations.VALUE_EXPR.equals(name))) {
-//
-//            super.clearProperty(Annotations.VALUE_EXPR);
-//
-//        }
-//
-//        return bop;
-//
-//    }
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public ModifiableBOpBase setUnboundProperty(final String name, final Object value) {
-//		
-//		final ModifiableBOpBase bop = super.setUnboundProperty(name, value);
-//		
-//		if(!(Annotations.VALUE_EXPR.equals(name))){
-//
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//		}
-//		return bop;
-//		
-//	}
-//
-//	/**
-//	 * If we destructively modify the AST node we also need to clear the
-//	 * cached value expression.
-//	 */
-//	@Override
-//	public ModifiableBOpBase clearProperty(final String name) {
-//		
-//		final ModifiableBOpBase bop = super.clearProperty(name);
-//		
-//		super.clearProperty(Annotations.VALUE_EXPR);
-//		
-//		return bop;
-//		
-//	}
-
 	/**
 	 * Overridden to clear the cached value expression.
 	 */

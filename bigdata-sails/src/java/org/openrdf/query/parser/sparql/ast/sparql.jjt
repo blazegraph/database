@@ -584,8 +584,16 @@ void NamedSubqueryInclude() :
      <INCLUDE> t = <VAR3>
      { jjtThis.setName(t.image); }
      [ // Note: query hint in case static analysis can not figure this out.
-       <JOIN_ON > <LPAREN> Var() ( <COMMA> Var() )* <RPAREN> 
+       <JOIN_ON > VarList() {jjtThis.setQueryHint(true);}
      ]
+}
+
+void VarList() #void :
+{}
+{
+	<NIL>
+|
+	<LPAREN> Var() ( <COMMA> Var() )* <RPAREN>
 }
 
 void TriplesBlock() #void :

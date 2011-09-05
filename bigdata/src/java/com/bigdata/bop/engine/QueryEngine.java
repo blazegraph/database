@@ -1112,6 +1112,30 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * Evaluate a query. This node will serve as the controller for the query.
      * 
+     * @param query
+     *            The query to evaluate.
+     * @param bsets
+     *            The binding sets to be consumed by the query.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    public AbstractRunningQuery eval(final BOp op,
+            final IAsynchronousIterator<IBindingSet[]> bsets) throws Exception {
+
+        final UUID queryId = getQueryUUID(op);
+        
+        return eval(queryId, (PipelineOp) op,
+                newLocalChunkMessage(queryId, op, bsets));
+
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * 
      * @param queryId
      *            The unique identifier for the query.
      * @param query

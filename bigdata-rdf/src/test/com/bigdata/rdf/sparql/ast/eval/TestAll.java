@@ -60,6 +60,19 @@ public class TestAll extends TestCase {
         // Test suite for the iterator which interprets the CONSTRUCT clause.
         suite.addTestSuite(TestASTConstructIterator.class);
         
+        /*
+         * Data driven tests.
+         */
+        
+        // Basic query.
+        suite.addTestSuite(TestBasicQuery.class);
+        
+        // Different kinds of subqueries.
+        suite.addTestSuite(TestSubQuery.class);
+        
+        // Complex queries.
+        suite.addTestSuite(TestComplexQuery.class);
+        
         return suite;
         
     }

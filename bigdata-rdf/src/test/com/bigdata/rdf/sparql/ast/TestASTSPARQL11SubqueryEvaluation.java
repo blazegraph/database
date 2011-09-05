@@ -111,6 +111,8 @@ public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTest
      * </pre>
      * 
      * @throws Exception
+     * 
+     * Note: This duplicates <code>sparql-subselect</code> but at the AST level.
      */
     public void test_subSelect() throws Exception {
 

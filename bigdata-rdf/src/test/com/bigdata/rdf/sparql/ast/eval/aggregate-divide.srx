@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="_set17"/>
+    <variable name="_set10"/>
+  </head>
+  <results>
+    <result>
+      <binding name="_set17">
+      	<uri>http://example.org/c1</uri>
+      </binding>
+      <binding name="_set10">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.4</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="_set17">
+      	<uri>http://example.org/c2</uri>
+      </binding>
+      <binding name="_set10">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.3</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="_set17">
+      	<uri>http://example.org/c3</uri>
+      </binding>
+      <binding name="_set10">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.2</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="_set17">
+      	<uri>http://example.org/c4</uri>
+      </binding>
+      <binding name="_set10">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">0.1</literal>
+      </binding>
+    </result>        
+  </results>
+</sparql>

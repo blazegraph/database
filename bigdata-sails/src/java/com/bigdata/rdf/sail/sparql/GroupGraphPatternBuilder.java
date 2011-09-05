@@ -467,7 +467,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         final int nargs = node.jjtGetNumChildren();
 
-        if (nargs > 0) {
+        if (nargs > 0 || node.isQueryHint()) {
 
             /*
              * Query hint for the join variables. This query hint may be used if

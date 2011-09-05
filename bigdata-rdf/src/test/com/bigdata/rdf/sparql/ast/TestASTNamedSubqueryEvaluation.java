@@ -122,11 +122,13 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
      * </pre>
      * 
      * @throws Exception
+     * 
+     * Note: This duplicates <code>named-subquery</code> but at the AST level.
      */
     public void test_namedSubquery() throws Exception {
 
         final String sparql = ""//
-                + "PREFIX rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"//
+                + "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"//
                 + "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"//
                 + "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n"//
                 + "select ?x ?o \n" //
@@ -336,6 +338,9 @@ public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCas
      * same solutions, but do more work to identify them.
      * 
      * @throws Exception
+     * 
+     *             Note: This duplicates <code>named-subquery-noJoinVars</code>,
+     *             but at the AST level.
      */
     public void test_namedSubquery_noJoinVars() throws Exception {
 

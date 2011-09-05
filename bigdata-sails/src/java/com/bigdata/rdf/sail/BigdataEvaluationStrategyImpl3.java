@@ -1184,45 +1184,44 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
         
     }
 
-
-	/**
-	 * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
-	 * iteration which will visit Sesame binding sets having materialized RDF
-	 * Values.
-	 * 
-	 * @param runningQuery
-	 *            The query.
-	 * 
-	 * @return The iterator.
-	 * 
-	 * @throws QueryEvaluationException
-	 */
-	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
-			final IRunningQuery runningQuery, final IVariable[] required
-			) throws QueryEvaluationException {
-
-		// The iterator draining the query solutions.
-		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
-				.iterator();
-
-	    // De-chunk the IBindingSet[] visited by that iterator.
-	    final IChunkedOrderedIterator<IBindingSet> it2 = 
-	    	new ChunkedWrappedIterator<IBindingSet>(
-    	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
-    	    	new RunningQueryCloseableIterator<IBindingSet>(runningQuery,
-    	    			new Dechunkerator<IBindingSet>(it1)));
-	    
-	    // Materialize IVs as RDF Values.
-	    final CloseableIteration<BindingSet, QueryEvaluationException> result =
-			// Convert bigdata binding sets to Sesame binding sets.
-	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-        		// Materialize IVs as RDF Values.
-	            new BigdataBindingSetResolverator(database, it2, required).start(
-	            		database.getExecutorService()));
-	
-	    return result;
-
-    }
+//	/**
+//	 * Wrap the {@link IRunningQuery#iterator()}, returning a Sesame compatible
+//	 * iteration which will visit Sesame binding sets having materialized RDF
+//	 * Values.
+//	 * 
+//	 * @param runningQuery
+//	 *            The query.
+//	 * 
+//	 * @return The iterator.
+//	 * 
+//	 * @throws QueryEvaluationException
+//	 */
+//	private CloseableIteration<BindingSet, QueryEvaluationException> wrapQuery(
+//			final IRunningQuery runningQuery, final IVariable[] required
+//			) throws QueryEvaluationException {
+//
+//		// The iterator draining the query solutions.
+//		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+//				.iterator();
+//
+//	    // De-chunk the IBindingSet[] visited by that iterator.
+//	    final IChunkedOrderedIterator<IBindingSet> it2 = 
+//	    	new ChunkedWrappedIterator<IBindingSet>(
+//    	    	// Monitor IRunningQuery and cancel if Sesame iterator is closed.
+//    	    	new RunningQueryCloseableIterator<IBindingSet>(runningQuery,
+//    	    			new Dechunkerator<IBindingSet>(it1)));
+//	    
+//	    // Materialize IVs as RDF Values.
+//	    final CloseableIteration<BindingSet, QueryEvaluationException> result =
+//			// Convert bigdata binding sets to Sesame binding sets.
+//	        new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+//        		// Materialize IVs as RDF Values.
+//	            new BigdataBindingSetResolverator(database, it2, required).start(
+//	            		database.getExecutorService()));
+//	
+//	    return result;
+//
+//    }
 	
 	private static ICloseableIterator<IBindingSet> iterator(
 			final IRunningQuery runningQuery) {

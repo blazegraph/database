@@ -56,6 +56,17 @@ public class BigdataBindingSetResolverator
     	
     }
     
+    /**
+     * 
+     * @param db
+     *            Used to resolve term identifiers to {@link Value} objects.
+     * @param src
+     *            The source iterator (will be closed when this iterator is
+     *            closed).
+     * @param required
+     *            The variables to be resolved (optional). When
+     *            <code>null</code>, all variables will be resolved.
+     */
     public BigdataBindingSetResolverator(final AbstractTripleStore db,
             final IChunkedOrderedIterator<IBindingSet> src,
             final IVariable[] required) {
