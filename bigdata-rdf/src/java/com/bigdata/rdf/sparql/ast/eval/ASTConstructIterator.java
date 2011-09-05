@@ -29,8 +29,10 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
@@ -41,11 +43,15 @@ import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 
-import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -55,7 +61,13 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * validly) bound for a given solution. Blank nodes are scoped to a solution.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTConstructIterator.java 5131 2011-09-05 20:48:48Z thompsonbry
+ *          $
+ * 
+ *          TODO Quads extensions for CONSTRUCT template.
+ * 
+ *          TODO Was there a feature in native construct for the statement type
+ *          (inferred, explicit, axioms)?
  */
 public class ASTConstructIterator implements
         CloseableIteration<BigdataStatement, QueryEvaluationException> {
@@ -101,14 +113,12 @@ public class ASTConstructIterator implements
             if (pat.isGround()) {
 
                 // add statement from template to buffer.
-                @SuppressWarnings("rawtypes")
                 final BigdataStatement stmt = f.createStatement(//
-                    (Resource)((IV) pat.s().getValueExpression().get()).getValue(),//
-                    (URI)((IV) pat.p().getValueExpression().get()).getValue(),//
-                    (Value)((IV) pat.o().getValueExpression().get()).getValue(),//
-                    pat.c() == null ? null : (Resource) ((IV) pat.c()
-                            .getValueExpression().get()).getValue()//
-                    );
+                        (Resource) pat.s().getValue(),//
+                        (URI) pat.p().getValue(),//
+                        (Value) pat.o().getValue(),//
+                        pat.c() == null ? null : (Resource) pat.c().getValue()//
+                        );
 
                 if (log.isInfoEnabled())
                     log.info("Ground statement: pattern" + pat + "\nstmt"
@@ -215,33 +225,117 @@ public class ASTConstructIterator implements
      * (missing slots, bad type for a slot, etc).
      * 
      * @param solution
-     * 
-     *            FIXME BNode() in the CONSTRUCT template.
-     * 
-     *            FIXME Blank nodes are scoped to a solution.
-     * 
-     *            TODO Quads extensions for CONSTRUCT template.
      */
     private void fillBuffer(final BindingSet solution) {
 
         // Should only be invoked when the buffer is empty.
         assert buffer.isEmpty();
         
+        // Blank nodes (scoped to the solution).
+        final Map<String,BigdataBNode> bnodes = new LinkedHashMap<String, BigdataBNode>();
+        
         for(StatementPatternNode pat : templates) {
 
-//            final (Resource)((IV) pat.s().getValueExpression()).getValue(),//
-//            (URI)((IV) pat.p().getValueExpression()).getValue(),//
-//            (Value)((IV) pat.o().getValueExpression()).getValue(),//
-//            (Resource)((IV) pat.c().getValueExpression()).getValue()//
-//
-//            
-//            final BigdataStatement stmt = f.createStatement(s, p, o, c);
-//
-//            buffer.add(stmt);
+            /*
+             * Attempt to build a statement from this statement pattern and
+             * solution.
+             */
+            
+            final BigdataStatement stmt = makeStatement(pat, solution, bnodes);
 
+            if(stmt != null) {
+            
+                // If successful, then add to the buffer.
+                buffer.add(stmt);
+                
+            }
+            
         }
+                
+    }
+
+    /**
+     * Return a statement if a valid statement could be constructed for that
+     * statement pattern and this solution.
+     * 
+     * @param pat
+     *            A statement pattern from the construct template.
+     * @param solution
+     *            A solution from the query.
+     * @param bnodes
+     *            A map used to scope blank nodes to the solution.
+     * 
+     * @return A statement if a valid statement could be constructed for that
+     *         statement pattern and this solution.
+     */
+    private BigdataStatement makeStatement(final StatementPatternNode pat,
+            final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
+
+        // resolve values from template and/or solution.
+        final BigdataValue s = getValue(pat.s(), solution, bnodes);
+        final BigdataValue p = getValue(pat.p(), solution, bnodes);
+        final BigdataValue o = getValue(pat.o(), solution, bnodes);
+        final BigdataValue c = pat.c() == null ? null : getValue(pat.c(),
+                solution, bnodes);
+
+        // filter out unbound values.
+        if (s == null || p == null || o == null)
+            return null;
+
+        // filter out bindings which do not produce legal statements.
+        if (!(s instanceof Resource))
+            return null;
+        if (!(p instanceof URI))
+            return null;
+        if (!(o instanceof Value))
+            return null;
+        if (c != null && !(c instanceof Resource))
+            return null;
+
+        // return the statement
+        return f.createStatement((Resource) s, (URI) p, (Value) o, (Resource) c);
         
-        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Return the as-bound value of the variable or constant given the solution.
+     * 
+     * @param term
+     *            Either a variable or a constant from the statement pattern in
+     *            the template.
+     * @param solution
+     *            A solution from the query.
+     * @param bnodes
+     *            A map used to scope blank nodes to the solution.
+     * 
+     * @return The as-bound value.
+     * 
+     *         FIXME BNode() in the CONSTRUCT template (probably shows up as a
+     *         function node in the statement pattern).
+     * 
+     *         FIXME Blank nodes are scoped to a solution (this is not handling
+     *         blank nodes at all).
+     */
+    private BigdataValue getValue(final TermNode term,
+            final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
+
+        if (term instanceof ConstantNode) {
+
+            return term.getValue();
+
+        } else if(term instanceof VarNode) {
+
+            final String varname = ((VarNode) term).getValueExpression()
+                    .getName();
+
+            return (BigdataValue) solution.getValue(varname);
+
+        } else {
+            
+            // TODO Support the BNode() function here.
+            throw new UnsupportedOperationException("term: "+term);
+            
+        }
         
     }
 

@@ -49,11 +49,20 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * A SELECT query consisting of a single statement pattern.
+     */
+    public void test_select_1() throws Exception {
+        
+        new TestHelper("select-1").runTest();
+        
+    }
+    
+    /**
      * A simple SELECT query.
      */
-    public void test_select() throws Exception {
+    public void test_select_2() throws Exception {
         
-        new TestHelper("select").runTest();
+        new TestHelper("select-2").runTest();
         
     }
     
