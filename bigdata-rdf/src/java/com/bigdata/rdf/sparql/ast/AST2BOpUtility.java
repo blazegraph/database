@@ -127,7 +127,14 @@ public class AST2BOpUtility {
         // The AST query model.
         final QueryRoot query = ctx.query;
         
-        // Run the AST query rewrites / query optimizers.
+        /*
+         * Run the AST query rewrites / query optimizers.
+         * 
+         * FIXME For improved visibility, the optimizer should be run outside of
+         * this method and/or we should publish the optimizer AST. Otherwise
+         * things like DESCRIBE can be rewritten pretty broadly and we do not
+         * get a chance to see the rewritten AST model.
+         */
         final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(
                 ctx, query, bindingSets);
         
@@ -1138,12 +1145,11 @@ public class AST2BOpUtility {
     	/*
     	 * First do the non-optional subgroups
     	 */
-    	for (IQueryNode child : joinGroup) {
+    	for (IGroupMemberNode child : joinGroup) {
     		
-            if (!(child instanceof JoinGroupNode)
-                    && !(child instanceof UnionNode)) {
-    			continue;
-    		}
+            if (!(child instanceof GraphPatternGroup<?>)) {
+                continue;
+            }
     		
             @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
@@ -1165,10 +1171,9 @@ public class AST2BOpUtility {
     	/*
     	 * Next do the optional sub-group 
     	 */
-    	for (IQueryNode child : joinGroup) {
+    	for (IGroupMemberNode child : joinGroup) {
     		
-            if (!(child instanceof JoinGroupNode)
-                    && !(child instanceof UnionNode)) {
+            if (!(child instanceof GraphPatternGroup<?>)) {
     			continue;
     		}
     		

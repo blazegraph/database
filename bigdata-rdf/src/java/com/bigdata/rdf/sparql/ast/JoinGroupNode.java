@@ -15,7 +15,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
  * An optional or non-optional collection of query nodes that run together in
  * a group.
  */
-public class JoinGroupNode extends GroupNodeBase<IGroupMemberNode> {
+public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     /**
      * 

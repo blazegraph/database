@@ -6,7 +6,7 @@ import org.apache.log4j.Logger;
  * A special kind of group {@link IGroupNode} that represents the sparql union
  * operator. This node only accepts {@link JoinGroupNode}s as children. 
  */
-public class UnionNode extends GroupNodeBase<IGroupMemberNode> {
+public class UnionNode extends GraphPatternGroup<IGroupMemberNode> {
 	
     /**
      * 

@@ -162,7 +162,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             if (log.isInfoEnabled())
                 log.info("testURI:\n" + testURI);
-            
+
             this.testURI = testURI;
             this.queryFileURL = queryFileURL;
             this.dataFileURL = dataFileURL;
@@ -170,27 +170,33 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             this.queryStr = getResourceAsString(queryFileURL);
 
-            if(log.isInfoEnabled())
-                log.info("query:\n"+queryStr);
-            
+            if (log.isInfoEnabled())
+                log.info("query:\n" + queryStr);
+
             final long nparsed = loadData(dataFileURL);
-            
+
             if (log.isInfoEnabled())
                 log.info("Loaded " + nparsed + " statements from "
                         + dataFileURL);
 
             queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, null/* baseUri */);
-            
+
             if (log.isInfoEnabled())
                 log.info("AST:\n" + queryRoot);
 
             this.context = new AST2BOpContext(queryRoot, store);
-            
+
+            /*
+             * FIXME Pull the optimizer pass out of this method so we have
+             * better transparency. I need this to debug DESCRIBE, but it will
+             * help a lot to see the output of the optimizers in general as well
+             * as the AST model produced by the parser.
+             */
             queryPlan = AST2BOpUtility.convert(context);
-            
-            if(log.isInfoEnabled())
-                log.info("queryPlan:\n"+queryPlan);
+
+            if (log.isInfoEnabled())
+                log.info("queryPlan:\n" + queryPlan);
 
         }
 
