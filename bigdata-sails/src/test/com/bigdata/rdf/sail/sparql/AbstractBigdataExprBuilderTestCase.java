@@ -29,7 +29,6 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.Properties;
 
-import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
@@ -39,6 +38,8 @@ import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -273,8 +274,10 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             log.error("expected: " + expected);
             log.error("actual: " + actual);
 
-            throw new AssertionFailedError("expected:\n" + expected
-                    + "\nbut was:\n" + actual);
+            AbstractQueryEngineTestCase.diff((BOp) expected, (BOp) actual);
+
+            // No difference was detected?
+            throw new AssertionError();
 
         }
         

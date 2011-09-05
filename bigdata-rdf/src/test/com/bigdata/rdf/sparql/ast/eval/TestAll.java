@@ -57,9 +57,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("AST Evaluation");
 
-        // Test suite for the iterator which interprets the CONSTRUCT clause.
-        suite.addTestSuite(TestASTConstructIterator.class);
-        
         /*
          * Data driven tests.
          */

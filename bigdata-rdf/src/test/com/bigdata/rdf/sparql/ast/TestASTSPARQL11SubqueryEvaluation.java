@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern;
@@ -62,6 +63,9 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * @version $Id$
  */
 public class TestASTSPARQL11SubqueryEvaluation extends AbstractASTEvaluationTestCase {
+
+    private static final Logger log = Logger
+            .getLogger(TestASTSPARQL11SubqueryEvaluation.class);
 
     public TestASTSPARQL11SubqueryEvaluation() {
     }

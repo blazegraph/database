@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern;
@@ -68,6 +69,9 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  * TODO Unit test when the named result set is consumed more than once.
  */
 public class TestASTNamedSubqueryEvaluation extends AbstractASTEvaluationTestCase {
+
+    private static final Logger log = Logger
+            .getLogger(TestASTNamedSubqueryEvaluation.class);
 
     public TestASTNamedSubqueryEvaluation() {
     }

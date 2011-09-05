@@ -66,12 +66,32 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
-    public void test_construct() {
-        fail("write test");
+    /**
+     * A simple CONSTRUCT query.
+     */
+    public void test_construct() throws Exception {
+
+        new TestHelper(
+                "construct", // testURI,
+                "construct.rq",// queryFileURL
+                "construct.trig",// dataFileURL
+                "construct-result.trig"// resultFileURL
+                ).runTest();
+        
     }
 
-    public void test_describe() {
-        fail("write test");
+    /**
+     * A simple DESCRIBE query.
+     */
+    public void test_describe() throws Exception {
+
+        new TestHelper(
+                "describe", // testURI,
+                "describe.rq",// queryFileURL
+                "describe.trig",// dataFileURL
+                "describe-result.trig"// resultFileURL
+                ).runTest();
+        
     }
 
 }
