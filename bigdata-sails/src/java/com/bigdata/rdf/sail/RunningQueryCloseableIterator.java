@@ -17,6 +17,7 @@ public class RunningQueryCloseableIterator<E extends IBindingSet>
     private final IRunningQuery runningQuery;
     private final ICloseableIterator<E> src;
     private boolean checkedFuture = false;
+
     /**
      * The next element is buffered so we can always return it if the
      * {@link #runningQuery} was not aborted at the time that {@link #hasNext()}
@@ -34,11 +35,41 @@ public class RunningQueryCloseableIterator<E extends IBindingSet>
 
     }
 
+    /**
+     * Test for abnormal completion of the {@link IRunningQuery}.
+     */
+    private void checkFuture() {
+
+//        if (!checkedFuture && runningQuery.isDone()) {
+            try {
+                runningQuery.get();
+            } catch (InterruptedException e) {
+                /*
+                 * Interrupted while waiting on the Future (should not happen
+                 * since the Future is already done).
+                 */
+                throw new RuntimeException(e);
+            } catch (Throwable e) {
+                /*
+                 * Exception thrown by the runningQuery.
+                 */
+                if (runningQuery.getCause() != null) {
+                    // abnormal termination - wrap and rethrow.
+                    throw new RuntimeException(e);
+                }
+                // otherwise this is normal termination.
+            }
+            checkedFuture = true;
+//        }
+
+    }
+    
     public void close() {
         if (open) {
             open = false;
             runningQuery.cancel(true/* mayInterruptIfRunning */);
             src.close();
+            checkFuture();
         }
     }
 
@@ -68,34 +99,17 @@ public class RunningQueryCloseableIterator<E extends IBindingSet>
         // buffer the next element.
         current = src.next();
 
-        // test for abnormal completion of the runningQuery. 
         if (!checkedFuture && runningQuery.isDone()) {
-            try {
-                runningQuery.get();
-            } catch (InterruptedException e) {
-                /*
-                 * Interrupted while waiting on the Future (should not happen
-                 * since the Future is already done).
-                 */
-                throw new RuntimeException(e);
-            } catch (Throwable e) {
-                /*
-                 * Exception thrown by the runningQuery.
-                 */
-                if (runningQuery.getCause() != null) {
-                    // abnormal termination - wrap and rethrow.
-                    throw new RuntimeException(e);
-                }
-                // otherwise this is normal termination.
-            }
-            checkedFuture = true;
-        }
 
+            checkFuture();
+            
+        }
+        
         // the next element is now buffered.
         return true;
 
     }
-
+    
     public E next() {
 
         if (!hasNext())
