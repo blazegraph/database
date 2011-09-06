@@ -31,13 +31,13 @@ import java.util.Properties;
 
 import org.openrdf.query.Dataset;
 import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.dataset.DatasetRepository;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**
  * Test harness for running the SPARQL test suites against a {@link Journal}
@@ -76,7 +76,7 @@ public class BigdataSparqlFullRWTxTest extends BigdataSparqlTest {
 	 * connection by the test harness when using full read-write transactions.
 	 */
 	@Override
-	protected RepositoryConnection getQueryConnection(Repository dataRep)
+	protected BigdataSailRepositoryConnection getQueryConnection(Repository dataRep)
 			throws Exception {
 
 		return ((BigdataSailRepository) ((DatasetRepository) dataRep)

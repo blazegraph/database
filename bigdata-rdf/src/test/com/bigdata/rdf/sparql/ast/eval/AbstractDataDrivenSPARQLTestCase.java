@@ -217,9 +217,6 @@ public class AbstractDataDrivenSPARQLTestCase extends
          * @throws Exception
          *             if the resources can not be found, if the query does not
          *             produce the expected results, etc.
-         * 
-         *             FIXME Add support for CONSTRUCT/DESCRIBE and migrate into
-         *             {@link ASTEvalHelper}.
          */
         public void runTest() throws Exception {
 

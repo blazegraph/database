@@ -125,6 +125,7 @@ public class BigdataValueReplacer {
             
         }
 
+        if(tupleExpr != null)
         tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
             @Override
@@ -250,6 +251,7 @@ public class BigdataValueReplacer {
          * Replace the values with BigdataValues having their resolve term
          * identifiers.
          */
+        if(tupleExpr!=null)
         tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
             @Override

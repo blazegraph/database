@@ -29,6 +29,8 @@ package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+
 /**
  * Interface providing access to more state of the original SPARQL query AST.
  * <p>
@@ -40,6 +42,8 @@ import java.util.Properties;
  * @version $Id$
  * 
  * @see BigdataSailQuery
+ * 
+ * @deprecated by {@link QueryRoot}
  */
 public interface IBigdataParsedQuery {
     

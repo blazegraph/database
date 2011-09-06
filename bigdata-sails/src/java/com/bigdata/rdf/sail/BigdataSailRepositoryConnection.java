@@ -20,7 +20,9 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -231,6 +233,46 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
 	}
 
+    /**
+     * Parse a SPARQL query
+     * 
+     * @param ql
+     *            The {@link QueryLanguage}.
+     * @param queryStr
+     *            The query.
+     * @param baseURI
+     *            The base URI.
+     * 
+     * @return The bigdata AST model for that query.
+     * 
+     * @throws MalformedQueryException
+     */
+    public BigdataSailQuery prepareNativeSPARQLQuery(final QueryLanguage ql,
+            final String queryStr, final String baseURI)
+            throws MalformedQueryException {
+
+        if (ql != QueryLanguage.SPARQL)
+            throw new UnsupportedOperationException(ql.toString());
+
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(
+                getTripleStore()).parseQuery2(queryStr, baseURI);
+
+        switch (queryRoot.getQueryType()) {
+        case SELECT:
+            return new BigdataSailTupleQuery(queryRoot, this);
+        case DESCRIBE:
+        case CONSTRUCT:
+            return new BigdataSailGraphQuery(queryRoot, this);
+        case ASK: {
+            return new BigdataSailBooleanQuery(queryRoot, this);
+        }
+        default:
+            throw new RuntimeException("Unknown query type: "
+                    + queryRoot.getQueryType());
+        }
+
+    }
+	   
     /**
      * {@inheritDoc}
      * <p>

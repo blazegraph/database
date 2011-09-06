@@ -4,24 +4,35 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.parser.ParsedBooleanQuery;
 import org.openrdf.repository.sail.SailBooleanQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 public class BigdataSailBooleanQuery extends SailBooleanQuery 
         implements BigdataSailQuery {
-    
+
+    private static Logger log = Logger.getLogger(BigdataSailBooleanQuery.class);
+
     /**
      * Query hints are embedded in query strings as namespaces.  
      * See {@link QueryHints#PREFIX} for more information.
      */
+    @Deprecated
     private final Properties queryHints;
     
     public Properties getQueryHints() {
@@ -30,12 +41,41 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     	
     }
 
+    private final QueryRoot queryRoot;
+
+    public QueryRoot getQueryRoot() {
+        
+        return queryRoot;
+        
+    }
+
+    public AbstractTripleStore getTripleStore() {
+
+        return ((BigdataSailRepositoryConnection) getConnection())
+                .getTripleStore();
+
+    }
+
+    public BigdataSailBooleanQuery(final QueryRoot queryRoot,
+            final BigdataSailRepositoryConnection con) {
+
+        super(null/*tupleQuery*/, con); // TODO Might have to fake the TupleExpr with a Nop.
+        
+        this.queryHints = queryRoot.getQueryHints();
+        
+        this.queryRoot = queryRoot;
+        
+    }
+    
+    @Deprecated
     public BigdataSailBooleanQuery(ParsedBooleanQuery tupleQuery,
             SailRepositoryConnection con, Properties queryHints) {
 
     	super(tupleQuery, con);
     	
         this.queryHints = queryHints;
+        
+        this.queryRoot = null;
         
     }
 
@@ -49,6 +89,38 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
      */
     @Override
     public boolean evaluate() throws QueryEvaluationException {
+
+        if (queryRoot != null) {
+            
+            final AbstractTripleStore store = getTripleStore();
+
+            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+            if (log.isInfoEnabled())
+                log.info("queryRoot:\n" + queryRoot);
+
+            /*
+             * Run the query optimizer first so we have access to the rewritten
+             * query plan.
+             */
+            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
+                    .optimize(context, queryRoot, null/* bindingSet[] */);
+
+            if (log.isInfoEnabled())
+                log.info("optimizedQuery:\n" + optimizedQuery);
+
+            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+            if (log.isInfoEnabled())
+                log.info("queryPlan:\n" + queryPlan);
+
+            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
+                    store, queryPlan, new QueryBindingSet(),
+                    context.queryEngine);
+            
+            return queryResult;
+            
+        }
 
         final ParsedBooleanQuery parsedBooleanQuery = getParsedQuery();
         

@@ -48,6 +48,7 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.SPARQLASTQueryTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
@@ -64,6 +65,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**
  * Test harness for running the SPARQL test suites. This version runs against
@@ -72,7 +74,10 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataSparqlTest extends SPARQLQueryTest {
+public class BigdataSparqlTest 
+extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
+//extends SPARQLASTQueryTest // Bigdata native AST based evaluation
+{
 
     static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);
     
@@ -647,12 +652,12 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 	 * deadlock).
 	 */
 	@Override
-	protected RepositoryConnection getQueryConnection(Repository dataRep)
-			throws Exception {
+    protected BigdataSailRepositoryConnection getQueryConnection(
+            Repository dataRep) throws Exception {
 
-		return ((BigdataSailRepository) ((DatasetRepository) dataRep)
-				.getDelegate()).getReadOnlyConnection();
+        return ((BigdataSailRepository) ((DatasetRepository) dataRep)
+                .getDelegate()).getReadOnlyConnection();
 
-	}
+    }
 
 }
