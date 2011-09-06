@@ -453,31 +453,39 @@ public class TestGroupGraphPatternBuilder extends
                 expected.setPrefixDecls(prefixDecls);
             }
 
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+            }
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
-            final UnionNode union1 = new UnionNode();
-            whereClause.addChild(union1);
-            final JoinGroupNode group1 = new JoinGroupNode();
-            final JoinGroupNode group2 = new JoinGroupNode();
-            final JoinGroupNode group3 = new JoinGroupNode();
-            union1.addChild(group1);
-            final UnionNode union2 = new UnionNode();
-            union1.addChild(union2);
-            union2.addChild(group2);
-            union2.addChild(group3);
+            {
+                
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+                final UnionNode union1 = new UnionNode();
+                whereClause.addChild(union1);
+                final JoinGroupNode group1 = new JoinGroupNode();
+                final JoinGroupNode group2 = new JoinGroupNode();
+                final JoinGroupNode group3 = new JoinGroupNode();
+                final JoinGroupNode group4 = new JoinGroupNode();
+                union1.addChild(group1);
+                final UnionNode union2 = new UnionNode();
+                union1.addChild(group4);
+                group4.addChild(union2);
+                union2.addChild(group2);
+                union2.addChild(group3);
 
-            group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
 
-            group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
 
-            group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+                
+            }
 
         }
 

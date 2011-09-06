@@ -121,6 +121,17 @@ public class AST2BOpUtility {
          * there are several and we can constrain a variable to the known values
          * which it can take on). This could be passed through using the [ctx]
          * or directly.
+         * 
+         * Do we still want the ability to pass in an IBindingSet[] to query
+         * evaluation or we are planning to handle this entirely via a "java"
+         * service interface. If so, then we need the ability to run the
+         * optimizer once we have evaluated that service request in order to do
+         * things like set an IN filter based on the returned solution set.
+         * 
+         * If we model this with an "inline access path", then that is really
+         * very close to the Htree / hash join. The IN constraint could just be
+         * the evaluation of the join. We could also do column projections,
+         * which would give us something like the hash-set based IN constraint.
          */
         final IBindingSet[] bindingSets = null;
         
@@ -135,8 +146,11 @@ public class AST2BOpUtility {
          * things like DESCRIBE can be rewritten pretty broadly and we do not
          * get a chance to see the rewritten AST model.
          */
-        final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(
-                ctx, query, bindingSets);
+        if (ctx.optimizedQuery == null) {
+            ctx.optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
+                    query, bindingSets);
+        }
+        final QueryRoot optimizedQuery = ctx.optimizedQuery;
         
         // The executable query plan.
         final PipelineOp queryPlan = convert(optimizedQuery, ctx);
@@ -595,7 +609,7 @@ public class AST2BOpUtility {
      * @return
      */
     private static PipelineOp convertJoinGroupOrUnion(final PipelineOp left,
-            final IGroupNode<IGroupMemberNode> groupNode,
+            final IGroupNode<? extends IGroupMemberNode> groupNode,
             final AST2BOpContext ctx) {
 
 		if (groupNode instanceof UnionNode) {
@@ -662,7 +676,7 @@ public class AST2BOpUtility {
         final BOp[] subqueries = new BOp[arity];
 
         int i = 0;
-        for (IQueryNode child : unionNode) {
+        for (IGroupMemberNode child : unionNode) {
         	
             // convert the child
         	if (child instanceof JoinGroupNode) {
@@ -683,7 +697,7 @@ public class AST2BOpUtility {
         	} else {
         		
         		throw new RuntimeException(
-        				"illegal child type for union: " + child.getClass());
+        				"Illegal child type for union: " + child.getClass());
         		
         	}
 			

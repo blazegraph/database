@@ -179,6 +179,12 @@ public class DescribeOptimizer implements IASTOptimizer {
 			
 			{ // <term> ?pN-a ?oN
 			
+                /*
+                 * Note: Each statement has to be in a different part of the
+                 * UNION. Also, note that we do not allow a bare statement
+                 * pattern in a union. The statement pattern has to be embedded
+                 * within a group.
+                 */
 				final StatementPatternNode sp = new StatementPatternNode(
 						term, 
 						new VarNode("p"+termNum+"a"),
@@ -187,7 +193,11 @@ public class DescribeOptimizer implements IASTOptimizer {
 
 				construct.addChild(sp);
 				
-				union.addChild(sp);
+				final JoinGroupNode group = new JoinGroupNode();
+				group.addChild(sp);
+                union.addChild(group);
+				
+//				union.addChild(sp);
 				
 			}
 				
@@ -201,8 +211,12 @@ public class DescribeOptimizer implements IASTOptimizer {
 					);
 
 				construct.addChild(sp);
-				
-				union.addChild(sp);
+
+                final JoinGroupNode group = new JoinGroupNode();
+                group.addChild(sp);
+                union.addChild(group);
+
+//				union.addChild(sp);
 				
 			}
 			

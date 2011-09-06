@@ -64,6 +64,7 @@ public class BOpUtility {
      * Pre-order recursive visitation of the operator tree (arguments only, no
      * annotations).
      */
+    @SuppressWarnings("unchecked")
     public static Iterator<BOp> preOrderIterator(final BOp op) {
 
         return new Striterator(new SingleValueIterator(op))

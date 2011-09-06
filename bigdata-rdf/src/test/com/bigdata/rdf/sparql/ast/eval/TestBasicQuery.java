@@ -90,15 +90,43 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A simple DESCRIBE query.
+     * A simple DESCRIBE query of a constant.
      */
-    public void test_describe() throws Exception {
+    public void test_describe_1() throws Exception {
 
         new TestHelper(
-                "describe", // testURI,
-                "describe.rq",// queryFileURL
-                "describe.trig",// dataFileURL
-                "describe-result.trig"// resultFileURL
+                "describe-1", // testURI,
+                "describe-1.rq",// queryFileURL
+                "describe-1.trig",// dataFileURL
+                "describe-1-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    /**
+     * A simple DESCRIBE query of a variable with a where clause.
+     */
+    public void test_describe_2() throws Exception {
+
+        new TestHelper(
+                "describe-2", // testURI,
+                "describe-2.rq",// queryFileURL
+                "describe-2.trig",// dataFileURL
+                "describe-2-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    /**
+     * A simple DESCRIBE query of a constant plus a variable with a where clause.
+     */
+    public void test_describe_3() throws Exception {
+
+        new TestHelper(
+                "describe-3", // testURI,
+                "describe-3.rq",// queryFileURL
+                "describe-3.trig",// dataFileURL
+                "describe-3-result.trig"// resultFileURL
                 ).runTest();
         
     }

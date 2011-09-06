@@ -526,22 +526,40 @@ public class ASTEvalHelper {
             
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
                 
-                try {
-                    
-                    runningQuery.get();
-                    
-                } catch (Exception e) {
-            
-                    throw new QueryEvaluationException(e);
-                    
-                }
-        
+                checkFuture(runningQuery);
+
             }
 
         }
 
     }
 
+    /**
+     * Test for abnormal completion of the {@link IRunningQuery}.
+     */
+    static private void checkFuture(final IRunningQuery runningQuery)
+            throws QueryEvaluationException {
+
+        try {
+            runningQuery.get();
+        } catch (InterruptedException e) {
+            /*
+             * Interrupted while waiting on the Future.
+             */
+            throw new RuntimeException(e);
+        } catch (Throwable e) {
+            /*
+             * Exception thrown by the runningQuery.
+             */
+            if (runningQuery.getCause() != null) {
+                // abnormal termination - wrap and rethrow.
+                throw new QueryEvaluationException(e);
+            }
+            // otherwise this is normal termination.
+        }
+
+    }
+    
     /**
      * Evaluate a SELECT query.
      * 
@@ -563,7 +581,7 @@ public class ASTEvalHelper {
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final PipelineOp queryPlan,
             final BindingSet bs, final QueryEngine queryEngine,
-            final IVariable[] projected) throws QueryEvaluationException {
+            final IVariable<?>[] projected) throws QueryEvaluationException {
 
         final List<String> projectedSet = new LinkedList<String>();
 
@@ -601,7 +619,7 @@ public class ASTEvalHelper {
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final PipelineOp queryPlan,
             final QueryBindingSet queryBindingSet,
-            final QueryEngine queryEngine, final IVariable[] projected,
+            final QueryEngine queryEngine, final IVariable<?>[] projected,
             final Map<String, String> prefixDecls, final ConstructNode construct)
             throws QueryEvaluationException {
 
@@ -630,7 +648,7 @@ public class ASTEvalHelper {
     static public CloseableIteration<BindingSet, QueryEvaluationException> doEvaluateNatively(
             final AbstractTripleStore database, final PipelineOp queryPlan,
             final BindingSet bs, final QueryEngine queryEngine,
-            final IVariable[] required) throws QueryEvaluationException {
+            final IVariable<?>[] required) throws QueryEvaluationException {
 
         IRunningQuery runningQuery = null;
         final IAsynchronousIterator<IBindingSet[]> source = wrapSource(bs); 
@@ -718,7 +736,7 @@ public class ASTEvalHelper {
     
     private static CloseableIteration<BindingSet, QueryEvaluationException> 
         iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
-            final IVariable[] required) {
+            final IVariable<?>[] required) {
     
         final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
         

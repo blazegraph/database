@@ -47,7 +47,6 @@ import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -244,11 +243,11 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
 
-            union.addChild(new StatementPatternNode(term0, p0a, o0));
-            union.addChild(new StatementPatternNode(s0, p0b, term0));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term0, p0a, o0)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s0, p0b, term0)));
 
-            union.addChild(new StatementPatternNode(term1, p1a, o1));
-            union.addChild(new StatementPatternNode(s1, p1b, term1));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term1, p1a, o1)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s1, p1b, term1)));
 
         }
 
@@ -312,11 +311,11 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
 
-            union.addChild(new StatementPatternNode(term0, p0a, o0));
-            union.addChild(new StatementPatternNode(s0, p0b, term0));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term0, p0a, o0)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s0, p0b, term0)));
 
-            union.addChild(new StatementPatternNode(term1, p1a, o1));
-            union.addChild(new StatementPatternNode(s1, p1b, term1));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term1, p1a, o1)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s1, p1b, term1)));
 
             /*
              * Setup the PROJECTION node. 
