@@ -23,23 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.datatype.XMLGregorianCalendar;
-
-import org.semanticweb.yars.nx.namespace.XSD;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
@@ -62,7 +58,7 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
          * @see DateOp
          */
         String OP = (DateBOp.class.getName() + ".op").intern();
-        
+
     }
 
     public enum DateOp {
@@ -135,13 +131,13 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
         // not yet bound?
         if (left == null)
             throw new SparqlTypeErrorException.UnboundVarException();
-        
-        
+
+
         if (left.isLiteral()) {
             if(!left.hasValue()){
                 throw new NotMaterializedException();
             }
-                
+
             BigdataLiteral bl = (BigdataLiteral) left.getValue();
             if (XSD.DATETIME.equals(bl.getDatatype())) {
                 XMLGregorianCalendar cal=bl.calendarValue();
@@ -188,5 +184,5 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
     public Requirement getRequirement() {
         return Requirement.SOMETIMES;
     }
-    
+
 }
