@@ -5,20 +5,32 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.ArrayList;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.TupleQueryResultImpl;
 import org.openrdf.query.parser.ParsedTupleQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 public class BigdataSailTupleQuery extends SailTupleQuery 
         implements BigdataSailQuery {
+
+    private static final Logger log = Logger
+            .getLogger(BigdataSailTupleQuery.class);
     
     /**
      * Query hints are embedded in query strings as namespaces.  
@@ -31,18 +43,47 @@ public class BigdataSailTupleQuery extends SailTupleQuery
      */
     private volatile TupleExpr tupleExpr;
     
+    private final QueryRoot queryRoot;
+    
     public Properties getQueryHints() {
     	
     	return queryHints;
     	
     }
     
+    public QueryRoot getQueryRoot() {
+        
+        return queryRoot;
+        
+    }
+
+    public AbstractTripleStore getTripleStore() {
+
+        return ((BigdataSailRepositoryConnection) getConnection())
+                .getTripleStore();
+
+    }
+    
+    public BigdataSailTupleQuery(final QueryRoot queryRoot,
+            final BigdataSailRepositoryConnection con) {
+
+        super(null/*tupleQuery*/, con); // TODO Might have to fake the TupleExpr with a Nop.
+
+        this.queryHints = queryRoot.getQueryHints();
+
+        this.queryRoot = queryRoot;
+        
+    }
+
+    @Deprecated
 	public BigdataSailTupleQuery(final ParsedTupleQuery tupleQuery,
 			final SailRepositoryConnection con, final Properties queryHints) {
 
     	super(tupleQuery, con);
     	
         this.queryHints = queryHints;
+
+        this.queryRoot = null;
         
     }
 
@@ -55,6 +96,46 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 	 */
     @Override
     public TupleQueryResult evaluate() throws QueryEvaluationException {
+
+        if (queryRoot != null) {
+            
+            final AbstractTripleStore store = getTripleStore();
+
+            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+            if (log.isInfoEnabled())
+                log.info("queryRoot:\n" + queryRoot);
+
+            /*
+             * Run the query optimizer first so we have access to the rewritten
+             * query plan.
+             */
+            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
+                    .optimize(context, queryRoot, null/* bindingSet[] */);
+
+            if (log.isInfoEnabled())
+                log.info("optimizedQuery:\n" + optimizedQuery);
+
+            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+            if (log.isInfoEnabled())
+                log.info("queryPlan:\n" + queryPlan);
+
+            final IVariable<?>[] projected = queryRoot.getProjection()
+                    .getProjectionVars();
+
+            final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(store, queryPlan,
+                            new QueryBindingSet(), context.queryEngine,
+                            projected);
+            
+            return queryResult;
+            
+        }
+        
+        /*
+         * FIXME The code below this point is going away.
+         */
         
     	final TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
 
@@ -82,6 +163,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
     }
 
+    @Deprecated
     public TupleExpr getTupleExpr() throws QueryEvaluationException {
 
         if (tupleExpr == null) {
@@ -108,23 +190,5 @@ public class BigdataSailTupleQuery extends SailTupleQuery
         return tupleExpr;
 
 	}
-
-//    synchronized public void setBindingSets(
-//            final CloseableIteration<BindingSet, QueryEvaluationException> bindings) {
-//
-//        if (this.bindings != null)
-//            throw new IllegalStateException();
-//
-//        this.bindings = bindings;
-//
-//    }
-//
-//    synchronized public CloseableIteration<BindingSet, QueryEvaluationException> getBindingSets() {
-//
-//        return bindings;
-//
-//    }
-//
-//    private CloseableIteration<BindingSet, QueryEvaluationException> bindings;
 
 }

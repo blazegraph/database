@@ -22,18 +22,10 @@ import java.util.Set;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import info.aduna.io.IOUtil;
-import info.aduna.iteration.Iterations;
-import info.aduna.text.StringUtil;
-
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
@@ -66,10 +58,12 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.util.RDFInserter;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
-import org.openrdf.rio.Rio;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
+import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 
@@ -240,7 +234,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private void compareTupleQueryResults(TupleQueryResult queryResult, TupleQueryResult expectedResult)
+	protected void compareTupleQueryResults(TupleQueryResult queryResult, TupleQueryResult expectedResult)
 		throws Exception
 	{
 		// Create MutableTupleQueryResult to be able to re-iterate over the
@@ -403,7 +397,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		*/
 	}
 
-	private void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
+	protected void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
 		throws Exception
 	{
 		if (!ModelUtil.equals(expectedResult, queryResult)) {
@@ -524,7 +518,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private TupleQueryResult readExpectedTupleQueryResult()
+	protected TupleQueryResult readExpectedTupleQueryResult()
 		throws Exception
 	{
 		TupleQueryResultFormat tqrFormat = QueryResultIO.getParserFormatForFileName(resultFileURL);
@@ -551,7 +545,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private boolean readExpectedBooleanQueryResult()
+	protected boolean readExpectedBooleanQueryResult()
 		throws Exception
 	{
 		BooleanQueryResultFormat bqrFormat = BooleanQueryResultParserRegistry.getInstance().getFileFormatForFileName(
@@ -572,7 +566,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
-	private Set<Statement> readExpectedGraphQueryResult()
+	protected Set<Statement> readExpectedGraphQueryResult()
 		throws Exception
 	{
 		RDFFormat rdfFormat = Rio.getParserFormatForFileName(resultFileURL);

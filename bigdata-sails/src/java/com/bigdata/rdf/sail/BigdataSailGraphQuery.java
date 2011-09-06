@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.parser.ParsedGraphQuery;
@@ -44,14 +45,16 @@ import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
-/**
- * 
- * @deprecated by the AST refactor.
- */
-public class BigdataSailGraphQuery extends SailGraphQuery 
-        implements BigdataSailQuery {
+public class BigdataSailGraphQuery extends SailGraphQuery implements
+        BigdataSailQuery {
     
 	private static Logger log = Logger.getLogger(BigdataSailGraphQuery.class);
 	
@@ -59,14 +62,22 @@ public class BigdataSailGraphQuery extends SailGraphQuery
      * Query hints are embedded in query strings as namespaces.  
      * See {@link QueryHints#PREFIX} for more information.
      */
+	@Deprecated
     private final Properties queryHints;
     
-    private final boolean describe;
-    
+    private final QueryRoot queryRoot;
+
+    public QueryRoot getQueryRoot() {
+        
+        return queryRoot;
+        
+    }
+
     /**
      * Allow clients to bypass the native construct iterator, which resolves
      * binding sets into SPOs into BigdataStatements.
      */
+    @Deprecated
     private boolean useNativeConstruct = false;
     
     public Properties getQueryHints() {
@@ -75,18 +86,37 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     	
     }
 
+    public AbstractTripleStore getTripleStore() {
+
+        return ((BigdataSailRepositoryConnection) getConnection())
+                .getTripleStore();
+
+    }
+
+    public BigdataSailGraphQuery(final QueryRoot queryRoot,
+            final BigdataSailRepositoryConnection con) {
+
+        super(null/*tupleQuery*/, con); // TODO Might have to fake the TupleExpr with a Nop.
+        
+        this.queryHints = queryRoot.getQueryHints();
+        
+        this.queryRoot = queryRoot;
+        
+    }
+    
+    @Deprecated
     public BigdataSailGraphQuery(final ParsedGraphQuery tupleQuery,
             final SailRepositoryConnection con, final Properties queryHints, 
             final boolean describe) {
         super(tupleQuery, con);
         this.queryHints = queryHints;
-        this.describe = describe;
-        
+        this.queryRoot = null;
         if (describe) {
             optimizeDescribe();
         }
     }
     
+    @Deprecated
     protected void optimizeDescribe() {
         try {
             ParsedQuery parsedQuery = getParsedQuery();
@@ -203,38 +233,30 @@ public class BigdataSailGraphQuery extends SailGraphQuery
         }
     }
 
+    @Deprecated
     private Var createConstVar(Value value, int constantVarID) {
         Var var = createAnonVar("-const-" + constantVarID);
         var.setValue(value);
         return var;
     }
 
+    @Deprecated
     private Var createAnonVar(String varName) {
         Var var = new Var(varName);
         var.setAnonymous(true);
         return var;
     }
-
     
+//    /**
+//     * Allow clients to bypass the native construct iterator, which resolves
+//     * binding sets into SPOs into BigdataStatements.  Sometimes this can
+//     * cause problems, especially when construct graphs contain values not
+//     * in the database's lexicon. 
+//     */
+//    public void setUseNativeConstruct(boolean useNativeConstruct) {
+//        this.useNativeConstruct = useNativeConstruct;
+//    }
     
-    /**
-     * Allow clients to bypass the native construct iterator, which resolves
-     * binding sets into SPOs into BigdataStatements.  Sometimes this can
-     * cause problems, especially when construct graphs contain values not
-     * in the database's lexicon. 
-     */
-    public void setUseNativeConstruct(boolean useNativeConstruct) {
-        this.useNativeConstruct = useNativeConstruct;
-    }
-    
-    /**
-     * Return true if this graph query is a SPARQL DESCRIBE.  (Needs to be
-     * optimized differently).
-     */
-    public boolean isDescribe() {
-        return describe;
-    }
-
     /**
      * {@inheritDoc}
      * <p>
@@ -245,7 +267,45 @@ public class BigdataSailGraphQuery extends SailGraphQuery
      */
     @Override
     public GraphQueryResult evaluate() throws QueryEvaluationException {
-        
+    
+        if (queryRoot != null) {
+            
+            final AbstractTripleStore store = getTripleStore();
+
+            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+            if (log.isInfoEnabled())
+                log.info("queryRoot:\n" + queryRoot);
+
+            /*
+             * Run the query optimizer first so we have access to the rewritten
+             * query plan.
+             */
+            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
+                    .optimize(context, queryRoot, null/* bindingSet[] */);
+
+            if (log.isInfoEnabled())
+                log.info("optimizedQuery:\n" + optimizedQuery);
+
+            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+            if (log.isInfoEnabled())
+                log.info("queryPlan:\n" + queryPlan);
+
+            final GraphQueryResult queryResult = ASTEvalHelper
+                    .evaluateGraphQuery(
+                    store, //
+                    queryPlan, //
+                    new QueryBindingSet(),//
+                    context.queryEngine, //
+                    queryRoot.getProjection().getProjectionVars(),
+                    queryRoot.getPrefixDecls(), //
+                    queryRoot.getConstruct()//
+                    );
+
+            return queryResult;
+            
+        }
         try {
             
         	final TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
@@ -331,6 +391,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery
     /**
      * Return the same optimized operator tree as what would be executed.
      */
+    @Deprecated
     public TupleExpr getTupleExpr() throws QueryEvaluationException {
         
         TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
@@ -352,23 +413,5 @@ public class BigdataSailGraphQuery extends SailGraphQuery
         }
 
     }
-    
-//    synchronized public void setBindingSets(
-//            final CloseableIteration<BindingSet, QueryEvaluationException> bindings) {
-//
-//        if (this.bindings != null)
-//            throw new IllegalStateException();
-//
-//        this.bindings = bindings;
-//
-//    }
-//
-//    synchronized public CloseableIteration<BindingSet, QueryEvaluationException> getBindingSets() {
-//
-//        return bindings;
-//
-//    }
-//
-//    private CloseableIteration<BindingSet, QueryEvaluationException> bindings;
 
 }
