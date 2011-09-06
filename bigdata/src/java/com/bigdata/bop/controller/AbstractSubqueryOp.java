@@ -93,15 +93,13 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
 		 * The ordered {@link BOp}[] of subqueries to be evaluated for each
 		 * binding set presented (required).
 		 */
-		String SUBQUERIES = (AbstractSubqueryOp.class.getName() + ".subqueries")
-				.intern();
+		String SUBQUERIES = AbstractSubqueryOp.class.getName() + ".subqueries";
 
 		/**
 		 * The maximum parallelism with which the subqueries will be evaluated
 		 * (default is unlimited).
 		 */
-		String MAX_PARALLEL_SUBQUERIES = (AbstractSubqueryOp.class.getName() + ".maxParallelSubqueries")
-				.intern();
+		String MAX_PARALLEL_SUBQUERIES = AbstractSubqueryOp.class.getName() + ".maxParallelSubqueries";
 
 		int DEFAULT_MAX_PARALLEL_SUBQUERIES = Integer.MAX_VALUE;
 
@@ -365,10 +363,16 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                     subquerySolutionItr = runningSubquery.iterator();
 
                     // Copy solutions from the subquery to the query.
-                    BOpUtility.copy(subquerySolutionItr, parentContext
-                            .getSink(), null/* sink2 */, null/* select */,
-                            null/* constraints */, null/* stats */);
-                    
+                    BOpUtility.copy(//
+                            subquerySolutionItr, //
+                            parentContext.getSink(), //
+                            null, // sink2
+                            null, // merge solution (parent's source solution).
+                            null, // selectVars (subquery projection).
+                            null, // constraints
+                            null  // stats
+                            );
+
                     // wait for the subquery.
                     runningSubquery.get();
 

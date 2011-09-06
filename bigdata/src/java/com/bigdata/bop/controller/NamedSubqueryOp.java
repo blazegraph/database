@@ -430,9 +430,15 @@ public class NamedSubqueryOp extends PipelineOp {
                 // default sink
                 final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
-                BOpUtility.copy(source, sink, null/* sink2 */,
-                        null/* select */, null/* constraints */,
-                        context.getStats());
+                BOpUtility.copy(//
+                        source, //
+                        sink,//
+                        null, // sink2
+                        null, // mergeSolution (aka parent's source solution).
+                        null, // selectVars (aka projection).
+                        null, // constraints
+                        context.getStats()//
+                        );
 
                 sink.flush();
 

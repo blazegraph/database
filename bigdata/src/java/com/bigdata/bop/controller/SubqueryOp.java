@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -39,9 +42,12 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * Pipelined join with subquery.
@@ -92,6 +98,8 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  */
 public class SubqueryOp extends PipelineOp {
 
+    private static final Logger log = Logger.getLogger(SubqueryOp.class);
+    
     /**
      * 
      */
@@ -99,6 +107,31 @@ public class SubqueryOp extends PipelineOp {
 
     public interface Annotations extends SubqueryJoinAnnotations {
 
+        /**
+         * The {@link IVariable}[] projected by the subquery (optional).
+         * <p>
+         * Rule: A variable within a subquery is distinct from the same name
+         * variable outside of the subquery unless the variable is projected
+         * from the subquery.
+         * <p>
+         * When this option is given, only the variables projected by the
+         * subquery will be visible during the subquery (this models SPARQL 1.1
+         * subquery variable scope semantics). A variable having the same name
+         * in the parent context and the subquery which is not projected by the
+         * subquery is a distinct variable. This constraint is enforced by
+         * passing only the projected variables into the subquery and then
+         * merging the unprojected variables from the source solution into each
+         * result produced by the subquery for a given source solution.
+         * <p>
+         * When this option is not given, all variables are passed into the
+         * subquery (basically, the semantics are those of <code>SELECT *</code>
+         * ).
+         * <p>
+         * Note: This overrides the semantics of the same named annotation on
+         * the {@link JoinAnnotations} interface.
+         */
+        String SELECT = SubqueryJoinAnnotations.SELECT;
+        
     }
 
     /**
@@ -120,6 +153,21 @@ public class SubqueryOp extends PipelineOp {
         super(args, annotations);
 
         getRequiredProperty(Annotations.SUBQUERY);
+
+        final IVariable<?>[] selectVars = (IVariable<?>[]) getProperty(Annotations.SELECT);
+
+        if (selectVars != null && selectVars.length == 0) {
+
+            /*
+             * An empty array suggests that nothing is being projected. Either
+             * we should reject that here or we should treat it instead as
+             * "SELECT *".
+             */
+            
+            throw new IllegalArgumentException(Annotations.SELECT
+                    + " is optional, but may not be empty.");
+            
+        }
         
     }
 
@@ -146,10 +194,11 @@ public class SubqueryOp extends PipelineOp {
         private final boolean optional;
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
-        /** The selected variables for the output binding sets (optional). */
-        private final IVariable<?>[] selectVars;
+        /** The projected variables (<code>select *</code>) if missing. */
+        private final IVariable[] selectVars;
         /** The optional constraints on the join. */
         private final IConstraint[] constraints;
+        private final BOpStats stats;
         
         public ControllerTask(final SubqueryOp controllerOp,
                 final BOpContext<IBindingSet> context) {
@@ -174,6 +223,8 @@ public class SubqueryOp extends PipelineOp {
 
             this.constraints = (IConstraint[]) controllerOp
                     .getProperty(Annotations.CONSTRAINTS);
+            
+            this.stats = context.getStats();
             
         }
 
@@ -244,7 +295,7 @@ public class SubqueryOp extends PipelineOp {
              * there are no solutions for the subquery (optional join
              * semantics).
              */
-            private final IBindingSet bset;
+            private final IBindingSet parentSolutionIn;
             
             /**
              * The root operator for the subquery.
@@ -254,7 +305,7 @@ public class SubqueryOp extends PipelineOp {
             public SubqueryTask(final IBindingSet bset, final BOp subQuery,
                     final BOpContext<IBindingSet> parentContext) {
 
-                this.bset = bset;
+                this.parentSolutionIn = bset;
                 
                 this.subQueryOp = subQuery;
 
@@ -264,29 +315,52 @@ public class SubqueryOp extends PipelineOp {
 
             public IRunningQuery call() throws Exception {
 
+                /*
+                 * Binding set in which only the projected variables are
+                 * visible. (if selectVars is empty, then all variables remain
+                 * visible.).
+                 */
+                final IBindingSet childSolutionIn = parentSolutionIn
+                        .copy(selectVars);
+
             	// The subquery
                 IRunningQuery runningSubquery = null;
             	// The iterator draining the subquery
                 IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
-                    final QueryEngine queryEngine = parentContext.getRunningQuery()
-                            .getQueryEngine();
+                    final QueryEngine queryEngine = parentContext
+                            .getRunningQuery().getQueryEngine();
+
+                    if(log.isDebugEnabled())
+                        log.debug("\nRunning subquery:" //
+                            + "\n        selectVars: "
+                            + Arrays.toString(selectVars) //
+                            + "\nparentSolution(in): "
+                            + parentSolutionIn //
+                            + "\n childSolution(in): "
+                            + childSolutionIn//
+                    );
                     
                     runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
-                            bset);
+                            childSolutionIn);
 
 					long ncopied = 0L;
 					try {
 						
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
-
+						
 						// Copy solutions from the subquery to the query.
-                        ncopied = BOpUtility.copy(subquerySolutionItr,
-                                parentContext.getSink(), null/* sink2 */,
-                                selectVars, constraints, parentContext
-                                        .getStats());
+						ncopied = BOpUtility.copy(//
+                                subquerySolutionItr,// subquery solutions.
+                                parentContext.getSink(), //
+                                null, // sink2
+                                parentSolutionIn,// original bindings from parent query.
+                                selectVars, // variables projected by subquery.
+                                constraints, //
+                                parentContext.getStats()//
+                                );
 
 						// wait for the subquery to halt / test for errors.
 						runningSubquery.get();
@@ -306,14 +380,16 @@ public class SubqueryOp extends PipelineOp {
 
                         /*
                          * Since there were no solutions for the subquery, copy
-                         * the original binding set to the default sink and do
-                         * NOT apply the constraints.
+                         * the original binding set to the appropriate sink and
+                         * do NOT apply the constraints.
                          */
 
-                        final IBindingSet tmp = selectVars == null ? bset
-                                : bset.copy(selectVars);
+                        final IBlockingBuffer<IBindingSet[]> optionalSink = parentContext
+                                .getSink2() != null ? parentContext.getSink2()
+                                : parentContext.getSink();
 
-                        parentContext.getSink().add(new IBindingSet[] { tmp });
+                        optionalSink
+                                .add(new IBindingSet[] { parentSolutionIn });
 
                     }
                     

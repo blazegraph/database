@@ -186,13 +186,15 @@ public class CopyOp extends PipelineOp {
                     BOpUtility.copy(
                             new ThickAsynchronousIterator<IBindingSet[]>(
                                     new IBindingSet[][] { bindingSets }), sink,
-                            sink2, select, constraints, stats);
+                            sink2, null/* mergeSolution */, select,
+                            constraints, stats);
 
                 } else {
 
                     // copy binding sets from the source.
-                    BOpUtility.copy(source, sink, sink2, select, constraints,
-                            stats);
+                    BOpUtility
+                            .copy(source, sink, sink2, null/* mergeSolution */,
+                                    select, constraints, stats);
 
                 }
                 

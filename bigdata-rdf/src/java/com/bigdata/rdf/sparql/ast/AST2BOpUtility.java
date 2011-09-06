@@ -42,7 +42,6 @@ import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
-import com.bigdata.bop.controller.SubqueryScopeOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
@@ -474,17 +473,23 @@ public class AST2BOpUtility {
      * <p>
      * Rule: A variable within a subquery is distinct from the same name
      * variable outside of the subquery unless the variable is projected from
-     * the subquery. This is handled by wrapping the subquery with a push / pop
-     * pattern in which variables in the parent context which are not projected
-     * by the subquery are hidden from view during its evaluation scope.
+     * the subquery. This is handled by a pattern in which variables in the
+     * parent context which are not projected by the subquery are hidden from
+     * view during its evaluation scope.
      * <p>
-     * Note: We currently evaluate SPARQL 1.1 style sub-queries using a
-     * pipelined subquery join. For each solution which flows through the
-     * pipeline, we issue the sub-query for the as-bound solution and join the
-     * subquery results against that as-bound solution.
+     * Note: We evaluate SPARQL 1.1 style sub-queries using a pipelined subquery
+     * join. For each solution which flows through the pipeline, we issue the
+     * sub-query for the as-bound solution and join the subquery results against
+     * that as-bound solution.
+     * <p>
+     * Note: Some SPARQL 1.1 subqueries may be more efficiently run once to
+     * produce a temporary solution set which is then joined into the query for
+     * each solution which flows through the query. Such subqueries should be
+     * translated into named subqueries with an include by a query optimizer
+     * step. When a subquery is rewritten like this is will no longer appear as
+     * a {@link SubqueryRoot} node in the AST.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
-     * @see IBindingSet#push(IVariable[])
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
@@ -498,21 +503,22 @@ public class AST2BOpUtility {
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subquery + "\nplan=" + subqueryPlan);
 
-        left = new SubqueryScopeOp(leftOrEmpty(left),// PUSH
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
-                new NV(SubqueryScopeOp.Annotations.PUSH, true)//
-                );
+//        left = new SubqueryScopeOp(leftOrEmpty(left),// PUSH
+//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+//                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
+//                new NV(SubqueryScopeOp.Annotations.PUSH, true)//
+//                );
         left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                 new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
                 new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),
-                new NV(SubqueryOp.Annotations.OPTIONAL, false)//
+                new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+                new NV(SubqueryOp.Annotations.SELECT, vars)//
                 );
-        left = new SubqueryScopeOp(leftOrEmpty(left),// POP
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
-                new NV(SubqueryScopeOp.Annotations.PUSH, false)//
-                );
+//        left = new SubqueryScopeOp(leftOrEmpty(left),// POP
+//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+//                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
+//                new NV(SubqueryScopeOp.Annotations.PUSH, false)//
+//                );
 
         return left;
         
