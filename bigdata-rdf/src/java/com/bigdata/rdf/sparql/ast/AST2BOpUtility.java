@@ -1400,39 +1400,51 @@ public class AST2BOpUtility {
         final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
         if (projectExprs != null) {
+            
             for (IValueExpression expr : projectExprs) {
-                if(expr instanceof Bind){
-                    vars.add(((Bind)expr).getVar());
-                    expr=((Bind)expr).getExpr();
-                }
-                if (expr instanceof IVariable<?>) {
+                
+                if (expr instanceof Bind) {
+                
+                    vars.add(((Bind) expr).getVar());
+                    
+                    expr = ((Bind) expr).getExpr();
+                    
+                } else if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
 
                 } else {
 
-                    ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
+                    ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                            expr, vars);
 
                 }
+
             }
 
         }
 
         if (groupByExprs != null) {
+
             for (IValueExpression expr : groupByExprs) {
-                if(expr instanceof Bind){
-                    vars.add(((Bind)expr).getVar());
-                    expr=((Bind)expr).getExpr();
-                }
-                if (expr instanceof IVariable<?>) {
+
+                if (expr instanceof Bind) {
+
+                    vars.add(((Bind) expr).getVar());
+
+                    expr = ((Bind) expr).getExpr();
+
+                } else if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
 
-                } else{
+                } else {
 
-                    ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
+                    ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                            expr, vars);
 
                 }
+
             }
 
         }

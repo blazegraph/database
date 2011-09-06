@@ -57,15 +57,4 @@ public class TestComplexQuery extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper("aggregate-divide").runTest();
     }
 
-//    public void test_aggregate_divide_namedSubqueryOnly() throws Exception {
-//
-//        new TestHelper(
-//                "aggregate-divide-namedSubqueryOnly", // testURI,
-//                "aggregate-divide-namedSubqueryOnly.rq",// queryFileURL
-//                "aggregate-divide.trig",// dataFileURL
-//                "aggregate-divide.srx"// resultFileURL
-//                ).runTest();
-//
-//    }
-
 }
