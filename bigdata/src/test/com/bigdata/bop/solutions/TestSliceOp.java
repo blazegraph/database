@@ -786,8 +786,8 @@ public class TestSliceOp extends TestCase2 {
                     + ", ncancel=" + ncancel + ", ntimeout=" + ntimeout
                     + ", ninterrupt=" + ninterrupt + ", nsuccess=" + nsuccess;
 
-            System.err.println(getClass().getName() + "." + getName() + " : "
-                    + msg);
+            if (log.isInfoEnabled())
+                log.info(getClass().getName() + "." + getName() + " : " + msg);
 
             if (nerror > 0)
                 fail(msg);

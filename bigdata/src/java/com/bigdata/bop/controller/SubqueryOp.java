@@ -42,10 +42,11 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
+import com.bigdata.bop.solutions.GroupByRewriter;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -132,6 +133,14 @@ public class SubqueryOp extends PipelineOp {
          */
         String SELECT = SubqueryJoinAnnotations.SELECT;
         
+        /**
+         * Boolean annotation should be <code>true</code> if the subquery is an
+         * aggregate (default {@value #DEFAULT_IS_AGGREGATE}).
+         */
+        String IS_AGGREGATE = Annotations.class.getName() + ".isAggregate";
+
+        boolean DEFAULT_IS_AGGREGATE = false;
+        
     }
 
     /**
@@ -191,14 +200,16 @@ public class SubqueryOp extends PipelineOp {
     private static class ControllerTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
+        /** <code>true</code> if the subquery has optional join semantics. */
         private final boolean optional;
+        /** <code>true</code> if the subquery is an aggregate. */
+        private final boolean aggregate;
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
         /** The projected variables (<code>select *</code>) if missing. */
-        private final IVariable[] selectVars;
+        private final IVariable<?>[] selectVars;
         /** The optional constraints on the join. */
         private final IConstraint[] constraints;
-        private final BOpStats stats;
         
         public ControllerTask(final SubqueryOp controllerOp,
                 final BOpContext<IBindingSet> context) {
@@ -215,6 +226,10 @@ public class SubqueryOp extends PipelineOp {
                     Annotations.OPTIONAL,
                     Annotations.DEFAULT_OPTIONAL);
 
+            this.aggregate = controllerOp.getProperty(
+                    Annotations.IS_AGGREGATE,
+                    Annotations.DEFAULT_IS_AGGREGATE);
+
             this.subquery = (PipelineOp) controllerOp
                     .getRequiredProperty(Annotations.SUBQUERY);
             
@@ -223,8 +238,6 @@ public class SubqueryOp extends PipelineOp {
 
             this.constraints = (IConstraint[]) controllerOp
                     .getProperty(Annotations.CONSTRAINTS);
-            
-            this.stats = context.getStats();
             
         }
 
@@ -300,14 +313,31 @@ public class SubqueryOp extends PipelineOp {
             /**
              * The root operator for the subquery.
              */
-            private final BOp subQueryOp;
+            private final PipelineOp subQueryOp;
 
-            public SubqueryTask(final IBindingSet bset, final BOp subQuery,
+            public SubqueryTask(final IBindingSet bset, final PipelineOp subQuery,
                     final BOpContext<IBindingSet> parentContext) {
 
                 this.parentSolutionIn = bset;
                 
-                this.subQueryOp = subQuery;
+                if (aggregate) {
+                    
+                    /*
+                     * Note: We need to have distinct IAggregates in subqueries
+                     * since they have internal state. This makes a copy of the
+                     * subquery in which each IAggregate function is a distinct
+                     * instance. This prevents inappropriate sharing of state
+                     * across invocations of the subquery.
+                     */
+                    
+                    this.subQueryOp = BOpUtility
+                            .makeAggregateDistinct(subQuery);
+                    
+                } else {
+
+                    this.subQueryOp = subQuery;
+                    
+                }
 
                 this.parentContext = parentContext;
 
@@ -342,7 +372,7 @@ public class SubqueryOp extends PipelineOp {
                             + childSolutionIn//
                     );
                     
-                    runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
+                    runningSubquery = queryEngine.eval(subQueryOp,
                             childSolutionIn);
 
 					long ncopied = 0L;

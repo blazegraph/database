@@ -1,8 +1,8 @@
 prefix : <http://example.org/> 
 prefix xsd: <http://www.w3.org/2001/XMLSchema#> 
+
 SELECT ?_set17
-(<http://www.w3.org/2006/sparql-functions#coalesce>((COUNT(?_set16) /
-SAMPLE(?_set19)), 0) AS ?_set10)
+      (coalesce((COUNT(?_set16) / SAMPLE(?_set19)), 0) AS ?_set10)
 
 WITH {
       SELECT DISTINCT ?_set12

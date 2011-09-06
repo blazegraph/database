@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+
 /**
  * Data driven test suite for complex queries.
  * 
@@ -54,7 +55,17 @@ public class TestComplexQuery extends AbstractDataDrivenSPARQLTestCase {
     public void test_aggregate_divide() throws Exception {
 
         new TestHelper("aggregate-divide").runTest();
-        
     }
+
+//    public void test_aggregate_divide_namedSubqueryOnly() throws Exception {
+//
+//        new TestHelper(
+//                "aggregate-divide-namedSubqueryOnly", // testURI,
+//                "aggregate-divide-namedSubqueryOnly.rq",// queryFileURL
+//                "aggregate-divide.trig",// dataFileURL
+//                "aggregate-divide.srx"// resultFileURL
+//                ).runTest();
+//
+//    }
 
 }

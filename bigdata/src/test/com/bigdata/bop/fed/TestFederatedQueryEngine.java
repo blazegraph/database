@@ -205,7 +205,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
             }
             
-            System.err.println("queryPeer : " + dataService0.getQueryEngine());
+            if(log.isInfoEnabled())
+                log.info("queryPeer : " + dataService0.getQueryEngine());
             
         }
 

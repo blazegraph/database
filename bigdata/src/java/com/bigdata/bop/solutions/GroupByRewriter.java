@@ -30,6 +30,7 @@ package com.bigdata.bop.solutions;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
@@ -178,6 +179,33 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
 //        return columnProjections;
 //    }
 
+    /**
+     * Special construct creates a distinct instance of each {@link IAggregate}
+     * in order to avoid side-effects in the internal state of the
+     * {@link IAggregate} functions when evaluated in different contexts (e.g.,
+     * a pipelined aggregation subquery).
+     * 
+     * @param rewrittenState
+     */
+    public GroupByRewriter(final IGroupByRewriteState rewrittenState) {
+
+        this.select2 = rewrittenState.getSelect2();
+
+        this.having2 = rewrittenState.getHaving2();
+
+        final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr = rewrittenState.getAggExpr();
+
+        this.aggExpr = new LinkedHashMap<IAggregate<?>, IVariable<?>>();
+
+        for (Map.Entry<IAggregate<?>, IVariable<?>> e : aggExpr.entrySet()) {
+
+            // Note: *clone* the IAggregate function!
+            this.aggExpr.put((IAggregate<?>) e.getKey().clone(), e.getValue());
+
+        }
+        
+    }
+    
     public GroupByRewriter(final IGroupByState groupByState) {
 
         if (groupByState == null)
