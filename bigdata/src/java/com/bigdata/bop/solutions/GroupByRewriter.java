@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.solutions;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,6 +75,16 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
 //    private final LinkedHashMap<IValueExpression<?>,ProjectionType> columnProjections;
     private final IValueExpression<?>[] select2;
     private final IConstraint[] having2;
+
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getSimpleName());
+        sb.append("{aggExpr=" + aggExpr);
+        sb.append(",select2=" + Arrays.toString(select2));
+        sb.append(",having2=" + Arrays.toString(having2));
+        sb.append("}");
+        return sb.toString();
+    }
     
     /**
      * The set of all unique {@link IAggregate} expressions with {@link Bind}s

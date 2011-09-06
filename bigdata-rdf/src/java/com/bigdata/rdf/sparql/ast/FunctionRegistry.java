@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -73,7 +74,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  *      functions</a>
  *      
  * TODO Openrdf now defines the URIs for the XPath functions in <code>org.openrdf.model.vocabulary.FN</code>.
- * Use referencs to that class here?
+ * Use references to that class here?
  */
 public class FunctionRegistry {
 
@@ -1213,6 +1214,7 @@ public class FunctionRegistry {
 	}
 
 	public static class GroupConcatFactory implements Factory {
+	   
 	    public interface Annotations extends GROUP_CONCAT.Annotations{
 	    }
 
@@ -1223,16 +1225,27 @@ public class FunctionRegistry {
 	            final Map<String,Object> scalarValues,
                 final ValueExpressionNode... args) {
 
-            checkArgs(args, ValueExpressionNode.class,ConstantNode.class);
-            if(!scalarValues.containsKey(Annotations.SEPARATOR)){
-                throw new IllegalArgumentException("missing scalar value:"+Annotations.SEPARATOR);
+            checkArgs(args, ValueExpressionNode.class);
+            
+            final LinkedHashMap<String, Object> tmp = new LinkedHashMap<String, Object>(
+                    scalarValues);
+
+            if (!scalarValues.containsKey(Annotations.SEPARATOR)) {
+                
+                // Per the spec.
+                tmp.put(Annotations.SEPARATOR, " ");
+
             }
 
+            tmp.put(Annotations.NAMESPACE, lex);
+            
             final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
 
-            return new com.bigdata.bop.rdf.aggregate.GROUP_CONCAT(new BOp[]{ve},scalarValues);
+            return new com.bigdata.bop.rdf.aggregate.GROUP_CONCAT(
+                    new BOp[] { ve }, tmp);
 
         }
+	    
 	}
 
     /**

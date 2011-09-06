@@ -26,16 +26,14 @@ package com.bigdata.bop.rdf.aggregate;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AbstractLiteralBOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
@@ -161,8 +159,6 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
     private transient int characterLimit;
 
-
-
     private BigdataValueFactory getValueFactory(){
         if (vf == null) {
             final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
@@ -207,7 +203,19 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
         firstCause = null;
 
-        // cache stuff.
+        cache();
+
+    }
+    
+    /**
+     * Cache stuff.
+     * <p>
+     * Note: The {@link PipelinedAggregationOp} does NOT invoke {@link #reset()}
+     * so we have to conditionally cache stuff from {@link #get(IBindingSet)}
+     * and {@link #done()} as well.
+     */
+    private void cache() {
+
         sep();
         valueLimit();
         characterLimit();
@@ -217,17 +225,26 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
     synchronized public IV done() {
 
+        if(sep == null)
+            cache();
+
         if (firstCause != null) {
 
             throw new RuntimeException(firstCause);
 
         }
 
-        if (aggregated == null)
-            return DummyConstantNode.toDummyIV(vf.createLiteral(""));
+        final BigdataValueFactory vf = getValueFactory();
 
-        return DummyConstantNode
-                .toDummyIV(vf.createLiteral(aggregated.toString()));
+        IV ret;
+        if (aggregated == null) {
+            ret = DummyConstantNode.toDummyIV(vf.createLiteral(""));
+        } else {
+            ret = DummyConstantNode.toDummyIV(vf.createLiteral(aggregated
+                    .toString()));
+        }
+//        System.err.println("aggregated:=" + aggregated+" : "+ret);
+        return ret;
 
     }
 
@@ -253,6 +270,9 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
 
     private IV doGet(final IBindingSet bindingSet) {
 
+        if(sep == null)
+            cache();
+        
         final IValueExpression<IV<?, ?>> expr = (IValueExpression<IV<?, ?>>) get(0);
 
         final IV<?, ?> iv = expr.get(bindingSet);
@@ -269,17 +289,19 @@ public class GROUP_CONCAT extends AggregateBase<IV> implements INeedsMaterializa
             if (aggregated == null)
                 aggregated = new StringBuilder(str);
             else {
-                aggregated.append(sep);
+                aggregated.append(sep());
                 aggregated.append(str);
+//                System.err.println("aggregated:=" + aggregated);
+               
             }
 
             nvalues++;
 
-            if (characterLimit != -1 && aggregated.length() >= characterLimit) {
+            if (characterLimit() != -1 && aggregated.length() >= characterLimit) {
                 // Exceeded the character length limit.
-                aggregated.setLength(characterLimit()); // truncate.
+                aggregated.setLength(characterLimit); // truncate.
                 done = true;
-            } else if (valueLimit != -1 && nvalues >= valueLimit) {
+            } else if (valueLimit() != -1 && nvalues >= valueLimit) {
                 // Exceeded the value limit.
                 done = true;
             }

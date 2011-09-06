@@ -42,9 +42,12 @@ public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
     }
 
     @Override
-    public boolean accept(IBindingSet bindingSet) {
-        Object result = ((ConditionalBind) get(0)).get(bindingSet);
-       return result!=null;
+    public boolean accept(final IBindingSet bindingSet) {
+        
+        final Object result = ((ConditionalBind) get(0)).get(bindingSet);
+        
+        return result != null;
+        
     }
 
 }

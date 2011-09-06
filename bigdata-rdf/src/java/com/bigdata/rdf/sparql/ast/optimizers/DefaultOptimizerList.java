@@ -207,6 +207,13 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ConstructOptimizer());
 
         /**
+         * If a {@link SubqueryRoot} appears in an otherwise empty (and
+         * non-optional) {@link JoinGroupNode}, then the join group is replaced
+         * by the {@link SubqueryRoot}.
+         */
+        add(new ASTSubqueryRootInGroupOptimizer());
+        
+        /**
          * Validates named subquery / include patterns, identifies the join
          * variables, and annotates the named subquery root and named subquery
          * include with those join variables.
