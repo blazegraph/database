@@ -51,10 +51,8 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.TestASTNamedSubqueryEvaluation;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.DescribeOptimizer;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
@@ -231,8 +229,8 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             expected.setWhereClause(whereClause);
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
-            union.addChild(new StatementPatternNode(term0, p0a, o0));
-            union.addChild(new StatementPatternNode(s0, p0b, term0));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term0, p0a, o0)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s0, p0b, term0)));
 
         }
 
@@ -445,11 +443,11 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
 
-            union.addChild(new StatementPatternNode(term0, p0a, o0));
-            union.addChild(new StatementPatternNode(s0, p0b, term0));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term0, p0a, o0)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s0, p0b, term0)));
 
-            union.addChild(new StatementPatternNode(term1, p1a, o1));
-            union.addChild(new StatementPatternNode(s1, p1b, term1));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term1, p1a, o1)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s1, p1b, term1)));
 
         }
 
@@ -637,8 +635,8 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
 
-            union.addChild(new StatementPatternNode(term0, p0a, o0));
-            union.addChild(new StatementPatternNode(s0, p0b, term0));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(term0, p0a, o0)));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(s0, p0b, term0)));
 
         }
 

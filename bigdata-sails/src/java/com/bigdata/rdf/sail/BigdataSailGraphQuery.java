@@ -46,6 +46,10 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
+/**
+ * 
+ * @deprecated by the AST refactor.
+ */
 public class BigdataSailGraphQuery extends SailGraphQuery 
         implements BigdataSailQuery {
     

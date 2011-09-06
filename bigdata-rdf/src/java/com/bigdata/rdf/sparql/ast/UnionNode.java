@@ -4,9 +4,11 @@ import org.apache.log4j.Logger;
 
 /**
  * A special kind of group {@link IGroupNode} that represents the sparql union
- * operator. This node only accepts {@link JoinGroupNode}s as children. 
+ * operator.
+ * <p>
+ * Note: This node only accepts {@link JoinGroupNode}s as children.
  */
-public class UnionNode extends GraphPatternGroup<IGroupMemberNode> {
+public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 	
     /**
      * 
@@ -31,19 +33,23 @@ public class UnionNode extends GraphPatternGroup<IGroupMemberNode> {
 	}
 
     @Override
-    public UnionNode addChild(final IGroupMemberNode child) {
+    public UnionNode addChild(final JoinGroupNode child) {
 
         // can only add non-optional join groups as children to union
-        if (child instanceof JoinGroupNode) {
+        if (!(child instanceof JoinGroupNode)) {
 
-            final JoinGroupNode group = (JoinGroupNode) child;
+            throw new IllegalArgumentException("UnionNode only permits "
+                    + JoinGroupNode.class.getSimpleName()
+                    + " children, but child=" + child);
 
-            // can only add non-optional join groups as children to union
-            if (group.isOptional()) {
+        }
 
-                log.warn("optional tag on child will be ignored");
+        final JoinGroupNode group = (JoinGroupNode) child;
 
-            }
+        // can only add non-optional join groups as children to union
+        if (group.isOptional()) {
+
+            log.warn("optional tag on child will be ignored");
 
         }
 

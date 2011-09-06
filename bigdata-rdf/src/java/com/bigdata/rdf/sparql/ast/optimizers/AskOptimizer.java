@@ -80,7 +80,7 @@ public class AskOptimizer implements IASTOptimizer {
         
         if (slice.getLimit() > 1L) {
 
-            slice.setLimit(1l);
+            slice.setLimit(1L);
             
         }        
         

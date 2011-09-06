@@ -134,6 +134,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
         
         private final AST2BOpContext context;
         
+        private final QueryRoot optimizedQuery;
+        
         private final PipelineOp queryPlan;
 
         /**
@@ -188,11 +190,15 @@ public class AbstractDataDrivenSPARQLTestCase extends
             this.context = new AST2BOpContext(queryRoot, store);
 
             /*
-             * FIXME Pull the optimizer pass out of this method so we have
-             * better transparency. I need this to debug DESCRIBE, but it will
-             * help a lot to see the output of the optimizers in general as well
-             * as the AST model produced by the parser.
+             * Run the query optimizer first so we have access to the rewritten
+             * query plan.
              */
+            this.optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
+                    .optimize(context, queryRoot, null/* bindingSet[] */);
+
+            if (log.isInfoEnabled())
+                log.info("optimizedQuery:\n" + optimizedQuery);
+
             queryPlan = AST2BOpUtility.convert(context);
 
             if (log.isInfoEnabled())

@@ -46,10 +46,15 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
  * "Semantics and Complexity of SPARQL", 2006, Jorge Pérez et al.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: BadlyDesignedLeftJoinsUtil.java 5118 2011-09-01 17:36:12Z
+ *          thompsonbry $
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
  * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
+ * 
+ *      TODO Review this class. It is not used currently. We may wind up not
+ *      needing it. I need to check the SPARQL TCK first for queries with badly
+ *      designed left joins and see what's up with their evaluation.
  */
 public class BadlyDesignedLeftJoinsUtil {
 
@@ -105,7 +110,7 @@ public class BadlyDesignedLeftJoinsUtil {
 
             final Set<IVariable<?>> parentVars = new LinkedHashSet<IVariable<?>>();
 
-            IGroupNode<IGroupMemberNode> parent = group.getParent();
+            IGroupNode<? extends IGroupMemberNode> parent = group.getParent();
 
             while (parent instanceof UnionNode) {
 
@@ -149,7 +154,7 @@ public class BadlyDesignedLeftJoinsUtil {
     }
 
     private static void addVars(final Set<IVariable<?>> bindings,
-            final IGroupNode<IGroupMemberNode> group,
+            final IGroupNode<? extends IGroupMemberNode> group,
             final boolean includeFilters) {
 
         for (IGroupMemberNode op : group) {

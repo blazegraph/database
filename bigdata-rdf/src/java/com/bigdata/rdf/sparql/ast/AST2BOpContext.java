@@ -64,6 +64,11 @@ public class AST2BOpContext implements IdFactory {
     public final OptimizerList optimizers;
 
     /**
+     * The query as rewritten by the query optimizers. 
+     */
+    public QueryRoot optimizedQuery;
+    
+    /**
      * When <code>true</code>, will use the version of DISTINCT which operators
      * on the native heap (assuming that the query is not of such obvious low
      * cardinality that the JVM heap version will do better).
@@ -94,6 +99,7 @@ public class AST2BOpContext implements IdFactory {
         this.query = query;
         this.idFactory = idFactory;
         this.db = db;
+        this.optimizers = new DefaultOptimizerList();
         this.queryEngine = queryEngine;
         this.queryHints = queryHints;
 
@@ -106,8 +112,6 @@ public class AST2BOpContext implements IdFactory {
 
         this.queryId = queryId;
 		
-        this.optimizers = new DefaultOptimizerList();
-
 	}
 
     /**
@@ -126,7 +130,7 @@ public class AST2BOpContext implements IdFactory {
      *            {@link FunctionRegistry}.
      */
     public AST2BOpContext(final QueryRoot queryRoot,
-            final AbstractTripleStore db) {
+                final AbstractTripleStore db) {
 
         if (queryRoot == null)
             throw new IllegalArgumentException();
@@ -137,6 +141,8 @@ public class AST2BOpContext implements IdFactory {
         this.query = queryRoot;
 
         this.db = db;
+
+        this.optimizers = new DefaultOptimizerList();
 
         /*
          * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
@@ -167,8 +173,6 @@ public class AST2BOpContext implements IdFactory {
 
         this.queryId = queryId;
         
-        this.optimizers = new DefaultOptimizerList();
-
     }
 
     public int nextId() {
