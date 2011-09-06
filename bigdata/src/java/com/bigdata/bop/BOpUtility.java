@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -1007,7 +1008,15 @@ public class BOpUtility {
      *            The sink (required).
      * @param sink2
      *            Another sink (optional).
-     * @param select
+     * @param mergeSolution
+     *            A solution to be merged in with each solution copied from the
+     *            <i>source</i> (optional). When given, the <i>selectVars</i>
+     *            will be applied first to prune the copied solutions to just
+     *            the selected variables and any additional bindings will then
+     *            be added from the <i>mergeSolution</i>. This supports the
+     *            lexical scoping on variables within a subquery when that
+     *            subquery is being pipelined.
+     * @param selectVars
      *            The variables to be retained (optional). When not specified,
      *            all variables will be retained.
      * @param constraints
@@ -1023,7 +1032,8 @@ public class BOpUtility {
             final IAsynchronousIterator<IBindingSet[]> source,
             final IBlockingBuffer<IBindingSet[]> sink,
             final IBlockingBuffer<IBindingSet[]> sink2,
-            final IVariable<?>[] select,//
+            final IBindingSet mergeSolution,
+            final IVariable<?>[] selectVars,//
             final IConstraint[] constraints, //
             final BOpStats stats//
             ) {
@@ -1043,11 +1053,9 @@ public class BOpUtility {
             }
 
             // apply optional constraints and optional SELECT.
-            final IBindingSet[] tmp = applyConstraints(chunk, select,
-                    constraints);
+            final IBindingSet[] tmp = applyConstraints(chunk, mergeSolution,
+                    selectVars, constraints);
 
-//            System.err.println("Copying: "+Arrays.toString(tmp));
-            
             // copy accepted binding sets to the default sink.
             sink.add(tmp);
             
@@ -1072,7 +1080,15 @@ public class BOpUtility {
      * 
      * @param chunk
      *            A chunk of binding sets.
-     * @param select
+     * @param mergeSolution
+     *            A solution to be merged in with each solution copied from the
+     *            <i>source</i> (optional). When given, the <i>selectVars</i>
+     *            will be applied first to prune the copied solutions to just
+     *            the selected variables and any additional bindings will then
+     *            be added from the <i>mergeSolution</i>. This supports the
+     *            lexical scoping on variables within a subquery when that
+     *            subquery is being pipelined.
+     * @param selectVars
      *            The variables to be retained (optional). When not specified,
      *            all variables will be retained.
      * @param constraints
@@ -1080,11 +1096,15 @@ public class BOpUtility {
      *            
      * @return The dense chunk of binding sets.
      */
-    static private IBindingSet[] applyConstraints(final IBindingSet[] chunk,
-            final IVariable<?>[] select,
-            final IConstraint[] constraints) {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    static private IBindingSet[] applyConstraints(//
+            final IBindingSet[] chunk,//
+            final IBindingSet mergeSolution,//
+            final IVariable<?>[] selectVars,//
+            final IConstraint[] constraints//
+            ) {
 
-        if (constraints == null && select == null) {
+        if (constraints == null && selectVars == null && mergeSolution == null) {
 
             /*
              * No constraints and everything is selected, so just return the
@@ -1105,7 +1125,9 @@ public class BOpUtility {
 
         for (int i = 0; i < chunk.length; i++) {
 
-            IBindingSet bindingSet = chunk[i];
+            final IBindingSet sourceSolution = chunk[i];
+            
+            IBindingSet bindingSet = sourceSolution;
 
             if (constraints != null
                     && !BOpUtility.isConsistent(constraints, bindingSet)) {
@@ -1114,9 +1136,50 @@ public class BOpUtility {
 
             }
 
-            if (select != null) {
+            if (selectVars != null) {
 
-                bindingSet = bindingSet.copy(select);
+                bindingSet = bindingSet.copy(selectVars);
+
+            }
+            
+            if (mergeSolution != null) {
+
+                final Iterator<Map.Entry<IVariable, IConstant>> itr = mergeSolution
+                        .iterator();
+
+                while (itr.hasNext()) {
+
+                    final Map.Entry<IVariable, IConstant> e = itr.next();
+
+                    final IVariable var = e.getKey();
+
+                    final IConstant val = e.getValue();
+
+                    final IConstant oval = bindingSet.get(var);
+
+                    if (oval != null) {
+                        /*
+                         * This is a paranoia assertion. We should never be in a
+                         * position where merging in a binding could overwrite
+                         * an existing binding with an inconsistent value.
+                         */
+                        if (!oval.equals(val)) {
+                            throw new AssertionError(
+                                    "Inconsistent binding: var=" + var
+                                            + ", oval=" + oval + ", nval="
+                                            + val);
+                        }
+                    } else {
+                        bindingSet.set(var, val);
+                    }
+
+                }
+
+//                log.error("\n    selectVars: " + Arrays.toString(selectVars)//
+//                        + "\n mergeSolution: " + mergeSolution//
+//                        + "\nsourceSolution: " + bindingSet//
+//                        + "\noutputSolution: " + bindingSet//
+//                        );
 
             }
 

@@ -268,8 +268,8 @@ public class HashJoinUtility {
             while (leftItr.hasNext()) {
 
                 final IBindingSet leftSolution = leftItr.next();
-                if(selectVars != null)
-                    leftSolution.push(selectVars);
+//                if(selectVars != null)
+//                    leftSolution.push(selectVars);
 
                 // Compute hash code from bindings on the join vars.
                 int hashCode;

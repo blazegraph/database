@@ -32,6 +32,8 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.bigdata.bop.controller.SubqueryOp;
+
 /**
  * Interface for a set of bindings. The set of variables values is extensible
  * and the bound values are loosely typed.
@@ -191,51 +193,57 @@ public interface IBindingSet extends Cloneable, Serializable {
 //	 */
 //	public void pop(boolean save);
 
-    /**
-     * Push the current symbol table, copying the bindings for only the named
-     * variables into a new symbol table on the top of the stack. Only the
-     * bindings in the current symbol table are visible. {@link #iterator()}
-     * WILL NOT visit bindings unless they are present at the top of the stack.
-     * <p>
-     * Note: push()/pop() model the change in lexical scope for variables when
-     * entering and leaving a subquery. Only those variables projected from a
-     * subquery may be bound on entry, and only those variables projected from a
-     * subquery should have their bindings preserved when the subquery
-     * completes. Since variables which were bound on entry will remain bound,
-     * the bindings will remain consistent throughout the subquery and pop() can
-     * not cause inconsistent bindings to be propagated into the parent's symbol
-     * table.
-     * 
-     * @param vars
-     *            The variable(s) whose bindings will be visible in the new
-     *            symbol table.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the {@link IBindingSet} is not mutable.
-     * 
-     * @see #pop(IVariable[])
-     */
-    public void push(IVariable[] vars);
-
-    /**
-     * Pop the current symbol table off of the stack, copying the bindings for
-     * the specified variables into the revealed symbol table.
-     * <p>
-     * The variables represent the projection of the subquery. For correct
-     * semantics, a pop() MUST balance a push(), providing the same variables in
-     * each case. Consistency is provided when push() and pop() are injected
-     * into a query plan since the query planner knows the projection and can
-     * plan the push and pop operations accordingly.
-     * 
-     * @param vars
-     *            The variables whose bindings will be copied into the uncovered
-     *            symbol table.
-     * 
-     * @throws IllegalStateException
-     *             if there is no nested symbol table.
-     * 
-     * @see #push(IVariable[])
-     */
-    public void pop(IVariable[] vars);
+//    /**
+//     * Push the current symbol table, copying the bindings for only the named
+//     * variables into a new symbol table on the top of the stack. Only the
+//     * bindings in the current symbol table are visible. {@link #iterator()}
+//     * WILL NOT visit bindings unless they are present at the top of the stack.
+//     * <p>
+//     * Note: push()/pop() model the change in lexical scope for variables when
+//     * entering and leaving a subquery. Only those variables projected from a
+//     * subquery may be bound on entry, and only those variables projected from a
+//     * subquery should have their bindings preserved when the subquery
+//     * completes. Since variables which were bound on entry will remain bound,
+//     * the bindings will remain consistent throughout the subquery and pop() can
+//     * not cause inconsistent bindings to be propagated into the parent's symbol
+//     * table.
+//     * 
+//     * @param vars
+//     *            The variable(s) whose bindings will be visible in the new
+//     *            symbol table.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the {@link IBindingSet} is not mutable.
+//     * 
+//     * @see #pop(IVariable[])
+//     * 
+//     * @deprecated It looks like we will not be using this facility. This
+//     *             operation is handled directly by {@link SubqueryOp}.
+//     */
+//    public void push(IVariable[] vars);
+//
+//    /**
+//     * Pop the current symbol table off of the stack, copying the bindings for
+//     * the specified variables into the revealed symbol table.
+//     * <p>
+//     * The variables represent the projection of the subquery. For correct
+//     * semantics, a pop() MUST balance a push(), providing the same variables in
+//     * each case. Consistency is provided when push() and pop() are injected
+//     * into a query plan since the query planner knows the projection and can
+//     * plan the push and pop operations accordingly.
+//     * 
+//     * @param vars
+//     *            The variables whose bindings will be copied into the uncovered
+//     *            symbol table.
+//     * 
+//     * @throws IllegalStateException
+//     *             if there is no nested symbol table.
+//     * 
+//     * @see #push(IVariable[])
+//     * 
+//     * @deprecated It looks like we will not be using this facility. This
+//     *             operation is handled directly by {@link SubqueryOp}.
+//     */
+//    public void pop(IVariable[] vars);
 
 }

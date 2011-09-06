@@ -333,95 +333,95 @@ public abstract class TestIBindingSet extends TestCase2 {
         assertTrue ( "expected equal: same bindings after mutation", bs1.hashCode () == bs4.hashCode () ) ;
     }
 
-    /*
-     * push()/pop() tests.
-     * 
-     * In addition to testing push() and pop(), we have to test that copy() and
-     * clone() operate correctly in the presence of nested symbol tables, and
-     * that the visitation patterns for the bindings operate correctly when
-     * there are nested symbol tables. For example, if there "y" is bound at
-     * level zero, a push() is executed, and then "x" is bound at level one. The
-     * visitation pattern must visit both "x" and "y".
-     */
-
-    public void test_pushPop1() {
-
-        final Var<?> var1 = Var.var("var1"); // visible and bound in query and subquery.
-        final Var<?> var2 = Var.var("var2"); // visible only in subquery and not projected.
-        final Var<?> var3 = Var.var("var3"); // visible in query and subquery; bound in subquery.
-        final Var<?> var4 = Var.var("var4"); // visible and bound only in query
-
-        final Constant<Integer> val1 = new Constant<Integer>(1);
-        final Constant<Integer> val2 = new Constant<Integer>(2);
-        final Constant<Integer> val3 = new Constant<Integer>(3);
-        final Constant<Integer> val4 = new Constant<Integer>(4);
-        final Constant<Integer> val4a = new Constant<Integer>(40);
-
-        // the "projected" variables.
-        final IVariable<?>[] vars = new IVariable[] { var1, var3 };
-
-        final IBindingSet bs1 = newBindingSet(4/* size */);
-
-        /*
-         * bind var1 in the base symbol table.
-         */
-        bs1.set(var1, val1);
-        bs1.set(var4, val4);
-        assertEqual(bs1, new IVariable[] { var1, var4 }, new IConstant[] { val1, val4 });
-
-        /*
-         * push a symbol table onto the stack
-         */
-        bs1.push(vars);
-
-        // verify initial symbol table for subquery.
-        assertEqual(bs1, new IVariable[] { var1 }, new IConstant[] { val1 });
-        
-        // bind an unbound variables.
-        bs1.set(var2, val2);
-        bs1.set(var3, val3);
-        bs1.set(var4, val4a); // note: variable and binding are distinct in this scope.
-        assertEqual(bs1, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
-                val1, val2, val3, val4a });
-
-        // verify clone shows the same symbol table.
-        final IBindingSet copy = bs1.clone();
-        assertEqual(copy, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
-                val1, val2, val3, val4a });
-        assertEquals(bs1, copy);
-        
-        // pop the stack.
-        bs1.pop(vars);
-
-        // verify projected variables were copied and local vars discarded.
-        assertEqual(bs1, new IVariable[] { var1, var3, var4 }, new IConstant[] {
-                val1, val3, val4 });
-
-        // verify copy was not effected.
-        assertEqual(copy, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
-                val1, val2, val3, val4a });
-
-        copy.pop(vars);
-
-        // verify projected variables were copied and local vars discarded.
-        assertEqual(bs1, new IVariable[] { var1, var3, var4 }, new IConstant[] {
-                val1, val3, val4 });
-        
-        // copy and original should now be equal again.
-        assertEquals(bs1, copy);
-
-        /*
-         * Verify that we can not pop() off the last symbol table in the stack.
-         */
-        try {
-            bs1.pop(vars);
-            fail("Expecting: " + IllegalStateException.class);
-        } catch (IllegalStateException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-
-    }
+//    /*
+//     * push()/pop() tests.
+//     * 
+//     * In addition to testing push() and pop(), we have to test that copy() and
+//     * clone() operate correctly in the presence of nested symbol tables, and
+//     * that the visitation patterns for the bindings operate correctly when
+//     * there are nested symbol tables. For example, if there "y" is bound at
+//     * level zero, a push() is executed, and then "x" is bound at level one. The
+//     * visitation pattern must visit both "x" and "y".
+//     */
+//
+//    public void test_pushPop1() {
+//
+//        final Var<?> var1 = Var.var("var1"); // visible and bound in query and subquery.
+//        final Var<?> var2 = Var.var("var2"); // visible only in subquery and not projected.
+//        final Var<?> var3 = Var.var("var3"); // visible in query and subquery; bound in subquery.
+//        final Var<?> var4 = Var.var("var4"); // visible and bound only in query
+//
+//        final Constant<Integer> val1 = new Constant<Integer>(1);
+//        final Constant<Integer> val2 = new Constant<Integer>(2);
+//        final Constant<Integer> val3 = new Constant<Integer>(3);
+//        final Constant<Integer> val4 = new Constant<Integer>(4);
+//        final Constant<Integer> val4a = new Constant<Integer>(40);
+//
+//        // the "projected" variables.
+//        final IVariable<?>[] vars = new IVariable[] { var1, var3 };
+//
+//        final IBindingSet bs1 = newBindingSet(4/* size */);
+//
+//        /*
+//         * bind var1 in the base symbol table.
+//         */
+//        bs1.set(var1, val1);
+//        bs1.set(var4, val4);
+//        assertEqual(bs1, new IVariable[] { var1, var4 }, new IConstant[] { val1, val4 });
+//
+//        /*
+//         * push a symbol table onto the stack
+//         */
+//        bs1.push(vars);
+//
+//        // verify initial symbol table for subquery.
+//        assertEqual(bs1, new IVariable[] { var1 }, new IConstant[] { val1 });
+//        
+//        // bind an unbound variables.
+//        bs1.set(var2, val2);
+//        bs1.set(var3, val3);
+//        bs1.set(var4, val4a); // note: variable and binding are distinct in this scope.
+//        assertEqual(bs1, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
+//                val1, val2, val3, val4a });
+//
+//        // verify clone shows the same symbol table.
+//        final IBindingSet copy = bs1.clone();
+//        assertEqual(copy, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
+//                val1, val2, val3, val4a });
+//        assertEquals(bs1, copy);
+//        
+//        // pop the stack.
+//        bs1.pop(vars);
+//
+//        // verify projected variables were copied and local vars discarded.
+//        assertEqual(bs1, new IVariable[] { var1, var3, var4 }, new IConstant[] {
+//                val1, val3, val4 });
+//
+//        // verify copy was not effected.
+//        assertEqual(copy, new IVariable[] { var1, var2, var3, var4 }, new IConstant[] {
+//                val1, val2, val3, val4a });
+//
+//        copy.pop(vars);
+//
+//        // verify projected variables were copied and local vars discarded.
+//        assertEqual(bs1, new IVariable[] { var1, var3, var4 }, new IConstant[] {
+//                val1, val3, val4 });
+//        
+//        // copy and original should now be equal again.
+//        assertEquals(bs1, copy);
+//
+//        /*
+//         * Verify that we can not pop() off the last symbol table in the stack.
+//         */
+//        try {
+//            bs1.pop(vars);
+//            fail("Expecting: " + IllegalStateException.class);
+//        } catch (IllegalStateException ex) {
+//            if (log.isInfoEnabled())
+//                log.info("Ignoring expected exception: " + ex);
+//        }
+//
+//    }
 
     public void test_serialization() {
     	

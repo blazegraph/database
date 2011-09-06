@@ -86,117 +86,117 @@ public class ListBindingSet implements IBindingSet {
         }
     };
 
-	/**
-	 * The stack of symbol tables. Each symbol table is a mapping from an
-	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
-	 * The stack is initialized with an empty symbol table. Symbol tables may be
-	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
-	 * become empty.
-	 */
-	private final LightStack<List<E>> stack;
-//	private final List<E> current;
+//	/**
+//	 * The stack of symbol tables. Each symbol table is a mapping from an
+//	 * {@link IVariable} onto its non-<code>null</code> bound {@link IConstant}.
+//	 * The stack is initialized with an empty symbol table. Symbol tables may be
+//	 * pushed onto the stack or popped off of the stack, but the stack MAY NOT
+//	 * become empty.
+//	 */
+//	private final LightStack<List<E>> stack;
+	private final List<E> current;
 
 	/**
 	 * Return the symbol table on the top of the stack.
 	 */
 	final private List<E> current() {
 
-//	    return current;
-		return stack.peek();
+	    return current;
+//		return stack.peek();
 		
 	}
 
-    public void push(final IVariable[] vars) {
-
-        // Create a new symbol table.
-        final List<E> tmp = new LinkedList<E>();
-
-        /*
-         * For each variable which is to be projected into the new symbol table,
-         * look up its binding. If it is bound, then copy that binding into the
-         * new symbol table.
-         */
-        for (IVariable<?> var : vars) {
-
-		    final IConstant<?> val = get(var);
-		    
-            if (val != null)
-                tmp.add(new E(var, val));
-
-		}
-
-		// Push the new symbol table onto the stack.
-        stack.push(tmp);
-
-        hash = 0;
-        
-	}
-
-	public void pop(final IVariable[] vars) {
-
-		if (stack.size() < 2) {
-			/*
-			 * The stack may never become empty. Therefore there must be at
-			 * least two symbol tables on the stack for a pop() request.
-			 */
-			throw new IllegalStateException();
-		}
-		
-		// Pop the symbol table off of the top of the stack.
-        final List<E> old = stack.pop();
-
-        /*
-         * Copy the current binding for any variable that was projected by the
-         * subquery.
-         * 
-         * Note: This does not enforce consistency between the existing binding
-         * (if any) for a variable on the nested symbol table and the binding
-         * from the symbol table which is being popped off of the stack. It is
-         * the responsibility of the JOINs, BIND, etc. to verify that bindings
-         * are consistent when they are made. If the operators are written
-         * correctly then a variable which was bound on entry to a subquery will
-         * have the same binding on exit and there will be no need to verify
-         * that the value, when bound, is consistent.
-         */
-        for (E e : old) { // for each binding from the top of the stack.
-
-            for (IVariable<?> v : vars) { // for each projected variable.
-
-                if (e.var == v) { // if the binding was projected
-                    
-                    set(e.var, e.val); // then copy to revealed symbol table.
-
-                    break;
-                    
-                }
-                
-            }
-
-        }
-
-        hash = 0;
-        
-	}
+//    public void push(final IVariable[] vars) {
+//
+//        // Create a new symbol table.
+//        final List<E> tmp = new LinkedList<E>();
+//
+//        /*
+//         * For each variable which is to be projected into the new symbol table,
+//         * look up its binding. If it is bound, then copy that binding into the
+//         * new symbol table.
+//         */
+//        for (IVariable<?> var : vars) {
+//
+//		    final IConstant<?> val = get(var);
+//		    
+//            if (val != null)
+//                tmp.add(new E(var, val));
+//
+//		}
+//
+//		// Push the new symbol table onto the stack.
+//        stack.push(tmp);
+//
+//        hash = 0;
+//        
+//	}
+//
+//	public void pop(final IVariable[] vars) {
+//
+//		if (stack.size() < 2) {
+//			/*
+//			 * The stack may never become empty. Therefore there must be at
+//			 * least two symbol tables on the stack for a pop() request.
+//			 */
+//			throw new IllegalStateException();
+//		}
+//		
+//		// Pop the symbol table off of the top of the stack.
+//        final List<E> old = stack.pop();
+//
+//        /*
+//         * Copy the current binding for any variable that was projected by the
+//         * subquery.
+//         * 
+//         * Note: This does not enforce consistency between the existing binding
+//         * (if any) for a variable on the nested symbol table and the binding
+//         * from the symbol table which is being popped off of the stack. It is
+//         * the responsibility of the JOINs, BIND, etc. to verify that bindings
+//         * are consistent when they are made. If the operators are written
+//         * correctly then a variable which was bound on entry to a subquery will
+//         * have the same binding on exit and there will be no need to verify
+//         * that the value, when bound, is consistent.
+//         */
+//        for (E e : old) { // for each binding from the top of the stack.
+//
+//            for (IVariable<?> v : vars) { // for each projected variable.
+//
+//                if (e.var == v) { // if the binding was projected
+//                    
+//                    set(e.var, e.val); // then copy to revealed symbol table.
+//
+//                    break;
+//                    
+//                }
+//                
+//            }
+//
+//        }
+//
+//        hash = 0;
+//        
+//	}
 
     /**
      * Create an empty binding set.
-     * <p>
-     * We generally want the binding set stack to be pretty shallow. We only
-     * push/pop around a subquery. Simple queries have a depth of 1. A stack
-     * depth of 3 is typical of a complex query with nested subqueries. Deeper
-     * nesting is uncommon. Since we create a LOT of {@link IBindingSet}s, the
-     * initial capacity of the associated stack is important.
      */
+//    * <p>
+//    * We generally want the binding set stack to be pretty shallow. We only
+//    * push/pop around a subquery. Simple queries have a depth of 1. A stack
+//    * depth of 3 is typical of a complex query with nested subqueries. Deeper
+//    * nesting is uncommon. Since we create a LOT of {@link IBindingSet}s, the
+//    * initial capacity of the associated stack is important.
 	public ListBindingSet() {
 
-	    /*
-	     * Start with a capacity of ONE (1) and expand only as required.
-	     */
-		stack = new LightStack<List<E>>(1/*initialCapacity*/);
-		
-		stack.push(new LinkedList<E>());
+//	    /*
+//	     * Start with a capacity of ONE (1) and expand only as required.
+//	     */
+//		stack = new LightStack<List<E>>(1/*initialCapacity*/);
+//		
+//		stack.push(new LinkedList<E>());
 	    
-//	    current = new LinkedList<E>();
+	    current = new LinkedList<E>();
 
 	}
 	
@@ -240,31 +240,31 @@ public class ListBindingSet implements IBindingSet {
     protected ListBindingSet(final ListBindingSet src,
 			final IVariable[] variablesToKeep) {
 
-        final int stackSize = src.stack.size();
+//        final int stackSize = src.stack.size();
+//
+//		stack = new LightStack<List<E>>(stackSize);
+//
+//		int depth = 1;
+//		
+//		for (List<E> srcLst : src.stack) {
+//
+//			/*
+//			 * Copy the source bindings.
+//			 * 
+//			 * Note: If a restriction exists on the variables to be copied, then
+//			 * it is applied onto the the top level of the stack. If the symbol
+//			 * table is saved when it is pop()'d, then the modified bindings
+//			 * will replace the parent symbol table on the stack.
+//			 */
+//			final List<E> tmp = copy(srcLst,
+//					depth == stackSize ? variablesToKeep : null);
+//
+//			// Push onto the stack.
+//			stack.push(tmp);
+//
+//		}
 
-		stack = new LightStack<List<E>>(stackSize);
-
-		int depth = 1;
-		
-		for (List<E> srcLst : src.stack) {
-
-			/*
-			 * Copy the source bindings.
-			 * 
-			 * Note: If a restriction exists on the variables to be copied, then
-			 * it is applied onto the the top level of the stack. If the symbol
-			 * table is saved when it is pop()'d, then the modified bindings
-			 * will replace the parent symbol table on the stack.
-			 */
-			final List<E> tmp = copy(srcLst,
-					depth == stackSize ? variablesToKeep : null);
-
-			// Push onto the stack.
-			stack.push(tmp);
-
-		}
-
-//        current = copy(src.current, variablesToKeep);
+        current = copy(src.current, variablesToKeep);
 
 	}
 
