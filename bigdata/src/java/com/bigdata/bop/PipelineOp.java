@@ -31,12 +31,9 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.solutions.SortOp.Annotations;
 
 /**
  * Abstract base class for pipeline operators where the data moving along the
@@ -52,8 +49,8 @@ abstract public class PipelineOp extends BOpBase {
      */
     private static final long serialVersionUID = 1L;
 
-	private final static transient Logger log = Logger
-			.getLogger(PipelineOp.class);
+//	private final static transient Logger log = Logger
+//			.getLogger(PipelineOp.class);
 
     public interface Annotations extends BOp.Annotations, BufferAnnotations {
 
