@@ -45,8 +45,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
-import com.bigdata.bop.solutions.GroupByRewriter;
-import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
