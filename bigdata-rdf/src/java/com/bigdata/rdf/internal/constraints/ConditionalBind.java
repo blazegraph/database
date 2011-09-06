@@ -16,6 +16,8 @@ import com.bigdata.rdf.internal.IV;
  * Operator causes a variable to be bound to the result of its evaluation as a
  * side-effect unless the variable is already bound and the as-bound value does
  * not compare as equals.
+ * <p>
+ * Note: This is intended for use within a {@link BindingConstraint}.  That
  * 
  * @author mroycsi
  */
@@ -141,6 +143,12 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
 
         } else {
 
+            /*
+             * Note: A BindingConstraint wrapping the ConditionalBind will see
+             * the [null] and fail the solution. This avoids throwing the
+             * SPARQLTypeErrorException, which has more overhead.
+             */
+            
             return (val.equals(existing)) ? val : null;
 
         }

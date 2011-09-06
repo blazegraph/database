@@ -1096,7 +1096,10 @@ public class AST2BOpUtility {
 						: null
 				);
     	
-    	// just for now
+        /*
+         * FIXME Pull code up for this. (note that Rule2BOpUtility is also
+         * handling materialization steps for joins.
+         */
     	left = Rule2BOpUtility.convert(
     			rule,
     			left,
@@ -1406,10 +1409,13 @@ public class AST2BOpUtility {
                 if (expr instanceof Bind) {
                 
                     vars.add(((Bind) expr).getVar());
-                    
+                
+                    // Note: side-effect on expr!
                     expr = ((Bind) expr).getExpr();
                     
-                } else if (expr instanceof IVariable<?>) {
+                }
+                
+                if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
 
@@ -1432,9 +1438,12 @@ public class AST2BOpUtility {
 
                     vars.add(((Bind) expr).getVar());
 
+                    // Note: side-effect on expr.
                     expr = ((Bind) expr).getExpr();
 
-                } else if (expr instanceof IVariable<?>) {
+                } 
+                
+                if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
 

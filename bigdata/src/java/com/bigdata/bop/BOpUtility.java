@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -1350,7 +1349,7 @@ public class BOpUtility {
                 final IVariable<?> avar = itr.next();
 
                 if (p1vars.contains(avar)) {
-
+                    
 					if (sharedVars == null) {
 
 						// lazy initialization.
@@ -1389,6 +1388,8 @@ public class BOpUtility {
     
     private static BOp makeAggregateDistinct2(final BOp op) {
 
+        boolean dirty = false;
+        
         /*
          * Children.
          */
@@ -1402,6 +1403,9 @@ public class BOpUtility {
 
             // depth first recursion.
             args[i] = makeAggregateDistinct2(child);
+            
+            if(args[i] != child)
+                dirty = true;
             
         }
         
@@ -1423,6 +1427,8 @@ public class BOpUtility {
                 
                 nval = new GroupByRewriter((IGroupByRewriteState) oval);
                 
+                dirty = true;
+                
             } else {
                 
                 nval = oval;
@@ -1433,6 +1439,9 @@ public class BOpUtility {
             
         }
 
+        if(!dirty)
+            return op;
+        
         try {
 
             final Constructor<BOp> ctor = (Constructor<BOp>) op.getClass()

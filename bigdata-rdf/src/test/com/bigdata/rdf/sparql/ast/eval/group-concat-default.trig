@@ -1,0 +1,6 @@
+@prefix : <http://example.org/> .
+
+:group-concat-default {
+	:s1 :p "a", "walk", "in", "the", "park" .
+	:s2 :p "hi", 4, "now" .
+}
