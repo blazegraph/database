@@ -499,29 +499,39 @@ public class AST2BOpUtility {
         final IVariable<?>[] vars = projection.getProjectionVars();
         
         final PipelineOp subqueryPlan = convert(subquery, ctx);
+
+        final boolean aggregate = isAggregate(subquery);
         
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subquery + "\nplan=" + subqueryPlan);
 
-//        left = new SubqueryScopeOp(leftOrEmpty(left),// PUSH
-//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
-//                new NV(SubqueryScopeOp.Annotations.PUSH, true)//
-//                );
         left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
-                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(SubqueryOp.Annotations.OPTIONAL, false),//
-                new NV(SubqueryOp.Annotations.SELECT, vars)//
+                new NV(SubqueryOp.Annotations.SELECT, vars),//
+                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
                 );
-//        left = new SubqueryScopeOp(leftOrEmpty(left),// POP
-//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(SubqueryScopeOp.Annotations.VARS, vars),//
-//                new NV(SubqueryScopeOp.Annotations.PUSH, false)//
-//                );
 
         return left;
         
+    }
+
+    /**
+     * Return <code>true</code> if any of the {@link ProjectionNode},
+     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
+     * aggregation query.
+     * 
+     * @param query
+     *            The query.
+     * 
+     * @return <code>true</code>if it is an aggregation query.
+     */
+    private static boolean isAggregate(final QueryBase query) {
+
+        return isAggregate(query.getProjection(), query.getGroupBy(),
+                query.getHaving());
+
     }
 
     /**

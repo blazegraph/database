@@ -10,21 +10,22 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Operator causes a variable to be bound to the result of its evaluation as a side-effect unless the variable is already bound
- * and the as-bound value does not compare as equals.
- *
+ * Operator causes a variable to be bound to the result of its evaluation as a
+ * side-effect unless the variable is already bound and the as-bound value does
+ * not compare as equals.
+ * 
  * @author mroycsi
  */
-public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValueExpression<E>, IBind<E> ,IPassesMaterialization{
+public class ConditionalBind<E extends IV> extends ImmutableBOp implements
+        IValueExpression<E>, IBind<E>, IPassesMaterialization {
 
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends BOp.Annotations {
-        String PROJECTION = (ConditionalBind.class.getName() + ".projection").intern();
+        String PROJECTION = ConditionalBind.class.getName() + ".projection";
     }
 
     protected transient Boolean projection;
@@ -45,8 +46,11 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValu
      */
     public ConditionalBind(IVariable<E> var, IValueExpression<E> expr,boolean projection) {
 
-        this(new BOp[] { var, expr },  NV.asMap(new NV(Annotations.PROJECTION, projection)));
-        this.projection=projection;
+        this(new BOp[] { var, expr }, NV.asMap(new NV(Annotations.PROJECTION,
+                projection)));
+        
+        this.projection = projection;
+        
     }
 
     /**
@@ -56,16 +60,24 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValu
      * @param annotations
      */
     public ConditionalBind(BOp[] args, Map<String, Object> annotations) {
+
         super(args, annotations);
+        
         if (getProperty(Annotations.PROJECTION) == null)
             throw new IllegalArgumentException();
+    
     }
 
     boolean isProjection(){
-        if(projection==null){
+    
+        if (projection == null) {
+        
             projection = (Boolean) getRequiredProperty(Annotations.PROJECTION);
+            
         }
+
         return projection;
+        
     }
 
     /**
@@ -95,21 +107,29 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements IValu
 
         final IValueExpression<E> expr = getExpr();
 
-        final boolean aggregate=!isProjection()&&(expr instanceof IAggregate);
-        if(aggregate){
-            ((IAggregate)expr).reset();
-        }
+        /*
+         * This code has been removed since (per LeeF) an aggregate in a
+         * non-aggregate context should be an error.
+         */
+//        /*
+//         * Evaluate the value expression.
+//         * 
+//         * Note: This also handles the special case of an aggregate appearing
+//         * within a function call context outside of a projection.
+//         */
+//        final E val;
+//        final boolean aggregate = !isProjection()
+//                && (expr instanceof IAggregate);
+//        if (aggregate) {
+//            ((IAggregate<E>) expr).reset();
+//            expr.get(bindingSet);
+//            val = (E) ((IAggregate<E>) expr).done();
+//        } else {
+//            val = expr.get(bindingSet);
+//        }
+        final E val = expr.get(bindingSet); // evaluate the value expression.
 
-        // evaluate the value expression.
-        final E val;
-        if(aggregate){
-            expr.get(bindingSet);
-            val = (E)((IAggregate)expr).done();
-        }else{
-            val = expr.get(bindingSet);
-        }
-
-        final E existing = var.get(bindingSet);
+        final E existing = var.get(bindingSet); // lookup current bound value.
 
         if (existing == null) {
 

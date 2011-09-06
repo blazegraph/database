@@ -354,7 +354,7 @@ public class TestSampleIndex extends TestCase2 {
 
 		if (log.isInfoEnabled()) {
 
-			System.err.println("limit=" + limit + ", nrecords=" + nrecords
+			log.info("limit=" + limit + ", nrecords=" + nrecords
 					+ ", nsamples=" + a.length + ", sampleType=" + sampleType);
 
 			for (int i = 0; i < a.length && i < 10; i++) {

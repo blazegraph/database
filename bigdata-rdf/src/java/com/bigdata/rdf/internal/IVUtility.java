@@ -549,7 +549,19 @@ public class IVUtility {
         case MULTIPLY:
             return new XSDDecimalIV(left.multiply(right));
         case DIVIDE:
-            return new XSDDecimalIV(left.divide(right, RoundingMode.HALF_UP));
+            /*
+             * Note: Change per mroycsi.  Reverts to a half-rounding mode iff
+             * an exact quotient can not be represented.
+             */
+            try {
+                // try for exact quotient
+                return new XSDDecimalIV(left.divide(right));
+            } catch (ArithmeticException ae) {
+                // half-rounding mode.
+                return new XSDDecimalIV(left.divide(right, 20,
+                        RoundingMode.HALF_UP));
+            }
+//            return new XSDDecimalIV(left.divide(right, RoundingMode.HALF_UP));
         case MIN:
             return new XSDDecimalIV(left.compareTo(right) < 0 ? left : right);
         case MAX:

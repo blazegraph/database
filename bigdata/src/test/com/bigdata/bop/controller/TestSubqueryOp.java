@@ -380,7 +380,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
     }
 
     /**
-     * Unit test for a simple join.
+     * Unit test for a simple join in which only <code>x</code> is projected
+     * into the subquery.
      */
     public void test_join_selectOnly_x() throws Exception {
 
@@ -426,9 +427,9 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                         new IConstant[] { new Constant<String>("Mary") }//
                 ),//
                 new ListBindingSet(//
-                        new IVariable[] { x },//
+                        new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Brad"),
-//                                          new Constant<String>("Fred"),
+                                          new Constant<String>("Fred"),
                                 }//
                 ),//
         };

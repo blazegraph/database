@@ -54,7 +54,6 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.util.InnerCause;
@@ -756,9 +755,9 @@ public class MemoryGroupByOp extends GroupByOp {
                     }
 
                 }
-                
-                Object result=expr.done();
-                if(result!=null){
+
+                final Object result = expr.done();
+                if (result != null) {
                     c = new Constant(result);
                 }
                 
@@ -797,8 +796,8 @@ public class MemoryGroupByOp extends GroupByOp {
 
                 }
                 
-                Object result=expr.done();
-                if(result!=null){
+                final Object result = expr.done();
+                if (result != null) {
                     c = new Constant(result);
                 }
             
@@ -818,8 +817,8 @@ public class MemoryGroupByOp extends GroupByOp {
                     expr.get(bset);
                     
                 }
-                Object result=expr.done();
-                if(result!=null){
+                final Object result = expr.done();
+                if (result != null) {
                     c = new Constant(result);
                 }
 

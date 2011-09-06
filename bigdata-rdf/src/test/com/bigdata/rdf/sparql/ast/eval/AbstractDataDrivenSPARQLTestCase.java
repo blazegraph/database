@@ -524,7 +524,10 @@ public class AbstractDataDrivenSPARQLTestCase extends
 //                    System.err.println(con.getClass());
 //                    try {
                     message.append("\n===================================\n");
+                    message.append("\nqueryRoot:\n");
                     message.append(BOpUtility.toString(queryRoot));
+                    message.append("\noptimizedQuery:\n");
+                    message.append(BOpUtility.toString(optimizedQuery));
                     message.append("\nqueryPlan:\n");
                     message.append(BOpUtility.toString(queryPlan));
                     message.append("\n===================================\n");

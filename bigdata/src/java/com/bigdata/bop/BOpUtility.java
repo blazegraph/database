@@ -27,7 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.Arrays;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -40,7 +41,11 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.solutions.GroupByOp;
+import com.bigdata.bop.solutions.GroupByRewriter;
+import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -1366,6 +1371,81 @@ public class BOpUtility {
 
 		return sharedVars;
 
+    }
+
+    /**
+     * Return a copy of the subquery in which each {@link IAggregate} function
+     * is a distinct instance. This prevents inappropriate sharing of state
+     * across invocations of the subquery.
+     * 
+     * @param subQuery
+     * @return
+     */
+    public static PipelineOp makeAggregateDistinct(PipelineOp subQuery) {
+
+        return (PipelineOp) makeAggregateDistinct2(subQuery);
+        
+    }
+    
+    private static BOp makeAggregateDistinct2(final BOp op) {
+
+        /*
+         * Children.
+         */
+        final int arity = op.arity();
+
+        final BOp[] args = arity == 0 ? BOp.NOARGS : new BOp[arity];
+        
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = op.get(i);
+
+            // depth first recursion.
+            args[i] = makeAggregateDistinct2(child);
+            
+        }
+        
+        /*
+         * Annotations.
+         */
+        
+        final LinkedHashMap<String,Object> anns = new LinkedHashMap<String, Object>();
+        
+        for(Map.Entry<String, Object> e : op.annotations().entrySet()) {
+            
+            final String name = e.getKey();
+            
+            final Object oval = e.getValue();
+            
+            final Object nval;
+            
+            if(name.equals(GroupByOp.Annotations.GROUP_BY_REWRITE)) {
+                
+                nval = new GroupByRewriter((IGroupByRewriteState) oval);
+                
+            } else {
+                
+                nval = oval;
+                
+            }
+            
+            anns.put(name, nval);
+            
+        }
+
+        try {
+
+            final Constructor<BOp> ctor = (Constructor<BOp>) op.getClass()
+                    .getConstructor(BOp[].class, Map.class);
+            
+            return ctor.newInstance(args, anns);
+            
+        } catch (Exception e1) {
+            
+            throw new RuntimeException(e1);
+            
+        }
+        
     }
 
 }
