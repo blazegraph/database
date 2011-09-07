@@ -141,10 +141,11 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
             return suite;
         }
         
-//        if(hideDatasetTests)
-//            suite1 = filterOutDataSetTests(suite1,"dataset");
-        suite1 = filterOutDataSetTests(suite1,"property-paths");
-        
+        if (hideDatasetTests)
+            suite1 = filterOutDataSetTests(suite1, "dataset");
+
+        suite1 = filterOutDataSetTests(suite1, "property-paths");
+
         return suite1;
         
     }
