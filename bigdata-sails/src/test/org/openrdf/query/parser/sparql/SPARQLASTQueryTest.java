@@ -19,8 +19,6 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.repository.Repository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
@@ -40,8 +38,8 @@ public abstract class SPARQLASTQueryTest extends SPARQLQueryTest {
 	 * Constants *
 	 *-----------*/
 
-	private static final Logger log = LoggerFactory.getLogger(SPARQLASTQueryTest.class);
-
+//	private static final Logger log = LoggerFactory.getLogger(SPARQLASTQueryTest.class);
+//
 //	protected final String testURI;
 //
 //	protected final String queryFileURL;

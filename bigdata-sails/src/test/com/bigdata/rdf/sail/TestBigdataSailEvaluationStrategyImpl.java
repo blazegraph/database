@@ -30,6 +30,8 @@ import info.aduna.xml.XMLWriter;
 import java.io.StringWriter;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.Properties;
+
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -71,6 +73,20 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
         super(arg0);
     }
 
+    /**
+     * Overridden to disable {@link BigdataSail.Options#NATIVE_SPARQL}. 
+     */
+    @Override
+    public Properties getProperties() {
+        
+        final Properties properties = new Properties(super.getProperties());
+        
+        properties.setProperty(BigdataSail.Options.NATIVE_SPARQL,"false");
+        
+        return properties;
+        
+    }
+    
     public void test_or_equals() throws Exception {
 
         final String ns = "http://www.bigdata.com/rdf#";

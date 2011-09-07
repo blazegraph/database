@@ -301,6 +301,21 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DEFAULT_NATIVE_JOINS = "true";
         
         /**
+         * When true, SAIL will delegate all query evaluation to bigdata.
+         * Bigdata will parse the SPARQL query into its own AST
+         * {@link QueryRoot} and then evaluate that. The Sesame
+         * {@link TupleExpr} operator model will not be used. This option
+         * provides access new bigdata query operators, including those which
+         * can exploit the JVM process heap, those which can pipeline
+         * aggregations, and those which can be parallelized on a cluster.
+         */
+        public static final String NATIVE_SPARQL = BigdataSail.class
+                .getPackage().getName()
+                + ".nativeSparql";
+        
+        public static final String DEFAULT_NATIVE_SPARQL = "false";
+        
+        /**
          * Option (default <code>true</code>) may be used to explicitly
          * disable query-time expansion for entailments NOT computed during
          * closure. In particular, this may be used to disable the query time
@@ -495,6 +510,16 @@ public class BigdataSail extends SailBase implements Sail {
      * @see Options#NATIVE_JOINS
      */
     final private boolean nativeJoins;
+    
+    /**
+     * When true, SAIL will delegate all query evaluation to bigdata. Bigdata
+     * will parse the SPARQL query into its own AST {@link QueryRoot} and then
+     * evaluate that. The Sesame {@link TupleExpr} operator model will not be
+     * used.
+     * 
+     * @see Options#NATIVE_SPARQL
+     */
+    final private boolean nativeSparql;
     
     /**
      * When true, SAIL will compute entailments at query time that were excluded
@@ -972,6 +997,19 @@ public class BigdataSail extends SailBase implements Sail {
 
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.NATIVE_JOINS + "=" + nativeJoins);
+
+        }
+
+        // nativeSparql
+        {
+            
+            nativeSparql = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.NATIVE_SPARQL,
+                    BigdataSail.Options.DEFAULT_NATIVE_SPARQL));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.NATIVE_SPARQL + "="
+                        + nativeSparql);
 
         }
 
@@ -1766,6 +1804,18 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        /**
+         * When <code>true</code>, bigdata provides native SPARQL evaluation and
+         * the Sesame {@link TupleExpr} operator model will not be used.
+         * 
+         * @see Options#NATIVE_SPARQL
+         */
+        public final boolean isNativeSparql() {
+            
+            return nativeSparql;
+            
+        }
+        
         /**
          * When true, SAIL will compute entailments at query time that were excluded
          * from forward closure.
@@ -3226,6 +3276,8 @@ public class BigdataSail extends SailBase implements Sail {
          * the other overloaded version (the one with queryHints).
          * <p>
          * See {@link #evaluate(TupleExpr, Dataset, BindingSet, boolean, Properties)}.
+         * 
+         * @deprecated by {@link Options#NATIVE_SPARQL}
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 final TupleExpr tupleExpr, //
@@ -3241,6 +3293,8 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * Return the optimized operator tree.  Useful for debugging.
+         * 
+         * @deprecated by {@link Options#NATIVE_SPARQL}
          */
         /*public*/ synchronized TupleExpr optimize(
                 TupleExpr tupleExpr,//
@@ -3339,6 +3393,8 @@ public class BigdataSail extends SailBase implements Sail {
          *             <i>bindingSet</i> is non-empty.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
+         * 
+         * @deprecated by {@link Options#NATIVE_SPARQL}
          */
         public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 TupleExpr tupleExpr,//
@@ -3452,6 +3508,8 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @return yucky hack, need to return a new dataset and a new binding
          *         set. dataset is [0], binding set is [1]
+         *         
+         * @deprecated by {@link Options#NATIVE_SPARQL}
          */
         protected Object[] replaceValues(final Dataset dataset,
                 final TupleExpr tupleExpr, final BindingSet bindings)

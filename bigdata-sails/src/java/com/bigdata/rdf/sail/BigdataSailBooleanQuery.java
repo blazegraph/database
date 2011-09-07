@@ -3,6 +3,7 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
@@ -15,6 +16,7 @@ import org.openrdf.repository.sail.SailBooleanQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
@@ -92,6 +94,12 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
         if (queryRoot != null) {
             
+            final int maxQuery = getMaxQueryTime();
+            if (maxQuery > 0) {
+                queryRoot.setProperty(BOp.Annotations.TIMEOUT,
+                        TimeUnit.SECONDS.toMillis(maxQuery));
+            }
+
             final AbstractTripleStore store = getTripleStore();
 
             final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
@@ -161,6 +169,11 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
     public TupleExpr getTupleExpr() throws QueryEvaluationException {
         
+        if (getParsedQuery() == null) {
+            // native sparql evaluation.
+            return null;
+        }
+
         TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
         
         try {

@@ -85,7 +85,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         final SailQuery sailQuery = prepareQuery(ql, qs, baseURI);
         
-        if(sailQuery.getParsedQuery() instanceof ParsedGraphQuery) {
+        if(sailQuery instanceof BigdataSailGraphQuery) {
             
             return (BigdataSailGraphQuery) sailQuery;
             
@@ -122,7 +122,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         final SailQuery sailQuery = prepareQuery(ql, qs, baseURI);
         
-        if(sailQuery.getParsedQuery() instanceof ParsedTupleQuery) {
+        if(sailQuery instanceof BigdataSailTupleQuery) {
             
             return (BigdataSailTupleQuery) sailQuery;
             
@@ -155,7 +155,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         final SailQuery sailQuery = prepareQuery(ql, qs, baseURI);
         
-        if(sailQuery.getParsedQuery() instanceof ParsedBooleanQuery) {
+        if(sailQuery instanceof BigdataSailBooleanQuery) {
             
             return (BigdataSailBooleanQuery) sailQuery;
             
@@ -189,6 +189,12 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	public SailQuery prepareQuery(final QueryLanguage ql, final String qs,
 			final String baseURI) throws MalformedQueryException {
 
+        if (getSailConnection().isNativeSparql()) {
+
+            return (SailQuery) prepareNativeSPARQLQuery(ql, qs, baseURI);
+
+	    }
+	    
 		final ParsedQuery parsedQuery;
 		final Properties queryHints;
 		final boolean describe;

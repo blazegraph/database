@@ -251,6 +251,9 @@ abstract public class CoreBaseBOp implements BOp {
 
         if (!(other instanceof BOp))
             return false;
+        
+        if(this.getClass() != other.getClass())
+            return false;
 
         final BOp o = (BOp) other;
 
