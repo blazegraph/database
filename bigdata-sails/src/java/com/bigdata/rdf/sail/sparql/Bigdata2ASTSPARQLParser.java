@@ -43,7 +43,6 @@ import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.BaseDeclProcessor;
 import org.openrdf.query.parser.sparql.BlankNodeVarProcessor;
-import org.openrdf.query.parser.sparql.DatasetDeclProcessor;
 import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
 import org.openrdf.query.parser.sparql.StringEscapesProcessor;
 import org.openrdf.query.parser.sparql.UpdateExprBuilder;

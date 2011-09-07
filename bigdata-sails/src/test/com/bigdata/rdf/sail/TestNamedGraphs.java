@@ -194,7 +194,7 @@ public class TestNamedGraphs extends QuadsTestCase {
             TupleQueryResult result = tupleQuery.evaluate();
             // do something with the results
 
-            Collection<BindingSet> answer = new LinkedList<BindingSet>();
+            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
             answer.add(createBindingSet(
                     new BindingImpl("name", new LiteralImpl("Alice"))));
             

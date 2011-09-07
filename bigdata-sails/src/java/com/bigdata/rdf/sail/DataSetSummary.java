@@ -290,7 +290,7 @@ public class DataSetSummary {
     @Override
     public String toString() {
 
-        return "DataSetSummary{ngraphs=" + graphs.size() + ", nknown " + nknown
+        return "DataSetSummary{ngraphs=" + graphs.size() + ", nknown=" + nknown
                 + "}";
         
     }

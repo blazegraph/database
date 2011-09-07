@@ -89,6 +89,22 @@ abstract public class QueryBase extends QueryNodeBase {
          */
         String SLICE = "slice";
         
+        /**
+         * When <code>true</code> inferred statements will not be stripped from
+         * the access paths (default {@value #DEFAULT_INCLUDE_INFERRED}).
+         */
+        String INCLUDE_INFERRED = "includeInferred";
+        
+        boolean DEFAULT_INCLUDE_INFERRED = true;
+
+        /**
+         * The {@link Long} value giving the time limit for the query
+         * (milliseconds).
+         */
+        String TIMEOUT = "timeout";
+
+        long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+
     }
 
     /**
@@ -283,7 +299,38 @@ abstract public class QueryBase extends QueryNodeBase {
         setProperty(Annotations.ORDER_BY, orderBy);
         
     }
-    
+
+    /**
+     * @see Annotations#INCLUDE_INFERRED
+     */
+    public boolean getIncludeInferred() {
+        return getProperty(Annotations.INCLUDE_INFERRED,
+                Annotations.DEFAULT_INCLUDE_INFERRED);
+    }
+
+    /**
+     * @see Annotations#INCLUDE_INFERRED
+     */
+    public void setIncludeInferred(boolean includeInferred) {
+        setProperty(Annotations.INCLUDE_INFERRED, includeInferred);
+    }
+
+    /**
+     * @see Annotations#TIMEOUT
+     */
+    public long getTimeout() {
+        return getProperty(Annotations.TIMEOUT, Annotations.DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Set the timeout (milliseconds) for the query.
+     * 
+     * @see Annotations#TIMEOUT
+     */
+    public void setTimeout(long timeout) {
+        setProperty(Annotations.TIMEOUT, timeout);
+    }
+
 	public String toString(final int indent) {
 		
 	    final String s = indent(indent);
@@ -305,6 +352,18 @@ abstract public class QueryBase extends QueryNodeBase {
 
         }
 
+        if (getProperty(Annotations.INCLUDE_INFERRED) != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("includeInferred=" + getIncludeInferred());
+        }
+
+        if (getProperty(Annotations.TIMEOUT) != null) {
+            sb.append("\n");
+            sb.append(s);
+            sb.append("timeout=" + getTimeout());
+        }
+
         if (construct != null && !construct.isEmpty()) {
 
             sb.append(construct.toString(indent));
@@ -318,12 +377,6 @@ abstract public class QueryBase extends QueryNodeBase {
 		}
 
         if (whereClause != null) {
-
-//            sb.append("\n");
-//            
-//            sb.append(s);
-//
-//            sb.append("where\n");
 
             sb.append(whereClause.toString(indent + 1));
 
