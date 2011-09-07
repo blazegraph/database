@@ -95,7 +95,7 @@ public class QueryRoot extends QueryBase {
          * The {@link NamedSubqueriesNode} (optional).
          */
         String NAMED_SUBQUERIES = "namedSubqueries";
-        
+
     }
 
     public QueryRoot(final QueryType queryType) {

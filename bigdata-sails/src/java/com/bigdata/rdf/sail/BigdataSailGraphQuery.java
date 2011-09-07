@@ -272,11 +272,11 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
     
         if (queryRoot != null) {
 
-            final int maxQuery = getMaxQueryTime();
-            if (maxQuery > 0) {
-                queryRoot.setProperty(BOp.Annotations.TIMEOUT,
-                        TimeUnit.SECONDS.toMillis(maxQuery));
-            }
+            if (getMaxQueryTime() > 0)
+                queryRoot.setTimeout(TimeUnit.SECONDS
+                        .toMillis(getMaxQueryTime()));
+
+            queryRoot.setIncludeInferred(getIncludeInferred());
 
             final AbstractTripleStore store = getTripleStore();
 

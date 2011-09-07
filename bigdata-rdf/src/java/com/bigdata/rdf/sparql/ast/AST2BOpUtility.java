@@ -82,12 +82,14 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
+import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
@@ -101,6 +103,9 @@ import com.bigdata.relation.rule.Rule;
  * 
  *          FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
  *          variable bindings during query evaluation).
+ * 
+ *          TODO What about the backchain access path stuff? Are we going prolog
+ *          / datalog or bringing that stuff forward?
  */
 public class AST2BOpUtility {
 
@@ -165,25 +170,6 @@ public class AST2BOpUtility {
         queryPlan = (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
-        /*
-         * Set a timeout on the query.
-         * 
-         * TODO Could be done for subqueries too.
-         */
-        {
-
-            final Number timeout = (Long) optimizedQuery
-                    .getProperty(BOp.Annotations.TIMEOUT);
-
-            if (timeout != null && timeout.longValue() > 0) {
-
-                queryPlan.setProperty(BOp.Annotations.TIMEOUT,
-                        timeout.longValue());
-
-            }
-            
-        }
-
         return queryPlan;
 
     }
@@ -201,7 +187,6 @@ public class AST2BOpUtility {
      */
     private static PipelineOp convert(final QueryBase query,
             final AST2BOpContext ctx) {
-
     	
     	final String lex = ctx.db.getLexiconRelation().getNamespace();
     	
@@ -344,6 +329,22 @@ public class AST2BOpUtility {
         }
 
         left = addEndOp(left, ctx);
+        
+        /*
+         * Set a timeout on a query or subquery.
+         */
+        {
+
+            final long timeout = query.getTimeout();
+
+            if (timeout > 0 && timeout != Long.MAX_VALUE) {
+
+                left = (PipelineOp) left.setProperty(BOp.Annotations.TIMEOUT,
+                        timeout);
+
+            }
+            
+        }
         
         /*
          * TODO Do we need to add operators for materialization of any remaining
@@ -2202,20 +2203,19 @@ public class AST2BOpUtility {
             }
         }
 
-//        /*
-//         * This applies a filter to the access path to remove any inferred
-//         * triples when [includeInferred] is false.
-//         * 
-//         * @todo We can now stack filters so are we missing out here by not
-//         * layering in other filters as well? [In order to rotate additional
-//         * constraints onto an access path we would need to either change
-//         * IPredicate and AbstractAccessPath to process an IConstraint[] or
-//         * write a delegation pattern that let's us wrap one filter inside of
-//         * another.]
-//         */
-//        final IElementFilter<ISPO> filter = 
-//            !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
-//                : null;
+        /*
+         * This applies a filter to the access path to remove any inferred
+         * triples when [includeInferred] is false.
+         * 
+         * @todo We can now stack filters so are we missing out here by not
+         * layering in other filters as well? [In order to rotate additional
+         * constraints onto an access path we would need to either change
+         * IPredicate and AbstractAccessPath to process an IConstraint[] or
+         * write a delegation pattern that let's us wrap one filter inside of
+         * another.]
+         */
+        final IElementFilter<ISPO> filter = !ctx.query.getIncludeInferred() ? ExplicitSPOFilter.INSTANCE
+                : null;
 
         // Decide on the correct arity for the predicate.
         final BOp[] vars;
@@ -2230,10 +2230,10 @@ public class AST2BOpUtility {
         anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
                 new String[] { database.getSPORelation().getNamespace() }));//
         
-//        // filter on elements visited by the access path.
-//        if (filter != null)
-//            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
-//                    ElementFilter.newInstance(filter)));
+        // filter on elements visited by the access path.
+        if (filter != null)
+            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                    ElementFilter.newInstance(filter)));
 
         // free text search expander or named graphs expander
         if (expander != null)
