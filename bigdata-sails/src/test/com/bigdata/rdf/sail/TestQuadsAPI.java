@@ -183,6 +183,15 @@ public class TestQuadsAPI extends QuadsTestCase {
 
     }
     
+    /**
+     * Matt, do you recognize this unit test: TestQuadsAPI#testSCequality()? I
+     * think that this may have been something from you dealing with the binding
+     * on the S and C positions. Bryan
+     * <p>
+     * mooseroy: If i remember correctly, early on there was a problem when you
+     * had something like graph ?s{?s ?p ?o} where it wasn't ensuring the ?s in
+     * the context and subject position where equal.
+     */
     public void testSCequality() throws Exception {
 
         final BigdataSail sail = getSail();
@@ -255,7 +264,7 @@ public class TestQuadsAPI extends QuadsTestCase {
                 log.info("\n" + sail.getDatabase().dumpStore());
             }
             
-            String query = 
+            final String query = 
                 "SELECT  * " +
                 "WHERE { GRAPH ?g { " +
                 "?g <"+p1+"> <"+o1+"> . " +
@@ -264,10 +273,13 @@ public class TestQuadsAPI extends QuadsTestCase {
             
             final TupleQuery tupleQuery = 
                 cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+            
             tupleQuery.setIncludeInferred(true /* includeInferred */);
-            TupleQueryResult result = tupleQuery.evaluate();
+            
+            final TupleQueryResult result = tupleQuery.evaluate();
 
-            Collection<BindingSet> answer = new LinkedList<BindingSet>();
+            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+            
             answer.add(createBindingSet(
                     new BindingImpl("g", graphA)));
             

@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -130,7 +129,7 @@ class RunState {
 
             this.queryId = queryId;
 
-            this.deadline = deadline;
+            this.deadline = new AtomicLong(deadline);
 
             this.bopIndex = bopIndex;
 
@@ -166,7 +165,7 @@ class RunState {
          * @see BOp.Annotations#TIMEOUT
          * @see IRunningQuery#getDeadline()
          */
-        final long deadline;
+        final AtomicLong deadline;
 
         /**
          * Set to <code>true</code> iff the query evaluation has begun.
@@ -370,9 +369,45 @@ class RunState {
      * Return the deadline specified to the constructor.
      */
     final public long getDeadline() {
-        return innerState.deadline;
+        return innerState.deadline.get();
     }
 
+    /**
+     * Set the deadline for the query.
+     * 
+     * @param deadline
+     *            The deadline.
+     * 
+     * @throws IllegalArgumentException
+     *             if the deadline is non-positive.
+     * @throws IllegalStateException
+     *             if the deadline has already been set.
+     * @throws QueryTimeoutException
+     *             if the deadline is already expired.
+     */
+    final public void setDeadline(final long deadline) throws QueryTimeoutException {
+
+        if (deadline <= 0)
+            throw new IllegalArgumentException();
+
+        // set the deadline.
+        if (!innerState.deadline.compareAndSet(Long.MAX_VALUE/* expect */,
+                deadline/* update */)) {
+
+            // the deadline is already set.
+            throw new IllegalStateException();
+
+        }
+
+        if (deadline < System.currentTimeMillis()) {
+
+            // deadline has already expired.
+            throw new QueryTimeoutException();
+
+        }
+
+    }
+    
     /**
      * Return <code>true</code> if evaluation of the query has been initiated
      * using {@link #startQuery(IChunkMessage)}.
@@ -480,9 +515,15 @@ class RunState {
      */
     public RunState(final IRunningQuery query) {
 
+        /*
+         * Note: The deadline is Long.MAX_VALUE until set. query.getDeadline()
+         * delegates back to RunState so we can not use it to setup our own
+         * state.
+         */
+
         this(new InnerState(query.getQuery(), query.getQueryId(),
-                query.getDeadline(), System.currentTimeMillis(),
-                query.getBOpIndex()));
+                Long.MAX_VALUE/* query.getDeadline() */,
+                System.currentTimeMillis(), query.getBOpIndex()));
 
     }
 
@@ -512,11 +553,11 @@ class RunState {
      *             if the query is already running.
      * @throws IllegalStateException
      *             if the query is already done.
-     * @throws TimeoutException
+     * @throws QueryTimeoutException
      *             if the deadline for the query has passed.
      */
     synchronized
-    public void startQuery(final IChunkMessage<?> msg) throws TimeoutException {
+    public void startQuery(final IChunkMessage<?> msg) throws QueryTimeoutException {
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -524,8 +565,8 @@ class RunState {
         if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (innerState.deadline < System.currentTimeMillis())
-            throw new TimeoutException(ERR_DEADLINE);
+        if (innerState.deadline.get() < System.currentTimeMillis())
+            throw new QueryTimeoutException(ERR_DEADLINE);
 
         if (!innerState.started.compareAndSet(false/* expect */, true/* update */))
             throw new IllegalStateException(ERR_QUERY_STARTED);
@@ -573,11 +614,11 @@ class RunState {
      * 
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
-     * @throws TimeoutException
+     * @throws QueryTimeoutException
      *             if the deadline for the query has passed.
      */
     synchronized
-    public boolean startOp(final StartOpMessage msg) throws TimeoutException {
+    public boolean startOp(final StartOpMessage msg) throws QueryTimeoutException {
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -586,8 +627,8 @@ class RunState {
             throw new IllegalStateException(ERR_QUERY_HALTED);
 //                    + "  bopId="+msg.bopId+" : msg="+msg);
 
-        if (innerState.deadline < System.currentTimeMillis())
-            throw new TimeoutException(ERR_DEADLINE);
+        if (innerState.deadline.get() < System.currentTimeMillis())
+            throw new QueryTimeoutException(ERR_DEADLINE);
 
         innerState.stepCount.incrementAndGet();
 
@@ -669,14 +710,14 @@ class RunState {
      *             if the query is not running.
      * @throws IllegalStateException
      *             if the operator addressed by the message is not running.
-     * @throws TimeoutException
+     * @throws QueryTimeoutException
      *             if the deadline has expired.
      * @throws ExecutionException
      *             if the {@link HaltOpMessage#cause} was non-<code>null</code>,
      *             if which case it wraps {@link HaltOpMessage#cause}.
      */
     synchronized
-    public RunStateEnum haltOp(final HaltOpMessage msg) throws TimeoutException,
+    public RunStateEnum haltOp(final HaltOpMessage msg) throws QueryTimeoutException,
             ExecutionException {
 
         if (msg == null)
@@ -685,8 +726,8 @@ class RunState {
         if (innerState.allDone.get())
             throw new IllegalStateException(ERR_QUERY_HALTED);
 
-        if (innerState.deadline < System.currentTimeMillis())
-            throw new TimeoutException(ERR_DEADLINE);
+        if (innerState.deadline.get() < System.currentTimeMillis())
+            throw new QueryTimeoutException(ERR_DEADLINE);
 
         innerState.stepCount.incrementAndGet();
 

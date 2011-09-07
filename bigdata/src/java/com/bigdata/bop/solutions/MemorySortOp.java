@@ -292,6 +292,9 @@ public class MemorySortOp extends SortOp {
                         
                 }
 
+                if (log.isInfoEnabled())
+                    log.info("Buffered " + stats.solutions + " so far");
+                
             } finally {
         
                 itr.close();
@@ -307,6 +310,9 @@ public class MemorySortOp extends SortOp {
          *            Where to write the results.
          */
         private void doOrderBy(final IBlockingBuffer<IBindingSet[]> sink) {
+
+            if (log.isInfoEnabled())
+                log.info("Sorting.");
 
             final IBindingSet[] all = stats.solutions
                     .toArray(new IBindingSet[0]);

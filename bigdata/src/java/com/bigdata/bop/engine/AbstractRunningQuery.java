@@ -287,30 +287,29 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         if (!controller)
             throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
-        if (deadline <= 0)
-            throw new IllegalArgumentException();
+        try {
 
-        // set the deadline.
-        if (!this.deadline
-                .compareAndSet(Long.MAX_VALUE/* expect */, deadline/* update */)) {
+            /*
+             * Attempt to set the deadline.
+             */
+            
+            runState.setDeadline(deadline);
+            
+        } catch (QueryTimeoutException e) {
 
-            // the deadline is already set.
-            throw new IllegalStateException();
+            /*
+             * Deadline is expired, so halt the query.
+             */
 
+            halt(e);
+            
         }
-
-        if (deadline < System.currentTimeMillis()) {
-
-            // deadline has already expired.
-            halt(new TimeoutException());
-
-        }
-
+        
     }
 
     final public long getDeadline() {
 
-        return deadline.get();
+        return runState.getDeadline();
         
     }
 

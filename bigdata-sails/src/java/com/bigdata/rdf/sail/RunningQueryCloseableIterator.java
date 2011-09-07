@@ -2,8 +2,11 @@ package com.bigdata.rdf.sail;
 
 import java.util.NoSuchElementException;
 
+import org.openrdf.query.QueryInterruptedException;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**

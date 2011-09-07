@@ -1239,6 +1239,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             final long deadline = System.currentTimeMillis() + timeout;
 
             if (deadline > 0) {
+
                 /*
                  * Impose a deadline on the query.
                  */
