@@ -41,17 +41,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
-import javax.xml.datatype.DatatypeConstants;
-import javax.xml.datatype.XMLGregorianCalendar;
-
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
-import org.openrdf.query.algebra.Compare.CompareOp;
-import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
-import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -72,8 +66,8 @@ import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
-import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
+import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
@@ -84,15 +78,14 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
-import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIShortIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -416,6 +409,18 @@ public class IVUtility {
         
     }
     
+    /**
+     * The XPath numeric functions: abs, ceiling, floor, and round.
+     * 
+     * @param iv1
+     *            The operand.
+     * @param op
+     *            The operation.
+
+     * @return The result.
+     * 
+     * @see XPathMathFunctions
+     */
     public static final IV numericalFunc(final IV iv1, final NumericOp op) {
 
         if (!iv1.isInline())
@@ -436,23 +441,42 @@ public class IVUtility {
 
         final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1;
 
-
-        // if one's a BigDecimal we should use the BigDecimal comparator for both
+        /*
+         * FIXME These xpath functions have very custom semantics. They need to
+         * be lifted out of this class and put into their own static methods
+         * with their own test suites.
+         */
+//        switch (op) {
+//        case ABS:
+//            return XPathMathFunctions.abs(iv1);
+//        case CEIL:
+//            return XPathMathFunctions.ceiling(iv1);
+//        case FLOOR:
+//            return XPathMathFunctions.floor(iv1);
+//        case ROUND:
+//            return XPathMathFunctions.round(iv1);
+//        default:
+//            throw new UnsupportedOperationException(op.toString());
+//        }
+        
+        // if one's a BigDecimal we should use the BigDecimal comparator for
+        // both
         if (dte1 == DTE.XSDDecimal) {
-            return numericalFunc(num1.decimalValue(),op);
-        }else if (dte1 == DTE.XSDInteger) {
-           return numericalFunc(num1.integerValue(),op);
-        }else if (dte1.isFloatingPointNumeric() ) {
-            return numericalFunc(num1.floatValue(),op);
-        }else if (dte1.equals(DTE.XSDInt)){
-            return numericalFunc(num1.intValue(),op);
-        }else if (dte1.equals(DTE.XSDDouble)){
-            return numericalFunc(num1.doubleValue(),op);
-        }else{
-            return numericalFunc(num1.longValue(),op);
+            return numericalFunc(num1.decimalValue(), op);
+        } else if (dte1 == DTE.XSDInteger) {
+            return numericalFunc(num1.integerValue(), op);
+        } else if (dte1.isFloatingPointNumeric()) {
+            return numericalFunc(num1.floatValue(), op);
+        } else if (dte1.equals(DTE.XSDInt)) {
+            return numericalFunc(num1.intValue(), op);
+        } else if (dte1.equals(DTE.XSDDouble)) {
+            return numericalFunc(num1.doubleValue(), op);
+        } else {
+            return numericalFunc(num1.longValue(), op);
         }
     }
     
+    @Deprecated
     private static final IV numericalFunc(final BigDecimal left, final NumericOp op) {
         switch(op) {
         case ABS:
@@ -467,12 +491,14 @@ public class IVUtility {
             throw new UnsupportedOperationException();
         }
     }
+    
+    @Deprecated
     private static final IV numericalFunc(final BigInteger left, final NumericOp op) {
         switch(op) {
         case ABS:
             return new XSDIntegerIV(left.abs());
         case CEIL:
-            return new XSDNumericIV(Math.ceil(left.doubleValue()));
+          return new XSDNumericIV(Math.ceil(left.doubleValue()));
         case FLOOR:
             return new XSDNumericIV(Math.floor(left.doubleValue()));
         case ROUND:
@@ -481,6 +507,8 @@ public class IVUtility {
             throw new UnsupportedOperationException();
         }
     }
+
+    @Deprecated
     private static final IV numericalFunc(final float left, final NumericOp op) {
         switch(op) {
         case ABS:
@@ -495,6 +523,8 @@ public class IVUtility {
             throw new UnsupportedOperationException();
         }
     }
+    
+    @Deprecated
     private static final IV numericalFunc(final int left, final NumericOp op) {
         switch(op) {
         case ABS:
@@ -509,6 +539,8 @@ public class IVUtility {
             throw new UnsupportedOperationException();
         }
     }
+    
+    @Deprecated
     private static final IV numericalFunc(final long left, final NumericOp op) {
         switch(op) {
         case ABS:
@@ -523,6 +555,8 @@ public class IVUtility {
             throw new UnsupportedOperationException();
         }
     }
+
+    @Deprecated
     private static final IV numericalFunc(final double left, final NumericOp op) {
         switch(op) {
         case ABS:
@@ -538,7 +572,7 @@ public class IVUtility {
         }
     }
     
-    public static final IV numericalMath(final BigDecimal left, 
+    private static final IV numericalMath(final BigDecimal left, 
             final BigDecimal right, final MathOp op) {
         
         switch(op) {
@@ -572,7 +606,7 @@ public class IVUtility {
         
     }
     
-    public static final IV numericalMath(final BigInteger left, 
+    private static final IV numericalMath(final BigInteger left, 
             final BigInteger right, final MathOp op) {
         
         switch(op) {
@@ -594,7 +628,7 @@ public class IVUtility {
         
     }
     
-    public static final IV numericalMath(final float left, 
+    private static final IV numericalMath(final float left, 
             final float right, final MathOp op) {
         
         switch(op) {
@@ -616,7 +650,7 @@ public class IVUtility {
         
     }
     
-    public static final IV numericalMath(final double left, 
+    private static final IV numericalMath(final double left, 
             final double right, final MathOp op) {
         
         switch(op) {
