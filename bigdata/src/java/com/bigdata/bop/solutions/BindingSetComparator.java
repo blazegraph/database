@@ -21,6 +21,9 @@ public class BindingSetComparator<E> implements Comparator<IBindingSet> {
      */
     private final Comparator<E> valueComparator;
 
+    /** The #of solutions compared. */
+    private long n = 0;
+    
     /**
      * 
      * @param sortOrder
@@ -54,6 +57,14 @@ public class BindingSetComparator<E> implements Comparator<IBindingSet> {
     
     public int compare(final IBindingSet bs1, final IBindingSet bs2) {
 
+        if ((n++ % 5000) == 1) {
+            /*
+             * Check for interrupts, but not too often.
+             */
+            if (Thread.interrupted())
+                throw new RuntimeException(new InterruptedException());
+        }
+        
         for (int i = 0; i < sortOrder.length; i++) {
 
             final ISortOrder<E> o = sortOrder[i];
