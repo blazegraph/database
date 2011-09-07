@@ -187,14 +187,32 @@ public class AbstractDataDrivenSPARQLTestCase extends
             if (log.isInfoEnabled())
                 log.info("\nquery:\n" + queryStr);
 
-            final long nparsed = loadData(dataFileURL);
+            if (dataFileURL != null) {
 
-            if (log.isInfoEnabled())
-                log.info("\nLoaded " + nparsed + " statements from "
-                        + dataFileURL);
+                final long nparsed = loadData(dataFileURL);
+
+                if (log.isInfoEnabled())
+                    log.info("\nLoaded " + nparsed + " statements from "
+                            + dataFileURL);
+                
+            }
+
+            /**
+             * Note: This should be the URL specified in the manifest as having
+             * the appropriate scope for the value of the qt:query attribute,
+             * which is normally specified as something like:
+             * 
+             * <pre>
+             * <dataset-01.rq>
+             * </pre>
+             * 
+             * and hence interpreted as relative to the baseURI.
+             */
+            final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
+                    + queryFileURL;
 
             queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                    queryStr, null/* baseUri */);
+                    queryStr, baseURI);
 
             if (log.isInfoEnabled())
                 log.info("\nAST:\n" + queryRoot);
