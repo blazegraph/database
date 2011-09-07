@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
+import java.math.BigInteger;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -30,9 +31,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 public class StrlenBOp extends AbstractLiteralBOp {
 
@@ -58,11 +58,17 @@ public class StrlenBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
-         final BigdataLiteral lit = literalValue(iv);
-        String label = lit.getLabel();
-        int length = label.length();
-        return new XSDNumericIV(length);
+        
+        final IV iv = getAndCheck(0, bs);
+        
+        final BigdataLiteral lit = literalValue(iv);
+        
+        final String label = lit.getLabel();
+        
+        final int length = label.length();
+        
+        return new XSDIntegerIV(BigInteger.valueOf(length));
+        
     }
 
 }

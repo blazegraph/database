@@ -69,7 +69,7 @@ public class StrlangBOp extends AbstractLiteralBOp {
         final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
         String langLit = l.getLabel();
-        final BigdataLiteral str = vf.createLiteral(label, langLit);
+        final BigdataLiteral str = getValueFactory().createLiteral(label, langLit);
         return DummyConstantNode.toDummyIV(str);
 
     }

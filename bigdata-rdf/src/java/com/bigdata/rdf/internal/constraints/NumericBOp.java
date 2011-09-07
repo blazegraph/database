@@ -43,7 +43,7 @@ public class NumericBOp extends IVValueExpression<IV>  {
     private static final long serialVersionUID = 9136864442064392445L;
 
     public interface Annotations extends ImmutableBOp.Annotations {
-        String OP = (NumericBOp.class.getName() + ".op").intern();
+        String OP = NumericBOp.class.getName() + ".op";
     }
 
     public enum NumericOp {

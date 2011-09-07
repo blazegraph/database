@@ -34,19 +34,39 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
+/**
+ * This function has an origin of ONE (1) not ZERO (0). The start and offset
+ * parameters are doubles and are ROUNDED using xpath:numeric-round to obtain
+ * the appropriate integer values. A negative or zero starting offset is treated
+ * as indicating the first character in the string, which is at index ONE (1).
+ * When the length parameter is not specified then it is assumed to be infinite.
+ * 
+ * @see http://www.w3.org/TR/xpath-functions/#func-substring
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class SubstrBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -7022953617164154412L;
 
-    public SubstrBOp(IValueExpression<? extends IV> x, IValueExpression<? extends IV> start, IValueExpression<? extends IV> length, String lex) {
-        this(new BOp[] { x, start, length }, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    @SuppressWarnings("rawtypes")
+    public SubstrBOp(//
+            final IValueExpression<? extends IV> x,
+            final IValueExpression<? extends IV> start,
+            final IValueExpression<? extends IV> length, String lex) {
+     
+        this(new BOp[] { x, start, length }, NV.asMap(new NV(
+                Annotations.NAMESPACE, lex)));
+        
     }
 
     public SubstrBOp(BOp[] args, Map<String, Object> anns) {
+
         super(args, anns);
+        
         if (args.length < 2 || args[0] == null || args[1] == null)
             throw new IllegalArgumentException();
 
@@ -60,42 +80,93 @@ public class SubstrBOp extends AbstractLiteralBOp {
         return Requirement.SOMETIMES;
     }
 
+    @SuppressWarnings("rawtypes")
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
-          IV start = get(1).get(bs);
-        if (!start.isFixedNumeric())
-            throw new SparqlTypeErrorException();
-        IV length = null;
-        if (arity() > 2) {
-            length = get(2).get(bs);
-            if (!length.isFixedNumeric())
-                throw new SparqlTypeErrorException();
-        }
 
-        final BigdataLiteral lit = literalValue(iv);
-        String lang = lit.getLanguage();
-        BigdataURI dt = lit.getDatatype();
+        // The literal.
+        
+        final IV literalArg = getAndCheck(0, bs);
+        
+        final BigdataLiteral lit = literalValue(literalArg);
+
+        /* 
+         * The starting offset for the substring.
+         */
+
+        final IV startArg = get(1).get(bs);
+
+        // Negative values and zero are treated as ONE.
+        final int start = Math.max(1,
+                (int) Math.round(literalValue(startArg).doubleValue()));
+
+        /*
+         * The length of the substring (optional argument).
+         */
+
         String label = lit.getLabel();
 
-        int s = literalValue(start).intValue();
-        if (length != null) {
-            int l = literalValue(length).intValue();
-            label = label.substring(s, l);
+        if (arity() > 2) {
+
+            /*
+             * substr(start,length)
+             */
+
+            final IV lengthArg = get(2).get(bs);
+
+            final int length = Math.min(label.length(),
+                    (int) Math.round(literalValue(lengthArg).doubleValue()));
+
+            label = label
+                    .substring(start - 1/* origin zero for Java */, length);
+
         } else {
-            label = label.substring(s);
+
+            label = label.substring(start - 1/* origin zero for Java */);
+
         }
+
+        /*
+         * Generate appropriate literal.
+         */
+
+        final String lang = lit.getLanguage();
+        
+        final BigdataURI dt = lit.getDatatype();
+        
         if (lang != null) {
-            // else return new simple literal using Literal.getLabel
-            final BigdataLiteral str = vf.createLiteral(label, lang);
+
+            /*
+             * Language code literal.
+             */
+
+            final BigdataLiteral str = getValueFactory().createLiteral(label,
+                    lang);
+
             return DummyConstantNode.toDummyIV(str);
+
         } else if (dt != null) {
-            // else return new simple literal using Literal.getLabel
-            final BigdataLiteral str = vf.createLiteral(label, dt);
+
+            /*
+             * Datatype literal.
+             */
+
+            final BigdataLiteral str = getValueFactory().createLiteral(label,
+                    dt);
+
             return DummyConstantNode.toDummyIV(str);
-        }else{
-            final BigdataLiteral str = vf.createLiteral(label);
+
+        } else {
+
+            /*
+             * Return new simple literal using Literal.getLabel()
+             */
+
+            final BigdataLiteral str = getValueFactory().createLiteral(label);
+
             return DummyConstantNode.toDummyIV(str);
+
         }
+
     }
 
 }
