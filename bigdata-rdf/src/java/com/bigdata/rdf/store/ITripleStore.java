@@ -252,11 +252,11 @@ interface ITripleStore {
      * Return the statement from the database matching the fully bound query.
      * <p>
      * Note: If the parameters are from an {@link AbstractTripleStore} using a
-     * different lexicon then you MUST either {@link BigdataValue#clearInternalValue()}
-     * or create a new {@link Value} object which either is not aware of the
-     * term identifier or does not have its term identifier set in order to
-     * avoid lookup using the term identifier rather than indirecting through
-     * the lexicon.
+     * different lexicon then you MUST either
+     * {@link BigdataValue#clearInternalValue()} or create a new {@link Value}
+     * object which either is not aware of the term identifier or does not have
+     * its term identifier set in order to avoid lookup using the term
+     * identifier rather than indirecting through the lexicon.
      * 
      * @param s
      *            The subject (required).

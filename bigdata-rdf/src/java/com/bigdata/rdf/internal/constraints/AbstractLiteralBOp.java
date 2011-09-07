@@ -1,8 +1,6 @@
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.datatype.DatatypeFactory;
 
@@ -11,19 +9,25 @@ import org.openrdf.model.Value;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
-abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implements INeedsMaterialization {
-    static protected final DatatypeFactory            datatypeFactory;
+abstract public class AbstractLiteralBOp extends IVValueExpression<IV>
+        implements INeedsMaterialization {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    static protected final transient DatatypeFactory datatypeFactory;
+
     static {
         try {
             datatypeFactory = DatatypeFactory.newInstance();
@@ -32,14 +36,36 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
         }
     }
 
-    protected transient BigdataValueFactory vf;
+    /**
+     * Note: The double-checked locking pattern <em>requires</em> the keyword
+     * <code>volatile</code>.
+     */
+    private transient volatile BigdataValueFactory vf;
+
+    protected BigdataValueFactory getValueFactory() {
+        if (vf == null) {
+            synchronized (this) {
+                if (vf == null) {
+                    final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
+                    vf = BigdataValueFactoryImpl.getInstance(namespace);
+                }
+            }
+        }
+        return vf;
+    }
 
     public interface Annotations extends BOp.Annotations {
-        public String NAMESPACE = (AbstractLiteralBOp.class.getName() + ".namespace").intern();
+
+        /**
+         * The namespace of the lexicon.
+         */
+        public String NAMESPACE = AbstractLiteralBOp.class.getName()
+                + ".namespace";
+        
     }
 
     /**
-     * Convienence constructor for most common unary function
+     * Convenience constructor for most common unary function
      * @param x
      * @param lex
      */
@@ -56,8 +82,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
         super(args, anns);
 
-        if (getProperty(Annotations.NAMESPACE) == null)
-            throw new IllegalArgumentException();
+        getRequiredProperty(Annotations.NAMESPACE);
 
     }
 
@@ -77,14 +102,6 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
     final public IV get(final IBindingSet bs) {
 
-        if (vf == null) {
-            synchronized (this) {
-                if (vf == null) {
-                    final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
-                    vf = BigdataValueFactoryImpl.getInstance(namespace);
-                }
-            }
-        }
         return _get(bs);
 
     }
@@ -109,9 +126,9 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
 
         if (iv.isInline()&&!iv.isExtension()) {
 
-            final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
+            final BigdataURI datatype = getValueFactory().asValue(iv.getDTE().getDatatypeURI());
 
-            return vf.createLiteral(((Value) iv).stringValue(), datatype);
+            return getValueFactory().createLiteral(((Value) iv).stringValue(), datatype);
 
         } else if (iv.hasValue()) {
 
@@ -134,4 +151,5 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV> implement
             throw new NotMaterializedException();
         }
     }
+
 }

@@ -109,12 +109,12 @@ public class ConcatBOp extends AbstractLiteralBOp {
         }
         if (allSame) {
             if (datatype != null) {
-                return DummyConstantNode.toDummyIV(vf.createLiteral(sb.toString(),datatype));
+                return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString(),datatype));
             } else if (lang != null) {
-                return DummyConstantNode.toDummyIV(vf.createLiteral(sb.toString(),lang));
+                return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString(),lang));
             }
         }
-        return DummyConstantNode.toDummyIV(vf.createLiteral(sb.toString()));
+        return DummyConstantNode.toDummyIV(getValueFactory().createLiteral(sb.toString()));
 
     }
 

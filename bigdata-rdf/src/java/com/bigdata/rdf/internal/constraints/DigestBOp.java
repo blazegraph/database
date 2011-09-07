@@ -160,7 +160,7 @@ public class DigestBOp extends AbstractLiteralBOp {
                     byte[] bytes = label.getBytes("UTF-8");
                     md.update(bytes);
                     byte[] digest = md.digest();
-                    final BigdataLiteral str = vf.createLiteral(toHexString(digest));
+                    final BigdataLiteral str = getValueFactory().createLiteral(toHexString(digest));
                     return DummyConstantNode.toDummyIV(str);
                 } catch (Exception e) {
                     throw new SparqlTypeErrorException();

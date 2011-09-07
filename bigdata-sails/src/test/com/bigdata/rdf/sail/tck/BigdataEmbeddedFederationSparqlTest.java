@@ -105,7 +105,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         }
         
         if(hideDatasetTests)
-            suite1 = filterOutDataSetTests(suite1);
+            suite1 = filterOutDataSetTests(suite1,"dataset");
         
         return suite1;
         

@@ -63,13 +63,13 @@ public class UcaseBOp extends AbstractLiteralBOp {
          final BigdataLiteral lit = literalValue(iv);
 
         if (lit.getLanguage() != null) {
-            final BigdataLiteral str = vf.createLiteral(lit.getLabel().toUpperCase(), lit.getLanguage());
+            final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getLanguage());
             return DummyConstantNode.toDummyIV(str);
         } else if (lit.getDatatype() != null) {
-            final BigdataLiteral str = vf.createLiteral(lit.getLabel().toUpperCase(), lit.getDatatype());
+            final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase(), lit.getDatatype());
             return DummyConstantNode.toDummyIV(str);
         } else {
-            final BigdataLiteral str = vf.createLiteral(lit.getLabel().toUpperCase());
+            final BigdataLiteral str = getValueFactory().createLiteral(lit.getLabel().toUpperCase());
             return DummyConstantNode.toDummyIV(str);
         }
     }

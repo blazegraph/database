@@ -80,7 +80,7 @@ public class StrdtBOp extends AbstractLiteralBOp {
         final BigdataURI dt = (BigdataURI) datatype.getValue();
         final BigdataLiteral lit = literalValue(iv);
         String label = lit.getLabel();
-        final BigdataLiteral str = vf.createLiteral(label, dt);
+        final BigdataLiteral str = getValueFactory().createLiteral(label, dt);
         return DummyConstantNode.toDummyIV(str);
 
     }

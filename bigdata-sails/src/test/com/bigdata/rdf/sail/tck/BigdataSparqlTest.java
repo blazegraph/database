@@ -42,16 +42,11 @@ import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
-import org.openrdf.query.Query;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLASTQueryTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
@@ -146,8 +141,9 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
             return suite;
         }
         
-        if(hideDatasetTests)
-            suite1 = filterOutDataSetTests(suite1);
+//        if(hideDatasetTests)
+//            suite1 = filterOutDataSetTests(suite1,"dataset");
+        suite1 = filterOutDataSetTests(suite1,"property-paths");
         
         return suite1;
         
@@ -161,7 +157,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
      * 
      * @return The test suite without the data set tests.
      */
-    static TestSuite filterOutDataSetTests(final TestSuite suite1) {
+    static TestSuite filterOutDataSetTests(final TestSuite suite1,final String name) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
         final Enumeration<Test> e = suite1.tests();
@@ -169,8 +165,8 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
             final Test aTest = e.nextElement();
             if (aTest instanceof TestSuite) {
                 final TestSuite aTestSuite = (TestSuite) aTest;
-                if (!aTestSuite.getName().equals("dataset")) {
-                    suite2.addTest(filterOutDataSetTests(aTestSuite));
+                if (!aTestSuite.getName().equals(name)) {
+                    suite2.addTest(filterOutDataSetTests(aTestSuite,name));
                 }
             } else {
                 suite2.addTest(aTest);
@@ -593,51 +589,54 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
         return queryString;
     }
     
+/*
+ * Note: This override is being done in the base class now.
+ */
     
-    @Override
-    protected void runTest()
-        throws Exception
-    {
-    	if(true) {
-			/*
-			 * Dump out some interesting things about the query, the parse tree,
-			 * and the state of the database *before* we run the unit test. This
-			 * uses the same logic that is used when the test is run by the base
-			 * class.
-			 */
-        RepositoryConnection con = getQueryConnection(dataRep);
-        try {
-
-//            log.info("database dump:");
-//            RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
-//            while (stmts.hasNext()) {
-//                log.info(stmts.next());
+//    @Override
+//    protected void runTest()
+//        throws Exception
+//    {
+//    	if(true) {
+//			/*
+//			 * Dump out some interesting things about the query, the parse tree,
+//			 * and the state of the database *before* we run the unit test. This
+//			 * uses the same logic that is used when the test is run by the base
+//			 * class.
+//			 */
+//        BigdataSailRepositoryConnection con = getQueryConnection(dataRep);
+//        try {
+//
+////            log.info("database dump:");
+////            RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
+////            while (stmts.hasNext()) {
+////                log.info(stmts.next());
+////            }
+//            log.info("dataset:\n" + dataset);
+//
+//            String queryString = readQueryString();
+//            log.info("query:\n" + getQueryString());
+//            
+//            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
+//            if (dataset != null) {
+//                query.setDataset(dataset);
 //            }
-            log.info("dataset:\n" + dataset);
-
-            String queryString = readQueryString();
-            log.info("query:\n" + getQueryString());
-            
-            Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
-            if (dataset != null) {
-                query.setDataset(dataset);
-            }
-
-            if (query instanceof TupleQuery) {
-                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
-                while (queryResult.hasNext()) {
-                    log.info("query result:\n" + queryResult.next());
-                }
-            }
-
-        }
-        finally {
-            con.close();
-        }
-    	}
-        
-        super.runTest();
-    }
+//
+//            if (query instanceof TupleQuery) {
+//                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
+//                while (queryResult.hasNext()) {
+//                    log.info("query result:\n" + queryResult.next());
+//                }
+//            }
+//
+//        }
+//        finally {
+//            con.close();
+//        }
+//    	}
+//        
+//        super.runTest();
+//    }
 
 	/**
 	 * Overridden to use {@link BigdataSail#getReadOnlyConnection()} as a

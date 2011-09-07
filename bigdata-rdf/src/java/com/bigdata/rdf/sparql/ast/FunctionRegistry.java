@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.FN;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
@@ -138,11 +139,13 @@ public class FunctionRegistry {
 
     public static final URI STR_DT = new URIImpl(SPARQL_FUNCTIONS+"strdt");
     public static final URI STR_LANG = new URIImpl(SPARQL_FUNCTIONS+"strlang");
-    public static final URI LCASE = new URIImpl(SPARQL_FUNCTIONS+"lcase");
-    public static final URI UCASE = new URIImpl(SPARQL_FUNCTIONS+"ucase");
-    public static final URI ENCODE_FOR_URI = new URIImpl(SPARQL_FUNCTIONS+"encodeForUri");
-    public static final URI STR_LEN = new URIImpl(SPARQL_FUNCTIONS+"strlen");
-    public static final URI SUBSTR = new URIImpl(SPARQL_FUNCTIONS+"substr");
+    public static final URI LCASE = FN.LOWER_CASE;//new URIImpl(XPATH_FUNCTIONS+"lower-case");
+    public static final URI UCASE = FN.UPPER_CASE;//new URIImpl(XPATH_FUNCTIONS+"upper-case");
+    public static final URI ENCODE_FOR_URI = FN.ENCODE_FOR_URI;//new URIImpl(SPARQL_FUNCTIONS+"encodeForUri");
+    public static final URI STR_LEN = FN.STRING_LENGTH;//new URIImpl(XPATH_FUNCTIONS+"string-length");
+    public static final URI SUBSTR = FN.SUBSTRING;//new URIImpl(SPARQL_FUNCTIONS+"substr");
+    public static final URI STARTS_WITH = FN.STARTS_WITH; // FIXME implement 
+    public static final URI ENDS_WITH = FN.ENDS_WITH; // FIXME implement
 
     /**
      * FIXME Implement and register the IRI function, as defined in <a
@@ -188,11 +191,11 @@ public class FunctionRegistry {
     public static final URI MULTIPLY = new URIImpl(XPATH_FUNCTIONS+"numeric-multiply");
     public static final URI DIVIDE = new URIImpl(XPATH_FUNCTIONS+"numeric-divide");
 
-    public static final URI ABS= new URIImpl(SPARQL_FUNCTIONS+"numeric-abs");
-    public static final URI ROUND= new URIImpl(SPARQL_FUNCTIONS+"numeric-round");
-    public static final URI CEIL = new URIImpl(SPARQL_FUNCTIONS+"numeric-ceil");
-    public static final URI FLOOR = new URIImpl(SPARQL_FUNCTIONS+"numeric-floor");
-    public static final URI RAND = new URIImpl(SPARQL_FUNCTIONS+"numeric-rand");
+    public static final URI ABS   = FN.NUMERIC_ABS;//new URIImpl(XPATH_FUNCTIONS+"numeric-abs");
+    public static final URI ROUND = FN.NUMERIC_ROUND;//new URIImpl(SPARQL_FUNCTIONS+"numeric-round");
+    public static final URI CEIL  = FN.NUMERIC_CEIL;//new URIImpl(SPARQL_FUNCTIONS+"numeric-ceil");
+    public static final URI FLOOR = FN.NUMERIC_FLOOR;//new URIImpl(SPARQL_FUNCTIONS+"numeric-floor");
+    public static final URI RAND  = new URIImpl(SPARQL_FUNCTIONS+"numeric-rand");
 
     public static final URI AVERAGE = new URIImpl(SPARQL_FUNCTIONS+"average");
     public static final URI COUNT = new URIImpl(SPARQL_FUNCTIONS+"count");
@@ -472,10 +475,16 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(lex, args[0]);
-                final IValueExpression<? extends IV> start = AST2BOpUtility.toVE(lex, args[1]);
-                final IValueExpression<? extends IV> length = args.length>2?AST2BOpUtility.toVE(lex, args[2]):null;
-                return new SubstrBOp(var,start ,length,lex);
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                        lex, args[0]);
+
+                final IValueExpression<? extends IV> start = AST2BOpUtility
+                        .toVE(lex, args[1]);
+                
+                final IValueExpression<? extends IV> length = args.length >= 2 ? AST2BOpUtility
+                        .toVE(lex, args[2]) : null;
+                
+                return new SubstrBOp(var, start, length, lex);
 
             }
         });

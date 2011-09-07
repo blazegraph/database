@@ -55,11 +55,13 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("rdf relation rule support");
+        final TestSuite suite = new TestSuite("IV Constraints and Functions");
 
         // test suite for inline constraints: GT, LT, GTE, LTE
         suite.addTestSuite(TestInlineConstraints.class);
 
+        suite.addTestSuite(TestSubstrBOp.class);
+        
         return suite;
         
     }
