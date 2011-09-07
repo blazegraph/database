@@ -81,7 +81,8 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * We produce 10^^xsd:decimal while openrdf expects 10.0^^xsd:decimal.
+     * This is not a DAWG test. We produce 10^^xsd:decimal while openrdf expects
+     * 10.0^^xsd:decimal.
      */
     public void test_sparql11_sum_04() throws Exception {
 
