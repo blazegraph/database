@@ -125,8 +125,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
         private final String dataFileURL;
         private final String resultFileURL;
 
-        private final boolean laxCardinality = false;
-        private final boolean checkOrder = false;
+        private final boolean laxCardinality;
+        private final boolean checkOrder;
         
         private final String queryStr;
 
@@ -161,31 +161,43 @@ public class AbstractDataDrivenSPARQLTestCase extends
         public TestHelper(final String testURI, final String queryFileURL,
                 final String dataFileURL, final String resultFileURL)
                 throws Exception {
+            
+            this(testURI, queryFileURL, dataFileURL, resultFileURL,
+                    false/* laxCardinality */, false/* checkOrder */);
+            
+        }
+        
+        public TestHelper(final String testURI, final String queryFileURL,
+                final String dataFileURL, final String resultFileURL,
+                final boolean laxCardinality, final boolean checkOrder)
+                throws Exception {
 
             if (log.isInfoEnabled())
-                log.info("testURI:\n" + testURI);
+                log.info("\ntestURI:\n" + testURI);
 
             this.testURI = testURI;
             this.queryFileURL = queryFileURL;
             this.dataFileURL = dataFileURL;
             this.resultFileURL = resultFileURL;
+            this.laxCardinality = laxCardinality;
+            this.checkOrder = checkOrder;
 
             this.queryStr = getResourceAsString(queryFileURL);
 
             if (log.isInfoEnabled())
-                log.info("query:\n" + queryStr);
+                log.info("\nquery:\n" + queryStr);
 
             final long nparsed = loadData(dataFileURL);
 
             if (log.isInfoEnabled())
-                log.info("Loaded " + nparsed + " statements from "
+                log.info("\nLoaded " + nparsed + " statements from "
                         + dataFileURL);
 
             queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, null/* baseUri */);
 
             if (log.isInfoEnabled())
-                log.info("AST:\n" + queryRoot);
+                log.info("\nAST:\n" + queryRoot);
 
             this.context = new AST2BOpContext(queryRoot, store);
 
@@ -197,12 +209,12 @@ public class AbstractDataDrivenSPARQLTestCase extends
                     .optimize(context, queryRoot, null/* bindingSet[] */);
 
             if (log.isInfoEnabled())
-                log.info("optimizedQuery:\n" + optimizedQuery);
+                log.info("\noptimizedQuery:\n" + optimizedQuery);
 
             queryPlan = AST2BOpUtility.convert(context);
 
             if (log.isInfoEnabled())
-                log.info("queryPlan:\n" + queryPlan);
+                log.info("\nqueryPlan:\n" + queryPlan);
 
         }
 
@@ -428,34 +440,36 @@ public class AbstractDataDrivenSPARQLTestCase extends
             }
 
             if (!resultsEqual) {
+
+                // Note: code block shows the expected and actual results.
+                if (!resultsEqual && true) {
+                    queryResultTable.beforeFirst();
+                    expectedResultTable.beforeFirst();
+                    final StringBuilder message = new StringBuilder(2048);
+                    message.append("\n============ ");
+                    message.append(getName());
+                    message.append(" =======================\n");
+                    message.append("Expected result: \n");
+                    while (expectedResultTable.hasNext()) {
+                        message.append(expectedResultTable.next());
+                        message.append("\n");
+                    }
+                    message.append("=============");
+                    StringUtil.appendN('=', getName().length(), message);
+                    message.append("========================\n");
+                    message.append("Query result: \n");
+                    while (queryResultTable.hasNext()) {
+                        message.append(queryResultTable.next());
+                        message.append("\n");
+                    }
+                    message.append("=============");
+                    StringUtil.appendN('=', getName().length(), message);
+                    message.append("========================\n");
+                    log.error(message);
+                }
+
                 queryResultTable.beforeFirst();
                 expectedResultTable.beforeFirst();
-
-// Note: code block shows the expected and actual results.
-//                
-//                if(false) {
-//                    StringBuilder message = new StringBuilder(2048);
-//                    message.append("\n============ ");
-//                    message.append(getName());
-//                    message.append(" =======================\n");
-//                    message.append("Expected result: \n");
-//                    while (expectedResultTable.hasNext()) {
-//                        message.append(expectedResultTable.next());
-//                        message.append("\n");
-//                    }
-//                    message.append("=============");
-//                    StringUtil.appendN('=', getName().length(), message);
-//                    message.append("========================\n");
-//                    message.append("Query result: \n");
-//                    while (queryResultTable.hasNext()) {
-//                        message.append(queryResultTable.next());
-//                        message.append("\n");
-//                    }
-//                    message.append("=============");
-//                    StringUtil.appendN('=', getName().length(), message);
-//                    message.append("========================\n");
-//                    System.err.println(message);
-//                }
 
                 final List<BindingSet> queryBindings = Iterations.asList(queryResultTable);
                 final List<BindingSet> expectedBindings = Iterations.asList(expectedResultTable);

@@ -300,7 +300,7 @@ public class AST2BOpUtility {
   
             if (projection.isDistinct() || projection.isReduced()) {
 
-                left = addDistinct(left, projection.getProjectionVars(), ctx);
+                left = addDistinct(left, query, ctx);
 
             }
 
@@ -1356,10 +1356,22 @@ public class AST2BOpUtility {
      * streamed back to the controller will still be distinct.)
      */
     private static final PipelineOp addDistinct(PipelineOp left,
-            final IVariable<?>[] vars, final AST2BOpContext ctx) {
-		
+            final QueryBase query, final AST2BOpContext ctx) {
+
 		final int bopId = ctx.nextId();
 		
+        final ProjectionNode projection = query.getProjection();
+
+        /*
+         * TODO This will find variables within subqueries as well. Those
+         * variables are not really in scope. We should have a modified
+         * getSpannedVariables() method which handles this (or maybe just modify
+         * the version we already have to be scope aware).
+         */
+        final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
+                .toArray(BOpUtility.getSpannedVariables((BOp) query
+                        .getWhereClause())) : projection.getProjectionVars();
+
 		final PipelineOp op;
 		if(ctx.nativeDistinct) {
 		    /*
@@ -1429,12 +1441,6 @@ public class AST2BOpUtility {
 
         final IConstraint[] havingExprs = having == null ? null
                 : having.getConstraints();
-
-//        System.err.println(""+groupBy);
-//        System.err.println(BOpUtility.toString(groupByExprs[0]));
-//        System.err.println(""+having);
-//        System.err.println(""+projection);
-//        System.err.println(BOpUtility.toString(projectExprs[0]));
 
         final IGroupByState groupByState = new GroupByState(projectExprs,
                 groupByExprs, havingExprs);
@@ -1510,7 +1516,7 @@ public class AST2BOpUtility {
 
         left = addMaterializationSteps(left, bopId, vars, ctx);
 
-        if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
+        if (false&&!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
 
             /*
              * Extremely efficient pipelined aggregation operator.

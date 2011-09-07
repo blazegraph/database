@@ -70,8 +70,8 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
  * @version $Id$
  */
 public class BigdataSparqlTest 
-extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
-//extends SPARQLASTQueryTest // Bigdata native AST based evaluation
+//extends SPARQLQueryTest // Sesame TupleExpr based evaluation 
+extends SPARQLASTQueryTest // Bigdata native AST based evaluation
 {
 
     static private final Logger log = Logger.getLogger(BigdataSparqlTest.class);

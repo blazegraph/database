@@ -297,7 +297,14 @@ abstract public class QueryBase extends QueryNodeBase {
         final HavingNode having = getHaving();
         final OrderByNode orderBy = getOrderBy();
         final SliceNode slice = getSlice();
-        
+
+        if (getQueryType() != null) {
+
+            sb.append("\n").append(s).append("QueryType: ")
+                    .append(getQueryType().toString());
+
+        }
+
         if (construct != null && !construct.isEmpty()) {
 
             sb.append(construct.toString(indent));
@@ -318,7 +325,7 @@ abstract public class QueryBase extends QueryNodeBase {
 //
 //            sb.append("where\n");
 
-            sb.append(whereClause.toString(indent));
+            sb.append(whereClause.toString(indent + 1));
 
         }
 

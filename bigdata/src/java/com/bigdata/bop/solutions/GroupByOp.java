@@ -29,7 +29,10 @@ package com.bigdata.bop.solutions;
 
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.aggregate.IAggregate;
 
@@ -100,5 +103,21 @@ abstract public class GroupByOp extends PipelineOp {
      * operations which would violate either of these constraints.
      */
     abstract public boolean isPipelinedAggregationOp();
-    
+
+    /**
+     * Logs the type error.
+     * 
+     * @param log
+     * @param t
+     * @param expr
+     */
+    static protected void handleTypeError(final Logger log, final Throwable t,
+            final IValueExpression<?> expr) {
+
+        if (log.isInfoEnabled())
+            log.info("Will not bind solution for aggregate due to error: expr="
+                    + expr + ", cause=" + t);
+
+    }
+
 }
