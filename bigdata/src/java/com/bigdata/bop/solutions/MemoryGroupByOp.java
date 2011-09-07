@@ -632,19 +632,20 @@ public class MemoryGroupByOp extends GroupByOp {
             // Evaluate SELECT expressions.
             for (IValueExpression<?> expr : rewrite.getSelect2()) {
 
-                /*
-                 * Note: This is a hack turning an IllegalArgumentException
-                 * which we presume is coming out of new Constant(null) into an
-                 * (implicit) SPARQL type error so we can drop the binding for
-                 * this SELECT expression. (Note that we are not trying to drop
-                 * the entire group!)
-                 */
                 try {
                     expr.get(aggregates);
+                } catch (SparqlTypeErrorException ex) {
+                    handleTypeError(log, ex, expr);
+                    continue;
                 } catch (IllegalArgumentException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("will not bind solution for aggregate due to error: expr="
-                                + expr + ", cause=" + ex);
+                    /*
+                     * Note: This is a hack turning an IllegalArgumentException
+                     * which we presume is coming out of new Constant(null) into
+                     * an (implicit) SPARQL type error so we can drop the
+                     * binding for this SELECT expression. (Note that we are not
+                     * trying to drop the entire group!)
+                     */
+                    handleTypeError(log, ex, expr);
                     continue;
                 }
 

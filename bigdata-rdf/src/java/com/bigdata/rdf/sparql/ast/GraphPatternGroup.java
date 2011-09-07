@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 /**
+ * Join group or union.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class GraphPatternGroup<E extends IGroupMemberNode> extends
+abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
         GroupNodeBase<E> {
 
     /**

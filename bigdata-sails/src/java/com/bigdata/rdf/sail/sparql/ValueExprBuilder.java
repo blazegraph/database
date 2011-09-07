@@ -881,31 +881,22 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     @Override
     final public AssignmentNode visit(final ASTGroupCondition node, Object data)
             throws VisitorException {
-        
+
+        // The first value-expression.
         final IValueExpressionNode ve = (IValueExpressionNode) node.jjtGetChild(0)
                 .jjtAccept(this, data);
 
         if (node.jjtGetNumChildren() == 2) {
 
             /*
-             * For some reason, the grammar appears to have removed the "AS"
-             * leaving us with just [var, expr] rather than [var, AS, expr] or
-             * [AS(var,expr)] (the latter would be my preference).
+             * If there are two value expressions, then BIND(ve,ve2).
              */
-            
-            final IValueExpressionNode ve2 = (IValueExpressionNode) node
+            final IValueExpressionNode asVar = (IValueExpressionNode) node
                     .jjtGetChild(1).jjtAccept(this, data);
 
-            return new AssignmentNode((VarNode) ve, ve2);
+            return new AssignmentNode((VarNode) asVar, ve);
 
         }
-
-//        if (ve instanceof AssignmentNode) {
-//
-//            // Already an assignment.
-//            return (AssignmentNode) ve;
-//
-//        }
 
         if (ve instanceof VarNode) {
 
@@ -916,37 +907,6 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         // Wrap with assignment to an anonymous variable.
         return new AssignmentNode(context.createAnonVar("-groupBy-"), ve);
-
-//        TupleExpr arg = group.getArg();
-//
-//        Extension extension = null;
-//        if (arg instanceof Extension) {
-//            extension = (Extension) arg;
-//        } else {
-//            extension = new Extension();
-//        }
-//
-//        String name = null;
-//        ValueExpr ve = (ValueExpr) node.jjtGetChild(0).jjtAccept(this, data);
-//        if (ve instanceof Var) {
-//            name = ((Var) ve).getName();
-//        } else {
-//            if (node.jjtGetNumChildren() > 1) {
-//                Var v = (Var) node.jjtGetChild(1).jjtAccept(this, data);
-//                name = v.getName();
-//            } else {
-//                // create an alias on the spot
-//                name = createConstVar(null).getName();
-//            }
-//
-//            ExtensionElem elem = new ExtensionElem(ve, name);
-//            extension.addElement(elem);
-//        }
-//
-//        if (extension.getElements().size() > 0 && !(arg instanceof Extension)) {
-//            extension.setArg(arg);
-//            group.setArg(extension);
-//        }
 
     }
     

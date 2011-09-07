@@ -40,9 +40,11 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase {
     @Override
     public String toString(final int indent) {
 
-        final StringBuilder sb = new StringBuilder(indent(indent));
+        final StringBuilder sb = new StringBuilder();
 
-        sb.append("filter(").append(getValueExpressionNode()).append(")");
+        sb.append("\n");
+        sb.append(indent(indent));
+        sb.append("FILTER( ").append(getValueExpressionNode()).append(" )");
 
         return sb.toString();
 

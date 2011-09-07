@@ -53,8 +53,17 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
      * modeled as an ASK sub-query which projects an anonymous variable and a
      * simple test of the truth state of that anonymous variable.
      */
-    public void test_exists() {
-        fail("write test");
+    public void test_exists_1() throws Exception {
+
+        new TestHelper(
+                "exists-1", // testURI,
+                "exists-1.rq",// queryFileURL
+                "exists-1.trig",// dataFileURL
+                "exists-1.srx" // resultFileURL,
+//                false, // laxCardinality
+//                true // checkOrder
+                ).runTest();
+        
     }
 
     public void test_sparql_subselect() throws Exception {
