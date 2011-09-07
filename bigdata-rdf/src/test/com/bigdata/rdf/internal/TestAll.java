@@ -126,6 +126,9 @@ public class TestAll extends TestCase {
          */
         // suite.addTestSuite(TestLongLiterals.class);
 
+        // xpath abs(), ceil(), floor(), and round()
+        suite.addTestSuite(TestXPathFunctions.class);
+        
         return suite;
         
     }

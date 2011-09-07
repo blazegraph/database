@@ -35,6 +35,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -663,6 +664,247 @@ public class TestTriplePatternBuilder extends
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new VarNode("p2"), new VarNode("o3"), null/* c */,
                     Scope.DEFAULT_CONTEXTS));
+        
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * <pre>
+     * PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>
+     * PREFIX  : <http://example.org/ns#>
+     * SELECT ?p { :x ?p (1) . }
+     * ===================================
+     * QueryRoot
+     *    Projection
+     *       ProjectionElemList
+     *          ProjectionElem "p"
+     *       Join
+     *          Join
+     *             StatementPattern
+     *                Var (name=-anon-1, anonymous)
+     *                Var (name=-const-2, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#first, anonymous)
+     *                Var (name=-const-1, value="1"^^<http://www.w3.org/2001/XMLSchema#integer>, anonymous)
+     *             StatementPattern
+     *                Var (name=-anon-1, anonymous)
+     *                Var (name=-const-4, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#rest, anonymous)
+     *                Var (name=-const-3, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#nil, anonymous)
+     *          StatementPattern
+     *             Var (name=-const-5, value=http://example.org/ns#x, anonymous)
+     *             Var (name=p)
+     *             Var (name=-anon-1, anonymous)
+     * </pre>
+     * 
+     * FIXME Update the expected answer for this test.
+     */
+    public void test_basic_list02() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" +
+        		"PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>\n"+
+        		"PREFIX  : <http://example.org/ns#>\n"+
+        		"SELECT ?p { :x ?p (1) . }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("xsd", XSD.NAMESPACE);
+                prefixDecls.put("", "http://example.org/ns#");
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p"), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o2"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o3"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+            }
+        
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * <pre>
+     * PREFIX : <http://example.org/ns#>
+     * 
+     * SELECT ?p ?v { :x ?p (?v) . }
+     * ===================================
+     * QueryRoot
+     *    Projection
+     *       ProjectionElemList
+     *          ProjectionElem "p"
+     *          ProjectionElem "v"
+     *       Join
+     *          Join
+     *             StatementPattern
+     *                Var (name=-anon-1, anonymous)
+     *                Var (name=-const-1, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#first, anonymous)
+     *                Var (name=v)
+     *             StatementPattern
+     *                Var (name=-anon-1, anonymous)
+     *                Var (name=-const-3, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#rest, anonymous)
+     *                Var (name=-const-2, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#nil, anonymous)
+     *          StatementPattern
+     *             Var (name=-const-4, value=http://example.org/ns#x, anonymous)
+     *             Var (name=p)
+     *             Var (name=-anon-1, anonymous)
+     * </pre>
+     * FIXME Update the expected answer for this test.
+     */
+    public void test_basic_list03() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "PREFIX  : <http://example.org/ns#>\n"+
+                "SELECT ?p ?v { :x ?p (?v) . }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("", "http://example.org/ns#");
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.addProjectionVar(new VarNode("p"));
+                projection.addProjectionVar(new VarNode("v"));
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p"), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o2"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o3"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+            }
+        
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
+    /**
+     * <pre>
+     * PREFIX : <http://example.org/ns#>
+     * 
+     * SELECT ?p ?v ?w { :x ?p (?v ?w) . }
+     * ===================================
+     * QueryRoot
+     *    Projection
+     *       ProjectionElemList
+     *          ProjectionElem "p"
+     *          ProjectionElem "v"
+     *          ProjectionElem "w"
+     *       Join
+     *          Join
+     *             Join
+     *                Join
+     *                   StatementPattern
+     *                      Var (name=-anon-1, anonymous)
+     *                      Var (name=-const-1, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#first, anonymous)
+     *                      Var (name=v)
+     *                   StatementPattern
+     *                      Var (name=-anon-1, anonymous)
+     *                      Var (name=-const-2, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#rest, anonymous)
+     *                      Var (name=-anon-1-1, anonymous)
+     *                StatementPattern
+     *                   Var (name=-anon-1-1, anonymous)
+     *                   Var (name=-const-3, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#first, anonymous)
+     *                   Var (name=w)
+     *             StatementPattern
+     *                Var (name=-anon-1-1, anonymous)
+     *                Var (name=-const-5, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#rest, anonymous)
+     *                Var (name=-const-4, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#nil, anonymous)
+     *          StatementPattern
+     *             Var (name=-const-6, value=http://example.org/ns#x, anonymous)
+     *             Var (name=p)
+     *             Var (name=-anon-1, anonymous)
+     * </pre>
+     * 
+     * FIXME Update the expected answer for this test.
+     */
+    public void test_basic_list04() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" +
+                "PREFIX  : <http://example.org/ns#>\n"+
+                "SELECT ?p ?v ?w { :x ?p (?v ?w) . }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("", "http://example.org/ns#");
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.addProjectionVar(new VarNode("p"));
+                projection.addProjectionVar(new VarNode("v"));
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p"), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o2"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                        new VarNode("p2"), new VarNode("o3"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+            }
         
         }
 
