@@ -143,17 +143,53 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         // visit the children of the node (default behavior).
         final Object ret = super.visit(node, null);
-        GroupNodeBase<?> ret2 = null; 
+        final GroupNodeBase<?> ret2; 
 
         if (ret instanceof SubqueryRoot) {
 
             final SubqueryRoot subqueryRoot = (SubqueryRoot) ret;
 
-            final JoinGroupNode joinGroup = new JoinGroupNode();
+            if (node.jjtGetParent() instanceof ASTWhereClause) {
+                
+                /**
+                 * SubSelect as the WHERE clause. In this case the outer graph
+                 * pattern group is a JoinGroupNode the SubSelect is embedded
+                 * within an inner JoinGroupNode.
+                 * 
+                 * <pre>
+                 * SELECT * { SELECT * { ?s ?p ?o } }
+                 * </pre>
+                 */
+                final JoinGroupNode joinGroup = new JoinGroupNode();
 
-            joinGroup.addChild(subqueryRoot);
+                graphPattern = new GroupGraphPattern(parentGP);
+                graphPattern.add(new JoinGroupNode(subqueryRoot));
+                
+                @SuppressWarnings("rawtypes")
+                final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
 
-            parentGP.add(joinGroup);
+                ret2 = group;
+
+            } else {
+
+                /**
+                 * SubSelect embedded under the WHERE clause within its own
+                 * graph pattern group by the { SELECT ... } syntax. For example
+                 * 
+                 * <pre>
+                 * SELECT ?s { ?s ?x ?o . {SELECT ?x where {?x ?p ?x}}}
+                 * </pre>
+                 */
+                
+                final JoinGroupNode joinGroup = new JoinGroupNode();
+
+                joinGroup.addChild(subqueryRoot);
+
+                parentGP.add(joinGroup);
+                
+                ret2 = null;
+                
+            }
 
         } else {
             

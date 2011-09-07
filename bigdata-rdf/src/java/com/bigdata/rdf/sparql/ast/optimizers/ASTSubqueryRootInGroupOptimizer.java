@@ -61,6 +61,12 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
         final IGroupNode<IGroupMemberNode> whereClause = queryRoot
                 .getWhereClause();
 
+        if (whereClause == null) {
+
+            throw new RuntimeException("Missing where clause? : " + queryNode);
+
+        }
+
         rewrite((GroupNodeBase<IGroupMemberNode>) whereClause);
 
         return queryRoot;
@@ -71,13 +77,14 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
      * @param p
      *            The parent.
      */
+    @SuppressWarnings("unchecked")
     private void rewrite(final GroupNodeBase<IGroupMemberNode> p) {
 
         final int arity = p.size();
 
         for (int i = 0; i < arity; i++) {
 
-            final IGroupMemberNode child = (IGroupMemberNode) (p).get(i);
+            final IGroupMemberNode child = (IGroupMemberNode) p.get(i);
 
             if (child instanceof JoinGroupNode) {
 
@@ -91,6 +98,13 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
                     
                 }
                 
+            }
+
+            if(child instanceof GroupNodeBase<?>) {
+
+                // Recursion
+                rewrite((GroupNodeBase<IGroupMemberNode>) child);
+
             }
             
         }

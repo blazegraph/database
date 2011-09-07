@@ -47,7 +47,8 @@ public class ExistsNode extends SubqueryFunctionNodeBase {
      * @param graphPattern
      *            The inner value of the EXISTS function.
      */
-    public ExistsNode(final VarNode anonvar, final GroupNodeBase<?> graphPattern) {
+    public ExistsNode(final VarNode anonvar,
+            final GroupNodeBase<IGroupMemberNode> graphPattern) {
 
         super(FunctionRegistry.EXISTS, anonvar, graphPattern );
 

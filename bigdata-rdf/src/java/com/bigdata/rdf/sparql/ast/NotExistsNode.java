@@ -46,7 +46,8 @@ public class NotExistsNode extends SubqueryFunctionNodeBase {
      * @param graphPattern
      *            The inner value of the NOT EXISTS function.
      */
-    public NotExistsNode(final VarNode anonvar, final GroupNodeBase<?> graphPattern) {
+    public NotExistsNode(final VarNode anonvar,
+            final GroupNodeBase<IGroupMemberNode> graphPattern) {
 
         super(FunctionRegistry.NOT_EXISTS, anonvar, graphPattern);
 

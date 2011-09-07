@@ -37,7 +37,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.FN;
 import org.openrdf.query.parser.sparql.ast.ASTAbs;
@@ -134,7 +133,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  */
 public class ValueExprBuilder extends BigdataASTVisitorBase {
 
-    private static final Logger log = Logger.getLogger(ValueExprBuilder.class);
+//    private static final Logger log = Logger.getLogger(ValueExprBuilder.class);
 
     /**
      * Used to manage collection and nesting of graph patterns. This is mostly

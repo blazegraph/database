@@ -14,14 +14,6 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase {
      */
     private static final long serialVersionUID = 1L;
 
-//	private final IValueExpressionNode ve;
-	
-//	private final Set<IVariable<?>> consumedVars;
-//	
-//	private final INeedsMaterialization.Requirement materializationRequirement;
-//	
-//	private final Set<IVariable<IV>> varsToMaterialize;
-
     /**
      * 
      * @param ve
@@ -45,18 +37,6 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase {
         
 	}
 
-//	public Set<IVariable<?>> getConsumedVars() {
-//		return consumedVars;
-//	}
-	
-//	public INeedsMaterialization.Requirement getRequirement() {
-//		return materializationRequirement;
-//	}
-//	
-//	public Set<IVariable<IV>> getVarsToMaterialize() {
-//		return varsToMaterialize;
-//	}
-
     @Override
     public String toString(final int indent) {
 
@@ -67,23 +47,5 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase {
         return sb.toString();
 
     }
-
-//    @Override
-//    public boolean equals(Object o) {
-//
-//        if (this == o)
-//            return true;
-//
-//        if (!(o instanceof FilterNode))
-//            return false;
-//
-//        final FilterNode t = (FilterNode) o;
-//
-//        if (!ve.equals(t.ve))
-//            return false;
-//
-//        return true;
-//
-//    }
 
 }

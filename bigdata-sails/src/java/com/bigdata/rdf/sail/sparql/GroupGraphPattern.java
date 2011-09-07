@@ -40,10 +40,8 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
-import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 
 /**
@@ -179,26 +177,7 @@ class GroupGraphPattern {
 
         for (IGroupMemberNode child : children) {
          
-            if (groupNode instanceof UnionNode
-                    && !(child instanceof JoinGroupNode)) {
-
-                /*
-                 * A UnionNode only permits a JoinGraph as its children. If we
-                 * see anything else, then it needs to be wrapped up in a
-                 * JoinGraph before we add it to the UnionNode.
-                 */
-                
-                final JoinGroupNode group = new JoinGroupNode();
-                
-                group.addChild(child);
-                
-                groupNode.addChild(group);
-                
-            } else {
-
                 groupNode.addChild(child);
-                
-            }
             
         }
 

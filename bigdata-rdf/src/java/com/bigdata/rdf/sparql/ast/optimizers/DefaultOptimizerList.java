@@ -207,6 +207,13 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ConstructOptimizer());
 
         /**
+         * Rewrites the group graph pattern annotation of an {@link ExistsNode}
+         * or a {@link NotExistsNode} into an ASK subquery in the containing
+         * join group.
+         */
+        add(new ASTExistsOptimizer());
+        
+        /**
          * If a {@link SubqueryRoot} appears in an otherwise empty (and
          * non-optional) {@link JoinGroupNode}, then the join group is replaced
          * by the {@link SubqueryRoot}.
