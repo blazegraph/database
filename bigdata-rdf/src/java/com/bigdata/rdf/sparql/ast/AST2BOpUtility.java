@@ -152,7 +152,7 @@ public class AST2BOpUtility {
         final QueryRoot optimizedQuery = ctx.optimizedQuery;
         
         // The executable query plan.
-        final PipelineOp queryPlan = convert(optimizedQuery, ctx);
+        PipelineOp queryPlan = convert(optimizedQuery, ctx);
 
         /*
          * Set the queryId on the top-level of the query plan.
@@ -162,8 +162,29 @@ public class AST2BOpUtility {
          * main query.
          */
 
-        return (PipelineOp) queryPlan.setProperty(
+        queryPlan = (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
+
+        /*
+         * Set a timeout on the query.
+         * 
+         * TODO Could be done for subqueries too.
+         */
+        {
+
+            final Number timeout = (Long) optimizedQuery
+                    .getProperty(BOp.Annotations.TIMEOUT);
+
+            if (timeout != null && timeout.longValue() > 0) {
+
+                queryPlan.setProperty(BOp.Annotations.TIMEOUT,
+                        timeout.longValue());
+
+            }
+            
+        }
+
+        return queryPlan;
 
     }
     
@@ -1516,7 +1537,7 @@ public class AST2BOpUtility {
 
         left = addMaterializationSteps(left, bopId, vars, ctx);
 
-        if (false&&!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
+        if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
 
             /*
              * Extremely efficient pipelined aggregation operator.

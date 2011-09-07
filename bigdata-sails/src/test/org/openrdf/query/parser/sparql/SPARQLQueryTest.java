@@ -355,10 +355,14 @@ public abstract class SPARQLQueryTest extends TestCase {
                 if (dataset != null) {
                     query.setDataset(dataset);
                 }
-                TupleExpr tupleExpr = ((BigdataSailQuery) query).getTupleExpr();
                 message.append(queryString.trim());
                 message.append("\n===================================\n");
-                message.append(tupleExpr);
+                final TupleExpr tupleExpr = ((BigdataSailQuery) query).getTupleExpr();
+                if(tupleExpr != null) {
+                    message.append(tupleExpr);
+                } else {
+                    message.append(((BigdataSailQuery) query).getQueryRoot());
+                }
                 
                 message.append("\n===================================\n");
                 message.append("database dump:\n");
