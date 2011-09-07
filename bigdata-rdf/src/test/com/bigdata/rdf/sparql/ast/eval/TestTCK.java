@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.bop.IConstraint;
+import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
+import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
+
 /**
  * Test driver for debugging Sesame or DAWG manifest tests.
  * 
@@ -157,7 +161,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Nested Optionals - 1
+     * <code>Nested Optionals - 1</code>. Classic badly designed left join.
      */
     public void test_two_nested_opt() throws Exception {
 
@@ -181,6 +185,22 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 //
 //    }
 
+    /**
+     * This was handled historically by
+     * 
+     * <pre>
+     * 
+     * If the scope binding names are empty we can definitely
+     * always fail the filter (since the filter's variables
+     * cannot be bound).
+     * 
+     *                 if (filter.getBindingNames().isEmpty()) {
+     *                     final IConstraint bop = new SPARQLConstraint(SparqlTypeErrorBOp.INSTANCE);
+     *                     sop.setBOp(bop);
+     * </pre>
+     * 
+     * @throws Exception
+     */
     public void test_filter_nested_2() throws Exception {
 
         new TestHelper(
@@ -192,6 +212,9 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * This will be fixed by the same issue as {@link #test_filter_nested_2()}.
+     */
     public void test_filter_scope_1() throws Exception {
 
         new TestHelper(
@@ -203,6 +226,9 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Classic badly designed left join.
+     */
     public void test_var_scope_join_1() throws Exception {
 
         new TestHelper(
