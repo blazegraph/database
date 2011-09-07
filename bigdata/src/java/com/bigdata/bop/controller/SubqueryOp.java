@@ -37,6 +37,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
@@ -45,6 +46,9 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -105,6 +109,18 @@ public class SubqueryOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends SubqueryJoinAnnotations {
+
+        /**
+         * When non-<code>null</code>, the {@link IVariable} which will be bound
+         * to <code>true</code> iff there is at least one solution for the
+         * subquery. When specified, {@link #SELECT} SHOULD be <code>null</code>
+         * in order to project all bindings from the parent's context into the
+         * subquery. However, bindings in the subquery WILL NOT be projected
+         * back into the parent.
+         * <p>
+         * Note: This supports EXISTS and NOT EXISTS semantics.
+         */
+        String ASK_VAR = Annotations.class.getName() + ".askVar";
 
         /**
          * The {@link IVariable}[] projected by the subquery (optional).
@@ -204,6 +220,8 @@ public class SubqueryOp extends PipelineOp {
         private final boolean aggregate;
         /** The subquery which is evaluated for each input binding set. */
         private final PipelineOp subquery;
+        /** Bound to true or false depending on whether or not there are solutions for the subquery (optional). */
+        private final IVariable<?> askVar;
         /** The projected variables (<code>select *</code>) if missing. */
         private final IVariable<?>[] selectVars;
         /** The optional constraints on the join. */
@@ -231,6 +249,9 @@ public class SubqueryOp extends PipelineOp {
             this.subquery = (PipelineOp) controllerOp
                     .getRequiredProperty(Annotations.SUBQUERY);
             
+            this.askVar = (IVariable<?>) controllerOp
+                    .getProperty(Annotations.ASK_VAR);
+
             this.selectVars = (IVariable<?>[]) controllerOp
                     .getProperty(Annotations.SELECT);
 
@@ -378,17 +399,45 @@ public class SubqueryOp extends PipelineOp {
 						
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
-						
-						// Copy solutions from the subquery to the query.
-						ncopied = BOpUtility.copy(//
-                                subquerySolutionItr,// subquery solutions.
-                                parentContext.getSink(), //
-                                null, // sink2
-                                parentSolutionIn,// original bindings from parent query.
-                                selectVars, // variables projected by subquery.
-                                constraints, //
-                                parentContext.getStats()//
-                                );
+
+                        if (askVar != null) {
+                            
+                            /*
+                             * For an ASK style subquery, we are only interested
+                             * in whether or not at least one solution exists.
+                             */
+                            
+                            final IV<BigdataLiteral, Boolean> success = subquerySolutionItr
+                                    .hasNext() ? XSDBooleanIV.TRUE
+                                    : XSDBooleanIV.FALSE;
+                            
+                            parentSolutionIn.set(askVar,
+                                    new Constant<IV<BigdataLiteral, Boolean>>(
+                                            success));
+                            
+                            parentContext.getSink().add(
+                                    new IBindingSet[] { parentSolutionIn });
+                            
+                            // halt the subquery.
+                            runningSubquery.cancel(true/*mayInterruptIfRunning*/);
+                            
+                            ncopied = 1;
+
+                        } else {
+
+                            // Copy solutions from the subquery to the query.
+                            ncopied = BOpUtility.copy(//
+                                    subquerySolutionItr,// subquery solutions.
+                                    parentContext.getSink(), //
+                                    null, // sink2
+                                    parentSolutionIn,// original bindings from
+                                                     // parent query.
+                                    selectVars, // variables projected by
+                                                // subquery.
+                                    constraints, //
+                                    parentContext.getStats()//
+                                    );
+                        }
 
 						// wait for the subquery to halt / test for errors.
 						runningSubquery.get();

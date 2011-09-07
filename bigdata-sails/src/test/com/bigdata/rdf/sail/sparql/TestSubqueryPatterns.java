@@ -157,7 +157,7 @@ public class TestSubqueryPatterns extends
             TokenMgrError, ParseException {
 
         final String sparql = "select ?s " //
-                + "where {"//
+                + "{"//
                 + " ?s ?x ?o "
                 + " {"//
                 + "   select ?x where { ?x ?p ?x }" //
@@ -221,6 +221,64 @@ public class TestSubqueryPatterns extends
 
     }
 
+    /**
+     * <pre>
+     * SELECT * { SELECT * { ?s ?p ?o } }
+     * </pre>
+     */
+    public void test_select_star_select_star_s_p_o()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "select * { select * { ?s ?p ?o } }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final SubqueryRoot subSelect;
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("*"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+//                whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+//                        new VarNode("x"), new VarNode("o"), null/* c */,
+//                        StatementPattern.Scope.DEFAULT_CONTEXTS));
+
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode(subSelect);
+                whereClause.addChild(wrapperGroup);
+            }
+            {
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(new VarNode("*"));
+                subSelect.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                subSelect.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+    
     /**
      * Unit test for simple subquery joined with a bind.
      * 

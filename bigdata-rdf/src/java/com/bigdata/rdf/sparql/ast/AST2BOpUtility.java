@@ -488,33 +488,77 @@ public class AST2BOpUtility {
      * translated into named subqueries with an include by a query optimizer
      * step. When a subquery is rewritten like this is will no longer appear as
      * a {@link SubqueryRoot} node in the AST.
+     * <p>
+     * Note: This also handles ASK subqueries, which are automatically created
+     * for {@link ExistsNode} and {@link NotExistsNode}.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
 
-        final ProjectionNode projection = subquery.getProjection();
-        
-        final IVariable<?>[] vars = projection.getProjectionVars();
+        final boolean aggregate = isAggregate(subquery);
         
         final PipelineOp subqueryPlan = convert(subquery, ctx);
 
-        final boolean aggregate = isAggregate(subquery);
-        
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subquery + "\nplan=" + subqueryPlan);
 
-        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                new NV(SubqueryOp.Annotations.OPTIONAL, false),//
-                new NV(SubqueryOp.Annotations.SELECT, vars),//
-                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
-                );
+        switch (subquery.getQueryType()) {
+        case ASK: {
+            
+            /*
+             * The projection should have just one variable, which is the
+             * variable that will be bound to true if there is a solution to the
+             * subquery and to false if there is no solution to the subquery.
+             */
+
+            final ProjectionNode projection = subquery.getProjection();
+
+            if (projection == null)
+                throw new RuntimeException("No projection for ASK subquery.");
+
+            final IVariable<?>[] vars = projection.getProjectionVars();
+
+            if (vars == null || vars.length != 1)
+                throw new RuntimeException(
+                        "Expecting ONE (1) projected variable for ASK subquery.");
+
+            final IVariable<?> askVar = vars[0];
+            
+            left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                    new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+                    new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
+                    new NV(SubqueryOp.Annotations.SELECT, null),//
+                    new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+            );
+            break;
+        }
+        case SELECT: {
+
+            final ProjectionNode projection = subquery.getProjection();
+            
+            final IVariable<?>[] vars = projection.getProjectionVars();
+            
+            left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                    new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+                    new NV(SubqueryOp.Annotations.SELECT, vars),//
+                    new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+            );
+            
+            break;
+            
+        }
+        default:
+            throw new UnsupportedOperationException();
+        }
 
         return left;
-        
+
     }
 
     /**
@@ -849,22 +893,28 @@ public class AST2BOpUtility {
             /*
              * Add the joins (statement patterns) and the filters on those
              * joins.
+             * 
+             * Note: This winds up handling materialization steps as well.
+             * 
+             * TODO Materialization steps are currently handled via recursion
+             * into Rule2BOpUtility, but there is a FIXME for that.
              */
             left = addJoins(left, joinGroup, ctx);
 
             /*
              * Add SPARQL 1.1 style subqueries.
              */
-            for (IQueryNode child : joinGroup) {
-                if (child instanceof SubqueryRoot)
+            for (IGroupMemberNode child : joinGroup) {
+                if (child instanceof SubqueryRoot) {
                     left = addSparql11Subquery(left, (SubqueryRoot) child, ctx);
+                }
             }
 
             /*
              * Add joins against named solution sets from WITH AS INCLUDE style
              * subqueries.
              */
-            for (IQueryNode child : joinGroup) {
+            for (IGroupMemberNode child : joinGroup) {
                 if (child instanceof NamedSubqueryInclude)
                     left = addSubqueryInclude(left,
                             (NamedSubqueryInclude) child, ctx);
@@ -881,11 +931,11 @@ public class AST2BOpUtility {
         /*
          * Add the LET assignments to the pipeline.
          * 
-         * FIXME A LET/BIND for an expression should be run as soon as the
-         * variables for that expression are known bound. This is the same rule
-         * which is used for filters. Running them here could even cause
-         * incorrect evaluation depending on when assigned-to variable is being
-         * consumed.
+         * TODO Review as generated query plans: A LET/BIND for an expression
+         * should be run as soon as the variables for that expression are known
+         * bound. This is the same rule which is used for filters. Running them
+         * here could even cause incorrect evaluation depending on when
+         * assigned-to variable is being consumed.
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
 

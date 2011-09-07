@@ -60,10 +60,9 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
      * @param graphPattern
      *            The inner value of the EXISTS function.
      */
-    protected SubqueryFunctionNodeBase( 
-    		final URI functionURI, 
-    		final VarNode anonvar,
-            final GroupNodeBase graphPattern) {
+    protected SubqueryFunctionNodeBase(final URI functionURI,
+            final VarNode anonvar,
+            final GroupNodeBase<IGroupMemberNode> graphPattern) {
 
         super(functionURI, null/* scalarValues */,
                 new ValueExpressionNode[] { anonvar });
@@ -73,6 +72,26 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
         if (graphPattern == null)
             throw new IllegalArgumentException();
+
+        setGraphPattern(graphPattern);
+
+    }
+
+    /**
+     * Return the graph pattern associated with the subquery.
+     */
+    @SuppressWarnings("unchecked")
+    public GroupNodeBase<IGroupMemberNode> getGraphPattern() {
+
+        return (GroupNodeBase<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
+
+    }
+
+    /**
+     * Set the graph pattern associated with the subquery.
+     */
+    public void setGraphPattern(
+            final GroupNodeBase<IGroupMemberNode> graphPattern) {
 
         setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 
