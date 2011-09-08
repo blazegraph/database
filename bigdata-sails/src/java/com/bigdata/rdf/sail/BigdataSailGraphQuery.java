@@ -19,6 +19,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Extension;
@@ -47,10 +48,12 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -66,13 +69,61 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
      */
 	@Deprecated
     private final Properties queryHints;
+
+    /** Set when the query is evaluated. */
+    private volatile QueryRoot optimizedQuery;
     
     private final QueryRoot queryRoot;
-
+    
     public QueryRoot getQueryRoot() {
         
         return queryRoot;
         
+    }
+
+    @Override
+    public void setDataset(final Dataset dataset) {
+        
+        if(queryRoot == null) {
+            
+            super.setDataset(dataset);
+            
+        } else {
+
+            /*
+             * Batch resolve RDF Values to IVs and then set on the query model.
+             */
+            
+            try {
+                
+                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
+                
+                queryRoot.setDataset(new DatasetNode((Dataset) tmp[0]));
+                
+            } catch (SailException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+        
+    }
+    
+    @Override
+    public String toString() {
+
+        if (queryRoot == null)
+            return super.toString();
+
+        QueryRoot tmp = optimizedQuery;
+
+        if (tmp == null)
+            tmp = queryRoot;
+
+        return BOpUtility.toString2(tmp);
+
     }
 
     /**
@@ -289,7 +340,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
              * Run the query optimizer first so we have access to the rewritten
              * query plan.
              */
-            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
+            this.optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
                     .optimize(context, queryRoot, null/* bindingSet[] */);
 
             if (log.isInfoEnabled())

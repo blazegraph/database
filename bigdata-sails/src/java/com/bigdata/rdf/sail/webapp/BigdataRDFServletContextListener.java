@@ -119,6 +119,21 @@ public class BigdataRDFServletContextListener implements
 
         }
 
+        final boolean nativeSparql;
+        {
+
+            final String s = context.getInitParameter(ConfigParams.NATIVE_SPARQL);
+
+            if (s != null)
+                nativeSparql = Boolean.valueOf(s);
+            else
+                nativeSparql = ConfigParams.DEFAULT_NATIVE_SPARQL;
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.NATIVE_SPARQL + "=" + nativeSparql);
+
+        }
+
         final IIndexManager indexManager;
         if (context.getAttribute(IIndexManager.class.getName()) != null) {
 
@@ -275,9 +290,8 @@ public class BigdataRDFServletContextListener implements
 
         }
 
-        final SparqlEndpointConfig config = new SparqlEndpointConfig(
-                namespace,timestamp,queryThreadPoolSize
-                );
+        final SparqlEndpointConfig config = new SparqlEndpointConfig(namespace,
+                timestamp, queryThreadPoolSize, nativeSparql);
 
         rdfContext = new BigdataRDFContext(config, indexManager);
 

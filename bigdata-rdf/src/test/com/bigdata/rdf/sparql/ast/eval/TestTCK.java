@@ -199,6 +199,11 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      *                     sop.setBOp(bop);
      * </pre>
      * 
+     * We need to figure out the variables that are in scope when the filter is
+     * evaluated and then filter them out when running the group in which the
+     * filter exists (it runs as a subquery). If there are NO variables that are
+     * in scope, then just fail the filter per the code above.
+     * 
      * @throws Exception
      */
     public void test_filter_nested_2() throws Exception {

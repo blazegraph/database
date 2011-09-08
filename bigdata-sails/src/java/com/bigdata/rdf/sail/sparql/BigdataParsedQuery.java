@@ -27,11 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Properties;
+
 import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 
+import com.bigdata.rdf.sail.IBigdataParsedQuery;
+import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 
 /**
@@ -46,7 +50,8 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataParsedQuery extends ParsedQuery {
+public class BigdataParsedQuery extends ParsedQuery implements
+        IBigdataParsedQuery {
 
     final private QueryRoot queryRoot;
 
@@ -75,6 +80,16 @@ public class BigdataParsedQuery extends ParsedQuery {
 
     public QueryRoot getQueryRoot() {
         return queryRoot;
+    }
+
+    @Override
+    public QueryType getQueryType() {
+        return queryRoot.getQueryType();
+    }
+
+    @Override
+    public Properties getQueryHints() {
+        return queryRoot.getQueryHints();
     }
 
 }

@@ -268,7 +268,8 @@ public class StatusServlet extends BigdataRDFServlet {
 					final AbstractQueryTask queryTask = acceptedQuery.queryTask;
 					
 					queryStr = acceptedQuery.queryTask.queryStr;
-								
+
+					// TODO redundant if using native SPARQL evaluation.
 					current.node("h2", "SPARQL").node("p",
 							HTMLUtility.escapeForXHTML(queryTask.queryStr));
 
