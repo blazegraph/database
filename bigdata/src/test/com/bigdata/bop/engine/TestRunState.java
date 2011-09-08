@@ -252,7 +252,7 @@ public class TestRunState extends TestCase2 {
 
         assertEquals("queryId", expected.queryId, actual.queryId);
 
-        assertEquals("deadline", expected.deadline, actual.deadline);
+        assertEquals("deadline", expected.deadline.get(), actual.deadline.get());
 
         assertEquals("started", expected.started.get(), actual.started.get());
 
