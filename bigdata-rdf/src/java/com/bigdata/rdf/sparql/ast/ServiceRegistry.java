@@ -10,8 +10,8 @@ import com.bigdata.bop.aggregate.AggregateBase;
 
 /**
  * Registry for service calls
- *
-  */
+ * 
+ */
 public class ServiceRegistry {
 
     public interface Annotations extends AggregateBase.Annotations{
@@ -19,8 +19,10 @@ public class ServiceRegistry {
 
 	private static ConcurrentMap<URI, ServiceFactory> services = new ConcurrentHashMap<URI, ServiceFactory>();
 
-    public static boolean containsService(URI functionUri){
+    public static boolean containsService(final URI functionUri){
+        
         return services.containsKey(functionUri);
+        
     }
 
     public static final void add(final URI serviceURI, final ServiceFactory factory) {
@@ -37,7 +39,8 @@ public class ServiceRegistry {
 
         if (!services.containsKey(serviceURI)) {
 
-            throw new UnsupportedOperationException("ServiceURI:"+serviceURI+ " not present.");
+            throw new UnsupportedOperationException("ServiceURI:" + serviceURI
+                    + " not present.");
 
         }
 
@@ -48,15 +51,7 @@ public class ServiceRegistry {
         }
     }
 
-	public static interface ServiceFactory {
-
-		ServiceCall create(
-				final String lex,
-				final IGroupNode<IGroupMemberNode> groupNode);
-
-	}
-
-	 /**
+    /**
      * Convert a {@link FunctionNode} into an {@link IValueExpression}.
      *
      * @param lex
@@ -71,7 +66,7 @@ public class ServiceRegistry {
      *
      * @return The {@link IValueExpression}.
      */
-    public static final ServiceCall toServiceCall(
+    public static final BigdataServiceCall toServiceCall(
             final String lex, final URI serviceURI,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
@@ -96,4 +91,25 @@ public class ServiceRegistry {
         return f.create(lex, groupNode);
 
     }
+
+    /*
+     * Skeleton of a mock ServiceCall implementation.
+     */
+//    static ServiceCall matchCal = new ServiceCall() {
+//        @Override
+//        public IAsynchronousIterator<IBindingSet[]> call(
+//                IRunningQuery runningQueryx) {
+//            IBindingSet[] solutions = new IBindingSet[vals.size()];
+//            for (int i = 0; i < vals.size(); i++) {
+//                solutions[i] = new ListBindingSet(
+//                        new IVariable[] { (IVariable) subject },
+//                        new IConstant[] { vals.get(i) });
+//            }
+//            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedArrayIterator<IBindingSet>(
+//                    solutions);
+//            return new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
+//                    src3);
+//        }
+//    };
+
 }

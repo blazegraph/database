@@ -39,7 +39,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -148,7 +147,7 @@ public class HashJoinUtility {
      * @return The #of solutions that were buffered.
      */
     public static long acceptSolutions(
-            final IAsynchronousIterator<IBindingSet[]> itr,
+            final ICloseableIterator<IBindingSet[]> itr,
             final IVariable<?>[] joinVars, final BOpStats stats,
             final HTree htree,
             final boolean optional) {
