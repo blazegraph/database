@@ -458,7 +458,8 @@ public class ASTEvalHelper {
      * @throws SailException 
      */
     static private IAsynchronousIterator<IBindingSet[]> wrapSource(
-            final AbstractTripleStore store, final BindingSet bs) throws SailException {
+            final AbstractTripleStore store, final BindingSet bs)
+            throws SailException {
 
         final IAsynchronousIterator<IBindingSet[]> source;
         
@@ -468,10 +469,12 @@ public class ASTEvalHelper {
              * A single input binding set will be fed into the query pipeline
              * using the supplied bindings.
              */
-            
+
+            // batch resolve Values to IVs.
             final Object[] tmp = new BigdataValueReplacer(store)
                     .replaceValues(null/* dataset */, null/* tupleExpr */, bs);
 
+            // wrap the resolved binding set.
             source = newBindingSetIterator(toBindingSet((BindingSet) tmp[1]));
 
         } else {

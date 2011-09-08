@@ -103,6 +103,13 @@ import com.bigdata.relation.rule.Rule;
  * 
  *          FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
  *          variable bindings during query evaluation).
+ *          <p>
+ *          Note: Sesame allows externally given bindings to flow through the
+ *          query even if they are projected by the query. This means that the
+ *          "projection" can not remove all bindings except those which are
+ *          projected. Either we need to also not prune exogenous bindings or we
+ *          need to strip out bindings introduced by anonymous variables which
+ *          are part of query rewrites. The former seems easier.
  * 
  *          TODO What about the backchain access path stuff? Are we going prolog
  *          / datalog or bringing that stuff forward?
