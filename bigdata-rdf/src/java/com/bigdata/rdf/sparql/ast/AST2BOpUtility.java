@@ -156,7 +156,9 @@ public class AST2BOpUtility {
          * FIXME For improved visibility, the optimizer should be run outside of
          * this method and/or we should publish the optimizer AST. Otherwise
          * things like DESCRIBE can be rewritten pretty broadly and we do not
-         * get a chance to see the rewritten AST model.
+         * get a chance to see the rewritten AST model. However, since the
+         * rewrite is destructive we will not get to see both the original and
+         * optimized versions at the same time.
          */
         if (ctx.optimizedQuery == null) {
 
@@ -974,15 +976,6 @@ public class AST2BOpUtility {
         
         /*
          * Add the pre-conditionals to the pipeline.
-         * 
-         * FIXME Does this force anything which will be needed by any filter in
-         * the query to become materialized before we do anything else? If so,
-         * then how do we ever handle materialization for filters against
-         * variables are not bound until we run a required join later in the
-         * group? Are those filters being moved to post-conditionals? If so,
-         * then that is very expensive. They should be tightly interwoven with
-         * the required joins such that we evaluate them as soon as possible to
-         * maximize the selectivity of the pipeline, right?
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
@@ -1028,7 +1021,7 @@ public class AST2BOpUtility {
              * Note: This winds up handling materialization steps as well.
              * 
              * TODO Materialization steps are currently handled via recursion
-             * into Rule2BOpUtility, but there is a FIXME for that.
+             * into Rule2BOpUtility.
              */
             left = addJoins(left, joinGroup, ctx);
 
