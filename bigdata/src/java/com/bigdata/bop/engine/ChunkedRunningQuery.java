@@ -1071,6 +1071,12 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
             if (p == null) {
                 /*
+                 * The top-most operator in the query plan is the last operator
+                 * in evaluation order. It MUST run on the query controller.
+                 * This is required in order for it to add solutions to the
+                 * query buffer. The QueryEngine verifies this before it
+                 * executes a query plan.
+                 * 
                  * Note: Operators MUST NOT close the query buffer since they do
                  * not have enough context to decide when the query is done. The
                  * query buffer will be closed when the query is cancelled.
@@ -1185,6 +1191,18 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             try {
                 ft.run(); // run
                 ft.get(); // verify success
+                /*
+                 * If the operator ran successfully, then it should have flushed
+                 * its sink(s) and closed them.
+                 */
+                if (sink != null) {
+                    sink.flush();
+                    sink.close();
+                }
+                if (altSink != null) {
+                    altSink.flush();
+                    altSink.close();
+                }
             } catch (Throwable t) {
                 halt(t);  // ensure query halts.
                 if (getCause() != null) {
@@ -1223,9 +1241,25 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             
         }
 
+//        public void add(E e) {
+//            log.error(Arrays.toString((Object[])e));
+//            super.add(e);
+//        }
+//
+//        public void reset() {
+//            log.error("");
+//            super.reset();
+//        }
+//
+//        public long flush() {
+//            log.error("");
+//            return super.flush();
+//        }
+
         @Override
         public void close() {
             // NOP
+//            log.error("");
         }
 
     }

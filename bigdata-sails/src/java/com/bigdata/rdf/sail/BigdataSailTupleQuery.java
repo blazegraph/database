@@ -183,10 +183,9 @@ public class BigdataSailTupleQuery extends SailTupleQuery
                     .getProjectionVars();
 
             final TupleQueryResult queryResult = ASTEvalHelper
-                    .evaluateTupleQuery(store, queryPlan,
-                            new QueryBindingSet(), context.queryEngine,
-                            projected);
-            
+                    .evaluateTupleQuery(store, queryPlan, new QueryBindingSet(
+                            getBindings()), context.queryEngine, projected);
+
             return queryResult;
             
         }

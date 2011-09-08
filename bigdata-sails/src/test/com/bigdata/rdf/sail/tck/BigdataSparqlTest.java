@@ -142,10 +142,10 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
         }
         
         if (hideDatasetTests)
-            suite1 = filterOutDataSetTests(suite1, "dataset");
+            suite1 = filterOutTests(suite1, "dataset");
 
-        suite1 = filterOutDataSetTests(suite1, "property-paths");
-
+        suite1 = filterOutTests(suite1, "property-paths");
+        
         return suite1;
         
     }
@@ -158,7 +158,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
      * 
      * @return The test suite without the data set tests.
      */
-    static TestSuite filterOutDataSetTests(final TestSuite suite1,final String name) {
+    static TestSuite filterOutTests(final TestSuite suite1, final String name) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
         final Enumeration<Test> e = suite1.tests();
@@ -167,7 +167,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
             if (aTest instanceof TestSuite) {
                 final TestSuite aTestSuite = (TestSuite) aTest;
                 if (!aTestSuite.getName().equals(name)) {
-                    suite2.addTest(filterOutDataSetTests(aTestSuite,name));
+                    suite2.addTest(filterOutTests(aTestSuite,name));
                 }
             } else {
                 suite2.addTest(aTest);

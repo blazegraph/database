@@ -172,9 +172,12 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
             if (log.isInfoEnabled())
                 log.info("queryPlan:\n" + queryPlan);
 
-            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
-                    store, queryPlan, new QueryBindingSet(),
-                    context.queryEngine);
+            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(//
+                    store, //
+                    queryPlan,//
+                    new QueryBindingSet(getBindings()),//
+                    context.queryEngine//
+                    );
             
             return queryResult;
             

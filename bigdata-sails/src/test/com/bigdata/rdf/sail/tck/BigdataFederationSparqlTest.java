@@ -99,7 +99,7 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         }
         
         if(hideDatasetTests)
-            suite1 = BigdataSparqlTest.filterOutDataSetTests(suite1,"dataset");
+            suite1 = BigdataSparqlTest.filterOutTests(suite1,"dataset");
         
         return suite1;
         

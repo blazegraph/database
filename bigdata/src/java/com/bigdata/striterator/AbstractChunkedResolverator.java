@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.striterator;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -348,7 +349,8 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 //            elapsed += (now - begin);
 
             if (log.isDebugEnabled())
-                log.debug("nextChunk ready");
+                log.debug("nextChunk ready: size=" + chunk.length + ", chunk="
+                        + Arrays.toString(chunk));
             
         }
 
@@ -357,7 +359,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
             
         if (log.isDebugEnabled())
             log.debug("lastIndex=" + lastIndex + ", chunk.length="
-                    + chunk.length + ", stmt=" + f);
+                    + chunk.length + ", visting=" + f);
 
         return f;
 

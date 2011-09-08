@@ -27,28 +27,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 
 /**
- * If a {@link SubqueryRoot} appears in an otherwise empty (and non-optional)
- * {@link JoinGroupNode}, then the join group is replaced by the
- * {@link SubqueryRoot}. This eliminates a subquery for the otherwise empty
- * {@link JoinGroupNode} since we can process the {@link SubqueryRoot} in the
- * parent directly.
+ * If the top-level join group has a single child, then it is replaced by that
+ * child. Embedded non-optional join groups without a context which contain a
+ * single child by lifting the child into the parent.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTSubqueryRootInGroupOptimizer.java 5143 2011-09-07 11:39:17Z
+ *          thompsonbry $
  */
-public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
+public class ASTJoinGroupOptimizer implements IASTOptimizer {
 
+    private static final Logger log = Logger
+            .getLogger(ASTJoinGroupOptimizer.class);
+    
+    @SuppressWarnings("unchecked")
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
@@ -58,7 +61,7 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        final IGroupNode<IGroupMemberNode> whereClause = queryRoot
+        GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>)queryRoot
                 .getWhereClause();
 
         if (whereClause == null) {
@@ -67,6 +70,30 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
 
         }
 
+        /*
+         * If the root join group has only a single child join group, then
+         * replace it with that child.
+         */
+
+        if ((whereClause.size() == 1)
+                && (whereClause.get(0) instanceof JoinGroupNode)) {
+
+            if (log.isInfoEnabled())
+                log.info("Replacing top-level group: "
+                        + whereClause.toShortString() + " with only child "
+                        + whereClause.get(0).toShortString());
+
+            final GroupNodeBase<IGroupMemberNode> child = (GroupNodeBase<IGroupMemberNode>) whereClause
+                    .get(0);
+
+            // remove child from the parent (clears parent reference).
+            whereClause.removeChild(child);
+
+            // set child as the new where clause.
+            queryRoot.setWhereClause(child);
+
+        }
+        
         rewrite((GroupNodeBase<IGroupMemberNode>) whereClause);
 
         return queryRoot;
@@ -91,10 +118,14 @@ public class ASTSubqueryRootInGroupOptimizer implements IASTOptimizer {
                 final JoinGroupNode group = (JoinGroupNode) child;
 
                 if (!group.isOptional() && group.size() == 1
-                        && group.get(0) instanceof SubqueryRoot) {
+                        && group.getContext() == p.getContext()) {
 
-                    // lift the SubqueryRoot into the parent.
-                    p.setArg(i, group.get(0));
+                    // lift the child into the parent.
+                    p.setArg(i, group);
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Lifting " + group.toShortString() + " into "
+                                + p.toShortString());
                     
                 }
                 

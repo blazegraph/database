@@ -46,7 +46,7 @@ public class TestOrderBy extends ProxyBigdataSailTestCase {
     @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        final Properties props = super.getProperties();
 
         props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -87,18 +87,18 @@ public class TestOrderBy extends ProxyBigdataSailTestCase {
             final ValueFactory vf = sail.getValueFactory();
             
 //          This fails with BigData trunk of 21-07-2010
-            URI s1 = vf.createURI("s:1");
-            URI s2 = vf.createURI("s:2");
-            URI s3 = vf.createURI("s:3");
-            URI pred1 = vf.createURI("p:1");
-            URI pred2 = vf.createURI("p:2");
+            final URI s1 = vf.createURI("s:1");
+            final URI s2 = vf.createURI("s:2");
+            final URI s3 = vf.createURI("s:3");
+            final URI pred1 = vf.createURI("p:1");
+            final URI pred2 = vf.createURI("p:2");
             cxn.add(s1, pred1, vf.createLiteral(3));
             cxn.add(s1, pred2, vf.createLiteral("a"));
             cxn.add(s2, pred1, vf.createLiteral(1));
             cxn.add(s2, pred2, vf.createLiteral("b"));
             cxn.add(s3, pred1, vf.createLiteral(2));
             cxn.add(s3, pred2, vf.createLiteral("c"));
-            TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, 
+            final TupleQuery tq = cxn.prepareTupleQuery(QueryLanguage.SPARQL, 
                     "SELECT ?s ?lit " +
                     "WHERE { " +
                     "  ?s <p:1> ?val. " +
@@ -106,10 +106,13 @@ public class TestOrderBy extends ProxyBigdataSailTestCase {
                     "} " +
                     "ORDER BY ?val"
                     );
-            TupleQueryResult result = tq.evaluate();
+            final TupleQueryResult result = tq.evaluate();
             try {
+                assertTrue(result.hasNext());
                 assertEquals(s2, result.next().getValue("s"));
+                assertTrue(result.hasNext());
                 assertEquals(s3, result.next().getValue("s"));
+                assertTrue(result.hasNext());
                 assertEquals(s1, result.next().getValue("s"));
                 assertFalse(result.hasNext());
             } finally {

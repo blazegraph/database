@@ -1,5 +1,6 @@
 package com.bigdata.rdf.store;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,7 +87,7 @@ public class BigdataBindingSetResolverator
     /**
      * Strengthens the return type.
      */
-    public BigdataBindingSetResolverator start(ExecutorService service) {
+    public BigdataBindingSetResolverator start(final ExecutorService service) {
 
         return (BigdataBindingSetResolverator) super.start(service);
         
@@ -100,7 +101,8 @@ public class BigdataBindingSetResolverator
     protected IBindingSet[] resolveChunk(final IBindingSet[] chunk) {
 
         if (log.isInfoEnabled())
-            log.info("Fetched chunk: size=" + chunk.length);
+            log.info("Fetched chunk: size=" + chunk.length + ", chunk="
+                    + Arrays.toString(chunk));
 
         /*
          * Create a collection of the distinct term identifiers used in this
@@ -142,9 +144,9 @@ public class BigdataBindingSetResolverator
 	            
             } else {
             	
-            	for (IVariable v : required) {
+            	for (IVariable<?> v : required) {
 
-            		final IConstant c = bindingSet.get(v);
+            		final IConstant<?> c = bindingSet.get(v);
             		
             		if (c == null) {
             			continue;
@@ -170,7 +172,8 @@ public class BigdataBindingSetResolverator
 //        System.err.println("resolving: " + Arrays.toString(ids.toArray()));
 
         if (log.isInfoEnabled())
-            log.info("Resolving " + ids.size() + " term identifiers");
+            log.info("Resolving " + ids.size() + " term identifiers, required="
+                    + Arrays.toString(required));
 
         // batch resolve term identifiers to terms.
         final Map<IV<?,?>, BigdataValue> terms = state.getLexiconRelation()
@@ -190,6 +193,10 @@ public class BigdataBindingSetResolverator
                 chunk2[i++] = f;
 
             }
+
+            if (log.isInfoEnabled())
+                log.info("Resolved chunk: size=" + chunk2.length + ", chunk="
+                        + Arrays.toString(chunk2));
 
             // return the chunk of resolved elements.
             return chunk2;

@@ -355,7 +355,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
                     .evaluateGraphQuery(
                     store, //
                     queryPlan, //
-                    new QueryBindingSet(),//
+                    new QueryBindingSet(getBindings()),//
                     context.queryEngine, //
                     queryRoot.getProjection().getProjectionVars(),
                     queryRoot.getPrefixDecls(), //

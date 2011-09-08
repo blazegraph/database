@@ -207,8 +207,8 @@ public class TestQuadsAPI extends QuadsTestCase {
             
             assertFalse(cxn.getContextIDs().hasNext());
             
-            final BNode a = new BNodeImpl("_:a");
-            final BNode b = new BNodeImpl("_:b");
+//            final BNode a = new BNodeImpl("_:a");
+//            final BNode b = new BNodeImpl("_:b");
             final URI graphA = new URIImpl("http://www.bigdata.com/rdf#graphA");
             final URI graphB = new URIImpl("http://www.bigdata.com/rdf#graphB");
             final URI s = new URIImpl("http://www.bigdata.com/rdf#s");
@@ -216,35 +216,14 @@ public class TestQuadsAPI extends QuadsTestCase {
             final URI o1 = new URIImpl("http://www.bigdata.com/rdf#o1");
             final URI p2 = new URIImpl("http://www.bigdata.com/rdf#p2");
             final URI o2 = new URIImpl("http://www.bigdata.com/rdf#o2");
-/**/            
-            cxn.add(
-                    graphA,
-                    p1,
-                    o1,
-                    graphA
-                    );
+
+            cxn.add(graphA, p1, o1, graphA);
+
+            cxn.add(     s, p1, o1, graphA);
             
-            cxn.add(
-                    s,
-                    p1,
-                    o1,
-                    graphA
-                    );
+            cxn.add(graphA, p2, o2, graphA);
             
-            cxn.add(
-                    graphA,
-                    p2,
-                    o2,
-                    graphA
-                    );
-            
-            cxn.add(
-                    s,
-                    p2,
-                    o2,
-                    graphB
-                    );
-/**/
+            cxn.add(     s, p2, o2, graphB);
 
             /*
              * Note: The either flush() or commit() is required to flush the
@@ -265,11 +244,13 @@ public class TestQuadsAPI extends QuadsTestCase {
             }
             
             final String query = 
-                "SELECT  * " +
-                "WHERE { GRAPH ?g { " +
-                "?g <"+p1+"> <"+o1+"> . " +
-                "?g <"+p2+"> <"+o2+"> . " +
-                "}}";
+                "SELECT  * \n" +
+                "WHERE { \n"+
+                "  GRAPH ?g { \n" +
+                "    ?g <"+p1+"> <"+o1+"> . \n" +
+                "    ?g <"+p2+"> <"+o2+"> . \n" +
+                "  }\n" +
+                "}";
             
             final TupleQuery tupleQuery = 
                 cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
