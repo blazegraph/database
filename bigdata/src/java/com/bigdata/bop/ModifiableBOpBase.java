@@ -186,10 +186,18 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      *            The new child expression.
      * 
      * @return This {@link ModifiableBOpBase}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the argument is <i>this</i>.
      */
     public ModifiableBOpBase setArg(final int index, final BOp newArg) {
 
         if (newArg == null)
+            throw new IllegalArgumentException();
+
+        if(newArg == this)
             throw new IllegalArgumentException();
 
         args.set(index, newArg);
@@ -207,8 +215,19 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      *            The argument.
      * 
      * @return <i>this</i>.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the argument is <i>this</i>.
      */
     public void addArg(final BOp newArg) {
+        
+        if(newArg == null)
+            throw new IllegalArgumentException();
+
+        if(newArg == this)
+            throw new IllegalArgumentException();
         
         args.add(newArg);
         
@@ -221,12 +240,23 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      * 
      * @param arg
      *            The argument.
+     *            
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the argument is <i>this</i>.
      */
     public void addArgIfAbsent(final BOp arg) {
-        
+
+        if(arg == null)
+            throw new IllegalArgumentException();
+
+        if(arg == this)
+            throw new IllegalArgumentException();
+
         if(!args.contains(arg)) {
 
-            args.add(arg);
+            addArg(arg);
          
             mutation();
 
@@ -241,9 +271,20 @@ public class ModifiableBOpBase extends CoreBaseBOp {
      *            The argument.
      *            
      * @return <code>true</code> iff the argument was removed.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the argument is <i>this</i>.
      */
     public boolean removeArg(final BOp arg) {
         
+        if (arg == null)
+            throw new IllegalArgumentException();
+
+        if (arg == this)
+            throw new IllegalArgumentException();
+
         if (args.remove(arg)) {
          
             mutation();
@@ -321,8 +362,9 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         
         private final List<T> delegate;
         
+        @SuppressWarnings("unchecked")
         NotifyingList(final ModifiableBOpBase bop) {
-            this(bop,(List)bop.args);
+            this(bop, (List<T>) bop.args);
         }
 
         NotifyingList(final ModifiableBOpBase bop, final List<T> subList) {
@@ -352,7 +394,7 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         public Object[] toArray() {
             return delegate.toArray();
         }
-        public <T> T[] toArray(T[] a) {
+        public <T1> T1[] toArray(T1[] a) {
             return delegate.toArray(a);
         }
         public boolean add(T e) {

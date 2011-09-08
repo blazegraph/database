@@ -23,14 +23,9 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * as {@link BOpEvaluationContext#CONTROLLER} when it is to be used for this
  * purpose.
  * 
- * FIXME This is hacked to extend {@link SliceOp} instead as that appears to be
- * necessary due to a persistent bug.
- * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/227
  */
-public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
-	
-//	private static final Logger log = Logger.getLogger(EndOp.class);
+public class EndOp extends PipelineOp {
 
 	/**
 	 * 
@@ -43,7 +38,6 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
 
 	public EndOp(BOp[] args, Map<String, Object> annotations) {
 
-//	    super(args, ensureSharedState(annotations));
 	    super(args, annotations);
         
 	    switch (getEvaluationContext()) {
@@ -56,15 +50,6 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
         }
 
 	}
-
-//	static private Map<String, Object> ensureSharedState(
-//			Map<String, Object> annotations) {
-//
-//		annotations.put(PipelineOp.Annotations.SHARED_STATE, true);
-//		
-//		return annotations;
-//		
-//	}
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -82,10 +67,8 @@ public class EndOp extends PipelineOp {//SliceOp {//CopyOp {
         
         private final BOpContext<IBindingSet> context;
         
-        OpTask(/*final PipelineOp op, */final BOpContext<IBindingSet> context) {
+        OpTask(final BOpContext<IBindingSet> context) {
 
-//            this.op = op;
-            
             this.context = context;
             
         }

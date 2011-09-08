@@ -45,6 +45,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -366,11 +367,16 @@ public class BOpUtility {
         
     }
 
-	/**
-	 * Return the distinct variables recursively using a pre-order traversal
-	 * present whether in the operator tree or on annotations attached to
-	 * operators.
-	 */
+    /**
+     * Return the distinct variables recursively using a pre-order traversal
+     * present whether in the operator tree or on annotations attached to
+     * operators.
+     * <p>
+     * Note: This will find variables within subqueries as well, which may not
+     * be want is intended.
+     * 
+     * @see ASTWildcardProjectionOptimizer
+     */
     @SuppressWarnings("unchecked")
     public static Iterator<IVariable<?>> getSpannedVariables(final BOp op) {
 

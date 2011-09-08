@@ -37,6 +37,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 
 /**
  * Pre-populated list of the default optimizers.
@@ -92,9 +93,6 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
  * we could leverage.</li>
  * </ul>
  * 
- * TODO Optimize away empty join groups and optimize those containing just a
- * single child by lifting the child into the parent whenever possible.
- * 
  * TODO Recognize OR of constraints and rewrite as IN. We can then optimize the
  * IN operator in a variety of ways (in fact, the {@link FunctionRegistry}
  * already handles those optimizations for IN).
@@ -110,20 +108,6 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
  * parent rather than requiring the context to be specified explicitly. This is
  * also true for a subquery. If it specifies a GRAPH pattern, then you MUST put
  * a FILTER on it. (An IASTOptimizer could take care of that.)
- * 
- * FIXME Either handle via AST rewrites or verify that AST2BOpUtility handles
- * this during convert().
- * <p>
- * An empty {} matches a single empty solution.
- * <p>
- * GRAPH ?g {} matches the distinct named graphs in the named graph portion of
- * the data set (special case). This should be translated into a distinct term
- * advancer on CSPO if there is no data set. If the named graphs are listed
- * explicitly, then just return that list. Third case: Anzo supports a FILTER on
- * the named graph or default graphs for ACLs.
- * <p>
- * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure on this
- * one.)
  * 
  * FIXME What follows are some rules for static analysis of variable scope.
  * <p>
@@ -174,6 +158,18 @@ public class DefaultOptimizerList extends OptimizerList {
 //        add(new ASTSubqueryVariableScopeRewrite());
         
         /**
+         * Rewrites any {@link ProjectionNode} with a wild card into the set of
+         * variables visible to the {@link QueryBase} having that projection.
+         * This is done first for the {@link NamedSubqueriesNode} and then
+         * depth-first for the WHERE clause. Only variables projected by a
+         * subquery will be projected by the parent query.
+         * <p>
+         * Note: This needs to be run before anything else which looks at the
+         * {@link ProjectionNode}.
+         */
+        add(new ASTWildcardProjectionOptimizer());
+        
+        /**
          * Propagates bindings from an input solution into the query, replacing
          * variables with constants while retaining the constant / variable
          * association.
@@ -214,11 +210,29 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
-         * If a {@link SubqueryRoot} appears in an otherwise empty (and
-         * non-optional) {@link JoinGroupNode}, then the join group is replaced
-         * by the {@link SubqueryRoot}.
+         * If the top-level join group has a single child, then it is
+         * replaced by that child. Embedded non-optional join groups without a
+         * context which contain a single child by lifting the child into the
+         * parent.
+         * <p>
+         * FIXME Either handle via AST rewrites or verify that AST2BOpUtility
+         * handles this during convert().
+         * <p>
+         * An empty {} matches a single empty solution. This is the same as not
+         * running the subquery, so we just eliminate the empty group.
+         * <p>
+         * GRAPH ?g {} matches the distinct named graphs in the named graph
+         * portion of the data set (special case). If there is no data set, then
+         * this should be translated into sp(_,_,_,?g)[filter=distinct] that
+         * should be recognized and evaluated using a distinct term advancer on
+         * CSPO. If the named graphs are listed explicitly, then just return
+         * that list. Third case: Anzo supports a FILTER on the named graph or
+         * default graphs for ACLs.
+         * <p>
+         * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure
+         * on this one.)
          */
-        add(new ASTSubqueryRootInGroupOptimizer());
+        add(new ASTJoinGroupOptimizer());
         
         /**
          * Validates named subquery / include patterns, identifies the join

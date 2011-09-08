@@ -78,9 +78,6 @@ public class TestAll extends TestCase {
         // Unit tests for sub-query evaluation.
         suite.addTestSuite(TestASTNamedSubqueryEvaluation.class);
         
-        // Unit tests for EXISTS sub-query evaluation.
-        suite.addTestSuite(TestASTExistsSubqueryEvaluation.class);
-        
         return suite;
         
     }

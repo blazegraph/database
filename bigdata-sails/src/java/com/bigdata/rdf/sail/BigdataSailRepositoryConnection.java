@@ -2,6 +2,7 @@ package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.ParsedBooleanQuery;
@@ -34,8 +35,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    
-//	private static transient final Logger log = Logger
-//			.getLogger(BigdataSailRepositoryConnection.class);
+	private static transient final Logger log = Logger
+			.getLogger(BigdataSailRepositoryConnection.class);
 
 	public String toString() {
 		return getClass().getName() + "{timestamp="
@@ -184,12 +185,14 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * Note: In order to ensure that all code paths captures this information,
      * all the other "prepare query" methods on this class delegate to this
      * implementation.
+     * 
+     * @see BigdataSail.Options#NATIVE_SPARQL
      */
 	@Override
 	public SailQuery prepareQuery(final QueryLanguage ql, final String qs,
 			final String baseURI) throws MalformedQueryException {
 
-        if (getSailConnection().isNativeSparql()) {
+        if (getSailConnection().isNativeSparql() && ql == QueryLanguage.SPARQL) {
 
             return (SailQuery) prepareNativeSPARQLQuery(ql, qs, baseURI);
 
@@ -210,6 +213,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 		    /*
 		     * Not a SPARQL query.
 		     */
+		    log.warn("Support for non-SPARQL queries is deprecated.");
             parsedQuery = QueryParserUtil.parseQuery(ql, qs, baseURI);
             queryHints = new Properties();
             describe = false;
@@ -252,6 +256,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * @return The bigdata AST model for that query.
      * 
      * @throws MalformedQueryException
+     * @throws UnsupportedOperationException
+     *             if the query language is not SPARQL.
      */
     public BigdataSailQuery prepareNativeSPARQLQuery(final QueryLanguage ql,
             final String queryStr, final String baseURI)
@@ -259,6 +265,10 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         if (ql != QueryLanguage.SPARQL)
             throw new UnsupportedOperationException(ql.toString());
+
+        // Flush buffers since we are about to resolve Values to IVs.
+        getSailConnection()
+                .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(
                 getTripleStore()).parseQuery2(queryStr, baseURI);

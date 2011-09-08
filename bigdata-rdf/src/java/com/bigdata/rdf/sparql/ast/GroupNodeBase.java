@@ -3,6 +3,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Iterator;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * Base class for AST group nodes.
@@ -43,32 +44,73 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
 	}
 
-	public IGroupNode<E> addChild(final E child) {
-		
-	    if(child == this)
-	        throw new IllegalArgumentException();
-	    
-        addArg((BOp) child);
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to set the parent reference on the child.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public ModifiableBOpBase setArg(final int index, final BOp newArg) {
+        
+        super.setArg(index, newArg);
+        
+        ((E) newArg).setParent(this);
+        
+        return this;
+        
+    }
 
-		child.setParent(this);
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to set the parent reference on the child
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public void addArg(final BOp newArg) {
+
+        super.addArg(newArg);
+
+        ((E) newArg).setParent(this);
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to clear the parent reference on the child.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public boolean removeArg(final BOp child) {
+
+        if (super.removeArg(child)) {
+        
+            ((E) child).setParent(null);
+            
+            return true;
+            
+        }
+
+        return false;
+        
+    }
+
+    public IGroupNode<E> addChild(final E child) {
+		
+        addArg((BOp) child);
 		
 		return this;
 		
 	}
 	
-	public IGroupNode<E> removeChild(final E child) {
+    public IGroupNode<E> removeChild(final E child) {
 
-        if (child == null)
-            throw new IllegalArgumentException();
+        removeArg((BOp) child);
 
-        if (child == this)
-            throw new IllegalArgumentException();
+        return this;
 
-        if (removeArg((BOp) child))
-            child.setParent(null);
-		
-		return this;
-		
 	}
 	
     public boolean isEmpty() {

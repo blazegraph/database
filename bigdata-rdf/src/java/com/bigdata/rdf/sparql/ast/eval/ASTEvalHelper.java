@@ -42,6 +42,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.GraphQueryResultImpl;
 import org.openrdf.query.impl.TupleQueryResultImpl;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -55,6 +56,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl3;
+import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
@@ -452,9 +454,11 @@ public class ASTEvalHelper {
 
     /**
      * Setup the input binding sets which will be fed into the query pipeline.
+     * 
+     * @throws SailException 
      */
     static private IAsynchronousIterator<IBindingSet[]> wrapSource(
-            final BindingSet bs) {
+            final AbstractTripleStore store, final BindingSet bs) throws SailException {
 
         final IAsynchronousIterator<IBindingSet[]> source;
         
@@ -465,8 +469,11 @@ public class ASTEvalHelper {
              * using the supplied bindings.
              */
             
-            source = newBindingSetIterator(toBindingSet(bs));
-            
+            final Object[] tmp = new BigdataValueReplacer(store)
+                    .replaceValues(null/* dataset */, null/* tupleExpr */, bs);
+
+            source = newBindingSetIterator(toBindingSet((BindingSet) tmp[1]));
+
         } else {
             
             /*
@@ -504,9 +511,11 @@ public class ASTEvalHelper {
             throws QueryEvaluationException {
 
         IRunningQuery runningQuery = null;
-        final IAsynchronousIterator<IBindingSet[]> source = wrapSource(bs); 
+        IAsynchronousIterator<IBindingSet[]> source = null;
         try {
 
+            source = wrapSource(database, bs);
+            
             // Submit query for evaluation.
             runningQuery = queryEngine.eval(queryPlan, source);
 
@@ -520,7 +529,8 @@ public class ASTEvalHelper {
         } finally {
             
             // Ensure source is closed.
-            source.close();
+            if(source != null)
+                source.close();
             
             if (runningQuery != null) {
             
@@ -580,7 +590,7 @@ public class ASTEvalHelper {
      */
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final PipelineOp queryPlan,
-            final BindingSet bs, final QueryEngine queryEngine,
+            final QueryBindingSet bs, final QueryEngine queryEngine,
             final IVariable<?>[] projected) throws QueryEvaluationException {
 
         final List<String> projectedSet = new LinkedList<String>();
@@ -590,7 +600,7 @@ public class ASTEvalHelper {
 
         return new TupleQueryResultImpl(projectedSet,
                 ASTEvalHelper.doEvaluateNatively(store, queryPlan,
-                        new QueryBindingSet(), queryEngine, projected));
+                        new QueryBindingSet(bs), queryEngine, projected));
 
     }
     
@@ -625,8 +635,7 @@ public class ASTEvalHelper {
 
         return new GraphQueryResultImpl(prefixDecls, new ASTConstructIterator(
                 store, construct, ASTEvalHelper.doEvaluateNatively(store,
-                        queryPlan, new QueryBindingSet(), queryEngine,
-                        projected)));
+                        queryPlan, queryBindingSet, queryEngine, projected)));
 
     }
     
@@ -647,12 +656,14 @@ public class ASTEvalHelper {
      */
     static public CloseableIteration<BindingSet, QueryEvaluationException> doEvaluateNatively(
             final AbstractTripleStore database, final PipelineOp queryPlan,
-            final BindingSet bs, final QueryEngine queryEngine,
+            final QueryBindingSet bs, final QueryEngine queryEngine,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
         IRunningQuery runningQuery = null;
-        final IAsynchronousIterator<IBindingSet[]> source = wrapSource(bs); 
+        IAsynchronousIterator<IBindingSet[]> source = null; 
         try {
+            
+            source = wrapSource(database, bs);
 
             // Submit query for evaluation.
             runningQuery = queryEngine.eval(queryPlan, source);
@@ -669,7 +680,8 @@ public class ASTEvalHelper {
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
             // ensure source is closed on error path.
-            source.close();
+            if(source != null) 
+                source.close();
             /*
              * Note: Do not wrap as a different exception type. The caller is
              * looking for this.
@@ -681,7 +693,8 @@ public class ASTEvalHelper {
                 runningQuery.cancel(true/* mayInterruptIfRunning */);
             }
             // ensure source is closed on error path.
-            source.close();
+            if(source != null) 
+                source.close();
             throw new QueryEvaluationException(t);
         }
 

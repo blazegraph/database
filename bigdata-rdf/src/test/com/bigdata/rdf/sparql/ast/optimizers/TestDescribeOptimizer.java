@@ -648,7 +648,12 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final AST2BOpContext context = new AST2BOpContext(queryRoot,
                     store);
 
-            final IQueryNode actual = new DescribeOptimizer().optimize(
+            IQueryNode actual;
+            
+            actual = new ASTWildcardProjectionOptimizer().optimize(
+                    context, queryRoot, null/* bindingSet */);
+            
+            actual = new DescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
             assertSameAST(expected, actual);
@@ -683,9 +688,12 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             final AST2BOpContext context = new AST2BOpContext(queryRoot,
                     store);
 
+            IQueryNode tmp = new ASTWildcardProjectionOptimizer().optimize(
+                    context, queryRoot, null/* bindingSet */);
+
             try {
                 new DescribeOptimizer()
-                        .optimize(context, queryRoot, null/* bindingSet */);
+                        .optimize(context, tmp, null/* bindingSet */);
                 fail("Expecting " + RuntimeException.class);
             } catch (RuntimeException ex) {
                 if (log.isInfoEnabled())

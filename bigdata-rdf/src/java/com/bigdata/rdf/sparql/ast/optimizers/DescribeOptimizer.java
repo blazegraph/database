@@ -28,14 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -136,32 +131,41 @@ public class DescribeOptimizer implements IASTOptimizer {
 		queryRoot.setConstruct(construct); // add CONSTRUCT node.
 		
 		final Collection<TermNode> terms = new LinkedHashSet<TermNode>();
-		
-		if (projection.isWildcard()) {
-		
-			/* 
-			 * Visit all variable nodes in where clause and add them
-			 * into the terms collections.
-			 */
-			final Iterator<IVariable<?>> it = 
-				BOpUtility.getSpannedVariables((BOp) where);
-			
-			while (it.hasNext()) {
-				
-				final IVariable<IV> v = (IVariable<IV>) it.next();
-				
-				final VarNode var = new VarNode(v);
-				
-				terms.add(var);
-				
-			}
-			
-            if (terms.isEmpty())
-                throw new RuntimeException(
-                        "DESCRIBE *, but no variables in this query");
 
-		} else {
-		
+		/*
+		 * The projection node should have been rewritten first.
+		 */
+        if (projection.isWildcard())
+            throw new AssertionError("Wildcard projection was not rewritten.");
+//		if (projection.isWildcard()) {
+//		
+//			/* 
+//			 * Visit all variable nodes in where clause and add them
+//			 * into the terms collections.
+//			 */
+//			final Iterator<IVariable<?>> it = 
+//				BOpUtility.getSpannedVariables((BOp) where);
+//			
+//			while (it.hasNext()) {
+//				
+//				final IVariable<IV> v = (IVariable<IV>) it.next();
+//				
+//				final VarNode var = new VarNode(v);
+//				
+//				terms.add(var);
+//				
+//			}
+//			
+//            if (terms.isEmpty())
+//                throw new RuntimeException(
+//                        "DESCRIBE *, but no variables in this query");
+//
+//		} else {
+
+        if (projection.isEmpty())
+            throw new RuntimeException(
+                    "DESCRIBE, but no variables are projected.");
+        
 			for (AssignmentNode n : projection) {
 				
 				// can only have variables and constants in describe projections
@@ -169,7 +173,7 @@ public class DescribeOptimizer implements IASTOptimizer {
 	
 			}
 				
-		}		
+//		}		
 		
 		int i = 0;
 		

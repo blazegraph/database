@@ -151,13 +151,14 @@ public class AST2BOpUtility {
          * get a chance to see the rewritten AST model.
          */
         if (ctx.optimizedQuery == null) {
+
             ctx.optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
                     query, bindingSets);
+            
         }
-        final QueryRoot optimizedQuery = ctx.optimizedQuery;
         
         // The executable query plan.
-        PipelineOp queryPlan = convert(optimizedQuery, ctx);
+        PipelineOp queryPlan = convert(ctx.optimizedQuery, ctx);
 
         /*
          * Set the queryId on the top-level of the query plan.
@@ -169,6 +170,12 @@ public class AST2BOpUtility {
 
         queryPlan = (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
+
+        if (log.isInfoEnabled()) {
+            log.info("\noriginal :\n" + query);
+            log.info("\noptimized:\n" + ctx.optimizedQuery);
+            log.info("\npipeline :\n" + BOpUtility.toString2(queryPlan));
+        }
 
         return queryPlan;
 
@@ -188,33 +195,37 @@ public class AST2BOpUtility {
     private static PipelineOp convert(final QueryBase query,
             final AST2BOpContext ctx) {
     	
-    	final String lex = ctx.db.getLexiconRelation().getNamespace();
-    	
-    	/*
-    	 * Visit all the value expression nodes and convert them into value
-    	 * expressions.
-    	 */
-    	final Iterator<IValueExpressionNode> it =
-    		BOpUtility.visitAll(query, IValueExpressionNode.class);
+        /*
+         * Visit all the value expression nodes and convert them into value
+         * expressions.
+         */
+        {
+            
+            final String lex = ctx.db.getLexiconRelation().getNamespace();
+            
+            final Iterator<IValueExpressionNode> it = BOpUtility.visitAll(
+                    query, IValueExpressionNode.class);
 
-        final ArrayList<IValueExpressionNode> allNodes = new ArrayList<IValueExpressionNode>();
-    	
-    	while (it.hasNext()) {
-    		
-    	    allNodes.add(it.next());
+            final ArrayList<IValueExpressionNode> allNodes = new ArrayList<IValueExpressionNode>();
 
-    	}
+            while (it.hasNext()) {
 
-        for (IValueExpressionNode ven : allNodes) {
+                allNodes.add(it.next());
 
-    		/*
-    		 * Convert and cache the value expression on the node as a 
-    		 * side-effect.
-    		 */
-    		toVE(lex, ven);
-    		
-    	}
-    	
+            }
+
+            for (IValueExpressionNode ven : allNodes) {
+
+                /*
+                 * Convert and cache the value expression on the node as a
+                 * side-effect.
+                 */
+                toVE(lex, ven);
+
+            }
+
+        }
+
         final IGroupNode<IGroupMemberNode> root = query.getWhereClause();
 
         if (root == null)
@@ -273,6 +284,10 @@ public class AST2BOpUtility {
              * materialized.
              */
 
+            if (projection.isWildcard())
+                throw new AssertionError(
+                        "Wildcard projection was not rewritten.");
+
             final GroupByNode groupBy = query.getGroupBy() == null ? null
                     : query.getGroupBy().isEmpty() ? null : query.getGroupBy();
 
@@ -328,7 +343,7 @@ public class AST2BOpUtility {
 
         }
 
-        left = addEndOp(left, ctx);
+//        left = addEndOp(left, ctx);
         
         /*
          * Set a timeout on a query or subquery.
@@ -353,11 +368,6 @@ public class AST2BOpUtility {
          * IVs. (I think that materialization is still handled by the bulk IV
          * resolution iterators).
          */
-        
-        if (log.isInfoEnabled()) {
-            log.info("ast:\n" + query);
-            log.info("pipeline:\n" + BOpUtility.toString(left));
-        }
         
         return left;
 		
@@ -1384,15 +1394,18 @@ public class AST2BOpUtility {
 		
         final ProjectionNode projection = query.getProjection();
 
-        /*
-         * TODO This will find variables within subqueries as well. Those
-         * variables are not really in scope. We should have a modified
-         * getSpannedVariables() method which handles this (or maybe just modify
-         * the version we already have to be scope aware).
-         */
-        final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
-                .toArray(BOpUtility.getSpannedVariables((BOp) query
-                        .getWhereClause())) : projection.getProjectionVars();
+        if (projection.isWildcard())
+            throw new AssertionError("Wildcard projection was not rewritten.");
+        final IVariable<?>[] vars = projection.getProjectionVars();
+//        /*
+//         * TODO This will find variables within subqueries as well. Those
+//         * variables are not really in scope. We should have a modified
+//         * getSpannedVariables() method which handles this (or maybe just modify
+//         * the version we already have to be scope aware).
+//         */
+//        final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
+//                .toArray(BOpUtility.getSpannedVariables((BOp) query
+//                        .getWhereClause())) : projection.getProjectionVars();
 
 		final PipelineOp op;
 		if(ctx.nativeDistinct) {
