@@ -30,49 +30,53 @@ package com.bigdata.rdf.sparql.ast;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
  * An extension point for external service calls which produce solution
  * multisets.
- *
  */
-public class ServiceNode extends GroupMemberNodeBase {
+public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
 
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends ValueExpressionNode.Annotations,HashJoinAnnotations {
+    interface Annotations extends GroupMemberNodeBase.Annotations {
 
         /**
          * The function URI from the {@link FunctionRegistry}.
          */
-        String SERVICE_URI = ServiceNode.class.getName() + ".serviceURI";
+        String SERVICE_URI = "serviceURI";
 
         /**
-         * The group node for the service
+         * The <code>group graph pattern</code> used to invoke the service.
          */
-        String GROUP_NODE = ServiceNode.class.getName() + ".groupNode";
+        String GROUP_NODE = "groupNode";
 
         /**
-         * The service call for the service
+         * The base name of the named solution set which will be generated when
+         * the service is invoked.
          */
-        String SERVICE_CALL = ServiceNode.class.getName() + ".serviceCall";
-
+        String NAME = "name";
+        
         /**
-         * The call name for the service
+         * A {@link VarNode}[] specifying the join variables that will be used
+         * when the named result set is join with the query. The join variables
+         * MUST be bound for a solution to join.
          */
-        String NAME = ServiceNode.class.getName() + ".name";
+        String JOIN_VARS = "joinVars";
+
     }
 
     /**
      * Construct a function node in the AST.
-     *
-     * @param functionURI
-     *            the function URI. see {@link FunctionRegistry}
-     * @param scalarValues
-     *            One or more scalar values that are passed to the function
-     * @param args
-     *            the arguments to the function.
+     * 
+     * @param serviceURI
+     *            The service URI. See {@link ServiceRegistry}
+     * @param name
+     *            The name of the solution set on which the service's results
+     *            will be buffered.
+     * @param groupNode
+     *            The graph pattern used to invoke the service.
      */
     public ServiceNode(//
             final String name,
@@ -89,19 +93,10 @@ public class ServiceNode extends GroupMemberNodeBase {
 
     }
 
-    public ServiceNode(final String name, final URI serviceURI,ServiceCall call){
-        super(new BOp[]{}, null/*anns*/);
-
-        super.setProperty(Annotations.NAME, name);
-
-        super.setProperty(Annotations.SERVICE_URI, serviceURI);
-
-        super.setProperty(Annotations.SERVICE_CALL, call);
-    }
-
     /**
      * The join variables to be used when the named result set is included into
-     * the query.
+     * the query. This should be set by an {@link IASTOptimizer} based on a
+     * static analysis of the query.
      */
     public VarNode[] getJoinVars() {
 
@@ -133,34 +128,35 @@ public class ServiceNode extends GroupMemberNodeBase {
 
     }
 
-    public IGroupNode<IGroupMemberNode> getGroupNode(){
+    /**
+     * The graph pattern which will be used provided to the service when it is
+     * invoked.
+     */
+    @SuppressWarnings("unchecked")
+    public IGroupNode<IGroupMemberNode> getGroupNode() {
 
-        return (IGroupNode<IGroupMemberNode>)getProperty(Annotations.GROUP_NODE);
+        return (IGroupNode<IGroupMemberNode>) getProperty(Annotations.GROUP_NODE);
 
-    }
-
-    public ServiceCall getServiceCall(){
-
-        return (ServiceCall)getProperty(Annotations.SERVICE_CALL);
-
-    }
-
-    public void setServiceCall(ServiceCall call){
-        setProperty(Annotations.SERVICE_CALL, call);
     }
 
     @Override
     public String toString(int indent) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(indent(indent));
-        sb.append("SERVICE <");
-        sb.append(getServiceURI().toString());
-        sb.append("> ");
-        if(getGroupNode()!=null){
-            sb.append(getGroupNode().toString(indent));
-        }
+
+        final StringBuilder sb = new StringBuilder();
+
+        final URI serviceURI = getServiceURI();
+        final String name = getName();
         final VarNode[] joinVars = getJoinVars();
 
+        sb.append("\n");
+        sb.append(indent(indent));
+        sb.append("SERVICE <");
+        sb.append(serviceURI);
+        sb.append("> ");
+
+        sb.append(" AS ");
+        sb.append(name);
+        
         if (joinVars != null) {
 
             sb.append(" JOIN ON (");
@@ -181,6 +177,13 @@ public class ServiceNode extends GroupMemberNodeBase {
             sb.append(")");
 
         }
+
+        if (getGroupNode() != null) {
+
+            sb.append(getGroupNode().toString(indent));
+            
+        }
+        
         return sb.toString();
 
     }

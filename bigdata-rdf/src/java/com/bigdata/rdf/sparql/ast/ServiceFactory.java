@@ -27,25 +27,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.striterator.ICloseableIterator;
-
 /**
- * Service invocation interface.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * Factory for creating {@link BigdataServiceCall}s from registered service
+ * URIs.
  */
-public interface ServiceCall<E> {
+public interface ServiceFactory {
 
     /**
-     * Invoke an service.
+     * Create a service invocation object.
      * 
-     * @param bindingSets
-     *            The BindingsClause from the SPARQL grammar.
+     * @param lex
+     *            The namespace of the lexicon.
+     * @param groupNode
+     *            The graph pattern parameter to the service.
      * 
-     * @return An iterator from which the solutions can be drained. If the
-     *         iterator is closed, the service invocation must be cancelled.
+     * @return The object which can be used to evaluate the service on the graph
+     *         pattern.
      */
-    ICloseableIterator<E> call(E[] bindingSets);
+    BigdataServiceCall create(
+			final String lex,
+			final IGroupNode<IGroupMemberNode> groupNode);
 
 }

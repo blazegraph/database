@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.rdf.internal;
+package com.bigdata.bop.controller;
 
 import java.util.Map;
 import java.util.UUID;
@@ -46,10 +46,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.HashJoinUtility;
 import com.bigdata.btree.Checkpoint;
@@ -61,10 +59,12 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sparql.ast.ServiceCall;
+import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.WrappedAsynchronousIterator;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 
 /**
  * Evaluation of a service call, producing a named result set. This operator passes
@@ -252,7 +252,7 @@ public class ServiceOp extends PipelineOp {
         private final NamedSolutionSetStats stats;
 
         /** The subquery which is evaluated for each input binding set. */
-        private final ServiceCall serviceCall;
+        private final BigdataServiceCall serviceCall;
 
         /** Metadata to identify the named solution set. */
         private final NamedSolutionSetRef namedSetRef;
@@ -288,7 +288,7 @@ public class ServiceOp extends PipelineOp {
 
             this.stats = ((NamedSolutionSetStats) context.getStats());
 
-            this.serviceCall = (ServiceCall) op
+            this.serviceCall = (BigdataServiceCall) op
                     .getRequiredProperty(Annotations.SERVICE_CALL);
 
             this.namedSetRef = (NamedSolutionSetRef) op
@@ -472,9 +472,9 @@ public class ServiceOp extends PipelineOp {
             /**
              * The root operator for the subquery.
              */
-            private final ServiceCall serviceCall;
+            private final BigdataServiceCall serviceCall;
 
-            public ServiceTask(final IBindingSet bset, final ServiceCall serviceCall,
+            public ServiceTask(final IBindingSet bset, final BigdataServiceCall serviceCall,
                     final BOpContext<IBindingSet> parentContext) {
 
                 this.bset = bset;
@@ -491,8 +491,22 @@ public class ServiceOp extends PipelineOp {
                 IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
                 try {
 
-						// Iterator visiting the subquery solutions.
-						subquerySolutionItr =  serviceCall.call(parentContext.getRunningQuery());
+                    /*
+                     * FIXME The BindingsClause needs to be on the QueryRoot. It
+                     * should be translated to IVs when we parse the SPARQL
+                     * query. If the service invocation is an external service
+                     * then we need to materialize the IVs (or cache them up
+                     * front) and send them along and, in addition, bulk resolve
+                     * the visited BindingSets using the
+                     * BigdataOpenRDFBindingSetsResolverator (there might be a
+                     * BigdataServiceCall class which handles this and delegates
+                     * through to an HTTP request against a remote Service URI).
+                     * Otherwise we should pass in the IBindingSet[].
+                     */
+                    // Iterator visiting the subquery solutions.
+                    subquerySolutionItr = new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
+                            new ChunkedWrappedIterator<IBindingSet>(
+                                    serviceCall.call(null/* BindingsClause */)));
 
 						// Buffer the solutions on the hash index.
                         final long ncopied = HashJoinUtility.acceptSolutions(
