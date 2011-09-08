@@ -22,9 +22,14 @@ public class SparqlEndpointConfig {
      * unbounded pool.
      */
     final public int queryThreadPoolSize;
+    
+    /**
+     * @see com.bigdata.rdf.sail.BigdataSail.Options#NATIVE_SPARQL
+     */
+    final public boolean nativeSparql;
 
     public SparqlEndpointConfig(final String namespace, final long timestamp,
-            final int queryThreadPoolSize) {
+            final int queryThreadPoolSize, final boolean nativeSparql) {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -34,6 +39,8 @@ public class SparqlEndpointConfig {
         this.timestamp = timestamp;
 
         this.queryThreadPoolSize = queryThreadPoolSize;
+        
+        this.nativeSparql = nativeSparql;
 
     }
 

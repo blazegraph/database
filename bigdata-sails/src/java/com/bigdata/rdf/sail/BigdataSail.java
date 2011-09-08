@@ -239,7 +239,6 @@ public class BigdataSail extends SailBase implements Sail {
      * Additional parameters understood by the Sesame 2.x SAIL implementation.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends com.bigdata.rdf.store.AbstractTripleStore.Options {
     
@@ -385,10 +384,13 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Option to use the new query plan generator (default
          * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
+         * 
+         * @deprecated
          */
         public static final String NEW_EVAL_STRATEGY = BigdataSail.class.getPackage()
                 .getName()+ ".newEvalStrategy";
 
+        @Deprecated
         public static final String DEFAULT_NEW_EVAL_STRATEGY = "true";
         
         /**
@@ -397,10 +399,13 @@ public class BigdataSail extends SailBase implements Sail {
          * exceptions.  If true, these queries will run heinously slow but they
          * will run. (default
          * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
+         * 
+         * @deprecated
          */
         public static final String ALLOW_SESAME_QUERY_EVALUATION = BigdataSail.class.getPackage()
                 .getName()+ ".allowSesameQueryEvaluation";
 
+        @Deprecated
         public static final String DEFAULT_ALLOW_SESAME_QUERY_EVALUATION = "false";
         
     }
@@ -2063,7 +2068,6 @@ public class BigdataSail extends SailBase implements Sail {
          * Namespace iterator.
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
          */
         private class NamespaceIterator implements CloseableIteration<Namespace,SailException> {
 

@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
@@ -18,12 +19,13 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -45,6 +47,9 @@ public class BigdataSailTupleQuery extends SailTupleQuery
      */
     private volatile TupleExpr tupleExpr;
     
+    /** Set when the query is evaluated. */
+    private volatile QueryRoot optimizedQuery;
+
     private final QueryRoot queryRoot;
     
     public Properties getQueryHints() {
@@ -59,6 +64,51 @@ public class BigdataSailTupleQuery extends SailTupleQuery
         
     }
 
+    @Override
+    public void setDataset(final Dataset dataset) {
+        
+        if(queryRoot == null) {
+            
+            super.setDataset(dataset);
+            
+        } else {
+
+            /*
+             * Batch resolve RDF Values to IVs and then set on the query model.
+             */
+            
+            try {
+                
+                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
+                
+                queryRoot.setDataset(new DatasetNode((Dataset) tmp[0]));
+                
+            } catch (SailException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+        
+    }
+    
+    @Override
+    public String toString() {
+
+        if (queryRoot == null)
+            return super.toString();
+        
+        QueryRoot tmp = optimizedQuery;
+
+        if (tmp == null)
+            tmp = queryRoot;
+
+        return BOpUtility.toString2(tmp);
+
+    }
+    
     public AbstractTripleStore getTripleStore() {
 
         return ((BigdataSailRepositoryConnection) getConnection())

@@ -17,10 +17,12 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -43,12 +45,60 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     	
     }
 
+    /** Set when the query is evaluated. */
+    private volatile QueryRoot optimizedQuery;
+
     private final QueryRoot queryRoot;
 
     public QueryRoot getQueryRoot() {
         
         return queryRoot;
         
+    }
+
+    @Override
+    public void setDataset(final Dataset dataset) {
+        
+        if(queryRoot == null) {
+            
+            super.setDataset(dataset);
+            
+        } else {
+
+            /*
+             * Batch resolve RDF Values to IVs and then set on the query model.
+             */
+            
+            try {
+                
+                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
+                
+                queryRoot.setDataset(new DatasetNode((Dataset) tmp[0]));
+                
+            } catch (SailException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+        
+    }
+    
+    @Override
+    public String toString() {
+
+        if (queryRoot == null)
+            return super.toString();
+        
+        QueryRoot tmp = optimizedQuery;
+
+        if (tmp == null)
+            tmp = queryRoot;
+
+        return BOpUtility.toString2(tmp);
+    
     }
 
     public AbstractTripleStore getTripleStore() {

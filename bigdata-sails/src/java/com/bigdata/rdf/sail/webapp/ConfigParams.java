@@ -1,5 +1,8 @@
 package com.bigdata.rdf.sail.webapp;
 
+import org.openrdf.query.algebra.QueryRoot;
+import org.openrdf.query.algebra.TupleExpr;
+
 /**
  * Interface declaring the <code>config-param</code>s understood by the
  * {@link BigdataRDFServletContextListener}.
@@ -38,6 +41,18 @@ public interface ConfigParams {
     String QUERY_THREAD_POOL_SIZE = "query-thread-pool-size";
     
     int DEFAULT_QUERY_THREAD_POOL_SIZE = 16;
+    
+    /**
+     * When <code>true</code>, all query evaluation will be handled by bigdata.
+     * Bigdata will parse the SPARQL query into its own AST {@link QueryRoot}
+     * and then evaluate that. The Sesame {@link TupleExpr} operator model will
+     * NOT be used. This option provides access new bigdata query operators,
+     * including those which can exploit the JVM process heap, those which can
+     * pipeline aggregations, and those which can be parallelized on a cluster.
+     */
+    String NATIVE_SPARQL = "nativeSparql";
+    
+    boolean DEFAULT_NATIVE_SPARQL = true;
     
     /**
      * Force a compacting merge of all shards on all data services in a

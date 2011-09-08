@@ -67,7 +67,10 @@ import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.sparql.BigdataParsedQuery;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
@@ -95,6 +98,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String EXPLAIN = "explain";
     
 	private final SparqlEndpointConfig m_config;
+	
+    /**
+     * Note: will use {@link Bigdata2ASTSPARQLParser} if null.
+     */
 	private final QueryParser m_queryParser;
 
     /**
@@ -145,7 +152,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 		// used to parse queries.
 //		m_queryParser = new SPARQLParserFactory().getParser();
-		m_queryParser = new BigdataSPARQLParser();
+		if(config.nativeSparql) {
+		    /*
+		     * Bigdata handles all query evaluation.
+		     */
+		    m_queryParser = null;
+		} else {
+		    /*
+		     * Hybrid of Sesame TupleExpr model and bigdata evaluation.
+		     */
+		    m_queryParser = new BigdataSPARQLParser();
+		}
 
         if (config.queryThreadPoolSize == 0) {
 
@@ -503,6 +520,27 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
+            final QueryRoot queryRoot = parsedQuery instanceof BigdataParsedQuery ? ((BigdataParsedQuery) parsedQuery)
+                    .getQueryRoot() : null;
+
+            if ( queryRoot != null) {
+
+                switch (queryRoot.getQueryType()) {
+                case SELECT:
+                    return new BigdataSailTupleQuery(queryRoot, cxn);
+                case DESCRIBE:
+                case CONSTRUCT:
+                    return new BigdataSailGraphQuery(queryRoot, cxn);
+                case ASK: {
+                    return new BigdataSailBooleanQuery(queryRoot, cxn);
+                }
+                default:
+                    throw new RuntimeException("Unknown query type: "
+                            + queryRoot.getQueryType());
+                }
+                
+            }
+            
             final Properties queryHints = ((IBigdataParsedQuery) parsedQuery)
                     .getQueryHints();
 
@@ -805,7 +843,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final HttpServletRequest req,//
             final OutputStream os) throws MalformedQueryException {
 
-
         /*
          * Setup the baseURI for this request. It will be set to the requestURI.
          */
@@ -818,8 +855,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
-        final ParsedQuery parsedQuery = m_queryParser.parseQuery(queryStr,
-                baseURI);
+        final ParsedQuery parsedQuery;
+        if (m_queryParser == null) {
+            parsedQuery = new Bigdata2ASTSPARQLParser(getTripleStore(namespace,
+                    timestamp)).parseQuery(queryStr, baseURI);
+        } else {
+            parsedQuery = m_queryParser.parseQuery(queryStr, baseURI);
+        }
 
         if (log.isDebugEnabled())
             log.debug(parsedQuery.toString());
@@ -941,6 +983,37 @@ public class BigdataRDFContext extends BigdataBaseContext {
      *            The timestamp.
      * 
      * @throws RepositoryException
+     */
+    public BigdataSailRepositoryConnection getQueryConnection(
+            final String namespace, final long timestamp)
+            throws RepositoryException {
+
+        final AbstractTripleStore tripleStore = getTripleStore(namespace,
+                timestamp);
+        
+        // Wrap with SAIL.
+        final BigdataSail sail = new BigdataSail(tripleStore);
+
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+        repo.initialize();
+
+        return (BigdataSailRepositoryConnection) repo
+                .getReadOnlyConnection(timestamp);
+
+    }
+
+    /**
+     * Return a read-only view of the {@link AbstractTripleStore} for the given
+     * namespace will read from the commit point associated with the given
+     * timestamp.
+     * 
+     * @param namespace
+     *            The namespace.
+     * @param timestamp
+     *            The timestamp.
+     * 
+     * @throws RepositoryException
      * 
      * @todo enforce historical query by making sure timestamps conform (we do
      *       not want to allow read/write tx queries unless update semantics are
@@ -949,13 +1022,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @todo Use a distributed read-only tx for queries (it would be nice if a
      *       tx used 2PL to specify which namespaces it could touch).
      */
-    public BigdataSailRepositoryConnection getQueryConnection(
-            final String namespace, final long timestamp)
-            throws RepositoryException {
-
+    public AbstractTripleStore getTripleStore(final String namespace,
+            final long timestamp) {
+        
         if (timestamp == ITx.UNISOLATED)
             throw new IllegalArgumentException("UNISOLATED reads disallowed.");
-        
+
         // resolve the default namespace.
         final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
                 .getResourceLocator().locate(namespace, timestamp);
@@ -967,16 +1039,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         }
 
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        return (BigdataSailRepositoryConnection) repo
-                .getReadOnlyConnection(timestamp);
-
+        return tripleStore;
+        
     }
 
     /**
