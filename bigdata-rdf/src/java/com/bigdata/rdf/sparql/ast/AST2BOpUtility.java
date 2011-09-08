@@ -356,7 +356,7 @@ public class AST2BOpUtility {
 
         }
 
-//        left = addEndOp(left, ctx);
+        left = addEndOp(left, ctx);
         
         /*
          * Set a timeout on a query or subquery.
