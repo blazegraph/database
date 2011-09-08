@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.bop.IConstraint;
-import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
-import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
-
 /**
  * Test driver for debugging Sesame or DAWG manifest tests.
  * 
