@@ -65,6 +65,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.ServiceOp;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
@@ -244,6 +245,11 @@ public class AST2BOpUtility {
          * Named subqueries.
          */
         if (query instanceof QueryRoot) {
+
+			/*
+			 *Materialize the results for the service calls into hashjoin
+			 */
+			left = addServiceNodes(left, (QueryRoot) query, ctx);
 
             final NamedSubqueriesNode namedSubqueries = ((QueryRoot) query)
                     .getNamedSubqueries();
@@ -451,6 +457,77 @@ public class AST2BOpUtility {
         
     }
 
+private static PipelineOp addServiceNodes(PipelineOp left, final QueryRoot queryRoot, final AST2BOpContext ctx) {
+
+        final Iterator<ServiceNode> svcNodes = BOpUtility.visitAll(queryRoot, ServiceNode.class);
+
+        while (svcNodes.hasNext()) {
+
+            ServiceNode node = svcNodes.next();
+
+            ServiceCall sc = node.getServiceCall();
+
+            if (sc == null) {
+
+                sc = ServiceRegistry.toServiceCall(ctx.getLexiconNamespace(), node.getServiceURI(), node.getGroupNode());
+
+                node.setServiceCall(sc);
+            }
+            final IVariable<?>[] joinVars = ASTUtil.convert(node.getJoinVars());
+
+            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(ctx.queryId, node.getName(), joinVars);
+
+            left = new ServiceOp(leftOrEmpty(left), //
+            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+            new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+            new NV(ServiceOp.Annotations.SERVICE_CALL, sc),//
+            new NV(ServiceOp.Annotations.JOIN_VARS, joinVars),//
+            new NV(ServiceOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            );
+
+        }
+
+        return left;
+
+    }
+
+    /**
+     * Add a join against a pre-computed temporary solution set into a join group.
+     * <p>
+     * Note: Since the subquery solution set has already been computed and only contains bindings for solutions projected by the
+     * subquery, we do not need to adjust the visibility of bindings when we execute the hash join against the named solution
+     * set.
+     */
+    private static PipelineOp addServiceNode(PipelineOp left, final ServiceNode serviceNode, final AST2BOpContext ctx) {
+
+        if (log.isInfoEnabled())
+            log.info("service: uri=" + serviceNode.getServiceURI());
+
+        ServiceCall call = serviceNode.getServiceCall();
+
+        if (call == null) {
+
+            call = ServiceRegistry.toServiceCall(ctx.getLexiconNamespace(), serviceNode.getServiceURI(), serviceNode.getGroupNode());
+
+            serviceNode.setServiceCall(call);
+        }
+
+
+        final IVariable<?>[] joinVars = ASTUtil.convert(serviceNode.getJoinVars());
+
+        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(ctx.queryId, serviceNode.getName(), joinVars);
+
+        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
+        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+        new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+        new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF, namedSolutionSetRef),//
+        new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
+        );
+
+        return left;
+
+    }
     /**
      * Add a join against a pre-computed temporary solution set into a join
      * group.
@@ -901,6 +978,13 @@ public class AST2BOpUtility {
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
+		/*
+         * Add the processed service node calls and insert the results into hash
+         */
+        for (IGroupMemberNode child : joinGroup) {
+            if (child instanceof ServiceNode)
+                left = addServiceNode(left, (ServiceNode) child, ctx);
+        }
         /*
          * Required joins and non-optional subqueries.
          * 

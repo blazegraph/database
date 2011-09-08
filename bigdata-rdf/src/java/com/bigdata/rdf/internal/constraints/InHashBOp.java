@@ -126,9 +126,9 @@ public class InHashBOp extends InBOp {
 
     public boolean accept(final IBindingSet bindingSet) {
         
-        if (valueExpr == null) {
+        if (valueExpr == null||set==null) {
             synchronized (this) {
-                if (valueExpr == null) {
+                if (valueExpr == null||set==null) {
                     // init() is guarded by double-checked locking pattern.
                     init();
                 }
