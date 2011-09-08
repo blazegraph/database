@@ -47,4 +47,6 @@ public interface IGroupMemberNode extends IQueryNode {
      */
     void setParent(final IGroupNode parent);
 
+    public TermNode getContext();
+
 }

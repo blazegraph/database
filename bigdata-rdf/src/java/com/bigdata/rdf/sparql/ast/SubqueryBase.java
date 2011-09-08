@@ -63,4 +63,23 @@ abstract public class SubqueryBase extends QueryBase implements
 
     }
 
+    /**
+     * Return the graph variable or constant iff this {@link JoinGroupNode}
+     * models a GraphPatternGroup. When not present, this reads up the parent
+     * chain to locate the dominating graph context.
+     */
+    public TermNode getContext() {
+
+        final IQueryNode parent = getParent();
+
+        if (parent instanceof GroupMemberNodeBase<?>) {
+
+            return ((GroupMemberNodeBase<?>) parent).getContext();
+
+        }
+
+        return null;
+
+    }
+
 }
