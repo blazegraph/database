@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -106,7 +105,7 @@ public class BigdataValueReplacer {
          * indicates that the query CAN NOT be satisfied by the data since
          * one or more required terms are unknown to the database.
          */
-        final HashMap<Value, BigdataValue> values = new HashMap<Value, BigdataValue>();
+        final Map<Value, BigdataValue> values = new LinkedHashMap<Value, BigdataValue>();
         
         /*
          * The set of variables encountered in the query.
@@ -125,7 +124,7 @@ public class BigdataValueReplacer {
             
         }
 
-        if(tupleExpr != null)
+        if(tupleExpr != null) {
         tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
             @Override
@@ -180,7 +179,7 @@ public class BigdataValueReplacer {
             }
             
         });
-        
+        } // tupleExpr != null
         if (bindings != null) {
         
             final Iterator<Binding> it = bindings.iterator();
@@ -251,7 +250,7 @@ public class BigdataValueReplacer {
          * Replace the values with BigdataValues having their resolve term
          * identifiers.
          */
-        if(tupleExpr!=null)
+        if(tupleExpr!=null) {
         tupleExpr.visit(new QueryModelVisitorBase<SailException>() {
 
             @Override
@@ -329,7 +328,7 @@ public class BigdataValueReplacer {
             }
             
         });
-        
+        } // tupleExpr != null
         if (bindings != null) {
         
             /*
@@ -344,16 +343,21 @@ public class BigdataValueReplacer {
                 
                 final BindingImpl binding = (BindingImpl) it.next();
 
-                if (!vars.containsKey(binding.getName())) {
-
-                    // Drop bindings which are not used within the query.
-                    
-                    if (log.isInfoEnabled())
-                        log.info("Dropping unused binding: var=" + binding);
-                    
-                    continue;
-                    
-                }
+                /*
+                 * Note: We can not do this. The Sesame APIs let bindings flow
+                 * through the query even if they are not projected by the
+                 * query.
+                 */
+//                if (!vars.containsKey(binding.getName())) {
+//
+//                    // Drop bindings which are not used within the query.
+//                    
+//                    if (log.isInfoEnabled())
+//                        log.info("Dropping unused binding: var=" + binding);
+//                    
+//                    continue;
+//                    
+//                }
                 
                 final Value val = binding.getValue();
                 
