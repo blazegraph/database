@@ -1112,7 +1112,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                     /*
                      * Close the query buffer so the iterator draining the query
                      * results will recognize that no new results will become
-                     * available.
+                     * available. Failure to do this will cause the iterator to
+                     * hang waiting for more results.
                      */
                     queryBuffer.close();
                 }
