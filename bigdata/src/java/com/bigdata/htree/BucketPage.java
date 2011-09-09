@@ -347,39 +347,11 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		if (key == null)
 			throw new IllegalArgumentException();
 
-		// #of slots on the page.
-		final int slotsOnPage = slotsOnPage(); // (1 << htree.addressBits);
-
-		// #of address slots in each buddy hash table.
-		// final int slotsPerBuddy = (1 << globalDepth);
-
-		// // #of buddy tables on a page.
-		// final int nbuddies = (slotsOnPage) / slotsPerBuddy;
-
-		// final int lastSlot = buddyOffset + slotsPerBuddy;
-
-		// range check buddyOffset.
-		// if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-		// throw new IndexOutOfBoundsException();
-
 		/*
-		 * Locate the first unassigned tuple in the buddy bucket.
-		 * 
-		 * TODO Faster comparison with a coded key in the raba by either (a)
-		 * asking the raba to do the equals() test; or (b) copying the key from
-		 * the raba into a buffer which we reuse for each test. This is another
-		 * way in which the hash table keys raba differs from the btree keys
-		 * raba.
-		 */
-		final IRaba keys = getKeys();
-		for (int i = 0; i < slotsOnPage; i++) {
-			if (!keys.isNull(i)) {
-				if (BytesUtil.bytesEqual(key, keys.get(i))) {
-					return true;
-				}
-			}
-		}
-		return false;
+		 * Use search to locate key, buddy offset is ignored for BucketPage
+		 */	
+		final int index = getKeys().search(key);
+		return index >= 0;
 	}
 
 	/**
@@ -544,36 +516,24 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			return copy.insert(key, val);
 
 		}
+		
+		// convert to raw record if necessary
+		final byte[] ival = checkRawRecord(val);
 
-		/*
-		 * Locate the first unassigned tuple in the buddy bucket.
-		 * 
-		 * Note: Given the IRaba data structure, this will require us to examine
-		 * the keys for a null. The "keys" rabas do not allow nulls, so we will
-		 * need to use a "values" raba (nulls allowed) for the bucket keys.
-		 * Unless we keep the entries in a buddy bucket dense (maybe making them
-		 * dense when they are persisted for faster scans, but why bother for
-		 * mutable buckets?) we will have to scan the entire buddy bucket to
-		 * find an open slot (or just to count the #of slots which are currently
-		 * in use).
-		 */
 		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
-		final MutableValueBuffer vals = (MutableValueBuffer) getValues();
-
-		for (int i = 0; i < slotsOnPage; i++) {
-			if (keys.isNull(i)) {
-				keys.nkeys++;
-				keys.keys[i] = key;
-				vals.nvalues++;
-				setValue(i, val);
-				// TODO deleteMarker:=false
-				// TODO versionTimestamp:=...
-				((HTree) htree).nentries++;
-				// insert Ok.
-				return true;
+		if (keys.nkeys < keys.capacity()) {
+			int insIndex = keys.search(key);
+			if (insIndex < 0) {
+				insIndex = -insIndex - 1;
 			}
+			
+			((MutableBucketData) data).insert(insIndex, key, ival, ival != val);
+			
+			((HTree) htree).nentries++;
+			
+			return true;
 		}
-
+			
 		/*
 		 * There is only one buddy on the page. Now we have to figure out
 		 * whether or not all keys are duplicates.
@@ -638,6 +598,27 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		return true;
 	}
 
+	/**
+	 * Checks to see if the value supplied should be converted to a raw record, and
+	 * if so converts it.
+	 * 
+	 * @param val - value to be checked
+	 * @return the value to be used, converted to raw record reference if required
+	 */
+	private byte[] checkRawRecord(final byte[] val) {
+		if (hasRawRecords() && val != null && val.length > htree.getMaxRecLen()) {
+
+			// write the value on the backing store.
+			final long naddr = htree.writeRawRecord(val);
+
+			// convert to byte[].
+			return ((HTree) htree).encodeRecordAddr(naddr);
+		} else {
+			return val;
+		}
+
+	}
+	
 	/**
 	 * Insert used when addLevel() is invoked to copy a tuple from an existing
 	 * bucket page into another bucket page. This method is very similar to
