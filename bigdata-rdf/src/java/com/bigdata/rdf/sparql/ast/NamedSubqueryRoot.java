@@ -136,7 +136,9 @@ public class NamedSubqueryRoot extends SubqueryBase {
 
         final StringBuilder sb = new StringBuilder();
         
-        super.toString(indent);
+        sb.append(super.toString(indent));
+        
+        sb.append("\n");
         
         sb.append(indent(indent));
 

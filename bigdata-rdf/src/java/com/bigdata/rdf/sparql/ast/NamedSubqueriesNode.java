@@ -48,18 +48,14 @@ public class NamedSubqueriesNode extends QueryNodeListBaseNode<NamedSubqueryRoot
 
     public String toString(final int indent) {
 
-        final String s = indent(indent);
-
-        final StringBuilder sb = new StringBuilder(s);
+        final StringBuilder sb = new StringBuilder();
 
         for (NamedSubqueryRoot n : this) {
             sb.append("\n");
-            sb.append(s);
+            sb.append(indent(indent));
             sb.append("WITH {");
             sb.append(n.toString(indent + 1));
-            sb.append("\n");
-            sb.append(s);
-            sb.append("AS " + n.getName() + "\n");
+            sb.append("} AS " + n.getName());
         }
 
         return sb.toString();

@@ -112,6 +112,10 @@ import com.bigdata.relation.rule.Rule;
  *          need to strip out bindings introduced by anonymous variables which
  *          are part of query rewrites. The former seems easier.
  * 
+ *          TODO The combination of DISTINCT and ORDER BY can be optimized using
+ *          just an ORDER BY in which duplicate solutions are discarded after
+ *          the sort.
+ * 
  *          TODO What about the backchain access path stuff? Are we going prolog
  *          / datalog or bringing that stuff forward?
  */

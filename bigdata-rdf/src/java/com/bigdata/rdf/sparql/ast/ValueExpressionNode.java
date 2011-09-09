@@ -48,6 +48,33 @@ public class ValueExpressionNode extends ASTBase implements
 
     }
 
+    /**
+     * Return <code>true</code> iff this is a {@link ConstantNode}.
+     */
+    public final boolean isConstant() {
+        
+        return this instanceof ConstantNode;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff this is a {@link VarNode}.
+     */
+    public final boolean isVariable() {
+        
+        return this instanceof VarNode;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff this is a {@link FunctionNode}.
+     */
+    public final boolean isFunction() {
+        
+        return this instanceof FunctionNode;
+        
+    }
+
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public IValueExpression<? extends IV> getValueExpression() {
 

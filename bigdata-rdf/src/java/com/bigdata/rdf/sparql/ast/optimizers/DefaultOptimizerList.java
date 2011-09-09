@@ -38,12 +38,13 @@ import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
 /**
  * Pre-populated list of the default optimizers.
  * 
  * <pre>
- * optimizerList.add(new BindingAssigner()); // yes.
+ * optimizerList.add(new BindingAssigner()); // done.
  * optimizerList.add(new ConstantOptimizer(strategy));
  * optimizerList.add(new CompareOptimizer());
  * optimizerList.add(new ConjunctiveConstraintSplitter());
@@ -129,6 +130,41 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
  * not share any variables at all then it will produce a cross product and,
  * again, we want to run that subquery once.)
  * 
+ * <pre>
+ * 
+ * TODO From BigdataEvaluationStrategyImpl3#945
+ * 
+ * Prunes the sop tree of optional join groups containing values
+ * not in the lexicon.
+ * 
+ *         sopTree = stb.pruneGroups(sopTree, groupsToPrune);
+ * 
+ * 
+ * If after pruning groups with unrecognized values we end up with a
+ * UNION with no subqueries, we can safely just return an empty
+ * iteration.
+ * 
+ *         if (SOp2BOpUtility.isEmptyUnion(sopTree.getRoot())) {
+ *             return new EmptyIteration<BindingSet, QueryEvaluationException>();
+ *         }
+ * </pre>
+ * 
+ * and also if we encounter a value not in the lexicon, we can still continue
+ * with the query if the value is in either an optional tail or an optional join
+ * group (i.e. if it appears on the right side of a LeftJoin). We can also
+ * continue if the value is in a UNION. Otherwise we can stop evaluating right
+ * now.
+ * 
+ * <pre>
+ *                 } catch (UnrecognizedValueException ex) {
+ *                     if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
+ *                         throw new UnrecognizedValueException(ex);
+ *                     } else {
+ *                         groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
+ *                     }
+ *                 }
+ * </pre>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
  *          thompsonbry$
@@ -141,21 +177,17 @@ public class DefaultOptimizerList extends OptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
-
-//        /**
-//         * Rule: A variable within a subquery is distinct from the same name
-//         * variable outside of the subquery unless the variable is projected
-//         * from the subquery.
-//         * <p>
-//         * This rewrites variable variable names within subqueries which are not
-//         * projected out of the subquery such that they do not overlap with
-//         * other variables in the query.
-//         * <p>
-//         * Note: This must be run before the {@link ASTBindingAssigner} since
-//         * otherwise we could bind a variable in a subquery which was not being
-//         * projected by that subquery.
-//         */
-//        add(new ASTSubqueryVariableScopeRewrite());
+        
+        /**
+         * Translate {@link BD#SEARCH} and associated magic predicates into a
+         * {@link NamedSubqueryRoot} using a {@link ServiceNode} to invoke the
+         * search engine and replace those magic predicates with a
+         * {@link NamedSubqueryInclude}. If there are multiple searches in the
+         * query, then each is translated into its own named subquery / include
+         * pattern. The magic predicates identify the bindings to be projected
+         * out of the named subquery (rank, cosine, etc).
+         */
+//        add(new ASTSearchOptimizer());
         
         /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of

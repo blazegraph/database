@@ -29,7 +29,7 @@ public abstract class TermNode extends ValueExpressionNode {
 		super(args, anns);
 		
 	}
-	
+
 	/**
 	 * Strengthen the return type.
 	 */

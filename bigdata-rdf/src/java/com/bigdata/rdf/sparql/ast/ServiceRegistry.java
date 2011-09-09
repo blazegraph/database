@@ -6,20 +6,31 @@ import java.util.concurrent.ConcurrentMap;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 
 /**
- * Registry for service calls
+ * Registry for service calls.
  * 
+ * TODO We should restrict registration of services in the {@link BD#NAMESPACE}
+ * to static initialization.
  */
 public class ServiceRegistry {
 
-    public interface Annotations extends AggregateBase.Annotations{
+    private static ConcurrentMap<URI, ServiceFactory> services;
+
+    /**
+     * Pre-register well known services.
+     */
+    static {
+        
+        services = new ConcurrentHashMap<URI, ServiceFactory>();
+        
+        ServiceRegistry.add(BD.SEARCH, new SearchServiceFactory());
+
     }
-
-	private static ConcurrentMap<URI, ServiceFactory> services = new ConcurrentHashMap<URI, ServiceFactory>();
-
+    
     public static boolean containsService(final URI functionUri){
         
         return services.containsKey(functionUri);
