@@ -45,24 +45,24 @@ public class TestRawRecords extends AbstractHTreeTestCase {
         metadata.setRawRecords(true);
         metadata.setMaxRecLen(64);
 
-		final HTree btree = HTree.create(store, metadata);
+		final HTree htree = HTree.create(store, metadata);
 
-		assertEquals(64, btree.getMaxRecLen());
+		assertEquals(64, htree.getMaxRecLen());
 
-		assertTrue(btree.rawRecords);
+		assertTrue(htree.rawRecords);
 
 		final byte[] key = new byte[] { 1, 2, 3 };
-		final byte[] val = new byte[btree.getMaxRecLen() + 1];
+		final byte[] val = new byte[htree.getMaxRecLen() + 1];
 		r.nextBytes(val);
 		
 		// insert an entry under that key.
-		assertNull(btree.insert(key, val));
+		assertNull(htree.insert(key, val));
 
 		// this test assumes that everything is in a single bucket page.
-		assertEquals(1, btree.getLeafCount());
+		assertEquals(1, htree.getLeafCount());
 
 		// examine the root.
-		final DirectoryPage root = (DirectoryPage) btree.getRoot();
+		final DirectoryPage root = (DirectoryPage) htree.getRoot();
 		
 		// all references should be to the same bucket page.
 		final BucketPage bucket = (BucketPage) root.childRefs[0].get();
@@ -73,7 +73,7 @@ public class TestRawRecords extends AbstractHTreeTestCase {
 		assertTrue(addr != IRawStore.NULL);
 
 		// read the raw record from the store.
-		final ByteBuffer actual = btree.readRawRecord(addr);
+		final ByteBuffer actual = htree.readRawRecord(addr);
 
 		// verify that the expected data were read.
 		TestCase3.assertEquals(val, actual);

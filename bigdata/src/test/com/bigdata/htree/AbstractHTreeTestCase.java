@@ -266,6 +266,16 @@ public class AbstractHTreeTestCase extends TestCase2 {
 		fail("Write test helper method");
 	
 	}
+
+	public static void assertSameOrderIterator(byte[][] keys,
+			Iterator<byte[]> values) {
+		for (int i = 0; i < keys.length; i++) {
+			final byte[] other = values.next();
+			
+			if (!BytesUtil.bytesEqual(keys[i], other))
+				fail("Unexpected ordered value");
+		}
+	}
     
 //	/**
 //	 * A suite of tests designed to verify that one htree correctly represents

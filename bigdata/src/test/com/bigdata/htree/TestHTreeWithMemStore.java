@@ -141,7 +141,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
         final int writeRetentionQueueCapacity = 30; // FIXME was 20
         
-        final int numOverflowPages = 5000; // FIXME was 5000
+        final int numOverflowPages = 1000; // FIXME was 5000
 
         doOverflowStressTest(addressBits, writeRetentionQueueCapacity, numOverflowPages);
         
@@ -258,6 +258,10 @@ public class TestHTreeWithMemStore extends TestCase {
                 assertEquals(total,visits);
             }
             
+            for (int i = 0; i < keys.length; i++) {
+             	assertTrue(htree.contains(keys[i]));
+            }
+            
             final long end = System.currentTimeMillis();
             
             final BTreeCounters counters = htree.getBtreeCounters();
@@ -343,7 +347,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 100000;
+    private static final int s_limit = 10000;
     private static final int s_retentionQueueCapacity = 20;
 
     /**
@@ -452,5 +456,144 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
 
-    
+    public void test_orderedInsert_addressBits2() {
+
+    	doOrderedTest(2/* addressBits */, 40/*s_retentionQueueCapacity*/);
+        
+    }
+
+    public void test_orderedInsert_addressBits4() {
+
+    	doOrderedTest(4/* addressBits */, s_retentionQueueCapacity);
+        
+    }
+
+    public void test_orderedInsert_addressBits8() {
+
+    	doOrderedTest(8/* addressBits */, s_retentionQueueCapacity);
+        
+    }
+
+    public void test_orderedInsert_addressBits10() {
+
+    	doOrderedTest(10/* addressBits */, s_retentionQueueCapacity);
+        
+    }
+
+    private void doOrderedTest(final int addressBits,
+            final int writeRetentionQueueCapacity) {
+
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
+                Integer.MAX_VALUE);
+
+        try {
+
+            final HTree htree = getHTree(store, addressBits,
+                    false/* rawRecords */, writeRetentionQueueCapacity);
+
+            try {
+
+                // Verify initial conditions.
+                assertTrue("store", store == htree.getStore());
+                assertEquals("addressBits", addressBits, htree.getAddressBits());
+
+                final IKeyBuilder keyBuilder = new KeyBuilder();
+
+                final byte[][] keys = new byte[s_limit][];
+                for (int i = 0; i < s_limit; i++) {
+                    keys[i] = keyBuilder.reset().append(new Integer(i).hashCode()).getKey();
+                }
+                final long begin = System.currentTimeMillis();
+                // insert in overlapping sequences of 0,2,4,6,8 - 1,3,5,7,9
+                for (int i = 0; i < s_limit; i+=10) {
+                	
+                    htree.insert(keys[i], keys[i]);
+                    htree.insert(keys[i+2], keys[i+2]);
+                    htree.insert(keys[i+4], keys[i+4]);
+                    htree.insert(keys[i+6], keys[i+6]);
+                    htree.insert(keys[i+8], keys[i+8]);
+                    htree.insert(keys[i+1], keys[i+1]);
+                    htree.insert(keys[i+3], keys[i+3]);
+                    htree.insert(keys[i+5], keys[i+5]);
+                    htree.insert(keys[i+7], keys[i+7]);
+                    htree.insert(keys[i+9], keys[i+9]);
+                   
+                    if (log.isTraceEnabled())
+                        log.trace("after key=" + i + "\n" + htree.PP());
+
+                }
+
+                final long elapsedInsertMillis = System.currentTimeMillis() - begin;
+                
+                assertEquals(s_limit, htree.getEntryCount());
+                
+                final long beginLookupFirst = System.currentTimeMillis();
+                // Verify all tuples are found.
+                for (int i = 0; i < s_limit; i++) {
+
+                    final byte[] key = keys[i];
+
+                    final byte[] firstVal = htree.lookupFirst(key);
+
+                    if (!BytesUtil.bytesEqual(key, firstVal))
+                        fail("Expected: " + BytesUtil.toString(key)
+                                + ", actual="
+                                + Arrays.toString(htree.lookupFirst(key)));
+
+                }
+
+                final long elapsedLookupFirstTime = System.currentTimeMillis()
+                        - beginLookupFirst;
+
+                final long beginValueIterator = System.currentTimeMillis();
+                
+                // Verify the iterator visits all of the tuples.
+                AbstractHTreeTestCase.assertSameOrderIterator(keys,
+                        htree.values());
+
+                final long elapsedValueIteratorTime = System
+                        .currentTimeMillis() - beginValueIterator;
+                
+                if (log.isInfoEnabled()) {
+                    log.info("Inserted: " + s_limit + " tuples in "
+                            + elapsedInsertMillis + "ms, lookupFirst(all)="
+                            + elapsedLookupFirstTime+ ", valueScan(all)="
+                            + elapsedValueIteratorTime + ", addressBits="
+                            + htree.getAddressBits() + ", nnodes="
+                            + htree.getNodeCount() + ", nleaves="
+                            + htree.getLeafCount());
+                }
+                
+                for (int i = 0; i < s_limit; i++) {
+                	
+                    assertTrue(htree.contains(keys[i]));
+                }
+
+
+            } catch (Throwable t) {
+
+                log.error(t);
+
+//              try {
+//                  log.error("Pretty Print of error state:\n" + htree.PP(), t);
+//              } catch (Throwable t2) {
+//                  log.error("Problem in pretty print: t2", t2);
+//              }
+
+                // rethrow the original exception.
+                throw new RuntimeException(t);
+
+            }
+
+//          log.error("Pretty Print of final state:\n" + htree.PP());
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
+
 }

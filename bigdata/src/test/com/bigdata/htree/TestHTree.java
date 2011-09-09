@@ -30,6 +30,9 @@ package com.bigdata.htree;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.htree.data.MockBucketData;
 import com.bigdata.rawstore.IRawStore;
@@ -129,7 +132,7 @@ public class TestHTree extends AbstractHTreeTestCase {
             assertEquals(0, a.getKeyCount());
             assertEquals(0, a.getValueCount());
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
@@ -162,7 +165,7 @@ public class TestHTree extends AbstractHTreeTestCase {
             assertEquals(1, a.getKeyCount());
             assertEquals(1, a.getValueCount());
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(1, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(1, new byte[][] { // keys
                             k1, null, null, null }),//
                     new ReadOnlyValuesRaba(1, new byte[][] { // vals
                             v1, null, null, null})),//
@@ -198,7 +201,7 @@ public class TestHTree extends AbstractHTreeTestCase {
 			if (log.isInfoEnabled())
 				log.info(htree.PP());
             assertEquals("nnodes", 1, htree.getNodeCount());
-            assertEquals("nleaves", 2, htree.getLeafCount());
+            assertEquals("nleaves", 1, htree.getLeafCount());
             assertEquals("nentries", 2, htree.getEntryCount());
             htree.dump(Level.ALL, System.err, true/* materialize */);
             assertTrue(root == htree.getRoot());
@@ -216,13 +219,13 @@ public class TestHTree extends AbstractHTreeTestCase {
             assertEquals(0, b.getKeyCount());
             assertEquals(0, b.getValueCount());
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(2, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(2, new byte[][] { // keys
                             k1, k2, null, null }),//
                     new ReadOnlyValuesRaba(2, new byte[][] { // vals
                             v1, k2, null, null})),//
                     a);
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
@@ -273,19 +276,19 @@ public class TestHTree extends AbstractHTreeTestCase {
             assertEquals(0, c.getKeyCount());
             assertEquals(0, c.getValueCount());
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(3, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(3, new byte[][] { // keys
                             k1, k2, k3, null }),//
                     new ReadOnlyValuesRaba(3, new byte[][] { // vals
                             v1, k2, k3, null})),//
                     a);
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
                     b);
             assertSameBucketData(new MockBucketData(//
-                    new ReadOnlyValuesRaba(0, new byte[][] { // keys
+                    new ReadOnlyKeysRaba(0, new byte[][] { // keys
                             null, null, null, null }),//
                     new ReadOnlyValuesRaba(0, new byte[][] { // vals
                             null, null, null, null})),//
@@ -855,12 +858,23 @@ public class TestHTree extends AbstractHTreeTestCase {
             final byte[] key = new byte[]{1};
             final byte[] val = new byte[]{2};
             
+            final int inserts = (1 << addressBits) * 20; // that'll be 20 pages then
+            
             // insert enough tuples to fill the page twice over.
-            for (int i = 0; i <= (addressBits * 2); i++) {
+            for (int i = 0; i < inserts; i++) {
 
                 htree.insert(key, val);
                 
             }
+            
+            // now iterate over all the values
+            ITupleIterator tups = htree.lookupAll(key);
+            int visits = 0;
+            while (tups.hasNext()) {
+            	ITuple tup = tups.next();
+            	visits++;
+            }
+            assertTrue(visits == inserts);
             
         } finally {
 
@@ -870,7 +884,7 @@ public class TestHTree extends AbstractHTreeTestCase {
 
     }
 
-    public void test_distinctBits() {
+	public void test_distinctBits() {
 
         final int addressBits = 2;
         
