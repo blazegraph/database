@@ -314,10 +314,9 @@ public class TestMutableKeyBuffer extends TestCase2 {
     
     /**
      * The keys of the {@link HTree} do not have any of the requirements of the
-     * B+Tree keys. The keys in a bucket page may contain duplicates and
-     * <code>null</code>s and are not searchable (only scannable, and then only
-     * within a logical buddy bucket). Therefore this class reports
-     * <code>false</code> for {@link IRaba#isKeys()}.
+     * B+Tree keys. The keys in a bucket page may contain duplicates but are now
+     * ordered and therefore searchable. Therefore this class reports
+     * <code>true</code> for {@link IRaba#isKeys()}.
      */
     public void test_isKeys() {
 
@@ -326,7 +325,7 @@ public class TestMutableKeyBuffer extends TestCase2 {
 
         final MutableKeyBuffer kbuf = new MutableKeyBuffer(m);
 
-        assertFalse(kbuf.isKeys());
+        assertTrue(kbuf.isKeys());
         
     }
     
@@ -372,9 +371,8 @@ public class TestMutableKeyBuffer extends TestCase2 {
     }
 
     /**
-     * {@link IRaba#search(byte[])} is not supported because it must be done
-     * within a buddy hash bucket boundary. Since the keys are neither ordered
-     * nor dense, search must use a simple scan.  Also note that there can be
+     * {@link IRaba#search(byte[])} is now supported because a BucketPage
+     * contains ordered keys. Note that there can be
      * duplicate keys within a buddy hash table.
      */
     public void test_search_not_supported() {
@@ -385,10 +383,8 @@ public class TestMutableKeyBuffer extends TestCase2 {
         final MutableKeyBuffer kbuf = new MutableKeyBuffer(m);
         try {
             kbuf.search(new byte[]{1,2});
-            fail("Expecting: " + UnsupportedOperationException.class);
         } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
+            fail("Search should be supported if keys are ordered");
         }
 
     }
