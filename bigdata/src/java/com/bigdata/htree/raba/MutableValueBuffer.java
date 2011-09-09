@@ -333,6 +333,19 @@ public class MutableValueBuffer implements IRaba {
         nvalues++;
         
     }
+    
+    final public void insert(final int index, final byte[] value) {
+
+        if (index < nvalues) {
+        	// shift "upper" keys - check there is room!
+        	assert values[nvalues] == null;
+        	System.arraycopy(values, index, values, index+1, nvalues-index);
+        }
+        
+        values[index] = value;
+        
+        nvalues++;
+    }
 
     /**
      * Remove a value in the buffer at the specified index, decrementing the #of

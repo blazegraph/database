@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.htree.HTree;
@@ -290,7 +291,7 @@ public class MutableKeyBuffer implements IRaba {
      */
     final public boolean isKeys() {
 
-        return false;
+        return true;
         
     }
 
@@ -336,6 +337,20 @@ public class MutableKeyBuffer implements IRaba {
         
         nkeys++;
         
+    }
+    
+    final public void insert(final int index, final byte[] key) {
+
+        assert key != null;
+        if (keys[index] != null) {
+        	// shift "upper" keys - check there is room!
+        	assert keys[nkeys] == null;
+        	System.arraycopy(keys, index, keys, index+1, nkeys-index);
+        }
+        
+        keys[index] = key;
+        
+        nkeys++;       
     }
 
     /**
@@ -400,17 +415,59 @@ public class MutableKeyBuffer implements IRaba {
     }
 
     /**
-     * This method is not supported. The keys in a buddy hash table are neither
-     * ordered, dense, nor unique (duplicate keys are permitted). Search must be
-     * performed by a scan of the non-<code>null</code> keys in a specific buddy
-     * bucket and there can be multiple "matches" for a given key.
+     * Used for both lookup and insert.  Similar to BTree methods it returns a
+     * negative number if the key is not found, but the negative number is one
+     * less than the insertion point should the key be added.  So an empty
+     * array would return -1 indicating the new value could be added at index
+     * zero.
      * 
-     * @throws UnsupportedOperationException
+     * Note that for duplicate keys the returned search index reflects the first
+     * location in the array. 
      */
-    public int search(byte[] searchKey) {
+    public int search(final byte[] key) {
         
-        throw new UnsupportedOperationException();
+		return search(key, keys, 0, capacity());
         
     }
+
+	/**
+	 * Optimized search for ordered insertion point using binary chop.
+	 * 
+	 * TODO: Could be further optimized ignoring prefix bits
+	 * 
+	 * Note that it does not return the first found position but the
+	 * first index position to match
+	 * 
+	 * @param key
+	 * @return the insertion point
+	 */	
+	private int search(final byte[] key, final byte[][] keys, final int start, final int length) {
+		if (length == 1) {
+			final byte[] tstkey = keys[start];
+			if (tstkey == null)
+				return -(start+1); // indicate insertion at start
+			
+			final int res = BytesUtil.compareBytes(key, tstkey);
+			if (res == 0) {
+				return start; // indicate found key AND insertion at start
+			} else if (res < 0) {
+				return -(start+1); // indicate insertion at start
+			} else {
+				return -(start+2); // indicate insertion at start+1
+			}
+		}
+		
+		final int partLen = (length >> 1);
+		final int pivot = start + partLen;
+		final byte[] pivotKey = keys[pivot];
+		final int tst = pivotKey == null ? -1 : BytesUtil.compareBytes(key, pivotKey);
+		if (tst == 0 && BytesUtil.compareBytes(key, keys[pivot-1]) != 0) { // AND previous is distinct
+			return pivot;			
+		} else if (tst <= 0) {
+			return search(key, keys, start, partLen);
+		} else {
+			return search(key, keys, pivot, partLen);
+		}
+	}
 
 }

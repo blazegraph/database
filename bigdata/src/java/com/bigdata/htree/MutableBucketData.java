@@ -509,4 +509,33 @@ public class MutableBucketData implements ILeafData {
 
     }
 
+    /**
+     * Inserts a new index/value, maintaining version timestamps and delete markers
+     * when necessary
+     * 
+     * @param insIndex
+     * @param key
+     * @param val
+     * @param rawRecord
+     */
+	public void insert(final int insIndex, final byte[] key, final byte[] val, final boolean rawRecord) {
+		keys.insert(insIndex, key);
+		vals.insert(insIndex, val);
+		
+		if (hasRawRecords()) {
+			System.arraycopy(rawRecords, insIndex, rawRecords, insIndex+1, vals.nvalues-insIndex-1);
+			rawRecords[insIndex] = rawRecord;
+		} else {
+			assert !rawRecord;
+		}
+		if (hasDeleteMarkers()) {
+			System.arraycopy(deleteMarkers, insIndex, deleteMarkers, insIndex+1, vals.nvalues-insIndex-1);
+			deleteMarkers[insIndex] = false;
+		}
+		if (hasVersionTimestamps()) {
+			System.arraycopy(versionTimestamps, insIndex, versionTimestamps, insIndex+1, vals.nvalues-insIndex-1);
+			versionTimestamps[insIndex] = 0; // current version
+		}
+	}
+
 }
