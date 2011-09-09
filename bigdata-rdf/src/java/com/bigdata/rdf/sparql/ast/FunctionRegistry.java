@@ -62,20 +62,22 @@ import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Registry for built-in and external SPARQL functions.
  * <p>
  * Note: Use an alternative namespace for functions which do not have official
  * namespaces.
- *
+ * 
  * @see <a href="http://www.w3.org/2005/xpath-functions/">XPath functions</a>
  * @see <a
  *      href="http://lists.w3.org/Archives/Public/public-rdf-dawg/2006AprJun/att-0138/sparql-function-uri.html">Sparql
  *      functions</a>
- *      
- * TODO Openrdf now defines the URIs for the XPath functions in <code>org.openrdf.model.vocabulary.FN</code>.
- * Use references to that class here?
+ * 
+ *      TODO We should restrict registration of functions in the
+ *      {@link BD#NAMESPACE} to static initialization.  The code
+ *      already does not permit replacement of registered functions.
  */
 public class FunctionRegistry {
 

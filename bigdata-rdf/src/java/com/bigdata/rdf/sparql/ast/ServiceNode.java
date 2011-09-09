@@ -77,6 +77,19 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
      *            will be buffered.
      * @param groupNode
      *            The graph pattern used to invoke the service.
+     * 
+     *            FIXME If the service streams out results and is just run first
+     *            within a named subquery then we do not need a "name" for the
+     *            service node. The "name" is the namedSet of the subquery. If
+     *            the service shows up by itself in the main body of a query
+     *            then we just need to create a named subquery for the service
+     *            invocation. It it is already part of a named subquery and
+     *            there is no other service in the named subquery, then we just
+     *            run it first in that named subquery. If there is another
+     *            service in that named subquery, then we need to lift one of
+     *            them out into its own named subquery (i.e., at most one
+     *            "run first/ run once" operation in the named subquery to avoid
+     *            a cross product).
      */
     public ServiceNode(//
             final String name,
@@ -153,8 +166,7 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
         sb.append("SERVICE <");
         sb.append(serviceURI);
         sb.append("> ");
-
-        sb.append(" AS ");
+        sb.append("AS ");
         sb.append(name);
         
         if (joinVars != null) {
@@ -180,7 +192,11 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
 
         if (getGroupNode() != null) {
 
-            sb.append(getGroupNode().toString(indent));
+            sb.append(" {");
+            
+            sb.append(getGroupNode().toString(indent+1));
+            
+            sb.append("\n").append(indent(indent)).append("}");
             
         }
         

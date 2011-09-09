@@ -345,22 +345,12 @@ public class QueryRoot extends QueryBase {
         
         if (dataset != null) {
 
-            sb.append("\n");
-            
-            sb.append(s);
-            
-            sb.append(dataset.toString());
+            sb.append(dataset.toString(indent+1));
             
         }
 
         if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
-            sb.append("\n");
-            
-            sb.append(s);
-            
-            sb.append("named subqueries");
-            
             sb.append(namedSubqueries.toString(indent));
 
         }
