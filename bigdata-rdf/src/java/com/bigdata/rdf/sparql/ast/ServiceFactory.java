@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 /**
  * Factory for creating {@link BigdataServiceCall}s from registered service
  * URIs.
@@ -38,6 +40,8 @@ public interface ServiceFactory {
      * 
      * @param lex
      *            The namespace of the lexicon.
+     * @param store
+     *            The {@link AbstractTripleStore}.
      * @param groupNode
      *            The graph pattern parameter to the service.
      * 
@@ -46,6 +50,7 @@ public interface ServiceFactory {
      */
     BigdataServiceCall create(
 			final String lex,
+			final AbstractTripleStore store,
 			final IGroupNode<IGroupMemberNode> groupNode);
 
 }

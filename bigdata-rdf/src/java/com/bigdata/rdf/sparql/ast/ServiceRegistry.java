@@ -7,6 +7,7 @@ import org.openrdf.model.URI;
 
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Registry for service calls
@@ -53,9 +54,11 @@ public class ServiceRegistry {
 
     /**
      * Convert a {@link FunctionNode} into an {@link IValueExpression}.
-     *
+     * 
      * @param lex
      *            The namespace of the lexicon relation.
+     * @param store
+     *            The {@link AbstractTripleStore}.
      * @param functionURI
      *            The function URI.
      * @param scalarValues
@@ -63,11 +66,11 @@ public class ServiceRegistry {
      *            things like the <code>separator</code> in GROUP_CONCAT.
      * @param args
      *            The function arguments.
-     *
+     * 
      * @return The {@link IValueExpression}.
      */
-    public static final BigdataServiceCall toServiceCall(
-            final String lex, final URI serviceURI,
+    public static final BigdataServiceCall toServiceCall(final String lex,
+            final AbstractTripleStore store, final URI serviceURI,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
         if (serviceURI == null)
@@ -88,7 +91,7 @@ public class ServiceRegistry {
                     + serviceURI);
         }
 
-        return f.create(lex, groupNode);
+        return f.create(lex, store, groupNode);
 
     }
 
