@@ -31,7 +31,6 @@ import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Service invocation interface for an external service. Data interchange with
@@ -45,15 +44,15 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public interface ExternalServiceCall extends ServiceCall<BindingSet> { 
 
-    /**
-     * Invoke an external service.
-     * 
-     * @param bindingSets
-     *            The BindingsClause from the SPARQL grammar.
-     *          
-     * @return An iterator from which the solutions can be drained. If the
-     *         iterator is closed, the service invocation must be cancelled.
-     */
-    ICloseableIterator<BindingSet> call(BindingSet[] bindingSets);
+//    /**
+//     * Invoke an external service.
+//     * 
+//     * @param bindingSets
+//     *            The BindingsClause from the SPARQL grammar.
+//     *          
+//     * @return An iterator from which the solutions can be drained. If the
+//     *         iterator is closed, the service invocation must be cancelled.
+//     */
+//    ICloseableIterator<BindingSet> call(BindingSet[] bindingSets);
 
 }

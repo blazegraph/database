@@ -480,7 +480,7 @@ public class AST2BOpUtility {
 
             // Lookup a class to "talk" to that Service URI.
             final BigdataServiceCall sc = ServiceRegistry.toServiceCall(
-                    ctx.getLexiconNamespace(), node.getServiceURI(),
+                    ctx.getLexiconNamespace(), ctx.db, node.getServiceURI(),
                     node.getGroupNode());
 
             final IVariable<?>[] joinVars = ASTUtil.convert(node.getJoinVars());
