@@ -204,7 +204,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
             CloseableIteration<? extends BindingSet, QueryEvaluationException> bindingsIter;
 
             bindingsIter = sailCon.evaluate(tupleExpr, dataset, getBindings(),
-                    null/* bindingSets */, getIncludeInferred(), queryHints);
+                    getIncludeInferred(), queryHints);
 
             bindingsIter = enforceMaxQueryTime(bindingsIter);
 
