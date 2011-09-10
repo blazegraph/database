@@ -101,6 +101,8 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         if(hideDatasetTests)
             suite1 = BigdataSparqlTest.filterOutTests(suite1,"dataset");
         
+        suite1 = BigdataSparqlTest.filterOutTests(suite1, "property-paths");
+        
         return suite1;
         
     }

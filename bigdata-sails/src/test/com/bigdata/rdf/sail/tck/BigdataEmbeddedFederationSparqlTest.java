@@ -106,6 +106,8 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         
         if(hideDatasetTests)
             suite1 = filterOutTests(suite1,"dataset");
+
+        suite1 = filterOutTests(suite1, "property-paths");
         
         return suite1;
         
