@@ -103,6 +103,7 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.AbstractJournal;
@@ -146,6 +147,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.AbstractFederation;
@@ -3290,8 +3292,21 @@ public class BigdataSail extends SailBase implements Sail {
                 final boolean includeInferred//
         ) throws SailException {
          
-            return evaluate(tupleExpr, dataset, bindings,
+            return evaluate2(tupleExpr, dataset, bindings,
                     null/* bindingSets */, includeInferred, new Properties());
+            
+        }
+        
+        public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
+                final TupleExpr tupleExpr, //
+                final Dataset dataset,//
+                final BindingSet bindings,//
+                final boolean includeInferred,//
+                final Properties queryHints
+        ) throws SailException {
+         
+            return evaluate2(tupleExpr, dataset, bindings,
+                    null/* bindingSets */, includeInferred, queryHints);
             
         }
         
@@ -3368,6 +3383,7 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
+         * Use this method to pump in a stream of bigdata IBindingSets.
          * 
          * @param bindings
          *            The initial binding set which will be feed into the native
@@ -3404,7 +3420,96 @@ public class BigdataSail extends SailBase implements Sail {
                 TupleExpr tupleExpr,//
                 Dataset dataset,//
                 BindingSet bindings,//
+                final IAsynchronousIterator<IBindingSet[]> bindingSets,
+                final boolean includeInferred,//
+                final Properties queryHints//
+                ) throws SailException {
+
+        	return evaluate2(tupleExpr, dataset, bindings, bindingSets, includeInferred, queryHints);
+        	
+        }
+        
+        /**
+         * Use this method to pump in a stream of Sesame BindingSets.
+         * 
+         * @param bindings
+         *            The initial binding set which will be feed into the native
+         *            query evaluation.
+         * 
+         * @param bindingSets
+         *            An optional source for zero or more binding sets which
+         *            will be fed into the start of the native query evaluation.
+         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
+         * 
+         * @param includeInferred
+         *            The <i>includeInferred</i> argument is applied in two
+         *            ways. First, inferences are stripped out of the
+         *            {@link AccessPath}. Second, query time expansion of
+         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
+         *            <p>
+         *            Note: Query time expansion can be disabled independently
+         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
+         *            per-query basis.
+         * 
+         * @param queryHints
+         *            A set of properties that are parsed from a SPARQL query.
+         *            See {@link QueryHints#PREFIX} for more information.
+         * 
+         * @throws SailException
+         *             if <i>bindingSets</i> is non-<code>null</code> and
+         *             <i>bindingSet</i> is non-empty.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
+         */
+        public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
+                TupleExpr tupleExpr,//
+                Dataset dataset,//
+                BindingSet bindings,//
                 final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
+                final boolean includeInferred,//
+                final Properties queryHints//
+                ) throws SailException {
+        	
+        	return evaluate2(tupleExpr, dataset, bindings, bindingSets, includeInferred, queryHints);
+        	
+        }
+
+        /**
+         * 
+         * @param bindings
+         *            The initial binding set which will be feed into the native
+         *            query evaluation.
+         * 
+         * @param bindingSets
+         *            An optional source for zero or more binding sets which
+         *            will be fed into the start of the native query evaluation.
+         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
+         * 
+         * @param includeInferred
+         *            The <i>includeInferred</i> argument is applied in two
+         *            ways. First, inferences are stripped out of the
+         *            {@link AccessPath}. Second, query time expansion of
+         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
+         *            <p>
+         *            Note: Query time expansion can be disabled independently
+         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
+         *            per-query basis.
+         * 
+         * @param queryHints
+         *            A set of properties that are parsed from a SPARQL query.
+         *            See {@link QueryHints#PREFIX} for more information.
+         * 
+         * @throws SailException
+         *             if <i>bindingSets</i> is non-<code>null</code> and
+         *             <i>bindingSet</i> is non-empty.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
+         */
+        private synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate2(
+                TupleExpr tupleExpr,//
+                Dataset dataset,//
+                BindingSet bindings,//
+                final Object bindingSets,
                 final boolean includeInferred,//
                 final Properties queryHints//
                 ) throws SailException {

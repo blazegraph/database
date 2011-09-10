@@ -304,7 +304,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 
     protected final Dataset dataset;
 
-    final private CloseableIteration<BindingSet, QueryEvaluationException> bindingSets;
+//    final private CloseableIteration<BindingSet, QueryEvaluationException> bindingSets;
+    final private Object bindingSets;
     
     private final AbstractTripleStore database;
 
@@ -321,12 +322,24 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
     public BigdataEvaluationStrategyImpl3(
             final BigdataTripleSource tripleSource,
             final Dataset dataset,
-            final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
+//          final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
+            final Object bindingSets,
             final boolean nativeJoins, 
             final boolean allowSesameQueryEvaluation) {
         
         super(tripleSource, dataset);
         
+        if (bindingSets != null 
+    		&&
+    		!(bindingSets instanceof CloseableIteration) // Sesame BindingSets
+        	&& 
+        	!(bindingSets instanceof IAsynchronousIterator) // bigdata IBindingSets
+        	) {
+        	
+        	throw new IllegalArgumentException("unknown binding set stream: " + bindingSets.getClass());
+        	
+        }
+            
         this.tripleSource = tripleSource;
         this.dataset = dataset;
         this.bindingSets = bindingSets;
@@ -1090,23 +1103,33 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
             throw new QueryEvaluationException(
                     "BindingSet and BindingSets are mutually exclusive.");
         if (bindingSets != null) {
-            /*
-             * A stream of input binding sets will be fed into the query
-             * pipeline (zero or more).
-             */
-            // align openrdf CloseableIteration with Bigdata IClosableIterator.
-            final IChunkedOrderedIterator<BindingSet> src = new ChunkedWrappedIterator<BindingSet>(
-                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
-                            bindingSets));
-            // efficient resolution of Value[]s to IV[]s for binding set chunks.
-            final ICloseableIterator<IBindingSet> src2 = new BigdataOpenRDFBindingSetsResolverator(
-                    database, src).start(database.getExecutorService());
-            // chunk up the binding sets. 
-            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedWrappedIterator<IBindingSet>(
-                    src2);
-            // wrap as an asynchronous iterator.
-            source = new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
-                    src3);
+        	
+        	if (bindingSets instanceof IAsynchronousIterator) {
+        		
+        		source = (IAsynchronousIterator<IBindingSet[]>) bindingSets;
+        		
+        	} else {
+        		
+	        	/*
+	             * A stream of input binding sets will be fed into the query
+	             * pipeline (zero or more).
+	             */
+	            // align openrdf CloseableIteration with Bigdata IClosableIterator.
+	            final IChunkedOrderedIterator<BindingSet> src = new ChunkedWrappedIterator<BindingSet>(
+	                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(
+	                            (CloseableIteration<BindingSet, QueryEvaluationException>) bindingSets));
+	            // efficient resolution of Value[]s to IV[]s for binding set chunks.
+	            final ICloseableIterator<IBindingSet> src2 = new BigdataOpenRDFBindingSetsResolverator(
+	                    database, src).start(database.getExecutorService());
+	            // chunk up the binding sets. 
+	            final IChunkedOrderedIterator<IBindingSet> src3 = new ChunkedWrappedIterator<IBindingSet>(
+	                    src2);
+	            // wrap as an asynchronous iterator.
+	            source = new WrappedAsynchronousIterator<IBindingSet[], IBindingSet>(
+	                    src3);
+	            
+        	}
+        	
         } else if (bs != null) {
             /*
              * A single input binding set will be fed into the query pipeline
@@ -2527,6 +2550,15 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			 * penalty.
 			 */
             return evaluateNatively(sp, bindings);
+        }
+        
+        if (bindingSets != null) {
+
+        	/*
+        	 * If we are piping in a stream of binding sets we need to use
+        	 * the native evaluation mechanism.
+        	 */
+        	return evaluateNatively(sp, bindings);
         }
         
         if (log.isDebugEnabled()) {
