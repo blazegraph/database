@@ -43,6 +43,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -150,7 +151,11 @@ public class SubqueryOp extends PipelineOp {
         /**
          * Boolean annotation should be <code>true</code> if the subquery is an
          * aggregate (default {@value #DEFAULT_IS_AGGREGATE}).
-         */
+         * <p>
+         * Note: We need to have distinct {@link IAggregate} objects in each
+         * subquery issued since they have internal state in order to prevent
+         * inappropriate sharing of state across invocations of the subquery.
+         * */
         String IS_AGGREGATE = Annotations.class.getName() + ".isAggregate";
 
         boolean DEFAULT_IS_AGGREGATE = false;

@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import org.openrdf.model.URI;
+
+import com.bigdata.bop.BOp;
 
 /**
  * A special function node for modeling value expression nodes which are
@@ -54,6 +58,22 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
     }
 
+    /**
+     * Required deep copy constructor.
+     */
+    public SubqueryFunctionNodeBase(SubqueryFunctionNodeBase op) {
+        super(op);
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public SubqueryFunctionNodeBase(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     /**
      * @param anonvar
      *            An anonymous variable which will be bound by an ASK subquery.

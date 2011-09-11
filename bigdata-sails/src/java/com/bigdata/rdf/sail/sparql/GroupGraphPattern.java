@@ -40,8 +40,10 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 
 /**
@@ -111,6 +113,29 @@ class GroupGraphPattern {
         
     }
 
+//    /**
+//     * The #of things in the group.
+//     */
+//    public int size() {
+//        
+//        return children.size();
+//        
+//    }
+//
+//    /**
+//     * Return the child at that index.
+//     * 
+//     * @param index
+//     *            The index.
+//     *            
+//     * @return The child.
+//     */
+//    public IGroupMemberNode get(final int index) {
+//     
+//        return children.get(index);
+//        
+//    }
+    
     public void setStatementPatternScope(final StatementPattern.Scope spScope) {
         
         assertValid();
@@ -168,6 +193,7 @@ class GroupGraphPattern {
      * 
      * @return The group node supplied by the caller with the data attached.
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public <T extends GroupNodeBase> T buildGroup(final T groupNode) {
 
         assertValid();
@@ -175,10 +201,19 @@ class GroupGraphPattern {
         // mark the GroupGraphPattern as consumed.
         invalid = true;
 
+        /*
+         * If we are building a union node, then we will wrap any
+         * non-JoinGroupNode with a JoinGroupNode.
+         */
+        final boolean isUnion = groupNode instanceof UnionNode;
+
         for (IGroupMemberNode child : children) {
-         
-                groupNode.addChild(child);
-            
+
+            groupNode.addChild((isUnion && !(child instanceof JoinGroupNode)) //
+                    ? new JoinGroupNode(child) //
+                    : child//
+                    );
+
         }
 
         return groupNode;

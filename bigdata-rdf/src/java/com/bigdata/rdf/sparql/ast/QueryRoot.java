@@ -30,6 +30,7 @@ import java.util.Properties;
 
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
 
@@ -98,6 +99,22 @@ public class QueryRoot extends QueryBase {
 
     }
 
+    /**
+     * Deep copy constructor.
+     * @param queryRoot
+     */
+    public QueryRoot(final QueryRoot queryRoot) {
+        
+        super(queryRoot);
+        
+    }
+
+    public QueryRoot(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+        
+    }
+    
     public QueryRoot(final QueryType queryType) {
         
         super(queryType);

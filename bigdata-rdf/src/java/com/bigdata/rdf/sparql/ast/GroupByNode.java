@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 
@@ -41,9 +44,32 @@ public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
     /**
      * 
      */
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 
+     */
     public GroupByNode() {
     }
 
+    /**
+     * Deep copy constructor.
+     */
+    public GroupByNode(final GroupByNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public GroupByNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     public void addGroupByVar(final VarNode var) {
 
         addExpr(new AssignmentNode(var, var));

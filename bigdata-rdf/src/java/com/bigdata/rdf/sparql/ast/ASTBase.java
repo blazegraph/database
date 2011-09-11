@@ -50,15 +50,14 @@ public class ASTBase extends ModifiableBOpBase {
     }
 
     /**
-     * @param op
+     * Required deep copy constructor.
      */
     public ASTBase(ASTBase op) {
         super(op);
     }
 
     /**
-     * @param args
-     * @param annotations
+     * Required shallow copy constructor.
      */
     public ASTBase(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);

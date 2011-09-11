@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -55,6 +58,24 @@ abstract public class SubqueryBase extends QueryBase implements
 
         this.parent = parent;
 
+    }
+
+    /**
+     * Deep copy constructor.
+     */
+    public SubqueryBase(final SubqueryBase queryBase) {
+    
+        super(queryBase);
+        
+    }
+    
+    /**
+     * Shallow copy constructor.
+     */
+    public SubqueryBase(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+        
     }
 
     public SubqueryBase(final QueryType queryType) {

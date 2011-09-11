@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
@@ -17,7 +19,23 @@ public class ConstantNode extends TermNode {
      */
     private static final long serialVersionUID = 1L;
 
-	public ConstantNode(final IV val) {
+    /**
+     * Required deep copy constructor.
+     */
+    public ConstantNode(ConstantNode op) {
+        super(op);
+    }
+    
+    /**
+     * Required shallow copy constructor.
+     */
+    public ConstantNode(final BOp[] args, final Map<String, Object> anns) {
+        
+        super(args, anns);
+        
+    }
+
+    public ConstantNode(final IV val) {
 
 		this(new Constant<IV>(val));
 		

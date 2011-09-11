@@ -427,11 +427,6 @@ public class BOpContext<E> extends BOpContextBase {
      * destination {@link IBindingSet}. It is an error if a binding already
      * exists in the destination {@link IBindingSet} which is not consistent
      * with a binding in the source {@link IBindingSet}.
-     * <p>
-     * Note: The bindings are propagated before the constraints are verified so
-     * this method will have a side-effect on the bindings even if the
-     * constraints were not satisfied. Therefore you should clone the
-     * destination {@link IBindingSet} before calling this method.
      * 
      * @param left
      *            The left binding set.
@@ -448,7 +443,7 @@ public class BOpContext<E> extends BOpContextBase {
      * @param constraints
      *            An array of constraints (optional). When given, destination
      *            {@link IBindingSet} will be validated <em>after</em> mutation.
-     * @param vars
+     * @param varsToKeep
      *            An array of variables whose bindings will be retained. The
      *            bindings are not stripped out until after the constraint(s)
      *            (if any) have been tested.
@@ -460,15 +455,16 @@ public class BOpContext<E> extends BOpContextBase {
     @SuppressWarnings("rawtypes")
     static public IBindingSet bind(final IBindingSet left,
             final IBindingSet right, final boolean leftIsPipeline,
-            final IConstraint[] constraints, final IVariable[] vars) {
+            final IConstraint[] constraints, final IVariable[] varsToKeep) {
 
         /*
          * Note: The binding sets from the query pipeline are always chosen as
          * the destination into which we will copy the bindings. This allows us
-         * to preserve the symbol table stack for nested SPARQL subquery.
+         * to preserve any state attached to those solutions (this is not
+         * something that we do right now).
          * 
-         * Note: We clone the destination binding set in order to avoid the
-         * possibility of side effects on that binding set.
+         * Note: We clone the destination binding set in order to avoid a side
+         * effect on that binding set if the join fails.
          */
         final IBindingSet src = leftIsPipeline ? right : left;
         final IBindingSet dst = leftIsPipeline ? left.clone() : right.clone();
@@ -520,7 +516,7 @@ public class BOpContext<E> extends BOpContextBase {
         }
 
         // strip off unnecessary variables.
-        if (vars != null && vars.length > 0) {
+        if (varsToKeep != null && varsToKeep.length > 0) {
 
             final Iterator<Map.Entry<IVariable, IConstant>> itr = dst
                     .iterator();
@@ -532,9 +528,9 @@ public class BOpContext<E> extends BOpContextBase {
                 final IVariable<?> var = (IVariable<?>) e.getKey();
 
                 boolean found = false;
-                for (int i = 0; i < vars.length; i++) {
+                for (int i = 0; i < varsToKeep.length; i++) {
 
-                    if (var == vars[i]) {
+                    if (var == varsToKeep[i]) {
                         
                         found = true;
                         

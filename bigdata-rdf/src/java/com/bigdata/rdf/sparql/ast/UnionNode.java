@@ -1,6 +1,10 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import org.apache.log4j.Logger;
+
+import com.bigdata.bop.BOp;
 
 /**
  * A special kind of group {@link IGroupNode} that represents the sparql union
@@ -17,12 +21,30 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     private static final transient Logger log = Logger.getLogger(UnionNode.class);
 	
-	/**
+    /**
+     * Required deep copy constructor.
+     */
+    public UnionNode(UnionNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public UnionNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
+    /**
 	 * Construct a non-optional union.
 	 */
 	public UnionNode() {
 		
-		super(false);
+		super(false/*optional*/);
 		
 	}
 

@@ -47,7 +47,6 @@ import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
@@ -111,7 +110,6 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.striterator.IKeyOrder;
-
 
 /**
  * Utility class converts {@link IRule}s to {@link BOp}s.
@@ -269,7 +267,7 @@ public class Rule2BOpUtility {
                  * controller so the results will be streamed back to the query
                  * controller in scale-out.
                  */
-                tmp = new EndOp(new BOp[] { tmp }, NV.asMap(//
+                tmp = new EndOp(leftOrEmpty(tmp), NV.asMap(//
                         new NV(BOp.Annotations.BOP_ID, idFactory
                                 .incrementAndGet()), //
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -824,7 +822,7 @@ public class Rule2BOpUtility {
 
                 anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-                left = applyQueryHints(new PipelineJoin(new BOp[] { left },
+                left = applyQueryHints(new PipelineJoin(leftOrEmpty(left),
                         anns.toArray(new NV[anns.size()])), queryHints);
 
             }
@@ -868,7 +866,7 @@ public class Rule2BOpUtility {
 				}
 
 				left = Rule2BOpUtility.applyQueryHints(
-	              	    new ConditionalRoutingOp(new BOp[]{left},
+	              	    new ConditionalRoutingOp(leftOrEmpty(left),
 	                        NV.asMap(new NV[]{//
 	                            new NV(BOp.Annotations.BOP_ID, condId),
 	                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
@@ -882,6 +880,20 @@ public class Rule2BOpUtility {
 
     }
 
+    /**
+     * Return either <i>left</i> wrapped as the sole member of an array or
+     * {@link BOp#NOARGS} iff <i>left</i> is <code>null</code>.
+     * 
+     * @param left
+     *            The prior operator in the pipeline (optional).
+     * @return The array.
+     */
+    static private BOp[] leftOrEmpty(final PipelineOp left) {
+
+        return left == null ? BOp.NOARGS : new BOp[] { left };
+        
+    }
+    
     /**
      * Use the {@link INeedsMaterialization} interface to find and collect
      * variables that need to be materialized for this constraint.
@@ -1005,7 +1017,7 @@ public class Rule2BOpUtility {
     			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
 
     		left = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{left},
+              	    new ConditionalRoutingOp(leftOrEmpty(left),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
@@ -1046,7 +1058,7 @@ public class Rule2BOpUtility {
     		final IConstraint c1 = new SPARQLConstraint(new IsMaterializedBOp(v, false));
 
             final PipelineOp condOp1 = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{left},
+              	    new ConditionalRoutingOp(leftOrEmpty(left),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, condId1),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c1),
@@ -1061,7 +1073,7 @@ public class Rule2BOpUtility {
     		final IConstraint c2 = new SPARQLConstraint(new IsInlineBOp(v, true));
 
             final PipelineOp condOp2 = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{condOp1},
+              	    new ConditionalRoutingOp(leftOrEmpty(condOp1),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, condId2),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
@@ -1093,7 +1105,7 @@ public class Rule2BOpUtility {
             }
 
             final PipelineOp inlineMaterializeOp = Rule2BOpUtility.applyQueryHints(
-              	    new InlineMaterializeOp(new BOp[]{condOp2},
+              	    new InlineMaterializeOp(leftOrEmpty(condOp2),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, inlineMaterializeId),
                             new NV(InlineMaterializeOp.Annotations.PREDICATE, lexPred.clone()),
@@ -1105,7 +1117,7 @@ public class Rule2BOpUtility {
             }
 
             final PipelineOp lexJoinOp = Rule2BOpUtility.applyQueryHints(
-		      	    new PipelineJoin(new BOp[]{inlineMaterializeOp},
+		      	    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
 		                NV.asMap(new NV[]{//
 		                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
 		                    new NV(PipelineJoin.Annotations.PREDICATE, lexPred.clone()),
@@ -1154,7 +1166,7 @@ public class Rule2BOpUtility {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-        return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+        return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                 .toArray(new NV[anns.size()])), queryHints);
 
     }
@@ -1206,7 +1218,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1219,7 +1231,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1248,7 +1260,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1274,7 +1286,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1326,7 +1338,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         } else {
@@ -1353,7 +1365,7 @@ public class Rule2BOpUtility {
             final IVariable<?> var = (IVariable<?>) pred.get(3);
 
             // The data set join.
-            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { left },
+            final DataSetJoin dataSetJoin = new DataSetJoin(leftOrEmpty(left),
                     NV.asMap(new NV[] {//
                                     new NV(DataSetJoin.Annotations.VAR, var),//
                                     new NV(DataSetJoin.Annotations.BOP_ID,
@@ -1374,7 +1386,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { dataSetJoin },
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(dataSetJoin),
                     anns.toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1418,7 +1430,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
         }
 
@@ -1436,7 +1448,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1465,7 +1477,7 @@ public class Rule2BOpUtility {
 
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
                     .toArray(new NV[anns.size()])), queryHints);
 
         }
@@ -1610,7 +1622,7 @@ public class Rule2BOpUtility {
 
 			anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+			return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
 					.toArray(new NV[anns.size()])),queryHints);
 
         } else {
@@ -1660,7 +1672,7 @@ public class Rule2BOpUtility {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-			return applyQueryHints(new PipelineJoin(new BOp[] { left }, anns
+			return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
 					.toArray(new NV[anns.size()])),queryHints);
 
         }
@@ -1729,10 +1741,10 @@ public class Rule2BOpUtility {
 
         final PipelineOp thisOp;
         if (isParallel) {
-            thisOp = new Union(new BOp[]{}, NV
+            thisOp = new Union(BOp.NOARGS, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
         } else {
-            thisOp = new Steps(new BOp[]{}, NV
+            thisOp = new Steps(BOp.NOARGS, NV
                     .asMap(anns.toArray(new NV[anns.size()])));
         }
 

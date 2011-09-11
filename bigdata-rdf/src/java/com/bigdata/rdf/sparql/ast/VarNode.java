@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
@@ -24,12 +26,33 @@ public class VarNode extends TermNode {
 
     public interface Annotations extends TermNode.Annotations {
         
+        /**
+         * Annotation marks anonymous variables (a variable created by the
+         * interpretation of the parse tree, AST, etc rather than one given
+         * directly in the original query).
+         */
         String ANONYMOUS = VarNode.class.getName() + ".anonymous";
 
         boolean DEFAULT_ANONYMOUS = false;
         
     }
     
+    /**
+     * Required deep copy constructor.
+     */
+    public VarNode(VarNode op) {
+        super(op);
+    }
+    
+    /**
+     * Required shallow copy constructor.
+     */
+    public VarNode(final BOp[] args, final Map<String, Object> anns) {
+        
+        super(args, anns);
+        
+    }
+
     public VarNode(final String var) {
     	
     	this(Var.var(var));

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 
 /**
@@ -61,7 +62,23 @@ public class FunctionNode extends ValueExpressionNode {
 		
 	}
 	
-	public URI getFunctionURI() {
+    /**
+     * Required deep copy constructor.
+     */
+    public FunctionNode(FunctionNode op) {
+        super(op);
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public FunctionNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
+    public URI getFunctionURI() {
 		
 		return (URI) getRequiredProperty(Annotations.FUNCTION_URI);
 		

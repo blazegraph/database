@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * A template for the construction of one or more graphs based on the solutions
  * projected by a query.
@@ -45,6 +49,24 @@ public class ConstructNode extends GroupNodeBase<StatementPatternNode> {
         super();
     }
 
+    /**
+     * Required deep copy constructor.
+     */
+    public ConstructNode(ConstructNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public ConstructNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     @Override
     public IGroupNode<StatementPatternNode> addChild(
             final StatementPatternNode child) {

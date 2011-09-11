@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -48,9 +51,32 @@ public class HavingNode extends
     /**
      * 
      */
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 
+     */
     public HavingNode() {
     }
 
+    /**
+     * Deep copy constructor.
+     */
+    public HavingNode(final HavingNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public HavingNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     /**
      * Return the {@link IConstraint}s for this {@link ProjectionNode}.
      */

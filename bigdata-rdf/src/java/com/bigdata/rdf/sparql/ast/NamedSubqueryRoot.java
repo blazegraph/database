@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -71,6 +74,24 @@ public class NamedSubqueryRoot extends SubqueryBase {
     }
     
 //    private String name;
+
+    /**
+     * Deep copy constructor.
+     */
+    public NamedSubqueryRoot(final NamedSubqueryRoot queryBase) {
+    
+        super(queryBase);
+        
+    }
+    
+    /**
+     * Shallow copy constructor.
+     */
+    public NamedSubqueryRoot(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+        
+    }
 
     /**
      * 

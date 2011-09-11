@@ -1,0 +1,15 @@
+# Search query.
+PREFIX bd: <http://www.bigdata.com/rdf/search#>
+
+SELECT ?subj ?label 
+  WITH {
+   SELECT ?subj ( ?lit as ?label )
+    WHERE {
+      ?lit bd:search "mike personick" .
+      ?lit bd:matchAllTerms "true" .
+      ?subj ?p ?lit .
+      }
+  } as %searchSet1
+WHERE {
+   include %searchSet1
+}

@@ -29,7 +29,9 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -63,6 +65,24 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    /**
+     * Deep copy constructor.
+     */
+    public ProjectionNode(final ProjectionNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public ProjectionNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     public void setDistinct(final boolean distinct) {
 
         setProperty(Annotations.DISTINCT, distinct);
@@ -168,9 +188,9 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         int i = 0;
         
         for (AssignmentNode n : this) {
-        
-            exprs[i++]=new Bind(n.getVar(),n.getValueExpression());
-            
+
+            exprs[i++] = new Bind(n.getVar(), n.getValueExpression());
+
         }
         
         return exprs;

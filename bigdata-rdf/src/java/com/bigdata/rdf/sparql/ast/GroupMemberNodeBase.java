@@ -59,16 +59,22 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
     public GroupMemberNodeBase() {
     }
 
-    public GroupMemberNodeBase(BOp[] args, Map<String, Object> anns) {
-
-        super(args, anns);
-
-    }
-
+    /**
+     * Required deep copy constructor.
+     */
     public GroupMemberNodeBase(GroupMemberNodeBase<E> op) {
 
         super(op);
         
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public GroupMemberNodeBase(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
+import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.ModifiableBOpBase;
@@ -24,6 +25,24 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
     }
 
+    /**
+     * Required deep copy constructor.
+     */
+    public GroupNodeBase(GroupNodeBase<E> op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public GroupNodeBase(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     /**
      * Note: Uses the default for the "optional" annotation.
      */

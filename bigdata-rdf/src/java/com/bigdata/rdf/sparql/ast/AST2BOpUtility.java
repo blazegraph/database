@@ -40,7 +40,7 @@ import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
-import com.bigdata.bop.controller.ServiceOp;
+import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
@@ -118,6 +118,9 @@ import com.bigdata.relation.rule.Rule;
  * 
  *          TODO What about the backchain access path stuff? Are we going prolog
  *          / datalog or bringing that stuff forward?
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/232"> A useful
+ *      summary of the different join operators </a>
  */
 public class AST2BOpUtility {
 
@@ -252,10 +255,10 @@ public class AST2BOpUtility {
          */
         if (query instanceof QueryRoot) {
 
-			/*
-			 *Materialize the results for the service calls into hashjoin
-			 */
-			left = addServiceNodes(left, (QueryRoot) query, ctx);
+//            /*
+//             * Materialize the results for the service calls into hashjoin
+//             */
+//            left = addServiceNodes(left, (QueryRoot) query, ctx);
 
             final NamedSubqueriesNode namedSubqueries = ((QueryRoot) query)
                     .getNamedSubqueries();
@@ -464,84 +467,36 @@ public class AST2BOpUtility {
     }
 
     /**
-     * Adds operators to the pipeline to materialize the named result sets for
-     * {@link ServiceNode}s.  
+     * Add an operator to evaluate a {@link ServiceCall}.
      * 
      * @param left
-     * @param queryRoot
+     * @param serviceNode
      * @param ctx
      * @return
      */
-    private static PipelineOp addServiceNodes(PipelineOp left,
-            final QueryRoot queryRoot, final AST2BOpContext ctx) {
-
-        final Iterator<ServiceNode> svcNodes = BOpUtility.visitAll(queryRoot,
-                ServiceNode.class);
-
-        while (svcNodes.hasNext()) {
-
-            final ServiceNode node = svcNodes.next();
-
-            // Lookup a class to "talk" to that Service URI.
-            final BigdataServiceCall sc = ServiceRegistry.toServiceCall(
-                    ctx.getLexiconNamespace(), ctx.db, node.getServiceURI(),
-                    node.getGroupNode());
-
-            final IVariable<?>[] joinVars = ASTUtil.convert(node.getJoinVars());
-
-            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                    ctx.queryId, node.getName(), joinVars);
-
-            // TODO Must pass through the BindingsClause.
-            left = new ServiceOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(ServiceOp.Annotations.SERVICE_CALL, sc),//
-                    new NV(ServiceOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(ServiceOp.Annotations.NAMED_SET_REF,
-                            namedSolutionSet)//
-            );
-
-        }
-
-        return left;
-
-    }
-
-    /**
-     * Add a join against a pre-computed temporary solution set into a join
-     * group.
-     * <p>
-     * Note: Since the subquery solution set has already been computed and only
-     * contains bindings for solutions projected by the subquery, we do not need
-     * to adjust the visibility of bindings when we execute the hash join
-     * against the named solution set.
-     */
-    private static PipelineOp addServiceCallJoin(PipelineOp left,
+    static private PipelineOp addServiceCall(PipelineOp left,
             final ServiceNode serviceNode, final AST2BOpContext ctx) {
 
-        if (log.isInfoEnabled())
-            log.info("service: uri=" + serviceNode.getServiceURI());
-
-        final IVariable<?>[] joinVars = ASTUtil.convert(serviceNode.getJoinVars());
-
-        final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
-                ctx.queryId, serviceNode.getName(), joinVars);
-
-        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
+        // TODO Pass BindingsClause from QueryRoot through to Service.
+        left = new ServiceCallJoin(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF,
-                        namedSolutionSetRef),//
-                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(ServiceCallJoin.Annotations.SERVICE_URI,
+                        serviceNode.getServiceURI()),//
+                new NV(ServiceCallJoin.Annotations.GROUP_NODE,
+                        serviceNode.getGroupNode()),//
+                new NV(ServiceCallJoin.Annotations.NAMESPACE,
+                        ctx.db.getNamespace()),//
+                new NV(ServiceCallJoin.Annotations.TIMESTAMP,
+                        ctx.db.getTimestamp())//
         );
 
         return left;
-
+        
     }
+    
     /**
      * Add a join against a pre-computed temporary solution set into a join
      * group.
@@ -963,33 +918,30 @@ public class AST2BOpUtility {
 	        final JoinGroupNode joinGroup,
 			final AST2BOpContext ctx) {
 
-        /*
-         * Place the StartOp at the beginning of the pipeline.
-         * 
-         * TODO We only need a start op on a cluster if there is a requirement
-         * to marshall all solutions from a parent's evaluation context onto the
-         * top-level query controller. I am not sure that we ever have to do
-         * this for a subquery, but there might be cases where it is required.
-         * For all other cases, we should begin with left := null. However,
-         * there are cases where getParent() is running into a null reference
-         * during query evaluation if [left := null] here. Look into and resolve
-         * those issues.
-         */
-	    if(left == null)
-	        left = addStartOp(ctx);
+//        /*
+//         * Place the StartOp at the beginning of the pipeline.
+//         * 
+//         * TODO We only need a start op on a cluster if there is a requirement
+//         * to marshall all solutions from a parent's evaluation context onto the
+//         * top-level query controller. I am not sure that we ever have to do
+//         * this for a subquery, but there might be cases where it is required.
+//         * For all other cases, we should begin with left := null. However,
+//         * there are cases where getParent() is running into a null reference
+//         * during query evaluation if [left := null] here. Look into and resolve
+//         * those issues.
+//         */
+//	    if(left == null)
+//	        left = addStartOp(ctx);
         
         /*
          * Add the pre-conditionals to the pipeline.
+         * 
+         * TODO These filters should be lifted into the parent group so we
+         * can avoid starting a subquery only to have it failed by a filter.
+         * We will do less work if we fail the solution in the parent group.
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
-		/*
-         * Add the processed service node calls and insert the results into hash
-         */
-        for (IGroupMemberNode child : joinGroup) {
-            if (child instanceof ServiceNode)
-                left = addServiceCallJoin(left, (ServiceNode) child, ctx);
-        }
         /*
          * Required joins and non-optional subqueries.
          * 
@@ -1017,6 +969,15 @@ public class AST2BOpUtility {
          * solution set when evaluated with an empty source binding set.
          */
         {
+
+            /*
+             * Run service calls first. 
+             */
+            for (IGroupMemberNode child : joinGroup) {
+                if (child instanceof ServiceNode) {
+                    left = addServiceCall(left, (ServiceNode) child, ctx);
+                }
+            }
 
             /*
              * Add the joins (statement patterns) and the filters on those
@@ -1082,7 +1043,12 @@ public class AST2BOpUtility {
         return left;
 		
 	}
-	
+
+    /**
+     * @deprecated The {@link StartOp} is not necessary in query plans. It is
+     *             just a convenient concept. When not using StartOp, the first
+     *             operator in the plan just needs to have an empty args[].
+     */
 	private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
 		
         final PipelineOp start = applyQueryHints(
@@ -1170,7 +1136,7 @@ public class AST2BOpUtility {
             }
 
 			left = applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{ left },
+              	    new ConditionalRoutingOp(leftOrEmpty(left),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, bopId),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
@@ -1228,7 +1194,7 @@ public class AST2BOpUtility {
                     ve);
 			
 			left = applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{ left },
+              	    new ConditionalRoutingOp(leftOrEmpty(left),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, bopId),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
@@ -1458,7 +1424,7 @@ public class AST2BOpUtility {
                 && !left.getEvaluationContext().equals(
                         BOpEvaluationContext.CONTROLLER)) {
 	
-            left = new EndOp(new BOp[] { left },//
+            left = new EndOp(leftOrEmpty(left),//
                     NV.asMap(
                             //
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -1510,7 +1476,7 @@ public class AST2BOpUtility {
 		     * DISTINCT on the JVM heap.
 		     */
 		    op = new DistinctBindingSetOp(//
-		            new BOp[] { left },// 
+		            leftOrEmpty(left),// 
 	                NV.asMap(new NV[]{//
 	                    new NV(DistinctBindingSetOp.Annotations.BOP_ID, bopId),
 	                    new NV(DistinctBindingSetOp.Annotations.VARIABLES, vars),
@@ -1524,7 +1490,7 @@ public class AST2BOpUtility {
 		     * DISTINCT on the native heap.
 		     */
 	        op = new DistinctBindingSetsWithHTreeOp(//
-	                new BOp[]{left},//
+	                leftOrEmpty(left),//
 	                NV.asMap(new NV[]{//
 	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,bopId),//
 	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,vars),//
@@ -1665,7 +1631,8 @@ public class AST2BOpUtility {
              * LET operator after the aggregates have been combined.
              */
 
-            op = new PipelinedAggregationOp(new BOp[] {left}, NV.asMap(new NV[] {//
+            op = new PipelinedAggregationOp(leftOrEmpty(left),//
+                    NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, bopId),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -1691,7 +1658,7 @@ public class AST2BOpUtility {
              * workstation). BBT 8/17/2011.
              */
             
-            op = new MemoryGroupByOp(new BOp[] {left}, NV.asMap(new NV[] {//
+            op = new MemoryGroupByOp(leftOrEmpty(left), NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, bopId),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -1759,7 +1726,7 @@ public class AST2BOpUtility {
 		
 		left = addMaterializationSteps(left, sortId, vars, ctx);
 		
-    	left = applyQueryHints(new MemorySortOp(new BOp[] { left }, 
+    	left = applyQueryHints(new MemorySortOp(leftOrEmpty(left), 
     			NV.asMap(new NV[] {//
 	                new NV(MemorySortOp.Annotations.BOP_ID, sortId),//
                     new NV(MemorySortOp.Annotations.SORT_ORDER, sortOrders),//
@@ -1785,7 +1752,7 @@ public class AST2BOpUtility {
 
 		final int bopId = ctx.nextId();
 		
-    	left = applyQueryHints(new SliceOp(new BOp[] { left },
+    	left = applyQueryHints(new SliceOp(leftOrEmpty(left),
     			NV.asMap(new NV[] { 
 					new NV(SliceOp.Annotations.BOP_ID, bopId),
 					new NV(SliceOp.Annotations.OFFSET, slice.getOffset()),
@@ -1864,7 +1831,7 @@ public class AST2BOpUtility {
                 new NeedsMaterializationBOp(ve));
 
 		left = applyQueryHints(
-          	    new ConditionalRoutingOp(new BOp[]{left},
+          	    new ConditionalRoutingOp(leftOrEmpty(left),
                     NV.asMap(new NV[]{//
                         new NV(BOp.Annotations.BOP_ID, ctx.nextId()),
                         new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
@@ -1949,7 +1916,7 @@ public class AST2BOpUtility {
                     new IsMaterializedBOp(v, false/* materialized */));
     		
             final PipelineOp condOp1 = applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{left},
+              	    new ConditionalRoutingOp(leftOrEmpty(left),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, condId1),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c1),
@@ -1965,7 +1932,7 @@ public class AST2BOpUtility {
                     new IsInlineBOp(v, true/* inline */));
 
             final PipelineOp condOp2 = applyQueryHints(
-              	    new ConditionalRoutingOp(new BOp[]{condOp1},
+              	    new ConditionalRoutingOp(leftOrEmpty(condOp1),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, condId2),
                             new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
@@ -2002,7 +1969,7 @@ public class AST2BOpUtility {
             }
             
             final PipelineOp inlineMaterializeOp = applyQueryHints(
-              	    new InlineMaterializeOp(new BOp[]{condOp2},
+              	    new InlineMaterializeOp(leftOrEmpty(condOp2),
                         NV.asMap(new NV[]{//
                             new NV(BOp.Annotations.BOP_ID, inlineMaterializeId),
                             new NV(InlineMaterializeOp.Annotations.PREDICATE, lexPred.clone()),
@@ -2014,7 +1981,7 @@ public class AST2BOpUtility {
             }
             
             final PipelineOp lexJoinOp = applyQueryHints(
-		      	    new PipelineJoin(new BOp[]{inlineMaterializeOp},
+		      	    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
 		                NV.asMap(new NV[]{//
 		                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
 		                    new NV(PipelineJoin.Annotations.PREDICATE, lexPred.clone()),

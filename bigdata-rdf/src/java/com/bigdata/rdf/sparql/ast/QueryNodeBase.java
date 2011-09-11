@@ -25,16 +25,22 @@ public abstract class QueryNodeBase extends ASTBase implements
 
     }
 
-    public QueryNodeBase(BOp[] args, Map<String, Object> anns) {
-
-        super(args, anns);
-
-    }
-
+    /**
+     * Required deep copy constructor.
+     */
     public QueryNodeBase(QueryNodeBase op) {
 
         super(op);
         
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public QueryNodeBase(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
     }
 
     @Override

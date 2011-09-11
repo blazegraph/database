@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
@@ -49,6 +51,20 @@ public class OrderByExpr extends ASTBase {
         
     }
     
+    /**
+     * Required deep copy constructor.
+     */
+    public OrderByExpr(OrderByExpr op) {
+        super(op);
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public OrderByExpr(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
+    }
+
     public OrderByExpr(final IValueExpressionNode ve, final boolean ascending) {
 
         super(new BOp[] { (BOp) ve }, null/* anns */);

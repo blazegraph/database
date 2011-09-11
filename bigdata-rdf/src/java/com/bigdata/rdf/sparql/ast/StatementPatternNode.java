@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -26,6 +27,24 @@ public class StatementPatternNode extends
     
     }
     
+    /**
+     * Required deep copy constructor.
+     */
+    public StatementPatternNode(StatementPatternNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public StatementPatternNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
     /**
      * A triple pattern.
      * 

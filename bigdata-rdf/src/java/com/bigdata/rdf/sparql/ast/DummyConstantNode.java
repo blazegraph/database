@@ -1,5 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -22,7 +25,6 @@ public class DummyConstantNode extends ConstantNode {
 	 */
 	private static final long serialVersionUID = 1393730362383536411L;
 
-	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final IV toDummyIV(final BigdataValue val) {
 		
@@ -42,4 +44,20 @@ public class DummyConstantNode extends ConstantNode {
 		
 	}
 	
+    /**
+     * Required deep copy constructor.
+     */
+    public DummyConstantNode(DummyConstantNode op) {
+        super(op);
+    }
+    
+    /**
+     * Required shallow copy constructor.
+     */
+    public DummyConstantNode(final BOp[] args, final Map<String, Object> anns) {
+        
+        super(args, anns);
+        
+    }
+    
 }

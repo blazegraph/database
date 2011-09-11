@@ -27,14 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * An extension point for external service calls which produce solution
- * multisets.
+ * multisets (a SPARQL <code>SERVICE</code>).
  */
 public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
 
@@ -43,27 +45,41 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
     interface Annotations extends GroupMemberNodeBase.Annotations {
 
         /**
-         * The function URI from the {@link FunctionRegistry}.
+         * The service {@link URI}, which will be resolved against the
+         * {@link ServiceRegistry} to obtain a {@link ServiceCall} object.
          */
         String SERVICE_URI = "serviceURI";
 
         /**
-         * The <code>group graph pattern</code> used to invoke the service.
+         * The {@link IGroupNode} modeling the <code>group graph pattern</code>
+         * used to invoke the service.
          */
         String GROUP_NODE = "groupNode";
 
         /**
-         * The base name of the named solution set which will be generated when
-         * the service is invoked.
+         * The namespace of the {@link AbstractTripleStore} instance (not the
+         * namespace of the lexicon relation). This resource will be located and
+         * made available to the {@link ServiceCall}.
          */
-        String NAME = "name";
+        String NAMESPACE = "namespace";
         
-        /**
-         * A {@link VarNode}[] specifying the join variables that will be used
-         * when the named result set is join with the query. The join variables
-         * MUST be bound for a solution to join.
-         */
-        String JOIN_VARS = "joinVars";
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public ServiceNode(ServiceNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public ServiceNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
 
     }
 
@@ -72,66 +88,18 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
      * 
      * @param serviceURI
      *            The service URI. See {@link ServiceRegistry}
-     * @param name
-     *            The name of the solution set on which the service's results
-     *            will be buffered.
      * @param groupNode
      *            The graph pattern used to invoke the service.
-     * 
-     *            FIXME If the service streams out results and is just run first
-     *            within a named subquery then we do not need a "name" for the
-     *            service node. The "name" is the namedSet of the subquery. If
-     *            the service shows up by itself in the main body of a query
-     *            then we just need to create a named subquery for the service
-     *            invocation. It it is already part of a named subquery and
-     *            there is no other service in the named subquery, then we just
-     *            run it first in that named subquery. If there is another
-     *            service in that named subquery, then we need to lift one of
-     *            them out into its own named subquery (i.e., at most one
-     *            "run first/ run once" operation in the named subquery to avoid
-     *            a cross product).
      */
     public ServiceNode(//
-            final String name,
             final URI serviceURI,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
         super(new BOp[]{}, null/*anns*/);
 
-        super.setProperty(Annotations.NAME, name);
-
         super.setProperty(Annotations.SERVICE_URI, serviceURI);
 
         super.setProperty(Annotations.GROUP_NODE, groupNode);
-
-    }
-
-    /**
-     * The join variables to be used when the named result set is included into
-     * the query. This should be set by an {@link IASTOptimizer} based on a
-     * static analysis of the query.
-     */
-    public VarNode[] getJoinVars() {
-
-        return (VarNode[]) getProperty(Annotations.JOIN_VARS);
-
-    }
-
-    /**
-     * Set the join variables.
-     *
-     * @param joinVars
-     *            The join variables.
-     */
-    public void setJoinVars(final VarNode[] joinVars) {
-
-        setProperty(Annotations.JOIN_VARS, joinVars);
-
-    }
-
-    public String getName() {
-
-        return (String) getRequiredProperty(Annotations.NAME);
 
     }
 
@@ -158,37 +126,12 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
         final StringBuilder sb = new StringBuilder();
 
         final URI serviceURI = getServiceURI();
-        final String name = getName();
-        final VarNode[] joinVars = getJoinVars();
 
         sb.append("\n");
         sb.append(indent(indent));
         sb.append("SERVICE <");
         sb.append(serviceURI);
         sb.append("> ");
-        sb.append("AS ");
-        sb.append(name);
-        
-        if (joinVars != null) {
-
-            sb.append(" JOIN ON (");
-
-            boolean first = true;
-
-            for (VarNode var : joinVars) {
-
-                if (!first)
-                    sb.append(",");
-
-                sb.append(var);
-
-                first = false;
-
-            }
-
-            sb.append(")");
-
-        }
 
         if (getGroupNode() != null) {
 

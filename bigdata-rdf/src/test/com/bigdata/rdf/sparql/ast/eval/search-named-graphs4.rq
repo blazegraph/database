@@ -1,0 +1,20 @@
+# Search query.
+prefix : <http://www.bigdata.com/> 
+PREFIX bd: <http://www.bigdata.com/rdf/search#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+prefix foaf: <http://xmlns.com/foaf/0.1/>
+SELECT ?g ?subj
+  FROM NAMED :g1
+  FROM NAMED :g2
+  WITH {
+   SELECT ?subj
+    WHERE {
+      GRAPH ?g {
+        ?lit bd:search "mike" .
+        ?subj ?p ?lit .
+        }
+      }
+  } as %searchSet1
+WHERE {
+   include %searchSet1 .
+}
