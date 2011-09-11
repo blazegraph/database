@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -54,6 +57,24 @@ public class SubqueryRoot extends SubqueryBase {
     private static final long serialVersionUID = 1L;
 
     /**
+     * Deep copy constructor.
+     */
+    public SubqueryRoot(final SubqueryRoot queryBase) {
+    
+        super(queryBase);
+        
+    }
+    
+    /**
+     * Shallow copy constructor.
+     */
+    public SubqueryRoot(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+        
+    }
+
+     /**
      * Note: This constructor variant may be used with the implicit subquery for
      * EXISTS to specify the type of the subquery as {@link QueryType#ASK}.
      * 

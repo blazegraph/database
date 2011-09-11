@@ -35,10 +35,12 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -287,9 +289,6 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         
         if (tmp != null) {
 
-            /*
-             * Validate searches.
-             */
             for (Map.Entry<IVariable<?>, Map<URI, StatementPatternNode>> e : tmp
                     .entrySet()) {
 
@@ -311,6 +310,9 @@ public class ASTSearchOptimizer implements IASTOptimizer {
                         group, searchVar, statementPatterns);
 
                 group.addChild(serviceNode);
+
+                if (group.getContext() != null)
+                    enforceNamedGraphConstraint(searchVar, group);
                 
                 if (log.isInfoEnabled())
                     log.info("Rewrote group: " + group);
@@ -319,6 +321,59 @@ public class ASTSearchOptimizer implements IASTOptimizer {
 
         }
         
+    }
+    
+    /**
+     * If there is no join to the subject position for the search variable (?s
+     * ?p ?searchVar) and the search appears in a graph context, then we insert
+     * one now. This basically imposes a constraint that the search results will
+     * only be reported for the bindings which the graph variable may take on.
+     * It also serves to bind the graph variable, which could otherwise not be
+     * bound as nothing was actually joined against a statement index.
+     * 
+     * @param searchVar
+     *            The search variable (the literal whose text is the free text
+     *            query).
+     * @param group
+     *            The group in which the search magic predicates appear.
+     */
+    private void enforceNamedGraphConstraint(final IVariable<?> searchVar,
+            final GroupNodeBase<IGroupMemberNode> group) {
+
+        StatementPatternNode subjectJoin = null;
+        for (IGroupMemberNode child : group) {
+
+            if (!(child instanceof StatementPatternNode))
+                continue;
+            
+            final StatementPatternNode sp = (StatementPatternNode) child;
+            
+            if (searchVar.equals(sp.o().getValueExpression())) {
+            
+                subjectJoin = sp;
+                
+                break;
+                
+            }
+            
+        }
+
+        if (subjectJoin != null)
+            return;
+        
+        // Add the join to impose the named graph constraint.
+        group.addChild(new StatementPatternNode(//
+                new VarNode(Var.var().getName()),// s
+                new VarNode(Var.var().getName()),// p
+                new VarNode(searchVar.getName()),// o
+                group.getContext(), // c
+                Scope.NAMED_CONTEXTS // scope
+        ));
+
+        if (log.isInfoEnabled())
+            log.info("Added subject join to imposed named graph constraint: "
+                    + group);
+
     }
 
     /**
@@ -340,7 +395,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             
         }
 
-        return new ServiceNode(searchVar.getName(), BD.SEARCH, groupNode);
+        return new ServiceNode(BD.SEARCH, groupNode);
 
     }
 

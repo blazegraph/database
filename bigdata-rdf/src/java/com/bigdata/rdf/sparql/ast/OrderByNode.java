@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
+import java.util.Map;
 
 import com.bigdata.bop.BOp;
 
@@ -46,6 +47,24 @@ public class OrderByNode extends SolutionModifierBase implements
      * 
      */
     private static final long serialVersionUID = 1L;
+
+    /**
+     * Deep copy constructor.
+     */
+    public OrderByNode(final OrderByNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public OrderByNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
 
     public OrderByNode() {
     }

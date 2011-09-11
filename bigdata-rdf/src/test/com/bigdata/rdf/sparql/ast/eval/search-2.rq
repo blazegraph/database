@@ -1,0 +1,16 @@
+# Search query.
+PREFIX bd: <http://www.bigdata.com/rdf/search#>
+
+SELECT ?subj ?score 
+  WITH {
+   SELECT ?subj ( round(?cosine*10)/10 as ?score )
+    WHERE {
+      ?lit bd:search "child proofing" .
+      ?lit bd:relevance ?cosine .
+      ?subj ?p ?lit .
+      }
+    ORDER BY DESC(?score) ?subj
+  } as %searchSet1
+WHERE {
+   include %searchSet1
+}

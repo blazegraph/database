@@ -119,9 +119,6 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
      * Note: (NOT) EXISTS uses a temporary graph pattern in order to avoid the
      * side-effect on the parent's graph pattern. Other value functions with
      * inner graph patterns should do this as well.
-     * <p>
-     * Note: Filters are scoped to the graph pattern group and do not affect
-     * bindings external to the group.
      * 
      * @return The {@link GroupNodeBase}. This return value is used by the
      *         visitor method for the {@link ASTWhereClause}. If the child was a
@@ -141,7 +138,7 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         graphPattern = new GroupGraphPattern(parentGP);
 
-        // visit the children of the node (default behavior).
+        /* Visit the children of the node (default behavior).  Note: [ret] will be null in many cases with a side effect on [graphPattern]. */
         final Object ret = super.visit(node, null);
         final GroupNodeBase<?> ret2; 
 
@@ -160,13 +157,14 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
                  * SELECT * { SELECT * { ?s ?p ?o } }
                  * </pre>
                  */
-                final JoinGroupNode joinGroup = new JoinGroupNode();
-
+                
                 graphPattern = new GroupGraphPattern(parentGP);
+                
                 graphPattern.add(new JoinGroupNode(subqueryRoot));
                 
                 @SuppressWarnings("rawtypes")
-                final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+                final GroupNodeBase group = graphPattern
+                        .buildGroup(new JoinGroupNode());
 
                 ret2 = group;
 
@@ -181,38 +179,55 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
                  * </pre>
                  */
                 
-                final JoinGroupNode joinGroup = new JoinGroupNode();
-
-                joinGroup.addChild(subqueryRoot);
-
-                parentGP.add(joinGroup);
+                parentGP.add(new JoinGroupNode(subqueryRoot));
                 
                 ret2 = null;
                 
             }
 
         } else {
-            
-            final JoinGroupNode joinGroup = new JoinGroupNode();
 
-            if (node.jjtGetParent() instanceof ASTGraphGraphPattern) {
+//            if (node.jjtGetParent() instanceof ASTWhereClause
+//                    && graphPattern.isSimpleJoinGroup()) {
+//
+//                /*
+//                 * If the sole child is a non-optional join group without a
+//                 * graph context, then it is elimated. This handles cases like a
+//                 * top-level UNION which would otherwise be nested as
+//                 * JoinGroupNode(JoinGroupNode(UnionNode(...))).
+//                 */
+//
+//                final JoinGroupNode group = (JoinGroupNode) graphPattern.get(0);
+//
+//                parentGP.add(group);
+//
+//                ret2 = group;
+//                
+//            } else {
 
-                /*
-                 * TODO Should we reach up to the first GRAPH graph pattern in
-                 * case it is more than one level above us and pull in its
-                 * context? Or should that be handled by an AST Optimizer?
-                 */
+                final JoinGroupNode joinGroup = new JoinGroupNode();
 
-                joinGroup.setContext(parentGP.getContext());
+                if (node.jjtGetParent() instanceof ASTGraphGraphPattern) {
 
-            }
+                    /*
+                     * TODO Should we reach up to the first GRAPH graph pattern
+                     * in case it is more than one level above us and pull in
+                     * its context? Or should that be handled by an AST
+                     * Optimizer?
+                     */
 
-            @SuppressWarnings("rawtypes")
-            final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+                    joinGroup.setContext(parentGP.getContext());
 
-            parentGP.add(group);
+                }
 
-            ret2 = group;
+                @SuppressWarnings("rawtypes")
+                final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+
+                parentGP.add(group);
+
+                ret2 = group;
+
+//            }
             
         }
 
@@ -387,7 +402,10 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
          */
         node.jjtGetChild(1).jjtAccept(this, null);
         
-        parentGP.add(graphPattern.buildGroup(new UnionNode()));
+        // Build a union of those patterns.
+        final UnionNode union = graphPattern.buildGroup(new UnionNode());
+        
+        parentGP.add(union);
         
         graphPattern = parentGP;
 

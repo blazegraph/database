@@ -43,6 +43,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -87,7 +88,7 @@ public class SearchServiceFactory implements ServiceFactory {
 //    private static final Logger log = Logger
 //            .getLogger(SearchServiceFactory.class);
 
-    public BigdataServiceCall create(final String lex,
+    public BigdataServiceCall create(
             final AbstractTripleStore store,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
@@ -368,8 +369,8 @@ public class SearchServiceFactory implements ServiceFactory {
 
             this.vars = new IVariable[] {//
                     searchVar,//
-                    relVar,//
-                    rankVar //
+                    relVar == null ? Var.var() : relVar,// must be non-null.
+                    rankVar == null ? Var.var() : rankVar // must be non-null.
             };
 
             this.minRank = minRank;
@@ -453,10 +454,13 @@ public class SearchServiceFactory implements ServiceFactory {
                     return true;
                 while (src.hasNext()) {
                     current = src.next();
-                    if (isBound && !boundVal.equals(current.getDocId())) {
-                        // Drop hit.
-                        continue;
+                    if (isBound) {
+                        if (!boundVal.equals(current.getDocId())) {
+                            // Drop hit.
+                            continue;
+                        }
                     }
+                    return true;
                 }
                 return current != null;
             }

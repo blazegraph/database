@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * AST node for a SLICE (offset/limit).
  * 
@@ -52,6 +56,24 @@ public class SliceNode extends SolutionModifierBase {
     
     }
     
+    /**
+     * Deep copy constructor.
+     */
+    public SliceNode(final SliceNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public SliceNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
     /**
      * Slice with defaults that do not impose a constraint (offset is ZERO,
      * limit is {@link Long#MAX_VALUE}).

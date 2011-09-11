@@ -38,8 +38,6 @@ public interface ServiceFactory {
     /**
      * Create a service invocation object.
      * 
-     * @param lex
-     *            The namespace of the lexicon.
      * @param store
      *            The {@link AbstractTripleStore}.
      * @param groupNode
@@ -49,7 +47,6 @@ public interface ServiceFactory {
      *         pattern.
      */
     BigdataServiceCall create(
-			final String lex,
 			final AbstractTripleStore store,
 			final IGroupNode<IGroupMemberNode> groupNode);
 

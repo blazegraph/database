@@ -42,6 +42,16 @@ public class ValueExpressionNode extends ASTBase implements
         
     }
     
+    /**
+     * Required deep copy constructor.
+     */
+    public ValueExpressionNode(ValueExpressionNode op) {
+        super(op);
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
     public ValueExpressionNode(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);

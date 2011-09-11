@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -114,8 +117,26 @@ abstract public class QueryBase extends QueryNodeBase {
     private QueryBase() {
         
     }
+
+    /**
+     * Deep copy constructor.
+     */
+    public QueryBase(final QueryBase queryBase) {
     
-	public QueryBase(final QueryType queryType) {
+        super(queryBase);
+        
+    }
+    
+    /**
+     * Shallow copy constructor.
+     */
+    public QueryBase(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+        
+    }
+
+    public QueryBase(final QueryType queryType) {
 	    
         setQueryType(queryType);
 	    

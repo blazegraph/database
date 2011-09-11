@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
+import java.util.Map;
 
 import com.bigdata.bop.BOp;
 
@@ -40,12 +41,33 @@ import com.bigdata.bop.BOp;
 abstract public class QueryNodeListBaseNode<E extends IQueryNode>
         extends QueryNodeBase implements Iterable<E> {
 
-//    private final List<E> children = new LinkedList<E>();
-
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
+
+    public QueryNodeListBaseNode() {
+        super();
+    }
+    
+    /**
+     * Deep copy constructor.
+     */
+    public QueryNodeListBaseNode(final QueryNodeListBaseNode<E> op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public QueryNodeListBaseNode(final BOp[] args,
+            final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
 
     public void add(final E e) {
 

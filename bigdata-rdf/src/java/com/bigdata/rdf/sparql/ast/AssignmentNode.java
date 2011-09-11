@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -26,6 +28,24 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     public AssignmentNode(final VarNode var, final IValueExpressionNode ve) {
 
         super(new BOp[] { var, (BOp) ve }, null/* anns */);
+
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public AssignmentNode(AssignmentNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public AssignmentNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
 
     }
 

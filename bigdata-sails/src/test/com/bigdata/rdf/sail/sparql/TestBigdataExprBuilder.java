@@ -36,6 +36,8 @@ import org.openrdf.query.parser.sparql.DC;
 import org.openrdf.query.parser.sparql.ast.ParseException;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -268,8 +270,8 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
             final GroupByNode groupBy = new GroupByNode();
             expected.setGroupBy(groupBy);
             groupBy.addExpr(//
-                    new AssignmentNode(new VarNode("o"),
-                    (IValueExpressionNode) new VarNode("z"))//
+                    new AssignmentNode(new VarNode("z"),
+                    (IValueExpressionNode) new VarNode("o"))//
                     );
 
         }
@@ -919,13 +921,25 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
             }
 
             {
+                final BigdataURI uri1 = valueFactory
+                        .createURI("http://example.org/dft.ttl");
+
+                final BigdataURI uri2 = valueFactory
+                        .createURI("http://example.org/alice");
+                
+                final BigdataURI uri3 = valueFactory
+                        .createURI("http://example.org/bob"); 
+
+                final BigdataValue[] values = new BigdataValue[] { uri1, uri2,
+                        uri3 };
+                
+                tripleStore.getLexiconRelation().addTerms(values,
+                        values.length, false/* readOnly */);
+
                 final DatasetImpl dataset = new DatasetImpl();
-                dataset.addDefaultGraph(valueFactory
-                        .createURI("http://example.org/dft.ttl"));
-                dataset.addNamedGraph(valueFactory
-                        .createURI("http://example.org/alice"));
-                dataset.addNamedGraph(valueFactory
-                        .createURI("http://example.org/bob"));
+                dataset.addDefaultGraph(uri1);
+                dataset.addNamedGraph(uri2);
+                dataset.addNamedGraph(uri3);
                 final DatasetNode datasetNode = new DatasetNode(dataset);
                 expected.setDataset(datasetNode);
             }
@@ -957,5 +971,104 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
         assertSameAST(sparql, expected, actual);
 
     }
-    
+
+    /**
+     * A variant of the above test where one of the URIs in the default / named
+     * graph declarations is not a graph in the KB.
+     * 
+     * @throws MalformedQueryException
+     * @throws TokenMgrError
+     * @throws ParseException
+     */
+    public void test_from_and_from_named_with_unknown_graph()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql = "" + //
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n" + //
+                "PREFIX dc: <http://purl.org/dc/elements/1.1/>\n" + //
+                "SELECT ?who ?g ?mbox\n" + //
+                "FROM <http://example.org/dft.ttl>\n" + //
+                "FROM NAMED <http://example.org/alice>\n" + //
+                "FROM NAMED <http://example.org/bob>\n" + //
+                "WHERE {\n" + //
+                "    ?g dc:publisher ?who .\n" + //
+                "    GRAPH ?g { ?x foaf:mbox ?mbox } \n" + //
+                "}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
+                prefixDecls.put("dc", DC.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.addProjectionVar(new VarNode("who"));
+                projection.addProjectionVar(new VarNode("g"));
+                projection.addProjectionVar(new VarNode("mbox"));
+            }
+
+            {
+                final BigdataURI uri1 = valueFactory
+                        .createURI("http://example.org/dft.ttl");
+
+                final BigdataURI uri2 = valueFactory
+                        .createURI("http://example.org/alice");
+
+                final BigdataURI uri3 = valueFactory
+                        .createURI("http://example.org/bob");
+
+                final BigdataValue[] values = new BigdataValue[] { //
+                        uri1, //
+                        uri2,//
+//                        uri3 //
+                };
+
+                tripleStore.getLexiconRelation().addTerms(values,
+                        values.length, false/* readOnly */);
+
+                final DatasetImpl dataset = new DatasetImpl();
+                dataset.addDefaultGraph(uri1);
+                dataset.addNamedGraph(uri2);
+                dataset.addNamedGraph(uri3);
+                final DatasetNode datasetNode = new DatasetNode(dataset);
+                expected.setDataset(datasetNode);
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("g"),
+                                new ConstantNode(makeIV(valueFactory
+                                        .createURI(DC.PUBLISHER.toString()))),
+                                new VarNode("who"), null/* c */,
+                                Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode group = new JoinGroupNode();
+                whereClause.addChild(group);
+                group.setContext(new VarNode("g"));
+                group.addChild(new StatementPatternNode(
+                        new VarNode("x"),
+                        new ConstantNode(makeIV(valueFactory
+                                .createURI(FOAFVocabularyDecl.mbox.toString()))),
+                        new VarNode("mbox"), new VarNode("g"),
+                        Scope.NAMED_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
 }

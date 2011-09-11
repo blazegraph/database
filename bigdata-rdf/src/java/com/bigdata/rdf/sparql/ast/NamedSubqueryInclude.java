@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
  * that a named solution set should be joined with the solutions in the group.
@@ -67,6 +71,24 @@ public class NamedSubqueryInclude extends
          */
         String JOIN_VARS = "joinVars";
         
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public NamedSubqueryInclude(NamedSubqueryInclude op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public NamedSubqueryInclude(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
     }
 
     /**

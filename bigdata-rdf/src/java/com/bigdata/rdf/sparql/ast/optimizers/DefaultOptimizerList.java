@@ -130,6 +130,9 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * not share any variables at all then it will produce a cross product and,
  * again, we want to run that subquery once.)
  * 
+ * FIXME Write AST optimizer which rejects queries that SELECT variables which
+ * do not otherwise appear in the query.
+ * 
  * <pre>
  * 
  * TODO From BigdataEvaluationStrategyImpl3#945
@@ -177,6 +180,12 @@ public class DefaultOptimizerList extends OptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+
+        /**
+         * Eliminate semantically empty join group nodes which are the sole
+         * child of another join groups.
+         */
+        add(new ASTEmptyGroupOptimizer());
         
         /**
          * Translate {@link BD#SEARCH} and associated magic predicates into a
@@ -187,7 +196,7 @@ public class DefaultOptimizerList extends OptimizerList {
          * pattern. The magic predicates identify the bindings to be projected
          * out of the named subquery (rank, cosine, etc).
          */
-//        add(new ASTSearchOptimizer());
+        add(new ASTSearchOptimizer());
         
         /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of

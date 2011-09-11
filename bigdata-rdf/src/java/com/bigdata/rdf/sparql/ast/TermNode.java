@@ -24,6 +24,16 @@ public abstract class TermNode extends ValueExpressionNode {
 	 */
 	private static final long serialVersionUID = 2050144811725774174L;
 
+    /**
+     * Required deep copy constructor.
+     */
+    public TermNode(TermNode op) {
+        super(op);
+    }
+    
+    /**
+     * Required shallow copy constructor.
+     */
 	public TermNode(final BOp[] args, final Map<String, Object> anns) {
 		
 		super(args, anns);

@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * A node whose children are a list of {@link NamedSubqueryRoot}s.
  * 
@@ -39,6 +43,24 @@ public class NamedSubqueriesNode extends QueryNodeListBaseNode<NamedSubqueryRoot
      * 
      */
     private static final long serialVersionUID = 1L;
+
+    /**
+     * Deep copy constructor.
+     */
+    public NamedSubqueriesNode(final NamedSubqueriesNode op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public NamedSubqueriesNode(final BOp[] args, final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
 
     /**
      * 

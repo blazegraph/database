@@ -1,0 +1,34 @@
+# Test using example based on <a href="http://www.ec-securehost.com/SIAM/SE17.html">
+# Understanding Search Engines </a> by Barry and Browne. I recommend the book as
+# a good overview of search engine basis and an excellent reader for latent semantic
+# indexing (Barry was one of the original people involved with LSI).
+# There is a worksheet <code>src/architecture/search.xls</code> that gives the 
+# background for this test.  There is also a detailed example in the full text
+# index search code.
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+:search-2 {
+
+    # Infant & Toddler First Aid 
+	:book1 rdfs:label "Infant Toddler" .
+
+    # Babies Children's Room (For Your Home)
+    :book2 rdfs:label "Bab Child Home" .
+
+    # Child Safety at Home
+    :book3 rdfs:label "Child Safety Home" . 
+
+    # Your Baby's Health and Safety: From Infant to Toddler
+    :book4 rdfs:label "Bab Health Safety Infant Toddler" .
+
+    # Baby Proofing Basics
+    :book5 rdfs:label "Bab Proofing" .
+
+    # Your Guide To Easy Rust Proofing
+    :book6 rdfs:label "Guide Proofing" .
+
+    # Beanie Babies Collector's Guide
+    :book7 rdfs:label "Bab Guide" .
+
+}

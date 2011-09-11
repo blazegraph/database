@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * AST node for solution modifiers (SLICE, ORDER BY, GROUP BY)
  *  
@@ -40,4 +44,26 @@ abstract public class SolutionModifierBase extends QueryNodeBase {
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Deep copy constructor.
+     */
+    public SolutionModifierBase(final SolutionModifierBase op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public SolutionModifierBase(final BOp[] args,
+            final Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
+    public SolutionModifierBase() {
+        super();
+    }
 }

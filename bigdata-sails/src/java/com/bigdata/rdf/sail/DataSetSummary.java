@@ -107,7 +107,7 @@ public class DataSetSummary {
 
                 final IV iv = itr.next();
 
-                if (iv != null) {
+                if (iv != null && !iv.isNullIV()) {
 
                     if (++nknown == 1) {
 
@@ -133,11 +133,11 @@ public class DataSetSummary {
 
         while (itr.hasNext()) {
 
-            final IV id = itr.next();
+            final IV iv = itr.next();
 
-            if (id != null) {
+            if (iv != null && !iv.isNullIV()) {
 
-                a[nknown++] = id;
+                a[nknown++] = iv;
 
             }
 

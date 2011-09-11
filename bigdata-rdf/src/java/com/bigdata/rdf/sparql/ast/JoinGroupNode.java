@@ -5,8 +5,10 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
@@ -31,6 +33,24 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          */
         String CONTEXT = "context";
         
+    }
+    
+    /**
+     * Required deep copy constructor.
+     */
+    public JoinGroupNode(JoinGroupNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public JoinGroupNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
     }
     
     /**

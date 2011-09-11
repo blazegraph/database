@@ -1,9 +1,11 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.openrdf.query.Dataset;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.DataSetSummary;
 import com.bigdata.rdf.spo.ISPO;
@@ -43,11 +45,25 @@ public class DatasetNode extends QueryNodeBase {
         String NAMED_GRAPH_FILTER = "namedGraphFilter";
         
     }
-    
-//	private final DataSetSummary defaultGraphs, namedGraphs;
-//	
-//	private final IElementFilter<ISPO> defaultGraphFilter, namedGraphFilter;
 	
+    /**
+     * Required deep copy constructor.
+     */
+    public DatasetNode(DatasetNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public DatasetNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+
     @SuppressWarnings("rawtypes")
 	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs) {
 		
@@ -70,12 +86,6 @@ public class DatasetNode extends QueryNodeBase {
             final DataSetSummary namedGraphs) {
 
         this(defaultGraphs, namedGraphs, null, null);
-        
-//        this.defaultGraphs = defaultGraphs;
-//        this.namedGraphs = namedGraphs;
-//
-//        this.defaultGraphFilter = null;
-//        this.namedGraphFilter = null;
 
     }
 	

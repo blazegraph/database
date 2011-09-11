@@ -66,8 +66,6 @@ public class ServiceRegistry {
     /**
      * Convert a {@link FunctionNode} into an {@link IValueExpression}.
      * 
-     * @param lex
-     *            The namespace of the lexicon relation.
      * @param store
      *            The {@link AbstractTripleStore}.
      * @param functionURI
@@ -80,7 +78,7 @@ public class ServiceRegistry {
      * 
      * @return The {@link IValueExpression}.
      */
-    public static final BigdataServiceCall toServiceCall(final String lex,
+    public static final BigdataServiceCall toServiceCall(
             final AbstractTripleStore store, final URI serviceURI,
             final IGroupNode<IGroupMemberNode> groupNode) {
 
@@ -98,11 +96,10 @@ public class ServiceRegistry {
              * However, if we handle this translation lazily then this might not
              * be an issue.
              */
-            throw new IllegalArgumentException("unknown service: "
-                    + serviceURI);
+            throw new IllegalArgumentException("unknown service: " + serviceURI);
         }
 
-        return f.create(lex, store, groupNode);
+        return f.create(store, groupNode);
 
     }
 

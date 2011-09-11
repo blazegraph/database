@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
@@ -14,6 +16,24 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase {
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Required deep copy constructor.
+     */
+    public FilterNode(FilterNode op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public FilterNode(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     /**
      * 
      * @param ve

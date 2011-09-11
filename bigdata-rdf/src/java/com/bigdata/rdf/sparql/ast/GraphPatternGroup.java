@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
+
 /**
  * Join group or union.
  * 
@@ -41,6 +45,24 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Required deep copy constructor.
+     */
+    public GraphPatternGroup(GraphPatternGroup<E> op) {
+
+        super(op);
+        
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public GraphPatternGroup(BOp[] args, Map<String, Object> anns) {
+
+        super(args, anns);
+
+    }
+    
     /**
      * 
      */

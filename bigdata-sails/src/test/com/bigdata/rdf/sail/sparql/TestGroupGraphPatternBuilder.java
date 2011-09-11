@@ -394,20 +394,17 @@ public class TestGroupGraphPatternBuilder extends
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
+
             final UnionNode union = new UnionNode();
             whereClause.addChild(union);
-            final JoinGroupNode group1 = new JoinGroupNode();
-            final JoinGroupNode group2 = new JoinGroupNode();
-            union.addChild(group1);
-            union.addChild(group2);
 
-            group1.addChild(new StatementPatternNode(new VarNode("s"),
-                    new VarNode("p"), new VarNode("o"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(
+                    new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                    null/* c */, Scope.DEFAULT_CONTEXTS)));
 
-            group2.addChild(new StatementPatternNode(new VarNode("o"),
-                    new VarNode("p2"), new VarNode("s"), null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+            union.addChild(new JoinGroupNode(new StatementPatternNode(
+                    new VarNode("o"), new VarNode("p2"), new VarNode("s"),
+                    null/* c */, Scope.DEFAULT_CONTEXTS)));
 
         }
 
@@ -460,30 +457,23 @@ public class TestGroupGraphPatternBuilder extends
             }
 
             {
-                
+
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
+
                 final UnionNode union1 = new UnionNode();
                 whereClause.addChild(union1);
-                final JoinGroupNode group1 = new JoinGroupNode();
-                final JoinGroupNode group2 = new JoinGroupNode();
-                final JoinGroupNode group3 = new JoinGroupNode();
-                final JoinGroupNode group4 = new JoinGroupNode();
-                union1.addChild(group1);
+
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p1, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+
                 final UnionNode union2 = new UnionNode();
-                union1.addChild(group4);
-                group4.addChild(union2);
-                union2.addChild(group2);
-                union2.addChild(group3);
-
-                group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
-                        Scope.DEFAULT_CONTEXTS));
-
-                group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
-                        Scope.DEFAULT_CONTEXTS));
-
-                group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
-                        Scope.DEFAULT_CONTEXTS));
+                union1.addChild(new JoinGroupNode(union2));
+                
+                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p2, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p3, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
                 
             }
 
@@ -533,39 +523,33 @@ public class TestGroupGraphPatternBuilder extends
                 expected.setPrefixDecls(prefixDecls);
             }
 
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("s"));
-            expected.setProjection(projection);
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+            }
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
 
-            final UnionNode union1 = new UnionNode();
-            final UnionNode union2 = new UnionNode();
-            
-            final JoinGroupNode group1 = new JoinGroupNode();
-            final JoinGroupNode group2 = new JoinGroupNode();
-            final JoinGroupNode group3 = new JoinGroupNode();
-            final JoinGroupNode group4 = new JoinGroupNode();
-            
-            whereClause.addChild(union1);
-            
-            union1.addChild(group1);
-            union1.addChild(group4);
+                final UnionNode union1 = new UnionNode();
+                final UnionNode union2 = new UnionNode();
 
-            group4.addChild(union2);
-            
-            union2.addChild(group2);
-            union2.addChild(group3);
+                whereClause.addChild(union1);
 
-            group1.addChild(new StatementPatternNode(s, p1, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                union1.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p1, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+                
+                union1.addChild(new JoinGroupNode(union2));
 
-            group2.addChild(new StatementPatternNode(s, p2, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p2, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
 
-            group3.addChild(new StatementPatternNode(s, p3, o, null/* c */,
-                    Scope.DEFAULT_CONTEXTS));
+                union2.addChild(new JoinGroupNode(new StatementPatternNode(s,
+                        p3, o, null/* c */, Scope.DEFAULT_CONTEXTS)));
+
+            }
 
         }
 

@@ -66,7 +66,10 @@ public class TestAll extends TestCase {
         
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
-        
+
+        // Full text search
+        suite.addTestSuite(TestSearch.class);
+
         // Complex queries.
         suite.addTestSuite(TestComplexQuery.class);
         
