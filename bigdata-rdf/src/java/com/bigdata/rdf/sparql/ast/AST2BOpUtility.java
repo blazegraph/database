@@ -438,32 +438,39 @@ public class AST2BOpUtility {
      * @param ctx
      * @return
      * 
-     *         TODO It is possible to run the named subqueries in parallel since
-     *         the do not have any mutual dependencies. {@link Steps} could be
-     *         used to do this. Whether this is a wise use of resources is
-     *         another matter. It probably is on a cluster. It might not be on a
-     *         single machine depending on how heavy the subqueries are and what
-     *         the concurrent workload is on the machine.
-     * 
      * @see ASTNamedSubqueryOptimizer
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             final NamedSubqueriesNode namedSubquerieNode,
             final QueryRoot queryRoot, final AST2BOpContext ctx) {
 
+        if (true) {
+
+            /*
+             * Run the named subqueries sequentially in the pre-determined
+             * order.
+             */
+            for (NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+
+                left = createNamedSubquery(left, subqueryRoot, ctx);
+
+            }
+
+        }
+
         /*
          * If there is more than one named subquery whose DEPENDS_ON attribute
          * is an empty String[], then run them in parallel using STEPS (and
          * filter them out in the 2nd pass). Then run the remaining named
          * subqueries in their current sequence.
+         * 
+         * FIXME This code breaks with a low level error from the memory
+         * manager. This problem would appear to be one of the scope and life
+         * cycle of the memory manager instance on which the HTree data is
+         * written. The problem only appears if you run the STEPS operator. It
+         * can be manifested if you always wrap the named subquery in a STEPS
+         * operator. See below for details.
          */
-
-//        Note: This code runs them sequentially in the pre-determined order.
-//        for(NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
-//            
-//            left = createNamedSubquery(left, subqueryRoot, ctx);
-//            
-//        }
 
         // All named subqueries with NO dependencies.
         final List<NamedSubqueryRoot> runFirst = new LinkedList<NamedSubqueryRoot>();
@@ -492,7 +499,13 @@ public class AST2BOpUtility {
             
             throw new AssertionError();
 
-        } else if (nfirst == 1) {
+        } else if (/* false && */nfirst == 1) {
+
+            /*
+             * TODO ^^^^^^^^^^^^^ If we disable this code path then we always
+             * wrap the named subquery in a STEPS operator and the memory
+             * manager error will be demonstrated. See above.
+             */
 
             left = createNamedSubquery(left, runFirst.get(0), ctx);
 
@@ -1027,7 +1040,7 @@ public class AST2BOpUtility {
         /*
          * Add the pre-conditionals to the pipeline.
          * 
-         * TODO These filters should be lifted into the parent group so we
+         * TODO These filters should be lifted into the parent group (by a rewrite rule) so we
          * can avoid starting a subquery only to have it failed by a filter.
          * We will do less work if we fail the solution in the parent group.
          */
@@ -1167,9 +1180,14 @@ public class AST2BOpUtility {
 	}
 
     /**
-     * @deprecated The {@link StartOp} is not necessary in query plans. It is
-     *             just a convenient concept. When not using StartOp, the first
-     *             operator in the plan just needs to have an empty args[].
+     * Adds a {@link StartOp}.
+     * <p>
+     * Note: {@link StartOp} is not necessary in query plans. It is just a
+     * convenient concept. When not using {@link StartOp}, the first operator in
+     * the plan just needs to have an empty <code>args[]</code>. The only time
+     * this is really necessary is when the top-level query plan would otherwise
+     * be empty (a <code>null</code>). In this case, the {@link StartOp} just
+     * copies its inputs to its outputs (which is all it ever does).
      */
 	private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
 		

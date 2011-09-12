@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Data driven test suite for full text search.
@@ -37,7 +38,10 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
  * 
  *          TODO Correct rejection test when a magic predicate for search
  *          appears outside of a named query clause.
- *          
+ * 
+ *          TODO Correct rejection test when an unknown magic predicate in the
+ *          {@link BD#SEARCH_NAMESPACE} is observed.
+ * 
  *          TODO Add unit tests for slicing by rank and relevance.
  */
 public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
@@ -179,6 +183,16 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
         
         new TestHelper("search-main-where-clause").runTest();
         
+    }
+    
+    /**
+     * Unit test with explicit {@link BD#MIN_RELEVANCE} of zero and a prefix
+     * match search.
+     */
+    public void test_search_min_relevance() throws Exception {
+
+        new TestHelper("search-min-relevance").runTest();
+
     }
     
     /**

@@ -149,6 +149,8 @@ public class NamedSubqueryInclude extends
 
         final StringBuilder sb = new StringBuilder();
         
+        sb.append("\n");
+        
         sb.append(indent(indent));
 
         sb.append("INCLUDE ").append(getName());
