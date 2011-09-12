@@ -121,6 +121,10 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * not share any variables at all then it will produce a cross product and,
  * again, we want to run that subquery once.)
  * 
+ * TODO The combination of DISTINCT and ORDER BY can be optimized using an ORDER
+ * BY in which duplicate solutions are discarded after the sort by a filter
+ * which compares the current solution with the prior solution.
+ * 
  * FIXME Write AST optimizer which rejects queries that SELECT variables which
  * do not otherwise appear in the query.
  * 

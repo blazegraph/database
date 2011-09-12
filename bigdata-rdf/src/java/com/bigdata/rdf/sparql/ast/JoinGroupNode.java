@@ -210,12 +210,18 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		
 		return filters;
 		
-	}
+    }
 
-	/**
-	 * Return only the filter child nodes in this group that will be fully
-	 * bound before running any of the joins in this group.
-	 */
+    /**
+     * Return only the filter child nodes in this group that will be fully bound
+     * before running any of the joins in this group.
+     * <p>
+     * Note: Anything returned by this method should be lifted into the parent
+     * group since it can be run before this group is evaluated. By lifting the
+     * pre-filters into the parent group we can avoid issuing as many as-bound
+     * subqueries for this group since those which fail the filter will not be
+     * issued.
+     */
 	public Collection<FilterNode> getPreFilters() {
 		
 		/*
