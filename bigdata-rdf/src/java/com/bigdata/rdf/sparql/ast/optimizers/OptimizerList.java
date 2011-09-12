@@ -80,6 +80,8 @@ public class OptimizerList extends LinkedList<IASTOptimizer> implements
 
             queryNode = opt.optimize(context, queryNode, bindingSets);
 
+            assert queryNode != null : "Optimized discarded query: " + opt;
+
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
             

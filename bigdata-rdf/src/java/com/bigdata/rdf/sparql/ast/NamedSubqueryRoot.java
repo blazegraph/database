@@ -27,6 +27,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 
 /**
  * A subquery with a named solution set which can be referenced from other parts
@@ -41,12 +42,19 @@ public class NamedSubqueryRoot extends SubqueryBase {
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends SubqueryRoot.Annotations {
+    public interface Annotations extends SubqueryRoot.Annotations {
         
         /**
          * The name of the temporary solution set.
          */
         String SUBQUERY_NAME = "subqueryName";
+        
+        /**
+         * The {@link String}[] of the named solution sets on which this named
+         * subquery has a dependency. This is computed by the
+         * {@link ASTNamedSubqueryOptimizer}.
+         */
+        String DEPENDS_ON = "dependsOn";
         
         /**
          * A {@link VarNode}[] specifying the join variables that will be used
@@ -64,17 +72,11 @@ public class NamedSubqueryRoot extends SubqueryBase {
          * very expensive. Whenever possible you should identify one or more
          * variables which must be bound for the join and specify those as the
          * join variables.
-         * 
-         * TODO This should be an array of arrays in order to handle cases
-         * where we need more than one join index (alternatively, we can just
-         * use NO join variables for such cases and let performance suffer).
          */
         String JOIN_VARS = "joinVars";
 
     }
     
-//    private String name;
-
     /**
      * Deep copy constructor.
      */
@@ -152,6 +154,23 @@ public class NamedSubqueryRoot extends SubqueryBase {
 
     }
 
+    /**
+     * Return the set of named solution sets on which this named subquery
+     * depends.
+     * <p>
+     * Note: This is currently set by the {@link ASTNamedSubqueryOptimizer}.
+     * However, it could also be computed dynamically by scanning for
+     * {@link NamedSubqueryInclude}s within the WHERE clause of the named
+     * subquery.
+     * 
+     * @see Annotations#DEPENDS_ON
+     */
+    final String[] getDependsOn() {
+        
+        return (String[]) getRequiredProperty(Annotations.DEPENDS_ON);
+        
+    }
+    
     @Override
     public String toString(int indent) {
 

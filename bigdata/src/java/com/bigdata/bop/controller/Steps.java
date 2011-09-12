@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 
 /**
@@ -78,6 +79,12 @@ public class Steps extends AbstractSubqueryOp {
             throw new IllegalArgumentException(Annotations.MAX_PARALLEL_SUBQUERIES + "="
                     + getMaxParallel());
 
+    }
+
+    public Steps(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
+        
     }
 
 }

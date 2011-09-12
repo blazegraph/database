@@ -1,0 +1,5 @@
+@prefix : <http://www.bigdata.com/> .
+
+{
+:Bryan :likes :RDFS .
+}

@@ -101,15 +101,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * TODO Optimize IN and named graph and default graph queries with inline access
  * path.
  * 
- * TODO Optimize when you have a nested graph pattern with an eventual parent
- * graph pattern by placing a SameTerm filter to ensure that the nested graph
- * pattern only find solutions which are not allowed by the outer graph.
- * 
- * TODO StatementPatternNode should inherit the context dynamically from the
- * parent rather than requiring the context to be specified explicitly. This is
- * also true for a subquery. If it specifies a GRAPH pattern, then you MUST put
- * a FILTER on it. (An IASTOptimizer could take care of that.)
- * 
  * FIXME What follows are some rules for static analysis of variable scope.
  * <p>
  * Rule: A variable bound within an OPTIONAL *MAY* be bound in the parent group.
@@ -271,37 +262,12 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
-         * If the top-level join group has a single child, then it is
-         * replaced by that child. Embedded non-optional join groups without a
-         * context which contain a single child by lifting the child into the
-         * parent.
-         * <p>
-         * FIXME Either handle via AST rewrites or verify that AST2BOpUtility
-         * handles this during convert().
-         * <p>
-         * An empty {} matches a single empty solution. This is the same as not
-         * running the subquery, so we just eliminate the empty group.
-         * <p>
-         * GRAPH ?g {} matches the distinct named graphs in the named graph
-         * portion of the data set (special case). If there is no data set, then
-         * this should be translated into sp(_,_,_,?g)[filter=distinct] that
-         * should be recognized and evaluated using a distinct term advancer on
-         * CSPO. If the named graphs are listed explicitly, then just return
-         * that list. Third case: Anzo supports a FILTER on the named graph or
-         * default graphs for ACLs.
-         * <p>
-         * GRAPH <uri> {} is an existence test for the graph? (Matt is not sure
-         * on this one.)
-         */
-        add(new ASTJoinGroupOptimizer());
-        
-        /**
          * Validates named subquery / include patterns, identifies the join
          * variables, and annotates the named subquery root and named subquery
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());
-
+        
     }
 
 }

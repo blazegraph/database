@@ -8,6 +8,7 @@ import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
+import junit.framework.TestCase;
 import junit.framework.TestResult;
 import junit.textui.ResultPrinter;
 
@@ -145,6 +146,36 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
 
 	}
 	
+    /**
+     * The {@link TestMode#triples} test suite.
+     */
+    public static class test_NSS_triples extends TestCase {
+        public static Test suite() {
+            return TestNanoSparqlServerWithProxyIndexManager.suite(
+                    getTemporaryJournal(), TestMode.triples);
+        }
+    }
+    
+    /**
+     * The {@link TestMode#quads} test suite.
+     */
+    public static class Test_NSS_quads extends TestCase {
+        public static Test suite() {
+            return TestNanoSparqlServerWithProxyIndexManager.suite(
+                    getTemporaryJournal(), TestMode.quads);
+        }
+    }
+    
+    /**
+     * The {@link TestMode#sids} test suite.
+     */
+    public static class Test_NSS_sids extends TestCase {
+        public static Test suite() {
+            return TestNanoSparqlServerWithProxyIndexManager.suite(
+                    getTemporaryJournal(), TestMode.sids);
+        }
+    }
+    
 	/**
 	 * Return suite running in the given mode against the given
 	 * {@link IIndexManager}.
