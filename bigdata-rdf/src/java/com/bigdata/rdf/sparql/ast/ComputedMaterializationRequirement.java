@@ -49,16 +49,35 @@ import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 public class ComputedMaterializationRequirement implements
         INeedsMaterialization {
 
-    private final INeedsMaterialization.Requirement requirement;
+    private final Requirement requirement;
 
     private final Set<IVariable<IV>> varsToMaterialize;
 
-    public ComputedMaterializationRequirement(IValueExpression ve) {
+    public ComputedMaterializationRequirement(final IValueExpression<?> ve) {
 
+//        if (ve instanceof IVariable<?>) {
+//
+//            /*
+//             * A single variable evaluated in a FILTER is handled by computing
+//             * its expected boolean value. We need to materialize the variable
+//             * to do that.
+//             */
+//            
+//            varsToMaterialize = Collections.singleton((IVariable<IV>) ve);
+//
+//            requirement = Requirement.ALWAYS;
+//            
+//        } else {
+//
+//        /*
+//         * Something more complicated.
+//         */
+        
         varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
 
-        requirement = gatherVarsToMaterialize(ve,
-                varsToMaterialize);
+        requirement = gatherVarsToMaterialize(ve, varsToMaterialize);
+
+//        }
 
     }
 
@@ -71,29 +90,46 @@ public class ComputedMaterializationRequirement implements
     public Set<IVariable<IV>> getVarsToMaterialize() {
         
         return varsToMaterialize;
-        
+
     }
 
-    public static Set<IVariable<IV>> getVarsFromArguments(BOp c) {
-        Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>(c.arity());
-        for (int i = 0; i < c.arity(); i++) {
-            BOp arg = c.get(i);
+    public static Set<IVariable<IV>> getVarsFromArguments(final BOp c) {
+
+        final int arity = c.arity();
+        
+        final Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>(arity);
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp arg = c.get(i);
+
             if (arg != null) {
-                if (arg instanceof IValueExpression && arg instanceof IPassesMaterialization) {
-                    terms.addAll(getVarsFromArguments( arg));
+
+                if (arg instanceof IValueExpression
+                        && arg instanceof IPassesMaterialization) {
+
+                    terms.addAll(getVarsFromArguments(arg));
+
                 } else if (arg instanceof IVariable) {
+
                     terms.add((IVariable) arg);
+
                 }
+
             }
+
         }
+
         return terms;
+
     }
 
     /**
      * Static helper used to determine materialization requirements.
      */
-    static INeedsMaterialization.Requirement gatherVarsToMaterialize(final IValueExpression<?> c, final Set<IVariable<IV>> terms) {
-     
+    static INeedsMaterialization.Requirement gatherVarsToMaterialize(
+            final IValueExpression<?> c, final Set<IVariable<IV>> terms) {
+
         boolean materialize = false;
         boolean always = false;
         
@@ -126,10 +162,11 @@ public class ComputedMaterializationRequirement implements
                 }
                 
             }
-            
+
         }
 
-        return materialize ? (always ? Requirement.ALWAYS : Requirement.SOMETIMES) : Requirement.NEVER;
+        return materialize ? (always ? Requirement.ALWAYS
+                : Requirement.SOMETIMES) : Requirement.NEVER;
 
     }
     

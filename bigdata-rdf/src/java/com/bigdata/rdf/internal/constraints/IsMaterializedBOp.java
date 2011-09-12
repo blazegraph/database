@@ -50,11 +50,11 @@ public class IsMaterializedBOp extends XSDBooleanIVValueExpression {
 	
     public interface Annotations extends PipelineOp.Annotations {
 
-    	/**
-    	 * If true, only accept variable bindings for {@link #x} that have a
-    	 * materialized RDF {@link BigdataValue}.  If false, only accept those
-    	 * that don't. 
-    	 */
+        /**
+         * If <code>true</code>, only accept variable bindings for
+         * <code>x</code> that have a materialized RDF {@link BigdataValue}. If
+         * <code>false</code>, only accept those that don't.
+         */
     	String MATERIALIZED = IsMaterializedBOp.class.getName() + ".materialized";
     	
     }

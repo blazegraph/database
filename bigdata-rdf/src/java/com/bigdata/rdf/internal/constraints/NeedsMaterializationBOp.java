@@ -30,29 +30,26 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.util.InnerCause;
 
 /**
- * Attempts to run a constraint prior to materialization. Returns false if it
- * completes successfully without a {@link NotMaterializedException}, true
- * otherwise.
+ * Attempts to run a constraint prior to materialization. Returns
+ * <code>false</code> if it completes successfully without a
+ * {@link NotMaterializedException}, <code>true</code> otherwise.
  */
 public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
 
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 4767476516948560884L;
+    private static final long serialVersionUID = 4767476516948560884L;
 
-	private static final transient Logger log = Logger.getLogger(NeedsMaterializationBOp.class);
-	
+    private static final transient Logger log = Logger
+            .getLogger(NeedsMaterializationBOp.class);
 
-	public NeedsMaterializationBOp(final IValueExpression x) {
+	public NeedsMaterializationBOp(final IValueExpression<?> x) {
         
         this(new BOp[] { x }, BOp.NOANNS); 
         
@@ -61,9 +58,10 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
     /**
      * Required shallow copy constructor.
      */
-    public NeedsMaterializationBOp(final BOp[] args, final Map<String, Object> anns) {
+    public NeedsMaterializationBOp(final BOp[] args,
+            final Map<String, Object> anns) {
 
-    	super(args, anns);
+        super(args, anns);
     	
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
@@ -79,7 +77,7 @@ public class NeedsMaterializationBOp extends XSDBooleanIVValueExpression {
 
     public boolean accept(final IBindingSet bs) {
 
-    	final IValueExpression ve = get(0); 
+    	final IValueExpression<?> ve = get(0); 
     	
     	try {
     		

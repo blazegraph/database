@@ -113,10 +113,6 @@ import com.bigdata.relation.rule.Rule;
  *          need to strip out bindings introduced by anonymous variables which
  *          are part of query rewrites. The former seems easier.
  * 
- *          TODO The combination of DISTINCT and ORDER BY can be optimized using
- *          just an ORDER BY in which duplicate solutions are discarded after
- *          the sort.
- * 
  *          TODO What about the backchain access path stuff? Are we going prolog
  *          / datalog or bringing that stuff forward?
  * 
@@ -1040,9 +1036,10 @@ public class AST2BOpUtility {
         /*
          * Add the pre-conditionals to the pipeline.
          * 
-         * TODO These filters should be lifted into the parent group (by a rewrite rule) so we
-         * can avoid starting a subquery only to have it failed by a filter.
-         * We will do less work if we fail the solution in the parent group.
+         * TODO These filters should be lifted into the parent group (by a
+         * rewrite rule) so we can avoid starting a subquery only to have it
+         * failed by a filter. We will do less work if we fail the solution in
+         * the parent group.
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
@@ -1159,7 +1156,9 @@ public class AST2BOpUtility {
          * should be run as soon as the variables for that expression are known
          * bound. This is the same rule which is used for filters. Running them
          * here could even cause incorrect evaluation depending on when
-         * assigned-to variable is being consumed.
+         * assigned-to variable is being consumed. [Another way to clarify this
+         * is to run the join group children in the order produced by the AST
+         * optimizers so we have better transparency about what gets run when.]
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
 
@@ -1961,6 +1960,10 @@ public class AST2BOpUtility {
      * requirement depends on the data flowing through). A good example of this
      * is {@link CompareBOp}, which can sometimes work on internal values and
      * sometimes can't.
+     * 
+     * TODO Consider the efficiency of the steps which are being taken. Should
+     * we test for the most common cases first, or for those with the least
+     * latency to "fix"?
      */
     @SuppressWarnings("rawtypes")
     private static PipelineOp addMaterializationSteps(
