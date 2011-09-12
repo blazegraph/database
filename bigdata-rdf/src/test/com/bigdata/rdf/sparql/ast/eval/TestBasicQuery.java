@@ -90,6 +90,20 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * A construct with told triples in the CONSTRUCT clause and no WHERE
+     * clause.
+     */
+    public void test_construct_without_where_clause() throws Exception {
+       
+        new TestHelper(
+                "construct-without-where-clause", // testURI,
+                "construct-without-where-clause.rq",// queryFileURL
+                "construct-without-where-clause.trig",// dataFileURL
+                "construct-without-where-clause-result.trig"// resultFileURL
+                ).runTest();
+    }
+    
+    /**
      * A simple DESCRIBE query of a constant.
      */
     public void test_describe_1() throws Exception {

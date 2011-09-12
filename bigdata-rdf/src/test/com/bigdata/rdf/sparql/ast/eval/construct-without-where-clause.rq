@@ -1,0 +1,6 @@
+PREFIX : <http://www.bigdata.com/>
+
+CONSTRUCT {
+  :Bryan :likes :RDFS
+} where {
+}

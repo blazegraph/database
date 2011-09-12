@@ -27,11 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -39,11 +48,14 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -61,6 +73,9 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
+    private static final Logger log = Logger
+            .getLogger(ASTNamedSubqueryOptimizer.class);
+    
     /**
      *
      * @throws RuntimeException
@@ -78,6 +93,22 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             /*DatasetNode dataset,*/ IBindingSet[] bindingSet) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
+
+        /*
+         * Rewrite subqueryRoot objects as named subquery.
+         * 
+         * FIXME We should do this if there are no join variables for the SPARQL
+         * 1.1 subquery. That will prevent multiple evaluations of the SPARQL
+         * 1.1 subquery since the named subquery is run once before the main
+         * WHERE clause.
+         */
+        if (false)
+            rewriteSparql11Subqueries(queryRoot);
+
+        /*
+         * Order the named subqueries in order to support nested includes
+         */
+        orderNamedSubqueries(queryRoot, queryRoot.getNamedSubqueries());
 
         final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
 
@@ -140,12 +171,21 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
         }
 
+        if (queryRoot.getNamedSubqueries() != null) {
+
+            for(NamedSubqueryRoot root:queryRoot.getNamedSubqueries()){
+
+                list.addAll(findSubqueryIncludes(root));
+
+            }
+
+        }
 
         return list.toArray(new NamedSubqueryInclude[] {});
 
     }
 
-    private List<NamedSubqueryInclude> findSubqueryIncludes(final SubqueryRoot queryRoot){
+    private List<NamedSubqueryInclude> findSubqueryIncludes(final SubqueryBase queryRoot){
         final Striterator itr = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
 
@@ -170,6 +210,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             list.addAll(findSubqueryIncludes((SubqueryRoot) itr2.next()));
 
         }
+
         return list;
 
     }
@@ -317,6 +358,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
             for (NamedSubqueryInclude anInclude : includes) {
 
+                @SuppressWarnings("rawtypes")
                 final IVariable[] joinvars;
 
                 if (anInclude.getJoinVars() == null) {
@@ -364,20 +406,40 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
                 /*
                  * Since there is more than one set of join variables required
-                 * by the INCLUDEs, we just use no join variables and let the
-                 * performance suffer.
-                 *
-                 * FIXME {@link NamedSubqueryOp} should be modified to populate
-                 * more than one hash index if necessary so we can have high
-                 * performance on each INCLUDE join.
+                 * by the INCLUDEs, we use the largest subset of the join
+                 * variables defined across all of the includes.
                  */
-                final VarNode[] NO_VARS = new VarNode[] {};
 
-                aNamedSubquery.setJoinVars(NO_VARS);
+                // First, collect all join variables.
+                final Set<IVariable<?>> sharedVariables = new LinkedHashSet<IVariable<?>>();
 
-                for(NamedSubqueryInclude anInclude : includes) {
+                for (JoinVars joinVars : distinctJoinVarsSet) {
 
-                    anInclude.setJoinVars(NO_VARS);
+                    sharedVariables.addAll(joinVars.vars());
+
+                }
+                
+                // Now, retain only those variables in scope for each include.
+                for (JoinVars joinVars : distinctJoinVarsSet) {
+
+                    sharedVariables.retainAll(joinVars.vars());
+
+                }
+
+                /*
+                 * The join variables which are shared across all contexts in
+                 * which this named solution set is joined back into the query.
+                 */
+                final VarNode[] sharedJoinVars = ASTUtil
+                        .convert(sharedVariables.toArray(new IVariable[] {}));
+
+                // Set the shared join variables on the named subquery.
+                aNamedSubquery.setJoinVars(sharedJoinVars);
+
+                for (NamedSubqueryInclude anInclude : includes) {
+
+                    // Set the shared join variables on each subquery include.
+                    anInclude.setJoinVars(sharedJoinVars);
 
                 }
 
@@ -387,13 +449,148 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
                  * Since there is just one set of join variables we will use
                  * that.
                  */
-                aNamedSubquery.setJoinVars(ASTUtil.convert(distinctJoinVarsSet
-                        .iterator().next().a));
+
+                final JoinVars joinVars = distinctJoinVarsSet.iterator().next();
+
+                aNamedSubquery.setJoinVars(ASTUtil.convert(joinVars.toArray()));
 
             }
 
         }
 
+    }
+
+    private void rewriteSparql11Subqueries(final QueryRoot queryRoot){
+
+        final Striterator itr2 = new Striterator(
+                BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
+
+        itr2.addTypeFilter(SubqueryRoot.class);
+
+        final List<SubqueryRoot> subqueries  = new ArrayList<SubqueryRoot>();
+
+        while (itr2.hasNext()) {
+
+            subqueries.add((SubqueryRoot)itr2.next());
+
+        }
+        
+        if (queryRoot.getNamedSubqueries() == null) {
+        
+            queryRoot.setNamedSubqueries(new NamedSubqueriesNode());
+            
+        }
+
+        for (SubqueryRoot root : subqueries) {
+
+            @SuppressWarnings("unchecked")
+            final IGroupNode<IGroupMemberNode> parent = root.getParent();
+
+            parent.removeChild(root);
+
+            final String newName = UUID.randomUUID().toString();
+
+            final NamedSubqueryInclude include = new NamedSubqueryInclude(
+                    newName);
+
+            parent.addChild(include);
+
+            final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                    root.getQueryType(), newName);
+
+            nsr.setConstruct(root.getConstruct());
+            nsr.setGroupBy(root.getGroupBy());
+            nsr.setHaving(root.getHaving());
+            nsr.setOrderBy(root.getOrderBy());
+            nsr.setProjection(root.getProjection());
+            nsr.setSlice(root.getSlice());
+            nsr.setWhereClause(root.getWhereClause());
+
+            queryRoot.getNamedSubqueries().add(nsr);
+
+        }
+
+    }
+
+    /**
+     * Order the named subqueries based on nested includes
+     */
+    private void orderNamedSubqueries(final QueryRoot queryRoot,
+            final NamedSubqueriesNode namedSubqueries) {
+        
+        if (namedSubqueries != null) {
+
+            /*
+             * List of named solutions on which each named subquery depends.
+             */
+            final Map<NamedSubqueryRoot, List<String>> subqueryToIncludes = new HashMap<NamedSubqueryRoot, List<String>>();
+
+            final Map<String, NamedSubqueryRoot> nameToSubquery = new HashMap<String, NamedSubqueryRoot>();
+
+            for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
+
+                nameToSubquery.put(aNamedSubquery.getName(), aNamedSubquery);
+
+            }
+
+            for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
+
+                final List<String> includes = new ArrayList<String>();
+
+                subqueryToIncludes.put(aNamedSubquery, includes);
+
+                for (NamedSubqueryInclude include : findSubqueryIncludes(aNamedSubquery)) {
+
+                    includes.add(include.getName());
+
+                }
+
+                // Set the DEPENDS_ON annotation.
+                aNamedSubquery.setProperty(
+                        NamedSubqueryRoot.Annotations.DEPENDS_ON,
+                        includes.toArray(new String[0]));
+                
+            }
+            
+            final Set<String> processed = new HashSet<String>();
+
+            final NamedSubqueriesNode newNode = new NamedSubqueriesNode();
+
+            Iterator<Map.Entry<NamedSubqueryRoot, List<String>>> iter = subqueryToIncludes
+                    .entrySet().iterator();
+
+            while (iter.hasNext()) {
+                final Map.Entry<NamedSubqueryRoot, List<String>> entry = iter
+                        .next();
+                final NamedSubqueryRoot namedSubquery = entry.getKey();
+                if (entry.getValue().size() == 0) {
+                    newNode.add(namedSubquery);
+                    processed.add(namedSubquery.getName());
+                    iter.remove();
+                }
+            }
+
+            while (subqueryToIncludes.size() > 0) {
+                iter = subqueryToIncludes.entrySet().iterator();
+                while (iter.hasNext()) {
+                    boolean ok = true;
+                    final Map.Entry<NamedSubqueryRoot, List<String>> entry = iter
+                            .next();
+                    for (String dep : entry.getValue()) {
+                        if (!processed.contains(dep)) {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if (ok) {
+                        newNode.add(entry.getKey());
+                        processed.add(entry.getKey().getName());
+                        iter.remove();
+                    }
+                }
+            }
+            queryRoot.setNamedSubqueries(newNode);
+        }
     }
 
     /**
@@ -412,6 +609,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      *         of join variables will always produce the correct solutions, it
      *         is not very efficient.]
      */
+    @SuppressWarnings("rawtypes")
     private IVariable[] staticAnalysis(QueryRoot queryRoot,
             NamedSubqueryRoot aNamedSubquery, NamedSubqueryInclude anInclude) {
 
@@ -420,6 +618,8 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 //
 //        return projected;
 
+        log.error("FIXME : Write the code for the static analysis of the join variables.");
+        
         return new IVariable[]{};
 
     }
@@ -430,15 +630,33 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      */
     private static class JoinVars {
 
-        public final IVariable[] a;
+        private final Set<IVariable<?>> vars;
 
         private final int hashCode;
 
-        public JoinVars(final IVariable[] a) {
+        public Set<IVariable<?>> vars() {
+            
+            return Collections.unmodifiableSet(vars);
+            
+        }
+        
+        public IVariable<?>[] toArray() {
+            
+            return vars.toArray(new IVariable[vars.size()]);
+            
+        }
+        
+        public JoinVars(final IVariable<?>[] vars) {
 
-            this.a = a;
+            this.vars = new LinkedHashSet<IVariable<?>>();
 
-            this.hashCode = Arrays.hashCode(a);
+            for (int i = 0; i < vars.length; i++) {
+
+                this.vars.add(vars[i]);
+
+            }
+
+            this.hashCode = Arrays.hashCode(vars);
 
         }
 
@@ -454,7 +672,8 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             if (!(o instanceof JoinVars))
                 return false;
             final JoinVars t = (JoinVars) o;
-            return Arrays.equals(a, t.a);
+            return vars.equals(t.vars);
+//            return Arrays.equals(vars, t.vars);
         }
 
     }

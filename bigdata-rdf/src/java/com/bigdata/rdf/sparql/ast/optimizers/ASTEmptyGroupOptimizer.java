@@ -142,12 +142,6 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
              * Note: We can eliminate the parent even if it is optional or has a
              * context by setting those attributes on the child (as long as the
              * child does not have a different context).
-             * 
-             * TODO If they have different graph variables then we really should
-             * be imposing a SameTerm constraint, right? In which case we can
-             * still merge them.
-             * 
-             * TODO What if they provide different IRIs?
              */
 
             final JoinGroupNode parent = (JoinGroupNode) op;
@@ -215,14 +209,16 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
             final BOp child = op.get(i);
 
-            if (child instanceof GroupNodeBase<?>) {
+            if (!(child instanceof GroupNodeBase<?>))
+                continue;
 
-                eliminateEmptyGroups((GroupNodeBase<IGroupMemberNode>) child);
+            @SuppressWarnings("unchecked")
+            final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
-            }
+            eliminateEmptyGroups(childGroup);
 
         }
-        
+
     }
 
 }

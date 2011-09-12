@@ -82,6 +82,7 @@ import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -177,6 +178,17 @@ public class AST2BOpUtility {
         // The executable query plan.
         PipelineOp queryPlan = convert(ctx.optimizedQuery, ctx);
 
+        if (queryPlan == null) {
+
+            /*
+             * An empty query plan. Just copy anything from the input to the
+             * output.
+             */
+            
+            queryPlan = addStartOp(ctx);
+            
+        }
+        
         /*
          * Set the queryId on the top-level of the query plan.
          * 
@@ -432,40 +444,119 @@ public class AST2BOpUtility {
      *         another matter. It probably is on a cluster. It might not be on a
      *         single machine depending on how heavy the subqueries are and what
      *         the concurrent workload is on the machine.
+     * 
+     * @see ASTNamedSubqueryOptimizer
      */
     private static PipelineOp addNamedSubqueries(PipelineOp left,
             final NamedSubqueriesNode namedSubquerieNode,
             final QueryRoot queryRoot, final AST2BOpContext ctx) {
 
-        for(NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+        /*
+         * If there is more than one named subquery whose DEPENDS_ON attribute
+         * is an empty String[], then run them in parallel using STEPS (and
+         * filter them out in the 2nd pass). Then run the remaining named
+         * subqueries in their current sequence.
+         */
+
+//        Note: This code runs them sequentially in the pre-determined order.
+//        for(NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+//            
+//            left = createNamedSubquery(left, subqueryRoot, ctx);
+//            
+//        }
+
+        // All named subqueries with NO dependencies.
+        final List<NamedSubqueryRoot> runFirst = new LinkedList<NamedSubqueryRoot>();
+
+        // Remaining named subqueries, which MUST already be in an ordering
+        // consistent with their dependencies.
+        final List<NamedSubqueryRoot> remainder = new LinkedList<NamedSubqueryRoot>();
+        
+        for (NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+
+            final String[] dependsOn = subqueryRoot.getDependsOn();
+
+            if (dependsOn.length == 0)
+                runFirst.add(subqueryRoot);
+            else
+                remainder.add(subqueryRoot);
+
+        }
+
+        final int nfirst = runFirst.size();
+        
+        if(nfirst == 0) {
+
+            // Can't be true. At least one of the named subqueries must not
+            // depend on any of the others.
             
-            final PipelineOp subqueryPlan = convert(subqueryRoot, ctx);
+            throw new AssertionError();
+
+        } else if (nfirst == 1) {
+
+            left = createNamedSubquery(left, runFirst.get(0), ctx);
+
+        } else {
             
-            if (log.isInfoEnabled())
-                log.info("\nsubquery: " + subqueryRoot + "\nplan="
-                        + subqueryPlan);
+            final PipelineOp[] steps = new PipelineOp[nfirst];
+            
+            int i = 0;
+            
+            for(NamedSubqueryRoot subqueryRoot : runFirst) {
+                
+                steps[i] = createNamedSubquery(null/*left*/, subqueryRoot, ctx);
+                
+            }
 
-            final IVariable<?>[] joinVars = ASTUtil.convert(subqueryRoot
-                    .getJoinVars());
-
-            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                    ctx.queryId, subqueryRoot.getName(), joinVars);
-
-            left = new NamedSubqueryOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            // Run the steps in parallel.
+            left = new Steps(leftOrEmpty(left), //
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+                new NV(Steps.Annotations.SUBQUERIES, steps),//
+                new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES, steps.length)//
             );
-
+            
+        }
+ 
+        // Run the remaining steps in sequence.
+        for(NamedSubqueryRoot subqueryRoot : remainder) {
+            
+            left = createNamedSubquery(left, subqueryRoot, ctx);
+            
         }
         
         return left;
         
     }
 
+    static private PipelineOp createNamedSubquery(PipelineOp left,
+            final NamedSubqueryRoot subqueryRoot, final AST2BOpContext ctx) {
+        
+        final PipelineOp subqueryPlan = convert(subqueryRoot, ctx);
+        
+        if (log.isInfoEnabled())
+            log.info("\nsubquery: " + subqueryRoot + "\nplan="
+                    + subqueryPlan);
+
+        final IVariable<?>[] joinVars = ASTUtil.convert(subqueryRoot
+                .getJoinVars());
+
+        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                ctx.queryId, subqueryRoot.getName(), joinVars);
+
+        left = new NamedSubqueryOp(leftOrEmpty(left), //
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+        );
+
+        return left;
+
+    }
+    
     /**
      * Add an operator to evaluate a {@link ServiceCall}.
      * 
@@ -980,6 +1071,32 @@ public class AST2BOpUtility {
             }
 
             /*
+             * Add joins against named solution sets from WITH AS INCLUDE style
+             * subqueries for which there are NO join variables. Such includes
+             * will be a cross product so we want to run them as early as
+             * possible.
+             * 
+             * Note: This corresponds to a very common use case where the named
+             * subquery is used to constrain the remainder of the join group.
+             * 
+             * Note: If there ARE join variables the the named subquery include
+             * MUST NOT be run until after the join variables have been bound.
+             * Failure to observe this rule will cause the unbound variable to
+             * be included when computing the hash code of a solution and the
+             * join will not produce the correct solutions.
+             */
+            for (IGroupMemberNode child : joinGroup) {
+                if (child instanceof NamedSubqueryInclude) {
+                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
+                    final VarNode[] joinVars = nsi.getJoinVars();
+                    if (joinVars == null)
+                        throw new AssertionError();
+                    if (joinVars.length == 0)
+                        left = addSubqueryInclude(left, nsi, ctx);
+                }
+            }
+
+            /*
              * Add the joins (statement patterns) and the filters on those
              * joins.
              * 
@@ -1000,13 +1117,18 @@ public class AST2BOpUtility {
             }
 
             /*
-             * Add joins against named solution sets from WITH AS INCLUDE style
-             * subqueries.
+             * Add named subquery joins for named subqueries for which at least
+             * one join variable was identified by static analysis.
              */
             for (IGroupMemberNode child : joinGroup) {
-                if (child instanceof NamedSubqueryInclude)
-                    left = addSubqueryInclude(left,
-                            (NamedSubqueryInclude) child, ctx);
+                if (child instanceof NamedSubqueryInclude) {
+                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
+                    final VarNode[] joinVars = nsi.getJoinVars();
+                    if (joinVars == null)
+                        throw new AssertionError();
+                    if (joinVars.length > 0)
+                        left = addSubqueryInclude(left, nsi, ctx);
+                }
             }
 
         }
