@@ -317,6 +317,15 @@ public class SearchServiceFactory implements ServiceFactory {
                 final IVariable<?> searchVar,
                 final Map<URI, StatementPatternNode> statementPatterns) {
 
+            if(store == null)
+                throw new IllegalArgumentException();
+
+            if(searchVar == null)
+                throw new IllegalArgumentException();
+
+            if(statementPatterns == null)
+                throw new IllegalArgumentException();
+
             this.store = store;
             
             /*

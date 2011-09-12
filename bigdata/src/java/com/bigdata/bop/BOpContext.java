@@ -29,6 +29,7 @@ package com.bigdata.bop;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -239,6 +240,44 @@ public class BOpContext<E> extends BOpContextBase {
 //        this.source = new MultiSourceSequentialAsynchronousIterator<E[]>(source);
         this.sink = sink;
         this.sink2 = sink2; // may be null
+    }
+
+    /**
+     * Return the {@link IQueryAttributes} associated with the specified query.
+     * 
+     * @param queryId
+     *            The {@link UUID} of some {@link IRunningQuery}.
+     * 
+     * @return The {@link IQueryAttributes} for that {@link IRunningQuery}.
+     * 
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} has halted.
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} is not found.
+     */
+    public IQueryAttributes getQueryAttributes(final UUID queryId) {
+
+        // Lookup the query on which we will hang the solution set.
+        final IRunningQuery runningQuery;
+        try {
+            runningQuery = getRunningQuery().getQueryEngine()
+                    .getRunningQuery(queryId);
+
+        } catch (RuntimeException ex) {
+            throw new RuntimeException("Query halted? : " + ex, ex);
+        }
+
+        if (runningQuery == null) {
+            // We could not locate the query which generated this solution
+            // set.
+            throw new RuntimeException("IRunningQuery not found.");
+        }
+
+        // The attributes for that query.
+        final IQueryAttributes attrs = runningQuery.getAttributes();
+
+        return attrs;
+        
     }
 
     /**

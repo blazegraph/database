@@ -35,6 +35,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -128,24 +129,15 @@ public class BOpContextBase {
     }
     
     /**
-     * Locate and return the view of the relation(s) identified by the
+     * Locate and return the view of the relation identified by the
      * {@link IPredicate}.
-     * <p>
-     * Note: This method is responsible for returning a fused view when more
-     * than one relation name was specified for the {@link IPredicate}. It
-     * SHOULD be used whenever the {@link IRelation} is selected based on a
-     * predicate in the tail of an {@link IRule} and could therefore be a fused
-     * view of more than one relation instance. (The head of the {@link IRule}
-     * must be a simple {@link IRelation} and not a view.)
-     * <p>
-     * Note: The implementation should choose the read timestamp for each
-     * relation in the view using {@link #getReadTimestamp(String)}.
      * 
      * @param pred
      *            The {@link IPredicate}, which MUST be a tail from some
      *            {@link IRule}.
      * 
-     * @return The {@link IRelation}.
+     * @return The {@link IRelation} -or- <code>null</code> if the relation did
+     *         not exist for that timestamp.
      * 
      * @todo Replaces {@link IJoinNexus#getTailRelationView(IPredicate)}. In
      *       order to support mutation operator we will also have to pass in the
@@ -154,6 +146,28 @@ public class BOpContextBase {
     @SuppressWarnings("unchecked")
     public <E> IRelation<E> getRelation(final IPredicate<E> pred) {
 
+        final String namespace = pred.getOnlyRelationName();
+        
+        final long timestamp = pred.getTimestamp();
+
+        return (IRelation<E>) getResource(namespace, timestamp);
+
+    }
+    
+    /**
+     * Locate and return the view of the identified relation.
+     * 
+     * @param namespace
+     *            The namespace of the relation.
+     * @param timestamp
+     *            The timestamp of the view of that relation.
+     * 
+     * @return The {@link ILocatableResource} -or- <code>null</code> if the
+     *         relation did not exist for that timestamp.
+     */
+    public ILocatableResource<?> getResource(final String namespace,
+            final long timestamp) {
+
         /*
          * Note: This uses the federation as the index manager when locating a
          * resource for scale-out since that let's us look up the relation in
@@ -161,11 +175,9 @@ public class BOpContextBase {
          */
         final IIndexManager tmp = getFederation() == null ? getIndexManager()
                 : getFederation();
-        
-        final long timestamp = pred.getTimestamp();
 
-        return (IRelation<E>) tmp.getResourceLocator().locate(
-                pred.getOnlyRelationName(), timestamp);
+        return (ILocatableResource<?>) tmp.getResourceLocator().locate(
+                namespace, timestamp);
 
     }
 

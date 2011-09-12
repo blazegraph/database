@@ -207,31 +207,10 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-//            // Parse that name into {queryId, namedSet, joinVar[]).
-//            final NamedSolutionSetRef namedSetRef2 = NamedSolutionSetRef
-//                    .valueOf(namedSetRef);
-
-            // Lookup the query that generated the solution set.
-            final IRunningQuery runningQuery;
-            try {
-                runningQuery = context.getRunningQuery().getQueryEngine()
-                        .getRunningQuery(namedSetRef.queryId);
-
-            } catch (RuntimeException ex) {
-                throw new RuntimeException("Query halted? : " + ex, ex);
-            }
-
-            if (runningQuery == null) {
-                // We could not locate the query which generated this solution
-                // set.
-                throw new RuntimeException("Query not found.");
-            }
-
-            // The attributes for that query.
-            final IQueryAttributes attrs = runningQuery.getAttributes();
-            
-//            final IQueryAttributes attrs = context.getRunningQuery()
-//                    .getAttributes();
+            // Lookup the attributes for the query on which we will hang the
+            // solution set.
+            final IQueryAttributes attrs = context
+                    .getQueryAttributes(namedSetRef.queryId);
 
             // The HTree holding the solutions.
             rightSolutions = (HTree) attrs.get(namedSetRef);

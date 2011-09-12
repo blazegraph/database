@@ -200,8 +200,7 @@ public class ServiceCallJoin extends PipelineOp {
                     .getRequiredProperty(Annotations.TIMESTAMP)).longValue();
 
             final AbstractTripleStore db = (AbstractTripleStore) context
-                    .getIndexManager().getResourceLocator()
-                    .locate(namespace, timestamp);
+                    .getResource(namespace, timestamp);
 
             // Lookup a class to "talk" to that Service URI.
             this.serviceCall = ServiceRegistry.toServiceCall(db, serviceURI,

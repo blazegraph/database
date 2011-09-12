@@ -286,6 +286,12 @@ public class NamedSubqueryOp extends PipelineOp {
         private final NamedSolutionSetRef namedSetRef;
 
         /**
+         * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
+         * we will hang the named solution set.
+         */
+        final IQueryAttributes attrs;
+        
+        /**
          * The join variables.
          */
         private final IVariable[] joinVars;
@@ -333,8 +339,10 @@ public class NamedSubqueryOp extends PipelineOp {
                  * Note: Since the operator is not thread-safe, we do not need
                  * to use a putIfAbsent pattern here.
                  */
-                final IQueryAttributes attrs = context.getRunningQuery()
-                        .getAttributes();
+                
+                // Lookup the attributes for the query on which we will hang the
+                // solution set.
+                attrs = context.getQueryAttributes(namedSetRef.queryId);
 
                 HTree solutions = (HTree) attrs.get(namedSetRef);
 
@@ -474,8 +482,8 @@ public class NamedSubqueryOp extends PipelineOp {
             final HTree readOnly = HTree.load(solutions.getStore(),
                     checkpoint.getCheckpointAddr(), true/* readOnly */);
 
-            final IQueryAttributes attrs = context.getRunningQuery()
-                    .getAttributes();
+//            final IQueryAttributes attrs = context.getRunningQuery()
+//                    .getAttributes();
 
             if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
                 throw new AssertionError();
