@@ -41,7 +41,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -60,8 +59,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
 /**
- * Translate {@link BD#SEARCH} and within a {@link NamedSubqueryRoot} into a
- * {@link ServiceNode} to invoke the search engine.
+ * Translate {@link BD#SEARCH} and related magic predicates into a
+ * {@link ServiceNode} which will invoke the bigdata search engine.
  * 
  * <pre>
  * with {
@@ -135,65 +134,78 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             }
 
         }
+        
+        if (queryRoot.getWhereClause() != null) {
+            
+            /*
+             * Look for, validate, and rewrite magic predicates for search if
+             * they appear within the main WHERE clause.
+             */
+            
+            extractSearches(context.db, queryRoot,
+                    (GroupNodeBase<IGroupMemberNode>) queryRoot
+                            .getWhereClause());
 
-        /*
-         * The magic predicates for search should not appear in the main WHERE
-         * clause for the query.
-         */
-        validateNoSearch((BOp) queryRoot.getWhereClause());
+        }
+
+//        /*
+//         * The magic predicates for search should not appear in the main WHERE
+//         * clause for the query.
+//         */
+//        validateNoSearch((BOp) queryRoot.getWhereClause());
 
         return queryRoot;
 
     }
 
-    /**
-     * Verify that no magic predicates for search are found within the given
-     * operator (recursive).
-     */
-    private void validateNoSearch(final BOp op) {
-
-        if(op == null)
-            return;
-        
-        if (op instanceof StatementPatternNode) {
-
-            final StatementPatternNode sp = (StatementPatternNode) op;
-
-            final TermNode p = sp.p();
-
-            if (p.isConstant()) {
-
-                final BigdataValue value = p.getValue();
-
-                if (value != null) {
-                    
-                    // Must be a Value known to the database.
-
-                    if (((ConstantNode) p).getValue().stringValue()
-                            .startsWith(BD.SEARCH_NAMESPACE)) {
-
-                        throw new RuntimeException(
-                                "Search predicates are only allowed in named subqueries.");
-
-                    }
-
-                }
-
-            }
-
-        }
-        
-        final int arity = op.arity();
-        
-        for (int i = 0; i < arity; i++) {
-            
-            final BOp child = op.get(i);
-            
-            validateNoSearch(child);
-
-        }
-
-    }
+//    /**
+//     * Verify that no magic predicates for search are found within the given
+//     * operator (recursive).
+//     */
+//    private void validateNoSearch(final BOp op) {
+//
+//        if(op == null)
+//            return;
+//        
+//        if (op instanceof StatementPatternNode) {
+//
+//            final StatementPatternNode sp = (StatementPatternNode) op;
+//
+//            final TermNode p = sp.p();
+//
+//            if (p.isConstant()) {
+//
+//                final BigdataValue value = p.getValue();
+//
+//                if (value != null) {
+//                    
+//                    // Must be a Value known to the database.
+//
+//                    if (((ConstantNode) p).getValue().stringValue()
+//                            .startsWith(BD.SEARCH_NAMESPACE)) {
+//
+//                        throw new RuntimeException(
+//                                "Search predicates are only allowed in named subqueries.");
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//        
+//        final int arity = op.arity();
+//        
+//        for (int i = 0; i < arity; i++) {
+//            
+//            final BOp child = op.get(i);
+//            
+//            validateNoSearch(child);
+//
+//        }
+//
+//    }
 
     /**
      * Rewrite search predicates for each distinct <code>searchVar</code>. All

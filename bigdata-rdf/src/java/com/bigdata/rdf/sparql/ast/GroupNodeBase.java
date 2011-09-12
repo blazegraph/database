@@ -197,15 +197,21 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         if (isOptional()) {
 
-            sb.append("[optional]");
+            sb.append(" [optional]");
 
+        }
+        
+        if (this instanceof JoinGroupNode
+                && ((JoinGroupNode) this).getContext() != null) {
+
+            sb.append(" [context=" + ((JoinGroupNode) this).getContext() + "]");
+            
         }
 
         sb.append(" {");
 
         for (IQueryNode n : this) {
 
-//            sb.append(n.toString(indent + 1)).append("\n");
             sb.append(n.toString(indent+1));
 
         }
