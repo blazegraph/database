@@ -188,15 +188,35 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTEmptyGroupOptimizer());
         
         /**
-         * Translate {@link BD#SEARCH} and associated magic predicates into a
-         * {@link NamedSubqueryRoot} using a {@link ServiceNode} to invoke the
-         * search engine and replace those magic predicates with a
-         * {@link NamedSubqueryInclude}. If there are multiple searches in the
-         * query, then each is translated into its own named subquery / include
-         * pattern. The magic predicates identify the bindings to be projected
-         * out of the named subquery (rank, cosine, etc).
+         * Translate {@link BD#SEARCH} and associated magic predicates into a a
+         * {@link ServiceNode}. If there are multiple searches in the query,
+         * then each is translated into its own {@link ServiceNode}. The magic
+         * predicates identify the bindings to be projected out of the named
+         * subquery (rank, cosine, etc).
+         * <p>
+         * Note: Search is most efficiently expressed within named subqueries.
+         * This let's you perform additional joins against the solutions from
+         * the search service before the results are materialized on a hash
+         * index to be joined into the main query.
          */
         add(new ASTSearchOptimizer());
+
+        /**
+         * Rewrites the WHERE clause of each query by lifting out any
+         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
+         * of any named subquery such that there is no more than one
+         * {@link ServiceNode} in that subquery by lifting out additional
+         * {@link ServiceNode}s into new named subqueries.
+         * <p>
+         * Note: This rewrite step is necessary to preserve the "run-once"
+         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
+         * any position other than the head of a named subquery, it will be
+         * invoked once for each solution which flows through that part of
+         * the query plan.  This is wasteful since the SERVICE call does not
+         * run "as-bound" (source solutions are not propagated to the SERVICE
+         * when it is invoked).
+         */
+        add(new ASTServiceNodeOptimizer());
         
         /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of

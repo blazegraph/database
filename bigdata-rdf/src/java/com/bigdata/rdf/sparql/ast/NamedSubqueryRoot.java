@@ -157,13 +157,19 @@ public class NamedSubqueryRoot extends SubqueryBase {
 
         final StringBuilder sb = new StringBuilder();
         
-        sb.append(super.toString(indent));
+        sb.append("\n");
+        
+        sb.append(indent(indent));
+
+        sb.append("WITH {");
+
+        sb.append(super.toString(indent+1));
         
         sb.append("\n");
         
         sb.append(indent(indent));
 
-        sb.append("AS ").append(getName());
+        sb.append("} AS ").append(getName());
 
         final VarNode[] joinVars = getJoinVars();
 

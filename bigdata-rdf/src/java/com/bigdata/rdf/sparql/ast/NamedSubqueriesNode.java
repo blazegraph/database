@@ -73,11 +73,11 @@ public class NamedSubqueriesNode extends QueryNodeListBaseNode<NamedSubqueryRoot
         final StringBuilder sb = new StringBuilder();
 
         for (NamedSubqueryRoot n : this) {
-            sb.append("\n");
-            sb.append(indent(indent));
-            sb.append("WITH {");
-            sb.append(n.toString(indent + 1));
-            sb.append("} AS " + n.getName());
+//            sb.append("\n");
+//            sb.append(indent(indent));
+//            sb.append("WITH {");
+            sb.append(n.toString(indent));
+//            sb.append("} AS " + n.getName());
         }
 
         return sb.toString();

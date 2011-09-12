@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.ServiceNode;
+
 /**
  * Data driven test suite for full text search.
  * 
@@ -168,6 +170,17 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
+    /**
+     * Unit test for a query with magic search predicates in the main WHERE
+     * clause. These predicates should be translated into a {@link ServiceNode}
+     * which is then lifted into a named subquery.
+     */
+    public void test_search_main_where_clause() throws Exception {
+        
+        new TestHelper("search-main-where-clause").runTest();
+        
+    }
+    
     /**
      * TODO Unit test for search-in-search pattern:
      * 

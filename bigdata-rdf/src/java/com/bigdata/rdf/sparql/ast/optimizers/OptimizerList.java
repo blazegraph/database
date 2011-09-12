@@ -29,6 +29,8 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.LinkedList;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -41,6 +43,8 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
  */
 public class OptimizerList extends LinkedList<IASTOptimizer> implements
         IASTOptimizer {
+    
+    private static final Logger log = Logger.getLogger(OptimizerList.class);
 
     /**
      * 
@@ -71,8 +75,14 @@ public class OptimizerList extends LinkedList<IASTOptimizer> implements
 
         for (IASTOptimizer opt : this) {
 
+            if (log.isInfoEnabled())
+                log.info("Applying: " + opt);
+
             queryNode = opt.optimize(context, queryNode, bindingSets);
 
+            if (log.isDebugEnabled())
+                log.debug("Rewritten AST:\n" + queryNode);
+            
         }
 
         return queryNode;
