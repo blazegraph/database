@@ -1358,7 +1358,7 @@ public class BytesUtil {
 	/**
 	 * Return the binary representation of the unsigned byte[].
 	 * 
-	 * @param a
+	 * @param b
 	 *            The unsigned byte[].
 	 * 
 	 * @return The representation of the bits in that unsigned byte[].
