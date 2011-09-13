@@ -45,8 +45,13 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * another join groups. Such nodes either do not specify a context or they
  * specify the same context as the parent.
  * 
+ * <pre>
+ * { { ... } } => { ... }
+ * </pre>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTEmptyGroupOptimizer.java 5177 2011-09-12 17:49:44Z
+ *          thompsonbry $
  */
 public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 

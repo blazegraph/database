@@ -113,7 +113,42 @@ public class FunctionNode extends ValueExpressionNode {
 	    super.clearProperty(Annotations.VALUE_EXPR);
 	    
         super.invalidate();
+
+    }
+
+    /**
+     * Return <code>true</code> iff the {@link FunctionNode} makes use of a
+     * {@link FunctionRegistry#BOUND} operator.
+     * 
+     * @return <code>true</code>iff it uses <code>BOUND()</code>
+     * 
+     * TODO Unit test.
+     */
+    public boolean isBound() {
+
+        if (FunctionRegistry.BOUND.equals(getFunctionURI()))
+            return true;
+
+        final int arity = arity();
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = get(i);
+
+            if (child instanceof FunctionNode) {
+
+                if (!((FunctionNode) child).isBound()) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        return false;
         
-	}
-	
+    }
+
 }

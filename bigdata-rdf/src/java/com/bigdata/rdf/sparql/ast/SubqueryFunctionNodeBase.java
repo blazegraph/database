@@ -52,7 +52,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
     interface Annotations extends FunctionNode.Annotations {
 
         /**
-         * The graph pattern associated with the subquery.
+         * The {@link GraphPatternGroup} associated with the subquery.
          */
         String GRAPH_PATTERN = "graphPattern";
 
@@ -82,7 +82,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
      */
     protected SubqueryFunctionNodeBase(final URI functionURI,
             final VarNode anonvar,
-            final GroupNodeBase<IGroupMemberNode> graphPattern) {
+            final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
         super(functionURI, null/* scalarValues */,
                 new ValueExpressionNode[] { anonvar });
@@ -101,9 +101,9 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
      * Return the graph pattern associated with the subquery.
      */
     @SuppressWarnings("unchecked")
-    public GroupNodeBase<IGroupMemberNode> getGraphPattern() {
+    public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
-        return (GroupNodeBase<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
+        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
 
     }
 
@@ -111,7 +111,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
      * Set the graph pattern associated with the subquery.
      */
     public void setGraphPattern(
-            final GroupNodeBase<IGroupMemberNode> graphPattern) {
+            final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
         setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 

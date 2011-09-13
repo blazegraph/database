@@ -117,7 +117,8 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
-import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
@@ -674,11 +675,11 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         graphPattern = new GroupGraphPattern();
 
-        final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
+        @SuppressWarnings("unchecked")
+        final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node
                 .jjtGetChild(0).jjtAccept(this/* visitor */, null);
 
-        final ExistsNode fn = new ExistsNode(anonvar,
-                innerGraphPattern);
+        final ExistsNode fn = new ExistsNode(anonvar, innerGraphPattern);
 
         // Restore the parent's context.
         graphPattern = parentGP;
@@ -707,11 +708,11 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         graphPattern = new GroupGraphPattern();
 
-        final GroupNodeBase innerGraphPattern = (GroupNodeBase) node
+        @SuppressWarnings("unchecked")
+        final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node
                 .jjtGetChild(0).jjtAccept(this/* visitor */, null);
 
-        final NotExistsNode fn = new NotExistsNode(anonvar,
-                innerGraphPattern);
+        final NotExistsNode fn = new NotExistsNode(anonvar, innerGraphPattern);
 
         // Restore the parent's context.
         graphPattern = parentGP;

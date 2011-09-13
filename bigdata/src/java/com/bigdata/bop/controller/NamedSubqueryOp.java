@@ -385,10 +385,10 @@ public class NamedSubqueryOp extends PipelineOp {
                     /*
                      * This wraps an efficient raw store interface around a
                      * child memory manager created from the IMemoryManager
-                     * which is backing the query.
+                     * which will back the named solution set.
                      */
                     final IRawStore store = new MemStore(context
-                            .getRunningQuery().getMemoryManager()
+                            .getMemoryManager(namedSetRef.queryId)
                             .createAllocationContext());
 
                     // Will support incremental eviction and persistence.

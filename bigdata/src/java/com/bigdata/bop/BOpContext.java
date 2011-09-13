@@ -45,6 +45,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
@@ -243,6 +244,40 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
+     * Return the {@link IRunningQuery} associated with the specified queryId.
+     * 
+     * @param queryId
+     *            The {@link UUID} of some {@link IRunningQuery}.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} has halted.
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} is not found.
+     */
+    public IRunningQuery getRunningQuery(final UUID queryId) {
+
+        // Lookup the query by its UUID. 
+        final IRunningQuery runningQuery;
+        try {
+            runningQuery = getRunningQuery().getQueryEngine()
+                    .getRunningQuery(queryId);
+
+        } catch (RuntimeException ex) {
+            throw new RuntimeException("Query halted? : " + ex, ex);
+        }
+
+        if (runningQuery == null) {
+            // We could not locate the query.
+            throw new RuntimeException("IRunningQuery not found.");
+        }
+        
+        return runningQuery;
+        
+    }
+    
+    /**
      * Return the {@link IQueryAttributes} associated with the specified query.
      * 
      * @param queryId
@@ -257,29 +292,29 @@ public class BOpContext<E> extends BOpContextBase {
      */
     public IQueryAttributes getQueryAttributes(final UUID queryId) {
 
-        // Lookup the query on which we will hang the solution set.
-        final IRunningQuery runningQuery;
-        try {
-            runningQuery = getRunningQuery().getQueryEngine()
-                    .getRunningQuery(queryId);
+        return getRunningQuery(queryId).getAttributes();
 
-        } catch (RuntimeException ex) {
-            throw new RuntimeException("Query halted? : " + ex, ex);
-        }
-
-        if (runningQuery == null) {
-            // We could not locate the query which generated this solution
-            // set.
-            throw new RuntimeException("IRunningQuery not found.");
-        }
-
-        // The attributes for that query.
-        final IQueryAttributes attrs = runningQuery.getAttributes();
-
-        return attrs;
-        
     }
 
+    /**
+     * Return the {@link IMemoryManager} associated with the specified query.
+     * 
+     * @param queryId
+     *            The {@link UUID} of some {@link IRunningQuery}.
+     * 
+     * @return The {@link IMemoryManager} for that {@link IRunningQuery}.
+     * 
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} has halted.
+     * @throws RuntimeException
+     *             if the {@link IRunningQuery} is not found.
+     */
+    public IMemoryManager getMemoryManager(final UUID queryId) {
+
+        return getRunningQuery(queryId).getMemoryManager();
+
+    }
+    
     /**
      * Binds variables from a visited element.
      * <p>

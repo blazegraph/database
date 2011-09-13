@@ -51,10 +51,18 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     interface Annotations extends ValueExpressionListBaseNode.Annotations {
     
+        /**
+         * {@link Boolean} value annotation marks projection of the "distinct"
+         * solutions.
+         */
         String DISTINCT = "distinct";
 
         boolean DEFAULT_DISTINCT = false;
 
+        /**
+         * {@link Boolean} value annotation marks projection of the "reduced"
+         * solutions.
+         */
         String REDUCED = "reduced";
 
         boolean DEFAULT_REDUCED = false;
@@ -196,7 +204,7 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         return exprs;
         
     }
-    
+
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();

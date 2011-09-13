@@ -76,7 +76,11 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
         store = getStore(getProperties());
         
-        baseURI = "";
+        /*
+         * Note: This needs to be an absolute URI.
+         */
+        
+        baseURI = "http://www.bigdata.com";
         
     }
     

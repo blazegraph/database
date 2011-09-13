@@ -72,6 +72,9 @@ public class TestAll extends TestCase {
         // Unit tests for elimination of unnecessary join groups.
         suite.addTestSuite(TestASTEmptyGroupOptimizer.class);
         
+        // Unit tests for named subquery rewrites.
+        suite.addTestSuite(TestASTNamedSubqueryOptimizer.class);
+        
         // Unit tests for identifying badly designed left joins.
         suite.addTestSuite(TestBadlyDesignedLeftJoinUtil.class);
         

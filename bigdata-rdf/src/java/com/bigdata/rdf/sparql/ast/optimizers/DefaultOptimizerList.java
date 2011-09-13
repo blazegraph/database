@@ -125,8 +125,40 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
  * 
+ * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
+ * DistinctTermScan. What other patterns can we optimize?
+ * 
+ * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
+ * solutions.
+ * 
  * FIXME Write AST optimizer which rejects queries that SELECT variables which
  * do not otherwise appear in the query.
+ * 
+ * TODO If a child group is non-optional and not a union, then flatten it out
+ * (lift it into the parent). (This sort of thing is not directly expressible
+ * in the SPARQL syntax but it might arise through other AST transforms.)
+ * 
+ * TODO Nested unions should be flattened. This only works until one of the join
+ * groups (A, B, or C) introduces something else in the which should apply to
+ * just that child union.
+ * 
+ * <pre>
+ *       UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
+ * </pre>
+ * 
+ * Mike's example of where this does not work is:
+ * 
+ * <pre>
+ *       { ?s ?p1 ?o } UNION { ?x ?y ?x . { ?s ?p2 ?o } UNION { ?s ?p3 ?o } }
+ * </pre>
+ * 
+ * In this example, the right hand side of the first union involves a join with
+ * the second union, represented here as F(). UNION(A,F(UNION(B,C))). We can not
+ * lift that inner union beyond F().
+ * <p>
+ * The spec does have some rules are how to rewrite things. We might take a look
+ * at that.
+ * 
  * 
  * <pre>
  * 
@@ -179,6 +211,9 @@ public class DefaultOptimizerList extends OptimizerList {
         /**
          * Eliminate semantically empty join group nodes which are the sole
          * child of another join groups.
+         * <pre>
+         * { { ... } } => { ... }
+         * </pre>
          */
         add(new ASTEmptyGroupOptimizer());
         
@@ -266,12 +301,18 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
+         * Handles a variety of special constructions related to graph graph
+         * groups.
+         */
+        add(new ASTGraphGroupOptimizer());
+    
+        /**
          * Validates named subquery / include patterns, identifies the join
          * variables, and annotates the named subquery root and named subquery
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());
-        
+
     }
 
 }

@@ -60,6 +60,9 @@ public class TestAll extends TestCase {
         // Test suite for AST manipulation (mainly for use by hand).
         suite.addTestSuite(TestAST.class);
 
+        // Test suite for methods which determine must/may/not bound vars.
+        suite.addTestSuite(TestStaticAnalysisMethods.class);
+
         // Test suite for AST query rewriters/optimizers.
         suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());
 

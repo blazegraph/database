@@ -107,48 +107,19 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         if (context != null)
             return context;
 
-        // Note: the base class will case the parent.
+        // Note: the base class will test the parent.
         return super.getContext();
 
     }
-    
-	/**
-	 * Calculate the variable bindings that will definitely be produced by this
-	 * join group. A group will produce bindings for vars from its statement
-	 * patterns. It may produce bindings for vars from its subgroups, but those
-	 * are not counted since they are either optional or a union of different
-	 * possible groups and thus we cannot be sure what if anything they will
-	 * actually bind.
-	 */
-	private Set<IVariable<?>> getProducedBindings() {
-		
-		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-		
-		for (IQueryNode child : this) {
-			
-			if (child instanceof StatementPatternNode) {
-				
-				final StatementPatternNode sp = (StatementPatternNode) child;
-				
-				vars.addAll(sp.getProducedBindings());
-				
-			}
-			
-		}
-		
-		return vars;
-		
-	}
 
-	/**
-	 * Calculate the set of variables that are known to be bound coming into
-	 * this group (i.e. variables bound by statement patterns in ancestor
-	 * join groups). Useful for determining when to run various filters. 
-	 */
-	public Set<IVariable<?>> getIncomingBindings() {
-		
-		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-		
+    /**
+     * FIXME This needs to pay attention to bottom up variable scoping rules in
+     * order for us to use it to identify filters which can not succeed and
+     * which must therefore be pruned.
+     */
+    @Override
+	public Set<IVariable<?>> getIncomingBindings(final Set<IVariable<?>> vars) {
+				
 		IGroupNode<?> parent = getParent();
 		
 		while (parent != null) {
@@ -157,7 +128,13 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 				
 				final JoinGroupNode joinGroup = (JoinGroupNode) parent;
 				
-				vars.addAll(joinGroup.getProducedBindings());
+                /*
+                 * Note: This needs to be a non-recursive definition of the
+                 * definitely produced bindings. Just those for *this* group for
+                 * each parent considered.
+                 */
+
+				joinGroup.getDefinatelyProducedBindings(vars, false/*recursive*/);
 				
 			}
 			
@@ -168,7 +145,98 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		return vars;
 		
 	}
-	
+
+    public Set<IVariable<?>> getDefinatelyProducedBindings(
+            final Set<IVariable<?>> vars, final boolean recursive) {
+
+        for (IGroupMemberNode child : this) {
+            
+            if (child instanceof StatementPatternNode) {
+
+                /*
+                 * Add anything bound by a statement pattern.
+                 */
+                
+                final StatementPatternNode sp = (StatementPatternNode) child;
+                
+                vars.addAll(sp.getProducedBindings());
+            
+            } else if(recursive && child instanceof GraphPatternGroup<?>) {
+
+                /*
+                 * Add anything bound by a child group.
+                 */
+                
+                final GraphPatternGroup<?> group = (GraphPatternGroup<?>) child;
+
+                if (!group.isOptional()) {
+
+                    vars.addAll(group.getDefinatelyProducedBindings(vars,
+                            recursive));
+
+                }
+
+            }
+
+        }
+
+        /*
+         * Note: Assignments which have an error cause the variable to be left
+         * unbound rather than failing the solution. Therefore assignment nodes
+         * are handled as "maybe" bound, not "must" bound.
+         */
+
+        return vars;
+        
+    }
+  
+    /*
+     * Note: IF is not allowed to conditionally bind a variable in the THEN/ELSE
+     * expressions so we do not include it here.
+     */
+    @Override
+    public Set<IVariable<?>> getMaybeProducedBindings(
+            final Set<IVariable<?>> vars, final boolean recursive) {
+
+        // Add in anything definitely produced by this group (w/o recursion).
+        getDefinatelyProducedBindings(vars, false/* recursive */);
+
+        /*
+         * Note: Assignments which have an error cause the variable to be left
+         * unbound rather than failing the solution. Therefore assignment nodes
+         * are handled as "maybe" bound, not "must" bound.
+         */
+
+        for(AssignmentNode bind : getAssignments()) {
+            
+            vars.add(bind.getVar());
+            
+        }
+
+        if (recursive) {
+
+            /*
+             * Add in anything "maybe" produced by a child group.
+             */
+
+            for (IGroupMemberNode child : this) {
+
+                if (child instanceof GraphPatternGroup<?>) {
+
+                    final GraphPatternGroup<?> group = (GraphPatternGroup<?>) child;
+
+                    vars.addAll(group.getMaybeProducedBindings(vars, recursive));
+
+                }
+
+            }
+
+        }
+
+        return vars;
+
+    }
+
 	/**
 	 * Return only the statement pattern child nodes in this group.
 	 */
@@ -190,6 +258,32 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		return spNodes;
 		
 	}
+
+    /**
+     * Return any <code>LET x:= expr</code> or <code>(expr AS ?x)</code> nodes
+     * in <i>this</i> group (these are modeled in exactly the same way by the
+     * AST {@link AssignmentNode}).
+     * <p>
+     * Note: {@link AssignmentNode}s MUST NOT be reordered. They MUST be
+     * evaluated left-to-right in the order given in the original query.
+     */
+    public List<AssignmentNode> getAssignments(){
+        
+        final List<AssignmentNode> assignments = new ArrayList<AssignmentNode>();
+        
+        for (IQueryNode node : this) {
+            
+            if (node instanceof AssignmentNode) {
+                
+                assignments.add((AssignmentNode) node);
+                
+            }
+            
+        }
+        
+        return assignments;
+        
+    }
 
 	/**
 	 * Return only the filter child nodes in this group.
@@ -221,157 +315,237 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * pre-filters into the parent group we can avoid issuing as many as-bound
      * subqueries for this group since those which fail the filter will not be
      * issued.
+     * 
+     * @return The filters which should either be run before the non-optional
+     *         join graph or (preferably) lifted into the parent group.
      */
-	public Collection<FilterNode> getPreFilters() {
-		
-		/*
-		 * Get the variables known to be bound starting out.
-		 */
-		final Set<IVariable<?>> knownBound = getIncomingBindings();
+    public Collection<FilterNode> getPreFilters() {
 
-		/*
-		 * Get the filters that are bound by this set of known bound vars.
-		 */
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
+        final Collection<FilterNode> filters = getBoundFilters(knownBound);
+
+        return filters;
+
+    }
+
+    /**
+     * Return only the filter child nodes in this group that will be fully bound
+     * only by running the joins in this group.
+     * 
+     * @return The filters to be attached to the non-optional join graph for
+     *         this group.
+     */
+    public Collection<FilterNode> getJoinFilters() {
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all the "must" bound variables for this group.
+         * 
+         * Note: We do not recursively compute the "must" bound variables for
+         * this step because we are only interested in a FILTER which can be
+         * attached to a non-optional JOIN run within this group.
+         */
+        getDefinatelyProducedBindings(knownBound, false/* recursive */);
+		
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
 		final Collection<FilterNode> filters = getBoundFilters(knownBound);
 		
-		return filters;
-		
-	}
-
-	/**
-	 * Return only the filter child nodes in this group that will be fully
-	 * bound only by running the joins in this group.
-	 */
-	public Collection<FilterNode> getJoinFilters() {
-		
-		/*
-		 * Get the variables known to be bound starting out.
-		 */
-		final Set<IVariable<?>> knownBound = getIncomingBindings();
-		
-		/*
-		 * Add all the variables bound by statement patterns in this group.
-		 */
-		knownBound.addAll(getProducedBindings());
-		
-		/*
-		 * Get the filters that are bound by this set of known bound vars.
-		 */
-		final Collection<FilterNode> filters = getBoundFilters(knownBound);
-		
-		/*
-		 * Remove the preConditional filters (those fully bound by just
-		 * incoming bindings).
-		 */
+        /*
+         * Remove the preConditional filters (those fully bound by just incoming
+         * bindings).
+         */
 		filters.removeAll(getPreFilters());
 		
 		return filters;
 		
 	}
-	
-	/**
-	 * Return only the filter child nodes in this group that will not be fully
-	 * bound even after running the joins in this group.  We must assume they
-	 * will become fully bound by running the sub-groups (unions and optionals).
-	 */
+
+    /**
+     * Return only the filter child nodes in this group that will not be fully
+     * bound even after running the joins in this group. It is possible that
+     * some of these filters will be fully bound due to nested optionals and
+     * unions.
+     * 
+     * @return The filters to be run last in the group (after the nested
+     *         optionals and unions).
+     */
 	public Collection<FilterNode> getPostFilters() {
 
 		/*
 		 * Start with all the filters in this group.
 		 */
-		final Collection<FilterNode> filters = getFilters();
-		
-		/*
-		 * Get the variables known to be bound starting out.
-		 */
-		final Set<IVariable<?>> knownBound = getIncomingBindings();
-		
-		/*
-		 * Add all the variables bound by statement patterns in this group.
-		 */
-		knownBound.addAll(getProducedBindings());
-		
-		/*
-		 * Get the filters that are bound by this set of known bound vars.
-		 */
-		final Collection<FilterNode> preAndJoinFilters = getBoundFilters(knownBound);
-		
-		/*
-		 * Remove the preFilters and joinFilters, leaving only
-		 * the postFilters.
-		 */
+        final Collection<FilterNode> filters = getFilters();
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all the "must" bound variables for this group.
+         * 
+         * Note: We do not recursively compute the "must" bound variables for
+         * this step because we are only interested in a FILTER which can be
+         * attached to a non-optional JOIN run within this group.
+         */
+        getDefinatelyProducedBindings(knownBound, false/* recursive */);
+
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
+        final Collection<FilterNode> preAndJoinFilters = getBoundFilters(knownBound);
+
+        /*
+         * Remove the preFilters and joinFilters, leaving only the postFilters.
+         * 
+         * Note: This approach deliberately will report any filter which would
+         * not have already been run for the group.
+         */
 		filters.removeAll(preAndJoinFilters);
 
 		return filters;
 		
 	}
 
-	/**
-	 * Return any LET(x,expr) or BIND(x,expr) nodes.
-	 */
-	public List<AssignmentNode> getAssignments(){
-		
-		final List<AssignmentNode> assignments = new ArrayList<AssignmentNode>();
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof AssignmentNode) {
-				
-				assignments.add((AssignmentNode) node);
-				
-			}
-			
-		}
-		
-		return assignments;
-	}
+    /**
+     * Return any filters can not succeed based on the "incoming", "must" and
+     * "may" bound variables for this group. These filters are candidates for
+     * pruning.
+     * <p>
+     * Note: Filters containing a {@link FunctionNode} for
+     * {@link FunctionRegistry#BOUND} MUST NOT be pruned and are NOT reported by
+     * this method.
+     * 
+     * @return The filters which are known to fail.
+     * 
+     *         TODO It is possible to prune a BOUND(?x) or NOT BOUND(?x) filter
+     *         through a more detailed analysis of the value expression. If the
+     *         variable <code>?x</code> simply does not appear in the group or
+     *         any child of that group, then BOUND(?x) can be replaced by
+     *         <code>false</code> and NOT BOUND(?x) by <code>true</code>.
+     *         <p>
+     *         However, in order to do this we must also look at any exogenous
+     *         solution(s) (those supplied with the query when it is being
+     *         evaluated). If the variable is bound in some exogenous solutions
+     *         then it could be bound when the FILTER is run and the filter can
+     *         not be pruned.
+     */
+    public Collection<FilterNode> getFiltersToPrune() {
 
+        /*
+         * Start with all the filters in this group.
+         */
+        final Collection<FilterNode> filters = getFilters();
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> maybeBound = getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all "must" / "may" bound variables for this group (recursively).
+         */
+        getMaybeProducedBindings(maybeBound, true/* recursive */);
+
+        /*
+         * Get the filters that are bound by this set of "maybe" bound variables.
+         */
+        final Collection<FilterNode> maybeFilters = getBoundFilters(maybeBound);
+
+        /*
+         * Remove the maybe bound filters, leaving only those which can not
+         * succeed.
+         */
+        filters.removeAll(maybeFilters);
+        
+        /*
+         * Collect all maybeFilters which use BOUND(). These can not be failed
+         * as easily.
+         */
+        
+        final Set<FilterNode> isBoundFilters = new LinkedHashSet<FilterNode>();
+        
+        for (FilterNode filter : maybeFilters) {
+
+            final IValueExpressionNode node = filter.getValueExpressionNode();
+            
+            if (node instanceof FunctionNode) {
+            
+                if (((FunctionNode) node).isBound()) {
+                
+                    isBoundFilters.add(filter);
+                    
+                }
+                
+            }
+            
+        }
+
+        // Remove filters which use BOUND().
+        filters.removeAll(isBoundFilters);
+        
+        return filters;
+        
+    }
+    
 	/**
 	 * Helper method to determine the set of filters that will be fully bound
 	 * assuming the specified set of variables is bound.
 	 */
-	private final Collection<FilterNode> getBoundFilters(
-			final Set<IVariable<?>> knownBound) {
-		
-		final Collection<FilterNode> filters = 
-			new LinkedList<FilterNode>();
-		
-		for (IQueryNode node : this) {
-			
-			if (!(node instanceof FilterNode))
-				continue;
-		
-			final FilterNode filter = (FilterNode) node;
-			
-			final Set<IVariable<?>> filterVars = filter.getConsumedVars();
-			
-			boolean allBound = true;
-			
-			for (IVariable<?> v : filterVars) {
-				
-				allBound &= knownBound.contains(v);
-				
-			}
-			
-			if (allBound) {
-				
-				filters.add(filter);
-				
-			}
-			
-		}
+    private final Collection<FilterNode> getBoundFilters(
+            final Set<IVariable<?>> knownBound) {
 
-		return filters;
+        final Collection<FilterNode> filters = new LinkedList<FilterNode>();
 
-	}
-	
-	/**
-	 * A "simple optional" is an optional sub-group that contains only one
-	 * statement pattern, no sub-groups of its own, and no filters that
-	 * require materialized variables. We can lift these "simple optionals"
-	 * into the parent group without incurring the costs of launching
-	 * a {@link SubqueryOp}.
-	 */
+        for (IQueryNode node : this) {
+
+            if (!(node instanceof FilterNode))
+                continue;
+
+            final FilterNode filter = (FilterNode) node;
+
+            final Set<IVariable<?>> filterVars = filter.getConsumedVars();
+
+            boolean allBound = true;
+
+            for (IVariable<?> v : filterVars) {
+
+                allBound &= knownBound.contains(v);
+
+            }
+
+            if (allBound) {
+
+                filters.add(filter);
+
+            }
+
+        }
+
+        return filters;
+
+    }
+
+    /**
+     * A "simple optional" is an optional sub-group that contains only one
+     * statement pattern, no sub-groups of its own, and no filters that require
+     * materialized variables. We can lift these "simple optionals" into the
+     * parent group without incurring the costs of launching a
+     * {@link SubqueryOp}.
+     */
 	public boolean isSimpleOptional() {
 		
 		// first, the whole group must be optional
@@ -415,10 +589,10 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 			}
 			
 		}
-		
-		// if we've made it this far, we are simple optional 
-		return sp!=null;
-		
+
+        // if we've made it this far, we are simple optional
+        return sp != null;
+
 	}
 	
 	/**
@@ -445,7 +619,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		throw new RuntimeException("not a simple optional join group");
 		
 	}
-	
+
 	/*
 	 * Note: I took this out and put a simpler version of toString(indent) into
 	 * the base class.  The multiple passes over the AST when rendering it into

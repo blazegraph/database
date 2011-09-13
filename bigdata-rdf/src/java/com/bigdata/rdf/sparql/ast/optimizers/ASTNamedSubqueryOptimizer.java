@@ -40,8 +40,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
@@ -73,8 +71,8 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
-    private static final Logger log = Logger
-            .getLogger(ASTNamedSubqueryOptimizer.class);
+//    private static final Logger log = Logger
+//            .getLogger(ASTNamedSubqueryOptimizer.class);
     
     /**
      *
@@ -483,7 +481,6 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
         for (SubqueryRoot root : subqueries) {
 
-            @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> parent = root.getParent();
 
             parent.removeChild(root);
@@ -610,17 +607,31 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      *         is not very efficient.]
      */
     @SuppressWarnings("rawtypes")
-    private IVariable[] staticAnalysis(QueryRoot queryRoot,
-            NamedSubqueryRoot aNamedSubquery, NamedSubqueryInclude anInclude) {
+    private IVariable[] staticAnalysis(final QueryRoot queryRoot,
+            final NamedSubqueryRoot aNamedSubquery,
+            final NamedSubqueryInclude anInclude) {
 
-//        final IVariable[] projected = aNamedSubquery.getProjection()
-//                .getProjectionVars();
-//
-//        return projected;
-
-        log.error("FIXME : Write the code for the static analysis of the join variables.");
+        final Set<IVariable<?>> boundBySubquery = aNamedSubquery
+                .getDefinatelyProducedBindings();
         
-        return new IVariable[]{};
+        final Set<IVariable<?>> incomingBindings = anInclude.getParentJoinGroup()
+                .getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * This is only those variables which are bound on entry into the group
+         * in which the INCLUDE appears *and* which are "must" bound variables
+         * projected by the subquery.
+         */
+        boundBySubquery.retainAll(incomingBindings);
+
+        // Convert to an array.
+        final IVariable[] vars = boundBySubquery
+                .toArray(new IVariable[boundBySubquery.size()]);
+
+        // Put the variable[] into a consistent, predictable order.
+        Arrays.sort(vars);
+
+        return vars;
 
     }
 

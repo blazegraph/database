@@ -73,6 +73,12 @@ public class TestAll extends TestCase {
         // Complex queries.
         suite.addTestSuite(TestComplexQuery.class);
         
+        /*
+         * Some persnickety DAWK test cases, mainly things dealing with bottom
+         * up evaluation semantics.
+         */
+        suite.addTestSuite(TestTCK.class);
+        
         return suite;
         
     }
