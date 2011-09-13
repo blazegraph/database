@@ -1832,7 +1832,8 @@ public class AST2BOpUtility {
 
         left = addMaterializationSteps(left, bopId, vars, ctx);
 
-        if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()) {
+        if (!groupByState.isAnyDistinct() && !groupByState.isSelectDependency()
+                && !groupByState.isNestedAggregates()) {
 
             /*
              * Extremely efficient pipelined aggregation operator.
