@@ -79,7 +79,7 @@ public class TestAST extends TestCase {
      */
     public void testSimpleJoin() {
     	
-    	final IGroupNode root = new JoinGroupNode();
+    	final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
     	
     	root.addChild(sp(1));
     	root.addChild(sp(2));
@@ -103,7 +103,7 @@ public class TestAST extends TestCase {
      */
     public void testSimpleOptional() {
     	
-    	final IGroupNode root = new JoinGroupNode();
+        final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
     	root.addChild(sp(1));
     	
     	final IGroupNode optional = new JoinGroupNode(true);
@@ -132,7 +132,7 @@ public class TestAST extends TestCase {
      */
     public void testOptionalJoinGroup() {
     	
-    	final IGroupNode root = new JoinGroupNode();
+        final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
     	root.addChild(sp(1));
     	
     	final IGroupNode optional = new JoinGroupNode(true);
@@ -172,7 +172,7 @@ public class TestAST extends TestCase {
     	g2.addChild(sp(3));
     	g2.addChild(sp(4));
     	
-    	final IGroupNode union = new UnionNode();
+    	final GraphPatternGroup union = new UnionNode();
     	union.addChild(g1);
     	union.addChild(g2);
     	
@@ -213,7 +213,7 @@ public class TestAST extends TestCase {
     	union.addChild(g1);
     	union.addChild(g2);
     	
-    	final IGroupNode root = new JoinGroupNode();
+    	final GraphPatternGroup root = new JoinGroupNode();
     	root.addChild(sp(1));
     	root.addChild(filter(2));
     	root.addChild(union);
@@ -229,7 +229,7 @@ public class TestAST extends TestCase {
     
     public void testEverything() {
     	
-    	final IGroupNode root = new JoinGroupNode();
+    	final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
     	
     	root.addChild(sp(1)).addChild(sp(2)).addChild(filter(3));
     	

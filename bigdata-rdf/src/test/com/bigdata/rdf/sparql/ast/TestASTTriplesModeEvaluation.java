@@ -86,7 +86,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
          */
         {
             
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
 
             root.addChild(sp());
 
@@ -128,7 +128,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
          */
         if(true){
             
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
 
             root.addChild(sp());
 
@@ -176,7 +176,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
          */
         {
             
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
 
             root.addChild(sp());
 
@@ -253,8 +253,8 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
          */
         {
 
-            final IGroupNode root = new JoinGroupNode();
-            
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
+
             root.addChild(new StatementPatternNode(new VarNode("s"),
                     new ConstantNode(new Constant<IV>(type)),
                     new ConstantNode(new Constant<IV>(cIv))));
@@ -306,7 +306,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
          */
         {
 
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
 
             root.addChild(new StatementPatternNode(new VarNode("s"),
                     new ConstantNode(new Constant<IV>(type)),
@@ -400,7 +400,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         {
             final VarNode s = new VarNode("s");
             final VarNode o = new VarNode("o");
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
             root.addChild(new StatementPatternNode(s, new ConstantNode(
                     new Constant<IV>(type)), new ConstantNode(
                     new Constant<IV>(cIv))));
@@ -514,15 +514,15 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         {
             final VarNode s = new VarNode("s");
             final VarNode o = new VarNode("o");
-            final IGroupNode root = new JoinGroupNode();
+            final GraphPatternGroup<IGroupMemberNode> root = new JoinGroupNode();
             root.addChild(new StatementPatternNode(s, new ConstantNode(
                     new Constant<IV>(type)), new ConstantNode(
                     new Constant<IV>(cIv))));
             root.addChild(new StatementPatternNode(s, new ConstantNode(
                     new Constant<IV>(predicateIv)), o));
 
-
-            final CoalesceBOp coalesce=new CoalesceBOp(s.getValueExpression(),o.getValueExpression());
+            final CoalesceBOp coalesce = new CoalesceBOp(
+                    s.getValueExpression(), o.getValueExpression());
 
             final StrBOp op = new StrBOp(coalesce, store.getNamespace());
 

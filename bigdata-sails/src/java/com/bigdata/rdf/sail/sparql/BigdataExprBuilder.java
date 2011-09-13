@@ -68,10 +68,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
@@ -653,7 +653,7 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
 
             graphPattern = new GroupGraphPattern();
             
-            final IGroupNode<IGroupMemberNode> ret = (IGroupNode<IGroupMemberNode>) graphPatternGroup
+            final GraphPatternGroup<IGroupMemberNode> ret = (GraphPatternGroup<IGroupMemberNode>) graphPatternGroup
                     .jjtAccept(this, null/* data */);
 
             queryRoot.setWhereClause(ret);

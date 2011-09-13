@@ -18,12 +18,11 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Efficiently resolve term identifiers in Bigdata {@link ISolution}s to RDF
+ * Efficiently resolve term identifiers in Bigdata {@link IBindingSet}s to RDF
  * {@link BigdataValue}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -94,7 +93,7 @@ public class BigdataBindingSetResolverator
     }
 
     /**
-     * Resolve a chunk of {@link ISolution}s into a chunk of
+     * Resolve a chunk of {@link IBindingSet}s into a chunk of
      * {@link IBindingSet}s in which term identifiers have been resolved to
      * {@link BigdataValue}s.
      */
@@ -206,7 +205,7 @@ public class BigdataBindingSetResolverator
     }
 
     /**
-     * Resolve the term identifiers in the {@link ISolution} using the map
+     * Resolve the term identifiers in the {@link IBindingSet} using the map
      * populated when we fetched the current chunk and return the
      * {@link IBindingSet} for that solution in which term identifiers have been
      * resolved to their corresponding {@link BigdataValue}s.
@@ -221,7 +220,7 @@ public class BigdataBindingSetResolverator
      * 
      * @throws IllegalStateException
      *             if the {@link IBindingSet} was not materialized with the
-     *             {@link ISolution}.
+     *             {@link IBindingSet}.
      */
     private IBindingSet getBindingSet(final IBindingSet solution,
             final Map<IV<?,?>, BigdataValue> terms) {

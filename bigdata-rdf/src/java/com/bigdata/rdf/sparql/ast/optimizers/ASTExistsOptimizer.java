@@ -33,6 +33,7 @@ import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -123,7 +124,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
             final SubqueryFunctionNodeBase subqueryFunction = (SubqueryFunctionNodeBase) ve;
 
-            final GroupNodeBase<IGroupMemberNode> graphPattern = subqueryFunction
+            final GraphPatternGroup<IGroupMemberNode> graphPattern = subqueryFunction
                     .getGraphPattern();
 
             if (graphPattern != null) {

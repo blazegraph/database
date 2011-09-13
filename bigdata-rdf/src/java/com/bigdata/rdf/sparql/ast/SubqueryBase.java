@@ -45,16 +45,16 @@ abstract public class SubqueryBase extends QueryBase implements
      * 
      */
     private static final long serialVersionUID = 1L;
-    
-    private IGroupNode parent;
 
-    final public IGroupNode getParent() {
+    private IGroupNode<IGroupMemberNode> parent;
+
+    final public IGroupNode<IGroupMemberNode> getParent() {
 
         return parent;
 
     }
 
-    final public void setParent(final IGroupNode parent) {
+    final public void setParent(final IGroupNode<IGroupMemberNode> parent) {
 
         this.parent = parent;
 
@@ -64,18 +64,18 @@ abstract public class SubqueryBase extends QueryBase implements
      * Deep copy constructor.
      */
     public SubqueryBase(final SubqueryBase queryBase) {
-    
+
         super(queryBase);
-        
+
     }
-    
+
     /**
      * Shallow copy constructor.
      */
     public SubqueryBase(final BOp[] args, final Map<String, Object> anns) {
 
         super(args, anns);
-        
+
     }
 
     public SubqueryBase(final QueryType queryType) {
@@ -84,11 +84,6 @@ abstract public class SubqueryBase extends QueryBase implements
 
     }
 
-    /**
-     * Return the graph variable or constant iff this {@link JoinGroupNode}
-     * models a GraphPatternGroup. When not present, this reads up the parent
-     * chain to locate the dominating graph context.
-     */
     public TermNode getContext() {
 
         final IQueryNode parent = getParent();
@@ -101,6 +96,41 @@ abstract public class SubqueryBase extends QueryBase implements
 
         return null;
 
+    }
+
+    public JoinGroupNode getParentJoinGroup() {
+
+        IGroupNode<?> parent = getParent();
+
+        while (parent != null) {
+
+            if (parent instanceof JoinGroupNode)
+                return (JoinGroupNode) parent;
+
+            parent = parent.getParent();
+
+        }
+
+        return null;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public GraphPatternGroup<IGroupMemberNode> getParentGraphPatternGroup() {
+        
+        IGroupNode<?> parent = getParent();
+
+        while (parent != null) {
+
+            if (parent instanceof GraphPatternGroup)
+                return (GraphPatternGroup<IGroupMemberNode>) parent;
+
+            parent = parent.getParent();
+
+        }
+
+        return null;
+        
     }
 
 }

@@ -93,7 +93,7 @@ public class BOpUtility {
          */
     	
 		// mild optimization when no children are present.
-		if (op.arity() == 0)
+		if (op == null || op.arity() == 0)
 			return EmptyIterator.DEFAULT;
 
         return new Striterator(op.argIterator()).addFilter(new Expander() {
@@ -175,6 +175,9 @@ public class BOpUtility {
          * Iterator visits the direct children, expanding them in turn with a
          * recursive application of the post-order iterator.
          */
+
+        if (op == null || op.arity() == 0)
+            return EmptyIterator.DEFAULT;
 
         return new Striterator(op.argIterator()).addFilter(new Expander() {
 
@@ -913,6 +916,26 @@ public class BOpUtility {
         if (bop == null)
             return;
         
+        /*
+         * Render annotations which are bops as well. For example, this shows us
+         * the subquery plans.
+         */
+        for(Map.Entry<String, Object> e : bop.annotations().entrySet()) {
+            
+            if (e.getValue() instanceof PipelineOp) {
+
+                sb.append(indent(indent)).append("@").append(e.getKey())
+                        .append(":\n");
+
+                toString((BOp) e.getValue(), sb, indent + 1);
+                
+            }
+            
+        }
+
+        /*
+         * Render the child bops.
+         */
     	final Iterator<BOp> itr = bop.argIterator();
 
     	while(itr.hasNext()) {
@@ -926,7 +949,7 @@ public class BOpUtility {
             }
 
         }
-
+    	
     }
 
     /**

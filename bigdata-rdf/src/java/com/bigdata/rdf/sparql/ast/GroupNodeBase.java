@@ -74,8 +74,8 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         
         super.setArg(index, newArg);
         
-        ((E) newArg).setParent(this);
-        
+        ((E) newArg).setParent((IGroupNode<IGroupMemberNode>) this);
+
         return this;
         
     }
@@ -91,7 +91,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         super.addArg(newArg);
 
-        ((E) newArg).setParent(this);
+        ((E) newArg).setParent((IGroupNode<IGroupMemberNode>) this);
 
     }
 

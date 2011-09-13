@@ -40,7 +40,7 @@ public class SOp2ASTUtility {
 		
 		final SOpGroup sopRoot = sopTree.getRoot();
 		
-		final IGroupNode astRoot = convert(sopRoot);
+		final GraphPatternGroup astRoot = convert(sopRoot);
 		
         /*
          * TODO This is always using SELECT since the SOpTree does not provide
@@ -67,7 +67,7 @@ public class SOp2ASTUtility {
 		
 	}
 	
-	private static final IGroupNode convert(final SOpGroup sopGroup) {
+	private static final GraphPatternGroup convert(final SOpGroup sopGroup) {
 		
 		if (log.isDebugEnabled()) {
 			log.debug("converting:\n"+sopGroup.getGroup());
@@ -76,7 +76,7 @@ public class SOp2ASTUtility {
 		final boolean optional = sopGroup.size() != 0 && 
 			SOp2BOpUtility.isOptional(sopGroup);
 		
-		final IGroupNode astGroup;
+		final GraphPatternGroup astGroup;
 		
 		if (SOp2BOpUtility.isUnion(sopGroup)) {
 			
@@ -92,7 +92,7 @@ public class SOp2ASTUtility {
 				
 				if (bop instanceof Predicate) {
 					
-					final Predicate pred = (Predicate) bop;
+					final Predicate<?> pred = (Predicate<?>) bop;
 					
 					final StatementPattern sp = (StatementPattern) sop.getOperator();
 					

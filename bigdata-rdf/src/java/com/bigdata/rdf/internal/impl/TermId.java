@@ -23,11 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.impl;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-
-import javax.xml.datatype.XMLGregorianCalendar;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -130,15 +125,21 @@ public class TermId<V extends BigdataValue>
     }
     
     /**
-     * Human readable representation includes the term identifier, whether
-     * this is a URI, Literal, Blank node, or Statement identifier and the
-     * datatype URI if one is assigned. This representation is based solely
-     * on the flag bits and the term identifier.
+     * Human readable representation includes the term identifier, whether this
+     * is a URI, Literal, Blank node, or Statement identifier and the datatype
+     * URI if one is assigned. This representation is based solely on the flag
+     * bits and the term identifier.
+     * <p>
+     * The cached {@link BigdataValue}, if any, is also rendered. This is done
+     * using {@link BigdataValue#stringValue()} in order to avoid possible
+     * infinite recursion through {@link BigdataValue#toString()} if the latter
+     * were to display the {@link IV}.
      */
     public String toString() {
 
         return "TermId(" + termId + String.valueOf(getVTE().getCharCode())
-                + ")";
+                + ")"
+                + (hasValue() ? "[" + getValue().stringValue() + "]" : "");
 
     }
 
@@ -153,11 +154,15 @@ public class TermId<V extends BigdataValue>
      */
     static public TermId<?> fromString(final String s) {
 
-        final char type = s.charAt(s.length() - 2);
+        final int pos = s.indexOf("[");
+        
+        final int end = (pos > 0 ? pos : s.length()) - 2;
 
-        final long tid = Long.valueOf(s.substring(7, s.length() - 2));
+        final long tid = Long.valueOf(s.substring(7, end));
+        
+        final char type = s.charAt(end);
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         final TermId<?> tmp = new TermId(VTE.valueOf(type), tid);
 
         return tmp;

@@ -35,22 +35,23 @@ import com.bigdata.bop.BOp;
  * Anything which can appear in an {@link IGroupNode}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: GroupMemberNodeBase.java 5174 2011-09-11 20:18:18Z thompsonbry
+ *          $
  */
 abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
         QueryNodeBase implements IGroupMemberNode {
 
     private static final long serialVersionUID = 1L;
 
-    private IGroupNode parent;
-    
-    final public IGroupNode getParent() {
-        
+    private IGroupNode<IGroupMemberNode> parent;
+
+    final public IGroupNode<IGroupMemberNode> getParent() {
+
         return parent;
-        
+
     }
 
-    final public void setParent(final IGroupNode parent) {
+    final public void setParent(final IGroupNode<IGroupMemberNode> parent) {
 
         this.parent = parent;
 
@@ -77,17 +78,19 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
 
     }
 
-    /**
-     * Return the graph variable or constant iff this {@link JoinGroupNode}
-     * models a GraphPatternGroup. When not present, this reads up the parent
-     * chain to locate the dominating graph context.
-     */
     public TermNode getContext() {
     
         final IQueryNode parent = getParent();
         
         if (parent instanceof GroupMemberNodeBase<?>) {
 
+            /*
+             * Recursion up to the parent context.
+             * 
+             * TODO It would seem better to explicitly recurse until we find the
+             * first JoinGroup parent, and to define a getJoinGroup() method for
+             * that.
+             */
             return ((GroupMemberNodeBase<?>) parent).getContext();
             
         }
@@ -96,4 +99,39 @@ abstract public class GroupMemberNodeBase<E extends IGroupMemberNode> extends
     
     }
 
+    public JoinGroupNode getParentJoinGroup() {
+
+        IGroupNode<?> parent = getParent();
+
+        while (parent != null) {
+
+            if (parent instanceof JoinGroupNode)
+                return (JoinGroupNode) parent;
+
+            parent = parent.getParent();
+
+        }
+
+        return null;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public GraphPatternGroup<IGroupMemberNode> getParentGraphPatternGroup() {
+        
+        IGroupNode<?> parent = getParent();
+
+        while (parent != null) {
+
+            if (parent instanceof GraphPatternGroup)
+                return (GraphPatternGroup<IGroupMemberNode>) parent;
+
+            parent = parent.getParent();
+
+        }
+
+        return null;
+        
+    }
+    
 }

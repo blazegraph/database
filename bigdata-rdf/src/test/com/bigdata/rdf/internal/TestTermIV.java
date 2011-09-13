@@ -39,6 +39,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Test suite for {@link TermId}.
@@ -92,11 +93,12 @@ public class TestTermIV extends TestCase2 {
 
     }
 
+    @SuppressWarnings("unchecked")
     private void doTermIVTest(final VTE vte, final long termId) {
 
         final IKeyBuilder keyBuilder = new KeyBuilder(1 + Bytes.SIZEOF_LONG);
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         final TermId<?> iv = new TermId(vte, termId);
 
         assertEquals(AbstractIV.toFlags(vte, false/* inline */,
@@ -110,7 +112,8 @@ public class TestTermIV extends TestCase2 {
 
         final byte[] key = iv.encode(keyBuilder.reset()).getKey();
         
-        final TermId<?> iv2 = (TermId<?>) IVUtility.decode(key);
+        @SuppressWarnings("rawtypes")
+        final TermId iv2 = (TermId) IVUtility.decode(key);
 
         assertEquals(vte, iv2.getVTE());
 
@@ -120,6 +123,14 @@ public class TestTermIV extends TestCase2 {
 
         assertEquals(iv, iv2);
 
+        final BigdataValue value = BigdataValueFactoryImpl.getInstance(
+                getName()).createLiteral("foo");
+        
+        iv2.setValue(value);
+        
+        assertEquals(iv,TermId.fromString(iv2.toString()));
+        
+        
     }
     
     public void test_TermId_URI() {

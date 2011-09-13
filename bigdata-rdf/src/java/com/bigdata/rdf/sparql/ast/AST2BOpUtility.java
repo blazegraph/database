@@ -150,10 +150,10 @@ public class AST2BOpUtility {
          * which would give us something like the hash-set based IN constraint.
          */
         final IBindingSet[] bindingSets = null;
-        
+
         // The AST query model.
         final QueryRoot query = ctx.query;
-        
+
         /*
          * Run the AST query rewrites / query optimizers.
          * 
@@ -168,9 +168,9 @@ public class AST2BOpUtility {
 
             ctx.optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
                     query, bindingSets);
-            
+
         }
-        
+
         // The executable query plan.
         PipelineOp queryPlan = convert(ctx.optimizedQuery, ctx);
 
@@ -180,11 +180,11 @@ public class AST2BOpUtility {
              * An empty query plan. Just copy anything from the input to the
              * output.
              */
-            
+
             queryPlan = addStartOp(ctx);
-            
+
         }
-        
+
         /*
          * Set the queryId on the top-level of the query plan.
          * 
@@ -198,14 +198,14 @@ public class AST2BOpUtility {
 
         if (log.isInfoEnabled()) {
             log.info("\noriginal :\n" + query);
-            log.info("\noptimized:\n" + ctx.optimizedQuery);
-            log.info("\npipeline :\n" + BOpUtility.toString2(queryPlan));
+            log.info("\noptimized:\n" + BOpUtility.toString(ctx.optimizedQuery));
+            log.info("\npipeline :\n" + BOpUtility.toString(queryPlan));
         }
 
         return queryPlan;
 
     }
-    
+
     /**
      * Convert a query (or subquery) into a query plan (pipeline).
      * 
@@ -219,15 +219,15 @@ public class AST2BOpUtility {
      */
     private static PipelineOp convert(final QueryBase query,
             final AST2BOpContext ctx) {
-    	
+
         /*
          * Visit all the value expression nodes and convert them into value
          * expressions.
          */
         {
-            
+
             final String lex = ctx.db.getLexiconRelation().getNamespace();
-            
+
             final Iterator<IValueExpressionNode> it = BOpUtility.visitAll(
                     query, IValueExpressionNode.class);
 
@@ -256,17 +256,17 @@ public class AST2BOpUtility {
         if (root == null)
             throw new IllegalArgumentException("No group node");
 
-		PipelineOp left = null;
+        PipelineOp left = null;
 
         /*
          * Named subqueries.
          */
         if (query instanceof QueryRoot) {
 
-//            /*
-//             * Materialize the results for the service calls into hashjoin
-//             */
-//            left = addServiceNodes(left, (QueryRoot) query, ctx);
+            // /*
+            // * Materialize the results for the service calls into hashjoin
+            // */
+            // left = addServiceNodes(left, (QueryRoot) query, ctx);
 
             final NamedSubqueriesNode namedSubqueries = ((QueryRoot) query)
                     .getNamedSubqueries();
@@ -287,7 +287,7 @@ public class AST2BOpUtility {
         final ProjectionNode projection = query.getProjection() == null ? null
                 : query.getProjection().isEmpty() ? null : query
                         .getProjection();
-        
+
         if (projection != null) {
 
             /**
@@ -348,7 +348,7 @@ public class AST2BOpUtility {
              * not change the order in which the solutions appear (but we are
              * evaluating it before ORDER BY so that is Ok.)
              */
-  
+
             if (projection.isDistinct() || projection.isReduced()) {
 
                 left = addDistinct(left, query, ctx);
@@ -356,13 +356,13 @@ public class AST2BOpUtility {
             }
 
         }
-        
-        final OrderByNode orderBy = query.getOrderBy();
-        
-        if (orderBy != null && ! orderBy.isEmpty()) {
 
-    		left = addOrderBy(left, orderBy, ctx);
-        	
+        final OrderByNode orderBy = query.getOrderBy();
+
+        if (orderBy != null && !orderBy.isEmpty()) {
+
+            left = addOrderBy(left, orderBy, ctx);
+
         }
 
         final SliceNode slice = query.getSlice();
@@ -374,7 +374,7 @@ public class AST2BOpUtility {
         }
 
         left = addEndOp(left, ctx);
-        
+
         /*
          * Set a timeout on a query or subquery.
          */
@@ -388,9 +388,9 @@ public class AST2BOpUtility {
                         timeout);
 
             }
-            
+
         }
-        
+
         /*
          * TODO Do we need to add operators for materialization of any remaining
          * variables which are being projected out of the query? Note that we do
@@ -398,10 +398,10 @@ public class AST2BOpUtility {
          * IVs. (I think that materialization is still handled by the bulk IV
          * resolution iterators).
          */
-        
+
         return left;
-		
-	}
+
+    }
 
     /**
      * Add pipeline operators for named subquery solution sets. The solution
@@ -440,32 +440,21 @@ public class AST2BOpUtility {
             final NamedSubqueriesNode namedSubquerieNode,
             final QueryRoot queryRoot, final AST2BOpContext ctx) {
 
-        if (true) {
-
-            /*
-             * Run the named subqueries sequentially in the pre-determined
-             * order.
-             */
-            for (NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
-
-                left = createNamedSubquery(left, subqueryRoot, ctx);
-
-            }
-
-        }
+//        /*
+//         * Run the named subqueries sequentially in the pre-determined
+//         * order.
+//         */
+//        for (NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
+//
+//            left = createNamedSubquery(left, subqueryRoot, ctx);
+//
+//        }
 
         /*
          * If there is more than one named subquery whose DEPENDS_ON attribute
          * is an empty String[], then run them in parallel using STEPS (and
          * filter them out in the 2nd pass). Then run the remaining named
          * subqueries in their current sequence.
-         * 
-         * FIXME This code breaks with a low level error from the memory
-         * manager. This problem would appear to be one of the scope and life
-         * cycle of the memory manager instance on which the HTree data is
-         * written. The problem only appears if you run the STEPS operator. It
-         * can be manifested if you always wrap the named subquery in a STEPS
-         * operator. See below for details.
          */
 
         // All named subqueries with NO dependencies.
@@ -474,7 +463,7 @@ public class AST2BOpUtility {
         // Remaining named subqueries, which MUST already be in an ordering
         // consistent with their dependencies.
         final List<NamedSubqueryRoot> remainder = new LinkedList<NamedSubqueryRoot>();
-        
+
         for (NamedSubqueryRoot subqueryRoot : namedSubquerieNode) {
 
             final String[] dependsOn = subqueryRoot.getDependsOn();
@@ -487,65 +476,61 @@ public class AST2BOpUtility {
         }
 
         final int nfirst = runFirst.size();
-        
-        if(nfirst == 0) {
+
+        if (nfirst == 0) {
 
             // Can't be true. At least one of the named subqueries must not
             // depend on any of the others.
-            
+
             throw new AssertionError();
 
-        } else if (/* false && */nfirst == 1) {
-
-            /*
-             * TODO ^^^^^^^^^^^^^ If we disable this code path then we always
-             * wrap the named subquery in a STEPS operator and the memory
-             * manager error will be demonstrated. See above.
-             */
+        } else if (nfirst == 1) {
 
             left = createNamedSubquery(left, runFirst.get(0), ctx);
 
         } else {
-            
+
             final PipelineOp[] steps = new PipelineOp[nfirst];
-            
+
             int i = 0;
-            
-            for(NamedSubqueryRoot subqueryRoot : runFirst) {
-                
-                steps[i] = createNamedSubquery(null/*left*/, subqueryRoot, ctx);
-                
+
+            for (NamedSubqueryRoot subqueryRoot : runFirst) {
+
+                steps[i] = createNamedSubquery(null/* left */, subqueryRoot,
+                        ctx);
+
             }
 
             // Run the steps in parallel.
             left = new Steps(leftOrEmpty(left), //
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
-                new NV(Steps.Annotations.SUBQUERIES, steps),//
-                new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES, steps.length)//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(Steps.Annotations.SUBQUERIES, steps),//
+                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
+                            steps.length)//
             );
-            
+
         }
- 
+
         // Run the remaining steps in sequence.
-        for(NamedSubqueryRoot subqueryRoot : remainder) {
-            
+        for (NamedSubqueryRoot subqueryRoot : remainder) {
+
             left = createNamedSubquery(left, subqueryRoot, ctx);
-            
+
         }
-        
+
         return left;
-        
+
     }
 
     static private PipelineOp createNamedSubquery(PipelineOp left,
             final NamedSubqueryRoot subqueryRoot, final AST2BOpContext ctx) {
-        
+
         final PipelineOp subqueryPlan = convert(subqueryRoot, ctx);
-        
+
         if (log.isInfoEnabled())
-            log.info("\nsubquery: " + subqueryRoot + "\nplan="
-                    + subqueryPlan);
+            log.info("\nsubquery: " + subqueryRoot + "\nplan=" + subqueryPlan);
 
         final IVariable<?>[] joinVars = ASTUtil.convert(subqueryRoot
                 .getJoinVars());
@@ -555,17 +540,19 @@ public class AST2BOpUtility {
 
         left = new NamedSubqueryOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF,
+                        namedSolutionSet)//
         );
 
         return left;
 
     }
-    
+
     /**
      * Add an operator to evaluate a {@link ServiceCall}.
      * 
@@ -594,9 +581,9 @@ public class AST2BOpUtility {
         );
 
         return left;
-        
+
     }
-    
+
     /**
      * Add a join against a pre-computed temporary solution set into a join
      * group.
@@ -613,28 +600,28 @@ public class AST2BOpUtility {
             log.info("include: solutionSet=" + subqueryInclude.getName());
 
         final VarNode[] joinvars = subqueryInclude.getJoinVars();
-        
+
         if (joinvars == null) {
 
             /*
              * The most likely explanation is not running the
              * ASTNamedSubqueryOptimizer.
              */
-            
+
             throw new AssertionError();
-            
+
         }
 
         if (joinvars.length == 0) {
-            
+
             /*
              * Note: If there are no join variables then the join will examine
              * the full N x M cross product of solutions. That is very
              * inefficient, so we are logging a warning.
              */
-            
+
             log.warn("No join variables: " + subqueryInclude.getName());
-            
+
         }
 
         final IVariable<?>[] joinVars = ASTUtil.convert(joinvars);
@@ -644,15 +631,17 @@ public class AST2BOpUtility {
 
         left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER),//
-                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF, namedSolutionSetRef),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF,
+                        namedSolutionSetRef),//
                 new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
-                );
+        );
 
         return left;
 
     }
-    
+
     /**
      * Add an explicit SPARQL 1.1 subquery into a join group.
      * <p>
@@ -683,7 +672,7 @@ public class AST2BOpUtility {
             final SubqueryRoot subquery, final AST2BOpContext ctx) {
 
         final boolean aggregate = isAggregate(subquery);
-        
+
         final PipelineOp subqueryPlan = convert(subquery, ctx);
 
         if (log.isInfoEnabled())
@@ -691,7 +680,7 @@ public class AST2BOpUtility {
 
         switch (subquery.getQueryType()) {
         case ASK: {
-            
+
             /*
              * The projection should have just one variable, which is the
              * variable that will be bound to true if there is a solution to the
@@ -710,7 +699,7 @@ public class AST2BOpUtility {
                         "Expecting ONE (1) projected variable for ASK subquery.");
 
             final IVariable<?> askVar = vars[0];
-            
+
             left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
@@ -724,9 +713,9 @@ public class AST2BOpUtility {
         case SELECT: {
 
             final ProjectionNode projection = subquery.getProjection();
-            
+
             final IVariable<?>[] vars = projection.getProjectionVars();
-            
+
             left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
@@ -734,9 +723,9 @@ public class AST2BOpUtility {
                     new NV(SubqueryOp.Annotations.SELECT, vars),//
                     new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
             );
-            
+
             break;
-            
+
         }
         default:
             throw new UnsupportedOperationException();
@@ -776,7 +765,7 @@ public class AST2BOpUtility {
 
         if (having != null && !having.isEmpty())
             return true;
-        
+
         if (projection != null) {
 
             for (IValueExpressionNode exprNode : projection) {
@@ -795,8 +784,8 @@ public class AST2BOpUtility {
 
         return false;
 
-	}
-	
+    }
+
     /**
      * Return <code>true</code> iff the {@link IValueExpression} is an obvious
      * aggregate (it uses an {@link IAggregate} somewhere within it). This is
@@ -821,15 +810,15 @@ public class AST2BOpUtility {
      */
     private static boolean isObviousAggregate(final IValueExpression<?> expr) {
 
-        if(expr instanceof IAggregate<?>)
+        if (expr instanceof IAggregate<?>)
             return true;
-        
+
         final Iterator<BOp> itr = expr.argIterator();
-        
+
         while (itr.hasNext()) {
 
             final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
-            
+
             if (arg != null) {
 
                 if (isObviousAggregate(arg)) // recursion.
@@ -838,11 +827,11 @@ public class AST2BOpUtility {
             }
 
         }
-        
+
         return false;
-        
+
     }
-	
+
     /**
      * Generate the query plan for a join group or union. This is invoked for
      * the top-level "WHERE" clause and may be invoked recursively for embedded
@@ -857,21 +846,21 @@ public class AST2BOpUtility {
             final IGroupNode<? extends IGroupMemberNode> groupNode,
             final AST2BOpContext ctx) {
 
-		if (groupNode instanceof UnionNode) {
-			
-			return convertUnion(left, (UnionNode) groupNode, ctx);
-			
-		} else if (groupNode instanceof JoinGroupNode) {
-			
-			return convertJoinGroup(left, (JoinGroupNode) groupNode, ctx);
-			
-		} else {
-		
-			throw new IllegalArgumentException();
-			
-		}
-		
-	}
+        if (groupNode instanceof UnionNode) {
+
+            return convertUnion(left, (UnionNode) groupNode, ctx);
+
+        } else if (groupNode instanceof JoinGroupNode) {
+
+            return convertJoinGroup(left, (JoinGroupNode) groupNode, ctx);
+
+        } else {
+
+            throw new IllegalArgumentException();
+
+        }
+
+    }
 
     /**
      * Generate the query plan for a union.
@@ -891,9 +880,8 @@ public class AST2BOpUtility {
      *         as an optional union, but we are not handling the optional
      *         property for a union right now.
      */
-	private static PipelineOp convertUnion(PipelineOp left,
-	        final UnionNode unionNode,
-			final AST2BOpContext ctx) {
+    private static PipelineOp convertUnion(PipelineOp left,
+            final UnionNode unionNode, final AST2BOpContext ctx) {
 
         if (unionNode.isOptional()) {
             /*
@@ -901,72 +889,70 @@ public class AST2BOpUtility {
              */
             log.warn("Optional union? : " + ctx.query.getQueryString());
         }
-	    
+
         final int arity = unionNode.size();
-        
+
         if (arity == 0) {
             /*
              * TODO We can probably just return [left]. The old evaluation
              * strategy code would translate an empty union into an empty
-             * iterator. That could be captured by a rewrite of the AST
-             * which recognizes and removes empty UNION nodes.
+             * iterator. That could be captured by a rewrite of the AST which
+             * recognizes and removes empty UNION nodes.
              */
-		    throw new IllegalArgumentException();
-		    
-		}
-		
+            throw new IllegalArgumentException();
+
+        }
+
         // The bopId for the UNION or STEP.
         final int thisId = ctx.nextId();
-        
+
         final BOp[] subqueries = new BOp[arity];
 
         int i = 0;
         for (IGroupMemberNode child : unionNode) {
-        	
+
             // convert the child
-        	if (child instanceof JoinGroupNode) {
-        		
+            if (child instanceof JoinGroupNode) {
+
                 subqueries[i++] = convertJoinGroup(null/* left */,
                         (JoinGroupNode) child, ctx);
-        		
-//        	} else if (child instanceof StatementPatternNode) {
-//        		
-//        		// allow lone statement patterns as children for unions,
-//        		// just use a dummy join group to ease the conversion process
-//        		
-//        		final IGroupNode dummyGroup = new JoinGroupNode(false);
-//        		dummyGroup.addChild(child);
-//
-//        		subqueries[i++] = convert(dummyGroup, ctx);
 
-        	} else {
-        		
-        		throw new RuntimeException(
-        				"Illegal child type for union: " + child.getClass());
-        		
-        	}
-			
+                // } else if (child instanceof StatementPatternNode) {
+                //
+                // // allow lone statement patterns as children for unions,
+                // // just use a dummy join group to ease the conversion process
+                //
+                // final IGroupNode dummyGroup = new JoinGroupNode(false);
+                // dummyGroup.addChild(child);
+                //
+                // subqueries[i++] = convert(dummyGroup, ctx);
+
+            } else {
+
+                throw new RuntimeException("Illegal child type for union: "
+                        + child.getClass());
+
+            }
+
         }
-        
+
         final LinkedList<NV> anns = new LinkedList<NV>();
         anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-        anns.add(new NV(Union.Annotations.SUBQUERIES,subqueries));
-        
-//      if (union.getParent() == null) {
-			anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-					BOpEvaluationContext.CONTROLLER));
-			anns.add(new NV(Union.Annotations.CONTROLLER, true));
-//      }
-        
-        final PipelineOp union = applyQueryHints(
-                new Union(leftOrEmpty(left),
-                        NV.asMap(anns.toArray(new NV[anns.size()]))),
-                ctx.queryHints);
-        
+        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+
+        // if (union.getParent() == null) {
+        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+                BOpEvaluationContext.CONTROLLER));
+        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+        // }
+
+        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
+                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+
         return union;
-		
-	}
-		
+
+    }
+
     /**
      * Join group consists of: statement patterns, constraints, and sub-groups
      * <p>
@@ -1014,25 +1000,26 @@ public class AST2BOpUtility {
      * 
      * TODO Think about how hash joins fit into this.
      */
-	private static PipelineOp convertJoinGroup(PipelineOp left,
-	        final JoinGroupNode joinGroup,
-			final AST2BOpContext ctx) {
+    private static PipelineOp convertJoinGroup(PipelineOp left,
+            final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
-//        /*
-//         * Place the StartOp at the beginning of the pipeline.
-//         * 
-//         * TODO We only need a start op on a cluster if there is a requirement
-//         * to marshall all solutions from a parent's evaluation context onto the
-//         * top-level query controller. I am not sure that we ever have to do
-//         * this for a subquery, but there might be cases where it is required.
-//         * For all other cases, we should begin with left := null. However,
-//         * there are cases where getParent() is running into a null reference
-//         * during query evaluation if [left := null] here. Look into and resolve
-//         * those issues.
-//         */
-//	    if(left == null)
-//	        left = addStartOp(ctx);
-        
+        // /*
+        // * Place the StartOp at the beginning of the pipeline.
+        // *
+        // * TODO We only need a start op on a cluster if there is a requirement
+        // * to marshall all solutions from a parent's evaluation context onto
+        // the
+        // * top-level query controller. I am not sure that we ever have to do
+        // * this for a subquery, but there might be cases where it is required.
+        // * For all other cases, we should begin with left := null. However,
+        // * there are cases where getParent() is running into a null reference
+        // * during query evaluation if [left := null] here. Look into and
+        // resolve
+        // * those issues.
+        // */
+        // if(left == null)
+        // left = addStartOp(ctx);
+
         /*
          * Add the pre-conditionals to the pipeline.
          * 
@@ -1072,7 +1059,7 @@ public class AST2BOpUtility {
         {
 
             /*
-             * Run service calls first. 
+             * Run service calls first.
              */
             for (IGroupMemberNode child : joinGroup) {
                 if (child instanceof ServiceNode) {
@@ -1142,13 +1129,13 @@ public class AST2BOpUtility {
             }
 
         }
-        
+
         /*
          * Add the subqueries (individual optional statement patterns, optional
          * join groups, and nested union).
          */
         left = addSubqueries(left, joinGroup, ctx);
-        
+
         /*
          * Add the LET assignments to the pipeline.
          * 
@@ -1175,8 +1162,8 @@ public class AST2BOpUtility {
         }
 
         return left;
-		
-	}
+
+    }
 
     /**
      * Adds a {@link StartOp}.
@@ -1188,70 +1175,66 @@ public class AST2BOpUtility {
      * be empty (a <code>null</code>). In this case, the {@link StartOp} just
      * copies its inputs to its outputs (which is all it ever does).
      */
-	private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
-		
+    private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
+
         final PipelineOp start = applyQueryHints(
-        		new StartOp(BOp.NOARGS,
-			        NV.asMap(new NV[] {//
-			              new NV(Predicate.Annotations.BOP_ID, 
-			            		  ctx.nextId()),
-			              new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-			                      BOpEvaluationContext.CONTROLLER),
-			        })), ctx.queryHints);
+                new StartOp(BOp.NOARGS, NV.asMap(new NV[] {//
+                                new NV(Predicate.Annotations.BOP_ID, ctx
+                                        .nextId()),
+                                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                        BOpEvaluationContext.CONTROLLER), })),
+                ctx.queryHints);
 
         return start;
-        
-	}
-	
+
+    }
+
     /**
      * Project select expressions (non-aggregation case).
      * 
      * FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
      * variable bindings during query evaluation). This is basically the last
-     * place where we can prune out variables which are not being projected.
-     * We need to do that here, but also incrementally.
+     * place where we can prune out variables which are not being projected. We
+     * need to do that here, but also incrementally.
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
-	        final List<AssignmentNode> assignments,
-	        final AST2BOpContext ctx){
-	    
+            final List<AssignmentNode> assignments, final AST2BOpContext ctx) {
+
         left = addAssignments(left, assignments, ctx, true/* projection */);
-        
+
         return left;
 
     }
-	
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
-	private static final PipelineOp addAssignments(PipelineOp left,    		
-    		final List<AssignmentNode> assignments,
-            final AST2BOpContext ctx,
+    private static final PipelineOp addAssignments(PipelineOp left,
+            final List<AssignmentNode> assignments, final AST2BOpContext ctx,
             final boolean projection) {
-	    
-		final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
-		for (AssignmentNode assignmentNode : assignments) {
+        final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
-			final IValueExpression ve = assignmentNode.getValueExpression();
-			
-			final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
-			
-			/*
-			 * Get the vars this filter needs materialized.
-			 */
+        for (AssignmentNode assignmentNode : assignments) {
+
+            final IValueExpression ve = assignmentNode.getValueExpression();
+
+            final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
+
+            /*
+             * Get the vars this filter needs materialized.
+             */
             vars.addAll(assignmentNode.getMaterializationRequirement()
                     .getVarsToMaterialize());
-			
-			/*
-			 * Remove the ones we've already done.
-			 */
-			vars.removeAll(done);
-			
+
+            /*
+             * Remove the ones we've already done.
+             */
+            vars.removeAll(done);
+
             final int bopId = ctx.nextId();
 
             final ConditionalBind b = new ConditionalBind(
                     assignmentNode.getVar(),
-                    assignmentNode.getValueExpression(),
-                    projection);
+                    assignmentNode.getValueExpression(), projection);
 
             IConstraint c = projection ? new ProjectedConstraint(b)
                     : new BindingConstraint(b);
@@ -1274,129 +1257,126 @@ public class AST2BOpUtility {
 
             }
 
-			left = applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(left),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, bopId),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                        })), ctx.queryHints);
-			
-		}
-		
-		return left;
-    	
+            left = applyQueryHints(
+                    new ConditionalRoutingOp(
+                            leftOrEmpty(left),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID, bopId),
+                                    new NV(
+                                            ConditionalRoutingOp.Annotations.CONDITION,
+                                            c), })), ctx.queryHints);
+
+        }
+
+        return left;
+
     }
-	
+
     @SuppressWarnings("rawtypes")
-    private static final PipelineOp addConditionals(PipelineOp left,    		
-    		final Collection<FilterNode> filters,
-            final AST2BOpContext ctx) {
+    private static final PipelineOp addConditionals(PipelineOp left,
+            final Collection<FilterNode> filters, final AST2BOpContext ctx) {
 
-		final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
+        final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
-		for (FilterNode filter : filters) {
+        for (FilterNode filter : filters) {
 
             @SuppressWarnings("unchecked")
             final IValueExpression<IV> ve = (IValueExpression<IV>) filter
                     .getValueExpression();
-			
-			final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
-			
-			/*
-			 * Get the vars this filter needs materialized.
-			 */
+
+            final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
+
+            /*
+             * Get the vars this filter needs materialized.
+             */
             vars.addAll(filter.getMaterializationRequirement()
                     .getVarsToMaterialize());
 
-			/*
-			 * Remove the ones we've already done.
-			 */
-			vars.removeAll(done);
-			
-			final int bopId = ctx.nextId();
+            /*
+             * Remove the ones we've already done.
+             */
+            vars.removeAll(done);
 
-			/*
-			 * We might have already materialized everything we need for this filter.
-			 */
-			if (vars.size() > 0) {
-				
-				left = addMaterializationSteps(left, bopId, ve, vars, ctx);
-			
-				/*
-				 * All the newly materialized vars to the set we've already done.
-				 */
-				done.addAll(vars);
-				
-			}
-		
+            final int bopId = ctx.nextId();
+
+            /*
+             * We might have already materialized everything we need for this
+             * filter.
+             */
+            if (vars.size() > 0) {
+
+                left = addMaterializationSteps(left, bopId, ve, vars, ctx);
+
+                /*
+                 * All the newly materialized vars to the set we've already
+                 * done.
+                 */
+                done.addAll(vars);
+
+            }
+
             final IConstraint c = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     ve);
-			
-			left = applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(left),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, bopId),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                        })), ctx.queryHints);
-			
-		}
-		
-		return left;
-    	
+
+            left = applyQueryHints(
+                    new ConditionalRoutingOp(
+                            leftOrEmpty(left),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID, bopId),
+                                    new NV(
+                                            ConditionalRoutingOp.Annotations.CONDITION,
+                                            c), })), ctx.queryHints);
+
+        }
+
+        return left;
+
     }
-    
+
     private static final PipelineOp addJoins(PipelineOp left,
-    		final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
+            final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
         @SuppressWarnings("rawtypes")
-    	final List<IPredicate> preds = new LinkedList<IPredicate>();
-    	
-    	for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
-    		preds.add(toPredicate(sp, ctx));
-    	}
+        final List<IPredicate> preds = new LinkedList<IPredicate>();
 
-    	// sometimes we get empty groups
-    	if (preds.size() == 0) {
-    		return left;
-    	}
-    	
-    	final List<IConstraint> constraints = new LinkedList<IConstraint>();
-    	
+        for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
+            preds.add(toPredicate(sp, ctx));
+        }
+
+        // sometimes we get empty groups
+        if (preds.size() == 0) {
+            return left;
+        }
+
+        final List<IConstraint> constraints = new LinkedList<IConstraint>();
+
         for (FilterNode filter : joinGroup.getJoinFilters()) {
 
             constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     filter.getValueExpression()));
-            
+
         }
-    	
-    	@SuppressWarnings("rawtypes")
-        final IRule rule = new Rule(
-    			"null", // name
-    			null, // head
-    			preds.toArray(new IPredicate[preds.size()]), // tails
-    			constraints.size() > 0 // constraints 
-    					? constraints.toArray(new IConstraint[constraints.size()]) 
-						: null
-				);
-    	
+
+        @SuppressWarnings("rawtypes")
+        final IRule rule = new Rule("null", // name
+                null, // head
+                preds.toArray(new IPredicate[preds.size()]), // tails
+                constraints.size() > 0 // constraints
+                ? constraints.toArray(new IConstraint[constraints.size()])
+                        : null);
+
         /*
          * FIXME Pull code up for this. (note that Rule2BOpUtility is also
          * handling materialization steps for joins.
          */
-    	left = Rule2BOpUtility.convert(
-    			rule,
-    			left,
-    			joinGroup.getIncomingBindings(), // knownBound
-    			ctx.idFactory,
-    			ctx.db,
-    			ctx.queryEngine,
-    			ctx.queryHints
-    			);
-    	
-    	return left;
-    	
+        left = Rule2BOpUtility.convert(rule, left,
+                joinGroup.getIncomingBindings(new LinkedHashSet<IVariable<?>>()), // knownBound
+                ctx.idFactory, ctx.db, ctx.queryEngine, ctx.queryHints);
+
+        return left;
+
     }
-    
+
     /**
      * Adds an optional join (prepared by the caller) in place of an optional
      * group having a join as its sole group member.
@@ -1418,31 +1398,24 @@ public class AST2BOpUtility {
     private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
             PipelineOp left, final Predicate<?> pred,
             final Collection<FilterNode> filters, final AST2BOpContext ctx) {
-    	
-//    	final Predicate pred = toPredicate(sp);
-    	
-    	final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
-    	
+
+        // final Predicate pred = toPredicate(sp);
+
+        final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+
         for (FilterNode filter : filters) {
-         
+
             constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     filter.getValueExpression()));
-            
+
         }
-    	
-    	// just for now
-    	left = Rule2BOpUtility.join(
-    			ctx.db, 
-    			ctx.queryEngine, 
-    			left, 
-    			pred,
-    			constraints,
-    			ctx.idFactory, 
-    			ctx.queryHints
-    			);
-    	
-    	return left;
-    	
+
+        // just for now
+        left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,
+                constraints, ctx.idFactory, ctx.queryHints);
+
+        return left;
+
     }
 
     /**
@@ -1456,50 +1429,98 @@ public class AST2BOpUtility {
      * @return
      */
     private static final PipelineOp addSubqueries(PipelineOp left,
-    		final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
+            final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
-    	/*
-    	 * First do the non-optional subgroups
-    	 */
-    	for (IGroupMemberNode child : joinGroup) {
-    		
+        /*
+         * First do the non-optional subgroups
+         */
+        for (IGroupMemberNode child : joinGroup) {
+
             if (!(child instanceof GraphPatternGroup<?>)) {
                 continue;
             }
-    		
+
             @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
 
-    		if (subgroup.isOptional()) {
-    			continue;
-    		}
-    		
-            final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */, subgroup, ctx);
-    		
-    		left = new SubqueryOp(leftOrEmpty(left), 
-                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
-                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),
-                    new NV(SubqueryOp.Annotations.OPTIONAL, false)
-            );
+            if (subgroup.isOptional()) {
+                continue;
+            }
 
-    	}
-    	
-    	/*
-    	 * Next do the optional sub-group 
-    	 */
-    	for (IGroupMemberNode child : joinGroup) {
-    		
+            final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
+                    subgroup, ctx);
+
+//            /*
+//             * FIXME BOTTOM UP EVALUATION
+//             * 
+//             * In order to be consistent with SPARQL's bottom up evaluation
+//             * semantics we sometimes have to "hide" binding for variables
+//             * which are already visible in the parent but which are not
+//             * used by the child group and, hence, would not be visible in
+//             * the child group if we were really using bottom up evaluation.
+//             * 
+//             * Bottom up evaluation is generally more a matter of adhering
+//             * to the SPARQL semantics for correctness than an issue of
+//             * practical concerns. In general, queries which do not have
+//             * variables shared at the various nesting levels are "badly
+//             * designed. Classic examples of this are discussed in section
+//             * 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
+//             * Pérez et al. Various examples of badly designed left joins
+//             * (this only shows up in the presence of optionals) are part of
+//             * the DAWG compliance test suite.
+//             * 
+//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
+//             * 
+//             * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
+//             */
+//            if (subgroup instanceof JoinGroupNode) {
+//
+//                final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
+//
+//                final IVariable<?>[] visibleVariables = subJoinGroup
+//                        .getMaybeProducedBindings().toArray(new IVariable[] {});
+//
+//                if (visibleVariables.length == 0) {
+//                    throw new UnsupportedOperationException(
+//                            "Nothing produced by group: " + subJoinGroup);
+//                }
+//                
+//                left = new SubqueryOp(leftOrEmpty(left), //
+//                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
+//                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
+//                        new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+//                        new NV(SubqueryOp.Annotations.SELECT, visibleVariables)//
+//                );
+//
+//            } else {
+//
+//                // UNION
+                left = new SubqueryOp(leftOrEmpty(left), //
+                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
+                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
+                        new NV(SubqueryOp.Annotations.OPTIONAL, false)//
+                );
+
+//            }
+
+        }
+
+        /*
+         * Next do the optional sub-groups.
+         */
+        for (IGroupMemberNode child : joinGroup) {
+
             if (!(child instanceof GraphPatternGroup<?>)) {
-    			continue;
-    		}
-    		
+                continue;
+            }
+
             @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
-    		
-    		if (!subgroup.isOptional()) {
-    			continue;
-    		}
-    		
+
+            if (!subgroup.isOptional()) {
+                continue;
+            }
+
             if (subgroup instanceof JoinGroupNode
                     && ((JoinGroupNode) subgroup).isSimpleOptional()) {
 
@@ -1507,39 +1528,88 @@ public class AST2BOpUtility {
                  * Optimize a simple join group as an optional join rather than
                  * a subquery.
                  */
-    		    
-    			final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
-    			
-    			final StatementPatternNode sp = subJoinGroup.getSimpleOptional();
-    			
-    			final Collection<FilterNode> filters = subJoinGroup.getFilters();
-    			
+
+                final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
+
+                final StatementPatternNode sp = subJoinGroup
+                        .getSimpleOptional();
+
+                final Collection<FilterNode> filters = subJoinGroup
+                        .getFilters();
+
                 final Predicate<?> pred = (Predicate<?>) toPredicate(sp, ctx)
                         .setProperty(IPredicate.Annotations.OPTIONAL,
                                 Boolean.TRUE);
-    			
-//    			final StatementPatternNode sp2 = new StatementPatternNode(pred);
-    			
+
                 left = addOptionalJoinForSingletonOptionalSubquery(left, pred,
                         filters, ctx);
 
-    		} else {
-    		
+            } else {
+
                 final PipelineOp subquery = convertJoinGroupOrUnion(
                         null/* left */, subgroup, ctx);
 
-	    		left = new SubqueryOp(leftOrEmpty(left), 
-	                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),
-	                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery),
-	                    new NV(SubqueryOp.Annotations.OPTIONAL, true)
-	            );
-	    		
-    		}
-    		
-    	}
-    	
-    	return left;
-    	
+//                /*
+//                 * FIXME BOTTOM UP EVALUATION
+//                 * 
+//                 * In order to be consistent with SPARQL's bottom up evaluation
+//                 * semantics we sometimes have to "hide" binding for variables
+//                 * which are already visible in the parent but which are not
+//                 * used by the child group and, hence, would not be visible in
+//                 * the child group if we were really using bottom up evaluation.
+//                 * 
+//                 * Bottom up evaluation is generally more a matter of adhering
+//                 * to the SPARQL semantics for correctness than an issue of
+//                 * practical concerns. In general, queries which do not have
+//                 * variables shared at the various nesting levels are "badly
+//                 * designed. Classic examples of this are discussed in section
+//                 * 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
+//                 * Pérez et al. Various examples of badly designed left joins
+//                 * (this only shows up in the presence of optionals) are part of
+//                 * the DAWG compliance test suite.
+//                 * 
+//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
+//                 * 
+//                 * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
+//                 */
+//                if (subgroup instanceof JoinGroupNode) {
+//
+//                    final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
+//
+//                    final IVariable<?>[] visibleVariables = subJoinGroup
+//                            .getMaybeProducedBindings().toArray(
+//                                    new IVariable[] {});
+//
+//                    if (visibleVariables.length == 0) {
+//                        throw new UnsupportedOperationException(
+//                                "Nothing produced by group: " + subJoinGroup);
+//                    }
+//                    
+//                    left = new SubqueryOp(leftOrEmpty(left), //
+//                            new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+//                            new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+//                            new NV(SubqueryOp.Annotations.OPTIONAL, true),//
+//                            new NV(SubqueryOp.Annotations.SELECT, visibleVariables)//
+//                    );
+//                    
+//                } else {
+//
+//                    // UNION
+
+                    left = new SubqueryOp(leftOrEmpty(left), //
+                            new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                            new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                            new NV(SubqueryOp.Annotations.OPTIONAL, true)//
+                    );
+
+//                }
+
+            }
+
+        }
+
+        return left;
+
     }
 
     /**
@@ -1554,15 +1624,16 @@ public class AST2BOpUtility {
      * back to that query controller.
      * 
      * TODO Should be conditional based on whether or not we are running on a
-     * cluster, but also see https://sourceforge.net/apps/trac/bigdata/ticket/227.
+     * cluster, but also see
+     * https://sourceforge.net/apps/trac/bigdata/ticket/227.
      */
-	private static final PipelineOp addEndOp(PipelineOp left,
-			final AST2BOpContext ctx) {
-		
+    private static final PipelineOp addEndOp(PipelineOp left,
+            final AST2BOpContext ctx) {
+
         if (ctx.isCluster()
                 && !left.getEvaluationContext().equals(
                         BOpEvaluationContext.CONTROLLER)) {
-	
+
             left = new EndOp(leftOrEmpty(left),//
                     NV.asMap(
                             //
@@ -1571,12 +1642,12 @@ public class AST2BOpUtility {
                                     BOpEvaluationContext.CONTROLLER)//
                     ));
 
-	    }
-		
-		return left;
-        
-	}
-	
+        }
+
+        return left;
+
+    }
+
     /**
      * Add DISTINCT semantics to the pipeline.
      * 
@@ -1592,56 +1663,64 @@ public class AST2BOpUtility {
     private static final PipelineOp addDistinct(PipelineOp left,
             final QueryBase query, final AST2BOpContext ctx) {
 
-		final int bopId = ctx.nextId();
-		
+        final int bopId = ctx.nextId();
+
         final ProjectionNode projection = query.getProjection();
 
         if (projection.isWildcard())
             throw new AssertionError("Wildcard projection was not rewritten.");
         final IVariable<?>[] vars = projection.getProjectionVars();
-//        /*
-//         * TODO This will find variables within subqueries as well. Those
-//         * variables are not really in scope. We should have a modified
-//         * getSpannedVariables() method which handles this (or maybe just modify
-//         * the version we already have to be scope aware).
-//         */
-//        final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
-//                .toArray(BOpUtility.getSpannedVariables((BOp) query
-//                        .getWhereClause())) : projection.getProjectionVars();
+        // /*
+        // * TODO This will find variables within subqueries as well. Those
+        // * variables are not really in scope. We should have a modified
+        // * getSpannedVariables() method which handles this (or maybe just
+        // modify
+        // * the version we already have to be scope aware).
+        // */
+        // final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
+        // .toArray(BOpUtility.getSpannedVariables((BOp) query
+        // .getWhereClause())) : projection.getProjectionVars();
 
-		final PipelineOp op;
-		if(ctx.nativeDistinct) {
-		    /*
-		     * DISTINCT on the JVM heap.
-		     */
-		    op = new DistinctBindingSetOp(//
-		            leftOrEmpty(left),// 
-	                NV.asMap(new NV[]{//
-	                    new NV(DistinctBindingSetOp.Annotations.BOP_ID, bopId),
-	                    new NV(DistinctBindingSetOp.Annotations.VARIABLES, vars),
-	                    new NV(DistinctBindingSetOp.Annotations.EVALUATION_CONTEXT,
-	                            BOpEvaluationContext.CONTROLLER),
-	                    new NV(DistinctBindingSetOp.Annotations.SHARED_STATE,
-	                            true),
-	                }));
-		} else {
-		    /*
-		     * DISTINCT on the native heap.
-		     */
-	        op = new DistinctBindingSetsWithHTreeOp(//
-	                leftOrEmpty(left),//
-	                NV.asMap(new NV[]{//
-	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,bopId),//
-	                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,vars),//
-	                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-	                            BOpEvaluationContext.CONTROLLER),//
-	                    new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-	                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-	                }));
-		}
-		
-    	left = applyQueryHints(op, ctx.queryHints);
-				
+        final PipelineOp op;
+        if (ctx.nativeDistinct) {
+            /*
+             * DISTINCT on the JVM heap.
+             */
+            op = new DistinctBindingSetOp(//
+                    leftOrEmpty(left),//
+                    NV.asMap(new NV[] {//
+                            new NV(DistinctBindingSetOp.Annotations.BOP_ID,
+                                    bopId),
+                            new NV(DistinctBindingSetOp.Annotations.VARIABLES,
+                                    vars),
+                            new NV(
+                                    DistinctBindingSetOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),
+                            new NV(
+                                    DistinctBindingSetOp.Annotations.SHARED_STATE,
+                                    true), }));
+        } else {
+            /*
+             * DISTINCT on the native heap.
+             */
+            op = new DistinctBindingSetsWithHTreeOp(//
+                    leftOrEmpty(left),//
+                    NV.asMap(new NV[] {//
+                            new NV(
+                                    DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,
+                                    bopId),//
+                            new NV(
+                                    DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,
+                                    vars),//
+                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    }));
+        }
+
+        left = applyQueryHints(op, ctx.queryHints);
+
         return left;
 
     }
@@ -1669,15 +1748,15 @@ public class AST2BOpUtility {
     private static final PipelineOp addAggregation(PipelineOp left,
             final ProjectionNode projection, final GroupByNode groupBy,
             final HavingNode having, final AST2BOpContext ctx) {
-        
+
         final IValueExpression<?>[] projectExprs = projection
                 .getValueExpressions();
 
         final IValueExpression<?>[] groupByExprs = groupBy == null ? null
                 : groupBy.getValueExpressions();
 
-        final IConstraint[] havingExprs = having == null ? null
-                : having.getConstraints();
+        final IConstraint[] havingExprs = having == null ? null : having
+                .getConstraints();
 
         final IGroupByState groupByState = new GroupByState(projectExprs,
                 groupByExprs, havingExprs);
@@ -1688,7 +1767,7 @@ public class AST2BOpUtility {
         final int bopId = ctx.nextId();
 
         final GroupByOp op;
-        
+
         /*
          * TODO Review. I believe that AssignmentNode.getValueExpression()
          * should always return the Bind().
@@ -1696,18 +1775,18 @@ public class AST2BOpUtility {
         final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
         if (projectExprs != null) {
-            
+
             for (IValueExpression expr : projectExprs) {
-                
+
                 if (expr instanceof Bind) {
-                
+
                     vars.add(((Bind) expr).getVar());
-                
+
                     // Note: side-effect on expr!
                     expr = ((Bind) expr).getExpr();
-                    
+
                 }
-                
+
                 if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
@@ -1734,8 +1813,8 @@ public class AST2BOpUtility {
                     // Note: side-effect on expr.
                     expr = ((Bind) expr).getExpr();
 
-                } 
-                
+                }
+
                 if (expr instanceof IVariable<?>) {
 
                     vars.add((IVariable<IV>) expr);
@@ -1772,16 +1851,18 @@ public class AST2BOpUtility {
 
             op = new PipelinedAggregationOp(leftOrEmpty(left),//
                     NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, bopId),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.PIPELINED, true),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                    new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
-                    new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
-            }));
+                            new NV(BOp.Annotations.BOP_ID, bopId),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.PIPELINED, true),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(GroupByOp.Annotations.GROUP_BY_STATE,
+                                    groupByState), //
+                            new NV(GroupByOp.Annotations.GROUP_BY_REWRITE,
+                                    groupByRewrite), //
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                    }));
 
         } else {
 
@@ -1796,25 +1877,26 @@ public class AST2BOpUtility {
              * (The code for this is either on the CI machine or the
              * workstation). BBT 8/17/2011.
              */
-            
+
             op = new MemoryGroupByOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, bopId),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.PIPELINED, false),//
-                    new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
-                    new NV(GroupByOp.Annotations.GROUP_BY_STATE, groupByState), //
-                    new NV(GroupByOp.Annotations.GROUP_BY_REWRITE, groupByRewrite), //
-            }));
+                            new NV(BOp.Annotations.BOP_ID, bopId),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.PIPELINED, false),//
+                            new NV(PipelineOp.Annotations.MAX_MEMORY, 0),//
+                            new NV(GroupByOp.Annotations.GROUP_BY_STATE,
+                                    groupByState), //
+                            new NV(GroupByOp.Annotations.GROUP_BY_REWRITE,
+                                    groupByRewrite), //
+                    }));
 
         }
-        
+
         left = applyQueryHints(op, ctx.queryHints);
 
         return left;
-        
+
     }
-    
 
     /**
      * TODO Minor optimization: A bare constant in the ORDER BY value expression
@@ -1822,91 +1904,98 @@ public class AST2BOpUtility {
      * the entire ORDER BY operation should be dropped.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-	private static final PipelineOp addOrderBy(PipelineOp left,
-			final OrderByNode orderBy, final AST2BOpContext ctx) {
-		
-		final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
-		
+    private static final PipelineOp addOrderBy(PipelineOp left,
+            final OrderByNode orderBy, final AST2BOpContext ctx) {
+
+        final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
+
         final ISortOrder<IV>[] sortOrders = new ISortOrder[orderBy.size()];
-		
-		final Iterator<OrderByExpr> it = orderBy.iterator();
-		
-		for (int i = 0; it.hasNext(); i++) {
-			
-    		final OrderByExpr orderByExpr = it.next();
-    		
-    		IValueExpression<?> expr = orderByExpr.getValueExpression();
-    		
-    		if(!(expr instanceof IVariableOrConstant<?> && !(expr instanceof IBind))) {
-    		
+
+        final Iterator<OrderByExpr> it = orderBy.iterator();
+
+        for (int i = 0; it.hasNext(); i++) {
+
+            final OrderByExpr orderByExpr = it.next();
+
+            IValueExpression<?> expr = orderByExpr.getValueExpression();
+
+            if (!(expr instanceof IVariableOrConstant<?> && !(expr instanceof IBind))) {
+
                 /*
                  * Wrap the expression with a BIND of an anonymous variable.
                  */
-    		    
+
                 expr = new Bind(Var.var(), expr);
-    		    
-    		}
-    		
-    		if (expr instanceof IVariable<?>) {
+
+            }
+
+            if (expr instanceof IVariable<?>) {
 
                 vars.add((IVariable<IV>) expr);
 
-            } else  {
+            } else {
 
-                ComputedMaterializationRequirement.gatherVarsToMaterialize(expr, vars);
-                
+                ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                        expr, vars);
+
             }
 
             sortOrders[i] = new SortOrder(expr, orderByExpr.isAscending());
-    		
-		}
-		
-		final int sortId = ctx.nextId();
-		
-		left = addMaterializationSteps(left, sortId, vars, ctx);
-		
-    	left = applyQueryHints(new MemorySortOp(leftOrEmpty(left), 
-    			NV.asMap(new NV[] {//
-	                new NV(MemorySortOp.Annotations.BOP_ID, sortId),//
-                    new NV(MemorySortOp.Annotations.SORT_ORDER, sortOrders),//
-                    new NV(MemorySortOp.Annotations.VALUE_COMPARATOR, new IVComparator()),//
-                    new NV(MemorySortOp.Annotations.EVALUATION_CONTEXT,
-	                       BOpEvaluationContext.CONTROLLER),//
-	                new NV(MemorySortOp.Annotations.PIPELINED, true),//
-	                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
-                    new NV(MemorySortOp.Annotations.LAST_PASS, true),//
-    			})), ctx.queryHints);
 
-		
-    	return left;
-		
-	}
-			
+        }
+
+        final int sortId = ctx.nextId();
+
+        left = addMaterializationSteps(left, sortId, vars, ctx);
+
+        left = applyQueryHints(
+                new MemorySortOp(
+                        leftOrEmpty(left),
+                        NV.asMap(new NV[] {//
+                                new NV(MemorySortOp.Annotations.BOP_ID, sortId),//
+                                new NV(MemorySortOp.Annotations.SORT_ORDER,
+                                        sortOrders),//
+                                new NV(
+                                        MemorySortOp.Annotations.VALUE_COMPARATOR,
+                                        new IVComparator()),//
+                                new NV(
+                                        MemorySortOp.Annotations.EVALUATION_CONTEXT,
+                                        BOpEvaluationContext.CONTROLLER),//
+                                new NV(MemorySortOp.Annotations.PIPELINED, true),//
+                                new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                                new NV(MemorySortOp.Annotations.SHARED_STATE,
+                                        true),//
+                                new NV(MemorySortOp.Annotations.LAST_PASS, true),//
+                        })), ctx.queryHints);
+
+        return left;
+
+    }
+
     /**
      * Impose an OFFSET and/or LIMIT on a query.
      */
     private static final PipelineOp addSlice(PipelineOp left,
             final SliceNode slice, final AST2BOpContext ctx) {
 
-		final int bopId = ctx.nextId();
-		
-    	left = applyQueryHints(new SliceOp(leftOrEmpty(left),
-    			NV.asMap(new NV[] { 
-					new NV(SliceOp.Annotations.BOP_ID, bopId),
-					new NV(SliceOp.Annotations.OFFSET, slice.getOffset()),
-					new NV(SliceOp.Annotations.LIMIT, slice.getLimit()),
-	                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-	                        BOpEvaluationContext.CONTROLLER),//
-	                new NV(SliceOp.Annotations.PIPELINED, false),//
-	                new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
-    			})), ctx.queryHints);
+        final int bopId = ctx.nextId();
 
-    	return left;
-		
-	}
-			
+        left = applyQueryHints(
+                new SliceOp(leftOrEmpty(left), NV.asMap(new NV[] {
+                        new NV(SliceOp.Annotations.BOP_ID, bopId),
+                        new NV(SliceOp.Annotations.OFFSET, slice.getOffset()),
+                        new NV(SliceOp.Annotations.LIMIT, slice.getLimit()),
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(SliceOp.Annotations.PIPELINED, false),//
+                        new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+                })), ctx.queryHints);
+
+        return left;
+
+    }
+
     /**
      * Apply any query hints to the operator as annotations of that operator.
      * 
@@ -1949,7 +2038,7 @@ public class AST2BOpUtility {
         }
 
         return op;
-        
+
     }
 
     /**
@@ -1966,25 +2055,28 @@ public class AST2BOpUtility {
      * latency to "fix"?
      */
     @SuppressWarnings("rawtypes")
-    private static PipelineOp addMaterializationSteps(
-    		PipelineOp left, final int rightId, final IValueExpression<IV> ve,
-    		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
+    private static PipelineOp addMaterializationSteps(PipelineOp left,
+            final int rightId, final IValueExpression<IV> ve,
+            final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
         final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                 new NeedsMaterializationBOp(ve));
 
-		left = applyQueryHints(
-          	    new ConditionalRoutingOp(leftOrEmpty(left),
-                    NV.asMap(new NV[]{//
-                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),
-                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
-                        new NV(PipelineOp.Annotations.ALT_SINK_REF, rightId),
-                    })), ctx.queryHints);
-    	
-    	return addMaterializationSteps(left, rightId, vars, ctx);
-    	
+        left = applyQueryHints(
+                new ConditionalRoutingOp(
+                        leftOrEmpty(left),
+                        NV.asMap(new NV[] {//
+                                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),
+                                new NV(
+                                        ConditionalRoutingOp.Annotations.CONDITION,
+                                        c2),
+                                new NV(PipelineOp.Annotations.ALT_SINK_REF,
+                                        rightId), })), ctx.queryHints);
+
+        return addMaterializationSteps(left, rightId, vars, ctx);
+
     }
-    
+
     /**
      * Adds a series of materialization steps to materialize terms needed
      * downstream. To materialize the variable <code>?term</code>, the pipeline
@@ -2012,244 +2104,260 @@ public class AST2BOpUtility {
      *            follows the materialization steps
      * @param vars
      *            the terms to materialize
-     *            
+     * 
      * @return the final bop added to the pipeline by this method
      */
     @SuppressWarnings("rawtypes")
-    private static PipelineOp addMaterializationSteps(
-    		PipelineOp left, final int rightId,
-    		final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
+    private static PipelineOp addMaterializationSteps(PipelineOp left,
+            final int rightId, final Collection<IVariable<IV>> vars,
+            final AST2BOpContext ctx) {
 
-    	final Iterator<IVariable<IV>> it = vars.iterator();
-    	
-    	int firstId = ctx.nextId();
-    	
-    	while (it.hasNext()) {
-    		
-    		final IVariable<IV> v = it.next();
-    	
-    		final int condId1 = firstId;
-    		final int condId2 = ctx.nextId();
-    		final int inlineMaterializeId = ctx.nextId();
+        final Iterator<IVariable<IV>> it = vars.iterator();
+
+        int firstId = ctx.nextId();
+
+        while (it.hasNext()) {
+
+            final IVariable<IV> v = it.next();
+
+            final int condId1 = firstId;
+            final int condId2 = ctx.nextId();
+            final int inlineMaterializeId = ctx.nextId();
             final int lexJoinId = ctx.nextId();
-            
+
             final int endId;
-            
-    		if (!it.hasNext()) {
-            	
-				/*
-				 * If there are no more terms to materialize, the terminus of
-				 * this materialization pipeline is the "right" (downstream)
-				 * operator that was passed in.
-				 */
-    			endId = rightId;
-    			
-    		} else {
-    			
-    			/* 
-    			 * If there are more terms, the terminus of this materialization
-    			 * pipeline is the 1st operator of the next materialization
-    			 * pipeline.
-    			 */
-    			endId = firstId = ctx.nextId();
-    			
-    		}
-    		
+
+            if (!it.hasNext()) {
+
+                /*
+                 * If there are no more terms to materialize, the terminus of
+                 * this materialization pipeline is the "right" (downstream)
+                 * operator that was passed in.
+                 */
+                endId = rightId;
+
+            } else {
+
+                /*
+                 * If there are more terms, the terminus of this materialization
+                 * pipeline is the 1st operator of the next materialization
+                 * pipeline.
+                 */
+                endId = firstId = ctx.nextId();
+
+            }
+
             final IConstraint c1 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     new IsMaterializedBOp(v, false/* materialized */));
-    		
+
             final PipelineOp condOp1 = applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(left),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, condId1),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c1),
-                            new NV(PipelineOp.Annotations.SINK_REF, condId2),
-                            new NV(PipelineOp.Annotations.ALT_SINK_REF, endId),
-                        })), ctx.queryHints);
-         
+                    new ConditionalRoutingOp(
+                            leftOrEmpty(left),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID, condId1),
+                                    new NV(
+                                            ConditionalRoutingOp.Annotations.CONDITION,
+                                            c1),
+                                    new NV(PipelineOp.Annotations.SINK_REF,
+                                            condId2),
+                                    new NV(PipelineOp.Annotations.ALT_SINK_REF,
+                                            endId), })), ctx.queryHints);
+
             if (log.isDebugEnabled()) {
-          	    log.debug("adding 1st conditional routing op: " + condOp1);
+                log.debug("adding 1st conditional routing op: " + condOp1);
             }
-        	
+
             final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     new IsInlineBOp(v, true/* inline */));
 
             final PipelineOp condOp2 = applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(condOp1),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, condId2),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
-                            new NV(PipelineOp.Annotations.SINK_REF, inlineMaterializeId),
-                            new NV(PipelineOp.Annotations.ALT_SINK_REF, lexJoinId),
-                        })), ctx.queryHints);
-         
+                    new ConditionalRoutingOp(
+                            leftOrEmpty(condOp1),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID, condId2),
+                                    new NV(
+                                            ConditionalRoutingOp.Annotations.CONDITION,
+                                            c2),
+                                    new NV(PipelineOp.Annotations.SINK_REF,
+                                            inlineMaterializeId),
+                                    new NV(PipelineOp.Annotations.ALT_SINK_REF,
+                                            lexJoinId), })), ctx.queryHints);
+
             if (log.isDebugEnabled()) {
-          	    log.debug("adding 2nd conditional routing op: " + condOp2);
+                log.debug("adding 2nd conditional routing op: " + condOp2);
             }
-            
-			final Predicate lexPred;
-			{
-				
-				/*
-				 * Note: Use the timestamp of the triple store view unless this
-				 * is a read/write transaction, in which case we need to use the
-				 * unisolated view in order to see any writes which it may have
-				 * performed (lexicon writes are always unisolated).
-				 */
-				
-				long timestamp = ctx.db.getTimestamp();
-				if (TimestampUtility.isReadWriteTx(timestamp))
-					timestamp = ITx.UNISOLATED;
-				
-				final String ns = ctx.db.getLexiconRelation().getNamespace();
-				
-				lexPred = LexPredicate.reverseInstance(ns, timestamp, v);
-				
-			}
-            
+
+            final Predicate lexPred;
+            {
+
+                /*
+                 * Note: Use the timestamp of the triple store view unless this
+                 * is a read/write transaction, in which case we need to use the
+                 * unisolated view in order to see any writes which it may have
+                 * performed (lexicon writes are always unisolated).
+                 */
+
+                long timestamp = ctx.db.getTimestamp();
+                if (TimestampUtility.isReadWriteTx(timestamp))
+                    timestamp = ITx.UNISOLATED;
+
+                final String ns = ctx.db.getLexiconRelation().getNamespace();
+
+                lexPred = LexPredicate.reverseInstance(ns, timestamp, v);
+
+            }
+
             if (log.isDebugEnabled()) {
-          	    log.debug("lex pred: " + lexPred);
+                log.debug("lex pred: " + lexPred);
             }
-            
+
             final PipelineOp inlineMaterializeOp = applyQueryHints(
-              	    new InlineMaterializeOp(leftOrEmpty(condOp2),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, inlineMaterializeId),
-                            new NV(InlineMaterializeOp.Annotations.PREDICATE, lexPred.clone()),
-                            new NV(PipelineOp.Annotations.SINK_REF, endId),
-                        })), ctx.queryHints);
+                    new InlineMaterializeOp(
+                            leftOrEmpty(condOp2),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID,
+                                            inlineMaterializeId),
+                                    new NV(
+                                            InlineMaterializeOp.Annotations.PREDICATE,
+                                            lexPred.clone()),
+                                    new NV(PipelineOp.Annotations.SINK_REF,
+                                            endId), })), ctx.queryHints);
 
             if (log.isDebugEnabled()) {
-          	    log.debug("adding inline materialization op: " + inlineMaterializeOp);
+                log.debug("adding inline materialization op: "
+                        + inlineMaterializeOp);
             }
-            
+
             final PipelineOp lexJoinOp = applyQueryHints(
-		      	    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
-		                NV.asMap(new NV[]{//
-		                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
-		                    new NV(PipelineJoin.Annotations.PREDICATE, lexPred.clone()),
-                            new NV(PipelineOp.Annotations.SINK_REF, endId),
-		                })), ctx.queryHints);
+                    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
+                            NV.asMap(new NV[] {//
+                                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
+                                    new NV(PipelineJoin.Annotations.PREDICATE,
+                                            lexPred.clone()),
+                                    new NV(PipelineOp.Annotations.SINK_REF,
+                                            endId), })), ctx.queryHints);
 
             if (log.isDebugEnabled()) {
-          	    log.debug("adding lex join op: " + lexJoinOp);
+                log.debug("adding lex join op: " + lexJoinOp);
             }
-            
+
             left = lexJoinOp;
-            
-    	}
-        
-    	return left;
-    	
+
+        }
+
+        return left;
+
     }
 
-//    /**
-//     * Return an array indicating the {@link IKeyOrder} that will be used when
-//     * reading on each of the tail predicates. The array is formed using a
-//     * private {@link IBindingSet} and propagating fake bindings to each
-//     * predicate in turn using the given evaluation order.
-//     * 
-//     * @param order
-//     *            The evaluation order.
-//     * @param nvars
-//     *            The #of unbound variables for each tail predicate is assigned
-//     *            by side-effect.
-//     * 
-//     * @return An array of the {@link IKeyOrder}s for each tail predicate. The
-//     *         array is correlated with the predicates index in the tail of the
-//     *         rule NOT its evaluation order.
-//     */
-//    @SuppressWarnings({ "rawtypes" })
-//    static private IKeyOrder[] computeKeyOrderForEachTail(final List<Predicate> preds,
-//            final BOpContextBase context, final int[] order, final int[] nvars) {
-//
-//        if (order == null)
-//            throw new IllegalArgumentException();
-//
-//        if (order.length != preds.size())
-//            throw new IllegalArgumentException();
-//
-//        final int tailCount = preds.size();
-//
-//        final IKeyOrder[] a = new IKeyOrder[tailCount];
-//        
-//        final IBindingSet bindingSet = new HashBindingSet();
-//        
-//        final IConstant<IV> fakeTermId = new Constant<IV>(TermId.mockIV(VTE.URI));
-//        
-//        for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
-//
-//            final int tailIndex = order[orderIndex];
-//
-//            final IPredicate pred = preds.get(tailIndex);
-//
-//            final IRelation rel = context.getRelation(pred);
-//            
-//            final IPredicate asBound = pred.asBound(bindingSet);
-//            
-//            final IKeyOrder keyOrder = context.getAccessPath(
-//                    rel, asBound).getKeyOrder();
-//
-//            if (log.isDebugEnabled())
-//                log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
-//                        + ", tailIndex=" + orderIndex + ", pred=" + pred
-//                        + ", bindingSet=" + bindingSet + ", preds=" +
-//                        Arrays.toString(preds.toArray()));
-//
-//            // save results.
-//            a[tailIndex] = keyOrder;
-//            nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
-//                    : asBound.getVariableCount((IKeyOrder) keyOrder);
-//
-//            final int arity = pred.arity();
-//
-//            for (int j = 0; j < arity; j++) {
-//
-//                final IVariableOrConstant<?> t = pred.get(j);
-//
-//                if (t.isVar()) {
-//
-//                    final IVariable<?> var = (IVariable<?>) t;
-//
-//                    if (log.isDebugEnabled()) {
-//
-//                        log.debug("Propagating binding: pred=" + pred
-//                                        + ", var=" + var + ", bindingSet="
-//                                        + bindingSet);
-//                        
-//                    }
-//                    
-//                    bindingSet.set(var, fakeTermId);
-//
-//                }
-//
-//            }
-//
-//        }
-//
-//        if (log.isDebugEnabled()) {
-//
-//            log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
-//                    + Arrays.toString(nvars) + ", preds=" + 
-//                    Arrays.toString(preds.toArray()));
-//
-//        }
-//
-//        return a;
-//
-//    }
+    // /**
+    // * Return an array indicating the {@link IKeyOrder} that will be used when
+    // * reading on each of the tail predicates. The array is formed using a
+    // * private {@link IBindingSet} and propagating fake bindings to each
+    // * predicate in turn using the given evaluation order.
+    // *
+    // * @param order
+    // * The evaluation order.
+    // * @param nvars
+    // * The #of unbound variables for each tail predicate is assigned
+    // * by side-effect.
+    // *
+    // * @return An array of the {@link IKeyOrder}s for each tail predicate. The
+    // * array is correlated with the predicates index in the tail of the
+    // * rule NOT its evaluation order.
+    // */
+    // @SuppressWarnings({ "rawtypes" })
+    // static private IKeyOrder[] computeKeyOrderForEachTail(final
+    // List<Predicate> preds,
+    // final BOpContextBase context, final int[] order, final int[] nvars) {
+    //
+    // if (order == null)
+    // throw new IllegalArgumentException();
+    //
+    // if (order.length != preds.size())
+    // throw new IllegalArgumentException();
+    //
+    // final int tailCount = preds.size();
+    //
+    // final IKeyOrder[] a = new IKeyOrder[tailCount];
+    //
+    // final IBindingSet bindingSet = new HashBindingSet();
+    //
+    // final IConstant<IV> fakeTermId = new
+    // Constant<IV>(TermId.mockIV(VTE.URI));
+    //
+    // for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
+    //
+    // final int tailIndex = order[orderIndex];
+    //
+    // final IPredicate pred = preds.get(tailIndex);
+    //
+    // final IRelation rel = context.getRelation(pred);
+    //
+    // final IPredicate asBound = pred.asBound(bindingSet);
+    //
+    // final IKeyOrder keyOrder = context.getAccessPath(
+    // rel, asBound).getKeyOrder();
+    //
+    // if (log.isDebugEnabled())
+    // log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
+    // + ", tailIndex=" + orderIndex + ", pred=" + pred
+    // + ", bindingSet=" + bindingSet + ", preds=" +
+    // Arrays.toString(preds.toArray()));
+    //
+    // // save results.
+    // a[tailIndex] = keyOrder;
+    // nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
+    // : asBound.getVariableCount((IKeyOrder) keyOrder);
+    //
+    // final int arity = pred.arity();
+    //
+    // for (int j = 0; j < arity; j++) {
+    //
+    // final IVariableOrConstant<?> t = pred.get(j);
+    //
+    // if (t.isVar()) {
+    //
+    // final IVariable<?> var = (IVariable<?>) t;
+    //
+    // if (log.isDebugEnabled()) {
+    //
+    // log.debug("Propagating binding: pred=" + pred
+    // + ", var=" + var + ", bindingSet="
+    // + bindingSet);
+    //
+    // }
+    //
+    // bindingSet.set(var, fakeTermId);
+    //
+    // }
+    //
+    // }
+    //
+    // }
+    //
+    // if (log.isDebugEnabled()) {
+    //
+    // log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
+    // + Arrays.toString(nvars) + ", preds=" +
+    // Arrays.toString(preds.toArray()));
+    //
+    // }
+    //
+    // return a;
+    //
+    // }
 
     @SuppressWarnings("rawtypes")
-    private static final Predicate toPredicate(
-    		final StatementPatternNode sp, final AST2BOpContext ctx) {
-    	
-    	final AbstractTripleStore database = ctx.db;
-    	
-    	final DatasetNode dataset = ctx.query.getDataset();
-    	
+    private static final Predicate toPredicate(final StatementPatternNode sp,
+            final AST2BOpContext ctx) {
+
+        final AbstractTripleStore database = ctx.db;
+
+        final DatasetNode dataset = ctx.query.getDataset();
+
         // create a solution expander for free text search if necessary
         IAccessPathExpander<ISPO> expander = null;
-        
+
         final Value predValue = sp.p().getValue();
         if (log.isDebugEnabled()) {
             log.debug(predValue);
@@ -2264,7 +2372,7 @@ public class AST2BOpUtility {
                         (Literal) objValue);
             }
         }
-        
+
         // @todo why is [s] handled differently?
         // because [s] is the variable in free text searches, no need to test
         // to see if the free text search expander is in place
@@ -2272,7 +2380,7 @@ public class AST2BOpUtility {
         if (s == null) {
             return null;
         }
-        
+
         final IVariableOrConstant<IV> p;
         if (expander == null) {
             p = sp.p().getValueExpression();
@@ -2282,7 +2390,7 @@ public class AST2BOpUtility {
         if (p == null) {
             return null;
         }
-        
+
         final IVariableOrConstant<IV> o;
         if (expander == null) {
             o = sp.o().getValueExpression();
@@ -2292,12 +2400,12 @@ public class AST2BOpUtility {
         if (o == null) {
             return null;
         }
-        
+
         // The annotations for the predicate.
         final List<NV> anns = new LinkedList<NV>();
-        
+
         final IVariableOrConstant<IV> c;
-        
+
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
@@ -2344,7 +2452,7 @@ public class AST2BOpUtility {
                 anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp
                         .getScope()));
                 if (dataset == null) {
-                    // attach the appropriate expander : @todo drop expanders. 
+                    // attach the appropriate expander : @todo drop expanders.
                     if (cvar == null) {
                         /*
                          * There is no dataset and there is no graph variable,
@@ -2374,19 +2482,21 @@ public class AST2BOpUtility {
                     // attach the DataSet.
                     anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
                             dataset));
-                    // attach the appropriate expander : @todo drop expanders. 
+                    // attach the appropriate expander : @todo drop expanders.
                     switch (sp.getScope()) {
                     case DEFAULT_CONTEXTS: {
-                        if(dataset.getDefaultGraphs()!=null){
-                        /*
-                         * Query against the RDF merge of zero or more source
-                         * graphs.
-                         */
-                        expander = new DefaultGraphSolutionExpander(dataset
-                                .getDefaultGraphs().getGraphs());
-                        }else if(dataset.getDefaultGraphFilter()!=null){
-                            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
-                                    ElementFilter.newInstance(dataset.getDefaultGraphFilter())));
+                        if (dataset.getDefaultGraphs() != null) {
+                            /*
+                             * Query against the RDF merge of zero or more
+                             * source graphs.
+                             */
+                            expander = new DefaultGraphSolutionExpander(dataset
+                                    .getDefaultGraphs().getGraphs());
+                        } else if (dataset.getDefaultGraphFilter() != null) {
+                            anns.add(new NV(
+                                    IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                    ElementFilter.newInstance(dataset
+                                            .getDefaultGraphFilter())));
                         }
                         /*
                          * Note: cvar can not become bound since context is
@@ -2399,15 +2509,17 @@ public class AST2BOpUtility {
                         break;
                     }
                     case NAMED_CONTEXTS: {
-                        if(dataset.getNamedGraphs()!=null){
-                        /*
-                         * Query against zero or more named graphs.
-                         */
-                        expander = new NamedGraphSolutionExpander(dataset
-                                .getNamedGraphs().getGraphs());
-                        }else if(dataset.getNamedGraphFilter()!=null){
-                            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
-                                    ElementFilter.newInstance(dataset.getNamedGraphFilter())));
+                        if (dataset.getNamedGraphs() != null) {
+                            /*
+                             * Query against zero or more named graphs.
+                             */
+                            expander = new NamedGraphSolutionExpander(dataset
+                                    .getNamedGraphs().getGraphs());
+                        } else if (dataset.getNamedGraphFilter() != null) {
+                            anns.add(new NV(
+                                    IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                    ElementFilter.newInstance(dataset
+                                            .getNamedGraphFilter())));
                         }
                         if (cvar == null) {// || !cvar.hasValue()) {
                             c = null;
@@ -2449,7 +2561,7 @@ public class AST2BOpUtility {
 
         anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
                 new String[] { database.getSPORelation().getNamespace() }));//
-        
+
         // filter on elements visited by the access path.
         if (filter != null)
             anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
@@ -2457,11 +2569,12 @@ public class AST2BOpUtility {
 
         // free text search expander or named graphs expander
         if (expander != null)
-            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER, expander));
+            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                    expander));
 
         // timestamp
-        anns.add(new NV(Annotations.TIMESTAMP, database
-                .getSPORelation().getTimestamp()));
+        anns.add(new NV(Annotations.TIMESTAMP, database.getSPORelation()
+                .getTimestamp()));
 
         /*
          * Explicitly set the access path / iterator flags.
@@ -2477,17 +2590,17 @@ public class AST2BOpUtility {
          */
         anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
                 | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
-        
+
         return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
-//        return new SPOPredicate(
-//                new String[] { database.getSPORelation().getNamespace() },
-//                -1, // partitionId
-//                s, p, o, c,
-//                optional, // optional
-//                filter, // filter on elements visited by the access path.
-//                expander // free text search expander or named graphs expander
-//                );
-    	
+        // return new SPOPredicate(
+        // new String[] { database.getSPORelation().getNamespace() },
+        // -1, // partitionId
+        // s, p, o, c,
+        // optional, // optional
+        // filter, // filter on elements visited by the access path.
+        // expander // free text search expander or named graphs expander
+        // );
+
     }
 
     /**
@@ -2501,9 +2614,9 @@ public class AST2BOpUtility {
     static private BOp[] leftOrEmpty(final PipelineOp left) {
 
         return left == null ? BOp.NOARGS : new BOp[] { left };
-        
+
     }
-    
+
     /**
      * Convert an {@link IValueExpressionNode} (recursively) to an
      * {@link IValueExpression}.
@@ -2512,66 +2625,67 @@ public class AST2BOpUtility {
      *            The lexicon namespace.
      * @param node
      *            The expression to convert.
-     *            
+     * 
      * @return The converted expression.
      */
-    public static final IValueExpression<? extends IV> toVE(
-    		final String lex, final IValueExpressionNode node) {
+    public static final IValueExpression<? extends IV> toVE(final String lex,
+            final IValueExpressionNode node) {
 
-    	/*
-    	 * Check to see if value expression has already been created and
-    	 * cached on node.
-    	 */
-    	if (node.getValueExpression() != null) {
-    		
-    		return node.getValueExpression();
-    		
-    	}
-    	
-    	if (node instanceof VarNode) {
-    		
-    		return node.getValueExpression();
-    		
-    	} else if (node instanceof ConstantNode) {
-    		
-    		return node.getValueExpression();
-    		
-    	} else if (node instanceof AssignmentNode) {
-    		
-    		final AssignmentNode assignment = (AssignmentNode) node;
-    		
-    		final IValueExpressionNode child = assignment.getValueExpressionNode();
-    		
+        /*
+         * Check to see if value expression has already been created and cached
+         * on node.
+         */
+        if (node.getValueExpression() != null) {
+
+            return node.getValueExpression();
+
+        }
+
+        if (node instanceof VarNode) {
+
+            return node.getValueExpression();
+
+        } else if (node instanceof ConstantNode) {
+
+            return node.getValueExpression();
+
+        } else if (node instanceof AssignmentNode) {
+
+            final AssignmentNode assignment = (AssignmentNode) node;
+
+            final IValueExpressionNode child = assignment
+                    .getValueExpressionNode();
+
             @SuppressWarnings("rawtypes")
-    		final IValueExpression<? extends IV> ve = toVE(lex, child);
-    		
-    		return ve;
-    		
-    	} else if (node instanceof FunctionNode) {
-    		
-    		final FunctionNode function = (FunctionNode) node;
-    		
-    		final URI functionURI = function.getFunctionURI();
-    		
-    		final Map<String,Object> scalarValues = function.getScalarValues();
-    		
-    		final ValueExpressionNode[] args = 
-    			function.args().toArray(new ValueExpressionNode[function.arity()]); 
-    		
-    		@SuppressWarnings("rawtypes")
-            final IValueExpression<? extends IV> ve =
-    			FunctionRegistry.toVE(lex, functionURI, scalarValues, args);
-    		
-    		node.setValueExpression(ve);
-    		
-    		return ve;
-    		
-    	} else {
-    		
-    		throw new IllegalArgumentException();
-    		
-    	}
-    	
+            final IValueExpression<? extends IV> ve = toVE(lex, child);
+
+            return ve;
+
+        } else if (node instanceof FunctionNode) {
+
+            final FunctionNode function = (FunctionNode) node;
+
+            final URI functionURI = function.getFunctionURI();
+
+            final Map<String, Object> scalarValues = function.getScalarValues();
+
+            final ValueExpressionNode[] args = function.args().toArray(
+                    new ValueExpressionNode[function.arity()]);
+
+            @SuppressWarnings("rawtypes")
+            final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
+                    lex, functionURI, scalarValues, args);
+
+            node.setValueExpression(ve);
+
+            return ve;
+
+        } else {
+
+            throw new IllegalArgumentException();
+
+        }
+
     }
-	
+
 }

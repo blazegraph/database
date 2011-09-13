@@ -35,8 +35,8 @@ import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -82,7 +82,8 @@ public class DescribeOptimizer implements IASTOptimizer {
 	 *   }
 	 * </pre>
 	 */
-	@Override
+	@SuppressWarnings("unchecked")
+    @Override
 	public IQueryNode optimize(final AST2BOpContext context, 
 			final IQueryNode queryNode, //final DatasetNode dataset, 
 			final IBindingSet[] bindingSet) {
@@ -99,7 +100,7 @@ public class DescribeOptimizer implements IASTOptimizer {
         // Change the query type. This helps prevent multiple rewrites.
 		queryRoot.setQueryType(QueryType.CONSTRUCT);
 		
-		final IGroupNode<IGroupMemberNode> where;
+		final GraphPatternGroup<IGroupMemberNode> where;
 		
 		if (queryRoot.hasWhereClause()) {
 			
