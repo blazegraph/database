@@ -28,8 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
@@ -41,7 +43,8 @@ import com.bigdata.bop.BOp;
  * @see NamedSubqueryRoot
  */
 public class NamedSubqueryInclude extends
-        GroupMemberNodeBase<NamedSubqueryInclude> {
+        GroupMemberNodeBase<NamedSubqueryInclude> implements
+        IBindingProducerNode {
 
     private static final long serialVersionUID = 1L;
 
@@ -144,6 +147,32 @@ public class NamedSubqueryInclude extends
 
     }
 
+    /**
+     * Return the corresponding {@link NamedSubqueryRoot}.
+     * 
+     * @return The {@link NamedSubqueryRoot} -or- <code>null</code> if none was
+     *         found.
+     */
+    public NamedSubqueryRoot getNamedSubqueryRoot(final QueryRoot queryRoot) {
+        
+        final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
+        
+        if(namedSubqueries == null)
+            return null;
+        
+        final String name = getName();
+        
+        for(NamedSubqueryRoot namedSubquery : namedSubqueries) {
+            
+            if(name.equals(namedSubquery.getName()))
+                return namedSubquery;
+            
+        }
+        
+        return null;
+
+    }
+    
     @Override
     public String toString(int indent) {
 

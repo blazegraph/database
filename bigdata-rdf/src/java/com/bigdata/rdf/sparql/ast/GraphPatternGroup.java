@@ -40,7 +40,7 @@ import com.bigdata.bop.IVariable;
  * @version $Id$
  */
 abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
-        GroupNodeBase<E> {
+        GroupNodeBase<E> implements IBindingProducerNode {
 
     /**
      * 
@@ -98,8 +98,10 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
      * 
      * @param vars
      *            Where to store the "MUST" bound variables.
-     *            
+     * 
      * @return The argument.
+     * 
+     * @deprecated by {@link StaticAnalysis}
      */
     abstract public Set<IVariable<?>> getIncomingBindings(
             final Set<IVariable<?>> vars);
@@ -123,10 +125,7 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
      * 
      * @return The argument.
      * 
-     *         TODO Should the recursive analysis throw out variables when part
-     *         of the tree will provably fail to bind anything? Right now we do
-     *         not do that, we only report on the variables which would be bound
-     *         in the solution were to be accepted.
+     * @deprecated by {@link StaticAnalysis}
      */
     abstract public Set<IVariable<?>> getDefinatelyProducedBindings(
             final Set<IVariable<?>> vars, boolean recursive);
@@ -147,6 +146,8 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
      *            be analyzed.
      *            
      * @return The argument.
+     * 
+     * @deprecated by {@link StaticAnalysis}
      */
     abstract public Set<IVariable<?>> getMaybeProducedBindings(
             final Set<IVariable<?>> vars, boolean recursive);

@@ -17,7 +17,8 @@ import com.bigdata.bop.NV;
  * requiring the context to be specified explicitly.
  */
 public class StatementPatternNode extends
-        GroupMemberNodeBase<StatementPatternNode> {
+        GroupMemberNodeBase<StatementPatternNode> implements
+        IBindingProducerNode {
 
     private static final long serialVersionUID = 1L;
 
