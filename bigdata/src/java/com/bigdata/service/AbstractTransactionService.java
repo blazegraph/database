@@ -91,38 +91,38 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public interface Options {
 
-		/**
-		 * How long you want to hold onto the database history (in milliseconds)
-		 * or {@link Long#MAX_VALUE} for an (effectively) immortal database. The
-		 * {@link ITransactionService} tracks the timestamp corresponding to the
-		 * earliest running transaction (if any). When such a transaction
-		 * exists, the actual release time is:
-		 * 
-		 * <pre>
-		 * releaseTime = min(lastCommitTime - 1, min(earliestRunningTx, now - minimumReleaseAge))
-		 * </pre>
-		 * 
-		 * This ensures that history in use by running transactions is not
-		 * released even when the minimumReleaseAge is ZERO (0).
-		 * <p>
-		 * When no transactions exist the actual release time is:
-		 * 
-		 * <pre>
-		 * releaseTime = min(commitTime - 1, now - minimumReleaseAge)
-		 * </pre>
-		 * 
-		 * This ensures that the the release time advances when no transactions
-		 * are in use, but that the minimum release age is still respected.
-		 * 
-		 * @see #DEFAULT_MIN_RELEASE_AGE
-		 * @see #MIN_RELEASE_AGE_1H
-		 * @see #MIN_RELEASE_AGE_1D
-		 * @see #MIN_RELEASE_AGE_1W
-		 * @see #MIN_RELEASE_AGE_NEVER
-		 * 
-		 * @see AbstractTransactionService#updateReleaseTime(long)
-		 * @see AbstractTransactionService#notifyCommit(long)
-		 */
+        /**
+         * How long you want to hold onto the database history (in milliseconds)
+         * or {@link Long#MAX_VALUE} for an (effectively) immortal database. The
+         * {@link ITransactionService} tracks the timestamp corresponding to the
+         * earliest running transaction (if any). When such a transaction
+         * exists, the actual release time is:
+         * 
+         * <pre>
+         * releaseTime = min(lastCommitTime - 1, min(earliestRunningTx, now - minimumReleaseAge))
+         * </pre>
+         * 
+         * This ensures that history in use by running transactions is not
+         * released even when the minimumReleaseAge is ZERO (0).
+         * <p>
+         * When no transactions exist the actual release time is:
+         * 
+         * <pre>
+         * releaseTime = min(commitTime - 1, now - minimumReleaseAge)
+         * </pre>
+         * 
+         * This ensures that the the release time advances when no transactions
+         * are in use, but that the minimum release age is still respected.
+         * 
+         * @see #DEFAULT_MIN_RELEASE_AGE
+         * @see #MIN_RELEASE_AGE_1H
+         * @see #MIN_RELEASE_AGE_1D
+         * @see #MIN_RELEASE_AGE_1W
+         * @see #MIN_RELEASE_AGE_NEVER
+         * 
+         * @see AbstractTransactionService#updateReleaseTime(long)
+         * @see AbstractTransactionService#notifyCommit(long)
+         */
         String MIN_RELEASE_AGE = AbstractTransactionService.class.getName()
                 + ".minReleaseAge";
 
@@ -677,9 +677,12 @@ abstract public class AbstractTransactionService extends AbstractService
 
             try {
 
-                final long tx = assignTransactionIdentifier(timestamp);
+                final AtomicLong readCommitTime = new AtomicLong();
 
-                activateTx(new TxState(tx));
+                final long tx = assignTransactionIdentifier(timestamp,
+                        readCommitTime);
+
+                activateTx(new TxState(tx, readCommitTime.get()));
 
                 return tx;
 
@@ -774,9 +777,9 @@ abstract public class AbstractTransactionService extends AbstractService
      * Return the minimum over the absolute values of the active transactions.
      */
     public long getEarliestTxStartTime() {
-    	
-    	return earliestTxStartTime;
-    	
+        
+        return earliestTxStartTime;
+        
     }
     private volatile long earliestTxStartTime = 0L;
     
@@ -997,15 +1000,15 @@ abstract public class AbstractTransactionService extends AbstractService
 
         synchronized (startTimeIndex) {
 
-			// Note: ZERO (0) is the first tuple in the B+Tree.
-        	// Note: MINUS ONE (-1) means that the B+Tree is empty.
-			final long indexOf = startTimeIndex.findIndexOf(timestamp);
-			
-			isEarliestTx = indexOf == 0;
+            // Note: ZERO (0) is the first tuple in the B+Tree.
+            // Note: MINUS ONE (-1) means that the B+Tree is empty.
+            final long indexOf = startTimeIndex.findIndexOf(timestamp);
+            
+            isEarliestTx = indexOf == 0;
 
-			// remove start time from the index.
-			if (indexOf != -1)
-				startTimeIndex.remove(timestamp);
+            // remove start time from the index.
+            if (indexOf != -1)
+                startTimeIndex.remove(timestamp);
 
             if (!isEarliestTx) {
 
@@ -1109,65 +1112,65 @@ abstract public class AbstractTransactionService extends AbstractService
 
         try {
 
-        	updateReleaseTimeForBareCommit(commitTime);
-        	
+            updateReleaseTimeForBareCommit(commitTime);
+            
         } finally {
 
             lock.unlock();
 
         }
 
-	}
+    }
 
-	/**
-	 * If there are NO active transactions and the current releaseTime is LT
-	 * (commitTime-1) then compute and set the new releaseTime.
-	 * <p>
-	 * Note: This method was historically part of {@link #notifyCommit(long)}.
-	 * It was moved into its own method so it can be overridden for some unit
-	 * tests.
-	 * 
-	 * @throws IllegalMonitorStateException
-	 *             unless the caller is holding the lock.
-	 */
-	protected void updateReleaseTimeForBareCommit(final long commitTime) {
+    /**
+     * If there are NO active transactions and the current releaseTime is LT
+     * (commitTime-1) then compute and set the new releaseTime.
+     * <p>
+     * Note: This method was historically part of {@link #notifyCommit(long)}.
+     * It was moved into its own method so it can be overridden for some unit
+     * tests.
+     * 
+     * @throws IllegalMonitorStateException
+     *             unless the caller is holding the lock.
+     */
+    protected void updateReleaseTimeForBareCommit(final long commitTime) {
 
-//		if(!lock.isHeldByCurrentThread())
-//			throw new IllegalMonitorStateException();
+//      if(!lock.isHeldByCurrentThread())
+//          throw new IllegalMonitorStateException();
 
-	    lock.lock();
-	    try {		
-		synchronized (startTimeIndex) {
+        lock.lock();
+        try {       
+        synchronized (startTimeIndex) {
 
-			if (this.releaseTime < (commitTime - 1)
-					&& startTimeIndex.getEntryCount() == 0) {
+            if (this.releaseTime < (commitTime - 1)
+                    && startTimeIndex.getEntryCount() == 0) {
 
-				final long lastCommitTime = commitTime;
+                final long lastCommitTime = commitTime;
 
-				final long now = _nextTimestamp();
+                final long now = _nextTimestamp();
 
-				final long releaseTime = Math.min(lastCommitTime - 1, now
-						- minReleaseAge);
+                final long releaseTime = Math.min(lastCommitTime - 1, now
+                        - minReleaseAge);
 
-				if (this.releaseTime < releaseTime) {
+                if (this.releaseTime < releaseTime) {
 
-					if (log.isInfoEnabled())
-						log.info("Advancing releaseTime (no active tx)"
-								+ ": lastCommitTime=" + lastCommitTime
-								+ ", minReleaseAge=" + minReleaseAge + ", now="
-								+ now + ", releaseTime(" + this.releaseTime
-								+ "->" + releaseTime + ")");
+                    if (log.isInfoEnabled())
+                        log.info("Advancing releaseTime (no active tx)"
+                                + ": lastCommitTime=" + lastCommitTime
+                                + ", minReleaseAge=" + minReleaseAge + ", now="
+                                + now + ", releaseTime(" + this.releaseTime
+                                + "->" + releaseTime + ")");
 
-					setReleaseTime(releaseTime);
+                    setReleaseTime(releaseTime);
 
-				}
+                }
 
-			}
+            }
 
-		}
-	    } finally {
-	        lock.unlock();
-		}
+        }
+        } finally {
+            lock.unlock();
+        }
 
     }
     
@@ -1212,7 +1215,10 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @param timestamp
      *            The timestamp.
-     * 
+     * @param readCommitTime
+     *            The commit point against which the transaction will read. This
+     *            is set as a side-effect on the caller's argument.
+     *            
      * @return The assigned transaction identifier.
      * 
      * @throws InterruptedException
@@ -1222,9 +1228,12 @@ abstract public class AbstractTransactionService extends AbstractService
      *             if a timeout occurs while awaiting a start time which would
      *             satisfy the request.
      */
-    protected long assignTransactionIdentifier(final long timestamp)
+    final protected long assignTransactionIdentifier(final long timestamp,
+            final AtomicLong readCommitTime)
             throws InterruptedException, TimeoutException {
         
+        final long lastCommitTime = getLastCommitTime();
+
         if (timestamp == ITx.UNISOLATED) {
 
             /*
@@ -1240,23 +1249,24 @@ abstract public class AbstractTransactionService extends AbstractService
              * the moment when we assigned this transaction identifier.
              */
 
+            // The transaction will read from the most recent commit point.
+            readCommitTime.set(lastCommitTime);
+            
             return -nextTimestamp();
 
         }
 
-        final long lastCommitTime = getLastCommitTime();
-
-//		if (timestamp > lastTimestamp) {
+//      if (timestamp > lastTimestamp) {
 //
 //            /*
 //             * You can't request a historical read for a timestamp which has not
 //             * yet been issued by this service!
 //             */
 //            
-//			throw new IllegalStateException(
-//					"Timestamp is in the future: timestamp=" + timestamp
-//							+ ", lastCommitTime=" + lastCommitTime
-//							+ ", lastTimestamp=" + lastTimestamp);
+//          throw new IllegalStateException(
+//                  "Timestamp is in the future: timestamp=" + timestamp
+//                          + ", lastCommitTime=" + lastCommitTime
+//                          + ", lastTimestamp=" + lastTimestamp);
 //
 //        } else 
             if (timestamp == lastCommitTime) {
@@ -1267,6 +1277,9 @@ abstract public class AbstractTransactionService extends AbstractService
              * Note: This is equivalent to a request using the symbolic constant
              * READ_COMMITTED.
              */
+            
+            // The transaction will read from the most recent commit point.
+            readCommitTime.set(lastCommitTime);
             
             return nextTimestamp();
             
@@ -1284,6 +1297,9 @@ abstract public class AbstractTransactionService extends AbstractService
              * Note: If [lastCommitTime == 0], we will still issue the next
              * timestamp.
              */
+
+            // The transaction will read from the most recent commit point.
+            readCommitTime.set(lastCommitTime);
 
             return nextTimestamp();
             
@@ -1307,7 +1323,7 @@ abstract public class AbstractTransactionService extends AbstractService
             
         }
         
-        return getStartTime(timestamp);
+        return getStartTime(timestamp, readCommitTime);
 
     }
 
@@ -1321,11 +1337,15 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @param timestamp
      *            The timestamp (identifies the desired commit point).
+     * @param readCommitTime
+     *            The commit point against which the transaction will read. This
+     *            is set as a side-effect on the caller's argument.
      * 
      * @return A distinct timestamp not in use by any transaction that will read
      *         from the same commit point.
      */
-    protected long getStartTime(final long timestamp)
+    final protected long getStartTime(final long timestamp,
+            final AtomicLong readCommitTime)
             throws InterruptedException, TimeoutException {
 
         /*
@@ -1334,6 +1354,9 @@ abstract public class AbstractTransactionService extends AbstractService
          */
         final long commitTime = findCommitTime(timestamp);
 
+        // The transaction will read from this commit point (-1 iff no commits yet).
+        readCommitTime.set(commitTime);
+        
         if (commitTime == -1L) {
 
             /*
@@ -1853,6 +1876,14 @@ abstract public class AbstractTransactionService extends AbstractService
         public final long tx;
         
         /**
+         * The commit time associated with the commit point against which this
+         * transaction will read. This will be <code>-1</code> IFF there are no
+         * commit points yet. Otherwise it is a real commit time associated with
+         * some existing commit point.
+         */
+        public final long readCommitTime;
+        
+        /**
          * <code>true</code> iff the transaction is read-only.
          */
         public final boolean readOnly;
@@ -2048,7 +2079,15 @@ abstract public class AbstractTransactionService extends AbstractService
          */
         final protected ReentrantLock lock = new ReentrantLock();
         
-        protected TxState(final long tx) {
+        /**
+         * 
+         * @param tx
+         *            The assigned transaction identifier.
+         * @param readCommitTime
+         *            The commit time associated with the commit point against
+         *            which this transaction will read.
+         */
+        protected TxState(final long tx, final long readCommitTime) {
             
             if (tx == ITx.UNISOLATED)
                 throw new IllegalArgumentException();
@@ -2057,6 +2096,8 @@ abstract public class AbstractTransactionService extends AbstractService
                 throw new IllegalArgumentException();
             
             this.tx = tx;
+            
+            this.readCommitTime = readCommitTime;
             
             this.readOnly = TimestampUtility.isReadOnly(tx);
                        
