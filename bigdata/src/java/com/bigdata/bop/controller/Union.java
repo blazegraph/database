@@ -31,7 +31,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.PipelineOp;
 
 /**
  * UNION()[maxParallel(default all); subqueries=ops]
