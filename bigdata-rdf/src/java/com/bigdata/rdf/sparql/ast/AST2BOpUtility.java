@@ -496,11 +496,14 @@ public class AST2BOpUtility {
 
             for (NamedSubqueryRoot subqueryRoot : runFirst) {
 
-                steps[i] = createNamedSubquery(null/* left */, subqueryRoot,
+                steps[i++] = createNamedSubquery(null/* left */, subqueryRoot,
                         ctx);
 
             }
 
+            // Do not run the subqueries with unlimited parallelism.
+            final int maxParallelSubqueries = Math.min(steps.length, 10);
+            
             // Run the steps in parallel.
             left = new Steps(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -508,7 +511,7 @@ public class AST2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(Steps.Annotations.SUBQUERIES, steps),//
                     new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
-                            steps.length)//
+                            maxParallelSubqueries)//
             );
 
         }
@@ -1632,8 +1635,8 @@ public class AST2BOpUtility {
 
 		if (left != null
 				&& ctx.isCluster()
-				&& !left.getEvaluationContext().equals(
-						BOpEvaluationContext.CONTROLLER)) {
+                && !left.getEvaluationContext().equals(
+                        BOpEvaluationContext.CONTROLLER)) {
 
             left = new EndOp(leftOrEmpty(left),//
                     NV.asMap(
@@ -2690,4 +2693,126 @@ public class AST2BOpUtility {
 
     }
 
+    /*
+     * TODO Integrate code to attach RangeBOps to predicates. (This code is from
+     * the old BigdataEvaluationStrategyImpl3 class.)
+     */
+//  private void attachRangeBOps(final SOpGroup g) {
+//
+//      final Map<IVariable,Collection<IValueExpression>> lowerBounds =
+//          new LinkedHashMap<IVariable,Collection<IValueExpression>>();
+//      final Map<IVariable,Collection<IValueExpression>> upperBounds =
+//          new LinkedHashMap<IVariable,Collection<IValueExpression>>();
+//      
+//      for (SOp sop : g) {
+//          final BOp bop = sop.getBOp();
+//          if (!(bop instanceof SPARQLConstraint)) {
+//              continue;
+//          }
+//          final SPARQLConstraint c = (SPARQLConstraint) bop;
+//          if (!(c.getValueExpression() instanceof CompareBOp)) {
+//              continue;
+//          }
+//          final CompareBOp compare = (CompareBOp) c.getValueExpression();
+//          final IValueExpression left = compare.get(0);
+//          final IValueExpression right = compare.get(1);
+//          final CompareOp op = compare.op();
+//          if (left instanceof IVariable) {
+//              final IVariable var = (IVariable) left;
+//              final IValueExpression ve = right;
+//              if (op == CompareOp.GE || op == CompareOp.GT) {
+//                  // ve is a lower bound
+//                  Collection bounds = lowerBounds.get(var);
+//                  if (bounds == null) {
+//                      bounds = new LinkedList<IValueExpression>();
+//                      lowerBounds.put(var, bounds);
+//                  }
+//                  bounds.add(ve);
+//              } else if (op == CompareOp.LE || op == CompareOp.LT) {
+//                  // ve is an upper bound
+//                  Collection bounds = upperBounds.get(var);
+//                  if (bounds == null) {
+//                      bounds = new LinkedList<IValueExpression>();
+//                      upperBounds.put(var, bounds);
+//                  }
+//                  bounds.add(ve);
+//              }
+//          } 
+//          if (right instanceof IVariable) {
+//              final IVariable var = (IVariable) right;
+//              final IValueExpression ve = left;
+//              if (op == CompareOp.LE || op == CompareOp.LT) {
+//                  // ve is a lower bound
+//                  Collection bounds = lowerBounds.get(var);
+//                  if (bounds == null) {
+//                      bounds = new LinkedList<IValueExpression>();
+//                      lowerBounds.put(var, bounds);
+//                  }
+//                  bounds.add(ve);
+//              } else if (op == CompareOp.GE || op == CompareOp.GT) {
+//                  // ve is an upper bound
+//                  Collection bounds = upperBounds.get(var);
+//                  if (bounds == null) {
+//                      bounds = new LinkedList<IValueExpression>();
+//                      upperBounds.put(var, bounds);
+//                  }
+//                  bounds.add(ve);
+//              }
+//          }
+//      }
+//      
+//      final Map<IVariable,RangeBOp> rangeBOps = 
+//          new LinkedHashMap<IVariable,RangeBOp>();
+//      
+//      for (IVariable v : lowerBounds.keySet()) {
+//          if (!upperBounds.containsKey(v))
+//              continue;
+//          
+//          IValueExpression from = null;
+//          for (IValueExpression ve : lowerBounds.get(v)) {
+//              if (from == null)
+//                  from = ve;
+//              else
+//                  from = new MathBOp(ve, from, MathOp.MAX,this.tripleSource.getDatabase().getNamespace());
+//          }
+//
+//          IValueExpression to = null;
+//          for (IValueExpression ve : upperBounds.get(v)) {
+//              if (to == null)
+//                  to = ve;
+//              else
+//                  to = new MathBOp(ve, to, MathOp.MIN,this.tripleSource.getDatabase().getNamespace());
+//          }
+//          
+//          final RangeBOp rangeBOp = new RangeBOp(v, from, to); 
+//          
+//          if (log.isInfoEnabled()) {
+//              log.info("found a range bop: " + rangeBOp);
+//          }
+//          
+//          rangeBOps.put(v, rangeBOp);
+//      }
+//      
+//      for (SOp sop : g) {
+//          final BOp bop = sop.getBOp();
+//          if (!(bop instanceof IPredicate)) {
+//              continue;
+//          }
+//          final IPredicate pred = (IPredicate) bop;
+//          final IVariableOrConstant o = pred.get(2);
+//          if (o.isVar()) {
+//              final IVariable v = (IVariable) o;
+//              if (!rangeBOps.containsKey(v)) {
+//                  continue;
+//              }
+//              final RangeBOp rangeBOp = rangeBOps.get(v);
+//              final IPredicate rangePred = (IPredicate)
+//                  pred.setProperty(SPOPredicate.Annotations.RANGE, rangeBOp);
+//              if (log.isInfoEnabled())
+//                  log.info("range pred: " + rangePred);
+//              sop.setBOp(rangePred);
+//          }
+//      }
+//  }
+  
 }
