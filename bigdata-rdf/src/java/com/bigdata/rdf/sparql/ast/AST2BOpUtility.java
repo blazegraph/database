@@ -1630,9 +1630,10 @@ public class AST2BOpUtility {
     private static final PipelineOp addEndOp(PipelineOp left,
             final AST2BOpContext ctx) {
 
-        if (ctx.isCluster()
-                && !left.getEvaluationContext().equals(
-                        BOpEvaluationContext.CONTROLLER)) {
+		if (left != null
+				&& ctx.isCluster()
+				&& !left.getEvaluationContext().equals(
+						BOpEvaluationContext.CONTROLLER)) {
 
             left = new EndOp(leftOrEmpty(left),//
                     NV.asMap(
