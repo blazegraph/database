@@ -69,7 +69,9 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataFederationSparqlTest extends SPARQLASTQueryTest
+public class BigdataFederationSparqlTest 
+extends SPARQLQueryTest
+//extends SPARQLASTQueryTest
 {
 
     /**
