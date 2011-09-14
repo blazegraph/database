@@ -376,7 +376,7 @@ public class BOpUtility {
      * operators.
      * <p>
      * Note: This will find variables within subqueries as well, which may not
-     * be want is intended.
+     * be what is intended.
      * 
      * @see ASTWildcardProjectionOptimizer
      */
