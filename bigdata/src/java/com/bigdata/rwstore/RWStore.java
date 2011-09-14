@@ -2238,7 +2238,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			immediateFree((int) oldMetaBits, oldMetaBitsSize);
 
 			// There must be no buffered deferred frees
-			assert m_deferredFreeOut.getBytesWritten() == 0;
+			// assert m_deferredFreeOut.getBytesWritten() == 0;
 
 			// save allocation headers
 			final Iterator<Allocator> iter = m_commitList.iterator();
