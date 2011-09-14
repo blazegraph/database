@@ -51,10 +51,6 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
  * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
- * 
- *      TODO Review this class. It is not used currently. We may wind up not
- *      needing it. I need to check the SPARQL TCK first for queries with badly
- *      designed left joins and see what's up with their evaluation.
  */
 public class BadlyDesignedLeftJoinsUtil {
 
@@ -153,6 +149,14 @@ public class BadlyDesignedLeftJoinsUtil {
 
     }
 
+    /**
+     * Collect all variables appearing in the WHERE clause.
+     * @param bindings
+     * @param group
+     * @param includeFilters
+     * 
+     * TODO This does not pay attention to subquery boundaries.
+     */
     private static void addVars(final Set<IVariable<?>> bindings,
             final IGroupNode<? extends IGroupMemberNode> group,
             final boolean includeFilters) {

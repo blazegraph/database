@@ -301,8 +301,18 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
+         * Rewrites aspects of queries where bottom-up evaluation would produce
+         * different results.
+         * 
+         * FIXME This is not implemented yet. 
+         */
+        add(new ASTBottomUpOptimizer());
+        
+        /**
          * Handles a variety of special constructions related to graph graph
          * groups.
+         * 
+         * FIXME This is not implemented yet. 
          */
         add(new ASTGraphGroupOptimizer());
     
