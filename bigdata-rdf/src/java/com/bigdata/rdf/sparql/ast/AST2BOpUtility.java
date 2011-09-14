@@ -113,11 +113,9 @@ import com.bigdata.relation.rule.Rule;
  *          need to strip out bindings introduced by anonymous variables which
  *          are part of query rewrites. The former seems easier.
  * 
- *          TODO What about the backchain access path stuff? Are we going prolog
- *          / datalog or bringing that stuff forward?
- * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/232"> A useful
- *      summary of the different join operators </a>
+ * @see <a href=
+ *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
+ *      >Query Evaluation</a>.
  */
 public class AST2BOpUtility {
 

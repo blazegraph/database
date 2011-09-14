@@ -130,6 +130,10 @@ public class TestASTNamedSubqueryOptimizer extends
         final NamedSubqueryInclude nsi = (NamedSubqueryInclude) queryRoot
                 .getWhereClause().get(1);
 
+        /*
+         * TODO This is failing for the reasons documented above. I've left this
+         * test case here as a place holder for the issue.
+         */
         assertEquals(joinVars, nsr.getJoinVars());
 
         assertEquals(joinVars, nsi.getJoinVars());

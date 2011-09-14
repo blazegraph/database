@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -35,6 +34,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
@@ -94,16 +94,6 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
     }
 
-    private static Set<IVariable<?>> asSet(final IVariable<?>[] vars) {
-
-        final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
-
-        set.addAll(Arrays.asList(vars));
-
-        return set;
-
-    }
-
     private static final Set<IVariable<?>> EMPTY_SET = Collections.emptySet();
     
     /**
@@ -113,7 +103,6 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
      * 
      * @throws MalformedQueryException
      */
-    @SuppressWarnings("unchecked")
     public void test_static_analysis01()
             throws MalformedQueryException {
 
@@ -126,15 +115,17 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
         
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
         final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
         
         expected.add(Var.var("x"));
         
-        assertEquals(expected, queryRoot.getDefinatelyProducedBindings());
+        assertEquals(expected, sa.getDefinatelyProducedBindings(queryRoot));
 
         assertEquals(
                 expected,
-                queryRoot.getWhereClause().getDefinatelyProducedBindings(
+                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -147,7 +138,6 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
      * 
      * @throws MalformedQueryException
      */
-    @SuppressWarnings("unchecked")
     public void test_static_analysis02()
             throws MalformedQueryException {
 
@@ -160,12 +150,14 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
         
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
         final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
         
         expectedProjected.add(Var.var("x"));
         expectedProjected.add(Var.var("y"));
         
-        assertEquals(expectedProjected, queryRoot.getDefinatelyProducedBindings());
+        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
 
         final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
         
@@ -173,7 +165,105 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals(
                 expectedWhereClause,
-                queryRoot.getWhereClause().getDefinatelyProducedBindings(
+                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+        
+    }
+
+    /**
+     * Unit test of static analysis for variables with a named subquery. This
+     * test verifies that we observe the variables projected by the subquery,
+     * but not those which it uses internally.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_static_analysis03()
+            throws MalformedQueryException {
+
+        final String queryStr = "" +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+
+                "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \n"+
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
+                "select ?x (12 as ?y)\n" +
+                "  with \n{" +
+                "    select ?x {\n" +
+                "      ?x rdf:type foaf:Person .\n" +
+                "      ?x rdfs:label ?y .\n" +
+                "    }\n" +
+                "  } as %namedSet1 \n"+
+                " where {\n" +
+                "  include %namedSet1\n" +
+                "}";
+
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
+        
+        expectedProjected.add(Var.var("x"));
+        expectedProjected.add(Var.var("y"));
+        
+        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
+
+        final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
+        
+        expectedWhereClause.add(Var.var("x"));
+
+        assertEquals(
+                expectedWhereClause,
+                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+        
+    }
+
+    /**
+     * Unit test of static analysis for variables with a SPARQL 1.1 subquery.
+     * This test verifies that we observe the variables projected by the
+     * subquery, but not those which it uses internally.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_static_analysis04()
+            throws MalformedQueryException {
+
+        final String queryStr = "" +
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+
+                "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \n"+
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
+                "select ?x (12 as ?y)\n" +
+                " where {\n" +
+                "  ?q foaf:knows ?p ." +
+                "  {\n" +
+                "    select ?x {\n" +
+                "      ?x rdf:type foaf:Person .\n" +
+                "      ?x rdfs:label ?z .\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
+
+        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
+        
+        expectedProjected.add(Var.var("x"));
+        expectedProjected.add(Var.var("y"));
+        
+        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
+
+        final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
+        
+        expectedWhereClause.add(Var.var("x"));
+        expectedWhereClause.add(Var.var("p"));
+        expectedWhereClause.add(Var.var("q"));
+
+        assertEquals(
+                expectedWhereClause,
+                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -205,6 +295,8 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
         // variables which must be bound in the top-level query's projection.
         {
             
@@ -214,7 +306,8 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             expectedProjected.add(Var.var("o"));
 
             assertEquals(expectedProjected,
-                    queryRoot.getDefinatelyProducedBindings());
+                    sa.getDefinatelyProducedBindings(queryRoot));
+            
         }
 
         // variables which must be bound in the named subquery's projection.
@@ -228,7 +321,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                     .getNamedSubqueries().get(0);
 
             assertEquals(expectedProjected,
-                    namedSubquery.getDefinatelyProducedBindings());
+                    sa.getDefinatelyProducedBindings(namedSubquery));
 
         }
 
@@ -240,12 +333,9 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             expectedWhereClause.add(Var.var("x"));
             expectedWhereClause.add(Var.var("o"));
 
-            assertEquals(
-                    expectedWhereClause,
-                    queryRoot
-                            .getWhereClause()
-                            .getDefinatelyProducedBindings(
-                                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+            assertEquals(expectedWhereClause, sa.getDefinatelyProducedBindings(
+                    queryRoot.getWhereClause(),
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
 
@@ -269,26 +359,29 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> whereClause = queryRoot
                 .getWhereClause();
 
         final Set<IVariable<?>> expected = asSet(new String[]{"v"});
 
         // Test "must" bound bindings for the query.
-        assertEquals(expected, queryRoot.getDefinatelyProducedBindings());
+        assertEquals(expected, sa.getDefinatelyProducedBindings(queryRoot));
 
         // Test "must" bound bindings for the where clause.
-        assertEquals(expected, whereClause.getDefinatelyProducedBindings(
+        assertEquals(expected, sa.getDefinatelyProducedBindings(whereClause,
                 new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         // Test "maybe" bound bindings for the where clause.
-        assertEquals(expected, whereClause.getMaybeProducedBindings(
+        assertEquals(expected,
+                sa.getMaybeProducedBindings(whereClause,
                 new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         // Test "incoming" bindings for the where clause.
-        assertEquals(EMPTY_SET,
-                whereClause
-                        .getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+        assertEquals(EMPTY_SET, sa.getIncomingBindings(whereClause,
+                new LinkedHashSet<IVariable<?>>()));
 
     }
 
@@ -317,31 +410,31 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "v" }),
-                queryRoot.getDefinatelyProducedBindings());
+                sa.getDefinatelyProducedBindings(queryRoot));
 
         // WHERE clause
         {
 
+            @SuppressWarnings("unchecked")
             final GraphPatternGroup<IGroupMemberNode> whereClause = queryRoot
                     .getWhereClause();
 
             final Set<IVariable<?>> expected = asSet(new String[] { "v" });
 
             // Test "incoming" bindings for the where clause.
-            assertEquals(
-                    EMPTY_SET,
-                    whereClause
-                            .getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+            assertEquals(EMPTY_SET, sa.getIncomingBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings for the where clause.
-            assertEquals(expected, whereClause.getDefinatelyProducedBindings(
+            assertEquals(expected, sa.getDefinatelyProducedBindings(whereClause,
                     new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings for the where clause.
-            assertEquals(expected, whereClause.getMaybeProducedBindings(
+            assertEquals(expected, sa.getMaybeProducedBindings(whereClause,
                     new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
@@ -353,17 +446,17 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                     .getWhereClause().get(1);
 
             // Test "incoming" bindings.
-            assertEquals(
-                    asSet(new String[] { "v" }),
-                    filterClause
-                            .getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+            assertEquals(asSet(new String[] { "v" }), sa.getIncomingBindings(
+                    filterClause, new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
-            assertEquals(EMPTY_SET, filterClause.getDefinatelyProducedBindings(
-                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+            assertEquals(
+                    EMPTY_SET,
+                    sa.getDefinatelyProducedBindings(filterClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
-            assertEquals(EMPTY_SET, filterClause.getMaybeProducedBindings(
+            assertEquals(EMPTY_SET, sa.getMaybeProducedBindings(filterClause,
                     new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // The FILTER node itself.
@@ -421,25 +514,27 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
      *   }
      * </pre>
      * 
-     * FIXME This can be reduced to a filter which does not bind anything. Since
-     * the FILTER can not succeed, it should logically be replaced by failing
-     * the group(s) within which it appears. This needs to be done recursively
-     * up to the parent, stopping at the first parent group which is optional.
-     * If all parents up to the WHERE clause are eliminated, then the WHERE
-     * clause itself can not succeed and the query should be replaced by a
+     * This can be reduced to a filter which does not bind anything. Since the
+     * FILTER can not succeed, it should logically be replaced by failing the
+     * group(s) within which it appears. This needs to be done recursively up to
+     * the parent, stopping at the first parent group which is optional. If all
+     * parents up to the WHERE clause are eliminated, then the WHERE clause
+     * itself can not succeed and the query should be replaced by a
      * "DropSolutionsBOp". The DropSolutionsOp can be substituted in directly
      * for a group which can not succeed and then we can work the pruning of the
      * parents as an efficiency.
+     * <p>
+     * Note: An AST optimizer needs to recognize and transform this query by
+     * lifting out
      * 
-     * FIXME Note that the variable visibility rules are not currently respected
-     * by getIncomingBindings(). That is why this test is failing. Once we fix
-     * the variable visibility rules in getIncomingBindings() the FILTER will be
-     * reported as something which can be pruned. Once we drop the filter the
-     * query should succeed. However, note that there are other TCK tests where
-     * we can not drop the filter to succeed. That works in this case, but the
-     * underlying reason why this query is failing is that we are not using
-     * bottom up evaluation and <code>?v</code> in the outer group is not
-     * visible to <code>?v</code> in the inner group.
+     * <pre>
+     *  :x :q ?w OPTIONAL {  :x :p ?v2 FILTER(?v = 1) }
+     * </pre>
+     * 
+     * into a named subquery. Since the named subquery runs without any incoming
+     * bindings, the result will be as if we had used bottom up evaluation.
+     * 
+     * @see ASTBottomUpOptimizer
      */
     public void test_static_analysis_filter_scope_1()
             throws MalformedQueryException {
@@ -468,9 +563,11 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
                 context, queryRoot, null /* bindingSets */);
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "v", "w" }),
-                queryRoot.getDefinatelyProducedBindings());
+                sa.getDefinatelyProducedBindings(queryRoot));
 
         // Outer group clause { :x :p ?v . }
         {
@@ -479,32 +576,31 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                     .getWhereClause();
 
             // Test "incoming" bindings.
-            assertEquals(
-                    EMPTY_SET,
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+            assertEquals(EMPTY_SET, sa.getIncomingBindings(group,
+                    new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "v" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v", "w" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "v" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v", "w", "v2" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
@@ -518,30 +614,30 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "v" }),
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "w" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "w" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "w" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "w", "v2" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
@@ -555,40 +651,40 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "v", "w" }),
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
             
             // The FILTER node itself.
             final FilterNode filter = BOpUtility.visitAll(queryRoot,
                     FilterNode.class).next();
 
-            assertEquals(Collections.emptyList(), group.getPreFilters());
+            assertEquals(Collections.singletonList(filter), group.getPreFilters());
             assertEquals(Collections.emptyList(), group.getJoinFilters());
             assertEquals(Collections.emptyList(), group.getPostFilters());
-            assertEquals(Collections.singletonList(filter), group.getFiltersToPrune());
+            assertEquals(Collections.emptyList(), group.getFiltersToPrune());
             
         }
 
@@ -615,8 +711,12 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
      * <code>?X</code> fail to join with the solutions in the outer group. Note
      * that there is no email address for "paul" for the data set used to run
      * this query. If there were, then the query would have a result.
-     * 
-     * FIXME In order for us to run this query correctly we need to run
+     * <p>
+     * These group expressions need to be evaluated independently because they
+     * are not sharing a binding for <code>?X</code> until we join them together
+     * on <code>?X</code>.
+     * <p>
+     * In order for us to run this query correctly we need to run
      * 
      * <pre>
      * {?Y :name "george" . OPTIONAL { ?X :email ?Z } }
@@ -628,10 +728,10 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
      * ?X  :name "paul"
      * </pre>
      * 
-     * Or, equally, we could do a binding set join rather than a pipelined
-     * subquery. It amounts to the same thing. These group expressions need to
-     * be evaluated independently because they are not sharing a binding for
-     * <code>?X</code> until we join them together on <code>?X</code>.
+     * This can be most easily achieved by lifting the former out into a named
+     * subquery.
+     * 
+     * @see ASTBottomUpOptimizer
      */
     public void test_static_analysis_join_scope_1()
             throws MalformedQueryException {
@@ -658,13 +758,15 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
                 context, queryRoot, null /* bindingSets */);
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
         // Rewrite the wild card in the projection.
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
                 context, queryRoot, null /* bindingSets */);
 
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "X", "Y" }),
-                queryRoot.getDefinatelyProducedBindings());
+                sa.getDefinatelyProducedBindings(queryRoot));
 
         // Outer group clause { ?X :name "paul" }
         {
@@ -675,30 +777,30 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     EMPTY_SET,
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "X" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Y" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "X" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Y", "Z" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
@@ -712,30 +814,30 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "X" }),
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "Y" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "Y" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "Y" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "Y", "X", "Z" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         }
@@ -749,30 +851,30 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "X", "Y" }),
-                    group.getIncomingBindings(new LinkedHashSet<IVariable<?>>()));
+                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "X", "Z" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Z" }),
-                    group.getDefinatelyProducedBindings(
+                    sa.getDefinatelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
             assertEquals(
                     asSet(new String[] { "X", "Z" }),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "maybe" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Z"}),
-                    group.getMaybeProducedBindings(
+                    sa.getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
                         
         }

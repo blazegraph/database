@@ -84,6 +84,7 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     }
 
+    @Deprecated
     @Override
     public Set<IVariable<?>> getIncomingBindings(final Set<IVariable<?>> vars) {
 
@@ -96,6 +97,7 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     }
 
+    @Deprecated
     @Override
     public Set<IVariable<?>> getDefinatelyProducedBindings(
             final Set<IVariable<?>> vars, final boolean recursive) {
@@ -141,6 +143,7 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     }
 
+    @Deprecated
     @Override
     public Set<IVariable<?>> getMaybeProducedBindings(
             final Set<IVariable<?>> vars, final boolean recursive) {

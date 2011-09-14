@@ -38,7 +38,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * An extension point for external service calls which produce solution
  * multisets (a SPARQL <code>SERVICE</code>).
  */
-public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode> {
+public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
+        implements IBindingProducerNode {
 
     private static final long serialVersionUID = 1L;
 

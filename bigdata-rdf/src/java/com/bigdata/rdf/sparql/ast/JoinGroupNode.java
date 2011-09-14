@@ -112,11 +112,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     }
 
-    /**
-     * FIXME This needs to pay attention to bottom up variable scoping rules in
-     * order for us to use it to identify filters which can not succeed and
-     * which must therefore be pruned.
-     */
+    @Deprecated
     @Override
 	public Set<IVariable<?>> getIncomingBindings(final Set<IVariable<?>> vars) {
 				
@@ -146,6 +142,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		
 	}
 
+    @Deprecated
     public Set<IVariable<?>> getDefinatelyProducedBindings(
             final Set<IVariable<?>> vars, final boolean recursive) {
 
@@ -202,6 +199,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * expressions so we do not include it here.
      */
     @Override
+    @Deprecated
     public Set<IVariable<?>> getMaybeProducedBindings(
             final Set<IVariable<?>> vars, final boolean recursive) {
 

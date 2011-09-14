@@ -42,8 +42,9 @@ import com.bigdata.rdf.sail.QueryType;
  * @see OrderByNode
  * @see SliceNode
  */
-abstract public class QueryBase extends QueryNodeBase {
-    
+abstract public class QueryBase extends QueryNodeBase implements
+        IBindingProducerNode {
+
     /**
      * 
      */
@@ -364,6 +365,8 @@ abstract public class QueryBase extends QueryNodeBase {
      * Note that the projection can rename variables. It can also bind a
      * constant on a variable. Variables which are not projected by the query
      * will NOT be reported.
+     * 
+     * @deprecated by {@link StaticAnalysis}
      */
     public Set<IVariable<?>> getDefinatelyProducedBindings() {
 
@@ -378,6 +381,7 @@ abstract public class QueryBase extends QueryNodeBase {
 
         }
 
+        @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> whereClause = getWhereClause();
 
         if (whereClause != null) {
@@ -428,6 +432,7 @@ abstract public class QueryBase extends QueryNodeBase {
 
         final ConstructNode construct = getConstruct();
         final ProjectionNode projection = getProjection();
+        @SuppressWarnings("unchecked")
         final IGroupNode<IGroupMemberNode> whereClause = getWhereClause();
         final GroupByNode groupBy = getGroupBy();
         final HavingNode having = getHaving();

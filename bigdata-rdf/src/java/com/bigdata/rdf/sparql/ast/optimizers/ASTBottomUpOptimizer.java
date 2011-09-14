@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
  * Rewrites aspects of queries where bottom-up evaluation would produce
@@ -115,7 +116,15 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
  * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTBottomUpOptimizer.java 5189 2011-09-14 17:56:53Z thompsonbry
+ *          $
+ * 
+ *          FIXME Use the same test cases that we use for the
+ *          {@link StaticAnalysis} class for this class, but in the case of this
+ *          class we want to recognize the badly designed left joins (inner
+ *          group with nested optional and no shared variable between the outer
+ *          group, the inner group, and the optional group) and lift it out into
+ *          a named subquery.
  */
 public class ASTBottomUpOptimizer implements IASTOptimizer {
 
