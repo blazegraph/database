@@ -190,8 +190,15 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         
     }
   
-    /*
-     * Note: IF is not allowed to conditionally bind a variable in the THEN/ELSE
+    /**
+     * {@inheritDoc}
+     * <P>
+     * Note: <code>IF</code> semantics: If evaluating the first argument raises
+     * an error, then an error is raised for the evaluation of the IF
+     * expression. (This greatly simplifies the analysis of the EBV of the IF
+     * value expressions, but there is still uncertainty concerning whether the
+     * THEN or the ELSE is executed for a given solution.) Also, <code>IF</code>
+     * is not allowed to conditionally bind a variable in the THEN/ELSE
      * expressions so we do not include it here.
      */
     @Override
