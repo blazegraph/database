@@ -29,23 +29,14 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.InGraphBinarySearchFilter;
-import com.bigdata.rdf.spo.InGraphHashSetFilter;
 
 /**
  * Abstract base class for "IN" {@link IConstraint} implementations.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: INConstraint.java 4286 2011-03-09 17:36:10Z mrpersonick $
- *
- *          FIXME Reconcile this with {@link InGraphBinarySearchFilter} and
- *          {@link InGraphHashSetFilter} and also with the use of an in-memory
- *          join against the incoming binding sets to handle SPARQL data sets.
- *          
- *          FIXME Reconcile with {@link ComputedIN}.
  */
 abstract public class InBOp extends XSDBooleanIVValueExpression {
 

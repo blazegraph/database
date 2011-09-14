@@ -34,9 +34,9 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.SPARQLASTQueryTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.dataset.DatasetRepository;
 
 import com.bigdata.btree.keys.CollatorEnum;
@@ -44,9 +44,9 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
@@ -69,7 +69,7 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataFederationSparqlTest extends SPARQLQueryTest
+public class BigdataFederationSparqlTest extends SPARQLASTQueryTest
 {
 
     /**
@@ -188,7 +188,7 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         return repo;
     }
 
-	protected RepositoryConnection getQueryConnection(Repository dataRep)
+	protected BigdataSailRepositoryConnection getQueryConnection(Repository dataRep)
 			throws Exception {
 		// return dataRep.getConnection();
 		final BigdataSailRepositoryConnection con = new BigdataSailRepositoryConnection(new BigdataSailRepository(
