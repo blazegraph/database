@@ -77,12 +77,31 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     abstract IValueExpression<? extends IV> getValueExpression();
 
+    /**
+     * Return the {@link IValueExpression}.
+     * 
+     * @return The {@link IValueExpression} and never <code>null</code>.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link IValueExpression} is not set on this node.
+     */
+    final IValueExpression<? extends IV> getRequiredValueExpression() {
+        
+        final IValueExpression<? extends IV> valueExpr = getValueExpression();
+
+        if (valueExpr == null)
+            throw new IllegalStateException("ValueExpression not set: " + this);
+
+        return valueExpr;
+        
+    }
+
     public Set<IVariable<?>> getConsumedVars() {
 
         final Set<IVariable<?>> consumedVars = new LinkedHashSet<IVariable<?>>();
 
         final Iterator<IVariable<?>> it = BOpUtility
-                .getSpannedVariables(getValueExpression());
+                .getSpannedVariables(getRequiredValueExpression());
 
         while (it.hasNext()) {
 
@@ -96,7 +115,8 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     public ComputedMaterializationRequirement getMaterializationRequirement() {
 
-        return new ComputedMaterializationRequirement(getValueExpression());
+        return new ComputedMaterializationRequirement(
+                getRequiredValueExpression());
 
     }
 

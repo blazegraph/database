@@ -41,17 +41,17 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OptimizerList extends LinkedList<IASTOptimizer> implements
+public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
         IASTOptimizer {
     
-    private static final Logger log = Logger.getLogger(OptimizerList.class);
+    private static final Logger log = Logger.getLogger(ASTOptimizerList.class);
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public OptimizerList() {
+    public ASTOptimizerList() {
         
     }
 

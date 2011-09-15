@@ -23,13 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.QueryType;
 
 /**
@@ -359,71 +355,6 @@ abstract public class QueryBase extends QueryNodeBase implements
         setProperty(Annotations.TIMEOUT, timeout);
     }
 
-    /**
-     * Report "MUST" bound bindings projected by the query. This involves
-     * checking the WHERE clause and the {@link ProjectionNode} for the query.
-     * Note that the projection can rename variables. It can also bind a
-     * constant on a variable. Variables which are not projected by the query
-     * will NOT be reported.
-     * 
-     * @deprecated by {@link StaticAnalysis}
-     */
-    public Set<IVariable<?>> getDefinatelyProducedBindings() {
-
-        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-        
-        final ProjectionNode projection = getProjection();
-        
-        if(projection == null) {
-
-            // If there is no projection then there is nothing to report.
-            return vars;
-
-        }
-
-        @SuppressWarnings("unchecked")
-        final GraphPatternGroup<IGroupMemberNode> whereClause = getWhereClause();
-
-        if (whereClause != null) {
-
-            whereClause
-                    .getDefinatelyProducedBindings(vars, true/* recursive */);
-
-        }
-
-        /*
-         * The set of projected variables.
-         */
-        final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
-        
-        for(AssignmentNode bind : projection) {
-        
-            if(bind.getValueExpression() instanceof IConstant<?>) {
-                
-                /*
-                 * If there is a BIND of a constant expression onto a variable,
-                 * then that variable is "MUST" bound by the query.
-                 * 
-                 * Note: This depends on pre-evaluation of constant expressions.
-                 * If the expression has not been reduced to a constant then it
-                 * will not be detected by this test!
-                 */
-                
-                vars.add(bind.getVar());               
-                
-            }
-            
-            projectedVars.add(bind.getVar());
-            
-        }
-
-        // Remove anything which is not projected out of the query.
-        vars.retainAll(projectedVars);
-        
-        return vars;
-
-    }
-    
 	public String toString(final int indent) {
 		
 	    final String s = indent(indent);

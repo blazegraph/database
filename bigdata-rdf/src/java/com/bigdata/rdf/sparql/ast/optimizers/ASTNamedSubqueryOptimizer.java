@@ -53,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -91,17 +92,6 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             /*DatasetNode dataset,*/ IBindingSet[] bindingSet) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
-
-        /*
-         * Rewrite subqueryRoot objects as named subquery.
-         * 
-         * FIXME We should do this if there are no join variables for the SPARQL
-         * 1.1 subquery. That will prevent multiple evaluations of the SPARQL
-         * 1.1 subquery since the named subquery is run once before the main
-         * WHERE clause.
-         */
-        if (false)
-            rewriteSparql11Subqueries(queryRoot);
 
         /*
          * Order the named subqueries in order to support nested includes
@@ -458,57 +448,6 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
     }
 
-    private void rewriteSparql11Subqueries(final QueryRoot queryRoot){
-
-        final Striterator itr2 = new Striterator(
-                BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
-
-        itr2.addTypeFilter(SubqueryRoot.class);
-
-        final List<SubqueryRoot> subqueries  = new ArrayList<SubqueryRoot>();
-
-        while (itr2.hasNext()) {
-
-            subqueries.add((SubqueryRoot)itr2.next());
-
-        }
-        
-        if (queryRoot.getNamedSubqueries() == null) {
-        
-            queryRoot.setNamedSubqueries(new NamedSubqueriesNode());
-            
-        }
-
-        for (SubqueryRoot root : subqueries) {
-
-            final IGroupNode<IGroupMemberNode> parent = root.getParent();
-
-            parent.removeChild(root);
-
-            final String newName = UUID.randomUUID().toString();
-
-            final NamedSubqueryInclude include = new NamedSubqueryInclude(
-                    newName);
-
-            parent.addChild(include);
-
-            final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
-                    root.getQueryType(), newName);
-
-            nsr.setConstruct(root.getConstruct());
-            nsr.setGroupBy(root.getGroupBy());
-            nsr.setHaving(root.getHaving());
-            nsr.setOrderBy(root.getOrderBy());
-            nsr.setProjection(root.getProjection());
-            nsr.setSlice(root.getSlice());
-            nsr.setWhereClause(root.getWhereClause());
-
-            queryRoot.getNamedSubqueries().add(nsr);
-
-        }
-
-    }
-
     /**
      * Order the named subqueries based on nested includes
      */
@@ -593,45 +532,59 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
     /**
      * Identify the join variables for the specified INCLUDE for the position
      * within the query in which it appears.
-     *
+     * 
      * @param queryRoot
      * @param aNamedSubquery
      * @param anInclude
      * @return
-     *
+     * 
      *         FIXME This code must figure out which variables "must" be bound
      *         by both the the subquery and context in which the INCLUDE appears
-     *         and return just those variables. [It is currently returning an
-     *         empty {@link IVariable}[]. While a hash join using an empty array
-     *         of join variables will always produce the correct solutions, it
-     *         is not very efficient.]
+     *         and return just those variables. The problem is that we can not
+     *         really decide this until we decide the evaluation order since the
+     *         named subquery include could run at any point in the required
+     *         joins. That includes the pipelined statement pattern joins, the
+     *         inline access path joins, the named subquery joins, the service
+     *         node joins, etc. The code currently assumes that the named
+     *         subquery include join will "run first" in the group.
      */
     @SuppressWarnings("rawtypes")
     private IVariable[] staticAnalysis(final QueryRoot queryRoot,
             final NamedSubqueryRoot aNamedSubquery,
             final NamedSubqueryInclude anInclude) {
 
-        final Set<IVariable<?>> boundBySubquery = aNamedSubquery
-                .getDefinatelyProducedBindings();
-        
-        final Set<IVariable<?>> incomingBindings = anInclude.getParentJoinGroup()
-                .getIncomingBindings(new LinkedHashSet<IVariable<?>>());
+        if (true) {
+           
+            return new IVariable[0];
+            
+        } else {
 
-        /*
-         * This is only those variables which are bound on entry into the group
-         * in which the INCLUDE appears *and* which are "must" bound variables
-         * projected by the subquery.
-         */
-        boundBySubquery.retainAll(incomingBindings);
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
-        // Convert to an array.
-        final IVariable[] vars = boundBySubquery
-                .toArray(new IVariable[boundBySubquery.size()]);
+            final Set<IVariable<?>> boundBySubquery = sa
+                    .getDefinatelyProducedBindings(aNamedSubquery);
 
-        // Put the variable[] into a consistent, predictable order.
-        Arrays.sort(vars);
+            final Set<IVariable<?>> incomingBindings = sa.getIncomingBindings(
+                    anInclude.getParentJoinGroup(),
+                    new LinkedHashSet<IVariable<?>>());
 
-        return vars;
+            /*
+             * This is only those variables which are bound on entry into the
+             * group in which the INCLUDE appears *and* which are "must" bound
+             * variables projected by the subquery.
+             */
+            boundBySubquery.retainAll(incomingBindings);
+
+            // Convert to an array.
+            final IVariable[] vars = boundBySubquery
+                    .toArray(new IVariable[boundBySubquery.size()]);
+
+            // Put the variable[] into a consistent, predictable order.
+            Arrays.sort(vars);
+
+            return vars;
+
+        }
 
     }
 

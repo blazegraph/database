@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -34,7 +35,9 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
@@ -407,12 +410,22 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "SELECT ?v \n" +//
                 "{ :x :p ?v . { FILTER(?v = 1) } }";
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+                queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+        // Set the IValueExpressions on the AST.
+        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
+
+        if (log.isInfoEnabled())
+            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
+                    + BOpUtility.toString(queryRoot));
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
-        // Test "must" bound bindings for the query.
+         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "v" }),
                 sa.getDefinatelyProducedBindings(queryRoot));
 
@@ -550,18 +563,22 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}"//
         ;
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
-        
+        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+                queryStr, baseURI);
+
         final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
 
-        if (log.isInfoEnabled())
-            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
-                    + BOpUtility.toString(queryRoot));
+        // Set the IValueExpressions on the AST.
+        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
 
         // Rewrite the wild card in the projection.
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
                 context, queryRoot, null /* bindingSets */);
+        
+        if (log.isInfoEnabled())
+            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
+                    + BOpUtility.toString(queryRoot));
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
@@ -750,20 +767,16 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
 
+        // Rewrite the wild card in the projection.
+        queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
+
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
                     + BOpUtility.toString(queryRoot));
 
-        // Rewrite the wild card in the projection.
-        queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
-
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
         
-        // Rewrite the wild card in the projection.
-        queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
-
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "X", "Y" }),
                 sa.getDefinatelyProducedBindings(queryRoot));
@@ -878,6 +891,257 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
                         
         }
+
+    }
+
+    /**
+     * Unit test for analysis of a {@link ServiceNode}. The analysis of a
+     * {@link ServiceNode} is just the analysis of the graph pattern reported by
+     * {@link ServiceNode#getGroupNode()}.
+     * 
+     * <pre>
+     * PREFIX bd: <http://www.bigdata.com/rdf/search#>
+     * SELECT ?subj ?score 
+     * WHERE {
+     *   ?lit bd:search "mike" .
+     *   ?lit bd:relevance ?score .
+     *   ?subj ?p ?lit .
+     * }
+     * </pre>
+     * 
+     * Note: The "be:search", "bd:relevance" and <code>?subj ?p ?lit</code>
+     * statement patterns below will be transformed into a {@link ServiceNode}.
+     * Since there is nothing else in the main query's WHERE clause, the
+     * {@link ServiceNode} is not lifted out into a named subquery.
+     * 
+     * TODO This could be redone using the SPARQL SERVICE syntax once we
+     * integrate with Sesame 2.5.1, which has support for that syntax in the
+     * parser.
+     */
+    public void test_static_analysis_serviceCall() throws MalformedQueryException {
+
+        final String queryStr = "" + //
+                "PREFIX bd: <http://www.bigdata.com/rdf/search#>\n" + //
+                "SELECT ?subj ?score\n" + //
+                "WHERE {\n" + //
+                "   ?lit bd:search \"mike\" .\n" + //
+                "   ?lit bd:relevance ?score .\n" + //
+                "   ?subj ?p ?lit .\n" + //
+                "}";
+
+        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+                queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+        // rewrite the search predicates as an AST ServiceNode.
+        queryRoot = (QueryRoot) new ASTSearchOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
+
+        if (log.isInfoEnabled())
+            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
+                    + BOpUtility.toString(queryRoot));
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        {
+            // variables which must be bound in the top-level query's
+            // projection.
+            {
+
+                final Set<IVariable<?>> expectedProjected = new LinkedHashSet<IVariable<?>>();
+
+                expectedProjected.add(Var.var("subj"));
+                expectedProjected.add(Var.var("score"));
+
+                assertEquals(expectedProjected,
+                        sa.getDefinatelyProducedBindings(queryRoot));
+
+            }
+
+            // variables which must be bound in the main query's where clause.
+            {
+
+                final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+                expected.add(Var.var("subj"));
+                expected.add(Var.var("score"));
+                expected.add(Var.var("p"));
+                expected.add(Var.var("lit"));
+
+                assertEquals(expected, sa.getDefinatelyProducedBindings(
+                        queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+
+            // variables which may be bound in the main query's where clause.
+            {
+
+                final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+
+                expected.add(Var.var("subj"));
+                expected.add(Var.var("score"));
+                expected.add(Var.var("p"));
+                expected.add(Var.var("lit"));
+
+                assertEquals(expected, sa.getMaybeProducedBindings(
+                        queryRoot.getWhereClause(),
+                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+        }
+        
+    }
+
+    /**
+     * Unit test(s) for the correct identification of pre-, join-, post-, and
+     * prune- filters.
+     */
+    public void test_static_analysis_filters() throws MalformedQueryException {
+        
+        final String queryStr = ""+//
+        "PREFIX : <http://www.bigdata.com/>\n" +//
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+//
+        "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \n"+//
+        "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+//
+        "SELECT ?a ?b \n" +//
+        " WHERE {\n" +//
+        "   ?a rdf:type foaf:Person . \n" +//
+        "   ?a foaf:knows ?b .\n"+//
+        "   { \n"+//
+        "     ?a :age ?ageA .\n"+//
+        "     ?b :age ?ageB .\n"+//
+        "     FILTER ( ?a != ?b ) .\n"+// pre-filter (can be lifted)
+        "     FILTER ( ?ageA > ?ageB) .\n"+// join-filter
+        "     FILTER ( ?x < 100 ) .\n"+// prune-filter (can be pruned)
+        "   }\n"+//
+        "   FILTER ( ?ageA > 20 ) .\n"+//post-filter (depends on subgroup)
+        "   "+//
+        "}";
+        
+        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+
+        // Set the IValueExpressions on the AST.
+        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
+                context, queryRoot, null /* bindingSets */);
+
+        if (log.isInfoEnabled())
+            log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
+                    + BOpUtility.toString(queryRoot));
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        /*
+         * Locate the outer join group and the inner join group.
+         */
+        final JoinGroupNode outerGroup;
+        final JoinGroupNode innerGroup;
+        
+        {
+         
+            final Iterator<JoinGroupNode> itr = BOpUtility.visitAll(
+                    queryRoot.getWhereClause(), JoinGroupNode.class);
+
+            outerGroup = itr.next();
+            innerGroup = itr.next();
+            
+        }
+        
+        /*
+         * Locate the different filters in the query.
+         */
+        
+        final FilterNode ageA_GT_ageB;
+        final FilterNode a_NE_b;
+        final FilterNode x_LT_10;
+        final FilterNode ageA_GT_20;
+        
+        // Filters in the outer group.
+        {
+            FilterNode tmp = null;
+            for(IGroupMemberNode child : outerGroup) {
+                if(child instanceof FilterNode) {
+                    tmp = (FilterNode)child;
+                    break;
+                }
+            }
+            ageA_GT_20 = tmp;
+        }
+        assertNotNull(ageA_GT_20);
+        
+        // Filters in the inner group.
+//        "     FILTER ( ?ageA > ?ageB) .\n"+// join-filter
+//        "     FILTER ( ?a != ?b ) .\n"+// pre-filter
+//        "     FILTER ( ?x < 100 ) .\n"+// prune-filter
+        {
+            FilterNode GT = null;
+            FilterNode NE = null;
+            FilterNode LT = null;
+            for (IGroupMemberNode child : innerGroup) {
+                if (child instanceof FilterNode) {
+                    final FilterNode tmp = (FilterNode) child;
+                    final FunctionNode expr = (FunctionNode) tmp
+                            .getValueExpressionNode();
+                    if (expr.getFunctionURI().equals(FunctionRegistry.GT)) {
+                        GT = tmp;
+                    } else if (expr.getFunctionURI()
+                            .equals(FunctionRegistry.NE)) {
+                        NE = tmp;
+                    } else if (expr.getFunctionURI()
+                            .equals(FunctionRegistry.LT)) {
+                        LT = tmp;
+                    } else
+                        throw new AssertionError();
+                }
+            }
+            ageA_GT_ageB = GT;
+            a_NE_b = NE;
+            x_LT_10 = LT;
+        }
+        assertNotNull(ageA_GT_ageB);
+        assertNotNull(a_NE_b);
+        assertNotNull(x_LT_10);
+
+        /*
+         * Now verify the static analysis of the filters.
+         */
+//        "     FILTER ( ?ageA > ?ageB) .\n"+// join-filter
+//        "     FILTER ( ?a != ?b ) .\n"+// pre-filter
+//        "     FILTER ( ?x < 100 ) .\n"+// prune-filter
+//        "   }\n"+//
+//        "   FILTER ( ?ageA > 20 ) .\n"+//post-filter
+        
+        // Inner group.
+        
+        assertEquals("pre-filters", Collections.singletonList(a_NE_b),
+                sa.getPreFilters(innerGroup));
+        
+        assertEquals("join-filters", Collections.singletonList(ageA_GT_ageB),
+                sa.getJoinFilters(innerGroup));
+        
+        assertEquals("post-filters", Collections.singletonList(x_LT_10),
+                sa.getPostFilters(innerGroup));
+        
+        assertEquals("prune-filters", Collections.singletonList(x_LT_10),
+                sa.getPruneFilters(innerGroup));
+
+        // Outer group.
+
+        assertEquals("pre-filters", Collections.emptyList(),
+                sa.getPreFilters(outerGroup));
+        
+        assertEquals("join-filters", Collections.emptyList(),
+                sa.getJoinFilters(outerGroup));
+        
+        assertEquals("post-filters", Collections.singletonList(ageA_GT_20),
+                sa.getPostFilters(outerGroup));
+
+        assertEquals("prune-filters", Collections.emptyList(),
+                sa.getPruneFilters(outerGroup));
 
     }
 
