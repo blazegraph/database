@@ -22,6 +22,7 @@ import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IPredicate.Annotations;
@@ -45,6 +46,7 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
@@ -69,6 +71,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
+import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
@@ -1000,6 +1003,7 @@ public class AST2BOpUtility {
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
+        left = addKnownInConditionals(left,joinGroup.getKnownInFilters(),ctx);
         /*
          * Required joins and non-optional subqueries.
          * 
@@ -1324,6 +1328,35 @@ public class AST2BOpUtility {
 
     }
 
+    @SuppressWarnings("rawtypes")
+    private static final PipelineOp addKnownInConditionals(PipelineOp left,
+            final Collection<FilterNode> filters, final AST2BOpContext ctx) {
+
+        for (FilterNode filter : filters) {
+
+            @SuppressWarnings("unchecked")
+            final IValueExpression ve = filter.getValueExpression();
+
+           InBOp bop=(InBOp)ve;
+           IConstant<IV>[] set=bop.getSet();
+           LinkedHashSet<IV> ivs=new LinkedHashSet<IV>();
+           for(IConstant<IV> iv:set){
+               ivs.add(iv.get());
+           }
+           IVariable var=(IVariable)bop.getValueExpression();
+           left =    new DataSetJoin(leftOrEmpty(left),
+                  NV.asMap(new NV[] {//
+                          new NV(DataSetJoin.Annotations.VAR, var),//
+                          new NV(DataSetJoin.Annotations.BOP_ID,
+                                  ctx.idFactory.incrementAndGet()),//
+                          new NV(DataSetJoin.Annotations.GRAPHS,
+                                  ivs) //
+                  }));
+        }
+
+        return left;
+
+    }
     private static final PipelineOp addJoins(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
