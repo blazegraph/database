@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IVariable;
 
 /**
  * Join group or union.
@@ -77,79 +75,5 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
     public GraphPatternGroup(boolean optional) {
         super(optional);
     }
-
-    /*
-     * Static analysis methods. There is one method which looks "up". This
-     * corresponds to how we actually evaluation things (left to right in the
-     * query plan). There are two methods which look "down". This corresponds to
-     * the bottom-up evaluation semantics of SPARQL.
-     */
-    
-    /**
-     * Return the set of variables which MUST be bound coming into this group
-     * during top-down, left-to-right evaluation. The returned set is based on a
-     * non-recursive analysis of the definitely (MUST) bound variables in each
-     * of the parent groups. The analysis is non-recursive for each parent
-     * group, but all parents of this group are considered. This approach
-     * excludes information about variables which MUST or MIGHT be bound from
-     * both <i>this</i> group and child groups. This is useful for determining
-     * when to run various filters or whether a filter can be lifted into the
-     * parent group.
-     * 
-     * @param vars
-     *            Where to store the "MUST" bound variables.
-     * 
-     * @return The argument.
-     * 
-     * @deprecated by {@link StaticAnalysis}
-     */
-    abstract public Set<IVariable<?>> getIncomingBindings(
-            final Set<IVariable<?>> vars);
-
-    /**
-     * Return the set of variables which MUST be bound for solutions after the
-     * evaluation of this group. A group will produce "MUST" bindings for
-     * variables from its statement patterns and a LET based on an expression
-     * whose variables are known bound.
-     * <p>
-     * The returned collection reflects "bottom-up" evaluation semantics. This
-     * method does NOT consider variables which are already bound on entry to
-     * the group.
-     * 
-     * @param vars
-     *            Where to store the "MUST" bound variables.
-     * @param recursive
-     *            When <code>true</code>, the child groups will be recursively
-     *            analyzed. When <code>false</code>, only <i>this</i> group will
-     *            be analyzed.
-     * 
-     * @return The argument.
-     * 
-     * @deprecated by {@link StaticAnalysis}
-     */
-    abstract public Set<IVariable<?>> getDefinatelyProducedBindings(
-            final Set<IVariable<?>> vars, boolean recursive);
-
-    /**
-     * Return the set of variables which MUST or MIGHT be bound after the
-     * evaluation of this join group.
-     * <p>
-     * The returned collection reflects "bottom-up" evaluation semantics. This
-     * method does NOT consider variables which are already bound on entry to
-     * the group.
-     * 
-     * @param vars
-     *            Where to store the "MUST" bound variables.
-     * @param recursive
-     *            When <code>true</code>, the child groups will be recursively
-     *            analyzed. When <code>false</code>, only <i>this</i> group will
-     *            be analyzed.
-     *            
-     * @return The argument.
-     * 
-     * @deprecated by {@link StaticAnalysis}
-     */
-    abstract public Set<IVariable<?>> getMaybeProducedBindings(
-            final Set<IVariable<?>> vars, boolean recursive);
 
 }

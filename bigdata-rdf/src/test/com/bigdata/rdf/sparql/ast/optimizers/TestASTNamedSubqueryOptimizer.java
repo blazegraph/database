@@ -37,10 +37,11 @@ import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
-import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
  * Test suite for the {@link ASTNamedSubqueryOptimizer}.
@@ -95,8 +96,9 @@ public class TestASTNamedSubqueryOptimizer extends
      * group so we can be assured that we will use the available join variables.
      * [This really depends on running the INCLUDE after the non-optional joins
      * in the parent, which is itself just a heuristic. In fact, the entire
-     * notion of {@link GraphPatternGroup#getIncomingBindings(Set)} depends on
-     * this heuristic!]
+     * notion of
+     * {@link StaticAnalysis#getIncomingBindings(IBindingProducerNode, Set)}
+     * depends on this heuristic!]
      */
     public void test_static_analysis_join_vars() throws MalformedQueryException {
 

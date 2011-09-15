@@ -164,6 +164,9 @@ public class AST2BOpUtility {
         // Set the optimized AST model on the container.
         astContainer.setOptimizedAST(optimizedQuery);
 
+        // Final static analysis object for the optimized query.
+        ctx.sa = new StaticAnalysis(optimizedQuery);
+        
         // The executable query plan.
         PipelineOp queryPlan = convert(optimizedQuery, ctx);
 
@@ -966,6 +969,8 @@ public class AST2BOpUtility {
     private static PipelineOp convertJoinGroup(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
+        final StaticAnalysis sa = ctx.sa;
+        
         // /*
         // * Place the StartOp at the beginning of the pipeline.
         // *
@@ -991,7 +996,7 @@ public class AST2BOpUtility {
          * failed by a filter. We will do less work if we fail the solution in
          * the parent group.
          */
-        left = addConditionals(left, joinGroup.getPreFilters(), ctx);
+        left = addConditionals(left, sa.getPreFilters(joinGroup), ctx);
 
         /*
          * FIXME We need to move away from the DataSetJoin class and replace it
@@ -1103,7 +1108,7 @@ public class AST2BOpUtility {
              * TODO Materialization steps are currently handled via recursion
              * into Rule2BOpUtility.
              */
-            left = addJoins(left, joinGroup, ctx);
+            left = addJoins(left, joinGroup, sa, ctx);
 
             /*
              * Add SPARQL 1.1 style subqueries.
@@ -1153,7 +1158,7 @@ public class AST2BOpUtility {
         /*
          * Add the post-conditionals to the pipeline.
          */
-        left = addConditionals(left, joinGroup.getPostFilters(), ctx);
+        left = addConditionals(left, sa.getPostFilters(joinGroup), ctx);
 
         /*
          * Add the end operator if necessary.
@@ -1368,7 +1373,8 @@ public class AST2BOpUtility {
     }
     
     private static final PipelineOp addJoins(PipelineOp left,
-            final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
+            final JoinGroupNode joinGroup, final StaticAnalysis sa,
+            final AST2BOpContext ctx) {
 
         @SuppressWarnings("rawtypes")
         final List<IPredicate> preds = new LinkedList<IPredicate>();
@@ -1384,7 +1390,7 @@ public class AST2BOpUtility {
 
         final List<IConstraint> constraints = new LinkedList<IConstraint>();
 
-        for (FilterNode filter : joinGroup.getJoinFilters()) {
+        for (FilterNode filter : sa.getJoinFilters(joinGroup)) {
 
             constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                     filter.getValueExpression()));
@@ -1399,13 +1405,16 @@ public class AST2BOpUtility {
                 ? constraints.toArray(new IConstraint[constraints.size()])
                         : null);
 
+        final Set<IVariable<?>> knownBound = sa.getIncomingBindings(
+                joinGroup, new LinkedHashSet<IVariable<?>>());
+
         /*
          * FIXME Pull code up for this. (note that Rule2BOpUtility is also
          * handling materialization steps for joins.
          */
-        left = Rule2BOpUtility.convert(rule, left,
-                joinGroup.getIncomingBindings(new LinkedHashSet<IVariable<?>>()), // knownBound
-                ctx.idFactory, ctx.db, ctx.queryEngine, ctx.queryHints);
+
+        left = Rule2BOpUtility.convert(rule, left, knownBound, ctx.idFactory,
+                ctx.db, ctx.queryEngine, ctx.queryHints);
 
         return left;
 

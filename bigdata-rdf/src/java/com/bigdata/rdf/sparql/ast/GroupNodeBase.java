@@ -212,7 +212,15 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         for (IQueryNode n : this) {
 
-            sb.append(n.toString(indent+1));
+            if(n instanceof AssignmentNode) {
+                /*
+                 * Note: Otherwise no newline before an AssignmentNode since
+                 * also used in a ProjectionNode.
+                 */
+                sb.append("\n");
+            }
+            
+            sb.append(n.toString(indent + 1));
 
         }
 
