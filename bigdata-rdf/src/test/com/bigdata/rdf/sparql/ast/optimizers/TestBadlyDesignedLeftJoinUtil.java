@@ -34,7 +34,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.TestASTNamedSubqueryEvaluation;
 import com.bigdata.rdf.sparql.ast.optimizers.BadlyDesignedLeftJoinsUtil.BadlyDesignedLeftJoinIteratorException;
 
 /**
@@ -83,7 +82,7 @@ public class TestBadlyDesignedLeftJoinUtil extends AbstractASTEvaluationTestCase
         final String baseURI = null;//"http://www.bigdata.com/";
         
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         if (log.isInfoEnabled())
             log.info("\n" + BOpUtility.toString(queryRoot));
@@ -122,7 +121,7 @@ public class TestBadlyDesignedLeftJoinUtil extends AbstractASTEvaluationTestCase
         final String baseURI = null;//"http://www.bigdata.com/";
         
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         if (log.isInfoEnabled())
             log.info("\n" + BOpUtility.toString(queryRoot));
@@ -155,7 +154,7 @@ public class TestBadlyDesignedLeftJoinUtil extends AbstractASTEvaluationTestCase
         final String baseURI = null;//"http://www.bigdata.com/";
         
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         if (log.isInfoEnabled())
             log.info("\n" + BOpUtility.toString(queryRoot));

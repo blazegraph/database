@@ -17,7 +17,6 @@ import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
@@ -153,27 +152,20 @@ public class AST2BOpUtility {
         final IBindingSet[] bindingSets = null;
 
         // The AST query model.
-        final QueryRoot query = ctx.query;
+        final ASTContainer astContainer = ctx.astContainer;
 
-        /*
-         * Run the AST query rewrites / query optimizers.
-         * 
-         * FIXME For improved visibility, the optimizer should be run outside of
-         * this method and/or we should publish the optimizer AST. Otherwise
-         * things like DESCRIBE can be rewritten pretty broadly and we do not
-         * get a chance to see the rewritten AST model. However, since the
-         * rewrite is destructive we will not get to see both the original and
-         * optimized versions at the same time.
-         */
-        if (ctx.optimizedQuery == null) {
-
-            ctx.optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
-                    query, bindingSets);
-
-        }
+        // The AST model as produced by the parser.
+        final QueryRoot originalQuery = astContainer.getOriginalAST();
+        
+        // Run the AST query rewrites / query optimizers.
+        final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
+                originalQuery, bindingSets);
+        
+        // Set the optimized AST model on the container.
+        astContainer.setOptimizedAST(optimizedQuery);
 
         // The executable query plan.
-        PipelineOp queryPlan = convert(ctx.optimizedQuery, ctx);
+        PipelineOp queryPlan = convert(optimizedQuery, ctx);
 
         if (queryPlan == null) {
 
@@ -198,9 +190,7 @@ public class AST2BOpUtility {
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
         if (log.isInfoEnabled()) {
-            log.info("\noriginal :\n" + query);
-            log.info("\noptimized:\n" + BOpUtility.toString(ctx.optimizedQuery));
-            log.info("\npipeline :\n" + BOpUtility.toString(queryPlan));
+            log.info(astContainer);
         }
 
         return queryPlan;
@@ -860,7 +850,7 @@ public class AST2BOpUtility {
             /*
              * This in fact shows up in the TCK which is a bit weird.
              */
-            log.warn("Optional union? : " + ctx.query.getQueryString());
+            log.warn("Optional union? : " + ctx.astContainer);
         }
 
         final int arity = unionNode.size();
@@ -1003,7 +993,23 @@ public class AST2BOpUtility {
          */
         left = addConditionals(left, joinGroup.getPreFilters(), ctx);
 
-        left = addKnownInConditionals(left,joinGroup.getKnownInFilters(),ctx);
+        /*
+         * FIXME We need to move away from the DataSetJoin class and replace it
+         * with an IPredicate to which we have attached an inline access path.
+         * That transformation needs to happen in a rewrite rule, which means
+         * that we will wind up removing the IN filter and replacing it with an
+         * AST node for that inline AP (something conceptually similar to a
+         * statement pattern but for a column projection of the variable for the
+         * IN expression). That way we do not have to magically "subtract" the
+         * known "IN" filters out of the join- and post- filters.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
+         * DataSetJoin with an "inline" access path.)
+         * 
+         * @see JoinGroupNode#getKnownInFilters()
+         */
+        left = addKnownInConditionals(left, joinGroup.getKnownInFilters(), ctx);
+
         /*
          * Required joins and non-optional subqueries.
          * 
@@ -1328,35 +1334,39 @@ public class AST2BOpUtility {
 
     }
 
+    /**
+     * Convert an IN filter to a join with an inline access path.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
+     *      DataSetJoin with an "inline" access path.)
+     */
     @SuppressWarnings("rawtypes")
     private static final PipelineOp addKnownInConditionals(PipelineOp left,
             final Collection<FilterNode> filters, final AST2BOpContext ctx) {
 
         for (FilterNode filter : filters) {
 
-            @SuppressWarnings("unchecked")
             final IValueExpression ve = filter.getValueExpression();
 
-           InBOp bop=(InBOp)ve;
-           IConstant<IV>[] set=bop.getSet();
-           LinkedHashSet<IV> ivs=new LinkedHashSet<IV>();
-           for(IConstant<IV> iv:set){
-               ivs.add(iv.get());
-           }
-           IVariable var=(IVariable)bop.getValueExpression();
-           left =    new DataSetJoin(leftOrEmpty(left),
-                  NV.asMap(new NV[] {//
-                          new NV(DataSetJoin.Annotations.VAR, var),//
-                          new NV(DataSetJoin.Annotations.BOP_ID,
-                                  ctx.idFactory.incrementAndGet()),//
-                          new NV(DataSetJoin.Annotations.GRAPHS,
-                                  ivs) //
-                  }));
+            final InBOp bop = (InBOp) ve;
+            final IConstant<IV>[] set = bop.getSet();
+            final LinkedHashSet<IV> ivs = new LinkedHashSet<IV>();
+            for (IConstant<IV> iv : set) {
+                ivs.add(iv.get());
+            }
+            final IVariable var = (IVariable) bop.getValueExpression();
+            left = new DataSetJoin(leftOrEmpty(left), NV.asMap(new NV[] {//
+                            new NV(DataSetJoin.Annotations.VAR, var),//
+                            new NV(DataSetJoin.Annotations.BOP_ID,
+                                    ctx.idFactory.incrementAndGet()),//
+                            new NV(DataSetJoin.Annotations.GRAPHS, ivs) //
+                    }));
         }
 
         return left;
 
     }
+    
     private static final PipelineOp addJoins(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
 
@@ -2379,9 +2389,11 @@ public class AST2BOpUtility {
     private static final Predicate toPredicate(final StatementPatternNode sp,
             final AST2BOpContext ctx) {
 
+        final QueryRoot query = ctx.astContainer.getOptimizedAST();
+        
         final AbstractTripleStore database = ctx.db;
 
-        final DatasetNode dataset = ctx.query.getDataset();
+        final DatasetNode dataset = query.getDataset();
 
         // create a solution expander for free text search if necessary
         IAccessPathExpander<ISPO> expander = null;
@@ -2574,7 +2586,7 @@ public class AST2BOpUtility {
          * write a delegation pattern that let's us wrap one filter inside of
          * another.]
          */
-        final IElementFilter<ISPO> filter = !ctx.query.getIncludeInferred() ? ExplicitSPOFilter.INSTANCE
+        final IElementFilter<ISPO> filter = !query.getIncludeInferred() ? ExplicitSPOFilter.INSTANCE
                 : null;
 
         // Decide on the correct arity for the predicate.

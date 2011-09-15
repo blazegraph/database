@@ -222,8 +222,8 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     protected QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException, TokenMgrError, ParseException {
 
-        return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery(queryStr,
-                baseURI).getQueryRoot();
+        return new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
+                baseURI).getOriginalAST();
 
     }
 
@@ -235,19 +235,19 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
         if (expected instanceof QueryRoot) {
 
-            if (((QueryRoot) expected).getQueryString() == null) {
-                /*
-                 * Note: Discard the query string since the unit tests are not
-                 * setting that attribute at this time.
-                 */
-                ((QueryRoot) actual).setQueryString(null);
-            }
-        
-            // Grab a reference to the parse tree.
-            parseTree = (Node) ((QueryRoot) actual).getParseTree();
-            
-            // Clear parse tree annotation since it is not on [expected].
-            ((QueryRoot) actual).setParseTree(null);
+//            if (((QueryRoot) expected).getQueryString() == null) {
+//                /*
+//                 * Note: Discard the query string since the unit tests are not
+//                 * setting that attribute at this time.
+//                 */
+//                ((QueryRoot) actual).setQueryString(null);
+//            }
+//        
+//            // Grab a reference to the parse tree.
+//            parseTree = (Node) ((QueryRoot) actual).getParseTree();
+//            
+//            // Clear parse tree annotation since it is not on [expected].
+//            ((QueryRoot) actual).setParseTree(null);
 
             if (((QueryRoot) expected).getQueryHints() == null) {
                 /*
@@ -270,7 +270,8 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         if (!expected.equals(actual)) {
 
             log.error("\nqueryStr:\n" + queryStr);
-            log.error("\nparseTree:\n" + ((SimpleNode) parseTree).dump(""));
+            log.error("\nparseTree:\n" + parseTree == null ? null
+                    : ((SimpleNode) parseTree).dump(""));
             log.error("\nexpected:\n" + expected);
             log.error("\nactual:\n" + actual);
 

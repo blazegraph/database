@@ -291,13 +291,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * semantics of the DESCRIBE query. The query type is also changed to
          * CONSTRUCT.
          */
-        add(new DescribeOptimizer());
+        add(new ASTDescribeOptimizer());
 
         /**
          * Creates and assigns a PROJECTION of all variables in the CONSTRUCT
          * clause.
          */
-        add(new ConstructOptimizer());
+        add(new ASTConstructOptimizer());
 
         /**
          * Rewrites the group graph pattern annotation of an {@link ExistsNode}

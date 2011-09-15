@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -19,12 +18,12 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
@@ -33,8 +32,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class BigdataSailTupleQuery extends SailTupleQuery 
         implements BigdataSailQuery {
 
-    private static final Logger log = Logger
-            .getLogger(BigdataSailTupleQuery.class);
+//    private static final Logger log = Logger
+//            .getLogger(BigdataSailTupleQuery.class);
     
     /**
      * Query hints are embedded in query strings as namespaces.  
@@ -47,10 +46,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
      */
     private volatile TupleExpr tupleExpr;
     
-    /** Set when the query is evaluated. */
-    private volatile QueryRoot optimizedQuery;
-
-    private final QueryRoot queryRoot;
+    private final ASTContainer astContainer;
     
     public Properties getQueryHints() {
     	
@@ -58,16 +54,16 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     	
     }
     
-    public QueryRoot getQueryRoot() {
+    public ASTContainer getASTContainer() {
         
-        return queryRoot;
+        return astContainer;
         
     }
 
     @Override
     public void setDataset(final Dataset dataset) {
         
-        if(queryRoot == null) {
+        if(astContainer == null) {
             
             super.setDataset(dataset);
             
@@ -82,7 +78,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
                 final Object[] tmp = new BigdataValueReplacer(getTripleStore())
                         .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
                 
-                queryRoot.setDataset(new DatasetNode((Dataset) tmp[0]));
+                astContainer.getOriginalAST().setDataset(new DatasetNode((Dataset) tmp[0]));
                 
             } catch (SailException e) {
                 
@@ -97,16 +93,11 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     @Override
     public String toString() {
 
-        if (queryRoot == null)
+        if (astContainer == null)
             return super.toString();
         
-        QueryRoot tmp = optimizedQuery;
-
-        if (tmp == null)
-            tmp = queryRoot;
-
-        return BOpUtility.toString2(tmp);
-
+        return astContainer.toString();
+        
     }
     
     public AbstractTripleStore getTripleStore() {
@@ -116,14 +107,17 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
     }
     
-    public BigdataSailTupleQuery(final QueryRoot queryRoot,
+    public BigdataSailTupleQuery(final ASTContainer astContainer,
             final BigdataSailRepositoryConnection con) {
 
-        super(null/*tupleQuery*/, con); // TODO Might have to fake the TupleExpr with a Nop.
+        super(null/*tupleQuery*/, con);
 
-        this.queryHints = queryRoot.getQueryHints();
+        if(astContainer == null)
+            throw new IllegalArgumentException();
+        
+        this.queryHints = astContainer.getOriginalAST().getQueryHints();
 
-        this.queryRoot = queryRoot;
+        this.astContainer = astContainer;
         
     }
 
@@ -135,7 +129,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     	
         this.queryHints = queryHints;
 
-        this.queryRoot = null;
+        this.astContainer = null;
         
     }
 
@@ -149,37 +143,27 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     @Override
     public TupleQueryResult evaluate() throws QueryEvaluationException {
 
-        if (queryRoot != null) {
+        if (astContainer != null) {
+            
+            astContainer.clearOptimizedAST();
+            
+            final QueryRoot originalQuery = astContainer.getOriginalAST();
             
             if (getMaxQueryTime() > 0)
-                queryRoot.setTimeout(TimeUnit.SECONDS
+                originalQuery.setTimeout(TimeUnit.SECONDS
                         .toMillis(getMaxQueryTime()));
             
-            queryRoot.setIncludeInferred(getIncludeInferred());
+            originalQuery.setIncludeInferred(getIncludeInferred());
             
             final AbstractTripleStore store = getTripleStore();
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
-
-            if (log.isInfoEnabled())
-                log.info("queryRoot:\n" + queryRoot);
-
-            /*
-             * Run the query optimizer first so we have access to the rewritten
-             * query plan.
-             */
-            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
-                    .optimize(context, queryRoot, null/* bindingSet[] */);
-
-            if (log.isInfoEnabled())
-                log.info("optimizedQuery:\n" + optimizedQuery);
+            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
             final PipelineOp queryPlan = AST2BOpUtility.convert(context);
 
-            if (log.isInfoEnabled())
-                log.info("queryPlan:\n" + queryPlan);
-
-            final IVariable<?>[] projected = queryRoot.getProjection()
+            final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+            
+            final IVariable<?>[] projected = optimizedQuery.getProjection()
                     .getProjectionVars();
 
             final TupleQueryResult queryResult = ASTEvalHelper

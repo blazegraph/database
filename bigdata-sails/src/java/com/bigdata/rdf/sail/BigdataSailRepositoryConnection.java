@@ -23,7 +23,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -270,21 +270,24 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         getSailConnection()
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
 
-        final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
                 getTripleStore()).parseQuery2(queryStr, baseURI);
 
-        switch (queryRoot.getQueryType()) {
+        final QueryType queryType = astContainer.getOriginalAST()
+                .getQueryType();
+        
+        switch (queryType) {
         case SELECT:
-            return new BigdataSailTupleQuery(queryRoot, this);
+            return new BigdataSailTupleQuery(astContainer, this);
         case DESCRIBE:
         case CONSTRUCT:
-            return new BigdataSailGraphQuery(queryRoot, this);
+            return new BigdataSailGraphQuery(astContainer, this);
         case ASK: {
-            return new BigdataSailBooleanQuery(queryRoot, this);
+            return new BigdataSailBooleanQuery(astContainer, this);
         }
         default:
             throw new RuntimeException("Unknown query type: "
-                    + queryRoot.getQueryType());
+                    + queryType);
         }
 
     }

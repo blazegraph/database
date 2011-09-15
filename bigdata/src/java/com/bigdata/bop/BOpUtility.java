@@ -1473,6 +1473,7 @@ public class BOpUtility {
         
         try {
 
+            @SuppressWarnings("unchecked")
             final Constructor<BOp> ctor = (Constructor<BOp>) op.getClass()
                     .getConstructor(BOp[].class, Map.class);
             
@@ -1484,6 +1485,95 @@ public class BOpUtility {
             
         }
         
+    }
+
+    /**
+     * Deep copy.  All bops will be distinct instances having the same data
+     * for their arguments and their annotations.  Annotations which are 
+     * bops are also deep copied.
+     */
+    public static <T extends BOp> T deepCopy(final T op) {
+
+        if( op == null )
+            return op;
+        
+        if (op instanceof IVariableOrConstant<?>) {
+            /*
+             * Note: Variables are immutable and support reference testing.
+             * 
+             * Note: Constants are immutable. There is a constant with an
+             * annotation for the name of the corresponding variable, but the
+             * constant can not be modified.
+             */
+            return op;
+        }
+
+        if(op instanceof BOpBase) {
+            /*
+             * The instances of this class can not be modified so we do not need
+             * to do a deep copy.
+             */
+            return op;
+        }
+        
+        /*
+         * Children.
+         */
+        final int arity = op.arity();
+
+        final BOp[] args = arity == 0 ? BOp.NOARGS : new BOp[arity];
+        
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = op.get(i);
+
+            // depth first recursion.
+            args[i] = deepCopy(child);
+            
+        }
+        
+        /*
+         * Annotations.
+         */
+        
+        final LinkedHashMap<String,Object> anns = new LinkedHashMap<String, Object>();
+        
+        for(Map.Entry<String, Object> e : op.annotations().entrySet()) {
+            
+            final String name = e.getKey();
+            
+            final Object oval = e.getValue();
+            
+            final Object nval;
+            
+            if(oval instanceof BOp) {
+                
+                nval = deepCopy((BOp)oval);
+                
+            } else {
+                
+                nval = oval;
+                
+            }
+            
+            anns.put(name, nval);
+            
+        }
+
+        try {
+
+            @SuppressWarnings("unchecked")
+            final Constructor<T> ctor = (Constructor<T>) op.getClass()
+                    .getConstructor(BOp[].class, Map.class);
+
+            return ctor.newInstance(args, anns);
+
+        } catch (Exception e1) {
+
+            throw new RuntimeException(e1);
+
+        }
+
     }
 
 }

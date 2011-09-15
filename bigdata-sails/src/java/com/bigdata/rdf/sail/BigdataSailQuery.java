@@ -28,7 +28,7 @@ import java.util.Properties;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
 
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -56,14 +56,14 @@ public interface BigdataSailQuery {
 	 * 
 	 * @see QueryHints
 	 * 
-	 * @deprecated by {@link #getQueryRoot()} 
+	 * @deprecated by {@link #getASTContainer()} 
 	 */
     Properties getQueryHints();
 
     /**
      * Return the AST model.
      */
-    QueryRoot getQueryRoot();
+    ASTContainer getASTContainer();
     
     /**
      * The backing database view.

@@ -70,7 +70,7 @@ import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.BigdataParsedQuery;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
@@ -520,23 +520,26 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
-            final QueryRoot queryRoot = parsedQuery instanceof BigdataParsedQuery ? ((BigdataParsedQuery) parsedQuery)
-                    .getQueryRoot() : null;
+            final ASTContainer astContainer = parsedQuery instanceof BigdataParsedQuery ? ((BigdataParsedQuery) parsedQuery)
+                    .getASTContainer() : null;
 
-            if ( queryRoot != null) {
+            if ( astContainer != null) {
 
-                switch (queryRoot.getQueryType()) {
+                final QueryType queryType = ((BigdataParsedQuery) parsedQuery)
+                        .getQueryType();
+                
+                switch (queryType) {
                 case SELECT:
-                    return new BigdataSailTupleQuery(queryRoot, cxn);
+                    return new BigdataSailTupleQuery(astContainer, cxn);
                 case DESCRIBE:
                 case CONSTRUCT:
-                    return new BigdataSailGraphQuery(queryRoot, cxn);
+                    return new BigdataSailGraphQuery(astContainer, cxn);
                 case ASK: {
-                    return new BigdataSailBooleanQuery(queryRoot, cxn);
+                    return new BigdataSailBooleanQuery(astContainer, cxn);
                 }
                 default:
                     throw new RuntimeException("Unknown query type: "
-                            + queryRoot.getQueryType());
+                            + queryType);
                 }
                 
             }

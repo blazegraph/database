@@ -28,8 +28,6 @@ import java.util.Enumeration;
 import java.util.Map;
 import java.util.Properties;
 
-import org.openrdf.query.parser.sparql.ast.SimpleNode;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.QueryType;
@@ -53,24 +51,6 @@ public class QueryRoot extends QueryBase {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends QueryBase.Annotations {
-
-        /**
-         * The original query from which this AST was generated.
-         */
-        String QUERY_STRING = "queryString";
-
-        /**
-         * The parse tree generated from the query string (optional). For the
-         * default integration, this is the parse tree assembled by the Sesame
-         * <code>sparql.jjt</code> grammar. Other integrations may produce
-         * different parse trees using different object models.
-         * <p>
-         * Note: There is no guarantee that the parse tree is a serializable
-         * object. It may not need to be stripped off of the {@link QueryRoot}
-         * if the {@link QueryRoot} is persisted or shipped to another node in a
-         * cluster.
-         */
-        String PARSE_TREE = "parseTree";
 
         /**
          * Query hints (optional). When present, this is a {@link Properties}
@@ -133,25 +113,6 @@ public class QueryRoot extends QueryBase {
     }
     
     /**
-     * Return the original query from which this AST model was generated.
-     */
-    public String getQueryString() {
-
-        return (String) getProperty(Annotations.QUERY_STRING);
-
-    }
-
-    /**
-     * Set the query string used to generate the AST model.
-     * @param queryString The query string.
-     */
-    public void setQueryString(String queryString) {
-        
-        setProperty(Annotations.QUERY_STRING, queryString);
-
-    }
-
-    /**
      * The namespace prefix declarations map. This is a {@link Map} with
      * {@link String} keys (prefix) and {@link String} values (the uri
      * associated with that prefix).
@@ -184,27 +145,6 @@ public class QueryRoot extends QueryBase {
 
     }
 
-    /**
-     * Return the parse tree generated from the query string. 
-     */
-    public Object getParseTree() {
-
-        return getProperty(Annotations.PARSE_TREE);
-        
-    }
-
-    /**
-     * Set the parse tree generated from the query string.
-     * 
-     * @param parseTree
-     *            The parse tree (may be <code>null</code>).
-     */
-    public void setParseTree(Object parseTree) {
-        
-        setProperty(Annotations.PARSE_TREE, parseTree);
-        
-    }
-    
     /**
      * Return the optional query hints.
      * 
@@ -278,9 +218,9 @@ public class QueryRoot extends QueryBase {
         
         final StringBuilder sb = new StringBuilder();
 
-        final String queryString = getQueryString();
-        
-        final Object parseTree = getParseTree();
+//        final String queryString = getQueryString();
+//        
+//        final Object parseTree = getParseTree();
         
         final Properties queryHints = getQueryHints();
 
@@ -290,34 +230,34 @@ public class QueryRoot extends QueryBase {
 
         final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
 
-        if (queryString != null) {
-
-            sb.append(s);
-            sb.append(queryString);
-            sb.append("\n");
-
-        }
-        
-        if (parseTree != null) {
-
-            if(parseTree instanceof SimpleNode) {
-
-                // Dump parse tree for sparql.jjt grammar.
-                sb.append(((SimpleNode)parseTree).dump(s));
-                
-            } else {
-            
-                /*
-                 * Dump some other parse tree, assuming it implements toString()
-                 * as pretty print.
-                 */
-                sb.append(s);
-                sb.append(parseTree.toString());
-                sb.append("\n");
-                
-            }
-
-        }
+//        if (queryString != null) {
+//
+//            sb.append(s);
+//            sb.append(queryString);
+//            sb.append("\n");
+//
+//        }
+//        
+//        if (parseTree != null) {
+//
+//            if(parseTree instanceof SimpleNode) {
+//
+//                // Dump parse tree for sparql.jjt grammar.
+//                sb.append(((SimpleNode)parseTree).dump(s));
+//                
+//            } else {
+//            
+//                /*
+//                 * Dump some other parse tree, assuming it implements toString()
+//                 * as pretty print.
+//                 */
+//                sb.append(s);
+//                sb.append(parseTree.toString());
+//                sb.append("\n");
+//                
+//            }
+//
+//        }
         
         if (queryHints != null) {
 

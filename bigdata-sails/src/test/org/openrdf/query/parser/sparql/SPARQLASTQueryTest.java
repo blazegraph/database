@@ -19,11 +19,10 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.sail.SailQuery;
 
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataValueReplacer;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
 
 /**
  * A variant on the {@link SPARQLQueryTest} which uses the bigdata AST and does
@@ -172,17 +171,18 @@ public abstract class SPARQLASTQueryTest extends SPARQLQueryTest {
 //			Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
             
 			if (dataset != null) {
-//				query.setDataset(dataset);
+				
+			    ((SailQuery)query).setDataset(dataset);
 			    
-			    // Batch resolve Values to IVs.
-                final Object[] tmp = new BigdataValueReplacer(
-                        con.getTripleStore()).replaceValues(dataset,
-                        null/* tupleExpr */, null/* bindings */);
-			    
-                final Dataset dataset = (Dataset) tmp[0];
-                
-                // Set dataset with resolve IVs on QueryRoot.
-                query.getQueryRoot().setDataset(new DatasetNode(dataset));
+//			    // Batch resolve Values to IVs.
+//                final Object[] tmp = new BigdataValueReplacer(
+//                        con.getTripleStore()).replaceValues(dataset,
+//                        null/* tupleExpr */, null/* bindings */);
+//			    
+//                final Dataset dataset = (Dataset) tmp[0];
+//                
+//                // Set dataset with resolved IVs on QueryRoot.
+//                query.getASTContainer().getOriginalAST().setDataset(new DatasetNode(dataset));
                 
 			}
 

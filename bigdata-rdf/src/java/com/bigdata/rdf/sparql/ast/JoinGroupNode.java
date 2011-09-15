@@ -9,10 +9,8 @@ import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.controller.SubqueryOp;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.InBOp;
 
@@ -344,26 +342,60 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     }
 
-    public Collection<FilterNode> getKnownInFilters() {
-        /*
-         * Get the inhash filters;
-         */
-        final Collection<FilterNode> filters = new ArrayList<FilterNode>();
+    /**
+     * Return the set of IN filters for this group.
+     * 
+     * FIXME We need to move away from the DataSetJoin class and replace it with
+     * an IPredicate to which we have attached an inline access path. That
+     * transformation needs to happen in a rewrite rule, which means that we
+     * will wind up removing the IN filter and replacing it with an AST node for
+     * that inline AP (something conceptually similar to a statement pattern but
+     * for a column projection of the variable for the IN expression). That way
+     * we do not have to magically "subtract" the known "IN" filters out of the
+     * join- and post- filters.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
+     *      DataSetJoin with an "inline" access path.)
+     */
+    public List<FilterNode> getKnownInFilters() {
+        
+        final List<FilterNode> filters = new LinkedList<FilterNode>();
+
         for (IQueryNode node : this) {
 
             if (!(node instanceof FilterNode))
                 continue;
-            if(true){
+
+            /*
+             * FIXME The "data set join" hack can be enabled by making this
+             * [true]. I have it disabled for the moment since I am in the
+             * middle of changing all of this static analysis stuff.
+             * 
+             * Note: You will also have to modify the join- and post- filter
+             * methods in the StaticAnalysis class for this to work. They need
+             * to subtract out the IN filters if they have already been applied.
+             */
+            if (false) {
+
                 final FilterNode filter = (FilterNode) node;
+
                 if (filter.getValueExpression() instanceof InBOp) {
-                    if (((InBOp) filter.getValueExpression()).getValueExpression() instanceof IVariable) {
+
+                    if (((InBOp) filter.getValueExpression())
+                            .getValueExpression() instanceof IVariable) {
+
                         filters.add(filter);
+
                     }
+
                 }
+
             }
+
         }
 
         return filters;
+        
     }
 
     /**
