@@ -44,6 +44,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
@@ -56,20 +57,20 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
- * Test suite for the {@link ConstructOptimizer}. This is applied for both
+ * Test suite for the {@link ASTConstructOptimizer}. This is applied for both
  * DESCRIBE and CONSTRUCT queries.  It generates the {@link ProjectionNode},
  * populating it with all of the variables in the {@link ConstructNode}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
+public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
 
-    public TestConstructOptimizer() {
+    public TestASTConstructOptimizer() {
         super();
     }
 
-    public TestConstructOptimizer(String name) {
+    public TestASTConstructOptimizer(String name) {
         super(name);
     }
 
@@ -351,10 +352,12 @@ public class TestConstructOptimizer extends AbstractASTEvaluationTestCase {
          */
         {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
-            final QueryRoot actual = (QueryRoot) new ConstructOptimizer()
+            final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
                     .optimize(context, queryRoot, null/* bindingSet */);
 
             // Sort the args for comparison.

@@ -49,7 +49,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 /**
  * Optimizer to turn a describe query into a construct query.
  */
-public class DescribeOptimizer implements IASTOptimizer {
+public class ASTDescribeOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger.getLogger(DescribeOptimizer.class); 
     

@@ -42,6 +42,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -56,21 +57,21 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
- * Test suite for the {@link DescribeOptimizer}.
+ * Test suite for the {@link ASTDescribeOptimizer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
+public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 
     private static final Logger log = Logger
-            .getLogger(TestDescribeOptimizer.class);
+            .getLogger(TestASTDescribeOptimizer.class);
 
-    public TestDescribeOptimizer() {
+    public TestASTDescribeOptimizer() {
         super();
     }
 
-    public TestDescribeOptimizer(String name) {
+    public TestASTDescribeOptimizer(String name) {
         super(name);
     }
 
@@ -239,10 +240,12 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
          */
         {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
-            final IQueryNode actual = new DescribeOptimizer().optimize(
+            final IQueryNode actual = new ASTDescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
             assertSameAST(expected, actual);
@@ -456,10 +459,12 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
          */
         {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
-            final IQueryNode actual = new DescribeOptimizer().optimize(
+            final IQueryNode actual = new ASTDescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
             assertSameAST(expected, actual);
@@ -645,7 +650,9 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
          */
         {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
             IQueryNode actual;
@@ -653,7 +660,7 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
             actual = new ASTWildcardProjectionOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
             
-            actual = new DescribeOptimizer().optimize(
+            actual = new ASTDescribeOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
             assertSameAST(expected, actual);
@@ -685,14 +692,16 @@ public class TestDescribeOptimizer extends AbstractASTEvaluationTestCase {
          */
         {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot,
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
                     store);
 
             IQueryNode tmp = new ASTWildcardProjectionOptimizer().optimize(
                     context, queryRoot, null/* bindingSet */);
 
             try {
-                new DescribeOptimizer()
+                new ASTDescribeOptimizer()
                         .optimize(context, tmp, null/* bindingSet */);
                 fail("Expecting " + RuntimeException.class);
             } catch (RuntimeException ex) {

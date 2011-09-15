@@ -42,17 +42,17 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 /**
  * Generates the {@link ProjectionNode} for a CONSTRUCT or DESCRIBE query. It is
  * populated with each variable which appears in the {@link ConstructNode}. The
- * {@link DescribeOptimizer} MUST be run first for a DESCRIBE query.
+ * {@link ASTDescribeOptimizer} MUST be run first for a DESCRIBE query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ConstructOptimizer implements IASTOptimizer {
+public class ASTConstructOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
 //            .getLogger(ConstructOptimizer.class);
     
-    public ConstructOptimizer() {
+    public ASTConstructOptimizer() {
     }
 
     @Override

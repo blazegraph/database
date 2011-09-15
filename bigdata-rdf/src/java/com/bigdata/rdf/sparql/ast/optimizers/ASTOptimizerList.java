@@ -31,6 +31,8 @@ import java.util.LinkedList;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -69,10 +71,16 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
     /**
      * Run all the optimizers in the list.
+     * <p>
+     * Note: This makes a deep copy of the AST before applying destructive
+     * modifications.
      */
     public IQueryNode optimize(final AST2BOpContext context,
             IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
+        // Avoid side-effects on the original AST!
+        queryNode = (IQueryNode) BOpUtility.deepCopy((BOp) queryNode);
+        
         for (IASTOptimizer opt : this) {
 
             if (log.isInfoEnabled())

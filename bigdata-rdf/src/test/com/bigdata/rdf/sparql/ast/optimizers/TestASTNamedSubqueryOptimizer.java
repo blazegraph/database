@@ -35,6 +35,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -112,10 +113,12 @@ public class TestASTNamedSubqueryOptimizer extends
                 "   INCLUDE %namedSet1 \n"+
                 "}";
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
         
         // Run the optimizers to determine the join variables.
         queryRoot = (QueryRoot) new DefaultOptimizerList().optimize(context,

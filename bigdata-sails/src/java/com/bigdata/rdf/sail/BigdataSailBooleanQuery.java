@@ -5,7 +5,6 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -16,12 +15,11 @@ import org.openrdf.repository.sail.SailBooleanQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
@@ -30,7 +28,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class BigdataSailBooleanQuery extends SailBooleanQuery 
         implements BigdataSailQuery {
 
-    private static Logger log = Logger.getLogger(BigdataSailBooleanQuery.class);
+//    private static Logger log = Logger.getLogger(BigdataSailBooleanQuery.class);
 
     /**
      * Query hints are embedded in query strings as namespaces.  
@@ -45,21 +43,18 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     	
     }
 
-    /** Set when the query is evaluated. */
-    private volatile QueryRoot optimizedQuery;
+    private final ASTContainer astContainer;
 
-    private final QueryRoot queryRoot;
-
-    public QueryRoot getQueryRoot() {
+    public ASTContainer getASTContainer() {
         
-        return queryRoot;
+        return astContainer;
         
     }
 
     @Override
     public void setDataset(final Dataset dataset) {
         
-        if(queryRoot == null) {
+        if(astContainer == null) {
             
             super.setDataset(dataset);
             
@@ -74,8 +69,8 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
                 final Object[] tmp = new BigdataValueReplacer(getTripleStore())
                         .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
                 
-                queryRoot.setDataset(new DatasetNode((Dataset) tmp[0]));
-                
+                astContainer.getOriginalAST().setDataset(new DatasetNode((Dataset) tmp[0]));
+
             } catch (SailException e) {
                 
                 throw new RuntimeException(e);
@@ -89,16 +84,11 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     @Override
     public String toString() {
 
-        if (queryRoot == null)
+        if (astContainer == null)
             return super.toString();
         
-        QueryRoot tmp = optimizedQuery;
-
-        if (tmp == null)
-            tmp = queryRoot;
-
-        return BOpUtility.toString2(tmp);
-    
+        return astContainer.toString();
+        
     }
 
     public AbstractTripleStore getTripleStore() {
@@ -108,14 +98,17 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
     }
 
-    public BigdataSailBooleanQuery(final QueryRoot queryRoot,
+    public BigdataSailBooleanQuery(final ASTContainer astContainer,
             final BigdataSailRepositoryConnection con) {
 
-        super(null/*tupleQuery*/, con); // TODO Might have to fake the TupleExpr with a Nop.
+        super(null/*tupleQuery*/, con);
+
+        if(astContainer == null)
+            throw new IllegalArgumentException();
         
-        this.queryHints = queryRoot.getQueryHints();
+        this.queryHints = astContainer.getOriginalAST().getQueryHints();
         
-        this.queryRoot = queryRoot;
+        this.astContainer = astContainer;
         
     }
     
@@ -127,7 +120,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     	
         this.queryHints = queryHints;
         
-        this.queryRoot = null;
+        this.astContainer = null;
         
     }
 
@@ -142,35 +135,24 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
     @Override
     public boolean evaluate() throws QueryEvaluationException {
 
-        if (queryRoot != null) {
+        if (astContainer != null) {
+            
+            astContainer.clearOptimizedAST();
+
+            final QueryRoot originalQuery = astContainer.getOriginalAST();
             
             if (getMaxQueryTime() > 0)
-                queryRoot.setTimeout(TimeUnit.SECONDS
+                originalQuery.setTimeout(TimeUnit.SECONDS
                         .toMillis(getMaxQueryTime()));
 
-            queryRoot.setIncludeInferred(getIncludeInferred());
+            originalQuery.setIncludeInferred(getIncludeInferred());
 
             final AbstractTripleStore store = getTripleStore();
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
-            if (log.isInfoEnabled())
-                log.info("queryRoot:\n" + queryRoot);
-
-            /*
-             * Run the query optimizer first so we have access to the rewritten
-             * query plan.
-             */
-            final QueryRoot optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
-                    .optimize(context, queryRoot, null/* bindingSet[] */);
-
-            if (log.isInfoEnabled())
-                log.info("optimizedQuery:\n" + optimizedQuery);
-
+            // Generate the query plan.
             final PipelineOp queryPlan = AST2BOpUtility.convert(context);
-
-            if (log.isInfoEnabled())
-                log.info("queryPlan:\n" + queryPlan);
 
             final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(//
                     store, //
@@ -246,23 +228,4 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
         }
         
     }
-
-//    synchronized public void setBindingSets(
-//            final CloseableIteration<BindingSet, QueryEvaluationException> bindings) {
-//
-//        if (this.bindings != null)
-//            throw new IllegalStateException();
-//
-//        this.bindings = bindings;
-//
-//    }
-//
-//    synchronized public CloseableIteration<BindingSet, QueryEvaluationException> getBindingSets() {
-//
-//        return bindings;
-//
-//    }
-//
-//    private CloseableIteration<BindingSet, QueryEvaluationException> bindings;
-
 }

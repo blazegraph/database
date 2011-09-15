@@ -361,7 +361,7 @@ public abstract class SPARQLQueryTest extends TestCase {
                 if(tupleExpr != null) {
                     message.append(tupleExpr);
                 } else {
-                    message.append(((BigdataSailQuery) query).getQueryRoot());
+                    message.append(((BigdataSailQuery) query).getASTContainer());
                 }
                 
                 message.append("\n===================================\n");

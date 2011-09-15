@@ -116,7 +116,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "select ?x where { ?x rdf:type foaf:Person }";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
         
@@ -151,7 +151,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "select ?x (12 as ?y) where { ?x rdf:type foaf:Person }";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
@@ -199,7 +199,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
         
@@ -247,7 +247,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
         
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
         
@@ -296,7 +296,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
@@ -360,7 +360,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "{ :x :p ?v . FILTER(?v = 1) }";
 
         final QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
+                .parseQuery2(queryStr, baseURI).getOriginalAST();
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
@@ -410,10 +410,12 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "SELECT ?v \n" +//
                 "{ :x :p ?v . { FILTER(?v = 1) } }";
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                 queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
 
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
@@ -563,11 +565,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}"//
         ;
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
                 context, queryRoot, null /* bindingSets */);
@@ -762,10 +766,12 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "}"//
         ;
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
 
         // Rewrite the wild card in the projection.
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
@@ -929,10 +935,12 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 "   ?subj ?p ?lit .\n" + //
                 "}";
 
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
-                queryStr, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
 
         // rewrite the search predicates as an AST ServiceNode.
         queryRoot = (QueryRoot) new ASTSearchOptimizer().optimize(
@@ -1020,10 +1028,12 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         "   "+//
         "}";
         
-        QueryRoot queryRoot = new Bigdata2ASTSPARQLParser(store)
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
                 .parseQuery2(queryStr, baseURI);
 
-        final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
 
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(

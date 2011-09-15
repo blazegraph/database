@@ -59,6 +59,7 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -171,9 +172,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public BigdataParsedQuery parseQuery(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        final QueryRoot queryRoot = parseQuery2(queryStr, baseURI);
-        
-        return new BigdataParsedQuery(queryRoot);
+        return new BigdataParsedQuery(parseQuery2(queryStr, baseURI));
         
     }
 
@@ -189,7 +188,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * 
      * @throws MalformedQueryException
      */
-    public QueryRoot parseQuery2(final String queryStr, final String baseURI)
+    public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
         
         try {
@@ -218,17 +217,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              */
             final QueryRoot queryRoot = buildQueryModel(qc, context);
 
+            final ASTContainer ast = new ASTContainer(queryRoot);
+            
             // Set the query string on the AST.
-            queryRoot.setQueryString(queryStr);
+            ast.setQueryString(queryStr);
 
             // Set the parse tree on the AST.
-            queryRoot.setParseTree(qc);
+            ast.setParseTree(qc);
 
             final Properties queryHints = getQueryHints(qc);
 
             if (queryHints != null) {
 
-                queryRoot.setQueryHints(queryHints);
+               queryRoot.setQueryHints(queryHints);
 
             }
 
@@ -258,7 +259,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
             }
 
-            return queryRoot;
+            return ast;
 
         } catch (ParseException e) {
         

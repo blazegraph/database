@@ -72,14 +72,8 @@ public class TestAll extends TestCase {
         // Unit tests for query evaluation written to the AST layer.
         suite.addTestSuite(TestASTTriplesModeEvaluation.class);
 
-        // Unit tests for sub-query evaluation.
-        suite.addTestSuite(TestASTSPARQL11SubqueryEvaluation.class);
-
         // Unit tests for named solution set references.
         suite.addTestSuite(TestNamedSolutionSetRef.class);
-        
-        // Unit tests for sub-query evaluation.
-        suite.addTestSuite(TestASTNamedSubqueryEvaluation.class);
         
         return suite;
         

@@ -64,10 +64,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTBindingAssigner.class);
         
         // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT.
-        suite.addTestSuite(TestDescribeOptimizer.class);
+        suite.addTestSuite(TestASTDescribeOptimizer.class);
 
         // Unit tests for AST rewrite of the PROJECTION for a CONSTRUCT query.
-        suite.addTestSuite(TestDescribeOptimizer.class);
+        suite.addTestSuite(TestASTDescribeOptimizer.class);
 
         // Unit tests for elimination of unnecessary join groups.
         suite.addTestSuite(TestASTEmptyGroupOptimizer.class);

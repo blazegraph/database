@@ -99,7 +99,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setProjection(pn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
 
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -147,7 +147,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setSlice(sn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
             
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -190,7 +190,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setProjection(pn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
             
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -277,7 +277,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setProjection(pn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
 
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -331,7 +331,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setProjection(pn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
 
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -430,7 +430,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             query.setGroupBy(gbn);
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
 
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };
@@ -544,7 +544,7 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
 
 
             final PipelineOp pipeline = AST2BOpUtility
-                    .convert(new AST2BOpContext(query, store));
+                    .convert(new AST2BOpContext(new ASTContainer(query), store));
 
             // Submit query for evaluation.
             final IBindingSet[][] existingBindings = new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } };

@@ -22,9 +22,9 @@ import com.bigdata.service.IBigdataFederation;
 public class AST2BOpContext implements IdFactory {
 
     /**
-     * The original {@link QueryRoot} to be evaluated.
+     * The {@link ASTContainer}
      */
-	public final QueryRoot query;
+	public final ASTContainer astContainer;
 	
 	/**
 	 * Factory for assigning unique within query identifiers to {@link BOp}s.
@@ -62,11 +62,6 @@ public class AST2BOpContext implements IdFactory {
      * and query rewrites for performance optimizations).
      */
     public final ASTOptimizerList optimizers;
-
-    /**
-     * The query as rewritten by the query optimizers. 
-     */
-    public QueryRoot optimizedQuery;
     
     /**
      * When <code>true</code>, will use the version of DISTINCT which operators
@@ -79,8 +74,8 @@ public class AST2BOpContext implements IdFactory {
 
     /**
      * 
-     * @param query
-     *            The top-level of the bigdata query model.
+     * @param astContainer
+     *            The top-level {@link ASTContainer}.
      * @param idFactory
      *            A factory for assigning identifiers to {@link BOp}s.
      * @param db
@@ -92,11 +87,11 @@ public class AST2BOpContext implements IdFactory {
      * 
      * @deprecated by the other constructor.
      */
-	public AST2BOpContext(final QueryRoot query,
+	public AST2BOpContext(final ASTContainer astContainer,
 			final AtomicInteger idFactory, final AbstractTripleStore db,
     		final QueryEngine queryEngine, final Properties queryHints) {
 
-        this.query = query;
+        this.astContainer = astContainer;
         this.idFactory = idFactory;
         this.db = db;
         this.optimizers = new DefaultOptimizerList();
@@ -129,16 +124,16 @@ public class AST2BOpContext implements IdFactory {
      *            the [lex] namespace parameter to the {@link FunctionNode} and
      *            {@link FunctionRegistry}.
      */
-    public AST2BOpContext(final QueryRoot queryRoot,
+    public AST2BOpContext(final ASTContainer ast,
                 final AbstractTripleStore db) {
 
-        if (queryRoot == null)
+        if (ast == null)
             throw new IllegalArgumentException();
 
         if (db == null)
             throw new IllegalArgumentException();
 
-        this.query = queryRoot;
+        this.astContainer = ast;
 
         this.db = db;
 
@@ -154,7 +149,7 @@ public class AST2BOpContext implements IdFactory {
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
 
-        this.queryHints = queryRoot.getQueryHints();
+        this.queryHints = ast.getOriginalAST().getQueryHints();
 
         /*
          * Figure out the query UUID that will be used. This will be bound onto

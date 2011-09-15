@@ -135,6 +135,7 @@ import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.SOp2ASTUtility;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
@@ -1021,8 +1022,8 @@ public class BigdataEvaluationStrategyImpl3 extends EvaluationStrategyImpl
 			if (log.isInfoEnabled())
 				log.info("\n"+ast);
 
-			query = AST2BOpUtility.convert(new AST2BOpContext(
-					ast, idFactory, database, queryEngine, queryHints));
+            query = AST2BOpUtility.convert(new AST2BOpContext(new ASTContainer(
+                    ast), idFactory, database, queryEngine, queryHints));
 
 			if (log.isInfoEnabled())
 				log.info("\n"+BOpUtility.toString2(query));

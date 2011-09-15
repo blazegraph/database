@@ -70,7 +70,6 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.rio.helpers.StatementCollector;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.model.StatementEnum;
@@ -78,6 +77,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 
@@ -130,12 +130,9 @@ public class AbstractDataDrivenSPARQLTestCase extends
         
         private final String queryStr;
 
-        private final QueryRoot queryRoot;
-        
+        private final ASTContainer ast;
         private final AST2BOpContext context;
-        
-        private final QueryRoot optimizedQuery;
-        
+       
         private final PipelineOp queryPlan;
 
         /**
@@ -211,28 +208,14 @@ public class AbstractDataDrivenSPARQLTestCase extends
             final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
                     + queryFileURL;
 
-            queryRoot = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+            ast = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, baseURI);
 
-            if (log.isInfoEnabled())
-                log.info("\nAST:\n" + queryRoot);
-
-            this.context = new AST2BOpContext(queryRoot, store);
-
-            /*
-             * Run the query optimizer first so we have access to the rewritten
-             * query plan.
-             */
-            this.optimizedQuery = context.optimizedQuery = (QueryRoot) context.optimizers
-                    .optimize(context, queryRoot, null/* bindingSet[] */);
+            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
+                    ast, store));
 
             if (log.isInfoEnabled())
-                log.info("\noptimizedQuery:\n" + optimizedQuery);
-
-            queryPlan = AST2BOpUtility.convert(context);
-
-            if (log.isInfoEnabled())
-                log.info("\nqueryPlan:\n" + queryPlan);
+                log.info(ast);
 
         }
 
@@ -250,8 +233,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
          */
         public void runTest() throws Exception {
 
-            final AST2BOpContext context = new AST2BOpContext(queryRoot, store);
-
+            final QueryRoot queryRoot = ast.getOptimizedAST();
+            
             switch (queryRoot.getQueryType()) {
             case SELECT: {
 
@@ -553,12 +536,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 //                    System.err.println(con.getClass());
 //                    try {
                     message.append("\n===================================\n");
-                    message.append("\nqueryRoot:\n");
-                    message.append(BOpUtility.toString(queryRoot));
-                    message.append("\noptimizedQuery:\n");
-                    message.append(BOpUtility.toString(optimizedQuery));
-                    message.append("\nqueryPlan:\n");
-                    message.append(BOpUtility.toString(queryPlan));
+                    message.append(ast.toString());
                     message.append("\n===================================\n");
                     message.append("database dump:\n");
                     message.append(store.dumpStore());

@@ -36,13 +36,13 @@ import org.openrdf.query.parser.QueryParser;
 
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.QueryType;
-import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 
 /**
  * Class extends {@link ParsedQuery} for API compliance with {@link QueryParser}
  * but DOES NOT support ANY aspect of the {@link QueryParser} API. All data
- * pertaining to the parsed query is reported by {@link #getQueryRoot()}. There
- * is NO {@link TupleExpr} associated with the {@link BigdataParsedQuery}.
+ * pertaining to the parsed query is reported by {@link #getASTContainer()}.
+ * There is NO {@link TupleExpr} associated with the {@link BigdataParsedQuery}.
  * Bigdata uses an entirely different model to represent the parsed query,
  * different optimizers to rewrite the parsed query, and different operations to
  * evaluate the {@link ParsedQuery}.
@@ -53,14 +53,14 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 public class BigdataParsedQuery extends ParsedQuery implements
         IBigdataParsedQuery {
 
-    final private QueryRoot queryRoot;
+    final private ASTContainer astContainer;
 
     /**
      * 
      */
-    public BigdataParsedQuery(final QueryRoot queryRoot) {
+    public BigdataParsedQuery(final ASTContainer astContainer) {
 
-        this.queryRoot = queryRoot;
+        this.astContainer = astContainer;
 
     }
 
@@ -78,18 +78,32 @@ public class BigdataParsedQuery extends ParsedQuery implements
         throw new UnsupportedOperationException();
     }
 
-    public QueryRoot getQueryRoot() {
-        return queryRoot;
+    /**
+     * The {@link ASTContainer}.
+     */
+    public ASTContainer getASTContainer() {
+        return astContainer;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This is a little bit ambiguous. It is returning the {@link QueryType}
+     * associated with {@link ASTContainer#getOriginalAST()}. If the AST
+     * optimizer pipeline changes the {@link QueryType} (which happens for a
+     * DESCRIBE query) then the new {@link QueryType} shows up on the
+     * {@link ASTContainer#getOptimizedAST()}. However, in general this
+     * difference does not make a difference as we evaluate CONSTRUCT and
+     * DESCRIBE queries in the same way have they have been optimized.
+     */
     @Override
     public QueryType getQueryType() {
-        return queryRoot.getQueryType();
+        return astContainer.getOriginalAST().getQueryType();
     }
 
     @Override
     public Properties getQueryHints() {
-        return queryRoot.getQueryHints();
+        return astContainer.getOriginalAST().getQueryHints();
     }
 
 }
