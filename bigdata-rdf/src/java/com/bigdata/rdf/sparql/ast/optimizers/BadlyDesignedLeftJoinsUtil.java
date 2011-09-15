@@ -51,6 +51,8 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
  * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
+ * 
+ * @deprecated by {@link ASTBottomUpOptimizer}
  */
 public class BadlyDesignedLeftJoinsUtil {
 

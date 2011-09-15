@@ -130,16 +130,16 @@ public class AST2BOpContext implements IdFactory {
      *            the [lex] namespace parameter to the {@link FunctionNode} and
      *            {@link FunctionRegistry}.
      */
-    public AST2BOpContext(final ASTContainer ast,
+    public AST2BOpContext(final ASTContainer astContainer,
                 final AbstractTripleStore db) {
 
-        if (ast == null)
+        if (astContainer == null)
             throw new IllegalArgumentException();
 
         if (db == null)
             throw new IllegalArgumentException();
 
-        this.astContainer = ast;
+        this.astContainer = astContainer;
 
         this.db = db;
 
@@ -155,7 +155,7 @@ public class AST2BOpContext implements IdFactory {
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
 
-        this.queryHints = ast.getOriginalAST().getQueryHints();
+        this.queryHints = astContainer.getOriginalAST().getQueryHints();
 
         /*
          * Figure out the query UUID that will be used. This will be bound onto

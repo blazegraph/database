@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -104,16 +105,6 @@ import com.bigdata.relation.rule.Rule;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
- *          variable bindings during query evaluation).
- *          <p>
- *          Note: Sesame allows externally given bindings to flow through the
- *          query even if they are projected by the query. This means that the
- *          "projection" can not remove all bindings except those which are
- *          projected. Either we need to also not prune exogenous bindings or we
- *          need to strip out bindings introduced by anonymous variables which
- *          are part of query rewrites. The former seems easier.
  * 
  * @see <a href=
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
@@ -1011,9 +1002,9 @@ public class AST2BOpUtility {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
          * DataSetJoin with an "inline" access path.)
          * 
-         * @see JoinGroupNode#getKnownInFilters()
+         * @see JoinGroupNode#getInFilters()
          */
-        left = addKnownInConditionals(left, joinGroup.getKnownInFilters(), ctx);
+        left = addKnownInConditionals(left, joinGroup.getInFilters(), ctx);
 
         /*
          * Required joins and non-optional subqueries.
@@ -1202,6 +1193,13 @@ public class AST2BOpUtility {
      * variable bindings during query evaluation). This is basically the last
      * place where we can prune out variables which are not being projected. We
      * need to do that here, but also incrementally.
+     * <p>
+     * Note: Sesame allows externally given bindings to flow through the query
+     * even if they are projected by the query. This means that the "projection"
+     * can not remove all bindings except those which are projected. Either we
+     * need to also not prune exogenous bindings or we need to strip out
+     * bindings introduced by anonymous variables which are part of query
+     * rewrites. The former seems easier.
      */
     private static final PipelineOp addProjectedAssigments(PipelineOp left,
             final List<AssignmentNode> assignments, final AST2BOpContext ctx) {
@@ -1380,11 +1378,12 @@ public class AST2BOpUtility {
         final List<IPredicate> preds = new LinkedList<IPredicate>();
 
         for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
-            preds.add(toPredicate(sp, ctx));
+            if(!sp.isSimpleOptional()) {
+                preds.add(toPredicate(sp, ctx));
+            }
         }
 
-        // sometimes we get empty groups
-        if (preds.size() == 0) {
+        if (preds.isEmpty()) {
             return left;
         }
 
@@ -1493,58 +1492,11 @@ public class AST2BOpUtility {
             final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
                     subgroup, ctx);
 
-//            /*
-//             * FIXME BOTTOM UP EVALUATION
-//             * 
-//             * In order to be consistent with SPARQL's bottom up evaluation
-//             * semantics we sometimes have to "hide" binding for variables
-//             * which are already visible in the parent but which are not
-//             * used by the child group and, hence, would not be visible in
-//             * the child group if we were really using bottom up evaluation.
-//             * 
-//             * Bottom up evaluation is generally more a matter of adhering
-//             * to the SPARQL semantics for correctness than an issue of
-//             * practical concerns. In general, queries which do not have
-//             * variables shared at the various nesting levels are "badly
-//             * designed. Classic examples of this are discussed in section
-//             * 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
-//             * Pérez et al. Various examples of badly designed left joins
-//             * (this only shows up in the presence of optionals) are part of
-//             * the DAWG compliance test suite.
-//             * 
-//             * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
-//             * 
-//             * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
-//             */
-//            if (subgroup instanceof JoinGroupNode) {
-//
-//                final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
-//
-//                final IVariable<?>[] visibleVariables = subJoinGroup
-//                        .getMaybeProducedBindings().toArray(new IVariable[] {});
-//
-//                if (visibleVariables.length == 0) {
-//                    throw new UnsupportedOperationException(
-//                            "Nothing produced by group: " + subJoinGroup);
-//                }
-//                
-//                left = new SubqueryOp(leftOrEmpty(left), //
-//                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
-//                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
-//                        new NV(SubqueryOp.Annotations.OPTIONAL, false),//
-//                        new NV(SubqueryOp.Annotations.SELECT, visibleVariables)//
-//                );
-//
-//            } else {
-//
-//                // UNION
-                left = new SubqueryOp(leftOrEmpty(left), //
-                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
-                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
-                        new NV(SubqueryOp.Annotations.OPTIONAL, false)//
-                );
-
-//            }
+            left = new SubqueryOp(leftOrEmpty(left), //
+                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
+                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
+                    new NV(SubqueryOp.Annotations.OPTIONAL, false)//
+            );
 
         }
 
@@ -1553,6 +1505,41 @@ public class AST2BOpUtility {
          */
         for (IGroupMemberNode child : joinGroup) {
 
+            if (child instanceof StatementPatternNode) {
+
+                final StatementPatternNode sp = (StatementPatternNode) child;
+
+                if (sp.isSimpleOptional()) {
+
+                    /*
+                     * ASTSimpleOptionalOptimizer will recognize and lift out
+                     * simple optionals into the parent join group. A simple
+                     * optional is basically a single a statement pattern in an
+                     * optional join group. If there were any FILTERs in the
+                     * simple optional join group, then they were lifted out as
+                     * well. This means that they will be tacked onto the end of
+                     * the query plan for this join group.
+                     * 
+                     * Note: This is a bit different from the old code path
+                     * which recognized optional join groups in some embedded
+                     * logic below. In that case we had to pull out the filters
+                     * ourselves and that meant that we had to run them with the
+                     * optional join.
+                     */
+
+                    final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
+                            ctx).setProperty(IPredicate.Annotations.OPTIONAL,
+                            Boolean.TRUE);
+
+                    final List<FilterNode> filters = Collections.emptyList();
+
+                    left = addOptionalJoinForSingletonOptionalSubquery(left,
+                            pred, filters, ctx);
+
+                }
+
+            }
+            
             if (!(child instanceof GraphPatternGroup<?>)) {
                 continue;
             }
@@ -1571,7 +1558,8 @@ public class AST2BOpUtility {
                  * Optimize a simple join group as an optional join rather than
                  * a subquery.
                  * 
-                 * FIXME Move this logic into an AST optimizer.
+                 * FIXME Deprecated by ASTSimpleOptionalOptimizer. This code
+                 * block should go away.
                  */
 
                 final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
@@ -1594,60 +1582,11 @@ public class AST2BOpUtility {
                 final PipelineOp subquery = convertJoinGroupOrUnion(
                         null/* left */, subgroup, ctx);
 
-//                /*
-//                 * FIXME BOTTOM UP EVALUATION
-//                 * 
-//                 * In order to be consistent with SPARQL's bottom up evaluation
-//                 * semantics we sometimes have to "hide" binding for variables
-//                 * which are already visible in the parent but which are not
-//                 * used by the child group and, hence, would not be visible in
-//                 * the child group if we were really using bottom up evaluation.
-//                 * 
-//                 * Bottom up evaluation is generally more a matter of adhering
-//                 * to the SPARQL semantics for correctness than an issue of
-//                 * practical concerns. In general, queries which do not have
-//                 * variables shared at the various nesting levels are "badly
-//                 * designed. Classic examples of this are discussed in section
-//                 * 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
-//                 * Pérez et al. Various examples of badly designed left joins
-//                 * (this only shows up in the presence of optionals) are part of
-//                 * the DAWG compliance test suite.
-//                 * 
-//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
-//                 * 
-//                 * @see http://www.dcc.uchile.cl/~cgutierr/papers/sparql.pdf
-//                 */
-//                if (subgroup instanceof JoinGroupNode) {
-//
-//                    final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
-//
-//                    final IVariable<?>[] visibleVariables = subJoinGroup
-//                            .getMaybeProducedBindings().toArray(
-//                                    new IVariable[] {});
-//
-//                    if (visibleVariables.length == 0) {
-//                        throw new UnsupportedOperationException(
-//                                "Nothing produced by group: " + subJoinGroup);
-//                    }
-//                    
-//                    left = new SubqueryOp(leftOrEmpty(left), //
-//                            new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-//                            new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-//                            new NV(SubqueryOp.Annotations.OPTIONAL, true),//
-//                            new NV(SubqueryOp.Annotations.SELECT, visibleVariables)//
-//                    );
-//                    
-//                } else {
-//
-//                    // UNION
-
-                    left = new SubqueryOp(leftOrEmpty(left), //
-                            new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                            new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-                            new NV(SubqueryOp.Annotations.OPTIONAL, true)//
-                    );
-
-//                }
+                left = new SubqueryOp(leftOrEmpty(left), //
+                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                        new NV(SubqueryOp.Annotations.OPTIONAL, true)//
+                );
 
             }
 
@@ -1667,9 +1606,9 @@ public class AST2BOpUtility {
      * that query engine is the query controller for the subquery and an
      * {@link EndOp} on the subquery would bring the results for the subquery
      * back to that query controller.
-     * 
-     * TODO Should be conditional based on whether or not we are running on a
-     * cluster, but also see
+     * <p>
+     * Note: This should be conditional based on whether or not we are running
+     * on a cluster, but also see
      * https://sourceforge.net/apps/trac/bigdata/ticket/227.
      */
     private static final PipelineOp addEndOp(PipelineOp left,
