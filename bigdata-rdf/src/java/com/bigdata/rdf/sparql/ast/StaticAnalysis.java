@@ -152,11 +152,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * {@link StaticAnalysis} into the methods on {@link JoinGroupNode} or move
  * those methods here and pass in the {@link JoinGroupNode}.
  * 
- * FIXME {@link GraphPatternGroup}, {@link JoinGroupNode}, {@link UnionNode},
- * and {@link QueryBase}: Remove the static analysis methods from these classes
- * once we have captured all of that in {@link StaticAnalysis}. Replace it with
- * this class and then test for new bugs.
- * 
  * FIXME Fold in the logic to detect a badly designed left join and finish the
  * {@link ASTBottomUpOptimizer}.
  * 

@@ -9,6 +9,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 
 /**
  * A node in the AST representing a statement pattern.
@@ -24,8 +25,21 @@ public class StatementPatternNode extends
 
     interface Annotations extends GroupMemberNodeBase.Annotations {
 
+        /**
+         * The {@link Scope} (required).
+         */
         String SCOPE = "scope";
+        
+        /**
+         * Boolean flag indicates that a {@link StatementPatternNode} was lifted
+         * out of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
+         * 
+         * @see ASTSimpleOptionalOptimizer
+         */
+        String SIMPLE_OPTIONAL = "simpleOptional";
     
+        boolean DEFAULT_SIMPLE_OPTIONAL = false;
+        
     }
     
     /**
@@ -109,6 +123,30 @@ public class StatementPatternNode extends
         
     }
 
+    /**
+     * Return <code>true</code> the {@link StatementPatternNode} was lifted out
+     * of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
+     * 
+     * @see Annotations#SIMPLE_OPTIONAL
+     */
+    public boolean isSimpleOptional() {
+        
+        return getProperty(Annotations.SIMPLE_OPTIONAL,
+                Annotations.DEFAULT_SIMPLE_OPTIONAL);
+        
+    }
+
+    /**
+     * Mark this {@link StatementPatternNode} as one which was lifted out of a
+     * "simple optional" group and which therefore has "optional" semantics (we
+     * will do an optional join for it).
+     */
+    public void setSimpleOptional(final boolean simpleOptional) {
+        
+        setProperty(Annotations.SIMPLE_OPTIONAL,simpleOptional);
+        
+    }
+    
     /**
      * Return <code>true</code> if none of s, p, o, or c is a variable.
      */

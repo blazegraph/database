@@ -75,6 +75,16 @@ public class TestAll extends TestCase {
         // Unit tests for named subquery rewrites.
         suite.addTestSuite(TestASTNamedSubqueryOptimizer.class);
         
+        // Unit tests for lifting of simple optionals into the parent group.
+        suite.addTestSuite(TestASTSimpleOptionalOptimizer.class);
+
+        // Unit tests for lifting pre-filters into the parent group.
+        suite.addTestSuite(TestASTLiftPreFiltersOptimizer.class);
+
+        // Unit tests for detecting and handling badly designed queries in a
+        // manner consistent with bottom-up evaluation semantics.
+        suite.addTestSuite(TestASTBottomUpOptimizer.class);
+
         // Unit tests for identifying badly designed left joins.
         suite.addTestSuite(TestBadlyDesignedLeftJoinUtil.class);
         

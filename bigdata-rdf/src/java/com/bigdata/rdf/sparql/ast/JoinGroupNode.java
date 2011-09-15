@@ -195,7 +195,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
      *      DataSetJoin with an "inline" access path.)
      */
-    public List<FilterNode> getKnownInFilters() {
+    public List<FilterNode> getInFilters() {
         
         final List<FilterNode> filters = new LinkedList<FilterNode>();
 
@@ -243,7 +243,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * parent group without incurring the costs of launching a
      * {@link SubqueryOp}.
      * 
-     * FIXME Move to {@link ASTSimpleOptionalOptimizer}
+     * @deprecated by {@link ASTSimpleOptionalOptimizer}
      */
     @Deprecated
 	public boolean isSimpleOptional() {
@@ -305,7 +305,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * <p>
      * See {@link #isSimpleOptional()}.
      * 
-     * FIXME Move to {@link ASTSimpleOptionalOptimizer}
+     * @deprecated by {@link ASTSimpleOptionalOptimizer}
      */
     @Deprecated
 	public StatementPatternNode getSimpleOptional() {
