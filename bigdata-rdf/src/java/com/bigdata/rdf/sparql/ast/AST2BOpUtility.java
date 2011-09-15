@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -83,6 +82,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sail.FreeTextSearchExpander;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
@@ -218,38 +218,7 @@ public class AST2BOpUtility {
     private static PipelineOp convert(final QueryBase query,
             final AST2BOpContext ctx) {
 
-        /*
-         * Visit all the value expression nodes and convert them into value
-         * expressions.
-         */
-        {
-
-            final String lex = ctx.db.getLexiconRelation().getNamespace();
-
-            final Iterator<IValueExpressionNode> it = BOpUtility.visitAll(
-                    query, IValueExpressionNode.class);
-
-            final ArrayList<IValueExpressionNode> allNodes = new ArrayList<IValueExpressionNode>();
-
-            while (it.hasNext()) {
-
-                allNodes.add(it.next());
-
-            }
-
-            for (IValueExpressionNode ven : allNodes) {
-
-                /*
-                 * Convert and cache the value expression on the node as a
-                 * side-effect.
-                 */
-                toVE(lex, ven);
-
-            }
-
-        }
-
-        final IGroupNode<IGroupMemberNode> root = query.getWhereClause();
+        final GraphPatternGroup<?> root = query.getWhereClause();
 
         if (root == null)
             throw new IllegalArgumentException("No group node");
@@ -1034,13 +1003,13 @@ public class AST2BOpUtility {
         /*
          * Required joins and non-optional subqueries.
          * 
-         * TODO SPARQL 1.1 style subqueries are currently always pipelined. Like
-         * named subquery includes, they are also never optional. However, there
-         * is no a-priori reason why we should run pipelined subqueries before
-         * named subquery includes and, really, no reason why we can not mix
-         * these with the required joins (above). I believe that this is being
-         * done solely for expediency (because the static query optimizer can
-         * not handle it).
+         * Note: SPARQL 1.1 style subqueries are currently always pipelined.
+         * Like named subquery includes, they are also never optional. However,
+         * there is no a-priori reason why we should run pipelined subqueries
+         * before named subquery includes and, really, no reason why we can not
+         * mix these with the required joins (above). I believe that this is
+         * being done solely for expediency (because the static query optimizer
+         * can not handle it).
          * 
          * Also, note that named subquery includes are hash joins. We have an
          * index. If the operator supported cutoff evaluation then we could
@@ -1056,6 +1025,27 @@ public class AST2BOpUtility {
          * might be better to lift such unselective subqueries into named
          * subqueries in order to obtain a hash index over the entire subquery
          * solution set when evaluated with an empty source binding set.
+         * 
+         * Note: This logic was originally constructed before we had required
+         * joins other than on a statement pattern. This shaped how the FILTERs
+         * were attached and how the materialization pipeline was generated in
+         * order to have materialized RDF Values on hand for those FILTERs.
+         * 
+         * We now have several kinds of required joins: pipelined statement
+         * pattern joins, SPARQL 1.1 subquery, named subquery include, subquery
+         * hash joins (when the subquery is optional), service call joins, etc.
+         * 
+         * FIXME The code currently only handles the FILTER attachment and
+         * materialization pipeline for the required statement pattern joins.
+         * However, FILTERs MUST be attached to these joins appropriate for ALL
+         * CASES and variables MUST be materialized as required for those
+         * filters to run.
+         * 
+         * FIXME All of these joins can be reordered by either static analysis
+         * of cardinality (which has not been extended to handle this yet) or by
+         * the RTO. The filter attachment decisions (and the materialization
+         * pipeline generation) needs to be deferred until we actually evaluate
+         * the join graph (at least for the RTO).
          */
         {
 
@@ -1528,6 +1518,8 @@ public class AST2BOpUtility {
                 /*
                  * Optimize a simple join group as an optional join rather than
                  * a subquery.
+                 * 
+                 * FIXME Move this logic into an AST optimizer.
                  */
 
                 final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
@@ -2630,6 +2622,8 @@ public class AST2BOpUtility {
      *            The expression to convert.
      * 
      * @return The converted expression.
+     * 
+     * @see ASTSetValueExpressionsOptimizer
      */
     public static final IValueExpression<? extends IV> toVE(final String lex,
             final IValueExpressionNode node) {

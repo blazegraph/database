@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,6 +36,7 @@ import java.util.Set;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 
 /**
  * Methods for static analysis of a query. There is one method which looks "up".
@@ -140,15 +142,15 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
  * but even then it is not enough since we would have to specify this for each
  * parent group in the AST.
  * 
- * FIXME Filter attachment (and javadoc). The analysis of filters depends on the
- * analysis of variables so we need to have the {@link QueryRoot} on hand in
- * order to resolve {@link NamedSubqueryInclude}s. This means that we either
- * pass {@link StaticAnalysis} into the methods on {@link JoinGroupNode} or move
+ * FIXME Filter javadoc. The analysis of filters depends on the analysis of
+ * variables so we need to have the {@link QueryRoot} on hand in order to
+ * resolve {@link NamedSubqueryInclude}s. This means that we either pass
+ * {@link StaticAnalysis} into the methods on {@link JoinGroupNode} or move
  * those methods here and pass in the {@link JoinGroupNode}.
  * 
  * FIXME {@link GraphPatternGroup}, {@link JoinGroupNode}, {@link UnionNode},
  * and {@link QueryBase}: Remove the static analysis methods from these classes
- * once we have captured all of that in {@link StaticAnalysis}.  Replace it with
+ * once we have captured all of that in {@link StaticAnalysis}. Replace it with
  * this class and then test for new bugs.
  * 
  * FIXME Fold in the logic to detect a badly designed left join and finish the
@@ -157,6 +159,17 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
  * TODO We can probably cache the heck out of things on this class. There is no
  * reason to recompute the SA of the know or maybe/must bound variables until
  * there is an AST change, and the caller can build a new SA when that happens.
+ * However, note that we must make the cache sets unmodifiable since there are a
+ * lot of patterns which rely on computing the difference between two sets and
+ * those can not have a side-effect on the cache.
+ * <p>
+ * We could also attach the {@link StaticAnalysis} as an annotation on the
+ * {@link QueryRoot} and provide a factory method for accessing it. That way we
+ * would have reuse of the cached static analysis data. Each AST optimizer (or
+ * the {@link ASTOptimizerList}) would have to clear the cached
+ * {@link StaticAnalysis} when producing a new {@link QueryRoot}.  Do this when
+ * we add an ASTContainer to provide a better home for the queryStr, the parse
+ * tree, the original AST, and the optimized AST.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -292,6 +305,12 @@ public class StaticAnalysis {
 
             vars.addAll(getDefinatelyProducedBindings(nsr));
 
+        } else if(node instanceof ServiceNode) {
+
+            final ServiceNode service = (ServiceNode) node;
+
+            vars.addAll(getDefinatelyProducedBindings(service));
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -362,6 +381,12 @@ public class StaticAnalysis {
 
             vars.addAll(getMaybeProducedBindings(nsr));
 
+        } else if(node instanceof ServiceNode) {
+
+            final ServiceNode service = (ServiceNode) node;
+
+            vars.addAll(getMaybeProducedBindings(service));
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -396,10 +421,12 @@ public class StaticAnalysis {
                         vars, recursive);
 
             } else if (child instanceof NamedSubqueryInclude
-                    || child instanceof SubqueryRoot) {
+                    || child instanceof SubqueryRoot
+                    || child instanceof ServiceNode) {
 
                 /*
-                 * Required JOIN (named solution set or subquery).
+                 * Required JOIN (Named solution set, SPARQL 1.1 subquery,
+                 * EXISTS, or SERVICE).
                  * 
                  * Note: We have to descend recursively into these structures in
                  * order to determine anything.
@@ -682,8 +709,325 @@ public class StaticAnalysis {
 
     }
 
+    /**
+     * Report "MUST" bound bindings projected by the service. This involves
+     * checking the graph pattern reported by {@link ServiceNode#getGroupNode()}
+     * . Bindings visible in the parent group are NOT projected into a SERVICE.
+     * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
+     * projected bindings.
+     * <p>
+     * Note: This assumes that services do not run "as-bound". If this is
+     * permitted, then this code needs to be reviewed.
+     */
+    // MUST : ServiceNode
+    public Set<IVariable<?>> getDefinatelyProducedBindings(final ServiceNode node) {
+
+        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+        
+        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGroupNode();
+
+        if (graphPattern != null) {
+
+            getDefinatelyProducedBindings(graphPattern, vars, true/* recursive */);
+
+        }
+
+        return vars;
+
+    }
+
+    /**
+     * Report "MAYBE" bound bindings projected by the service. This involves
+     * checking the graph pattern reported by {@link ServiceNode#getGroupNode()}
+     * . Bindings visible in the parent group are NOT projected into a SERVICE.
+     * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
+     * projected bindings.
+     * <p>
+     * Note: This assumes that services do not run "as-bound". If this is
+     * permitted, then this code needs to be reviewed.
+     */
+    // MAY : ServiceNode
+    public Set<IVariable<?>> getMaybeProducedBindings(final ServiceNode node) {
+
+        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+        
+        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGroupNode();
+
+        if (graphPattern != null) {
+
+            getMaybeProducedBindings(graphPattern, vars, true/* recursive */);
+
+        }
+
+        return vars;
+
+    }
+
     /*
-     * FIXME FILTERS analysis from JoinGroupNode
+     * FILTERS analysis for JoinGroupNodes
      */
     
+    /**
+     * Return only the filter child nodes in this group that will be fully bound
+     * before running any of the joins in this group.
+     * <p>
+     * Note: Anything returned by this method should be lifted into the parent
+     * group since it can be run before this group is evaluated. By lifting the
+     * pre-filters into the parent group we can avoid issuing as many as-bound
+     * subqueries for this group since those which fail the filter will not be
+     * issued.
+     * 
+     * @param group The {@link JoinGroupNode}.
+     * 
+     * @return The filters which should either be run before the non-optional
+     *         join graph or (preferably) lifted into the parent group.
+     *         
+     *         FIXME AST optimizer to lift the filters into the parent group.
+     */
+    public List<FilterNode> getPreFilters(final JoinGroupNode group) {
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+                new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
+        final List<FilterNode> filters = getBoundFilters(group,
+                knownBound);
+
+        return filters;
+
+    }
+
+    /**
+     * Return only the filter child nodes in this group that will be fully bound
+     * only by running the joins in this group.
+     * 
+     * @param group
+     *            The {@link JoinGroupNode}.
+     * 
+     * @return The filters to be attached to the non-optional join graph for
+     *         this group.
+     */
+    public List<FilterNode> getJoinFilters(final JoinGroupNode group) {
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+                new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all the "must" bound variables for this group.
+         * 
+         * Note: We do not recursively compute the "must" bound variables for
+         * this step because we are only interested in a FILTER which can be
+         * attached to a non-optional JOIN run within this group.
+         */
+        getDefinatelyProducedBindings(group, knownBound, false/* recursive */);
+        
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
+        final List<FilterNode> filters = getBoundFilters(group,
+                knownBound);
+
+        /*
+         * Remove the preConditional filters (those fully bound by just incoming
+         * bindings).
+         */
+        filters.removeAll(getPreFilters(group));
+        
+        return filters;
+        
+    }
+
+    /**
+     * Return only the filter child nodes in this group that will not be fully
+     * bound even after running the <em>required</em> joins in this group.
+     * <p>
+     * Note: It is possible that some of these filters will be fully bound due
+     * to nested optionals and unions.
+     * <p>
+     * Note: This will report any filters which are not pre-filters and are
+     * not-join filters, including filters which are prune-filters. An AST
+     * optimizer is responsible for identifying and removing filters which
+     * should be pruned. Until they have been pruned, they will continue to be
+     * reported by this method.
+     * 
+     * @param group
+     *            The {@link JoinGroupNode}.
+     * 
+     * @return The filters to be run last in the group (after the nested
+     *         optionals and unions).
+     */
+    public List<FilterNode> getPostFilters(final JoinGroupNode group) {
+
+        /*
+         * Start with all the filters in this group.
+         */
+        final List<FilterNode> filters = group.getFilters();
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+                new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all the "must" bound variables for this group.
+         * 
+         * Note: We do not recursively compute the "must" bound variables for
+         * this step because we are only interested in FILTERs which can be
+         * attached to a required JOIN run within this group. However, this
+         * SHOULD consider statement pattern joins, named subquery include
+         * joins, SPARQL 1.1 subquery joins, and service call joins -- all of
+         * which are required joins.
+         */
+        getDefinatelyProducedBindings(group, knownBound, false/* recursive */);
+
+        /*
+         * Get the filters that are bound by this set of known bound variables.
+         */
+        final Collection<FilterNode> preAndJoinFilters = getBoundFilters(group,
+                knownBound);
+
+        /*
+         * Remove the preFilters and joinFilters, leaving only the postFilters.
+         * 
+         * Note: This approach deliberately will report any filter which would
+         * not have already been run for the group.
+         */
+        filters.removeAll(preAndJoinFilters);
+
+        return filters;
+        
+    }
+
+    /**
+     * Return any filters can not succeed based on the "incoming", "must" and
+     * "may" bound variables for this group. These filters are candidates for
+     * pruning.
+     * <p>
+     * Note: Filters containing a {@link FunctionNode} for
+     * {@link FunctionRegistry#BOUND} MUST NOT be pruned and are NOT reported by
+     * this method.
+     * 
+     * @param group
+     *            The {@link JoinGroupNode}.
+     * 
+     * @return The filters which are known to fail.
+     * 
+     *         TODO It is possible to prune a BOUND(?x) or NOT BOUND(?x) filter
+     *         through a more detailed analysis of the value expression. If the
+     *         variable <code>?x</code> simply does not appear in the group or
+     *         any child of that group, then BOUND(?x) can be replaced by
+     *         <code>false</code> and NOT BOUND(?x) by <code>true</code>.
+     *         <p>
+     *         However, in order to do this we must also look at any exogenous
+     *         solution(s) (those supplied with the query when it is being
+     *         evaluated). If the variable is bound in some exogenous solutions
+     *         then it could be bound when the FILTER is run and the filter can
+     *         not be pruned.
+     */
+    public List<FilterNode> getPruneFilters(final JoinGroupNode group) {
+
+        /*
+         * Start with all the filters in this group.
+         */
+        final List<FilterNode> filters = group.getFilters();
+
+        /*
+         * Get the variables known to be bound starting out.
+         */
+        final Set<IVariable<?>> maybeBound = getIncomingBindings(group, new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Add all "must" / "may" bound variables for this group (recursively).
+         */
+        getMaybeProducedBindings(group, maybeBound, true/* recursive */);
+
+        /*
+         * Get the filters that are bound by this set of "maybe" bound variables.
+         */
+        final Collection<FilterNode> maybeFilters = getBoundFilters(group,
+                maybeBound);
+
+        /*
+         * Remove the maybe bound filters, leaving only those which can not
+         * succeed.
+         */
+        filters.removeAll(maybeFilters);
+        
+        /*
+         * Collect all maybeFilters which use BOUND(). These can not be failed
+         * as easily.
+         */
+        
+        final Set<FilterNode> isBoundFilters = new LinkedHashSet<FilterNode>();
+        
+        for (FilterNode filter : maybeFilters) {
+
+            final IValueExpressionNode node = filter.getValueExpressionNode();
+            
+            if (node instanceof FunctionNode) {
+            
+                if (((FunctionNode) node).isBound()) {
+                
+                    isBoundFilters.add(filter);
+                    
+                }
+                
+            }
+            
+        }
+
+        // Remove filters which use BOUND().
+        filters.removeAll(isBoundFilters);
+        
+        return filters;
+        
+    }
+    
+    /**
+     * Helper method to determine the set of filters that will be fully bound
+     * assuming the specified set of variables is bound.
+     */
+    private final List<FilterNode> getBoundFilters(
+            final JoinGroupNode group, final Set<IVariable<?>> knownBound) {
+
+        final List<FilterNode> filters = new LinkedList<FilterNode>();
+
+        for (IQueryNode node : group) {
+
+            if (!(node instanceof FilterNode))
+                continue;
+
+            final FilterNode filter = (FilterNode) node;
+
+            final Set<IVariable<?>> filterVars = filter.getConsumedVars();
+
+            boolean allBound = true;
+
+            for (IVariable<?> v : filterVars) {
+
+                allBound &= knownBound.contains(v);
+
+            }
+
+            if (allBound) {
+
+                filters.add(filter);
+
+            }
+
+        }
+
+        return filters;
+
+    }
+
 }

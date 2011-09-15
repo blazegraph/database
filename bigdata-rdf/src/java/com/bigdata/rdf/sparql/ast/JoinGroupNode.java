@@ -293,9 +293,9 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	/**
 	 * Return only the filter child nodes in this group.
 	 */
-	public Collection<FilterNode> getFilters() {
+	public List<FilterNode> getFilters() {
 		
-		final Collection<FilterNode> filters = new LinkedList<FilterNode>();
+		final List<FilterNode> filters = new LinkedList<FilterNode>();
 		
 		for (IQueryNode node : this) {
 			
@@ -324,6 +324,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * @return The filters which should either be run before the non-optional
      *         join graph or (preferably) lifted into the parent group.
      */
+	@Deprecated
     public Collection<FilterNode> getPreFilters() {
 
         /*
@@ -347,6 +348,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * @return The filters to be attached to the non-optional join graph for
      *         this group.
      */
+    @Deprecated
     public Collection<FilterNode> getJoinFilters() {
 
         /*
@@ -387,6 +389,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * @return The filters to be run last in the group (after the nested
      *         optionals and unions).
      */
+    @Deprecated
 	public Collection<FilterNode> getPostFilters() {
 
 		/*
@@ -448,6 +451,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      *         then it could be bound when the FILTER is run and the filter can
      *         not be pruned.
      */
+    @Deprecated
     public Collection<FilterNode> getFiltersToPrune() {
 
         /*
@@ -510,6 +514,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	 * Helper method to determine the set of filters that will be fully bound
 	 * assuming the specified set of variables is bound.
 	 */
+    @Deprecated
     private final Collection<FilterNode> getBoundFilters(
             final Set<IVariable<?>> knownBound) {
 
@@ -550,7 +555,10 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
      * materialized variables. We can lift these "simple optionals" into the
      * parent group without incurring the costs of launching a
      * {@link SubqueryOp}.
+     * 
+     * TODO Move to rewrite rule and unit test.
      */
+    @Deprecated
 	public boolean isSimpleOptional() {
 		
 		// first, the whole group must be optional
@@ -566,11 +574,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		
 		for (IQueryNode node : this) {
 			
-			if (node instanceof IGroupNode) {
-				
-				return false;
-				
-			} else if (node instanceof StatementPatternNode) {
+		    if (node instanceof StatementPatternNode) {
 			
 				// already got one
 				if (sp != null) {
@@ -591,6 +595,15 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 					return false;
 					
 				}
+            
+			} else {
+			
+			    /*
+			     * Anything else will queer the deal.
+			     */
+			    
+			    return false;
+			    
 			}
 			
 		}
@@ -599,12 +612,15 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         return sp != null;
 
 	}
-	
-	/**
-	 * Get the single "simple optional" statement pattern.
-	 * <p>
-	 * See {@link #isSimpleOptional()}.
-	 */
+
+    /**
+     * Get the single "simple optional" statement pattern.
+     * <p>
+     * See {@link #isSimpleOptional()}.
+     * 
+     * TODO Move to rewrite rule and unit test.
+     */
+    @Deprecated
 	public StatementPatternNode getSimpleOptional() {
 		
 		if (!isSimpleOptional()) {

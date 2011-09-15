@@ -11,7 +11,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
-import com.bigdata.rdf.sparql.ast.optimizers.OptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -61,7 +61,7 @@ public class AST2BOpContext implements IdFactory {
      * semantics, such as a rewrite of a DESCRIBE query into a CONSTRUCT query,
      * and query rewrites for performance optimizations).
      */
-    public final OptimizerList optimizers;
+    public final ASTOptimizerList optimizers;
 
     /**
      * The query as rewritten by the query optimizers. 

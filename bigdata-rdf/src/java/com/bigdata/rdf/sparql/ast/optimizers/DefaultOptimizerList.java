@@ -199,7 +199,7 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
  *          thompsonbry$
  */
-public class DefaultOptimizerList extends OptimizerList {
+public class DefaultOptimizerList extends ASTOptimizerList {
 
     /**
      * 
@@ -208,6 +208,12 @@ public class DefaultOptimizerList extends OptimizerList {
 
     public DefaultOptimizerList() {
 
+        /**
+         * Visit all the value expression nodes and convert them into value
+         * expressions.
+         */
+        add(new ASTSetValueExpressionsOptimizer());
+        
         /**
          * Eliminate semantically empty join group nodes which are the sole
          * child of another join groups.
@@ -301,6 +307,12 @@ public class DefaultOptimizerList extends OptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
+         * Lift FILTERs which can be evaluated based solely on the bindings in
+         * the parent group out of a child group.
+         */
+        add(new ASTLiftPreFiltersOptimizer());
+        
+        /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
          * 
@@ -322,6 +334,13 @@ public class DefaultOptimizerList extends OptimizerList {
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());
+        
+        /**
+         * Lift {@link SubqueryRoot}s into named subqueries when appropriate
+         * 
+         * FIXME This is not implemented yet.
+         */
+        add(new ASTSparql11SubqueryOptimizer());
 
     }
 
