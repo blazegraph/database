@@ -309,6 +309,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Lift FILTERs which can be evaluated based solely on the bindings in
          * the parent group out of a child group.
+         * 
+         * FIXME This is not implemented yet. 
          */
         add(new ASTLiftPreFiltersOptimizer());
         
@@ -319,6 +321,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * FIXME This is not implemented yet. 
          */
         add(new ASTBottomUpOptimizer());
+
+        /**
+         * Lifts a simple optional out of the child group.
+         * 
+         * FIXME This is not implemented yet. 
+         */
+        add(new ASTSimpleOptionalOptimizer());
         
         /**
          * Handles a variety of special constructions related to graph graph

@@ -3,7 +3,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -76,8 +75,6 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
             store.addStatement(y, rdfType, B);
             store.addStatement(z, rdfType, A);
  
-            final AtomicInteger idFactory = new AtomicInteger(0);
-            
             final QueryEngine queryEngine = QueryEngineFactory
                     .getQueryController(store.getIndexManager());
             
@@ -238,8 +235,6 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         store.addStatement(x, y, B);
         store.addStatement(z, rdfType, A);
 
-        final AtomicInteger idFactory = new AtomicInteger(0);
-
         final QueryEngine queryEngine = QueryEngineFactory
                 .getQueryController(store.getIndexManager());
 
@@ -374,7 +369,6 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         final Literal two= new LiteralImpl("1",XMLSchema.INT);
         final Literal three= new LiteralImpl("1",XMLSchema.INT);
 
-
         // add statements using the URIs declared above.
         store.addStatement(x, rdfType, C);
         store.addStatement(x, predicate, one);
@@ -384,8 +378,6 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         store.addStatement(z, rdfType, C);
         store.addStatement(z, predicate, two);
         store.addStatement(z, predicate, three);
-
-        final AtomicInteger idFactory = new AtomicInteger(0);
 
         final QueryEngine queryEngine = QueryEngineFactory
                 .getQueryController(store.getIndexManager());
@@ -476,6 +468,17 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
      * ValueExpression returns a non computed IV value, ie returns one of its
      * arguments, have to be captured in order to somehow handle this?
      * 
+     * <pre>
+     * 
+     * QueryType: SELECT
+     * SELECT VarNode(index)
+     *   JoinGroupNode {
+     *     StatementPatternNode(VarNode(s), ConstantNode(TermId(4U)), ConstantNode(TermId(2U)), DEFAULT_CONTEXTS)
+     *     StatementPatternNode(VarNode(s), ConstantNode(TermId(5U)), VarNode(o), DEFAULT_CONTEXTS)    
+     *     ( com.bigdata.rdf.sparql.ast.ValueExpressionNode()[ valueExpr=com.bigdata.rdf.internal.constraints.StrBOp(com.bigdata.rdf.internal.constraints.CoalesceBOp(s,o))[ com.bigdata.rdf.internal.constraints.StrBOp.namespace=kb]] AS VarNode(index) )
+     *   }
+     * </pre>
+     * 
      * @throws Exception
      */
     public void testProjectedGroupByWithNestedVars() throws Exception {
@@ -498,8 +501,6 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
         store.addStatement(z, rdfType, C);
         store.addStatement(z, predicate, two);
         store.addStatement(z, predicate, three);
-
-        final AtomicInteger idFactory = new AtomicInteger(0);
 
         final QueryEngine queryEngine = QueryEngineFactory
                 .getQueryController(store.getIndexManager());
@@ -530,18 +531,14 @@ public class TestASTTriplesModeEvaluation extends AbstractASTEvaluationTestCase 
 
             root.addChild(new AssignmentNode(new VarNode("index"), ven));
 
-
-
             final QueryRoot query = new QueryRoot(QueryType.SELECT);
 
             query.setWhereClause(root);
 
             final ProjectionNode pn = new ProjectionNode();
 
-
             pn.addProjectionVar(new VarNode("index"));
             query.setProjection(pn);
-
 
             final PipelineOp pipeline = AST2BOpUtility
                     .convert(new AST2BOpContext(new ASTContainer(query), store));

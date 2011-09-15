@@ -73,6 +73,12 @@ public class AST2BOpContext implements IdFactory {
     private int varIdFactory = 0;
 
     /**
+     * Static analysis object initialized once we apply the AST optimizers and
+     * used by {@link AST2BOpUtility}.
+     */
+    StaticAnalysis sa = null;
+    
+    /**
      * 
      * @param astContainer
      *            The top-level {@link ASTContainer}.

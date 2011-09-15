@@ -478,10 +478,10 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             final FilterNode filter = BOpUtility.visitAll(queryRoot,
                     FilterNode.class).next();
 
-            assertEquals(Collections.singletonList(filter), filterClause.getPreFilters());
-            assertEquals(Collections.emptyList(), filterClause.getJoinFilters());
-            assertEquals(Collections.emptyList(), filterClause.getPostFilters());
-            assertEquals(Collections.emptyList(), filterClause.getFiltersToPrune());
+            assertEquals(Collections.singletonList(filter), sa.getPreFilters(filterClause));
+            assertEquals(Collections.emptyList(), sa.getJoinFilters(filterClause));
+            assertEquals(Collections.emptyList(), sa.getPostFilters(filterClause));
+            assertEquals(Collections.emptyList(), sa.getPruneFilters(filterClause));
             
         }
         
@@ -702,10 +702,10 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             final FilterNode filter = BOpUtility.visitAll(queryRoot,
                     FilterNode.class).next();
 
-            assertEquals(Collections.singletonList(filter), group.getPreFilters());
-            assertEquals(Collections.emptyList(), group.getJoinFilters());
-            assertEquals(Collections.emptyList(), group.getPostFilters());
-            assertEquals(Collections.emptyList(), group.getFiltersToPrune());
+            assertEquals(Collections.singletonList(filter), sa.getPreFilters(group));
+            assertEquals(Collections.emptyList(), sa.getJoinFilters(group));
+            assertEquals(Collections.emptyList(), sa.getPostFilters(group));
+            assertEquals(Collections.emptyList(), sa.getPruneFilters(group));
             
         }
 

@@ -112,7 +112,11 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * Note: BIND() in a PROJECTION is handled differently as it is non-optional (if
  * the value expression results in an error the solution is dropped).
  * Projections are handled when we do the analysis of a QueryBase node since we
- * can see both the WHERE clause and the PROJECTION clauses at the same time.</dd>
+ * can see both the WHERE clause and the PROJECTION clauses at the same time.
+ * <p>
+ * See <a href="http://www.w3.org/TR/sparql11-query/#assignment"> If the
+ * evaluation of the expression produces an error, the variable remains unbound
+ * for that solution.</a></dd>
  * 
  * <dt><code>IF()</code></dt>
  * <dd>
@@ -167,7 +171,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * {@link QueryRoot} and provide a factory method for accessing it. That way we
  * would have reuse of the cached static analysis data. Each AST optimizer (or
  * the {@link ASTOptimizerList}) would have to clear the cached
- * {@link StaticAnalysis} when producing a new {@link QueryRoot}.  Do this when
+ * {@link StaticAnalysis} when producing a new {@link QueryRoot}. Do this when
  * we add an ASTContainer to provide a better home for the queryStr, the parse
  * tree, the original AST, and the optimized AST.
  * 
@@ -311,6 +315,22 @@ public class StaticAnalysis {
 
             vars.addAll(getDefinatelyProducedBindings(service));
 
+        } else if(node instanceof AssignmentNode) {
+            
+            /*
+             * Note: BIND() in a group is only a "maybe" because the spec says
+             * that an error when evaluating a BIND() in a group will not fail
+             * the solution.
+             * 
+             * @see http://www.w3.org/TR/sparql11-query/#assignment (
+             * "If the evaluation of the expression produces an error, the
+             * variable remains unbound for that solution.")
+             */
+
+        } else if(node instanceof FilterNode) {
+
+            // NOP.
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -387,6 +407,24 @@ public class StaticAnalysis {
 
             vars.addAll(getMaybeProducedBindings(service));
 
+        } else if(node instanceof AssignmentNode) {
+
+            /*
+             * Note: BIND() in a group is only a "maybe" because the spec says
+             * that an error when evaluating a BIND() in a group will not fail
+             * the solution.
+             * 
+             * @see http://www.w3.org/TR/sparql11-query/#assignment (
+             * "If the evaluation of the expression produces an error, the
+             * variable remains unbound for that solution.")
+             */
+
+            vars.add(((AssignmentNode) node).getVar());
+            
+        } else if(node instanceof FilterNode) {
+            
+            // NOP
+            
         } else {
             
             throw new AssertionError(node.toString());
@@ -451,6 +489,22 @@ public class StaticAnalysis {
                     }
 
                 }
+                
+            } else if (child instanceof AssignmentNode) {
+
+                /*
+                 * Note: BIND() in a group is only a "maybe" because the spec says
+                 * that an error when evaluating a BIND() in a group will not fail
+                 * the solution.
+                 * 
+                 * @see http://www.w3.org/TR/sparql11-query/#assignment (
+                 * "If the evaluation of the expression produces an error, the
+                 * variable remains unbound for that solution.")
+                 */
+
+            } else if(child instanceof FilterNode) {
+
+                // NOP
                 
             } else {
 
