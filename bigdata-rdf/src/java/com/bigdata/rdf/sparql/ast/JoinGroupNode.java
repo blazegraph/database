@@ -9,9 +9,12 @@ import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.controller.SubqueryOp;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.InBOp;
 
 /**
  * An optional or non-optional collection of query nodes that run together in
@@ -341,6 +344,28 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     }
 
+    public Collection<FilterNode> getKnownInFilters() {
+        /*
+         * Get the inhash filters;
+         */
+        final Collection<FilterNode> filters = new ArrayList<FilterNode>();
+        for (IQueryNode node : this) {
+
+            if (!(node instanceof FilterNode))
+                continue;
+            if(true){
+                final FilterNode filter = (FilterNode) node;
+                if (filter.getValueExpression() instanceof InBOp) {
+                    if (((InBOp) filter.getValueExpression()).getValueExpression() instanceof IVariable) {
+                        filters.add(filter);
+                    }
+                }
+            }
+        }
+
+        return filters;
+    }
+
     /**
      * Return only the filter child nodes in this group that will be fully bound
      * only by running the joins in this group.
@@ -375,7 +400,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          * bindings).
          */
 		filters.removeAll(getPreFilters());
-		
+        filters.removeAll(getKnownInFilters());
 		return filters;
 		
 	}
@@ -423,7 +448,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          * not have already been run for the group.
          */
 		filters.removeAll(preAndJoinFilters);
-
+        filters.removeAll(getKnownInFilters());
 		return filters;
 		
 	}
