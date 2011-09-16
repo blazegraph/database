@@ -52,16 +52,24 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * FIXME We should do this if there are no join variables for the SPARQL 1.1
  * subquery. That will prevent multiple evaluations of the SPARQL 1.1 subquery
- * since the named subquery is run once before the main WHERE clause. Move this
- * into its own AST optimizer. It will need to observe the required statement
- * patterns and decide whether we are better off running the named subquery
- * pipelined after the required statement patterns, using a hash join after the
- * required statement patterns, or running it as a named subquery and then
- * joining in the named solution set (and again, either before or after
- * everything else).
+ * since the named subquery is run once before the main WHERE clause.
+ * <p>
+ * This optimizer needs to examine the required statement patterns and decide
+ * whether we are better off running the named subquery pipelined after the
+ * required statement patterns, using a hash join after the required statement
+ * patterns, or running it as a named subquery and then joining in the named
+ * solution set (and again, either before or after everything else).
+ * 
+ * FIXME If a subquery does not share ANY variables which MUST be bound in the
+ * parent's context then rewrite the subquery into a named/include pattern so it
+ * will run exactly once. (If it does not share any variables at all then it
+ * will produce a cross product and, again, we want to run that subquery once.)
+ * 
+ * @see SubqueryRoot.Annotations#RUN_ONCE
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTSparql11SubqueryOptimizer.java 5193 2011-09-15 14:18:56Z
+ *          thompsonbry $
  */
 public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 

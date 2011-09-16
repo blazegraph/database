@@ -71,7 +71,7 @@ abstract public class CoreBaseBOp implements BOp {
     }
 
     /**
-     * Deep copy clone semantics for {@link #args} and {@link #annotations}.
+     * Deep copy clone semantics.
      * <p>
      * {@inheritDoc}
      */

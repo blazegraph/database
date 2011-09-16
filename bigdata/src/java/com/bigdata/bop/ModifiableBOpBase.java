@@ -168,17 +168,17 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     public ModifiableBOpBase setArgs(final BOp[] args) {
         if (args == null)
             throw new IllegalArgumentException();
-        this.args.clear();
+        this.args.clear(); // FIXME Override might not catch clear of parent ref.
         for (BOp arg : args) {
-            this.args.add(arg);
+            addArg(arg);
         }
         mutation();
         return this;
     }
     
     /**
-     * Replace the value of the argument at the specified index (destructive
-     * mutation).
+     * Replace the value of the argument at the specified index (core mutation
+     * method).
      * 
      * @param index
      *            The index of the child expression to be replaced.
@@ -209,7 +209,7 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     }
 
     /**
-     * Add a new argument.
+     * Add a new argument (core mutation method).
      * 
      * @param newArg
      *            The argument.
@@ -258,14 +258,12 @@ public class ModifiableBOpBase extends CoreBaseBOp {
 
             addArg(arg);
          
-            mutation();
-
         }
         
     }
     
     /**
-     * Remove the 1st occurrence of the argument.
+     * Remove the 1st occurrence of the argument (core mutation method).
      * 
      * @param arg
      *            The argument.

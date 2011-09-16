@@ -1525,6 +1525,13 @@ public class AST2BOpUtility {
                      * logic below. In that case we had to pull out the filters
                      * ourselves and that meant that we had to run them with the
                      * optional join.
+                     * 
+                     * FIXME In order for this to work we have to attach any
+                     * FILTER(s) lifted out of the optional group to the
+                     * statement pattern node and then cause them to be attached
+                     * to the JOIN when we generate the JOIN. This means that we
+                     * need to hang an IConstraint[] on the Predicate and
+                     * interpret it in toPredicate().
                      */
 
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
@@ -1655,16 +1662,6 @@ public class AST2BOpUtility {
         if (projection.isWildcard())
             throw new AssertionError("Wildcard projection was not rewritten.");
         final IVariable<?>[] vars = projection.getProjectionVars();
-        // /*
-        // * TODO This will find variables within subqueries as well. Those
-        // * variables are not really in scope. We should have a modified
-        // * getSpannedVariables() method which handles this (or maybe just
-        // modify
-        // * the version we already have to be scope aware).
-        // */
-        // final IVariable<?>[] vars = projection.isWildcard() ? BOpUtility
-        // .toArray(BOpUtility.getSpannedVariables((BOp) query
-        // .getWhereClause())) : projection.getProjectionVars();
 
         final PipelineOp op;
         if (ctx.nativeDistinct) {
@@ -2235,104 +2232,6 @@ public class AST2BOpUtility {
 
     }
 
-    // /**
-    // * Return an array indicating the {@link IKeyOrder} that will be used when
-    // * reading on each of the tail predicates. The array is formed using a
-    // * private {@link IBindingSet} and propagating fake bindings to each
-    // * predicate in turn using the given evaluation order.
-    // *
-    // * @param order
-    // * The evaluation order.
-    // * @param nvars
-    // * The #of unbound variables for each tail predicate is assigned
-    // * by side-effect.
-    // *
-    // * @return An array of the {@link IKeyOrder}s for each tail predicate. The
-    // * array is correlated with the predicates index in the tail of the
-    // * rule NOT its evaluation order.
-    // */
-    // @SuppressWarnings({ "rawtypes" })
-    // static private IKeyOrder[] computeKeyOrderForEachTail(final
-    // List<Predicate> preds,
-    // final BOpContextBase context, final int[] order, final int[] nvars) {
-    //
-    // if (order == null)
-    // throw new IllegalArgumentException();
-    //
-    // if (order.length != preds.size())
-    // throw new IllegalArgumentException();
-    //
-    // final int tailCount = preds.size();
-    //
-    // final IKeyOrder[] a = new IKeyOrder[tailCount];
-    //
-    // final IBindingSet bindingSet = new HashBindingSet();
-    //
-    // final IConstant<IV> fakeTermId = new
-    // Constant<IV>(TermId.mockIV(VTE.URI));
-    //
-    // for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
-    //
-    // final int tailIndex = order[orderIndex];
-    //
-    // final IPredicate pred = preds.get(tailIndex);
-    //
-    // final IRelation rel = context.getRelation(pred);
-    //
-    // final IPredicate asBound = pred.asBound(bindingSet);
-    //
-    // final IKeyOrder keyOrder = context.getAccessPath(
-    // rel, asBound).getKeyOrder();
-    //
-    // if (log.isDebugEnabled())
-    // log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
-    // + ", tailIndex=" + orderIndex + ", pred=" + pred
-    // + ", bindingSet=" + bindingSet + ", preds=" +
-    // Arrays.toString(preds.toArray()));
-    //
-    // // save results.
-    // a[tailIndex] = keyOrder;
-    // nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
-    // : asBound.getVariableCount((IKeyOrder) keyOrder);
-    //
-    // final int arity = pred.arity();
-    //
-    // for (int j = 0; j < arity; j++) {
-    //
-    // final IVariableOrConstant<?> t = pred.get(j);
-    //
-    // if (t.isVar()) {
-    //
-    // final IVariable<?> var = (IVariable<?>) t;
-    //
-    // if (log.isDebugEnabled()) {
-    //
-    // log.debug("Propagating binding: pred=" + pred
-    // + ", var=" + var + ", bindingSet="
-    // + bindingSet);
-    //
-    // }
-    //
-    // bindingSet.set(var, fakeTermId);
-    //
-    // }
-    //
-    // }
-    //
-    // }
-    //
-    // if (log.isDebugEnabled()) {
-    //
-    // log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
-    // + Arrays.toString(nvars) + ", preds=" +
-    // Arrays.toString(preds.toArray()));
-    //
-    // }
-    //
-    // return a;
-    //
-    // }
-
     @SuppressWarnings("rawtypes")
     private static final Predicate toPredicate(final StatementPatternNode sp,
             final AST2BOpContext ctx) {
@@ -2580,14 +2479,6 @@ public class AST2BOpUtility {
                 | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
 
         return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
-        // return new SPOPredicate(
-        // new String[] { database.getSPORelation().getNamespace() },
-        // -1, // partitionId
-        // s, p, o, c,
-        // optional, // optional
-        // filter, // filter on elements visited by the access path.
-        // expander // free text search expander or named graphs expander
-        // );
 
     }
 
@@ -2643,36 +2534,42 @@ public class AST2BOpUtility {
 
             final AssignmentNode assignment = (AssignmentNode) node;
 
-            final IValueExpressionNode child = assignment
+            final IValueExpressionNode valueExpr = assignment
                     .getValueExpressionNode();
 
             @SuppressWarnings("rawtypes")
-            final IValueExpression<? extends IV> ve = toVE(lex, child);
+            final IValueExpression<? extends IV> ve = toVE(lex, valueExpr);
 
             return ve;
 
         } else if (node instanceof FunctionNode) {
 
-            final FunctionNode function = (FunctionNode) node;
+            final FunctionNode functionNode = (FunctionNode) node;
 
-            final URI functionURI = function.getFunctionURI();
+            final URI functionURI = functionNode.getFunctionURI();
 
-            final Map<String, Object> scalarValues = function.getScalarValues();
+            // TODO More efficient if the factory replaces a [null] reference
+            // for scalar values with Collections.emptyMap().  Modify the 
+            // parse tree => AST conversion to leave [scalarValues:=null] unless
+            // we need to set something explicitly.
+            final Map<String, Object> scalarValues = functionNode.getScalarValues();
 
-            final ValueExpressionNode[] args = function.args().toArray(
-                    new ValueExpressionNode[function.arity()]);
+            // TODO More efficient to pass in the FunctionNode than creating a
+            // new VEN[] each time.
+            final ValueExpressionNode[] args = functionNode.args().toArray(
+                    new ValueExpressionNode[functionNode.arity()]);
 
             @SuppressWarnings("rawtypes")
             final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
                     lex, functionURI, scalarValues, args);
 
-            node.setValueExpression(ve);
+            functionNode.setValueExpression(ve);
 
             return ve;
 
         } else {
 
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(node.toString());
 
         }
 

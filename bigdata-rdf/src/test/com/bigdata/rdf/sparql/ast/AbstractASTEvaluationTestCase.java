@@ -33,12 +33,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.LinkedHashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -158,5 +162,53 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         }
 
     }
+
+    protected static Set<IVariable<?>> asSet(final String[] vars) {
+
+        final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
+
+        for (String s : vars) {
+
+            set.add(Var.var(s));
+
+        }
+
+        return set;
+
+    }
+
+    protected static Set<IVariable<?>> asSet(final IVariable<?>[] vars) {
+
+        final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
+
+        for (IVariable<?> var : vars) {
+
+            set.add(var);
+
+        }
+
+        return set;
+
+    }
+
+//    /**
+//     * Return a mock IV for the value.
+//     */
+//    @SuppressWarnings("unchecked")
+//    protected IV<BigdataValue, ?> mockIV(final BigdataValue value) {
+//
+//        IV iv = store.getLexiconRelation().getInlineIV(value);
+//
+//        if (iv == null) {
+//
+//            iv = (IV<BigdataValue, ?>) TermId.mockIV(VTE.valueOf(value));
+//            
+//            iv.setValue(value);
+//
+//        }
+//
+//        return iv;
+//
+//    }
 
 }

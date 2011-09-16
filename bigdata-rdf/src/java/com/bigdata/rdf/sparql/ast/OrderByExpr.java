@@ -36,7 +36,8 @@ import com.bigdata.rdf.internal.IV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OrderByExpr extends ASTBase {
+public class OrderByExpr extends ASTBase implements
+        IValueExpressionNodeContainer {
 
     /**
      * 

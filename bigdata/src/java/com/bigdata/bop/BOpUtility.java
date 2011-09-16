@@ -45,6 +45,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -1566,7 +1568,26 @@ public class BOpUtility {
             final Constructor<T> ctor = (Constructor<T>) op.getClass()
                     .getConstructor(BOp[].class, Map.class);
 
-            return ctor.newInstance(args, anns);
+            final T copy = ctor.newInstance(args, anns);
+            
+            if (copy instanceof GroupNodeBase<?>) {
+                
+                /*
+                 * Patch up the parent references.
+                 */
+                
+                for (int i = 0; i < arity; i++) {
+
+                    final IGroupMemberNode child = (IGroupMemberNode) copy
+                            .get(i);
+                    
+                    child.setParent((GroupNodeBase<IGroupMemberNode>) copy);
+                    
+                }
+                
+            }
+            
+            return copy;
 
         } catch (Exception e1) {
 

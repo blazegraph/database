@@ -205,6 +205,7 @@ public class ASTContainer extends ASTBase {
         
         if (queryString != null) {
 
+            sb.append("\n");
             sb.append(Annotations.QUERY_STRING);
             sb.append("\n");
             sb.append(queryString);
@@ -213,6 +214,10 @@ public class ASTContainer extends ASTBase {
         }
         
         if (parseTree != null) {
+
+            sb.append("\n");
+            sb.append(Annotations.PARSE_TREE);
+            sb.append("\n");
 
             if(parseTree instanceof SimpleNode) {
 
@@ -225,8 +230,6 @@ public class ASTContainer extends ASTBase {
                  * Dump some other parse tree, assuming it implements toString()
                  * as pretty print.
                  */
-                sb.append(Annotations.PARSE_TREE);
-                sb.append("\n");
                 sb.append(parseTree.toString());
                 sb.append("\n");
                 
@@ -236,6 +239,7 @@ public class ASTContainer extends ASTBase {
 
         if (originalAST != null) {
 
+            sb.append("\n");
             sb.append(Annotations.ORIGINAL_AST);
             sb.append(originalAST);
 
@@ -243,6 +247,7 @@ public class ASTContainer extends ASTBase {
 
         if (optimizedAST != null) {
 
+            sb.append("\n");
             sb.append(Annotations.OPTIMIZED_AST);
             sb.append(optimizedAST);
 

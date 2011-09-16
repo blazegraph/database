@@ -11,7 +11,8 @@ import com.bigdata.rdf.internal.constraints.EBVBOp;
 /**
  * AST node models a value expression which imposes a constraint.
  */
-public class FilterNode extends GroupMemberValueExpressionNodeBase {
+public class FilterNode extends GroupMemberValueExpressionNodeBase implements
+        IValueExpressionNodeContainer {
 
     /**
      * 

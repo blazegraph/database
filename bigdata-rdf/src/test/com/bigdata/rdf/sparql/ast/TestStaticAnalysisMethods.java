@@ -83,20 +83,6 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         super(arg0);
     }
 
-    private static Set<IVariable<?>> asSet(final String[] vars) {
-
-        final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
-
-        for (String s : vars) {
-
-            set.add(Var.var(s));
-
-        }
-
-        return set;
-
-    }
-
     private static final Set<IVariable<?>> EMPTY_SET = Collections.emptySet();
     
     /**
@@ -128,7 +114,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals(
                 expected,
-                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                sa.getDefinitelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -168,7 +154,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals(
                 expectedWhereClause,
-                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                sa.getDefinitelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -216,7 +202,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals(
                 expectedWhereClause,
-                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                sa.getDefinitelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -266,7 +252,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals(
                 expectedWhereClause,
-                sa.getDefinatelyProducedBindings(queryRoot.getWhereClause(),
+                sa.getDefinitelyProducedBindings(queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
         
     }
@@ -336,7 +322,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             expectedWhereClause.add(Var.var("x"));
             expectedWhereClause.add(Var.var("o"));
 
-            assertEquals(expectedWhereClause, sa.getDefinatelyProducedBindings(
+            assertEquals(expectedWhereClause, sa.getDefinitelyProducedBindings(
                     queryRoot.getWhereClause(),
                     new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
@@ -346,11 +332,15 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
     
     /**
      * Static analysis of TCK query:
+     * 
      * <pre>
      * PREFIX : <http://example/>
      * 
-     * SELECT ?v { :x :p ?v . FILTER(?v = 1) 
+     * SELECT ?v { :x :p ?v . FILTER(?v = 1)
      * </pre>
+     * 
+     * This query does not present a problem since <code>?v</code> is in scope
+     * when the filter is evaluated.
      */
     public void test_static_analysis_filter_nested_1() throws MalformedQueryException {
 
@@ -374,7 +364,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         assertEquals(expected, sa.getDefinatelyProducedBindings(queryRoot));
 
         // Test "must" bound bindings for the where clause.
-        assertEquals(expected, sa.getDefinatelyProducedBindings(whereClause,
+        assertEquals(expected, sa.getDefinitelyProducedBindings(whereClause,
                 new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         // Test "maybe" bound bindings for the where clause.
@@ -445,7 +435,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                     new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings for the where clause.
-            assertEquals(expected, sa.getDefinatelyProducedBindings(whereClause,
+            assertEquals(expected, sa.getDefinitelyProducedBindings(whereClause,
                     new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings for the where clause.
@@ -467,7 +457,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     EMPTY_SET,
-                    sa.getDefinatelyProducedBindings(filterClause,
+                    sa.getDefinitelyProducedBindings(filterClause,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -603,13 +593,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "v" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v", "w" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -640,13 +630,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "w" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "w" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -677,13 +667,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "v2" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -801,13 +791,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "X" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Y" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -838,13 +828,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "Y" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "Y" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -875,13 +865,13 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
             // Test "must" bound bindings.
             assertEquals(
                     asSet(new String[] { "X", "Z" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), false/* recursive */));
 
             // Test "must" bound bindings (recursive).
             assertEquals(
                     asSet(new String[] { "X", "Z" }),
-                    sa.getDefinatelyProducedBindings(group,
+                    sa.getDefinitelyProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
             // Test "maybe" bound bindings.
@@ -977,7 +967,7 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
                 expected.add(Var.var("p"));
                 expected.add(Var.var("lit"));
 
-                assertEquals(expected, sa.getDefinatelyProducedBindings(
+                assertEquals(expected, sa.getDefinitelyProducedBindings(
                         queryRoot.getWhereClause(),
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
@@ -1139,6 +1129,11 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
         assertEquals("prune-filters", Collections.singletonList(x_LT_10),
                 sa.getPruneFilters(innerGroup));
 
+        assertEquals("definitely-and-filters", asSet(new String[] { "a", "b",
+                "ageA", "ageB", "x" }),
+                sa.getDefinitelyProducedBindingsAndFilterVariables(innerGroup,
+                        new LinkedHashSet<IVariable<?>>()));
+        
         // Outer group.
 
         assertEquals("pre-filters", Collections.emptyList(),
@@ -1152,6 +1147,11 @@ public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
 
         assertEquals("prune-filters", Collections.emptyList(),
                 sa.getPruneFilters(outerGroup));
+
+        assertEquals("definitely-and-filters", asSet(new String[] { "a", "b",
+                "ageA" }),
+                sa.getDefinitelyProducedBindingsAndFilterVariables(outerGroup,
+                        new LinkedHashSet<IVariable<?>>()));
 
     }
 

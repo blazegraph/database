@@ -63,7 +63,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
  *      variable or by adding a "projection" to the INCLUDE so we could
  *      rename the variable there.
  * 
- *      Since this construction of nexted graph patterns is rare, and
+ *      Since this construction of nested graph patterns is rare, and
  *      since it is complicated to make it more efficient, we are going
  *      with the SameTerm() constraint for now.
  * 

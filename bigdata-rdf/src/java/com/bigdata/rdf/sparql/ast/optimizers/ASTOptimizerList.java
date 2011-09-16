@@ -78,6 +78,9 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
     public IQueryNode optimize(final AST2BOpContext context,
             IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
+        if (log.isDebugEnabled())
+            log.debug("Original AST:\n" + queryNode);
+
         // Avoid side-effects on the original AST!
         queryNode = (IQueryNode) BOpUtility.deepCopy((BOp) queryNode);
         
