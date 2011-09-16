@@ -38,6 +38,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 
@@ -1103,6 +1104,10 @@ public class StaticAnalysis {
      *         evaluated). If the variable is bound in some exogenous solutions
      *         then it could be bound when the FILTER is run and the filter can
      *         not be pruned.
+     * 
+     * @deprecated This is now handled by {@link ASTBottomUpOptimizer}. I think
+     *             that we will not need this method (it is only invoked from
+     *             the test suite at this point).
      */
     public List<FilterNode> getPruneFilters(final JoinGroupNode group) {
 

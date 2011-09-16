@@ -81,12 +81,7 @@ public class TestAll extends TestCase {
         // Unit tests for lifting pre-filters into the parent group.
         suite.addTestSuite(TestASTLiftPreFiltersOptimizer.class);
 
-        // Unit tests for pruning filters whose variables are guaranteed to not
-        // be bound (typically because they are not visible in that scope).
-        suite.addTestSuite(TestASTPruneFiltersOptimizer.class);
-
-        // Unit tests for detecting and handling badly designed queries in a
-        // manner consistent with bottom-up evaluation semantics.
+        // Unit tests for enforcing bottom-up evaluation semantics.
         suite.addTestSuite(TestASTBottomUpOptimizer.class);
 
         return suite;
