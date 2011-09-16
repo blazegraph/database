@@ -85,7 +85,8 @@ public class TestHardReferenceQueue extends TestCase2 {
             new HardReferenceQueue<String>(new MyListener<String>(), 0);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expectedRefs exception: " + ex);
+            if(log.isInfoEnabled())
+                log.info("Ignoring expectedRefs exception: " + ex);
         }
 
     }
@@ -104,7 +105,8 @@ public class TestHardReferenceQueue extends TestCase2 {
             cache.add(null);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expectedRefs exception: " + ex);
+            if(log.isInfoEnabled())
+                log.info("Ignoring expectedRefs exception: " + ex);
         }
         
     }
