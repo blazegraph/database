@@ -10,9 +10,9 @@ import com.bigdata.rdf.internal.IV;
 /**
  * AST node models the assignment of a value expression to a variable.
  */
-public class AssignmentNode extends GroupMemberValueExpressionNodeBase 
-		implements IValueExpressionNode, Comparable<AssignmentNode>,
-		IBindingProducerNode {
+public class AssignmentNode extends GroupMemberValueExpressionNodeBase
+        implements IValueExpressionNode, Comparable<AssignmentNode>,
+        IBindingProducerNode, IValueExpressionNodeContainer {
 
     /**
      * 

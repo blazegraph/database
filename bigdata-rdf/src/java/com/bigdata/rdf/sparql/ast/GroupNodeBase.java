@@ -63,6 +63,21 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
 	}
 
+//	/**
+//	 * {@inheritDoc}
+//	 * <p>
+//	 * Force the maintenance of the parent reference on the children. 
+//	 */
+//	@Override
+//	protected void mutation() {
+//        super.mutation();
+//        final int arity = arity();
+//        for (int i = 0; i < arity; i++) {
+//            final BOp child = get(i);
+//            ((E) child).setParent((IGroupNode<IGroupMemberNode>) this);
+//        }
+//    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -120,6 +135,8 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
         addArg((BOp) child);
 		
+//        assert child.getParent() == this;
+        
 		return this;
 		
 	}
@@ -127,6 +144,8 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     public IGroupNode<E> removeChild(final E child) {
 
         removeArg((BOp) child);
+
+//        assert child.getParent() == null;
 
         return this;
 
@@ -221,6 +240,13 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             }
             
             sb.append(n.toString(indent + 1));
+
+            if (((IGroupMemberNode) n).getParent() != this) {
+                sb.append(" : ERROR : parent not [this]");
+                throw new RuntimeException("Parent not this: child=" + n
+                        + ", this=" + toShortString() + ", but parent="
+                        + ((IGroupMemberNode) n).getParent());
+            }
 
         }
 

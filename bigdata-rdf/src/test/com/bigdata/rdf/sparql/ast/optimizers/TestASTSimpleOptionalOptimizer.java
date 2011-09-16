@@ -30,17 +30,25 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.Iterator;
 
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
  * Test suite for {@link ASTSimpleOptionalOptimizer}.
@@ -60,15 +68,22 @@ public class TestASTSimpleOptionalOptimizer extends
     }
 
     /**
-     * TODO Variation where there is a FILTER in the simple optional. Make sure
-     * that it also gets lifted.
+     * Unit test for recognizing a "simple optional" and lifting it into the
+     * parent join group.
      * 
-     * TODO Variation where there are FILTERS or other things in the optional
-     * which mean that we can not lift out the statement pattern.
+     * TODO Unit test for a variation where there is a FILTER in the simple
+     * optional. Make sure that it also gets lifted.
      * 
-     * @throws MalformedQueryException
+     * TODO Unit test for a variation where there are FILTERS or other things in
+     * the optional which mean that we can not lift out the statement pattern.
+     * 
+     * TODO Unit test for a variation where the FILTER *does* require
+     * materialization but we can lift it out anyway because the variables on
+     * which it depends will be "known" bound in the parent group by the time we
+     * evaluate the optional.
      */
     public void test_simpleOptional() throws MalformedQueryException {
+
         final String queryStr = "" + //
                 "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+//
                 "PREFIX dc: <http://purl.org/dc/terms/> \n"+//
@@ -132,6 +147,94 @@ public class TestASTSimpleOptionalOptimizer extends
             assertEquals("#ngroups", 2, ngroups);
             assertEquals("#optionalGroups", 1, noptionalGroups);
         }
+
+    }
+
+    /**
+     * Test effective boolean value - optional.
+     * 
+     * <pre>
+     * PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>
+     * PREFIX  : <http://example.org/ns#>
+     * SELECT  ?a
+     * WHERE
+     *     { ?a :p ?v . 
+     *       OPTIONAL
+     *         { ?a :q ?w } . 
+     *       FILTER (?w) .
+     *     }
+     * </pre>
+     * 
+     * @see ASTSimpleOptionalOptimizer
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void test_sparql_bev_5() throws Exception {
+
+        final String queryStr = "" + //
+                "PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>\n" + //
+                "PREFIX  : <http://example.org/ns#>" + //
+                "SELECT ?a \n" + //
+                "WHERE" + //
+                "    { ?a :p ?v . \n" + //
+                "      OPTIONAL \n" + //
+                "        { ?a :q ?w } . \n" + //
+                "      FILTER (?w) . \n" + //
+                "    }\n" //
+        ;
+
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI p = f.createURI("http://example.org/ns#p");
+        final BigdataURI q = f.createURI("http://example.org/ns#q");
+        final BigdataValue[] values = new BigdataValue[] { p, q };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        /*
+         * Create the expected AST.
+         */
+        final JoinGroupNode expectedClause = new JoinGroupNode();
+        {
+
+            // :x3 :q ?w
+            expectedClause.addChild(new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(p.getIV())),// p
+                    new VarNode("v"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    ));
+            // :x3 :q ?w
+            final StatementPatternNode liftedSp = new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(q.getIV())),// p
+                    new VarNode("w"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    );
+            liftedSp.setSimpleOptional(true);
+            expectedClause.addChild(liftedSp);
+            
+            expectedClause.addChild(new FilterNode(new VarNode("w")));
+            
+        }
+        
+        assertEquals("modifiedClause", expectedClause,
+                queryRoot.getWhereClause());        
 
     }
     

@@ -28,14 +28,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 
 /**
@@ -136,24 +139,38 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * 
  * </dl>
  * 
- * FIXME The main "gotcha" when looking "up" the tree is that we need to know
- * the position at which everything above us in the tree is being evaluated.
- * Historically, the evaluation order for binding producers was organized into
- * fairly simple regions : required pipelined joins of statement pattern nodes
- * and optional join groups. Life is more complex now that we also have SPARQL
- * 1.1 subqueries, SERVICE calls, and named subquery includes. We probably need
- * a concept which reflects these different evaluation regions within a group,
- * but even then it is not enough since we would have to specify this for each
- * parent group in the AST.
+ * <h3>FILTERs</h3>
  * 
- * FIXME Filter javadoc. The analysis of filters depends on the analysis of
- * variables so we need to have the {@link QueryRoot} on hand in order to
- * resolve {@link NamedSubqueryInclude}s. This means that we either pass
- * {@link StaticAnalysis} into the methods on {@link JoinGroupNode} or move
- * those methods here and pass in the {@link JoinGroupNode}.
+ * FILTERs are groups based on whether they can run before any required joins
+ * (pre-), with the required join (join-), or after all joins (post-).
+ * <dl>
+ * <dt>pre-</dt>
+ * <dd>The pre-filters have all their required variables bound on entry to the
+ * join group. They should be lifted into the parent join group.</dd>
+ * <dt>join-</dt>
+ * <dd>The join-filters will have all their required variables bound by the time
+ * the required joins are done. These filters will wind up attached to the
+ * appropriate required join. The specific filter/join attachments depend on the
+ * join evaluation order.</dd>
+ * <dt>post-</dt>
+ * <dd>The post-filters might not have all of their required variables bound. We
+ * have to wait until the last of the optionals joins has been evaluated before
+ * we can evaluate any post-filters, so they run "last".</dd>
+ * <dt>prune-</dt>
+ * <dd>The prune-filters are those whose required variables CAN NOT be bound.
+ * They should be pruned from the AST.</dd>
+ * </dl>
  * 
- * FIXME Fold in the logic to detect a badly designed left join and finish the
- * {@link ASTBottomUpOptimizer}.
+ * FIXME [This should all change once we move to a more dynamic approach to
+ * ordering the joins.] The main "gotcha" when looking "up" the tree is that we
+ * need to know the position at which everything above us in the tree is being
+ * evaluated. Historically, the evaluation order for binding producers was
+ * organized into fairly simple regions : required pipelined joins of statement
+ * pattern nodes and optional join groups. Life is more complex now that we also
+ * have SPARQL 1.1 subqueries, SERVICE calls, and named subquery includes. We
+ * probably need a concept which reflects these different evaluation regions
+ * within a group, but even then it is not enough since we would have to specify
+ * this for each parent group in the AST.
  * 
  * TODO We can probably cache the heck out of things on this class. There is no
  * reason to recompute the SA of the know or maybe/must bound variables until
@@ -176,6 +193,15 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 public class StaticAnalysis {
 
     private final QueryRoot queryRoot;
+    
+    /**
+     * Return the {@link QueryRoot} parameter given to the constructor.
+     */
+    public QueryRoot getQueryRoot() {
+       
+        return queryRoot;
+        
+    }
     
     /**
      * 
@@ -226,7 +252,7 @@ public class StaticAnalysis {
              * each parent considered.
              */
 
-            getDefinatelyProducedBindings(parent, vars, false/* recursive */);
+            getDefinitelyProducedBindings(parent, vars, false/* recursive */);
 
             parent = parent.getParentGraphPatternGroup();
             
@@ -259,7 +285,7 @@ public class StaticAnalysis {
      * 
      * @return The argument.
      */
-    public Set<IVariable<?>> getDefinatelyProducedBindings(
+    public Set<IVariable<?>> getDefinitelyProducedBindings(
             final IBindingProducerNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
 
@@ -267,12 +293,12 @@ public class StaticAnalysis {
         
             if (node instanceof JoinGroupNode) {
             
-                getDefinatelyProducedBindings((JoinGroupNode) node, vars,
+                getDefinitelyProducedBindings((JoinGroupNode) node, vars,
                         recursive);
                 
             } else if (node instanceof UnionNode) {
                 
-                getDefinatelyProducedBindings((UnionNode) node, vars, recursive);
+                getDefinitelyProducedBindings((UnionNode) node, vars, recursive);
                 
             } else {
                 
@@ -308,7 +334,7 @@ public class StaticAnalysis {
 
             final ServiceNode service = (ServiceNode) node;
 
-            vars.addAll(getDefinatelyProducedBindings(service));
+            vars.addAll(getDefinitelyProducedBindings(service));
 
         } else if(node instanceof AssignmentNode) {
             
@@ -334,6 +360,101 @@ public class StaticAnalysis {
 
         return vars;
       
+    }
+
+    /**
+     * Collect all variables appearing in the group. This DOES NOT descend
+     * recursively into groups. It DOES report variables projected out of named
+     * subqueries, SPARQL 1.1 subqueries, and SERVICE calls.
+     * <p>
+     * This has the same behavior as a non-recursive call obtain the definitely
+     * bound variables PLUS the variables used by the filters in the group.
+     * 
+     * @param vars
+     *            The variables are added to this set.
+     * @param group
+     *            The group whose variables will be reported.
+     * @param includeFilters
+     *            When <code>true</code>, variables appearing in FILTERs are
+     *            also reported.
+     * 
+     * @return The caller's set.
+     */
+    public Set<IVariable<?>> getDefinitelyProducedBindingsAndFilterVariables( 
+            final IGroupNode<? extends IGroupMemberNode> group,
+            final Set<IVariable<?>> vars) {
+
+        getDefinitelyProducedBindings((IBindingProducerNode) group, vars, false/* recursive */);
+
+        for (IGroupMemberNode op : group) {
+
+            if (op instanceof FilterNode) {
+
+                addAll(vars, op);
+
+//            } else if (op instanceof IBindingProducerNode) {
+//
+//                if (op instanceof StatementPatternNode) {
+//
+//                    addAll(vars, op);
+//
+//                } else if (op instanceof SubqueryRoot) {
+//
+//                    final SubqueryRoot subqueryRoot = (SubqueryRoot) op;
+//
+//                    vars.addAll((List) Arrays.asList(subqueryRoot
+//                            .getProjection().getProjectionVars()));
+//
+//                } else if (op instanceof NamedSubqueryInclude) {
+//
+//                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) op;
+//
+//                    final NamedSubqueryRoot nsr = nsi
+//                            .getNamedSubqueryRoot(queryRoot);
+//
+//                    vars.addAll((List) Arrays.asList(nsr.getProjection()
+//                            .getProjectionVars()));
+//
+//                } else if (op instanceof ServiceNode) {
+//
+//                    /*
+//                     * todo Add all maybe bound variables from the service
+//                     * node's graph pattern.
+//                     */
+//
+//                } else {
+//                    throw new AssertionError(op + " in " + group);
+//
+//                }
+//                
+            }
+            
+        }
+
+        return vars;
+        
+    }
+    
+    /**
+     * Add all variables spanned by the operator.
+     * 
+     * @param bindings
+     *            The set to which the variables will be added.
+     * @param op
+     *            The operator.
+     */
+    private void addAll(final Set<IVariable<?>> bindings,
+            final IGroupMemberNode op) {
+
+        final Iterator<IVariable<?>> it = BOpUtility
+                .getSpannedVariables((BOp) op);
+
+        while (it.hasNext()) {
+
+            bindings.add(it.next());
+
+        }
+
     }
 
     /**
@@ -435,7 +556,7 @@ public class StaticAnalysis {
      */
 
     // MUST : JOIN GROUP
-    private Set<IVariable<?>> getDefinatelyProducedBindings(
+    private Set<IVariable<?>> getDefinitelyProducedBindings(
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
 
@@ -450,7 +571,7 @@ public class StaticAnalysis {
                  * Required JOIN (statement pattern).
                  */
 
-                getDefinatelyProducedBindings((IBindingProducerNode) child,
+                getDefinitelyProducedBindings((IBindingProducerNode) child,
                         vars, recursive);
 
             } else if (child instanceof NamedSubqueryInclude
@@ -465,7 +586,7 @@ public class StaticAnalysis {
                  * order to determine anything.
                  */
 
-                vars.addAll(getDefinatelyProducedBindings(
+                vars.addAll(getDefinitelyProducedBindings(
                         (IBindingProducerNode) child,
                         new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
@@ -479,7 +600,7 @@ public class StaticAnalysis {
 
                     if (!group.isOptional()) {
 
-                        getDefinatelyProducedBindings(group, vars, recursive);
+                        getDefinitelyProducedBindings(group, vars, recursive);
 
                     }
 
@@ -525,7 +646,7 @@ public class StaticAnalysis {
             final boolean recursive) {
 
         // Add in anything definitely produced by this group (w/o recursion).
-        getDefinatelyProducedBindings(node, vars, false/* recursive */);
+        getDefinitelyProducedBindings(node, vars, false/* recursive */);
 
         /*
          * Note: Assignments which have an error cause the variable to be left
@@ -563,7 +684,7 @@ public class StaticAnalysis {
     }
 
     // MUST : UNION
-    private Set<IVariable<?>> getDefinatelyProducedBindings(
+    private Set<IVariable<?>> getDefinitelyProducedBindings(
             final UnionNode node,
             final Set<IVariable<?>> vars, final boolean recursive) {
 
@@ -587,7 +708,7 @@ public class StaticAnalysis {
             
             perChildSets.add(childSet);
 
-            getDefinatelyProducedBindings(child, childSet, recursive);
+            getDefinitelyProducedBindings(child, childSet, recursive);
 
         }
 
@@ -624,7 +745,7 @@ public class StaticAnalysis {
          */
         for (JoinGroupNode child : node) {
 
-            getDefinatelyProducedBindings(child, vars, recursive);
+            getDefinitelyProducedBindings(child, vars, recursive);
 
         }
 
@@ -658,7 +779,7 @@ public class StaticAnalysis {
 
         if (whereClause != null) {
 
-            getDefinatelyProducedBindings(whereClause, vars, true/* recursive */);
+            getDefinitelyProducedBindings(whereClause, vars, true/* recursive */);
 
         }
 
@@ -769,7 +890,7 @@ public class StaticAnalysis {
      * permitted, then this code needs to be reviewed.
      */
     // MUST : ServiceNode
-    public Set<IVariable<?>> getDefinatelyProducedBindings(final ServiceNode node) {
+    public Set<IVariable<?>> getDefinitelyProducedBindings(final ServiceNode node) {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
         
@@ -777,7 +898,7 @@ public class StaticAnalysis {
 
         if (graphPattern != null) {
 
-            getDefinatelyProducedBindings(graphPattern, vars, true/* recursive */);
+            getDefinitelyProducedBindings(graphPattern, vars, true/* recursive */);
 
         }
 
@@ -826,12 +947,13 @@ public class StaticAnalysis {
      * subqueries for this group since those which fail the filter will not be
      * issued.
      * 
-     * @param group The {@link JoinGroupNode}.
+     * @param group
+     *            The {@link JoinGroupNode}.
      * 
      * @return The filters which should either be run before the non-optional
      *         join graph or (preferably) lifted into the parent group.
-     *         
-     *         FIXME AST optimizer to lift the filters into the parent group.
+     * 
+     * @see ASTLiftPreFiltersOptimizer
      */
     public List<FilterNode> getPreFilters(final JoinGroupNode group) {
 
@@ -876,7 +998,7 @@ public class StaticAnalysis {
          * this step because we are only interested in a FILTER which can be
          * attached to a non-optional JOIN run within this group.
          */
-        getDefinatelyProducedBindings(group, knownBound, false/* recursive */);
+        getDefinitelyProducedBindings(group, knownBound, false/* recursive */);
         
         /*
          * Get the filters that are bound by this set of known bound variables.
@@ -936,7 +1058,7 @@ public class StaticAnalysis {
          * joins, SPARQL 1.1 subquery joins, and service call joins -- all of
          * which are required joins.
          */
-        getDefinatelyProducedBindings(group, knownBound, false/* recursive */);
+        getDefinitelyProducedBindings(group, knownBound, false/* recursive */);
 
         /*
          * Get the filters that are bound by this set of known bound variables.

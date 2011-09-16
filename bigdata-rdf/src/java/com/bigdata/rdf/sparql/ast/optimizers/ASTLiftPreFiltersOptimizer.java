@@ -30,21 +30,28 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
  * Lift FILTERs which can be evaluated based solely on the bindings in the
- * parent group out of a child group.
+ * parent group out of a child group. This helps because we will issue the
+ * subquery for the child group less often (assuming that the filter rejects any
+ * solutions). This optimizer is based on
+ * {@link StaticAnalysis#getPreFilters(JoinGroupNode)}. Anything reported by
+ * that method can be lifted out of the child group.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTLiftPreFiltersOptimizer.java 5193 2011-09-15 14:18:56Z
+ *          thompsonbry $
  * 
- * FIXME Implement.
+ *          FIXME Implement.
  */
 public class ASTLiftPreFiltersOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context, final IQueryNode queryNode,
+            final IBindingSet[] bindingSets) {
 
         return queryNode;
         

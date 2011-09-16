@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTPruneFiltersOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
+
 /**
  * Test driver for debugging Sesame or DAWG manifest tests.
  * 
@@ -122,28 +126,9 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      *         { ?a :q ?w } . 
      *       FILTER (?w) .
      *     }
-     * 
-     * PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-     * PREFIX : <http://example.org/ns#>
-     * QueryType: SELECT
-     * SELECT VarNode(a)
-     *   JoinGroupNode {
-     *     StatementPatternNode(VarNode(a), ConstantNode(TermId(1U)), VarNode(v), DEFAULT_CONTEXTS)
-     *     JoinGroupNode[optional] {
-     *       StatementPatternNode(VarNode(a), ConstantNode(TermId(2U)), VarNode(w), DEFAULT_CONTEXTS)
-     *     }
-     *     FILTER( VarNode(w) )
-     *   }
-     * INFO : 2984      main com.bigdata.rdf.sparql.ast.AST2BOpUtility.convert(AST2BOpUtility.java:359): pipeline:
-     * com.bigdata.bop.bset.EndOp[6](ConditionalRoutingOp[5])[ com.bigdata.bop.BOp.bopId=6, com.bigdata.bop.BOp.evaluationContext=CONTROLLER]
-     *   com.bigdata.bop.bset.ConditionalRoutingOp[5](PipelineJoin[4])[ com.bigdata.bop.BOp.bopId=5, com.bigdata.bop.bset.ConditionalRoutingOp.condition=com.bigdata.rdf.internal.constraints.SPARQLConstraint(com.bigdata.rdf.internal.constraints.EBVBOp(w))]
-     * ==> Missing a materialization step here.
-     *     com.bigdata.bop.join.PipelineJoin[4](PipelineJoin[3])[ com.bigdata.bop.BOp.bopId=4, com.bigdata.rdf.sail.Rule2BOpUtility.cost.scan=com.bigdata.bop.cost.ScanCostReport@8b677f{rangeCount=3,shardCount=1,cost=0.0}, com.bigdata.rdf.sail.Rule2BOpUtility.cost.subquery=null, com.bigdata.bop.BOp.evaluationContext=ANY, com.bigdata.bop.join.PipelineJoin.predicate=com.bigdata.rdf.spo.SPOPredicate(a=null, TermId(2U), w=null, ebffdb58-9c9e-40cb-9c04-0be4b74fe615=null)[ com.bigdata.bop.IPredicate.relationName=[kb.spo], com.bigdata.bop.IPredicate.timestamp=0, com.bigdata.bop.IPredicate.flags=[KEYS,VALS,READONLY,PARALLEL], com.bigdata.bop.IPredicate.optional=true, com.bigdata.bop.IPredicate.accessPathFilter=cutthecrap.utils.striterators.NOPFilter@37d490{annotations=null,filterChain=[com.bigdata.bop.rdf.filter.StripContextFilter(), com.bigdata.bop.ap.filter.DistinctFilter()]}]]
-     *       com.bigdata.bop.join.PipelineJoin[3](StartOp[1])[ com.bigdata.bop.BOp.bopId=3, com.bigdata.rdf.sail.Rule2BOpUtility.cost.scan=com.bigdata.bop.cost.ScanCostReport@1647278{rangeCount=8,shardCount=1,cost=0.0}, com.bigdata.rdf.sail.Rule2BOpUtility.cost.subquery=null, com.bigdata.bop.BOp.evaluationContext=ANY, com.bigdata.bop.join.PipelineJoin.predicate=com.bigdata.rdf.spo.SPOPredicate[2](a=null, TermId(1U), v=null, 4b7d02c5-3a72-47ed-b57c-f2fb5852ea2f=null)[ com.bigdata.bop.IPredicate.relationName=[kb.spo], com.bigdata.bop.IPredicate.timestamp=0, com.bigdata.bop.IPredicate.flags=[KEYS,VALS,READONLY,PARALLEL], com.bigdata.bop.BOp.bopId=2, com.bigdata.rdf.sail.Rule2BOpUtility.originalIndex=POCS, com.bigdata.rdf.sail.Rule2BOpUtility.estimatedCardinality=8, com.bigdata.bop.IPredicate.accessPathFilter=cutthecrap.utils.striterators.NOPFilter@1972e3a{annotations=null,filterChain=[com.bigdata.bop.rdf.filter.StripContextFilter(), com.bigdata.bop.ap.filter.DistinctFilter()]}]]
-     *         com.bigdata.bop.bset.StartOp[1]()[ com.bigdata.bop.BOp.bopId=1, com.bigdata.bop.BOp.evaluationContext=CONTROLLER]
      * </pre>
-     * AST2BOpUtility addConditionals() should be inserting a materialization
-     * step for this.  Check the post-filters.
+     * 
+     * @see ASTSimpleOptionalOptimizer
      */
     public void test_sparql_bev_5() throws Exception {
 
@@ -158,6 +143,8 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * <code>Nested Optionals - 1</code>. Classic badly designed left join.
+     * 
+     * @see ASTBottomUpOptimizer
      */
     public void test_two_nested_opt() throws Exception {
 
@@ -170,19 +157,23 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-//    public void test_filter_nested_1() throws Exception {
-//
-//        new TestHelper(
-//                "filter-nested-1", // testURI,
-//                "filter-nested-1.rq",// queryFileURL
-//                "filter-nested-1.ttl",// dataFileURL 
-//                "filter-nested-1.srx"// resultFileURL
-//                ).runTest();
-//
-//    }
+    /**
+     * This case is not a problem. It provides a contrast to
+     * {@link #test_filter_nested_2()}
+     */
+    public void test_filter_nested_1() throws Exception {
+
+        new TestHelper(
+                "filter-nested-1", // testURI,
+                "filter-nested-1.rq",// queryFileURL
+                "filter-nested-1.ttl",// dataFileURL 
+                "filter-nested-1.srx"// resultFileURL
+                ).runTest();
+
+    }
 
     /**
-     * This was handled historically by
+     * Note: This was handled historically by
      * 
      * <pre>
      * 
@@ -200,7 +191,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * filter exists (it runs as a subquery). If there are NO variables that are
      * in scope, then just fail the filter per the code above.
      * 
-     * @throws Exception
+     * @see ASTPruneFiltersOptimizer
      */
     public void test_filter_nested_2() throws Exception {
 
@@ -215,6 +206,8 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * This will be fixed by the same issue as {@link #test_filter_nested_2()}.
+     * 
+     * @see ASTBottomUpOptimizer
      */
     public void test_filter_scope_1() throws Exception {
 
@@ -229,6 +222,8 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * Classic badly designed left join.
+     * 
+     * @see ASTBottomUpOptimizer
      */
     public void test_var_scope_join_1() throws Exception {
 

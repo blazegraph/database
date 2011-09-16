@@ -37,7 +37,6 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
 /**
@@ -80,7 +79,8 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * assigning the constant to the variable.
  * 
  * FIXME {@link FilterOptimizer}. Pushes filters as far down in the query model
- * as possible.
+ * as possible. (What purpose does this serve for us? We want to attach filters
+ * to the first required join where they can possible by evaluated.)
  * 
  * FIXME Sesame has define a bunch of IQueryOptimizers that we are not using
  * (even before this refactor). Many of them apply to their SQL backends. A few
@@ -101,26 +101,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * TODO Optimize IN and named graph and default graph queries with inline access
  * path.
  * 
- * FIXME What follows are some rules for static analysis of variable scope.
- * <p>
- * Rule: A variable bound within an OPTIONAL *MAY* be bound in the parent group.
- * <p>
- * Rule: A variable bound within a UNION *MAY* be bound in the parent group.
- * Exception: if the variable is bound on all alternatives in the UNION, then it
- * MUST be bound in the parent group.
- * <p>
- * A variable bound by a statement pattern or a let/bind MUST be bound within
- * the parent group and within all contexts which are evaluated *after* it is
- * bound. (This is the basis for propagation of bindings to the parent. Since
- * SPARQL demands bottom up evaluation semantics a variable which MUST be bound
- * in a group MUST be bound in its parent.)
- * 
- * FIXME If a subquery does not share ANY variables which MUST be bound in the
- * parent's context then rewrite the subquery into a named/include pattern so it
- * will run exactly once. {@link SubqueryRoot.Annotations#RUN_ONCE}. (If it does
- * not share any variables at all then it will produce a cross product and,
- * again, we want to run that subquery once.)
- * 
  * TODO The combination of DISTINCT and ORDER BY can be optimized using an ORDER
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
@@ -135,8 +115,8 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * do not otherwise appear in the query.
  * 
  * TODO If a child group is non-optional and not a union, then flatten it out
- * (lift it into the parent). (This sort of thing is not directly expressible
- * in the SPARQL syntax but it might arise through other AST transforms.)
+ * (lift it into the parent). (This sort of thing is not directly expressible in
+ * the SPARQL syntax but it might arise through other AST transforms.)
  * 
  * TODO Nested unions should be flattened. This only works until one of the join
  * groups (A, B, or C) introduces something else in the which should apply to
@@ -308,26 +288,37 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         
         /**
          * Lift FILTERs which can be evaluated based solely on the bindings in
-         * the parent group out of a child group.
+         * the parent group out of a child group. This helps because we will
+         * issue the subquery for the child group less often (assuming that the
+         * filter rejects any solutions).
          * 
-         * FIXME This is not implemented yet. 
+         * FIXME This is not implemented yet.
          */
         add(new ASTLiftPreFiltersOptimizer());
         
         /**
+         * Prune the AST when a filter can not be evaluated because one or more
+         * variables on which it depends will never be bound within the scope in
+         * which the filter appears.
+         */
+        add(new ASTPruneFiltersOptimizer());
+        
+        /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
-         * 
-         * FIXME This is not implemented yet. 
          */
         add(new ASTBottomUpOptimizer());
 
         /**
          * Lifts a simple optional out of the child group.
          * 
-         * FIXME This is not implemented yet. 
+         * FIXME In order for this to work we have to attach any FILTER(s)
+         * lifted out of the optional group to the statement pattern node
+         * and then cause them to be attached to the JOIN when we generate
+         * the JOIN.  This means that we need to hang an IConstraint[] on
+         * the Predicate and interpret it in toPredicate().
          */
-        add(new ASTSimpleOptionalOptimizer());
+//        add(new ASTSimpleOptionalOptimizer());
         
         /**
          * Handles a variety of special constructions related to graph graph
@@ -347,7 +338,22 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate
          * 
-         * FIXME This is not implemented yet.
+         * FIXME This is not implemented yet. We should do this if there are no
+         * join variables for the SPARQL 1.1 subquery. That will prevent
+         * multiple evaluations of the SPARQL 1.1 subquery since the named
+         * subquery is run once before the main WHERE clause.
+         * <p>
+         * This optimizer needs to examine the required statement patterns and
+         * decide whether we are better off running the named subquery pipelined
+         * after the required statement patterns, using a hash join after the
+         * required statement patterns, or running it as a named subquery and
+         * then joining in the named solution set (and again, either before or
+         * after everything else).
+         * 
+         * FIXME This similar, but still different from, recognizing when we
+         * should be breaking out some of the joins into their own subqueries
+         * and then uniting those subqueries using a hash join (BSBM Q5, search
+         * in search).
          */
         add(new ASTSparql11SubqueryOptimizer());
 

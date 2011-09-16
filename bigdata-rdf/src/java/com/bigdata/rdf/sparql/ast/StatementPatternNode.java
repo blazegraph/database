@@ -9,13 +9,15 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 
 /**
  * A node in the AST representing a statement pattern.
  * 
  * TODO This should inherit the context dynamically from the parent rather than
- * requiring the context to be specified explicitly.
+ * requiring the context to be specified explicitly. See
+ * {@link ASTGraphGroupOptimizer}.
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
@@ -232,6 +234,10 @@ public class StatementPatternNode extends
         }
 
         sb.append(")");
+        
+        if(isSimpleOptional()) {
+            sb.append(" [simpleOptional]");
+        }
 
         return sb.toString();
     }

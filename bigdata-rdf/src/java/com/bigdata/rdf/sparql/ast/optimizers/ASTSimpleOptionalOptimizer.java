@@ -32,11 +32,11 @@ import java.util.LinkedList;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -54,11 +54,31 @@ import com.bigdata.rdf.store.BD;
  * variables. We can lift these "simple optionals" into the parent group without
  * incurring the costs of launching a {@link SubqueryOp}.
  * 
+ * 
+ * FIXME : Simple optional: must lift filter onto the statement pattern node.
+ * 
+ * <pre>
+ * where {
+ *  ?x type Foo . // adds binding for ?x
+ *  optional {
+ *    ?x p ?y . // adds bindings for ?y if ?x != Bar
+ *    filter (?x != Bar) .
+ *  }
+ * }
+ * </pre
+ * 
+ * The filter(s) can be lifted, but they must be attached to the statement
+ * pattern node such that toPredicate() puts them onto the predicate since they
+ * must run *with* the join for that predicate. (The problem is that ?x != Bar
+ * is filtering the optional join, not ?x).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTSimpleOptionalOptimizer.java 5197 2011-09-15 19:10:44Z
+ *          thompsonbry $
  */
 public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
+    @SuppressWarnings("unchecked")
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {        
@@ -119,10 +139,8 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
      * <p>
      * Note: Do not bother to collect an "optional" unless it has a parent join
      * group node (they all should).
-     * 
-     * FIXME Modify {@link AST2BOpUtility} to use
-     * {@link StatementPatternNode#isSimpleOptional()}!
      */
+    @SuppressWarnings("unchecked")
     private void collectOptionalGroups(
             final IGroupNode<IGroupMemberNode> group,
             final Collection<JoinGroupNode> optionalGroups) {
@@ -200,17 +218,17 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
                 sp.setSimpleOptional(true);
 
-                p.addChild(child);
-                
-            } else if(child instanceof FilterNode) {
+                p.replaceWith((BOp) group, (BOp) child);
+
+            } else if (child instanceof FilterNode) {
 
                 /*
                  * We can lift a filter as long as its materialization
                  * requirements would be satisfied in the parent.
                  */
-                
-                p.addChild(child);
-                
+
+                p.replaceWith((BOp) group, (BOp) child);
+
             } else {
 
                 /*
@@ -225,9 +243,6 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
             }
             
         }
-        
-        // Remove the OPTIONAL group.
-        p.removeChild(group);
        
     }
     
@@ -279,11 +294,15 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                     /*
                      * There are materialization requirements for this join.
                      * 
-                     * FIXME If the filter can be lifted into the parent then we
-                     * can still do this rewrite! Write a unit test where the
-                     * filter's variables are all known bound in the parent and
-                     * verify that the simple optional is recognized and the
-                     * filter lifted with the statement pattern into the parent.
+                     * FIXME We can lift a filter which only depends on
+                     * variables which are "incoming bound" into the parent.
+                     * 
+                     * FIXME If a filter depends on variables which are bound by
+                     * the sole statement pattern in the optional join group
+                     * (and which are not incoming bound) then we can still lift
+                     * the filter IFF it does not have any materialization
+                     * requirements for the variables bound by the optional's
+                     * statement pattern node.
                      */
 
                     return false;
