@@ -286,6 +286,19 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * </pre>
      * 
      * @see ASTBottomUpOptimizer
+     * 
+     *      FIXME Analyze this query. I'm not sure why it is failing. ?v is not
+     *      in scope in the FILTER. Nothing should be lifted out.... Maybe it is
+     *      being rewritten by mistake?
+     * 
+     *      I am wondering if ?v should be in scope here? I am wondering if the
+     *      syntax of OPTIONAL is such that we evaluate the (?x :p ?v ) clause
+     *      before the (?y :q ?w . FILTER(?v=2)) clause but that all variables
+     *      in both clauses are "in scope".
+     * 
+     *      If so, then the change is just to
+     *      handleFiltersWithVariablesNotInScope in {@link ASTBottomUpOptimizer}
+     *      .
      */
     public void test_opt_filter_1() throws Exception {
 

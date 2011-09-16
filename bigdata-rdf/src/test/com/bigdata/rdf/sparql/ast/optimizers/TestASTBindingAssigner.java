@@ -96,10 +96,12 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
 //        
 //        final IConstant const1 = new Constant<IV>(TermId.mockIV(VTE.URI));
 
+        final IV mockIV = TermId.mockIV(VTE.URI);
+        
         final IBindingSet[] bsets = new IBindingSet[] { //
         new ListBindingSet(//
                 new IVariable[] { Var.var("p") },//
-                new IConstant[] { new Constant<IV>(TermId.mockIV(VTE.URI)) }) //
+                new IConstant[] { new Constant<IV>(mockIV) }) //
         };
 
         // The source AST.
@@ -132,7 +134,7 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                     new ConstantNode(new Constant((IVariable) Var.var("p"),
-                            TermId.mockIV(VTE.URI))),
+                            mockIV)),
                     new VarNode("o"), null/* c */, Scope.DEFAULT_CONTEXTS));
             expected.setWhereClause(whereClause);
 
