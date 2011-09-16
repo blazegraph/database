@@ -29,6 +29,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -43,7 +44,7 @@ public class IsBoundBOp extends XSDBooleanIVValueExpression {
 
     public IsBoundBOp(final IVariable<IV> x) {
 
-        this(new BOp[] { x }, null/*annocations*/);
+        this(new BOp[] { x }, null/*annotations*/);
 
     }
 
@@ -66,9 +67,22 @@ public class IsBoundBOp extends XSDBooleanIVValueExpression {
         super(op);
     }
 
+    /**
+     * <pre>
+     * Returns true if var is bound to a value. Returns false otherwise.
+     * Variables with the value NaN or INF are considered bound.
+     * </pre>
+     * 
+     * @see http://www.w3.org/TR/sparql11-query/#func-bound
+     */
     public boolean accept(final IBindingSet bs) {
 
-        return get(0).get(bs) != null;
+        try {
+            return get(0).get(bs) != null;
+        } catch (SparqlTypeErrorException ex) {
+            // Not bound.
+            return false;
+        }
 
     }
     

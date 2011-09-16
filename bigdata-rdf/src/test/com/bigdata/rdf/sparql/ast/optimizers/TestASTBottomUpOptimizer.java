@@ -32,6 +32,11 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -40,6 +45,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -273,21 +279,17 @@ public class TestASTBottomUpOptimizer extends
      *   }
      * </pre>
      * 
-     * This can be reduced to a filter which does not bind anything. Since the
-     * FILTER can not succeed, it should logically be replaced by failing the
-     * group(s) within which it appears. This needs to be done recursively up to
-     * the parent, stopping at the first parent group which is optional. If all
-     * parents up to the WHERE clause are eliminated, then the WHERE clause
-     * itself can not succeed and the query should be replaced by a
-     * "DropSolutionsBOp". The DropSolutionsOp can be substituted in directly
-     * for a group which can not succeed and then we can work the pruning of the
-     * parents as an efficiency.
-     * <p>
-     * Note: An AST optimizer needs to recognize and transform this query by
-     * lifting out
+     * This query includes both a badly designed left join pattern, which must
+     * be lifted out:
      * 
      * <pre>
      * { :x :q ?w OPTIONAL {  :x :p ?v2 FILTER(?v = 1) } }
+     * </pre>
+     * 
+     * and a FILTER on a variable which is not in scope:
+     * 
+     * <pre>
+     * FILTER(?v = 1)
      * </pre>
      * 
      * @see ASTBottomUpOptimizer
@@ -385,14 +387,19 @@ public class TestASTBottomUpOptimizer extends
                             null,// c
                             Scope.DEFAULT_CONTEXTS//
                             ));
-                    // FILTER(?v = 1)
-                    innerClause.addChild(new FilterNode(new FunctionNode(
-                            FunctionRegistry.EQ, null/* scalarValues */,
-                            new ValueExpressionNode[] { // args
-                            new VarNode("v"),//
-                                    new ConstantNode(new Constant(ONE.getIV())) //
-                            }//
-                            )));
+                    // FILTER(?v = 1) => anonymous variable.
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(FunctionRegistry.EQ,
+                                    null/* scalarValues */,
+                                    new ValueExpressionNode[] { // args
+                                            new VarNode("-unbound-var-v-1"),//
+                                            new ConstantNode(new Constant(ONE
+                                                    .getIV())) //
+                                    }//
+                            ));
+                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                            filterNode.getValueExpressionNode());
+                    innerClause.addChild(filterNode);
 
                     expectedNSR.setWhereClause(liftedClause);
 
@@ -421,10 +428,9 @@ public class TestASTBottomUpOptimizer extends
         final NamedSubqueryRoot nsr = (NamedSubqueryRoot) namedSubqueries
                 .get(0);
         
-        assertEquals("liftedClause", expectedNSR, nsr);
+        diff(expectedNSR, nsr);
 
-        assertEquals("modifiedClause", modifiedClause,
-                queryRoot.getWhereClause());        
+        diff(modifiedClause, queryRoot.getWhereClause());        
 
     }
     
@@ -754,6 +760,230 @@ public class TestASTBottomUpOptimizer extends
         // Verify NO transform.
         assertEquals(expected, queryRoot);
         
+    }
+
+    /**
+     * This test is be based on <code>Filter-nested - 2</code> (Filter on
+     * variable ?v which is not in scope).
+     * 
+     * <pre>
+     * PREFIX : <http://example/> 
+     * 
+     * SELECT ?v
+     * { :x :p ?v . { FILTER(?v = 1) } }
+     * </pre>
+     * 
+     * This is one of the DAWG "bottom-up" evaluation semantics tests.
+     * <code>?v</code> is not bound in the FILTER because it is evaluated with
+     * bottom up semantics and therefore the bindings from the parent group are
+     * not visible.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_bottomUpOptimizer_filter_nested_2()
+            throws MalformedQueryException {
+
+        final String queryStr = "" + //
+                "PREFIX : <http://example/>\n" + //
+                "SELECT ?v \n" +//
+                "{ :x :p ?v . { FILTER(?v = 1) } }";
+        
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI x = f.createURI("http://example/x");
+        final BigdataURI p = f.createURI("http://example/p");
+        final BigdataLiteral ONE = f.createLiteral("1", XSD.INTEGER);
+        final BigdataValue[] values = new BigdataValue[] { x, p, ONE };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+//        x.getIV().setValue(x);
+//        p.getIV().setValue(p);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        /*
+         * Create the expected AST for the WHERE clause.
+         */
+        final JoinGroupNode expectedWhereClause = new JoinGroupNode();
+        {
+            // :x :p ?v
+            expectedWhereClause.addChild(new StatementPatternNode(//
+                    new ConstantNode(new Constant(x.getIV())),// s
+                    new ConstantNode(new Constant(p.getIV())),// p
+                    new VarNode("v"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    ));
+
+            final JoinGroupNode innerGroup = new JoinGroupNode();
+            expectedWhereClause.addChild(innerGroup);
+            
+            final String anonvar = "-unbound-var-v-0";
+            final FilterNode filterNode = new FilterNode(
+                    new FunctionNode(//
+                            FunctionRegistry.EQ,//
+                            null,// scalarValues(Map)Collections.emptyMap(),//
+                            new ValueExpressionNode[]{//
+                                new VarNode(anonvar),//
+                                new ConstantNode(ONE.getIV())//
+                            }//
+                            )//
+                    );
+            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    filterNode.getValueExpressionNode());
+            innerGroup.addChild(filterNode);
+
+        }
+
+        diff(expectedWhereClause, queryRoot.getWhereClause());
+//        assertEquals("modifiedClause", expectedWhereClause,
+//                queryRoot.getWhereClause());
+
+    }
+    
+    /**
+     * Test when <code>?v</code> is bound in the input {@link IBindingSet}[]. In
+     * this case we can not rewrite the filter.
+     * 
+     * @throws MalformedQueryException
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_bottomUpOptimizer_filter_nested_2_withBindings()
+            throws MalformedQueryException {
+
+        final String queryStr = "" + //
+                "PREFIX : <http://example/>\n" + //
+                "SELECT ?v \n" +//
+                "{ :x :p ?v . { FILTER(?v = 1) } }";
+        
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI x = f.createURI("http://example/x");
+        final BigdataURI p = f.createURI("http://example/p");
+        final BigdataValue[] values = new BigdataValue[] { x, p };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+
+        final QueryRoot expected = BOpUtility.deepCopy(queryRoot);
+        
+        /*
+         * A single solution with [v] bound. The value of the binding does not
+         * matter. The presence of the binding is what is critical.  Since [v]
+         * is bound in the source solutions we can not eliminate the filter.
+         */
+        final IBindingSet[] bindingSets = new IBindingSet[] {
+                new ListBindingSet(
+                new IVariable[] { Var.var("v") },
+                new IConstant[] { new Constant(x.getIV()) })
+        };
+        
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
+                context, queryRoot, bindingSets);
+
+        /*
+         * FIXME This is failing because the optimizer is not paying attention
+         * to exogenous variable bindings.
+         */
+        diff(expected, queryRoot);
+
+    }
+
+    /**
+     * Unit test for filter with a variable which is never bound (this has
+     * nothing to do with the variable scoping).
+     * 
+     * <pre>
+     * SELECT ?v
+     * { :x :p ?v . FILTER(?w = 1) }
+     * </pre>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_bottomUpOptimizer_filter_unboundVar()
+            throws MalformedQueryException {
+
+        final String queryStr = "" + //
+                "PREFIX : <http://example/>\n" + //
+                "SELECT ?v \n" +//
+                "{ :x :p ?v . FILTER(?w = 1) }";
+        
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI x = f.createURI("http://example/x");
+        final BigdataURI p = f.createURI("http://example/p");
+        final BigdataLiteral ONE = f.createLiteral("1", XSD.INTEGER);
+        final BigdataValue[] values = new BigdataValue[] { x, p, ONE };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        /*
+         * Create the expected AST for the WHERE clause.
+         */
+        final JoinGroupNode expectedWhereClause = new JoinGroupNode();
+        {
+            // :x :q ?w
+            expectedWhereClause.addChild(new StatementPatternNode(//
+                    new ConstantNode(new Constant(x.getIV())),// s
+                    new ConstantNode(new Constant(p.getIV())),// p
+                    new VarNode("v"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    ));
+            
+            final String anonvar = "-unbound-var-w-0";
+            final FilterNode filterNode = new FilterNode(
+                    new FunctionNode(//
+                            FunctionRegistry.EQ,//
+                            null,// scalarValues (Map)Collections.emptyMap(),//
+                            new ValueExpressionNode[]{//
+                                new VarNode(anonvar),//
+                                new ConstantNode(ONE.getIV())//
+                            }//
+                            )//
+            );
+            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    filterNode.getValueExpressionNode());
+            expectedWhereClause.addChild(filterNode);
+
+        }
+
+        diff(expectedWhereClause, queryRoot.getWhereClause());
+
     }
 
 }
