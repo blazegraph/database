@@ -187,7 +187,16 @@ public class TermId<V extends BigdataValue>
         if (this == o)
             return true;
         if (o instanceof TermId<?>) {
-            return termId == ((TermId<?>) o).termId;
+            if (this.termId == NULL || ((TermId) o).termId == NULL) {
+                if (this.hasValue() && ((TermId) o).hasValue()) {
+                    return this.getValue().equals(((TermId) o).hasValue());
+                } else {
+                    return false;
+                }
+            } else {
+                return termId == ((TermId<?>) o).termId;
+            }
+            //            return termId == ((TermId<?>) o).termId;
         }
         return false;
     }

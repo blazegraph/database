@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTPruneFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 
 /**
@@ -142,9 +141,29 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * <code>Nested Optionals - 1</code>. Classic badly designed left join.
+     * <code>Nested Optionals - 1</code>. Badly designed left join with TWO
+     * optionals.
+     * 
+     * <pre>
+     * SELECT *
+     * { 
+     *     :x1 :p ?v .
+     *     OPTIONAL
+     *     {
+     *       :x3 :q ?w .
+     *       OPTIONAL { :x2 :p ?v }
+     *     }
+     * }
+     * </pre>
      * 
      * @see ASTBottomUpOptimizer
+     * 
+     *      FIXME This appears to be failing because the "OPTIONAL" semantics
+     *      are not being attached to the INCLUDE.
+     *      <p>
+     *      Modify {@link NamedSubqueryIncludOp} to support optional semantics
+     *      and modify {@link ASTBottomUpOptimizer} to mark the INCLUDE as
+     *      optional.
      */
     public void test_two_nested_opt() throws Exception {
 
@@ -173,25 +192,14 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Note: This was handled historically by
+     * Filter-nested - 2 (Filter on variable ?v which is not in scope)
      * 
      * <pre>
-     * 
-     * If the scope binding names are empty we can definitely
-     * always fail the filter (since the filter's variables
-     * cannot be bound).
-     * 
-     *                 if (filter.getBindingNames().isEmpty()) {
-     *                     final IConstraint bop = new SPARQLConstraint(SparqlTypeErrorBOp.INSTANCE);
-     *                     sop.setBOp(bop);
+     * SELECT ?v
+     * { :x :p ?v . { FILTER(?v = 1) } }
      * </pre>
      * 
-     * We need to figure out the variables that are in scope when the filter is
-     * evaluated and then filter them out when running the group in which the
-     * filter exists (it runs as a subquery). If there are NO variables that are
-     * in scope, then just fail the filter per the code above.
-     * 
-     * @see ASTPruneFiltersOptimizer
+     * @see ASTBottomUpOptimizer
      */
     public void test_filter_nested_2() throws Exception {
 
@@ -205,7 +213,20 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * This will be fixed by the same issue as {@link #test_filter_nested_2()}.
+     * Badly designed left join pattern plus a FILTER with a variable which is
+     * not in scope.
+     * 
+     * <pre>
+     * PREFIX :    <http://example/>
+     * 
+     * SELECT *
+     * { 
+     *     :x :p ?v . 
+     *     { :x :q ?w 
+     *       OPTIONAL {  :x :p ?v2 FILTER(?v = 1) }
+     *     }
+     * }
+     * </pre>
      * 
      * @see ASTBottomUpOptimizer
      */
@@ -223,6 +244,17 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Classic badly designed left join.
      * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * 
+     * SELECT *
+     * { 
+     *   ?X  :name "paul"
+     *   {?Y :name "george" . OPTIONAL { ?X :email ?Z } }
+     * }
+     * 
+     * </pre>
+     * 
      * @see ASTBottomUpOptimizer
      */
     public void test_var_scope_join_1() throws Exception {
@@ -232,6 +264,36 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "var-scope-join-1.rq",// queryFileURL
                 "var-scope-join-1.ttl",// dataFileURL
                 "var-scope-join-1.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
+     * Optional-filter - 1
+     * 
+     * <pre>
+     * PREFIX :    <http://example/>
+     * 
+     * SELECT *
+     * { 
+     *   ?x :p ?v .
+     *   OPTIONAL
+     *   { 
+     *     ?y :q ?w .
+     *     FILTER(?v=2)
+     *   }
+     * }
+     * </pre>
+     * 
+     * @see ASTBottomUpOptimizer
+     */
+    public void test_opt_filter_1() throws Exception {
+
+        new TestHelper(
+                "opt-filter-1", // testURI,
+                "opt-filter-1.rq",// queryFileURL
+                "opt-filter-1.ttl",// dataFileURL
+                "opt-filter-1.srx"// resultFileURL
                 ).runTest();
 
     }

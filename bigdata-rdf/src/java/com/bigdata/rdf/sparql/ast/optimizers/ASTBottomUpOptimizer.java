@@ -28,21 +28,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -56,7 +64,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * Rewrites aspects of queries where bottom-up evaluation would produce
  * different results. This includes joins which are not "well designed" as
  * defined in section 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
- * Pérez et al.
+ * Pérez et al and also FILTERs on variables whose bindings are not in scope.
  * <p>
  * Note: The test suite for this class is a set of DAWG tests which focus on
  * bottom up evaluation semantics, including:
@@ -81,8 +89,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * 
  * Filter-scope - 1 (Query is not well designed because there are no shared
  * variables in the intermediate join group and there is an embedded OPTIONAL
- * join group. Also, ?v is used in the FILTER but is not visible in that scope,
- * but that issue is handled by the {@link ASTPruneFiltersOptimizer}.)
+ * join group. Also, ?v is used in the FILTER but is not visible in that scope.)
  * 
  * <pre>
  * SELECT *
@@ -106,6 +113,13 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * }
  * </pre>
  * 
+ * Filter-nested - 2 (Filter on variable ?v which is not in scope)
+ * 
+ * <pre>
+ * SELECT ?v
+ * { :x :p ?v . { FILTER(?v = 1) } }
+ * </pre>
+ * 
  * Nested groups which do not share variables with their parent can be lifted
  * out into a named subquery. This has the same effect as bottom up evaluation
  * since we will run the named subquery first and then perform the join against
@@ -121,6 +135,13 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTBottomUpOptimizer.java 5189 2011-09-14 17:56:53Z thompsonbry
  *          $
+ * 
+ *          TODO I have been assuming that the presence of any shared variable
+ *          is enough to enforce correlation between the solution sets and cause
+ *          the results of bottom up evaluation to be the same as our standard
+ *          evaluation model. If this is not true then we could just lift
+ *          everything into a named subquery, order the named subqueries by
+ *          their dependencies and just let it run.
  * 
  *          TODO What about a badly designed left-join inside of a sub-select
  *          (or EXISTS)? If we lift that out in this manner, it will run once in
@@ -143,7 +164,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
     public ASTBottomUpOptimizer() {
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
@@ -152,6 +172,27 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
+
+        // Rewrite badly designed left joins.
+        handleBadlyDesignedLeftJoins(context, queryRoot);
+
+        // Hide variables which would not be in scope for bottom up evaluation.
+        handleFiltersWithVariablesNotInScope(context, queryRoot);
+        
+        return queryNode;
+    
+    }
+
+    /**
+     * Collect badly designed left join patterns and the lift them out into a
+     * named subquery.
+     * 
+     * @param context
+     * @param queryRoot
+     */
+    @SuppressWarnings("unchecked")
+    private void handleBadlyDesignedLeftJoins(final AST2BOpContext context,
+            final QueryRoot queryRoot) {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
@@ -196,8 +237,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             
         }
         
-        return queryNode;
-    
     }
 
     /**
@@ -291,80 +330,78 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         assert group.isOptional();
 
-            /*
-             * Check to see whether this is the inner optional of a badly
-             * designed left-join pattern.
-             */
-            
-            final IGroupNode<? extends IGroupMemberNode> p = group.getParentJoinGroup();
+        /*
+         * Check to see whether this is the inner optional of a badly designed
+         * left-join pattern.
+         */
 
-            if(p == null) {
-                // No parent.
-                return;
-            }
+        final IGroupNode<? extends IGroupMemberNode> p = group
+                .getParentJoinGroup();
 
-            final IGroupNode<? extends IGroupMemberNode> pp = p.getParentJoinGroup();
-            
-            if (pp == null) {
-                // No parent's parent.
-                return;
-            }
-            
-            /*
-             * This is all definitely bound variables above the candidate
-             * optional group in the hierarchy.
-             * 
-             * Note: [topDownVars] needs to be reset on each entry with a new
-             * Set to avoid side-effects when we recursively explore sibling
-             * groups for this pattern. This method was rewritten without
-             * recursion to avoid that problem. It is now driven out of an
-             * iterator visiting the candidate optional join groups.
-             */
-            final Set<IVariable<?>> topDownVars = sa
-                    .getIncomingBindings((IBindingProducerNode) p,
-                            new LinkedHashSet<IVariable<?>>());
+        if (p == null) {
+            // No parent.
+            return;
+        }
 
-            /*
-             * Obtain the set of variables used in JOINs -OR- FILTERs within
-             * this optional group.
-             * 
-             * Note: We must consider the variables used in filters as well when
-             * examining a candidate inner optional group for a badly designed
-             * left join. This is necessary in order to capture a uncorrelated
-             * variables having the same name in the FILTER and in the parent's
-             * parent.
-             */
-            final Set<IVariable<?>> innerGroupVars = sa
-                    .getDefinitelyProducedBindingsAndFilterVariables(group,
-                            new LinkedHashSet<IVariable<?>>());
+        final IGroupNode<? extends IGroupMemberNode> pp = p
+                .getParentJoinGroup();
 
-            /*
-             * Obtain the set of variables used in joins within the parent join
-             * group.
-             */
-            final Set<IVariable<?>> parentVars = sa
-                    .getDefinitelyProducedBindings((IBindingProducerNode) p,
-                            new LinkedHashSet<IVariable<?>>(), false/* recursive */);
-            
-            /*
-             * The inner optional is part of a badly designed left join if it
-             * uses variables which are not present in the parent but which are
-             * present in the group hierarchy above that parent.
-             */
+        if (pp == null) {
+            // No parent's parent.
+            return;
+        }
 
-            // remove all variables declared by the parent.
-            innerGroupVars.removeAll(parentVars);
+        /*
+         * This is all definitely bound variables above the candidate optional
+         * group in the hierarchy.
+         * 
+         * Note: [topDownVars] needs to be reset on each entry with a new Set to
+         * avoid side-effects when we recursively explore sibling groups for
+         * this pattern. This method was rewritten without recursion to avoid
+         * that problem. It is now driven out of an iterator visiting the
+         * candidate optional join groups.
+         */
+        final Set<IVariable<?>> topDownVars = sa.getIncomingBindings(
+                (IBindingProducerNode) p, new LinkedHashSet<IVariable<?>>());
 
-            // retain all variables declared by the parent's parent.
-            innerGroupVars.retainAll(topDownVars);
+        /*
+         * Obtain the set of variables used in JOINs -OR- FILTERs within this
+         * optional group.
+         * 
+         * Note: We must consider the variables used in filters as well when
+         * examining a candidate inner optional group for a badly designed left
+         * join. This is necessary in order to capture a uncorrelated variables
+         * having the same name in the FILTER and in the parent's parent.
+         */
+        final Set<IVariable<?>> innerGroupVars = sa
+                .getDefinitelyProducedBindingsAndFilterVariables(group,
+                        new LinkedHashSet<IVariable<?>>());
 
-            if (!innerGroupVars.isEmpty()) {
+        /*
+         * Obtain the set of variables used in joins within the parent join
+         * group.
+         */
+        final Set<IVariable<?>> parentVars = sa.getDefinitelyProducedBindings(
+                (IBindingProducerNode) p, new LinkedHashSet<IVariable<?>>(),
+                false/* recursive */);
 
-                badlyDesignedLeftJoins.add((JoinGroupNode) group);
+        /*
+         * The inner optional is part of a badly designed left join if it uses
+         * variables which are not present in the parent but which are present
+         * in the group hierarchy above that parent.
+         */
 
-            }
+        // remove all variables declared by the parent.
+        innerGroupVars.removeAll(parentVars);
 
-//        }
+        // retain all variables declared by the parent's parent.
+        innerGroupVars.retainAll(topDownVars);
+
+        if (!innerGroupVars.isEmpty()) {
+
+            badlyDesignedLeftJoins.add((JoinGroupNode) group);
+
+        }
 
     }
 
@@ -441,4 +478,178 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
        
     }
     
+
+    /**
+     * Examine each {@link JoinGroupNode} in the query and each FILTER in each
+     * {@link JoinGroupNode}. If the filter depends on a variable which is not
+     * "maybe" bound for that group then the variable binding is not in scope.
+     * <p>
+     * Such filters and variables are identified. The variables within the
+     * filters are then rewritten in a consistent manner across the filters
+     * within the group, renaming the probably unbound variables in the filters
+     * to anonymous variables. This provides effective bottom up evaluation
+     * scope for the variables.
+     * 
+     * FIXME Figure out what variables have bindings in BindingSets. (We might
+     * want to compile that information, and perhaps even statistics about
+     * IBindingSet[]) and put it on the [context]. Note that the context does
+     * not currently have that information available, but maybe it should.)
+     */
+    private void handleFiltersWithVariablesNotInScope(
+            final AST2BOpContext context, final QueryRoot queryRoot) {
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
+
+        final Iterator<JoinGroupNode> itr = BOpUtility.visitAll(queryRoot,
+                JoinGroupNode.class);
+
+        while (itr.hasNext()) {
+
+            final JoinGroupNode group = itr.next();
+
+            /*
+             * All variables potentially bound by joins in this group or a
+             * subgroup.
+             * 
+             * FIXME We also need to consider the variables which have exogenous
+             * bindings here.
+             */
+            final Set<IVariable<?>> maybeBound = sa
+                    .getMaybeProducedBindings(group,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */);
+            
+            for (IGroupMemberNode child : group) {
+
+                if (!(child instanceof FilterNode))
+                    continue;
+
+                final FilterNode filter = (FilterNode) child;
+
+                if(rewriteUnboundVariablesInFilter(context, maybeBound, map,
+                        null/* parent */, filter.getValueExpressionNode())) {
+                    
+                    /*
+                     * Re-generate the IVE for this filter.
+                     */
+
+                    // clear the old value expression.
+                    filter.getValueExpressionNode().setValueExpression(null);
+                    
+                    // re-generate the value expression.
+                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                            filter.getValueExpressionNode());
+                    
+                }
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * If a FILTER depends on a variable which is not in scope for that filter
+     * then that variable will always be unbound in that scope. However, we can
+     * not fail the entire filter since it could use <code>BOUND(var)</code>.
+     * This takes the approach of rewriting the FILTER to use an anonymous
+     * variable for any variable which is provably not bound.
+     * <p>
+     * Note: The alternative approach is to replace the unbound variable with a
+     * type error. However, BOUND(?x) would have to be "replaced" by setting its
+     * {@link IValueExpressionNode} to [false]. Also, COALESCE(....) could use
+     * an unbound variable and no type error should be thrown. We either have to
+     * remove the expression the unbound variable shows up in from the
+     * COALESCE() or change it to an anonymous variable. If you want to pursue
+     * this approach see {@link SparqlTypeErrorBOp#INSTANCE}.
+     * 
+     * @param context
+     *            The context is used to generate anonymous variables.
+     * @param maybeBound
+     *            The set of variables which are in scope in the group.
+     * @param map
+     *            A map used to provide consistent variable renaming in the
+     *            filters of the group.
+     * @param parent
+     *            The parent {@link IValueExpressionNode}.
+     * @param node
+     *            An {@link IValueExpressionNode}. If this is a {@link VarNode}
+     *            and the variable is not in scope, then the {@link VarNode} is
+     *            replaced in the parent by an anonymous variable.
+     * 
+     * @return <code>true</code> if the expression was modified and its
+     *         {@link IValueExpressionNode} needs to be rebuilt.
+     * 
+     * @see AST2BOpUtility#toVE(String, IValueExpressionNode)
+     */
+    private boolean rewriteUnboundVariablesInFilter(final AST2BOpContext context,
+            final Set<IVariable<?>> maybeBound,
+            final Map<IVariable<?>/* old */, IVariable<?>/* new */> map,
+            final IValueExpressionNode parent, final IValueExpressionNode node) {
+
+        boolean modified = false;
+        // recursion.
+        {
+            
+            final int arity = ((BOp) node).arity();
+            
+            for (int i = 0; i < arity; i++) {
+            
+                final BOp tmp = ((BOp) node).get(i);
+                
+                if(!(tmp instanceof IValueExpressionNode))
+                    continue;
+                
+                final IValueExpressionNode child = (IValueExpressionNode) tmp;
+                
+                modified |= rewriteUnboundVariablesInFilter(context,
+                        maybeBound, map, node, child);
+                
+            }
+            
+        }
+
+        if (!(node instanceof VarNode)) {
+            // Not a variable.
+            return modified;
+        }
+
+        final VarNode varNode = (VarNode) node;
+
+        final IVariable<?> ovar = varNode.getValueExpression();
+
+        if (maybeBound.contains(ovar)) {
+            // A variable which might be bound during evaluation.
+            return modified;
+        }
+
+        /*
+         * A variable which is provably not bound.
+         * 
+         * Note: In order to mimic the variable scope for bottom-up evaluation
+         * we need to "hide" this variable.
+         */
+        IVariable<?> nvar = map.get(ovar);
+        
+        if(nvar == null) {
+            
+            /*
+             * An anonymous variable which will never be bound by the query. The
+             * map is used to share the replace an unbound variable with the
+             * corresponding anonymous variable in the same manner throughout
+             * the group.
+             */
+            map.put(ovar,
+                    nvar = Var.var(context.createVar("-unbound-var-"
+                            + ovar.getName() + "-")));
+            
+        }
+        
+        ((ASTBase)parent).replaceAllWith(ovar, nvar);
+        
+        return true;
+
+    }
+
 }

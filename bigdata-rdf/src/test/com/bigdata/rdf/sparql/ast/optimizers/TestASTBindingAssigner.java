@@ -143,6 +143,10 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
                 given/* queryNode */, bsets);
 
+        /**
+         * FIXME This was broken by mroycsi's change to TermId#equals(). The
+         * test is probably at fault.
+         */
         assertSameAST(expected, actual);
 
     }

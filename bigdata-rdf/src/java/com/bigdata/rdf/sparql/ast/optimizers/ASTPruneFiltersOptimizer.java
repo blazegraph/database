@@ -32,54 +32,20 @@ import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 
 /**
- * Prune the AST when a filter can not be evaluated because one or more
- * variables on which it depends will never be bound within the scope in which
- * the filter appears.
- * <p>
- * FILTERs which use variables which can not be bound may be elimated, but only
- * if the variable is not bound in the provided {@link IBindingSet}[].
- * 
- * FIXME Implement. This fixes one of the DAWG "bottom-up" evaluation tests, but
- * also test when we pass a {@link IBindingSet} to the optimizer with a binding
- * for <code>?v</code> since the filter MUST NOT be eliminated in that case.
- * 
- * <pre>
- * Filter-nested - 2 (Filter on variable ?v which is not in scope)
- * 
- * <pre>
- * SELECT ?v
- * { :x :p ?v . { FILTER(?v = 1) } }
- * </pre>
- * <p>
- * Note: This was handled historically by
- * 
- * <pre>
- * 
- * If the scope binding names are empty we can definitely
- * always fail the filter (since the filter's variables
- * cannot be bound).
- * 
- *                 if (filter.getBindingNames().isEmpty()) {
- *                     final IConstraint bop = new SPARQLConstraint(SparqlTypeErrorBOp.INSTANCE);
- *                     sop.setBOp(bop);
- * </pre>
- * 
- * We need to figure out the variables that are in scope when the filter is
- * evaluated and then filter them out when running the group in which the filter
- * exists (it runs as a subquery). If there are NO variables that are in scope,
- * then just fail the filter per the code above.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTPruneFiltersOptimizer.java 5198 2011-09-16 17:46:03Z
+ *          thompsonbry $
+ * @deprecated
  */
 public class ASTPruneFiltersOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         return queryNode;
-        
+
     }
 
 }

@@ -296,12 +296,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTLiftPreFiltersOptimizer());
         
-        /**
-         * Prune the AST when a filter can not be evaluated because one or more
-         * variables on which it depends will never be bound within the scope in
-         * which the filter appears.
-         */
-        add(new ASTPruneFiltersOptimizer());
+//        /**
+//         * Prune the AST when a filter can not be evaluated because one or more
+//         * variables on which it depends will never be bound within the scope in
+//         * which the filter appears. [Now handled by the ASTBottomUpOptimizer].
+//         */
+//        add(new ASTPruneFiltersOptimizer());
         
         /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
