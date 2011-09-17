@@ -69,7 +69,12 @@ public class TestTermIV extends TestCase2 {
 
         assertEquals(0L, iv.getTermId());
 
-        assertEquals(iv, TermId.fromString(iv.toString()));
+        final TermId<?> fromStringIV = TermId.fromString(iv.toString());
+        
+        // TermIds have same data but do not compare as equals()
+        assertNotSame(iv, fromStringIV);
+        assertEquals(iv.flags(), fromStringIV.flags());
+        assertEquals(iv.getTermId(), fromStringIV.getTermId());
         
         assertNull(IVUtility.decode(TermId.NullIV.encode(new KeyBuilder())
                 .getKey()));
@@ -334,9 +339,11 @@ public class TestTermIV extends TestCase2 {
                 // re-encode to the same string.
                 assertEquals(s, tmp.toString());
                 
-                // TermIds compare as equals()
-                assertEquals(v, tmp);
-                
+                // TermIds have same data but do not compare as equals()
+                assertNotSame(v, tmp);
+                assertEquals(v.flags(), tmp.flags());
+                assertEquals(v.getTermId(), tmp.getTermId());
+                                
             }
             
         }

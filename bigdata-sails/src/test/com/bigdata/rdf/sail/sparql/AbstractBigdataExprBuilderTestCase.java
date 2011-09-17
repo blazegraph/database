@@ -270,8 +270,9 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         if (!expected.equals(actual)) {
 
             log.error("\nqueryStr:\n" + queryStr);
-            log.error("\nparseTree:\n" + parseTree == null ? null
-                    : ((SimpleNode) parseTree).dump(""));
+            log.error("\nparseTree:\n"
+                    + (parseTree == null ? null : ((SimpleNode) parseTree)
+                            .dump("")));
             log.error("\nexpected:\n" + expected);
             log.error("\nactual:\n" + actual);
 
