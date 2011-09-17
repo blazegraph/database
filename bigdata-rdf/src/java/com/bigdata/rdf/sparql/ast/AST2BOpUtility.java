@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -1370,6 +1369,16 @@ public class AST2BOpUtility {
 
     }
     
+    /**
+     * Adds required statement pattern joins to the query plan for the join
+     * group.
+     * 
+     * @param left
+     * @param joinGroup
+     * @param sa
+     * @param ctx
+     * @return
+     */
     private static final PipelineOp addJoins(PipelineOp left,
             final JoinGroupNode joinGroup, final StaticAnalysis sa,
             final AST2BOpContext ctx) {
@@ -1379,6 +1388,7 @@ public class AST2BOpUtility {
 
         for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
             if(!sp.isSimpleOptional()) {
+                // Only required statement patterns.
                 preds.add(toPredicate(sp, ctx));
             }
         }
@@ -1425,23 +1435,17 @@ public class AST2BOpUtility {
      * 
      * @param left
      * @param pred
+     *            The {@link Predicate} for some optional statement pattern
+     *            node.
      * @param filters
+     *            Any filters which MUST be run with that statement pattern
+     *            node.
      * @param ctx
      * @return
-     * 
-     *         TODO This could be handled by an AST rewrite which replaces the
-     *         optional subquery with an optional {@link StatementPatternNode}.
-     *         There is no annotation for that at this time on the statement
-     *         pattern node. Also, if we allow that annotation then we have to
-     *         check statement pattern nodes to make sure that they are not
-     *         optional when they appear within a group which we currently do
-     *         not have to do as they are never optional.
      */
     private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
             PipelineOp left, final Predicate<?> pred,
             final Collection<FilterNode> filters, final AST2BOpContext ctx) {
-
-        // final Predicate pred = toPredicate(sp);
 
         final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
 
@@ -1517,28 +1521,17 @@ public class AST2BOpUtility {
                      * optional is basically a single a statement pattern in an
                      * optional join group. If there were any FILTERs in the
                      * simple optional join group, then they were lifted out as
-                     * well. This means that they will be tacked onto the end of
-                     * the query plan for this join group.
-                     * 
-                     * Note: This is a bit different from the old code path
-                     * which recognized optional join groups in some embedded
-                     * logic below. In that case we had to pull out the filters
-                     * ourselves and that meant that we had to run them with the
-                     * optional join.
-                     * 
-                     * FIXME In order for this to work we have to attach any
-                     * FILTER(s) lifted out of the optional group to the
-                     * statement pattern node and then cause them to be attached
-                     * to the JOIN when we generate the JOIN. This means that we
-                     * need to hang an IConstraint[] on the Predicate and
-                     * interpret it in toPredicate().
+                     * well and attached to this StatementPatternNode. Such
+                     * FILTER(s) MUST NOT have materialization requirements for
+                     * variables which were not already bound before the
+                     * optional JOIN on this statement pattern.
                      */
 
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
                             ctx).setProperty(IPredicate.Annotations.OPTIONAL,
                             Boolean.TRUE);
 
-                    final List<FilterNode> filters = Collections.emptyList();
+                    final List<FilterNode> filters = sp.getFilters();
 
                     left = addOptionalJoinForSingletonOptionalSubquery(left,
                             pred, filters, ctx);
@@ -2232,6 +2225,38 @@ public class AST2BOpUtility {
 
     }
 
+    /**
+     * Method produces a {@link Predicate} which captures the semantics of the
+     * {@link StatementPatternNode}.
+     * <p>
+     * Note: This method is responsible for layering in the default graph and
+     * named graph semantics on the access path associated with a statement
+     * pattern.
+     * <p>
+     * Note: This method is NOT responsible for selecting the statement index to
+     * use for the access path. That is decided when we determine the join
+     * ordering.
+     * 
+     * @param sp
+     *            The statement pattern.
+     * @param ctx
+     * 
+     * @return The {@link Predicate} which models the access path constraints
+     *         for that statement pattern.
+     * 
+     *         TODO We need to add support for inline access paths here for data
+     *         set joins. This will probably replace the
+     *         {@link DefaultGraphSolutionExpander} and
+     *         {@link NamedGraphSolutionExpander}. Joins against an inline
+     *         access path (a hash table attached to the predicate and backed by
+     *         the data set) are a more general way to represent the data set,
+     *         provide the same mechanisms for parallelism during query
+     *         evaluation, and allow us to reorder the data set joins just as we
+     *         would any other join.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
+     *      DataSetJoin with an "inline" access path.)
+     */
     @SuppressWarnings("rawtypes")
     private static final Predicate toPredicate(final StatementPatternNode sp,
             final AST2BOpContext ctx) {
@@ -2242,13 +2267,22 @@ public class AST2BOpUtility {
 
         final DatasetNode dataset = query.getDataset();
 
-        // create a solution expander for free text search if necessary
-        IAccessPathExpander<ISPO> expander = null;
-
         final Value predValue = sp.p().getValue();
         if (log.isDebugEnabled()) {
             log.debug(predValue);
         }
+        /*
+         * Old free text search integration point.
+         * 
+         * TODO Remove this code block for BD.SEARCH. This is now handled by an
+         * AST rewrite. Review the tests on [s, p, o] immediately below when we
+         * take out this code block.  They should no longer have a code path 
+         * for [expander != null] since we will not have attached the free text
+         * search expander.
+         */
+        // create a solution expander for free text search if necessary
+        IAccessPathExpander<ISPO> expander = null;
+        {  
         if (predValue != null && BD.SEARCH.equals(predValue)) {
             final Value objValue = sp.o().getValue();
             if (log.isDebugEnabled()) {
@@ -2258,6 +2292,7 @@ public class AST2BOpUtility {
                 expander = new FreeTextSearchExpander(database,
                         (Literal) objValue);
             }
+        }
         }
 
         // @todo why is [s] handled differently?
@@ -2328,6 +2363,9 @@ public class AST2BOpUtility {
                  * for this access path using the FreeTestSearchExpander. There
                  * is no need to do any named or default graph expansion work on
                  * a free text search access path.
+                 * 
+                 * TODO Remove code path as free text search is now handled by
+                 * an AST rewrite into a SERVICE.
                  */
                 c = null;
             } else {

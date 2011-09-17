@@ -38,13 +38,21 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 
 /**
  * Computed {@link INeedsMaterialization} metadata for an
  * {@link IValueExpression}.
  * 
+ * TODO This should also reason about datatype constraints on variables. If we
+ * know that a variable is constrained in a given scope to only take on a data
+ * type which is associated with an {@link FullyInlineTypedLiteralIV} or a
+ * specific numeric data type, then some operators may be able to operate
+ * directly on that {@link IV}. This is especially interesting for aggregates.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ComputedMaterializationRequirement.java 5179 2011-09-12
+ *          20:13:25Z thompsonbry $
  */
 public class ComputedMaterializationRequirement implements
         INeedsMaterialization {
@@ -53,6 +61,13 @@ public class ComputedMaterializationRequirement implements
 
     private final Set<IVariable<IV>> varsToMaterialize;
 
+    public String toString() {
+
+        return "{requirement=" + requirement + ", vars=" + varsToMaterialize
+                + "}";
+
+    }
+    
     public ComputedMaterializationRequirement(final IValueExpression<?> ve) {
 
 //        if (ve instanceof IVariable<?>) {

@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -39,15 +41,19 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -165,6 +171,9 @@ public class TestASTSimpleOptionalOptimizer extends
      *     }
      * </pre>
      * 
+     * Note: This TCK query will fail if we do not lift the simple optional
+     * correctly.
+     * 
      * @see ASTSimpleOptionalOptimizer
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -218,6 +227,7 @@ public class TestASTSimpleOptionalOptimizer extends
                     null,// c
                     Scope.DEFAULT_CONTEXTS//
                     ));
+        
             // :x3 :q ?w
             final StatementPatternNode liftedSp = new StatementPatternNode(//
                     new VarNode("a"),// s
@@ -226,15 +236,223 @@ public class TestASTSimpleOptionalOptimizer extends
                     null,// c
                     Scope.DEFAULT_CONTEXTS//
                     );
-            liftedSp.setSimpleOptional(true);
+
             expectedClause.addChild(liftedSp);
-            
+
+            liftedSp.setSimpleOptional(true);
+
+            // The filter stays in place (it is in the outer group).
             expectedClause.addChild(new FilterNode(new VarNode("w")));
-            
+
         }
         
-        assertEquals("modifiedClause", expectedClause,
-                queryRoot.getWhereClause());        
+        assertSameAST(expectedClause, queryRoot.getWhereClause());        
+
+    }
+    
+    /**
+     * A variant of the TCK test where the filter is in the optional group and
+     * uses BOUND() to wrap the variable. This filter does not have any
+     * materialization requirements. Both it and the statement pattern should be
+     * lifted out of the optional group. The filter should be attached to the
+     * statement pattern.
+     * 
+     * @throws Exception
+     */
+    public void test_sparql_bev_5_withFilterInOptionalGroup() throws Exception {
+
+        final String queryStr = "" + //
+                "PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>\n" + //
+                "PREFIX  : <http://example.org/ns#>" + //
+                "SELECT ?a \n" + //
+                "WHERE" + //
+                "    { ?a :p ?v . \n" + //
+                "      OPTIONAL \n" + //
+                "        { ?a :q ?w ." +
+                "          FILTER (BOUND(?w)) \n" +
+                "        } \n" + //
+                "    }\n" //
+        ;
+
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI p = f.createURI("http://example.org/ns#p");
+        final BigdataURI q = f.createURI("http://example.org/ns#q");
+        final BigdataValue[] values = new BigdataValue[] { p, q };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        queryRoot = BOpUtility.deepCopy(queryRoot);
+        
+        queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        /*
+         * Create the expected AST.
+         */
+        final JoinGroupNode expectedClause = new JoinGroupNode();
+        {
+
+            // :x3 :q ?w
+            expectedClause.addChild(new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(p.getIV())),// p
+                    new VarNode("v"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    ));
+        
+            // :x3 :q ?w
+            final StatementPatternNode liftedSp = new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(q.getIV())),// p
+                    new VarNode("w"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    );
+
+            expectedClause.addChild(liftedSp);
+
+            liftedSp.setSimpleOptional(true);
+            
+            final List<FilterNode> filters = new LinkedList<FilterNode>();
+            
+            final FilterNode filterNode = new FilterNode(//
+                    new FunctionNode(FunctionRegistry.BOUND, null,// scalarValues
+                            new ValueExpressionNode[] {//
+                            new VarNode("w")//
+                            }//
+                    ));
+            
+            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                    filterNode.getValueExpressionNode());
+            
+            filters.add(filterNode);
+            
+            liftedSp.setFilters(filters);
+
+        }
+        
+        assertSameAST(expectedClause, queryRoot.getWhereClause());        
+
+    }
+    
+    /**
+     * A variant of the TCK test where the filter is in the optional group and
+     * uses a variable which is "incoming bound" to the optional group (hence
+     * definitely bound in the parent group).
+     * <p>
+     * This filter does not have any materialization requirements on variables
+     * bound by the optional statement pattern. Both it and the statement
+     * pattern should be lifted out of the optional group. The filter should be
+     * attached to the statement pattern.
+     * 
+     * @throws Exception
+     */
+    public void test_sparql_bev_5_withFilterInOptionalGroup2() throws Exception {
+
+        final String queryStr = "" + //
+                "PREFIX  xsd: <http://www.w3.org/2001/XMLSchema#>\n" + //
+                "PREFIX  : <http://example.org/ns#>" + //
+                "SELECT ?a \n" + //
+                "WHERE" + //
+                "    { ?a :p ?v . \n" + //
+                "      OPTIONAL \n" + //
+                "        { ?a :q ?w ." +
+                "          FILTER (?v) \n" +
+                "        } \n" + //
+                "    }\n" //
+        ;
+
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI p = f.createURI("http://example.org/ns#p");
+        final BigdataURI q = f.createURI("http://example.org/ns#q");
+        final BigdataValue[] values = new BigdataValue[] { p, q };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        queryRoot = BOpUtility.deepCopy(queryRoot);
+        
+        queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        /*
+         * Create the expected AST.
+         */
+        final JoinGroupNode expectedClause = new JoinGroupNode();
+        {
+
+            // :x3 :q ?w
+            expectedClause.addChild(new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(p.getIV())),// p
+                    new VarNode("v"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    ));
+        
+            // :x3 :q ?w
+            final StatementPatternNode liftedSp = new StatementPatternNode(//
+                    new VarNode("a"),// s
+                    new ConstantNode(new Constant(q.getIV())),// p
+                    new VarNode("w"),// o
+                    null,// c
+                    Scope.DEFAULT_CONTEXTS//
+                    );
+
+            expectedClause.addChild(liftedSp);
+
+            liftedSp.setSimpleOptional(true);
+            
+            final List<FilterNode> filters = new LinkedList<FilterNode>();
+            
+            final FilterNode filterNode = new FilterNode(new VarNode("v"));
+
+//            AST2BOpUtility.toVE(context.getLexiconNamespace(),
+//                    filterNode.getValueExpressionNode());
+            
+            filters.add(filterNode);
+            
+            liftedSp.setFilters(filters);
+
+        }
+        
+        /*
+         * FIXME This is failing because the ASTSimpleOptionalOptimizer does not
+         * yet handle the case where the materialization requirements could be
+         * satisfied in the parent group. We need to add a mock Filter with
+         * appropriate materialization requirements into the parent to do that.
+         */
+        assertSameAST(expectedClause, queryRoot.getWhereClause());        
 
     }
     

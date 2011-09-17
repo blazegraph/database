@@ -95,10 +95,13 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * BindingsClause).</dd>
  * 
  * <dt>{@link StatementPatternNode}</dt>
- * <dd>All variables are definitely bound. (Note that we sometimes attach a
- * simple optional join to the parent group for efficiency, at which point it
- * becomes an "optional" statement pattern, but we only do that in the physical
- * query plan so it does not effect the static analysis.)</dd>
+ * <dd>All variables are definitely bound UNLESS
+ * {@link StatementPatternNode#isSimpleOptional()} is <code>true</code>.
+ * <p>
+ * Note: we sometimes attach a simple optional join to the parent group for
+ * efficiency, at which point it becomes an "optional" statement pattern. An
+ * optional statement pattern may also have zero or more {@link FilterNode}s
+ * associated with it.</dd>
  * 
  * <dt>{@link JoinGroupNode}</dt>
  * <dd></dd>
@@ -310,8 +313,13 @@ public class StaticAnalysis {
         } else if(node instanceof StatementPatternNode) {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
+            
+            if(!sp.isSimpleOptional()) {
 
-            vars.addAll(sp.getProducedBindings());
+                // Only if the statement pattern node is a required join.
+                vars.addAll(sp.getProducedBindings());
+                
+            }
 
         } else if(node instanceof SubqueryRoot) {
 
@@ -497,9 +505,16 @@ public class StaticAnalysis {
             }
 
         } else if( node instanceof StatementPatternNode) {
-            
-            // NOP
-            
+
+            final StatementPatternNode sp = (StatementPatternNode) node;
+
+            if(sp.isSimpleOptional()) {
+
+                // Only if the statement pattern node is an optional join.
+                vars.addAll(sp.getProducedBindings());
+                
+            }
+
         } else if(node instanceof SubqueryRoot) {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
@@ -568,12 +583,17 @@ public class StaticAnalysis {
             
             if (child instanceof StatementPatternNode) {
 
-                /*
-                 * Required JOIN (statement pattern).
-                 */
+                final StatementPatternNode sp = (StatementPatternNode) child;
 
-                getDefinitelyProducedBindings((IBindingProducerNode) child,
-                        vars, recursive);
+                if (!sp.isSimpleOptional()) {
+                    
+                    /*
+                     * Required JOIN (statement pattern).
+                     */
+
+                    getDefinitelyProducedBindings(sp, vars, recursive);
+
+                }
 
             } else if (child instanceof NamedSubqueryInclude
                     || child instanceof SubqueryRoot
@@ -975,8 +995,9 @@ public class StaticAnalysis {
     }
 
     /**
-     * Return only the filter child nodes in this group that will be fully bound
-     * only by running the joins in this group.
+     * Return only the filter child nodes in this group whose variables were not
+     * fully bound on entry into the join group but which will be fully bound no
+     * later than once we have run the required joins in this group.
      * 
      * @param group
      *            The {@link JoinGroupNode}.
