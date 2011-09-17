@@ -38,6 +38,7 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
@@ -173,12 +174,17 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        // Rewrite badly designed left joins.
+        /*
+         * Rewrite badly designed left joins by lifting them into a named
+         * subquery.
+         */
         handleBadlyDesignedLeftJoins(context, queryRoot);
 
-        // Hide variables which would not be in scope for bottom up evaluation.
-        handleFiltersWithVariablesNotInScope(context, queryRoot);
-        
+        /*
+         * Hide variables which would not be in scope for bottom up evaluation.
+         */
+        handleFiltersWithVariablesNotInScope(context, queryRoot, bindingSets);
+
         return queryNode;
     
     }
@@ -490,16 +496,35 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * to anonymous variables. This provides effective bottom up evaluation
      * scope for the variables.
      * 
-     * FIXME Figure out what variables have bindings in BindingSets. (We might
-     * want to compile that information, and perhaps even statistics about
-     * IBindingSet[]) and put it on the [context]. Note that the context does
-     * not currently have that information available, but maybe it should.)
+     * @param context
+     * @param queryRoot
+     * @param bindingSets
      */
     private void handleFiltersWithVariablesNotInScope(
-            final AST2BOpContext context, final QueryRoot queryRoot) {
+            final AST2BOpContext context, final QueryRoot queryRoot,
+            final IBindingSet[] bindingSets) {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-        
+
+        /*
+         * All exogenous variables (given in the source solutions).
+         * 
+         * TODO We might want to compile this information, and perhaps even
+         * statistics about IBindingSet[] and put it on the [context]. Note that
+         * the context does not currently have that information available, but
+         * maybe it should.
+         */
+        final Set<IVariable<?>> exogenous = new LinkedHashSet<IVariable<?>>();
+        if(bindingSets != null) {
+            for (IBindingSet bset : bindingSets) {
+                final Iterator<Map.Entry<IVariable, IConstant>> itr = bset
+                        .iterator();
+                while (itr.hasNext()) {
+                    exogenous.add(itr.next().getKey());
+                }
+            }
+        }
+
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
         final Iterator<JoinGroupNode> itr = BOpUtility.visitAll(queryRoot,
@@ -512,14 +537,41 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             /*
              * All variables potentially bound by joins in this group or a
              * subgroup.
-             * 
-             * FIXME We also need to consider the variables which have exogenous
-             * bindings here.
              */
             final Set<IVariable<?>> maybeBound = sa
                     .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
             
+            // All variables appearing in the source solutions.
+            maybeBound.addAll(exogenous);
+
+            if (group.isOptional()) {
+
+                /*
+                 * "A FILTER inside an OPTIONAL can reference a variable
+                 * bound in the required part of the OPTIONAL."
+                 * 
+                 * Note: This is ONLY true when the [group] is OPTIONAL.
+                 * Otherwise the variables in the parent are not visible.
+                 */
+
+                // The "required" part of the optional is the parent group.
+                final JoinGroupNode p = group.getParentJoinGroup();
+                
+                if (p != null) {
+                    
+                    // bindings "maybe" produced in the parent (non-recursive)
+                    final Set<IVariable<?>> incomingBound = sa
+                            .getMaybeProducedBindings(p,
+                                    new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+
+                    // add to those visible in FILTERs for this group.
+                    maybeBound.addAll(incomingBound);
+                
+                }
+                
+            }
+
             for (IGroupMemberNode child : group) {
 
                 if (!(child instanceof FilterNode))

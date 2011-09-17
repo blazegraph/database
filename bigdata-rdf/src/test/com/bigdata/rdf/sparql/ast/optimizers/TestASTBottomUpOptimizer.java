@@ -311,14 +311,14 @@ public class TestASTBottomUpOptimizer extends
 
         /*
          * Add the Values used in the query to the lexicon. This makes it
-         * possible for us to explicitly construct the expected AST and
-         * the verify it using equals().
+         * possible for us to explicitly construct the expected AST and the
+         * verify it using equals().
          */
         final BigdataValueFactory f = store.getValueFactory();
         final BigdataURI x = f.createURI("http://example/x");
         final BigdataURI p = f.createURI("http://example/p");
         final BigdataURI q = f.createURI("http://example/q");
-        final BigdataLiteral ONE = f.createLiteral("1",XSD.INTEGER);
+        final BigdataLiteral ONE = f.createLiteral("1", XSD.INTEGER);
         final BigdataValue[] values = new BigdataValue[] { x, p, q, ONE };
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
@@ -984,6 +984,88 @@ public class TestASTBottomUpOptimizer extends
 
         diff(expectedWhereClause, queryRoot.getWhereClause());
 
+    }
+
+    /**
+     * Optional-filter - 1
+     * 
+     * <pre>
+     * PREFIX :    <http://example/>
+     * 
+     * SELECT *
+     * { 
+     *   ?x :p ?v .
+     *   OPTIONAL
+     *   { 
+     *     ?y :q ?w .
+     *     FILTER(?v=2)
+     *   }
+     * }
+     * </pre>
+     * 
+     * Reading [1], it appears "SELECT *" is a special case:
+     * 
+     * <pre>
+     * SELECT * { P } v is in-scope in P
+     * </pre>
+     * 
+     * Thus, we need to handle v as if it were an exogenous variable for this
+     * query, which is to say that we would just execute it normally.
+     * <p>
+     * This case is a bit puzzling. As other TCK examples show, you can have a
+     * badly designed left join pattern with <code>SELECT *</code> so this only
+     * appear to affect the visibility of <code>?v</code> in the FILTER?
+     * 
+     * [1] http://www.w3.org/TR/sparql11-query/#variableScope
+     * 
+     * @see ASTBottomUpOptimizer
+     */
+    public void test_opt_filter_1() throws Exception {
+
+        final String queryStr = "" + //
+                "PREFIX : <http://example/>\n" + //
+                "SELECT * \n" + //
+                "{ \n" + //
+                "    :x :p ?v . \n" + //
+                "    OPTIONAL \n" +
+                "    {" +
+                "      :y :q ?w . \n" + //
+                "      FILTER(?v=2) \n" + //
+                "    } \n" + //
+                "}"//
+        ;
+
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI x = f.createURI("http://example/x");
+        final BigdataURI y = f.createURI("http://example/y");
+        final BigdataURI p = f.createURI("http://example/p");
+        final BigdataURI q = f.createURI("http://example/q");
+        final BigdataValue[] values = new BigdataValue[] { x, y, p, q };
+        store.getLexiconRelation()
+                .addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+    
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+
+        final QueryRoot expected = BOpUtility.deepCopy(queryRoot);
+        
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
+                context, queryRoot, null/* bindingSets */);
+        
+        diff(expected,queryRoot);
+        
     }
 
 }
