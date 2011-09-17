@@ -304,14 +304,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
         /**
          * Lifts a simple optional out of the child group.
-         * 
-         * FIXME In order for this to work we have to attach any FILTER(s)
-         * lifted out of the optional group to the statement pattern node
-         * and then cause them to be attached to the JOIN when we generate
-         * the JOIN.  This means that we need to hang an IConstraint[] on
-         * the Predicate and interpret it in toPredicate().
+         * <p>
+         * Note: In order for this to work we have to attach any FILTER(s)
+         * lifted out of the optional group to the statement pattern node and
+         * then cause them to be attached to the JOIN when we generate the JOIN.
          */
-//        add(new ASTSimpleOptionalOptimizer());
+        add(new ASTSimpleOptionalOptimizer());
         
         /**
          * Handles a variety of special constructions related to graph graph

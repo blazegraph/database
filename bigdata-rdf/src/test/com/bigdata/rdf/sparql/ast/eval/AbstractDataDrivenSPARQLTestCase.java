@@ -70,6 +70,7 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.rio.helpers.StatementCollector;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.model.StatementEnum;
@@ -130,7 +131,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
         
         private final String queryStr;
 
-        private final ASTContainer ast;
+        private final ASTContainer astContainer;
         private final AST2BOpContext context;
        
         private final PipelineOp queryPlan;
@@ -208,14 +209,17 @@ public class AbstractDataDrivenSPARQLTestCase extends
             final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
                     + queryFileURL;
 
-            ast = new Bigdata2ASTSPARQLParser(store).parseQuery2(
+            astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, baseURI);
 
             queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
-                    ast, store));
+                    astContainer, store));
 
             if (log.isInfoEnabled())
-                log.info(ast);
+                log.info(astContainer);
+
+            if (log.isInfoEnabled())
+                log.info("\n"+BOpUtility.toString(queryPlan));
 
         }
 
@@ -233,7 +237,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
          */
         public void runTest() throws Exception {
 
-            final QueryRoot queryRoot = ast.getOptimizedAST();
+            final QueryRoot queryRoot = astContainer.getOptimizedAST();
             
             switch (queryRoot.getQueryType()) {
             case SELECT: {
@@ -536,7 +540,9 @@ public class AbstractDataDrivenSPARQLTestCase extends
 //                    System.err.println(con.getClass());
 //                    try {
                     message.append("\n===================================\n");
-                    message.append(ast.toString());
+                    message.append(astContainer.toString());
+                    message.append("\n===================================\n");
+                    message.append(BOpUtility.toString(queryPlan));
                     message.append("\n===================================\n");
                     message.append("database dump:\n");
                     message.append(store.dumpStore());

@@ -28,15 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -46,16 +51,20 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.store.BD;
 
 /**
  * A "simple optional" is an optional sub-group that contains only one statement
  * pattern, no sub-groups of its own, and no filters that require materialized
- * variables. We can lift these "simple optionals" into the parent group without
- * incurring the costs of launching a {@link SubqueryOp}.
- * 
- * 
- * FIXME : Simple optional: must lift filter onto the statement pattern node.
+ * variables based on the optional statement pattern. We can lift these
+ * "simple optionals" into the parent group without incurring the costs of
+ * launching a {@link SubqueryOp}.
+ * <p>
+ * Note: When the filter is lifted, it must be attached to the statement pattern
+ * node such that toPredicate() puts them onto the predicate since they must run
+ * *with* the join for that predicate. (The problem is that ?x != Bar is
+ * filtering the optional join, not ?x).
  * 
  * <pre>
  * where {
@@ -66,11 +75,6 @@ import com.bigdata.rdf.store.BD;
  *  }
  * }
  * </pre
- * 
- * The filter(s) can be lifted, but they must be attached to the statement
- * pattern node such that toPredicate() puts them onto the predicate since they
- * must run *with* the join for that predicate. (The problem is that ?x != Bar
- * is filtering the optional join, not ?x).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTSimpleOptionalOptimizer.java 5197 2011-09-15 19:10:44Z
@@ -120,10 +124,12 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          * lift the statement pattern node and and filters into the parent group
          * and mark the statement pattern node as "optional".
          */
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
         for(JoinGroupNode group : optionalGroups) {
             
-            liftOptionalGroup(group);
+            liftOptionalGroup(sa, group);
             
         }
         
@@ -190,70 +196,96 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
      * statement pattern node and and filters into the parent group and mark the
      * statement pattern node as "optional".
      */
-    private void liftOptionalGroup(final JoinGroupNode group) {
+    private void liftOptionalGroup(final StaticAnalysis sa, final JoinGroupNode group) {
        
-        if(!isSimpleOptional(group)) {
+        // The parent join group.
+        final JoinGroupNode p = (JoinGroupNode) group.getParent();
+
+        if(p == null) {
+            // Can't lift if no parent.
+            return;
+        }
+        
+        if(!isSimpleOptional(sa, p, group)) {
         
             // Not a simple optional.
             return;
             
         }
 
-        // The immediately parent SHOULD be a join group.
-        final JoinGroupNode p = (JoinGroupNode) group.getParent();
-
-        if (p == null)
-            throw new AssertionError();
-        
-        for(IGroupMemberNode child : group) {
+        /*
+         * First, get the simple optional statement pattern and also identify
+         * any FILTERs to be attached to that statement pattern.
+         * 
+         * Note: We can lift a filter as long as its materialization
+         * requirements would be satisfied in the parent.
+         */
+        final StatementPatternNode sp;
+        final List<FilterNode> filters = new LinkedList<FilterNode>();
+        {
             
-            if(child instanceof StatementPatternNode) {
+            StatementPatternNode tmp = null;
 
-                final StatementPatternNode sp = (StatementPatternNode) child;
-
-                /*
-                 * Set the flag so we know to do an OPTIONAL join for this
-                 * statement pattern.
-                 */
-
-                sp.setSimpleOptional(true);
-
-                p.replaceWith((BOp) group, (BOp) child);
-
-            } else if (child instanceof FilterNode) {
-
-                /*
-                 * We can lift a filter as long as its materialization
-                 * requirements would be satisfied in the parent.
-                 */
-
-                p.replaceWith((BOp) group, (BOp) child);
-
-            } else {
-
-                /*
-                 * This would indicate an error in the logic to identify which
-                 * join groups qualify as "simple" optionals.
-                 */
+            for(IGroupMemberNode child : group) {
                 
-                throw new AssertionError(
-                        "Unexpected child for simple optional: group=" + group
-                                + ", child=" + child);
-                
+                if(child instanceof StatementPatternNode) {
+
+                    tmp = (StatementPatternNode) child;
+
+                } else if (child instanceof FilterNode) {
+
+                    filters.add((FilterNode) child);
+
+                } else {
+
+                    /*
+                     * This would indicate an error in the logic to identify
+                     * which join groups qualify as "simple" optionals.
+                     */
+
+                    throw new AssertionError(
+                            "Unexpected child for simple optional: group="
+                                    + group + ", child=" + child);
+
+                }
+
             }
+
+            assert tmp != null;
+            
+            sp = tmp;
             
         }
+
+        /*
+         * Set the flag so we know to do an OPTIONAL join for this statement
+         * pattern.
+         */
+        sp.setSimpleOptional(true);
+
+        /*
+         * Attach any lifted filters.
+         */
+        if (!filters.isEmpty())
+            sp.setFilters(filters);
+
+        /*
+         * Replace the group with the statement pattern node.
+         */
+        p.replaceWith((BOp) group, (BOp) sp);
        
     }
     
     /**
-     * Return <code>true</code> iff the join group is a "simple optional".
+     * Return <code>true</code> iff the <i>group</i> is a "simple optional".
      * 
+     * @param p
+     *            The parent {@link JoinGroupNode} (never <code>null</code>).
      * @param group
-     *            Some {@link JoinGroupNode}.
+     *            Some candidate {@link JoinGroupNode}.
      */
-    public static boolean isSimpleOptional(
-            final JoinGroupNode group) {
+    private static boolean isSimpleOptional(final StaticAnalysis sa,
+            final JoinGroupNode p, final JoinGroupNode group) {
 
         if (!group.isOptional()) {
 
@@ -284,30 +316,71 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
             } else if (node instanceof FilterNode) {
 
+                /*
+                 * The filter must be attached to the optional join for the
+                 * statement pattern if the statement pattern is lifted into the
+                 * parent group. Therefore we have to examine the
+                 * materialization requirements for the filter.
+                 */
+
                 final FilterNode filter = (FilterNode) node;
 
-                final INeedsMaterialization req = filter
+                final ComputedMaterializationRequirement req = filter
                         .getMaterializationRequirement();
 
-                if (req.getRequirement() != INeedsMaterialization.Requirement.NEVER) {
+                if (req.getRequirement() == INeedsMaterialization.Requirement.NEVER) {
 
                     /*
-                     * There are materialization requirements for this join.
-                     * 
-                     * FIXME We can lift a filter which only depends on
-                     * variables which are "incoming bound" into the parent.
-                     * 
-                     * FIXME If a filter depends on variables which are bound by
-                     * the sole statement pattern in the optional join group
-                     * (and which are not incoming bound) then we can still lift
-                     * the filter IFF it does not have any materialization
-                     * requirements for the variables bound by the optional's
-                     * statement pattern node.
+                     * The filter does not have any materialization requirements
+                     * so it can definitely be lifted with the statement
+                     * pattern.
                      */
 
-                    return false;
+                    continue;
+                    
+                }
+
+                if (false) {
+                    
+                    /*
+                     * We can lift a filter which only depends on variables
+                     * which are "incoming bound" into the parent.
+                     * 
+                     * FIXME In order to do this, the parent join group must
+                     * ensure that the variable(s) used by this filter are
+                     * materialized before the optional join is run. We can
+                     * achieve that by attaching the appropriate materialization
+                     * requirements to a "mock" filter for the required
+                     * variable(s) in the parent group. (Make sure that we
+                     * use toVE() on the mock filter.)
+                     */
+
+                    @SuppressWarnings({ "rawtypes", "unchecked" })
+                    final Set<IVariable<?>> requiredVars = (Set) req
+                            .getVarsToMaterialize();
+
+                    final Set<IVariable<?>> incomingBound = sa
+                            .getIncomingBindings(group,
+                                    new LinkedHashSet<IVariable<?>>());
+
+                    requiredVars.removeAll(incomingBound);
+
+                    if (requiredVars.isEmpty()) {
+
+                        continue;
+
+                    }
 
                 }
+                
+                /*
+                 * There is at least one required variable for this filter which
+                 * is not incoming bound to the optional group and hence would
+                 * not be definitely bound if the optional statement pattern
+                 * were evaluated in the parent group.
+                 */
+
+                return false;
 
             } else {
 

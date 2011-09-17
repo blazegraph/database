@@ -114,9 +114,10 @@ public abstract class GroupMemberValueExpressionNodeBase extends
     }
 
     public ComputedMaterializationRequirement getMaterializationRequirement() {
-
-        return new ComputedMaterializationRequirement(
-                getRequiredValueExpression());
+        
+        final IValueExpression<?> ve = getRequiredValueExpression();
+        
+        return new ComputedMaterializationRequirement(ve);
 
     }
 
