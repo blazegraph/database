@@ -12,8 +12,18 @@ public interface IValueExpressionNode {
      * Return the cached {@link IValueExpression} if it exists on the node,
      * otherwise return null.
      */
-	IValueExpression<? extends IV> getValueExpression();
-	
+    IValueExpression<? extends IV> getValueExpression();
+    
+    /**
+     * Return the cached {@link IValueExpressionNode} if it exists on the node.
+     * 
+     * @return The {@link IValueExpressionNode} and never <code>null</code>.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link IValueExpressionNode} is not cached.
+     */
+    IValueExpression<? extends IV> getRequiredValueExpression();
+    
 	/**
 	 * Cache the translated value expression on the node.
 	 */

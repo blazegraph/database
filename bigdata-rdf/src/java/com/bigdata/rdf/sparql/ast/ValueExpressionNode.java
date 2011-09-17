@@ -26,8 +26,6 @@ public class ValueExpressionNode extends ASTBase implements
         String VALUE_EXPR = "valueExpr";
 
     }
-    
-//    private final IValueExpression<? extends IV> ve;
 
     /**
      * FIXME Just for compatibility with SOp2ASTUtility. Remove when done
@@ -85,6 +83,17 @@ public class ValueExpressionNode extends ASTBase implements
         
     }
 
+    final public IValueExpression<? extends IV> getRequiredValueExpression() {
+
+        final IValueExpression<? extends IV> valueExpr = getValueExpression();
+
+        if (valueExpr == null)
+            throw new IllegalStateException("ValueExpression not set: " + this);
+
+        return valueExpr;
+
+    }
+    
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public IValueExpression<? extends IV> getValueExpression() {
 

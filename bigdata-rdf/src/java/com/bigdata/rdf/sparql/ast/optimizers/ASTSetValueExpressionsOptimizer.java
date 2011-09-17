@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Iterator;
-
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
@@ -37,12 +35,17 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Visit all the value expression nodes and convert them into value expressions
@@ -126,26 +129,30 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
         /*
          * Visit nodes that require modification.
          */
-//        final IStriterator it = new Striterator(
-//                BOpUtility.preOrderIteratorWithAnnotations(query))
-//                .addFilter(new Filter() {
-//
-//                    private static final long serialVersionUID = 1L;
-//
-//                    @Override
-//                    public boolean isValid(Object obj) {
+        final IStriterator it = new Striterator(
+                BOpUtility.preOrderIteratorWithAnnotations(query))
+                .addFilter(new Filter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean isValid(Object obj) {
 //                        if (obj instanceof AssignmentNode)
 //                            return true;
 //                        if (obj instanceof FilterNode)
 //                            return true;
 //                        if (obj instanceof OrderByExpr)
 //                            return true;
-//                        return false;
-//                    }
-//                });
+                        if (obj instanceof IValueExpressionNodeContainer)
+                            return true;
+                        if (obj instanceof HavingNode)
+                            return true;
+                        return false;
+                    }
+                });
 
-        final Iterator<IValueExpressionNodeContainer> it = BOpUtility.visitAll(
-                query, IValueExpressionNodeContainer.class);
+//        final Iterator<IValueExpressionNodeContainer> it = BOpUtility.visitAll(
+//                query, IValueExpressionNodeContainer.class);
 
         while (it.hasNext()) {
 
@@ -161,10 +168,27 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
              * FILTER()/BIND() in groups (ALL groups, anywhere in the query, including
              * EXISTS and SERVICE).
              * 
+             * HAVING : its children are top-level IValueExpressionNodes.
              */
-            final IValueExpressionNodeContainer op = it.next();
+            final Object op = it.next();
 
-            AST2BOpUtility.toVE(lex, op.getValueExpressionNode());
+            if (op instanceof IValueExpressionNodeContainer) {
+
+                // AssignmentNode, FilterNode, OrderByExpr
+                AST2BOpUtility.toVE(lex, ((IValueExpressionNodeContainer) op)
+                        .getValueExpressionNode());
+                
+            } else if (op instanceof HavingNode) {
+                
+                final HavingNode havingNode = (HavingNode)op;
+                
+                for(IValueExpressionNode node : havingNode) {
+                
+                    AST2BOpUtility.toVE(lex, node);
+                    
+                }
+                
+            }
             
 //            if(op instanceof AssignmentNode) {
 //                
