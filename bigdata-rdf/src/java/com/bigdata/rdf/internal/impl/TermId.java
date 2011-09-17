@@ -181,20 +181,23 @@ public class TermId<V extends BigdataValue>
     /**
      * {@inheritDoc
      * 
-     * Note: only the termId matters for equality.
+     * Note: only the termId matters for equality, unless either is #NULL, in
+     * which case this will compare the cached {@link BigdataValue}s if they
+     * exist.  Null IVs without cached values are never equal.
      */
     public boolean equals(final Object o) {
         if (this == o)
             return true;
         if (o instanceof TermId<?>) {
-            if (this.termId == NULL || ((TermId) o).termId == NULL) {
-                if (this.hasValue() && ((TermId) o).hasValue()) {
-                    return this.getValue().equals(((TermId) o).hasValue());
+            final TermId<?> t = (TermId<?>) o;
+            if (this.termId == NULL || t.termId == NULL) {
+                if (this.hasValue() && t.hasValue()) {
+                    return this.getValue().equals(t.getValue());
                 } else {
                     return false;
                 }
             } else {
-                return termId == ((TermId<?>) o).termId;
+                return termId == t.termId;
             }
             //            return termId == ((TermId<?>) o).termId;
         }
