@@ -61,7 +61,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestAST.class);
 
         // Test suite for methods which determine must/may/not bound vars.
-        suite.addTestSuite(TestStaticAnalysisMethods.class);
+        suite.addTestSuite(TestStaticAnalysis.class);
 
         // Test suite for AST query rewriters/optimizers.
         suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());

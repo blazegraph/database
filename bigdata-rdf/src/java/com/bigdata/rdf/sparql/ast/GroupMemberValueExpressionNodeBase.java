@@ -37,6 +37,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -114,9 +115,9 @@ public abstract class GroupMemberValueExpressionNodeBase extends
     }
 
     public ComputedMaterializationRequirement getMaterializationRequirement() {
-        
+
         final IValueExpression<?> ve = getRequiredValueExpression();
-        
+
         return new ComputedMaterializationRequirement(ve);
 
     }

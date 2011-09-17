@@ -65,21 +65,21 @@ import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStaticAnalysisMethods extends AbstractASTEvaluationTestCase {
+public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
     private final static Logger log = Logger
-            .getLogger(TestStaticAnalysisMethods.class);
+            .getLogger(TestStaticAnalysis.class);
     
     /**
      * 
      */
-    public TestStaticAnalysisMethods() {
+    public TestStaticAnalysis() {
     }
 
     /**
      * @param arg0
      */
-    public TestStaticAnalysisMethods(String arg0) {
+    public TestStaticAnalysis(String arg0) {
         super(arg0);
     }
 

@@ -289,6 +289,7 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * required part of the OPTIONAL
      * 
      * @see ASTBottomUpOptimizer
+     * @see ASTSimpleOptionalOptimizer
      */
     public void test_opt_filter_1() throws Exception {
 
