@@ -55,6 +55,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer.MockFilterNode;
 
 /**
  * Test suite for {@link ASTSimpleOptionalOptimizer}.
@@ -77,16 +78,8 @@ public class TestASTSimpleOptionalOptimizer extends
      * Unit test for recognizing a "simple optional" and lifting it into the
      * parent join group.
      * 
-     * TODO Unit test for a variation where there is a FILTER in the simple
-     * optional. Make sure that it also gets lifted.
-     * 
      * TODO Unit test for a variation where there are FILTERS or other things in
      * the optional which mean that we can not lift out the statement pattern.
-     * 
-     * TODO Unit test for a variation where the FILTER *does* require
-     * materialization but we can lift it out anyway because the variables on
-     * which it depends will be "known" bound in the parent group by the time we
-     * evaluate the optional.
      */
     public void test_simpleOptional() throws MalformedQueryException {
 
@@ -259,6 +252,7 @@ public class TestASTSimpleOptionalOptimizer extends
      * 
      * @throws Exception
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test_sparql_bev_5_withFilterInOptionalGroup() throws Exception {
 
         final String queryStr = "" + //
@@ -361,8 +355,12 @@ public class TestASTSimpleOptionalOptimizer extends
      * pattern should be lifted out of the optional group. The filter should be
      * attached to the statement pattern.
      * 
+     * @see TestTCK#test_opt_filter_1(), which will fail if the materialization
+     *      requirements are not properly imposed on the parent.
+     * 
      * @throws Exception
      */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void test_sparql_bev_5_withFilterInOptionalGroup2() throws Exception {
 
         final String queryStr = "" + //
@@ -444,13 +442,22 @@ public class TestASTSimpleOptionalOptimizer extends
             
             liftedSp.setFilters(filters);
 
+            /*
+             * The mock filter is used to impose the appropriate materialization
+             * requirements onto the parent.
+             */
+            
+            expectedClause.addChild(new MockFilterNode(filterNode
+                    .getValueExpressionNode(), filterNode
+                    .getMaterializationRequirement()));
+
         }
-        
+
         /*
-         * FIXME This is failing because the ASTSimpleOptionalOptimizer does not
-         * yet handle the case where the materialization requirements could be
-         * satisfied in the parent group. We need to add a mock Filter with
-         * appropriate materialization requirements into the parent to do that.
+         * FIXME This is failing because I am having difficulties getting the
+         * materialization pipeline to work correctly when a statement pattern
+         * with a filter having some materialization requirements is lifted into
+         * the parent group.  See the code in ASTSimpleOptionalOptimizer.
          */
         assertSameAST(expectedClause, queryRoot.getWhereClause());        
 

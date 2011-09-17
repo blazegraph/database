@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -55,7 +56,12 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
  *          20:13:25Z thompsonbry $
  */
 public class ComputedMaterializationRequirement implements
-        INeedsMaterialization {
+        INeedsMaterialization, Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     private final Requirement requirement;
 
@@ -68,6 +74,14 @@ public class ComputedMaterializationRequirement implements
 
     }
     
+    public ComputedMaterializationRequirement(final Requirement requirement,
+            final Set<IVariable<IV>> varsToMaterialize) {
+    
+        this.requirement = requirement;
+        
+        this.varsToMaterialize = varsToMaterialize;
+    }
+
     public ComputedMaterializationRequirement(final IValueExpression<?> ve) {
 
 //        if (ve instanceof IVariable<?>) {
@@ -183,6 +197,26 @@ public class ComputedMaterializationRequirement implements
         return materialize ? (always ? Requirement.ALWAYS
                 : Requirement.SOMETIMES) : Requirement.NEVER;
 
+    }
+    
+    public boolean equals(final Object o) {
+        
+        if (this == o)
+            return true;
+        
+        if (!(o instanceof ComputedMaterializationRequirement))
+            return false;
+        
+        final ComputedMaterializationRequirement t = (ComputedMaterializationRequirement) o;
+        
+        if (requirement != t.requirement)
+            return false;
+        
+        if (!varsToMaterialize.equals(t.varsToMaterialize))
+            return false;
+        
+        return true;
+    
     }
     
 }

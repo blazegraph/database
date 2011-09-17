@@ -31,27 +31,33 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -222,6 +228,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          */
         final StatementPatternNode sp;
         final List<FilterNode> filters = new LinkedList<FilterNode>();
+        final List<FilterNode> mockFilters = new LinkedList<FilterNode>();
         {
             
             StatementPatternNode tmp = null;
@@ -234,8 +241,59 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
                 } else if (child instanceof FilterNode) {
 
-                    filters.add((FilterNode) child);
+                    final FilterNode filter = (FilterNode) child;
+                    
+                    filters.add( filter);
 
+                    final INeedsMaterialization req = filter
+                            .getMaterializationRequirement();
+
+                    if (req.getRequirement() == INeedsMaterialization.Requirement.NEVER) {
+
+                        /*
+                         * The filter does not have any materialization requirements
+                         * so it can definitely be lifted with the statement
+                         * pattern.
+                         */
+
+                        continue;
+                        
+                    }
+
+                    if (req instanceof ComputedMaterializationRequirement) {
+
+                        /*
+                         * We can lift a filter which only depends on variables
+                         * which are "incoming bound" into the parent.
+                         * 
+                         * Note: In order to do this, the parent join group must
+                         * ensure that the variable(s) used by this filter are
+                         * materialized before the optional join is run.
+                         * 
+                         * We achieve that by attaching the appropriate
+                         * materialization requirements to a "mock" filter for
+                         * the required variable(s) in the parent group. (Make
+                         * sure that we use toVE() on the mock filter.)
+                         */
+
+                        final IValueExpressionNode ven = BOpUtility
+                                .deepCopy((ValueExpressionNode) filter
+                                        .getValueExpressionNode());
+
+                        ven.setValueExpression(TrueBOp.INSTANCE);
+
+                        final ComputedMaterializationRequirement mockReq = new ComputedMaterializationRequirement(
+                                Requirement.ALWAYS,
+                                ((ComputedMaterializationRequirement) req)
+                                        .getVarsToMaterialize());
+
+                        final MockFilterNode mockFilter = new MockFilterNode(
+                                ven, mockReq);
+
+                        mockFilters.add(mockFilter);
+                        
+                    }
+                    
                 } else {
 
                     /*
@@ -274,6 +332,16 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          */
         p.replaceWith((BOp) group, (BOp) sp);
        
+        /*
+         * Add any mock filters used to impose materialization requirements on
+         * the parent join group in support of lifted filter(s).
+         */
+        for(FilterNode mockFilter : mockFilters) {
+            
+            p.addChild(mockFilter);
+            
+        }
+        
     }
     
     /**
@@ -325,7 +393,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
                 final FilterNode filter = (FilterNode) node;
 
-                final ComputedMaterializationRequirement req = filter
+                final INeedsMaterialization req = filter
                         .getMaterializationRequirement();
 
                 if (req.getRequirement() == INeedsMaterialization.Requirement.NEVER) {
@@ -340,23 +408,36 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                     
                 }
 
-                if (false) {
+                /*
+                 * FIXME This is disabled. I am having trouble getting the query
+                 * plan to generate the correct materialization operations with
+                 * the mock filter node and its mock requirements. Talk this
+                 * over with MikeP or wait until I get further into how the
+                 * materialization pipeline is generated. Also, it seems that we
+                 * would have to use ALWAYS as the materialization requirement
+                 * in order to ensure that the variable(s) were materialized
+                 * before the optional join. If so, then this might not be worth
+                 * the effort as we could (potentially) be doing more work than
+                 * if we just ran the optional in the child group.
+                 */
+
+                if (false && req instanceof ComputedMaterializationRequirement) {
                     
                     /*
                      * We can lift a filter which only depends on variables
                      * which are "incoming bound" into the parent.
                      * 
-                     * FIXME In order to do this, the parent join group must
+                     * Note: In order to do this, the parent join group must
                      * ensure that the variable(s) used by this filter are
                      * materialized before the optional join is run. We can
                      * achieve that by attaching the appropriate materialization
                      * requirements to a "mock" filter for the required
-                     * variable(s) in the parent group. (Make sure that we
-                     * use toVE() on the mock filter.)
+                     * variable(s) in the parent group. (Make sure that we use
+                     * toVE() on the mock filter.)
                      */
 
                     @SuppressWarnings({ "rawtypes", "unchecked" })
-                    final Set<IVariable<?>> requiredVars = (Set) req
+                    final Set<IVariable<?>> requiredVars = (Set) ((ComputedMaterializationRequirement)req)
                             .getVarsToMaterialize();
 
                     final Set<IVariable<?>> incomingBound = sa
@@ -400,6 +481,87 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          */
 
         return sp != null;
+
+    }
+
+    /**
+     * Used to impose additional materialization requirements on the required
+     * join group in the parent when lifting a filter whose materialization
+     * requirements could be satisfied against the parent group.
+     */
+    final static class MockFilterNode extends FilterNode {
+
+        private static final long serialVersionUID = 1L;
+
+        interface Annotations extends FilterNode.Annotations {
+            
+            /**
+             * The {@link ComputedMaterializationRequirement} for the filter
+             * which was lifted onto the optional statement pattern from the
+             * simple optional group.
+             */
+            String REQUIREMENT = "requirement";
+            
+        }
+
+        /**
+         * Shallow copy constructor.
+         */
+        public MockFilterNode(BOp[] args, Map<String, Object> anns) {
+
+            super(args, anns);
+            
+        }
+
+        /**
+         * Deep copy constructor.
+         */
+        public MockFilterNode(MockFilterNode op) {
+
+            super(op);
+            
+        }
+
+        /**
+         * @param ve
+         */
+        public MockFilterNode(final IValueExpressionNode ve,
+                final ComputedMaterializationRequirement req) {
+         
+            super(ve);
+            
+            setProperty(Annotations.REQUIREMENT, req);
+            
+        }
+
+        /**
+         * Report any variables that are part of the materialization requirement
+         * for the original filter.
+         */
+        @SuppressWarnings("unchecked")
+        @Override
+        public Set<IVariable<?>> getConsumedVars() {
+
+            return (Set) getMaterializationRequirement().getVarsToMaterialize();
+
+        }
+        
+        @Override
+        final public ComputedMaterializationRequirement getMaterializationRequirement() {
+
+            return (ComputedMaterializationRequirement) getRequiredProperty(Annotations.REQUIREMENT);
+
+        }
+
+        /**
+         * Overridden to flag mock filters as such.
+         */
+        @Override
+        public String toString(final int indent) {
+           
+            return super.toString(indent) + " [mockFilter]";
+            
+        }
 
     }
 

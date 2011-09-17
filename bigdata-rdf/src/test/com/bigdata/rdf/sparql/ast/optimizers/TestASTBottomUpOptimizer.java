@@ -59,7 +59,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.TestStaticAnalysisMethods;
+import com.bigdata.rdf.sparql.ast.TestStaticAnalysis;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -70,7 +70,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * @version $Id: TestASTBottomUpOptimizer.java 5197 2011-09-15 19:10:44Z
  *          thompsonbry $
  * 
- * @see TestStaticAnalysisMethods
+ * @see TestStaticAnalysis
  */
 public class TestASTBottomUpOptimizer extends
         AbstractASTEvaluationTestCase {

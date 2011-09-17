@@ -28,8 +28,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * Always evaluates to false.
@@ -49,11 +47,11 @@ public class FalseBOp extends XSDBooleanIVValueExpression {
 		
 	}
 	
-	public FalseBOp(final IValueExpression<? extends IV> x) {
-		
-		this(new BOp[] { x }, BOp.NOANNS);
-		
-	}
+//	public FalseBOp(final IValueExpression<? extends IV> x) {
+//		
+//		this(new BOp[] { x }, BOp.NOANNS);
+//		
+//	}
 	
     /**
      * Required shallow copy constructor.
