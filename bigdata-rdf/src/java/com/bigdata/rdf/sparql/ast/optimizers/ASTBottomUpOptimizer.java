@@ -478,9 +478,32 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         }
         
         final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet);
+
+        if(p.isOptional()) {
         
-        // Replace with named subquery INCLUDE.
-        pp.replaceAllWith(p,nsi);
+            /**
+             * FIXME This is a hack because the NamedSubqueryIncludeOp does not
+             * currently support optional. As a workaround the INCLUDE is
+             * stuffed into an OPTIONAL group.
+             * 
+             * Modify {@link NamedSubqueryIncludOp} to support optional
+             * semantics and modify {@link ASTBottomUpOptimizer} to mark the
+             * INCLUDE as optional.  Once we do that we will no longer have
+             * to wrap the INCLUDE inside of an OPTIONAL.
+             */
+            
+            final JoinGroupNode tmp = new JoinGroupNode(true/* optional */);
+
+            tmp.addChild(nsi);
+
+            pp.replaceWith(p, tmp);
+            
+        } else {
+
+            // Replace with named subquery INCLUDE.
+            pp.replaceWith(p, nsi);
+        
+        }
        
     }
     
