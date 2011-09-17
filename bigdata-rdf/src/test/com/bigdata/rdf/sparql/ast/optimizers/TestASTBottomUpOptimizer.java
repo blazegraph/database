@@ -232,6 +232,13 @@ public class TestASTBottomUpOptimizer extends
         
         assertEquals("liftedClause", expectedNSR, nsr);
 
+        /*
+         * FIXME This is failing because the INCLUDE is being wrapped by an
+         * OPTIONAL group to maintain the OPTIONAL semantics of the lifted
+         * group. The NamedSubqueryIncludeOp should be modified to support
+         * OPTIONAL and ASTBottomUpOptimized modified to appropriate mark the
+         * INCLUDE as optional, at which point this problem will go away.
+         */
         assertEquals("modifiedClause", modifiedClause,
                 queryRoot.getWhereClause());        
 
@@ -902,10 +909,6 @@ public class TestASTBottomUpOptimizer extends
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
                 context, queryRoot, bindingSets);
 
-        /*
-         * FIXME This is failing because the optimizer is not paying attention
-         * to exogenous variable bindings.
-         */
         diff(expected, queryRoot);
 
     }
