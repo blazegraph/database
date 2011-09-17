@@ -67,6 +67,9 @@ public class TestAll extends TestCase {
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
 
+        // Test suite for aggregation queries.
+        suite.addTestSuite(TestAggregationQuery.class);
+
         // Full text search
         suite.addTestSuite(TestSearch.class);
 

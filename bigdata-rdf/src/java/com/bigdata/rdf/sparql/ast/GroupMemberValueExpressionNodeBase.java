@@ -85,7 +85,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
      * @throws IllegalStateException
      *             if the {@link IValueExpression} is not set on this node.
      */
-    final IValueExpression<? extends IV> getRequiredValueExpression() {
+    public final IValueExpression<? extends IV> getRequiredValueExpression() {
         
         final IValueExpression<? extends IV> valueExpr = getValueExpression();
 

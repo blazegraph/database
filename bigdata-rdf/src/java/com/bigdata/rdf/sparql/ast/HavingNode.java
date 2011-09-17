@@ -89,7 +89,7 @@ public class HavingNode extends
         for (IValueExpressionNode node : this) {
 
             exprs[i++] = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                    node.getValueExpression());
+                    node.getRequiredValueExpression());
 
         }
 
@@ -101,10 +101,12 @@ public class HavingNode extends
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append("\n").append(indent(indent)).append("having ");
+        sb.append("\n").append(indent(indent)).append("having");
 
         for (IValueExpressionNode v : this) {
 
+            sb.append(" ");
+            
             sb.append(v);
             
         }
