@@ -302,4 +302,35 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Complex optional semantics: 1.
+     * 
+     * <pre>
+     * Complex optional: LeftJoin(LeftJoin(BGP(..),{..}),Join(BGP(..),Union(..,..)))
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX  foaf:   <http://xmlns.com/foaf/0.1/>
+     * SELECT ?person ?nick ?page ?img ?name ?firstN
+     * { 
+     *     ?person foaf:nick ?nick
+     *     OPTIONAL { ?person foaf:isPrimaryTopicOf ?page } 
+     *     OPTIONAL { 
+     *         ?person foaf:name ?name 
+     *         { ?person foaf:depiction ?img } UNION 
+     *         { ?person foaf:firstName ?firstN } 
+     *     } FILTER ( bound(?page) || bound(?img) || bound(?firstN) ) 
+     * }
+     * </pre>
+     */
+    public void test_opt_complex_1() throws Exception {
+
+        new TestHelper(
+                "opt-complex-1", // testURI,
+                "opt-complex-1.rq",// queryFileURL
+                "opt-complex-1.ttl",// dataFileURL
+                "opt-complex-1-result.ttl"// resultFileURL
+                ).runTest();
+
+    }
 }
