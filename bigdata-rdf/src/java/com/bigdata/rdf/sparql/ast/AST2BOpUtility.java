@@ -1505,6 +1505,10 @@ public class AST2BOpUtility {
                      * FILTER(s) MUST NOT have materialization requirements for
                      * variables which were not already bound before the
                      * optional JOIN on this statement pattern.
+                     * 
+                     * TODO Move logic to set OPTIONAL on the Predicate into
+                     * toPredicate. It can already see the isSimpleOptional
+                     * annottion on the StatementPatternNode.
                      */
 
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,

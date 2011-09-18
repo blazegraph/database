@@ -47,7 +47,6 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -380,7 +379,9 @@ public class BOpUtility {
      * Note: This will find variables within subqueries as well, which may not
      * be what is intended.
      * 
-     * @see ASTWildcardProjectionOptimizer
+     * @see StaticAnalysis#getSpannedVariables(BOp, Set), which will only report
+     *      the variables which are actually visible (variables not projected
+     *      from subqueries are not reported).
      */
     @SuppressWarnings("unchecked")
     public static Iterator<IVariable<?>> getSpannedVariables(final BOp op) {

@@ -151,4 +151,18 @@ public class FunctionNode extends ValueExpressionNode {
         
     }
 
+    /*
+     * Factory methods.
+     */
+
+    /**
+     * Return <code>SameTerm(t1,t2)</code>
+     */
+    static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.EQ, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
 }

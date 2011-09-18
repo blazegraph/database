@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import com.bigdata.rdf.sail.TestNamedGraphs;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 
 /**
@@ -34,6 +35,8 @@ import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see TestNamedGraphs
  */
 public class TestASTGraphGroupOptimizer extends
         AbstractASTEvaluationTestCase {
