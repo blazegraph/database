@@ -205,7 +205,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
     private void liftOptionalGroup(final StaticAnalysis sa, final JoinGroupNode group) {
        
         // The parent join group.
-        final JoinGroupNode p = (JoinGroupNode) group.getParent();
+        final JoinGroupNode p = group.getParentJoinGroup();
 
         if(p == null) {
             // Can't lift if no parent.
