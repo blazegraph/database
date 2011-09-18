@@ -33,22 +33,18 @@ import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.SubqueryBase;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 import cutthecrap.utils.striterators.Striterator;
@@ -74,6 +70,8 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
         /*
          * NAMED SUBQUERIES
          * 
@@ -84,7 +82,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             for (NamedSubqueryRoot subqueryRoot : queryRoot
                     .getNamedSubqueries()) {
 
-                rewriteProjection(queryRoot, subqueryRoot);
+                rewriteProjection(sa, subqueryRoot);
 
             }
 
@@ -107,14 +105,14 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
                 final QueryBase queryBase = itr.next();
 
-                rewriteProjection(queryRoot, queryBase);
+                rewriteProjection(sa, queryBase);
 
             }
 
         }
 
         // Rewrite the projection on the QueryRoot last.
-        rewriteProjection(queryRoot, queryRoot);
+        rewriteProjection(sa, queryRoot);
 
         return queryRoot;
     
@@ -123,15 +121,13 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
     /**
      * Rewrite the projection for the {@link QueryBase}.
      * 
-     * @param queryRoot
-     *            The {@link QueryRoot} is used to resolve
-     *            {@link NamedSubqueryInclude}s to the corresponding
-     *            {@link NamedSubqueryRoot}.
+     * @param sa
+     *            {@link StaticAnalysis} helper.
      * @param queryBase
      *            The {@link QueryBase} whose {@link ProjectionNode} will be
      *            rewritten.
      */
-    private void rewriteProjection(final QueryRoot queryRoot,
+    private void rewriteProjection(final StaticAnalysis sa,
             final QueryBase queryBase) {
 
         final ProjectionNode projection = queryBase.getProjection();
@@ -141,9 +137,8 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryBase
                     .getWhereClause();
 
-            final Set<IVariable<?>> varSet = new LinkedHashSet<IVariable<?>>();
-
-            getSpannedVariables(queryRoot, whereClause, varSet);
+            final Set<IVariable<?>> varSet = sa.getSpannedVariables(
+                    whereClause, new LinkedHashSet<IVariable<?>>());
 
             final ProjectionNode p2 = new ProjectionNode();
             
@@ -157,139 +152,6 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             
         }
         
-    }
-
-    /**
-     * Return the distinct variables recursively using a pre-order traversal
-     * present whether in the operator tree or on annotations attached to
-     * operators. Variables projected by a subquery are included, but not
-     * variables within the WHERE clause of the subquery. Variables projected by
-     * a {@link NamedSubqueryInclude} are also reported.
-     */
-    private static void getSpannedVariables(final QueryRoot queryRoot,
-            final BOp op, final Set<IVariable<?>> varSet) {
-
-        if (op == null) {
-
-            return;
-            
-        } else if (op instanceof IVariable<?>) {
-         
-            varSet.add((IVariable<?>)op);
-            
-        } else if(op instanceof IConstant<?>) {
-            
-            final IConstant<?> c = (IConstant<?>)op;
-            
-            final IVariable<?> var = (IVariable<?> )c.getProperty(Constant.Annotations.VAR);
-                
-            if( var != null) {
-                
-                varSet.add(var);
-                
-            }
-            
-        } else if (op instanceof SubqueryRoot) {
-
-            /*
-             * Do not recurse into a subquery, but report any variables
-             * projected by that subquery.
-             */
-
-            final SubqueryRoot subquery = (SubqueryRoot) op;
-
-            addProjectedVariables(subquery, varSet);
-            
-            // DO NOT RECURSE INTO THE SUBQUERY!
-            return;
-
-        } else if (op instanceof NamedSubqueryInclude) {
-
-            final NamedSubqueryInclude namedInclude = (NamedSubqueryInclude) op;
-
-            final NamedSubqueryRoot subquery = getNamedSubqueryRoot(
-                    queryRoot, namedInclude);
-
-            addProjectedVariables(subquery, varSet);
-            
-            // DO NOT RECURSE INTO THE SUBQUERY!
-            return;
-            
-        }
-        
-        /*
-         * Recursion.
-         */
-
-        final int arity = op.arity();
-
-        for (int i = 0; i < arity; i++) {
-
-            getSpannedVariables(queryRoot, op.get(i), varSet);
-
-        }
-
-    }
-
-    /**
-     * Add all variables on the {@link ProjectionNode} of the subquery to the
-     * set of distinct variables visible within the scope of the parent query.
-     * 
-     * @param subquery
-     * @param varSet
-     */
-    static private void addProjectedVariables(final SubqueryBase subquery,
-            final Set<IVariable<?>> varSet) {
-        
-        final ProjectionNode proj = subquery.getProjection();
-
-        if (proj.isWildcard()) {
-            /* The subquery's projection should already have been rewritten. */
-            throw new AssertionError();
-        }
-
-        for (IVariable<?> var : proj.getProjectionVars()) {
-
-            varSet.add(var);
-
-        }
-
-    }
-    
-    /**
-     * Return the {@link NamedSubqueryRoot} for the {@link NamedSubqueryInclude}
-     * .
-     * 
-     * @param queryRoot
-     * @param namedInclude
-     * @return
-     * 
-     * @throws RuntimeException
-     *             if there is no corresponding {@link NamedSubqueryRoot}.
-     */
-    private static NamedSubqueryRoot getNamedSubqueryRoot(
-            final QueryRoot queryRoot, final NamedSubqueryInclude namedInclude) {
-
-        final NamedSubqueriesNode namedSubqueriesNode = queryRoot
-                .getNamedSubqueries();
-
-        if (namedSubqueriesNode != null) {
-
-            for (NamedSubqueryRoot subqueryRoot : namedSubqueriesNode) {
-
-                if (subqueryRoot.getName().equals(namedInclude.getName())) {
-
-                    return subqueryRoot;
-
-                }
-
-            }
-
-        }
-
-        throw new RuntimeException(
-                "Named subquery does not exist for namedSet: " + namedInclude);
-
     }
 
 }
