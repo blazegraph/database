@@ -292,7 +292,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * subqueries in order to correctly impose the GRAPH constraints on the
          * named subquery.
          * 
-         * FIXME This is not implemented yet.
+         * FIXME Semantics for GRAPH ?g {} (and unit test).
+         * 
+         * FIXME Semantics for GRAPH <uri> {} (and unit test).
          */
         add(new ASTGraphGroupOptimizer());
 

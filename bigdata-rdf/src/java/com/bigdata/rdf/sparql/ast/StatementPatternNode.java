@@ -147,6 +147,13 @@ public class StatementPatternNode extends
 	    return (TermNode) get(3);
 	}
 	
+    /**
+     * The scope for this statement pattern (either named graphs or default
+     * graphs).
+     * 
+     * @see Annotations#SCOPE
+     * @see Scope
+     */
     public Scope getScope() {
 
         return (Scope) getProperty(Annotations.SCOPE);
