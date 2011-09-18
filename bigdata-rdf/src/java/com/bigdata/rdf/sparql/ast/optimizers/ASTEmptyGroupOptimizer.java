@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -48,6 +49,17 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
  * <pre>
  * { { ... } } => { ... }
  * </pre>
+ * 
+ * and for non-graph groups:
+ * 
+ * <pre>
+ * { ... {} } =? { ... }
+ * </pre>
+ * 
+ * Note: An empty <code>{}</code> matches a single empty solution. Since we
+ * always push in an empty solution and the join of anything with an empty
+ * solution is that source solution, this is the same as not running the group,
+ * so we just eliminate the empty group.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTEmptyGroupOptimizer.java 5177 2011-09-12 17:49:44Z
@@ -66,16 +78,8 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
-        
-        /*
-         * Lift any ServiceNode out of the main WHERE clause (including any
-         * embedded subqueries). We can not have any service invocations run
-         * from the main WHERE clause because they will be invoked once for each
-         * solution pushed into the query, even if the ServiceNode is the first
-         * operator in the query plan. Each such ServiceNode is replaced by a
-         * named subquery root and a named subquery include.
-         */
 
+        // Main WHERE clause
         {
 
             final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
@@ -84,17 +88,14 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
             if (whereClause != null) {
 
                 eliminateEmptyGroups(whereClause);
-
+                
+                removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
+                
             }
 
         }
 
-        /*
-         * Examine each named subquery. If there is more than one ServiceNode,
-         * or if a ServiceNode is embedded in a subquery, then lift it out into
-         * its own named subquery root, replacing it with a named subquery
-         * include.
-         */
+        // Named subqueries
         if (queryRoot.getNamedSubqueries() != null) {
 
             final NamedSubqueriesNode namedSubqueries = queryRoot
@@ -115,6 +116,8 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                 if (whereClause != null) {
 
                     eliminateEmptyGroups(whereClause);
+                    
+                    removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
 
                 }
 
@@ -122,85 +125,96 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
         }
 
-//        log.error("\nafter rewrite:\n" + queryNode);
+        // log.error("\nafter rewrite:\n" + queryNode);
 
         return queryNode;
 
     }
 
+    /**
+     * Eliminate a parent join group whose only child is another join group by
+     * lifting the child (it replaces the parent).
+     * 
+     * @param op
+     */
     private static void eliminateEmptyGroups(
             final GroupNodeBase<IGroupMemberNode> op) {
 
-        /*
-         * First check whether this operator is a join group having a single
-         * child join group, in which case we eliminate the child, lifting its
-         * children into this join group.
-         */
+        final int arity = op.arity();
 
-        if((op instanceof JoinGroupNode) && op.arity()==1 && 
-                op.get(0) instanceof JoinGroupNode) {
+        if ((op instanceof JoinGroupNode)) {
             
             /*
-             * Verify that the two join groups can be merged into one. We can do
-             * this unless they both have a different graph context.
-             * 
-             * Note: We can eliminate the parent even if it is optional or has a
-             * context by setting those attributes on the child (as long as the
-             * child does not have a different context).
+             * First check whether this operator is a join group having a single
+             * child join group, in which case we eliminate the child, lifting
+             * its children into this join group.
              */
-
-            final JoinGroupNode parent = (JoinGroupNode) op;
-
-            final JoinGroupNode child = (JoinGroupNode) op.get(0);
             
-            if (parent.getContext() == child.getContext()
-                    || parent.getContext() == null
-                    || child.getContext() == null) {
+            if (arity == 1 && op.get(0) instanceof JoinGroupNode) {
 
                 /*
-                 * Lift the children of this child into its parent.
+                 * Verify that the two join groups can be merged into one. We
+                 * can do this unless they both have a different graph context.
                  * 
-                 * TODO We probably should scan the child's annotations for
-                 * other things which could be lifted onto to the parent. That
-                 * will let us preserve hints for a join group if the child
-                 * existed only to communicate those hints.
+                 * Note: We can eliminate the parent even if it is optional or
+                 * has a context by setting those attributes on the child (as
+                 * long as the child does not have a different context).
                  */
-                
-                if (log.isInfoEnabled())
-                    log.info("Lifting children of child group into parent: parent="
-                            + parent + ", child=" + child);
 
-                /*
-                 * If the child has a context, then lift it onto the parent.
-                 */
-                if (child.getContext() != null) {
-                    parent.setContext(child.getContext());
+                final JoinGroupNode parent = (JoinGroupNode) op;
+
+                final JoinGroupNode child = (JoinGroupNode) op.get(0);
+
+                if (parent.getContext() == child.getContext()
+                        || parent.getContext() == null
+                        || child.getContext() == null) {
+
+                    /*
+                     * Lift the children of this child into its parent.
+                     * 
+                     * TODO We probably should scan the child's annotations for
+                     * other things which could be lifted onto to the parent.
+                     * That will let us preserve hints for a join group if the
+                     * child existed only to communicate those hints.
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Lifting children of child group into parent: parent="
+                                + parent + ", child=" + child);
+
+                    /*
+                     * If the child has a context, then lift it onto the parent.
+                     */
+                    if (child.getContext() != null) {
+                        parent.setContext(child.getContext());
+                    }
+
+                    /*
+                     * If the child was optional, then lift that annotation onto
+                     * the parent.
+                     */
+                    if (child.isOptional()) {
+                        parent.setOptional(child.isOptional());
+                    }
+
+                    /*
+                     * Remove the child from the parent.
+                     */
+                    parent.removeChild(child);
+
+                    /*
+                     * Lift the children of the child onto the parent.
+                     */
+                    final int n = child.arity();
+
+                    for (int i = 0; i < n; i++) {
+
+                        parent.addChild((IGroupMemberNode) child.get(i));
+
+                    }
+
                 }
 
-                /*
-                 * If the child was optional, then lift that annotation onto
-                 * the parent.
-                 */
-                if (child.isOptional()) {
-                    parent.setOptional(child.isOptional());
-                }
-
-                /*
-                 * Remove the child from the parent.
-                 */
-                parent.removeChild(child);
-                
-                /*
-                 * Lift the children of the child onto the parent.
-                 */
-                final int n = child.arity();
-
-                for (int i = 0; i < n; i++) {
-
-                    parent.addChild((IGroupMemberNode) child.get(i));
-
-                }
-                
             }
 
         }
@@ -208,8 +222,6 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         /*
          * Recursion, but only into group nodes.
          */
-        final int arity = op.arity();
-
         for (int i = 0; i < arity; i++) {
 
             final BOp child = op.get(i);
@@ -221,6 +233,49 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
             final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
             eliminateEmptyGroups(childGroup);
+
+        }
+
+        if (op instanceof GraphPatternGroup<?>) {
+
+            removeEmptyChildGroups((GraphPatternGroup<?>) op);
+            
+        }
+
+    }
+
+    /**
+     * Remove any empty (non-GRAPH) groups (normal groups and UNIONs, but not
+     * GRAPH {}).
+     */
+    static private void removeEmptyChildGroups(final GraphPatternGroup<?> op) {
+
+        int n = op.arity();
+
+        for (int i = 0; i < n; i++) {
+
+            final BOp child = op.get(i);
+
+            if (!(child instanceof GroupNodeBase<?>))
+                continue;
+
+            if (((GroupNodeBase<?>) child).getContext() != null) {
+                /*
+                 * Do not prune GRAPH ?g {} or GRAPH uri {}. Those constructions
+                 * have special semantics.
+                 */
+                continue;
+            }
+
+            if (child.arity() == 0) {
+
+                // remove an empty child group.
+                op.removeArg(child);
+
+                // one less child to visit.
+                n--;
+
+            }
 
         }
 

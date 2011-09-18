@@ -216,11 +216,6 @@ public class AST2BOpUtility {
          */
         if (query instanceof QueryRoot) {
 
-            // /*
-            // * Materialize the results for the service calls into hashjoin
-            // */
-            // left = addServiceNodes(left, (QueryRoot) query, ctx);
-
             final NamedSubqueriesNode namedSubqueries = ((QueryRoot) query)
                     .getNamedSubqueries();
 
@@ -873,16 +868,6 @@ public class AST2BOpUtility {
                 subqueries[i++] = convertJoinGroup(null/* left */,
                         (JoinGroupNode) child, ctx);
 
-                // } else if (child instanceof StatementPatternNode) {
-                //
-                // // allow lone statement patterns as children for unions,
-                // // just use a dummy join group to ease the conversion process
-                //
-                // final IGroupNode dummyGroup = new JoinGroupNode(false);
-                // dummyGroup.addChild(child);
-                //
-                // subqueries[i++] = convert(dummyGroup, ctx);
-
             } else {
 
                 throw new RuntimeException("Illegal child type for union: "
@@ -1042,9 +1027,9 @@ public class AST2BOpUtility {
          * 
          * FIXME The code currently only handles the FILTER attachment and
          * materialization pipeline for the required statement pattern joins.
-         * However, FILTERs MUST be attached to these joins appropriate for ALL
-         * CASES and variables MUST be materialized as required for those
-         * filters to run.
+         * However, for efficiency, FILTERs MUST be attached to these joins as
+         * appropriate for ALL CASES and variables MUST be materialized as
+         * required for those filters to run.
          * 
          * FIXME All of these joins can be reordered by either static analysis
          * of cardinality (which has not been extended to handle this yet) or by
@@ -1093,10 +1078,8 @@ public class AST2BOpUtility {
              * Add the joins (statement patterns) and the filters on those
              * joins.
              * 
-             * Note: This winds up handling materialization steps as well.
-             * 
-             * TODO Materialization steps are currently handled via recursion
-             * into Rule2BOpUtility.
+             * Note: This winds up handling materialization steps as well (it
+             * calls through to Rule2BOpUtility).
              */
             left = addJoins(left, joinGroup, sa, ctx);
 
@@ -1135,13 +1118,10 @@ public class AST2BOpUtility {
         /*
          * Add the LET assignments to the pipeline.
          * 
-         * TODO Review as generated query plans: A LET/BIND for an expression
-         * should be run as soon as the variables for that expression are known
-         * bound. This is the same rule which is used for filters. Running them
-         * here could even cause incorrect evaluation depending on when
-         * assigned-to variable is being consumed. [Another way to clarify this
-         * is to run the join group children in the order produced by the AST
-         * optimizers so we have better transparency about what gets run when.]
+         * TODO Review as generated query plans: Make sure that we do not
+         * reorder LET/BIND in a join group. I believe that we are supposed to
+         * run them in the given order, just not in the given location (they
+         * run last).
          */
         left = addAssignments(left, joinGroup.getAssignments(), ctx, false/* projection */);
 
@@ -1251,8 +1231,8 @@ public class AST2BOpUtility {
                 left = addMaterializationSteps(left, bopId, ve, vars, ctx);
 
                 /*
-                 * All the newly materialized vars to the set we've already
-                 * done.
+                 * Add all the newly materialized variables to the set we've
+                 * already done.
                  */
                 done.addAll(vars);
 
@@ -1290,7 +1270,7 @@ public class AST2BOpUtility {
             final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
 
             /*
-             * Get the vars this filter needs materialized.
+             * Get the variables that this filter needs materialized.
              */
             vars.addAll(filter.getMaterializationRequirement()
                     .getVarsToMaterialize());
@@ -1418,7 +1398,7 @@ public class AST2BOpUtility {
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
         /*
-         * FIXME Pull code up for this. (note that Rule2BOpUtility is also
+         * TODO Pull code up for this. (note that Rule2BOpUtility is also
          * handling materialization steps for joins.
          */
 
@@ -1875,9 +1855,7 @@ public class AST2BOpUtility {
     }
 
     /**
-     * TODO Minor optimization: A bare constant in the ORDER BY value expression
-     * list should be dropped. If there are no remaining value expressions, then
-     * the entire ORDER BY operation should be dropped.
+     * Add an ORDER BY operator.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addOrderBy(PipelineOp left,
@@ -1991,6 +1969,9 @@ public class AST2BOpUtility {
      *         is not really all that accessible. [The way it is now, the query
      *         hints get sprayed onto every operator and that will make the
      *         query much fatter for NIO on a cluster.]
+     *         <p>
+     *         We can use (hintURI bd:hint hintValue) in statement patterns to
+     *         place hints more precisely within the AST.
      */
     private static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {
@@ -2395,8 +2376,8 @@ public class AST2BOpUtility {
                         /*
                          * There is no data set and there is a graph variable,
                          * so the query will run against all named graphs and
-                         * [cvar] will be to the context of each (s,p,o,c) in
-                         * turn. This handles constructions such as:
+                         * [cvar] will be bound to the context of each (s,p,o,c)
+                         * in turn. This handles constructions such as:
                          * 
                          * "SELECT * WHERE {graph ?g {?g :p :o } }"
                          */

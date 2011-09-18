@@ -98,18 +98,20 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * IN operator in a variety of ways (in fact, the {@link FunctionRegistry}
  * already handles those optimizations for IN).
  * 
- * TODO Optimize IN and named graph and default graph queries with inline access
- * path.
- * 
  * TODO The combination of DISTINCT and ORDER BY can be optimized using an ORDER
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
  * 
  * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
- * DistinctTermScan. What other patterns can we optimize?
+ * DistinctTermScan (?parallelize with DISTINCT filter on a cluster). What other
+ * patterns can we optimize?
  * 
  * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
  * solutions.
+ * 
+ * TODO Minor optimization: A bare constant in the ORDER BY value expression
+ * list should be dropped. If there are no remaining value expressions, then the
+ * entire ORDER BY operation should be dropped.
  * 
  * FIXME Write AST optimizer which rejects queries that SELECT variables which
  * do not otherwise appear in the query.
@@ -199,6 +201,10 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * child of another join groups.
          * <pre>
          * { { ... } } => { ... }
+         * </pre>
+         * and for non-GRAPH groups:
+         * <pre>
+         * { ... {} } =? { ... }
          * </pre>
          */
         add(new ASTEmptyGroupOptimizer());

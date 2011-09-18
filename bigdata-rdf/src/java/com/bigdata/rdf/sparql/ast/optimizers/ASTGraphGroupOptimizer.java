@@ -36,79 +36,77 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 /**
  * Handles a variety of special constructions related to graph graph groups.
  * 
- * <pre>
- * - GRAPH ?foo means that anything nested (even if a subquery) is
- *   contrained to be from ?foo.  
+ * <dl>
+ * <dt>GRAPH ?foo</dt>
+ * <dd>
+ * Anything nested (even if a subquery) is constrained to be from ?foo.
+ * <p>
+ * All nested statement patterns must have ?foo as their context, even if they
+ * occur within a subquery. (This is not true for a named subquery which just
+ * projects its solutions but does not inherit the parent's graph context.
+ * However, if we lifted the named subquery out, e.g., for bottom up evaluation
+ * semantics, then we should probably impose the GRAPH constraint on the named
+ * subquery.)</dd>
+ * <dt>GRAPH ?foo { GRAPH ?bar } }</dt>
+ * <dd>The easy way to enforce this constraint when there are nested graph
+ * patterns is with a <code>SameTerm(?foo,?bar)</code> constraint inside of the
+ * nested graph pattern.
+ * <p>
+ * The problem with this is that it does not enforce the constraint as soon as
+ * possible under some conditions. A rewrite of the variable would have that
+ * effect but the rewrite needs to be aware of variable scope rules so we do not
+ * rewrite the variable within a subquery if it is not projected by that
+ * subquery. We would also have to add a BIND(?foo AS ?bar) to make ?bar visible
+ * in the scope of parent groups.
+ * <p>
+ * However, there is an INCLUDE problem too. That could be handled by moving the
+ * INCLUDE into a subgroup with a BIND to renamed the variable or by adding a
+ * "projection" to the INCLUDE so we could rename the variable there.
+ * <p>
+ * Since this construction of nested graph patterns is rare, and since it is
+ * complicated to make it more efficient, we are going with the SameTerm()
+ * constraint for now.</dd>
+ * <dt>GRAPH uri</dt>
+ * <dd>
+ * This is only allowed if the uri is in the named data set (or if no data set
+ * was given). Translation time error.</dd>
+ * <dt>GRAPH uri { ... GRAPH uri2 ... }</dt>
+ * <dd>It is an query error if a <code>GRAPH uri</code> is nested within another
+ * <code>GRAPH uri</code> for distinct IRIs.</dd>
+ * <dt>GRAPH ?foo { ... GRAPH uri ... }</dt>
+ * <dd>If a constant is nested within a <i>non-optional</i>
+ * <code>GRAPH uri</code> then that constant could be lifted up and bound using
+ * Constant/2 on the outer graph pattern. Again, this is an optimization which
+ * may not contribute much value except in very rare cases. We do not need to do
+ * anything additional to make this case correct.</dd>
+ * <dt>GRAPH ?g {}</dt>
+ * <dd>This matches the distinct named graphs in the named graph portion of the
+ * data set (special case). There are several variations on this which need to
+ * be handled:
+ * <ul>
+ * <li>If ?g might be bound or is not bound:
+ * <ul>
+ * <li>If there is no data set, then this should be translated into
+ * sp(_,_,_,?g)[filter=distinct] that should be recognized and evaluated using a
+ * distinct term advancer on CSPO.</li>
+ * <li>If the named graphs are listed explicitly, then just visit that list
+ * [e.g., pump them into an htree].</li>
+ * </ul>
+ * Either way, if there is a filter then apply the filter to the scan/list.</li>
+ * <li>If <code>?g</code> is bound coming into <code>graph ?g {}</code> then we
+ * want to test for the existence of at least one statement on the CSPO index
+ * for <code>?g</code>. This is a CSPO iterator with C bound and a limit of one.
+ * </li>
+ * </ul>
+ * </dd>
+ * <dt>GRAPH <uri> {}</dt>
+ * <dd>This is an existence test for the graph. This is a CSPO iterator with C
+ * bound and a limit of one. However, lift this into a named subquery since we
+ * only want to run it once (or precompute the result).</dd>
+ * </dl>
  * 
- *    - All nested statement patterns must have ?foo as their context,
- *      even if they occur within a subquery. (This is not true for a
- *      named subquery which just projects its solutions but does not
- *      inherit the parent's graph context.)
- *    
- *    - GRAPH ?foo { GRAPH ?bar } }.  The easy way to enforce this
- *      constraint when there are nested graph patterns is with a
- *      SameTerm(?foo,?bar) constraint inside of the nested graph
- *      pattern.
- * 
- *      The problem with this is that it does not enforce the constraint
- *      as soon as possible under some conditions. A rewrite of the
- *      variable would have that effect but the rewrite needs to be aware
- *      of variable scope rules so we do not rewrite the variable within
- *      a subquery if it is not projected by that subquery.  We would
- *      also have to add a BIND(?foo AS ?bar) to make ?bar visible in the
- *      scope of parent groups.  
- * 
- *      However, there is an INCLUDE problem too.  That could be handled
- *      by moving the INCLUDE into a subgroup with a BIND to renamed the
- *      variable or by adding a "projection" to the INCLUDE so we could
- *      rename the variable there.
- * 
- *      Since this construction of nested graph patterns is rare, and
- *      since it is complicated to make it more efficient, we are going
- *      with the SameTerm() constraint for now.
- * 
- *    - If a constant is nested within a non-optional GRAPH <uri> then
- *      that constant could be lifted up and bound using Constant/2 on
- *      the outer graph pattern.  Again, this is an optimization which
- *      may not contribute much value except in very rare cases.  We do
- *      not need to do anything additional to make this case correct.
- * 
- *    - It is an query error if a GRAPH <uri> is nested within another
- *      GRAPH <uri> for distinct IRIs.
- * 
- * - GRAPH uri is only allowed if the uri is in the named data set (or if
- *   no data set was given).  Translation time error.
- * 
- * - An empty {} matches a single empty solution. Since we always push in
- *   an empty solution and the join of anything with an empty solution is
- *   that source solution, this is the same as not running the group, so
- *   we just eliminate the empty group.
- *          
- * - GRAPH ?g {} matches the distinct named graphs in the named graph
- *   portion of the data set (special case). 
- * 
- *   - If ?g might be bound or is not bound:
- * 
- *      - If there is no data set, then this should be translated into
- *        sp(_,_,_,?g)[filter=distinct] that should be recognized and
- *        evaluated using a distinct term advancer on CSPO.
- * 
- *      - If the named graphs are listed explicitly, then just visit that
- *        list [e.g., pump them into an htree].
- * 
- *     Either way, if there is a filter then apply the filter to the
- *     scan/list.
- * 
- *   - If ?g is bound coming into the join group then we want to test for
- *     the existence of at least one statement on the CSPO index for ?g.
- *     This is a CSPO iterator with C bound and a limit of one.
- *          
- * - GRAPH <uri> {} is an existence test for the graph. This is a CSPO
- *   iterator with C bound and a limit of one.  However, lift this into a
- *   named subquery since we only want to run it once (or precompute the
- *   result).
- * 
- * </pre>
+ * @see ASTEmptyGroupOptimizer, which handles <code>{}</code> for non-GRAPH
+ *      groups.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTEmptyGroupOptimizer.java 5177 2011-09-12 17:49:44Z

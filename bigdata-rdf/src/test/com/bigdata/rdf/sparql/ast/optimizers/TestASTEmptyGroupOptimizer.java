@@ -156,4 +156,67 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
     }
 
+    /**
+     * Unit test for
+     * 
+     * <pre>
+     * { {} } => {}
+     * </pre>
+     * 
+     * but not
+     * 
+     * <pre>
+     * { GRAPH foo {} } => {}
+     * </pre>
+     * 
+     * TODO also test for removal of empty UNIONs.
+     */
+    public void test_eliminateJoinGroup02() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            final JoinGroupNode graphGroup = new JoinGroupNode();
+            graphGroup.setContext(new VarNode("g"));
+            whereClause.addChild(graphGroup);
+
+            final JoinGroupNode joinGroup = new JoinGroupNode();
+            whereClause.addChild(joinGroup);
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            final JoinGroupNode graphGroup = new JoinGroupNode();
+            graphGroup.setContext(new VarNode("g"));
+            whereClause.addChild(graphGroup);
+
+//            final JoinGroupNode joinGroup = new JoinGroupNode();
+//            whereClause.addChild(joinGroup);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
 }
