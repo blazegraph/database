@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -43,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -185,11 +190,17 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
     /**
      * Lift out the {@link ServiceNode} into a new {@link NamedSubqueryRoot},
-     * replacing it in the parent with a {@link NamedSubqueryInclude}.
+     * replacing it in the parent with a {@link NamedSubqueryInclude}. The
+     * result looks as follows, except that the spanned variables in the
+     * {@link ServiceNode}s graph pattern are projected rather than using a wild
+     * card projection (wild card projections must be rewritten into the
+     * projected variables for evaluation so we do not need to reintroduce new
+     * wild cards here).
      * 
      * <pre>
      * WITH { SELECT * WHERE { SERVICE <uri> } } AS -anon-service-call-n
      * </pre>
+     * 
      * 
      * @param queryRoot
      *            The {@link QueryRoot}.
@@ -202,6 +213,13 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
             final GroupNodeBase<IGroupMemberNode> parent,
             final ServiceNode serviceNode) {
 
+        /*
+         * TODO Lift up into caller and pass through (QueryRoot is available
+         * from SA)? However, if we start caching the SA then we have to be
+         * careful when reusing it across structural modifications.
+         */
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
         final String namedSolutionSet = "%-anon-service-call-" + nrewrites++;
 
         final NamedSubqueryRoot namedSubqueryRoot = new NamedSubqueryRoot(
@@ -209,9 +227,25 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
         {
 
-            final ProjectionNode projection = new ProjectionNode();
-            projection.addProjectionVar(new VarNode("*"));
-            namedSubqueryRoot.setProjection(projection);
+            {
+                
+                final ProjectionNode projection = new ProjectionNode();
+                
+                namedSubqueryRoot.setProjection(projection);
+                
+                // projection.addProjectionVar(new VarNode("*"));
+
+                final Set<IVariable<?>> varSet = sa.getSpannedVariables(
+                        (BOp) serviceNode.getGroupNode(),
+                        new LinkedHashSet<IVariable<?>>());
+
+                for(IVariable<?> var : varSet) {
+                
+                    projection.addProjectionVar(new VarNode(var.getName()));
+                    
+                }
+
+            }
 
             final JoinGroupNode whereClause = new JoinGroupNode(serviceNode);
             namedSubqueryRoot.setWhereClause(whereClause);

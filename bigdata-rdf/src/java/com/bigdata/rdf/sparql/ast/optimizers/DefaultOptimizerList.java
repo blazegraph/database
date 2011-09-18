@@ -222,23 +222,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * index to be joined into the main query.
          */
         add(new ASTSearchOptimizer());
-
-        /**
-         * Rewrites the WHERE clause of each query by lifting out any
-         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
-         * of any named subquery such that there is no more than one
-         * {@link ServiceNode} in that subquery by lifting out additional
-         * {@link ServiceNode}s into new named subqueries.
-         * <p>
-         * Note: This rewrite step is necessary to preserve the "run-once"
-         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
-         * any position other than the head of a named subquery, it will be
-         * invoked once for each solution which flows through that part of
-         * the query plan.  This is wasteful since the SERVICE call does not
-         * run "as-bound" (source solutions are not propagated to the SERVICE
-         * when it is invoked).
-         */
-        add(new ASTServiceNodeOptimizer());
         
         /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of
@@ -263,6 +246,15 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * associated with the query in the appropriate scope. Those are not
          * being handled yet. Also, if a variable takes on the same value in ALL
          * source solutions, then it can be replaced by a constant.
+         * <p>
+         * The analysis of the source IBindingSet[] should be refactored into a
+         * central location, perhaps on the {@link AST2BOpContext}. We could
+         * collect which variables have bindings ("maybe bound") as well as
+         * statistics about those bindings. This is related to how we will
+         * handle BindingsClause once we support that federation extension.
+         * <p>
+         * Note: {@link ASTBottomUpOptimizer} currently examines the
+         * IBindingSet[].
          */ 
         add(new ASTBindingAssigner());
 
@@ -293,6 +285,35 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTExistsOptimizer());
         
         /**
+         * Handles a variety of special constructions related to graph graph
+         * groups.
+         * <p>
+         * Note: This optimizer MUST run before optimizers which lift out named
+         * subqueries in order to correctly impose the GRAPH constraints on the
+         * named subquery.
+         * 
+         * FIXME This is not implemented yet.
+         */
+        add(new ASTGraphGroupOptimizer());
+
+        /**
+         * Rewrites the WHERE clause of each query by lifting out any
+         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
+         * of any named subquery such that there is no more than one
+         * {@link ServiceNode} in that subquery by lifting out additional
+         * {@link ServiceNode}s into new named subqueries.
+         * <p>
+         * Note: This rewrite step is necessary to preserve the "run-once"
+         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
+         * any position other than the head of a named subquery, it will be
+         * invoked once for each solution which flows through that part of
+         * the query plan.  This is wasteful since the SERVICE call does not
+         * run "as-bound" (source solutions are not propagated to the SERVICE
+         * when it is invoked).
+         */
+        add(new ASTServiceNodeOptimizer());
+        
+        /**
          * Lift FILTERs which can be evaluated based solely on the bindings in
          * the parent group out of a child group. This helps because we will
          * issue the subquery for the child group less often (assuming that the
@@ -317,14 +338,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSimpleOptionalOptimizer());
         
-        /**
-         * Handles a variety of special constructions related to graph graph
-         * groups.
-         * 
-         * FIXME This is not implemented yet. 
-         */
-        add(new ASTGraphGroupOptimizer());
-    
         /**
          * Validates named subquery / include patterns, identifies the join
          * variables, and annotates the named subquery root and named subquery

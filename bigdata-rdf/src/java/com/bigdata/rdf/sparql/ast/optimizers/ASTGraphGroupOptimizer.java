@@ -27,11 +27,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Collection;
+import java.util.LinkedList;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.TermNode;
 
 /**
  * Handles a variety of special constructions related to graph graph groups.
@@ -104,6 +115,9 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
  * bound and a limit of one. However, lift this into a named subquery since we
  * only want to run it once (or precompute the result).</dd>
  * </dl>
+ * Note: This optimizer MUST run before optimizers which lift out named
+ * subqueries in order to correctly impose the GRAPH constraints on the named
+ * subquery.
  * 
  * @see ASTEmptyGroupOptimizer, which handles <code>{}</code> for non-GRAPH
  *      groups.
@@ -121,69 +135,96 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
 
-//        if (!(queryNode instanceof QueryRoot))
-//            return queryNode;
-//
-//        final QueryRoot queryRoot = (QueryRoot) queryNode;
-//        
-//        /*
-//         * Lift any ServiceNode out of the main WHERE clause (including any
-//         * embedded subqueries). We can not have any service invocations run
-//         * from the main WHERE clause because they will be invoked once for each
-//         * solution pushed into the query, even if the ServiceNode is the first
-//         * operator in the query plan. Each such ServiceNode is replaced by a
-//         * named subquery root and a named subquery include.
-//         */
-//
-//        {
-//
-//            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
-//                    .getWhereClause();
-//
-//            if (whereClause != null) {
-//
-//                eliminateEmptyGroups(whereClause);
-//
-//            }
-//
-//        }
-//
-//        /*
-//         * Examine each named subquery. If there is more than one ServiceNode,
-//         * or if a ServiceNode is embedded in a subquery, then lift it out into
-//         * its own named subquery root, replacing it with a named subquery
-//         * include.
-//         */
-//        if (queryRoot.getNamedSubqueries() != null) {
-//
-//            final NamedSubqueriesNode namedSubqueries = queryRoot
-//                    .getNamedSubqueries();
-//
-//            /*
-//             * Note: This loop uses the current size() and get(i) to avoid
-//             * problems with concurrent modification during visitation.
-//             */
-//            for (int i = 0; i < namedSubqueries.size(); i++) {
-//
-//                final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
-//                        .get(i);
-//
-//                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
-//                        .getWhereClause();
-//
-//                if (whereClause != null) {
-//
-//                    eliminateEmptyGroups(whereClause);
-//
-//                }
-//
-//            }
-//
-//        }
-//
-////        log.error("\nafter rewrite:\n" + queryNode);
+        if (!(queryNode instanceof QueryRoot))
+            return queryNode;
 
+        final QueryRoot queryRoot = (QueryRoot) queryNode;
+        
+        /*
+         * Collect GRAPH groups.
+         * 
+         * Note: We can not transform graph patterns inside of SERVICE calls so
+         * this explicitly visits the interesting parts of the tree.
+         */
+
+        final Collection<JoinGroupNode> graphGroups = new LinkedList<JoinGroupNode>();
+
+        {
+
+            if (queryRoot.getNamedSubqueries() != null) {
+
+                for (NamedSubqueryRoot namedSubquery : queryRoot
+                        .getNamedSubqueries()) {
+
+                    collectGraphGroups(namedSubquery.getWhereClause(),
+                            null/* context */, graphGroups);
+
+                }
+
+            }
+
+            collectGraphGroups(queryRoot.getWhereClause(), null/* context */,
+                    graphGroups);
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        for(JoinGroupNode group : graphGroups) {
+            
+//            liftOptionalGroup(sa, group);
+            
+        }
+        
         return queryNode;
+        
+    }
+
+    /**
+     * Collect the GRAPH groups.
+     * <p>
+     * Note: This will NOT visit stuff inside of SERVICE calls. If those graph
+     * patterns get rewritten it has to be by the SERVICE, not us.
+     * @param group
+     * @param context
+     * @param graphGroups
+     */
+    @SuppressWarnings("unchecked")
+    private void collectGraphGroups(final IGroupNode<IGroupMemberNode> group,
+            TermNode context,
+            final Collection<JoinGroupNode> graphGroups) {
+
+        if (group instanceof JoinGroupNode && group.getContext() != null) {
+
+            final TermNode innerContext = group.getContext();
+            
+            if (context == null)
+                context = innerContext;
+            
+            graphGroups.add((JoinGroupNode) group);
+
+        }
+
+        for (IGroupMemberNode child : group) {
+
+            if (child instanceof ServiceNode) {
+
+                /*
+                 * Do NOT translate SERVICE nodes (unless they are a bigdata
+                 * service).
+                 */
+
+                continue;
+
+            }
+
+            if (!(child instanceof IGroupNode<?>))
+                continue;
+
+            collectGraphGroups((IGroupNode<IGroupMemberNode>) child, context,
+                    graphGroups);
+
+        }
 
     }
 

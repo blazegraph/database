@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
-import java.util.Set;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IVariable;
 
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
@@ -171,6 +169,27 @@ public class NamedSubqueryInclude extends
         
         return null;
 
+    }
+
+    /**
+     * Return the corresponding {@link NamedSubqueryRoot}.
+     * 
+     * @return The {@link NamedSubqueryRoot} and never <code>null</code>.
+     * 
+     * @throws RuntimeException
+     *             if no {@link NamedSubqueryRoot} was found for the named set
+     *             associated with this {@link NamedSubqueryInclude}.
+     */
+    public NamedSubqueryRoot getRequiredNamedSubqueryRoot(final QueryRoot queryRoot) {
+        
+        final NamedSubqueryRoot nsr = getNamedSubqueryRoot(queryRoot);
+        
+        if(nsr == null)
+            throw new RuntimeException(
+                    "Named subquery does not exist for namedSet: " + getName());
+        
+        return nsr;
+        
     }
     
     @Override
