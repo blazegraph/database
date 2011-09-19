@@ -97,7 +97,7 @@ abstract public class Memoizer<A, V> implements Computable<A, V> {
 				 * Wrap the exception to indicate whether or not the interrupt
 				 * occurred in the thread of the caller that executed the
 				 * FutureTask in its thread. This is being done as an aid to
-				 * diagosing situations where f.get() throws out an
+				 * diagnosing situations where f.get() throws out an
 				 * InterruptedException.
 				 */
 				final InterruptedException e2 = new InterruptedException(
