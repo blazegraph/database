@@ -45,6 +45,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
@@ -1359,6 +1360,13 @@ public class StaticAnalysis {
     
     /**
      * Static helper used to determine materialization requirements.
+     * 
+     * TODO This should also reason about datatype constraints on variables. If
+     * we know that a variable is constrained in a given scope to only take on a
+     * data type which is associated with an {@link FullyInlineTypedLiteralIV}
+     * or a specific numeric data type, then some operators may be able to
+     * operate directly on that {@link IV}. This is especially interesting for
+     * aggregates.
      */
     @SuppressWarnings("rawtypes")
     public static INeedsMaterialization.Requirement gatherVarsToMaterialize(

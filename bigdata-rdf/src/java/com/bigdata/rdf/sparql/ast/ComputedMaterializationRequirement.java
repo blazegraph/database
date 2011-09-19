@@ -35,17 +35,10 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 
 /**
  * Computed {@link INeedsMaterialization} metadata for an
  * {@link IValueExpression}.
- * 
- * TODO This should also reason about datatype constraints on variables. If we
- * know that a variable is constrained in a given scope to only take on a data
- * type which is associated with an {@link FullyInlineTypedLiteralIV} or a
- * specific numeric data type, then some operators may be able to operate
- * directly on that {@link IV}. This is especially interesting for aggregates.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ComputedMaterializationRequirement.java 5179 2011-09-12
@@ -79,30 +72,10 @@ public class ComputedMaterializationRequirement implements
     }
 
     public ComputedMaterializationRequirement(final IValueExpression<?> ve) {
-
-//        if (ve instanceof IVariable<?>) {
-//
-//            /*
-//             * A single variable evaluated in a FILTER is handled by computing
-//             * its expected boolean value. We need to materialize the variable
-//             * to do that.
-//             */
-//            
-//            varsToMaterialize = Collections.singleton((IVariable<IV>) ve);
-//
-//            requirement = Requirement.ALWAYS;
-//            
-//        } else {
-//
-//        /*
-//         * Something more complicated.
-//         */
         
         varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
 
         requirement = StaticAnalysis.gatherVarsToMaterialize(ve, varsToMaterialize);
-
-//        }
 
     }
 
