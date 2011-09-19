@@ -71,7 +71,7 @@ public class InlineMaterializeOp<E> extends PipelineOp {
 		 * the lexicon relation and which variable in the incoming binding sets
 		 * needs materializing. 
 		 */
-		String PREDICATE = (InlineMaterializeOp.class.getName() + ".predicate").intern();
+		String PREDICATE = InlineMaterializeOp.class.getName() + ".predicate";
 		
     }
 

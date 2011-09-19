@@ -333,4 +333,31 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
+
+    /**
+     * Reification of the default graph (dawg-construct-reification-1).
+     * 
+     * <pre>
+     * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * PREFIX  foaf:       <http://xmlns.com/foaf/0.1/>
+     * 
+     * CONSTRUCT { [ rdf:subject ?s ;
+     *               rdf:predicate ?p ;
+     *               rdf:object ?o ] . }
+     * WHERE {
+     *   ?s ?p ?o .
+     * }
+     * </pre>
+     */
+    public void test_construct_reif_1() throws Exception {
+
+        new TestHelper(
+                "construct-reif-1", // testURI,
+                "construct-reif-1.rq",// queryFileURL
+                "construct-reif-1.ttl",// dataFileURL
+                "construct-reif-1-result.ttl"// resultFileURL
+                ).runTest();
+
+    }
+
 }

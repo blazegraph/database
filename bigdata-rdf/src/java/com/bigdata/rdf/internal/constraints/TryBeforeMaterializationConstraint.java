@@ -33,7 +33,6 @@ import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.constraint.Constraint;
-import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.util.InnerCause;
 

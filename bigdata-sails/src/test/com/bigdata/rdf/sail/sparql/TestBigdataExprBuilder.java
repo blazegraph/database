@@ -1071,4 +1071,93 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     }
 
+    /**
+     * Unit test for blank node "[]" syntax.
+     * 
+     * <pre>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * SELECT * {
+     *   [ foaf:name ?name ;
+     *     foaf:mbox <mailto:alice@example.org>
+     *   ]
+     * }
+     * </pre>
+     * 
+     * Note that this has exactly the same interpretation as:
+     * 
+     * <pre>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * SELECT * {
+     *   _:b18 foaf:name ?name .
+     *   _:b18 foaf:mbox <mailto:alice@example.org>
+     * }
+     * </pre>
+     * 
+     * assuming that the blank node is given the identity <code>_:b18</code>.
+     * <p>
+     * Note: blank nodes are translated into anonymous variables in the parse
+     * tree before the bigdata AST model is generated.
+     */
+    public void test_bnode_bracket_syntax_05() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "" + //
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n" + //
+                " SELECT * {\n" + //
+                "   [ foaf:name ?name ;\n" + //
+                "     foaf:mbox <mailto:alice@example.org>\n" + //
+                "   ]\n" + //
+                " }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("*"));
+                expected.setProjection(projection);
+            }
+
+            {
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final ConstantNode foaf_name = new ConstantNode(
+                        makeIV(valueFactory.createURI(FOAFVocabularyDecl.name
+                                .stringValue())));
+
+                final ConstantNode foaf_mbox = new ConstantNode(
+                        makeIV(valueFactory.createURI(FOAFVocabularyDecl.mbox
+                                .stringValue())));
+
+                final ConstantNode mailto = new ConstantNode(
+                        makeIV(valueFactory
+                                .createURI("mailto:alice@example.org")));
+
+                final VarNode bnode = new VarNode("-anon-11");
+                bnode.setAnonymous(true);
+
+                whereClause.addChild(new StatementPatternNode(bnode, foaf_name,
+                        new VarNode("name"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(bnode, foaf_mbox,
+                        mailto, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
 }

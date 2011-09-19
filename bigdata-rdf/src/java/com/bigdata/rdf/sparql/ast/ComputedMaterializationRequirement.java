@@ -28,17 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.io.Serializable;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
-import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 
 /**
@@ -104,7 +100,7 @@ public class ComputedMaterializationRequirement implements
         
         varsToMaterialize = new LinkedHashSet<IVariable<IV>>();
 
-        requirement = gatherVarsToMaterialize(ve, varsToMaterialize);
+        requirement = StaticAnalysis.gatherVarsToMaterialize(ve, varsToMaterialize);
 
 //        }
 
@@ -122,83 +118,6 @@ public class ComputedMaterializationRequirement implements
 
     }
 
-    public static Set<IVariable<IV>> getVarsFromArguments(final BOp c) {
-
-        final int arity = c.arity();
-        
-        final Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>(arity);
-
-        for (int i = 0; i < arity; i++) {
-
-            final BOp arg = c.get(i);
-
-            if (arg != null) {
-
-                if (arg instanceof IValueExpression
-                        && arg instanceof IPassesMaterialization) {
-
-                    terms.addAll(getVarsFromArguments(arg));
-
-                } else if (arg instanceof IVariable) {
-
-                    terms.add((IVariable) arg);
-
-                }
-
-            }
-
-        }
-
-        return terms;
-
-    }
-
-    /**
-     * Static helper used to determine materialization requirements.
-     */
-    static INeedsMaterialization.Requirement gatherVarsToMaterialize(
-            final IValueExpression<?> c, final Set<IVariable<IV>> terms) {
-
-        boolean materialize = false;
-        boolean always = false;
-        
-        final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
-        
-        while (it.hasNext()) {
-            
-            final BOp bop = it.next();
-            
-            if (bop instanceof INeedsMaterialization) {
-                
-                final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
-                
-                final Set<IVariable<IV>> t = getVarsFromArguments(bop);
-                
-                if (t.size() > 0) {
-                    
-                    terms.addAll(t);
-                    
-                    materialize = true;
-                    
-                    // if any bops have terms that always needs materialization
-                    // then mark the whole constraint as such
-                    if (bop2.getRequirement() == Requirement.ALWAYS) {
-                        
-                        always = true;
-                        
-                    }
-                    
-                }
-                
-            }
-
-        }
-
-        return materialize ? (always ? Requirement.ALWAYS
-                : Requirement.SOMETIMES) : Requirement.NEVER;
-
-    }
-    
     public boolean equals(final Object o) {
         
         if (this == o)

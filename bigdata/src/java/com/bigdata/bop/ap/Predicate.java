@@ -210,14 +210,14 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
     
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public IVariableOrConstant get(final int index) {
         
         return (IVariableOrConstant<?>) super.get(index);
         
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public IConstant<?> get(final E e, final int index) {
 
         return new Constant(((IElement) e).get(index));
@@ -419,6 +419,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
+    @SuppressWarnings("rawtypes")
     public Predicate<E> setArg(final int index, final IVariableOrConstant arg) {
 
         final Predicate<E> tmp = this.clone();

@@ -324,6 +324,34 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * FIXME This is not implemented yet.
          */
         add(new ASTLiftPreFiltersOptimizer());
+
+        /**
+         * Pruning rules for unknown IVs in statement patterns:
+         * 
+         * If an optional join is known to fail, then remove the optional group
+         * in which it appears from the group (which could be an optional group,
+         * a join group, or a union).
+         * 
+         * If a required join is known to fail, then the parent will also fail.
+         * Continue recursively up the parent hierarchy until we hit a UNION or
+         * an OPTIONAL. If we reach the root of the where clause for a subquery,
+         * then continue up the groups in which the subquery appears.
+         * 
+         * If the parent is a UNION, then remove the child from the UNION.
+         * 
+         * If a UNION has one child, then replace the UNION with the child.
+         * 
+         * If a UNION is empty, then fail the group in which it fails (unions
+         * are not optional).
+         * 
+         * These rules should be triggered if a join is known to fail, which
+         * includes the case of an unknown IV in a statement pattern as well
+         * <code>GRAPH uri {}</code> where uri is not a named graph.  
+         * 
+         * FIXME Isolate pruning logic since we need to use it in more than
+         * one place.
+         */
+//        add(new ASTUnknownIVOptimizer()); // FIXME
         
         /**
          * Rewrites aspects of queries where bottom-up evaluation would produce

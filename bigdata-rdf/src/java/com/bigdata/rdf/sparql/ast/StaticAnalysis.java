@@ -38,7 +38,13 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
+import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
@@ -1334,5 +1340,100 @@ public class StaticAnalysis {
         }
         
     }
+
+    /*
+     * Materialization pipeline support.
+     */
     
+    /**
+     * Use the {@link INeedsMaterialization} interface to find and collect
+     * variables that need to be materialized for this constraint.
+     */
+    @SuppressWarnings("rawtypes")
+    public static boolean requiresMaterialization(final IConstraint c) {
+    
+        return StaticAnalysis.gatherVarsToMaterialize(c,
+                new LinkedHashSet<IVariable<IV>>()) != Requirement.NEVER;
+    
+    }
+    
+    /**
+     * Static helper used to determine materialization requirements.
+     */
+    @SuppressWarnings("rawtypes")
+    public static INeedsMaterialization.Requirement gatherVarsToMaterialize(
+            final BOp c, final Set<IVariable<IV>> terms) {
+    
+        boolean materialize = false;
+        boolean always = false;
+        
+        final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
+        
+        while (it.hasNext()) {
+            
+            final BOp bop = it.next();
+            
+            if (bop instanceof INeedsMaterialization) {
+                
+                final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
+                
+                final Set<IVariable<IV>> t = getVarsFromArguments(bop);
+                
+                if (t.size() > 0) {
+                    
+                    terms.addAll(t);
+                    
+                    materialize = true;
+                    
+                    // if any bops have terms that always needs materialization
+                    // then mark the whole constraint as such
+                    if (bop2.getRequirement() == Requirement.ALWAYS) {
+                        
+                        always = true;
+                        
+                    }
+                    
+                }
+                
+            }
+    
+        }
+    
+        return materialize ? (always ? Requirement.ALWAYS
+                : Requirement.SOMETIMES) : Requirement.NEVER;
+    
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static Set<IVariable<IV>> getVarsFromArguments(final BOp c) {
+    
+        final int arity = c.arity();
+        
+        final Set<IVariable<IV>> terms = new LinkedHashSet<IVariable<IV>>(arity);
+    
+        for (int i = 0; i < arity; i++) {
+    
+            final BOp arg = c.get(i);
+    
+            if (arg != null) {
+    
+                if (arg instanceof IValueExpression
+                        && arg instanceof IPassesMaterialization) {
+    
+                    terms.addAll(getVarsFromArguments(arg));
+    
+                } else if (arg instanceof IVariable) {
+    
+                    terms.add((IVariable<IV>) arg);
+    
+                }
+    
+            }
+    
+        }
+    
+        return terms;
+    
+    }
+
 }

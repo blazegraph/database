@@ -172,6 +172,19 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         return iv;
 
     }
+    
+    /**
+     * Marks the variable as anonymous.
+     * 
+     * @param v
+     *            The variable.
+     *            
+     * @return The argument.
+     */
+    protected VarNode makeAnon(final VarNode v) {
+        v.setAnonymous(true);
+        return v;
+    }
 
     /*
      * Mock up the tripleStore.
