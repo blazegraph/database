@@ -31,7 +31,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -85,7 +84,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
@@ -94,8 +92,11 @@ import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.LexPredicate;
-import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
+import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
+import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -498,7 +499,9 @@ public class Rule2BOpUtility {
              * annotations which are being applied there will be lost which is
              * another problem, especially in scale-out. Both of these issues
              * need to be resolved before quads can be used with the runtime
-             * query optimizer.
+             * query optimizer. [Actually, a DataSetJoin is not a problem if
+             * we handle the RTO integration in terms of the AST, but we still
+             * might want to replace it with an inline access path.]
              *
              * @todo In fact, we should be able to write in a JoinGraph operator
              * which optimizes the join graph and then evaluates it rather than
@@ -651,16 +654,19 @@ public class Rule2BOpUtility {
 
     }
 
-    public static PipelineOp join(final AbstractTripleStore db,
-    		final QueryEngine queryEngine,
-			final PipelineOp left, final Predicate pred,
-			final AtomicInteger idFactory, final Properties queryHints) {
+//    public static PipelineOp join(final AbstractTripleStore db,
+//    		final QueryEngine queryEngine,
+//			final PipelineOp left, final Predicate pred,
+//			final AtomicInteger idFactory, final Properties queryHints) {
+//
+//		return join(db, queryEngine, left, pred, null,
+//				idFactory, queryHints);
+//
+//    }
 
-		return join(db, queryEngine, left, pred, null,
-				idFactory, queryHints);
-
-    }
-
+    /**
+     * @deprecated This is part of the {@link SOp2BOpUtility} integration.
+     */
     public static PipelineOp join(final AbstractTripleStore db,
     		final QueryEngine queryEngine,
 			final PipelineOp left, final Predicate pred,
@@ -727,7 +733,8 @@ public class Rule2BOpUtility {
 				final Set<IVariable<IV>> terms =
 					new LinkedHashSet<IVariable<IV>>();
 
-				final Requirement req = gatherTermsToMaterialize(c, terms);
+                final Requirement req = StaticAnalysis
+                        .gatherVarsToMaterialize(c, terms);
 
 				if (req != Requirement.NEVER) {
 
@@ -895,74 +902,12 @@ public class Rule2BOpUtility {
     }
     
     /**
-     * Use the {@link INeedsMaterialization} interface to find and collect
-     * variables that need to be materialized for this constraint.
-     */
-    public static boolean requiresMaterialization(
-    		final IConstraint c) {
-
-    	return gatherTermsToMaterialize(c, new HashSet<IVariable<IV>>()) != Requirement.NEVER;
-
-    }
-
-    /**
-     * Use the {@link INeedsMaterialization} interface to find and collect
-     * variables that need to be materialized for this constraint.
-     */
-    public static INeedsMaterialization.Requirement gatherTermsToMaterialize(
-    		final IConstraint c, final Set<IVariable<IV>> terms) {
-
-    	boolean materialize = false;
-    	boolean always = false;
-
-		final Iterator<BOp> it = BOpUtility.preOrderIterator(c);
-
-		while (it.hasNext()) {
-
-			final BOp bop = it.next();
-
-			if (log.isDebugEnabled()) {
-				log.debug(bop);
-			}
-
-			if (bop instanceof INeedsMaterialization) {
-
-				final INeedsMaterialization bop2 = (INeedsMaterialization) bop;
-
-				final Set<IVariable<IV>> t = ComputedMaterializationRequirement.getVarsFromArguments(bop);
-
-				if (t.size() > 0) {
-
-					terms.addAll(t);
-
-					materialize = true;
-
-					// if any bops have terms that always needs materialization
-					// then mark the whole constraint as such
-					if (bop2.getRequirement() == Requirement.ALWAYS) {
-
-						always = true;
-
-					}
-
-				}
-
-			}
-
-		}
-
-		return materialize ?
-				(always ? Requirement.ALWAYS : Requirement.SOMETIMES) :
-					Requirement.NEVER;
-
-    }
-
-    /**
      * Adds a series of materialization steps to materialize terms needed
      * downstream.
-     *
+     * 
      * To materialize the variable ?term, the pipeline looks as follows:
-     *
+     * 
+     * <pre>
      * left
      * ->
      * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
@@ -974,29 +919,32 @@ public class Rule2BOpUtility {
      * PipelineJoin (predicate=LexPredicate(?term))
      * ->
      * right
-     *
+     * </pre>
+     * 
      * @param db
-     * 			the database
+     *            the database
      * @param queryEngine
-     * 			the query engine
+     *            the query engine
      * @param left
-     * 			the left (upstream) operator that immediately proceeds the
-     * 			materialization steps
+     *            the left (upstream) operator that immediately proceeds the
+     *            materialization steps
      * @param right
-     * 			the right (downstream) operator that immediately follows the
-     * 			materialization steps
+     *            the right (downstream) operator that immediately follows the
+     *            materialization steps
      * @param c
-     * 			the constraint to run on the IsMaterialized op to see if the
-     * 			materialization pipeline can be bypassed (bypass if true and
-     * 			no {@link NotMaterializedException} is thrown).
+     *            the constraint to run on the IsMaterialized op to see if the
+     *            materialization pipeline can be bypassed (bypass if true and
+     *            no {@link NotMaterializedException} is thrown).
      * @param varsToMaterialize
-     * 			the terms to materialize
+     *            the terms to materialize
      * @param idFactory
-     * 			the bop id factory
+     *            the bop id factory
      * @param queryHints
-     * 			the query hints
-     * @return
-     * 			the final bop added to the pipeline by this method
+     *            the query hints
+     * @return the final bop added to the pipeline by this method
+     * 
+     * @see AST2BOpUtility#addMaterializationSteps(PipelineOp, int,
+     *      IValueExpression, Collection, AST2BOpContext)
      */
     public static PipelineOp addMaterializationSteps(
     		final AbstractTripleStore db,
@@ -1005,136 +953,154 @@ public class Rule2BOpUtility {
     		final Collection<IVariable<IV>> varsToMaterialize,
     		final AtomicInteger idFactory, final Properties queryHints) {
 
-		/*
-		 * If the constraint "c" can run without a NotMaterializedException then
-		 * bypass the pipeline
-		 */
-    	{
+        final AST2BOpContext context = new AST2BOpContext(
+                null/* astContainer */, idFactory, db, queryEngine, queryHints);
 
-			final IValueExpression ve = (IValueExpression) c.get(0);
+        final IValueExpression ve = (IValueExpression) c.get(0);
 
-    		final IConstraint c2 =
-    			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
-
-    		left = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(left),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
-                            new NV(PipelineOp.Annotations.ALT_SINK_REF, right),
-                        })), queryHints);
-
-    	}
-
-    	final Iterator<IVariable<IV>> it = varsToMaterialize.iterator();
-
-    	int firstId = idFactory.incrementAndGet();
-    	while (it.hasNext()) {
-
-    		final IVariable<IV> v = it.next();
-
-    		final int condId1 = firstId;
-    		final int condId2 = idFactory.incrementAndGet();
-    		final int inlineMaterializeId = idFactory.incrementAndGet();
-            final int lexJoinId = idFactory.incrementAndGet();
-
-            final int endId;
-    		if (!it.hasNext()) {
-				/*
-				 * If there are no more terms to materialize, the terminus of
-				 * this materialization pipeline is the "right" (downstream)
-				 * operator that was passed in.
-				 */
-    			endId = right;
-    		} else {
-    			/*
-    			 * If there are more terms, the terminus of this materialization
-    			 * pipeline is the 1st operator of the next materialization
-    			 * pipeline.
-    			 */
-    			endId = firstId = idFactory.incrementAndGet();
-    		}
-
-    		final IConstraint c1 = new SPARQLConstraint(new IsMaterializedBOp(v, false));
-
-            final PipelineOp condOp1 = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(left),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, condId1),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c1),
-                            new NV(PipelineOp.Annotations.SINK_REF, condId2),
-                            new NV(PipelineOp.Annotations.ALT_SINK_REF, endId),
-                        })), queryHints);
-
-            if (log.isDebugEnabled()) {
-          	    log.debug("adding 1st conditional routing op: " + condOp1);
-            }
-
-    		final IConstraint c2 = new SPARQLConstraint(new IsInlineBOp(v, true));
-
-            final PipelineOp condOp2 = Rule2BOpUtility.applyQueryHints(
-              	    new ConditionalRoutingOp(leftOrEmpty(condOp1),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, condId2),
-                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
-                            new NV(PipelineOp.Annotations.SINK_REF, inlineMaterializeId),
-                            new NV(PipelineOp.Annotations.ALT_SINK_REF, lexJoinId),
-                        })), queryHints);
-
-            if (log.isDebugEnabled()) {
-          	    log.debug("adding 2nd conditional routing op: " + condOp2);
-            }
-
-			final Predicate lexPred;
-			{
-				/*
-				 * Note: Use the timestamp of the triple store view unless this
-				 * is a read/write transaction, in which case we need to use the
-				 * unisolated view in order to see any writes which it may have
-				 * performed (lexicon writes are always unisolated).
-				 */
-				long timestamp = db.getTimestamp();
-				if (TimestampUtility.isReadWriteTx(timestamp))
-					timestamp = ITx.UNISOLATED;
-				lexPred = LexPredicate.reverseInstance(db.getLexiconRelation()
-						.getNamespace(), timestamp, v);
-			}
-
-            if (log.isDebugEnabled()) {
-          	    log.debug("lex pred: " + lexPred);
-            }
-
-            final PipelineOp inlineMaterializeOp = Rule2BOpUtility.applyQueryHints(
-              	    new InlineMaterializeOp(leftOrEmpty(condOp2),
-                        NV.asMap(new NV[]{//
-                            new NV(BOp.Annotations.BOP_ID, inlineMaterializeId),
-                            new NV(InlineMaterializeOp.Annotations.PREDICATE, lexPred.clone()),
-                            new NV(PipelineOp.Annotations.SINK_REF, endId),
-                        })), queryHints);
-
-            if (log.isDebugEnabled()) {
-          	    log.debug("adding inline materialization op: " + inlineMaterializeOp);
-            }
-
-            final PipelineOp lexJoinOp = Rule2BOpUtility.applyQueryHints(
-		      	    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
-		                NV.asMap(new NV[]{//
-		                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
-		                    new NV(PipelineJoin.Annotations.PREDICATE, lexPred.clone()),
-                            new NV(PipelineOp.Annotations.SINK_REF, endId),
-		                })), queryHints);
-
-            if (log.isDebugEnabled()) {
-          	    log.debug("adding lex join op: " + lexJoinOp);
-            }
-
-            left = lexJoinOp;
-
-    	}
-
-    	return left;
+        return AST2BOpUtility.addMaterializationSteps(left, right, ve,
+                varsToMaterialize, context);
 
     }
+    
+//    private static PipelineOp _addMaterializationSteps(
+//                final AbstractTripleStore db,
+//                final QueryEngine queryEngine, PipelineOp left, final int right,
+//                final IConstraint c,
+//                final Collection<IVariable<IV>> varsToMaterialize,
+//                final AtomicInteger idFactory, final Properties queryHints) {
+//
+//		/*
+//		 * If the constraint "c" can run without a NotMaterializedException then
+//		 * bypass the pipeline
+//		 */
+//    	{
+//
+//			final IValueExpression ve = (IValueExpression) c.get(0);
+//
+//    		final IConstraint c2 =
+//    			new SPARQLConstraint(new NeedsMaterializationBOp(ve));
+//
+//    		left = Rule2BOpUtility.applyQueryHints(
+//              	    new ConditionalRoutingOp(leftOrEmpty(left),
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()),
+//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
+//                            new NV(PipelineOp.Annotations.ALT_SINK_REF, right),
+//                        })), queryHints);
+//
+//    	}
+//
+//    	final Iterator<IVariable<IV>> it = varsToMaterialize.iterator();
+//
+//    	int firstId = idFactory.incrementAndGet();
+//
+//    	while (it.hasNext()) {
+//
+//    		final IVariable<IV> v = it.next();
+//
+//    		final int condId1 = firstId;
+//    		final int condId2 = idFactory.incrementAndGet();
+//    		final int inlineMaterializeId = idFactory.incrementAndGet();
+//            final int lexJoinId = idFactory.incrementAndGet();
+//
+//            final int endId;
+//    		if (!it.hasNext()) {
+//				/*
+//				 * If there are no more terms to materialize, the terminus of
+//				 * this materialization pipeline is the "right" (downstream)
+//				 * operator that was passed in.
+//				 */
+//    			endId = right;
+//    		} else {
+//    			/*
+//    			 * If there are more terms, the terminus of this materialization
+//    			 * pipeline is the 1st operator of the next materialization
+//    			 * pipeline.
+//    			 */
+//    			endId = firstId = idFactory.incrementAndGet();
+//    		}
+//
+//    		final IConstraint c1 = new SPARQLConstraint(new IsMaterializedBOp(v, false));
+//
+//            final PipelineOp condOp1 = Rule2BOpUtility.applyQueryHints(
+//              	    new ConditionalRoutingOp(leftOrEmpty(left),
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID, condId1),
+//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c1),
+//                            new NV(PipelineOp.Annotations.SINK_REF, condId2),
+//                            new NV(PipelineOp.Annotations.ALT_SINK_REF, endId),
+//                        })), queryHints);
+//
+//            if (log.isDebugEnabled()) {
+//          	    log.debug("adding 1st conditional routing op: " + condOp1);
+//            }
+//
+//    		final IConstraint c2 = new SPARQLConstraint(new IsInlineBOp(v, true));
+//
+//            final PipelineOp condOp2 = Rule2BOpUtility.applyQueryHints(
+//              	    new ConditionalRoutingOp(leftOrEmpty(condOp1),
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID, condId2),
+//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c2),
+//                            new NV(PipelineOp.Annotations.SINK_REF, inlineMaterializeId),
+//                            new NV(PipelineOp.Annotations.ALT_SINK_REF, lexJoinId),
+//                        })), queryHints);
+//
+//            if (log.isDebugEnabled()) {
+//          	    log.debug("adding 2nd conditional routing op: " + condOp2);
+//            }
+//
+//			final Predicate lexPred;
+//			{
+//				/*
+//				 * Note: Use the timestamp of the triple store view unless this
+//				 * is a read/write transaction, in which case we need to use the
+//				 * unisolated view in order to see any writes which it may have
+//				 * performed (lexicon writes are always unisolated).
+//				 */
+//				long timestamp = db.getTimestamp();
+//				if (TimestampUtility.isReadWriteTx(timestamp))
+//					timestamp = ITx.UNISOLATED;
+//				lexPred = LexPredicate.reverseInstance(db.getLexiconRelation()
+//						.getNamespace(), timestamp, v);
+//			}
+//
+//            if (log.isDebugEnabled()) {
+//          	    log.debug("lex pred: " + lexPred);
+//            }
+//
+//            final PipelineOp inlineMaterializeOp = Rule2BOpUtility.applyQueryHints(
+//              	    new InlineMaterializeOp(leftOrEmpty(condOp2),
+//                        NV.asMap(new NV[]{//
+//                            new NV(BOp.Annotations.BOP_ID, inlineMaterializeId),
+//                            new NV(InlineMaterializeOp.Annotations.PREDICATE, lexPred.clone()),
+//                            new NV(PipelineOp.Annotations.SINK_REF, endId),
+//                        })), queryHints);
+//
+//            if (log.isDebugEnabled()) {
+//          	    log.debug("adding inline materialization op: " + inlineMaterializeOp);
+//            }
+//
+//            final PipelineOp lexJoinOp = Rule2BOpUtility.applyQueryHints(
+//		      	    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
+//		                NV.asMap(new NV[]{//
+//		                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
+//		                    new NV(PipelineJoin.Annotations.PREDICATE, lexPred.clone()),
+//                            new NV(PipelineOp.Annotations.SINK_REF, endId),
+//		                })), queryHints);
+//
+//            if (log.isDebugEnabled()) {
+//          	    log.debug("adding lex join op: " + lexJoinOp);
+//            }
+//
+//            left = lexJoinOp;
+//
+//    	}
+//
+//    	return left;
+//
+//    }
 
     /**
      * Generate a {@link PipelineJoin} for a triples mode access path.
@@ -1553,10 +1519,15 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SCAN with C unbound.
-         *
+         * 
          * Note: We need to use the global index view in order to estimate the
          * cost of the scan regardless of whether the query runs with
          * partitioned or global index views when it is evaluated.
+         * 
+         * FIXME We need a higher threshold (and a cheaper test) to decide when
+         * we should SCAN+FILTER. For a journal, the #of elements in the filter
+         * needs to be probably 25% of the named graphs, which is probably too
+         * much data to have in memory anyway.
          */
         final IRelation r = context.getRelation(pred);
         final ScanCostReport scanCostReport = ((AccessPath) context

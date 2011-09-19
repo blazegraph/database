@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
  * Created on Sep 10, 2011
  */
@@ -33,9 +33,12 @@ import java.util.LinkedList;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.DataSetSummary;
+import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -104,17 +107,15 @@ import com.bigdata.rdf.sparql.ast.TermNode;
  * <li>If there is no data set, then this should be translated into
  * sp(_,_,_,?g)[filter=distinct] that should be recognized and evaluated using a
  * distinct term advancer on CSPO.</li>
- * <li>If the named graphs are listed explicitly, then just visit that list
- * [e.g., pump them into an htree].</li>
+ * <li>If the named graphs are explicitly given, then annotate
+ * {@link StatementPatternNode} with an "IN" for <code>(?g,namedGraphs)</code>.</li>
  * </ul>
- * Either way, if there is a filter then apply the filter to the scan/list.</li>
+ * Either way, if there is a filter then apply the filter to the scan/list (this
+ * happens in AST2BOPUtility#toPredicate()).</li>
  * <li>If <code>?g</code> is known bound coming into <code>graph ?g {}</code>
  * then we want to test for the existence of at least one statement on the CSPO
- * index for <code>?g</code>. (This is basically ASK sp(_,_,_,uri) LIMIT 1, but
- * we must run this for each binding on <code>?g</code>. However, if
- * <code>?g</code> can be statically analyzed as being bound to a specific
- * constant then we would rewrite <code>?g</code> using Constant/2 and then
- * handle this as <code>GRAPH uri {}</code>.)</li>
+ * index for <code>?g</code>.This is basically ASK sp(_,_,_,uri) LIMIT 1, but we
+ * must run this for each binding on <code>?g</code>.</li>
  * </ul>
  * </dd>
  * <dt>GRAPH uri {}</dt>
@@ -122,6 +123,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
  * bound and a limit of one. Lift this into a named subquery since we only want
  * to run it once. (This is basically ASK sp(_,_,_,uri) LIMIT 1.)</dd>
  * </dl>
+ * 
  * Note: This optimizer MUST run before optimizers which lift out named
  * subqueries in order to correctly impose the GRAPH constraints on the named
  * subquery.
@@ -135,16 +137,28 @@ import com.bigdata.rdf.sparql.ast.TermNode;
  * 
  *          FIXME Semantics for GRAPH ?g {} (and unit test).
  * 
- *          FIXME Semantics for GRAPH <uri> {} (and unit test).
+ *          FIXME Semantics for GRAPH <uri> {} (and unit test). We preresolve
+ *          the named graph IVs. If the IV is null, then we can prune the tree
+ *          (this is related to pruning statement patterns with unknown IVs).
+ *          Otherwise we need to verify that there is at least one statement in
+ *          that named graph.
+ * 
+ *          TODO If <code>?g</code> can be statically analyzed as being bound to
+ *          a specific constant then we would rewrite <code>?g</code> using
+ *          Constant/2 and then handle this as <code>GRAPH uri {}</code>
+ *          <p>
+ *          This is basically what {@link Rule2BOpUtility} does when it follows
+ *          the decision tree for named and default graphs. So, maybe that logic
+ *          can be lifted into this class as a rewrite?
  */
 public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
-//    private static final Logger log = Logger
-//            .getLogger(ASTGraphGroupOptimizer.class);
+    // private static final Logger log = Logger
+    // .getLogger(ASTGraphGroupOptimizer.class);
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
@@ -164,16 +178,17 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                 for (NamedSubqueryRoot namedSubquery : queryRoot
                         .getNamedSubqueries()) {
 
-                    visitGroups(dataSet, namedSubquery.getWhereClause(),
-                            null/* context */, graphGroups);
+                    visitGroups(context, dataSet,
+                            namedSubquery.getWhereClause(), null/* context */,
+                            graphGroups);
 
                 }
 
             }
 
             // Top-level WHERE clause.
-            visitGroups(dataSet, queryRoot.getWhereClause(), null/* context */,
-                    graphGroups);
+            visitGroups(context, dataSet, queryRoot.getWhereClause(),
+                    null/* context */, graphGroups);
 
         }
 
@@ -198,23 +213,25 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
      * Note: This <em>will</em> visit stuff inside of subqueries. A GRAPH
      * constraint outside of a subquery applies within the subquery as well.
      * 
+     * @param context
      * @param dataSet
      * @param group
-     * @param context
+     * @param graphContext
      * @param graphGroups
      */
     @SuppressWarnings("unchecked")
-    private void visitGroups(//
-            final DatasetNode dataSet,
-            final IGroupNode<IGroupMemberNode> group,
-            TermNode context,
+    private void visitGroups(
+            //
+            final AST2BOpContext context,//
+            final DatasetNode dataSet,//
+            final IGroupNode<IGroupMemberNode> group, TermNode graphContext,
             final Collection<JoinGroupNode> graphGroups) {
 
         if (group instanceof JoinGroupNode && group.getContext() != null) {
 
-            final TermNode innerContext = group.getContext();
-            
-            if (innerContext.isConstant()) {
+            final TermNode innerGraphContext = group.getContext();
+
+            if (innerGraphContext.isConstant()) {
 
                 /*
                  * If there is a named graphs data set, then verify that the
@@ -222,36 +239,38 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                  */
 
                 assertGraphInNamedDataset(
-                        (BigdataURI) ((TermNode) innerContext).getValue(),
+                        (BigdataURI) ((TermNode) innerGraphContext).getValue(),
                         dataSet);
 
             }
 
-            if (context == null) {
-             
+            if (graphContext == null) {
+
                 /*
                  * Top-most GRAPH group in this part of the query.
                  */
-                
-                context = innerContext;
-                
+
+                graphContext = innerGraphContext;
+
             } else {
-                
+
                 /*
                  * There is an existing GRAPH context.
                  * 
                  * Make sure the constraints are compatible and/or enforced.
                  */
-                
-                if (context.isConstant() && innerContext.isConstant()) {
+
+                if (graphContext.isConstant() && innerGraphContext.isConstant()) {
 
                     /*
                      * GRAPH uri { ... GRAPH uri { ... } ... }
                      */
 
-                    assertSameURI(context, innerContext);
-                    
-                } else if(context.isVariable() && innerContext.isVariable()) {
+                    assertSameURI(graphContext, innerGraphContext);
+
+                } else if (graphContext.isVariable()
+                        && innerGraphContext.isVariable()
+                        && !graphContext.equals(innerGraphContext)) {
 
                     /*
                      * GRAPH ?foo { ... GRAPH ?bar { ... } ... }
@@ -260,17 +279,22 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                      * pattern.
                      */
 
-                    group.addChild(new FilterNode(FunctionNode.sameTerm(
-                            context, innerContext)));
+                    final FilterNode filterNode = new FilterNode(
+                            FunctionNode.sameTerm(graphContext,
+                                    innerGraphContext));
+
+                    AST2BOpUtility.toVE(context.getLexiconNamespace(),
+                            filterNode.getValueExpressionNode());
+
+                    group.addChild(filterNode);
 
                 }
-                
+
                 /*
                  * TODO GRAPH ?foo { ... GRAPH uri ... } could be handled here
                  * (optimization, not correctness).
                  */
 
-                
             }
 
             graphGroups.add((JoinGroupNode) group);
@@ -296,8 +320,8 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
             }
 
-            if (context != null) {
-                
+            if (graphContext != null) {
+
                 if (child instanceof StatementPatternNode) {
 
                     /*
@@ -309,14 +333,14 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                     final StatementPatternNode sp = (StatementPatternNode) child;
 
                     final Scope scope = sp.getScope();
-                    
+
                     if (scope == null) {
 
                         // This is a required annotation.
                         throw new AssertionError("No scope? " + sp);
-                        
+
                     }
-                    
+
                     switch (scope) {
                     case NAMED_CONTEXTS:
                         break;
@@ -327,7 +351,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                     }
 
                     if (sp.c() == null) {
-                    
+
                         /*
                          * Impose the context if it is missing.
                          * 
@@ -335,14 +359,14 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                          * really has responsibility for attaching the [c]
                          * constraint? The code generating the SP or this code?
                          */
-                        sp.setArg(3/* c */, context);
+                        sp.setArg(3/* c */, graphContext);
 
                     }
-                    
+
                 }
 
             }
-            
+
             if (!(child instanceof IGroupNode<?>))
                 continue;
 
@@ -350,8 +374,8 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
              * Recursion.
              */
 
-            visitGroups(dataSet, (IGroupNode<IGroupMemberNode>) child,
-                    context, graphGroups);
+            visitGroups(context, dataSet, (IGroupNode<IGroupMemberNode>) child,
+                    graphContext, graphGroups);
 
         }
 
@@ -387,20 +411,20 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
     private void assertGraphInNamedDataset(final BigdataURI uri,
             final DatasetNode dataSet) {
 
-        if(dataSet == null) {
+        if (dataSet == null) {
             /*
              * The data set was not explicitly specified.
              */
             return;
         }
 
-        if(uri == null)
+        if (uri == null)
             throw new IllegalArgumentException();
-        
+
         final DataSetSummary namedGraphs = dataSet.getNamedGraphs();
-        
-        if(namedGraphs == null) {
-            
+
+        if (namedGraphs == null) {
+
             /*
              * No constraint on the named graphs (or just a filter, which will
              * get applied at runtime).

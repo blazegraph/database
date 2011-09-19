@@ -84,7 +84,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/180 (Migrate
          *      the RDFS inference and truth maintenance logic to BOPs)
          */
-        String RELATION_NAME = (IPredicate.class.getName() + ".relationName").intern();
+        String RELATION_NAME = IPredicate.class.getName() + ".relationName";
 
 //        /**
 //         * The {@link IKeyOrder} which will be used to read on the relation.
@@ -130,6 +130,12 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 //         */
 //        String CONSTRAINT = "constraint";
 
+//      /**
+//      * An optional {@link IConstraint}[] which places restrictions on the
+//      * legal patterns in the variable bindings.
+//      */
+//     String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+
         /**
          * An optional {@link IFilter} that will be evaluated local to the to
          * the index. When the index is remote, the filter will be sent to the
@@ -152,7 +158,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IRangeQuery#rangeIterator(byte[], byte[], int, int, IFilter)
          */
-        String INDEX_LOCAL_FILTER = (IPredicate.class.getName() + ".indexLocalFilter").intern();
+        String INDEX_LOCAL_FILTER = IPredicate.class.getName() + ".indexLocalFilter";
 
         /**
          * An optional {@link BOpFilterBase} to be applied to the elements of
@@ -169,7 +175,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * one another. You can chain {@link FilterBase} filters together as
          * well.
          */
-        String ACCESS_PATH_FILTER = (IPredicate.class.getName() + ".accessPathFilter").intern();
+        String ACCESS_PATH_FILTER = IPredicate.class.getName() + ".accessPathFilter";
 
         /**
          * Access path expander pattern. This allows you to wrap or replace the
@@ -198,13 +204,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see IAccessPathExpander
          */
-        String ACCESS_PATH_EXPANDER = (IPredicate.class.getName() + ".accessPathExpander").intern();
+        String ACCESS_PATH_EXPANDER = IPredicate.class.getName() + ".accessPathExpander";
 
         /**
          * The partition identifier -or- <code>-1</code> if the predicate does
          * not address a specific shard.
          */
-        String PARTITION_ID = (IPredicate.class.getName() + ".partitionId").intern();
+        String PARTITION_ID = IPredicate.class.getName() + ".partitionId";
         
         int DEFAULT_PARTITION_ID = -1;
 
@@ -246,7 +252,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see BOpEvaluationContext
          */
-        String REMOTE_ACCESS_PATH = (IPredicate.class.getName() + ".remoteAccessPath").intern();
+        String REMOTE_ACCESS_PATH = IPredicate.class.getName() + ".remoteAccessPath";
         
         boolean DEFAULT_REMOTE_ACCESS_PATH = true;
         
@@ -258,8 +264,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FULLY_BUFFERED_READ_THRESHOLD
          */
-        String FULLY_BUFFERED_READ_THRESHOLD = (IPredicate.class.getName()
-                + ".fullyBufferedReadThreshold").intern();
+        String FULLY_BUFFERED_READ_THRESHOLD = IPredicate.class.getName()
+                + ".fullyBufferedReadThreshold";
 
         /**
          * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}.
@@ -290,7 +296,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FLAGS
          */
-        String FLAGS = (IPredicate.class.getName() + ".flags").intern();
+        String FLAGS = IPredicate.class.getName() + ".flags";
 
         /**
          * The default flags will visit the keys and values of the non-deleted
@@ -315,7 +321,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * 
 		 * @see #TIMESTAMP
 		 */
-		String MUTATION = (IPredicate.class.getName() + ".mutation").intern();
+		String MUTATION = IPredicate.class.getName() + ".mutation";
 
         boolean DEFAULT_MUTATION = false;
 
@@ -325,13 +331,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * 
 		 * @see #MUTATION
 		 */
-		String TIMESTAMP = (IPredicate.class.getName() + ".timestamp").intern();
-
-//        /**
-//         * An optional {@link IConstraint}[] which places restrictions on the
-//         * legal patterns in the variable bindings.
-//         */
-//        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+		String TIMESTAMP = IPredicate.class.getName() + ".timestamp";
 
     }
     

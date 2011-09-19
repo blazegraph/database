@@ -72,10 +72,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
  *          $
- * 
- *          TODO Update the BigdataSPARQLSyntaxTest to use this version of the
- *          parser.  That will verify parser compliance against some manifest
- *          driven test suites.
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
@@ -306,7 +302,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     /**
      * TODO This should be handled by an AST visitor. It is just much simpler.
-     * That will also allow us to handle query hints embedded into comments. 
+     * That will also allow us to handle query hints embedded into comments
+     * (actually, the syntax <code>hintURI bd:hint hintValue</code> allows us to
+     * embed query hints into graph patterns).
      */
     static private Properties getQueryHints(final ASTQueryContainer qc)
             throws MalformedQueryException {

@@ -1508,7 +1508,7 @@ public class AST2BOpUtility {
                      * 
                      * TODO Move logic to set OPTIONAL on the Predicate into
                      * toPredicate. It can already see the isSimpleOptional
-                     * annottion on the StatementPatternNode.
+                     * annotation on the StatementPatternNode.
                      */
 
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
@@ -1752,7 +1752,7 @@ public class AST2BOpUtility {
 
                 } else {
 
-                    ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                    StaticAnalysis.gatherVarsToMaterialize(
                             expr, vars);
 
                 }
@@ -1780,7 +1780,7 @@ public class AST2BOpUtility {
 
                 } else {
 
-                    ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                    StaticAnalysis.gatherVarsToMaterialize(
                             expr, vars);
 
                 }
@@ -1893,7 +1893,7 @@ public class AST2BOpUtility {
 
             } else {
 
-                ComputedMaterializationRequirement.gatherVarsToMaterialize(
+                StaticAnalysis.gatherVarsToMaterialize(
                         expr, vars);
 
             }
@@ -2004,7 +2004,8 @@ public class AST2BOpUtility {
 
     /**
      * If the value expression that needs the materialized variables can run
-     * without a {@link NotMaterializedException} then just bypass the pipeline.
+     * without a {@link NotMaterializedException} then just route to the
+     * <i>rightId</i> (around the rest of the materialization pipeline steps).
      * This happens in the case of a value expression that only "sometimes"
      * needs materialized values, but not always (i.e. materialization
      * requirement depends on the data flowing through). A good example of this
@@ -2014,12 +2015,18 @@ public class AST2BOpUtility {
      * TODO Consider the efficiency of the steps which are being taken. Should
      * we test for the most common cases first, or for those with the least
      * latency to "fix"?
+     * 
+     * @see TryBeforeMaterializationConstraint
      */
     @SuppressWarnings("rawtypes")
-    private static PipelineOp addMaterializationSteps(PipelineOp left,
+    public static PipelineOp addMaterializationSteps(PipelineOp left,
             final int rightId, final IValueExpression<IV> ve,
             final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
+        /*
+         * If the constraint "c" can run without a NotMaterializedException then
+         * bypass the rest of the pipeline by routing the solutions to rightId.
+         */
         final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
                 new NeedsMaterializationBOp(ve));
 
@@ -2044,8 +2051,17 @@ public class AST2BOpUtility {
      * looks as follows:
      * 
      * <pre>
+     * (A) leftId      : The upstream operator
+     * (B) condId1     : if !materialized then condId2 (fall through) else rightId 
+     * (C) condId2     : if inline then inlineMatId (fall through) else lexJoinId
+     * (D) inlineMatId : InlineMaterializeOp; goto rightId.
+     * (E) lexJoinId   : LexJoin (fall through).
+     * (F) rightId     : the downstream operator.
+     * </pre>
+     * 
+     * <pre>
      * left 
-     * -> 
+     * ->
      * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
      * ->
      * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
@@ -2067,6 +2083,10 @@ public class AST2BOpUtility {
      *            the terms to materialize
      * 
      * @return the final bop added to the pipeline by this method
+     * 
+     * @see TryBeforeMaterializationConstraint
+     * 
+     * TODO make [vars] a Set.
      */
     @SuppressWarnings("rawtypes")
     private static PipelineOp addMaterializationSteps(PipelineOp left,
@@ -2081,6 +2101,7 @@ public class AST2BOpUtility {
 
             final IVariable<IV> v = it.next();
 
+            // Generate bopIds for the routing targets for this variable.
             final int condId1 = firstId;
             final int condId2 = ctx.nextId();
             final int inlineMaterializeId = ctx.nextId();

@@ -27,14 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.tck;
 
+import java.util.Properties;
+
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.sparql.SPARQLSyntaxTest;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Bigdata integration for the {@link SPARQLSyntaxTest}. This appears to be a
@@ -43,11 +50,86 @@ import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
  * which provides a W3C markup for the test results. The Earl report is part of
  * the Sesame compliance packages.
  * 
+ * @see Bigdata2ASTSPARQLParser
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
 
+    private AbstractTripleStore store = null;
+
+//    private String baseURI = null;
+
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        store = getStore(getProperties());
+        
+//        /*
+//         * Note: This needs to be an absolute URI.
+//         */
+//        
+//        baseURI = "http://www.bigdata.com";
+        
+    }
+    
+    protected void tearDown() throws Exception {
+        
+        if (store != null) {
+        
+            store.__tearDownUnitTest();
+            
+            store = null;
+        
+        }
+        
+//        baseURI = null;
+        
+        super.tearDown();
+        
+    }
+
+    public Properties getProperties() {
+
+        final Properties properties = new Properties();
+
+        // turn on quads.
+        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
+
+//        // override the default vocabulary.
+//        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+//                NoVocabulary.class.getName());
+
+        // turn off axioms.
+        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
+        // no persistence.
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+                BufferMode.Transient.toString());
+        
+        return properties;
+
+    }
+
+    protected AbstractTripleStore getStore(final Properties properties) {
+
+        final String namespace = "kb";
+
+        // create/re-open journal.
+        final Journal journal = new Journal(properties);
+
+        final LocalTripleStore lts = new LocalTripleStore(journal, namespace,
+                ITx.UNISOLATED, properties);
+
+        lts.create();
+
+        return lts;
+
+    }
+    
     /**
      * @param testURI
      * @param name
@@ -63,14 +145,14 @@ public class BigdataSPARQLSyntaxTest extends SPARQLSyntaxTest {
 
     /**
      * {@inheritDoc}
-     * 
-     * FIXME This needs to be changed to {@link Bigdata2ASTSPARQLParser}. 
+     * <p>
+     * Overridden to use {@link Bigdata2ASTSPARQLParser}.
      */
     @Override
     protected void parseQuery(String query, String queryFileURL)
             throws MalformedQueryException {
 
-        new BigdataSPARQLParser().parseQuery(query, queryFileURL);
+        new Bigdata2ASTSPARQLParser(store).parseQuery(query, queryFileURL);
 
     }
 

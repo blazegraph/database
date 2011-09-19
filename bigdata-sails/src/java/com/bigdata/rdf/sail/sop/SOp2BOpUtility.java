@@ -53,7 +53,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
-import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.SubqueryHashJoinOp;
@@ -68,6 +67,7 @@ import com.bigdata.rdf.sail.QueryHints;
 import com.bigdata.rdf.sail.Rule2BOpUtility;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
 import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.QueryOptions;
@@ -295,7 +295,7 @@ public class SOp2BOpUtility {
 	    					final IConstraint c = (IConstraint) bop;
 	    					constraints.add(c);
 	    					requiresMaterialization |= 
-	    						Rule2BOpUtility.requiresMaterialization(c);
+	    						StaticAnalysis.requiresMaterialization(c);
 	    				} else if (bop instanceof Predicate) {
 	    					pred = (Predicate) bop;
 	    				}
@@ -676,7 +676,7 @@ public class SOp2BOpUtility {
 			final Set<IVariable<IV>> terms = 
 				new LinkedHashSet<IVariable<IV>>();
 			
-			Rule2BOpUtility.gatherTermsToMaterialize(c, terms);
+			StaticAnalysis.gatherVarsToMaterialize(c, terms);
 			
 			toMaterialize.put(c, terms);
 			

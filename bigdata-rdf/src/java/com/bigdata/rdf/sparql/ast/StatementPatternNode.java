@@ -11,8 +11,13 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.htree.HTree;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
+import com.bigdata.rdf.spo.DistinctTermAdvancer;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOAccessPath;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * A node in the AST representing a statement pattern.
@@ -45,10 +50,12 @@ public class StatementPatternNode extends
         boolean DEFAULT_SIMPLE_OPTIONAL = false;
         
         /**
-         * An optional {@link List} of {@link FilterNode}s for constraints which
-         * MUST run <em>with</em> the JOIN for this statement pattern.
-         * <p>
-         * Note: This is specified when a simple optional is identified and the
+         * A {@link List} of {@link FilterNode}s for constraints which MUST run
+         * <em>with</em> the JOIN for this statement pattern (optional).
+         * 
+         * <h3>Simple Optionals</h3>
+         * 
+         * This is specified when a simple optional is identified and the
          * filters are lifted with the optional statement pattern into the
          * parent group. Under these circumstances the FILTER(s) MUST be
          * attached to the JOIN in order to preserve the OPTIONAL semantics of
@@ -67,8 +74,84 @@ public class StatementPatternNode extends
          * group).
          * 
          * @see ASTSimpleOptionalOptimizer
+         * 
+         *      FIXME This annotation was originally developed to support simple
+         *      optionals (and is currently only in the code path for simple
+         *      optionals), but might also be used to filter an access path. For
+         *      example, with IN(var,values). However, this annotation does not
+         *      distinguish between local and remote "element" filters and there
+         *      is some API tensions between visitation of "elements" versus
+         *      "bindingSets" for access paths.
          */
         String FILTERS = "filters";
+     
+        /**
+         * Boolean flag indicates that the distinct solutions for the statement
+         * pattern are required.
+         * <p>
+         * Note: This is a hint that the {@link DistinctTermAdvancer} should be
+         * used to visit the distinct {@link ISPO}s having a common prefix. This
+         * is used for <code>GRAPH ?g {}</code>, which evaluates to all of the
+         * named graphs in the database (if the named graphs were not explicitly
+         * specified).
+         * <p>
+         * Note: For only partly historical reasons, this is not used to mark
+         * default graph access. A default graph access path visits strips the
+         * context and then applies a DISTINCT filter to the resulting triples.
+         */
+        String DISTINCT = "distinct";
+        
+        /**
+         * The existence of at least one solution will be verified otherwise the
+         * solution will be failed. This turns into an iterator with a limit of
+         * ONE (1) on the {@link SPOAccessPath}.
+         * <p>
+         * Note: This is used in combination with a join against an inline
+         * access path for the named graphs. The "exists" statement pattern MUST
+         * run <em>after</em> the access path which produces the variety since
+         * it will be used to constrain that as-bound variety. This the join
+         * order in query plan must look like:
+         * 
+         * <pre>
+         * (_,_,_,?g)[@INLINE,@IN(g,namedGraphs)] x (_,_,_,?g)[@EXISTS]
+         * </pre>
+         * 
+         * rather than
+         * 
+         * <pre>
+         * (_,_,_,?g)[@EXISTS] x (_,_,_,?g)[@INLINE,@IN(g,namedGraphs)]
+         * </pre>
+         * 
+         * as the latter will find only one solution for <code>?g</code>.
+         */
+        String EXISTS = "exists";
+        
+        /**
+         * The data for this access path is inline. The value of the attribute
+         * is the column projection / solution set reference.
+         * 
+         * TODO A column projection is more efficient when we are handling
+         * things like the named graphs or constraining the subquery for an
+         * optional with multiple predicates. That column projection can be
+         * modeled as <code>IN(var,values)</code>. The IN filter could be
+         * attached to {@link #FILTERS} or it could be the value of this
+         * attribute.
+         * <p>
+         * We also have use cases for inline solution set access paths for use
+         * with the samples materialized by the RTO. Those should be an
+         * {@link HTree} and the data should be modeled as {@link ISolution}s.
+         * (Note that some vertices may correspond to "bop fragment" joins, in
+         * which case the can not be modeled as {@link ISPO}s.)
+         * <p>
+         * Both the column projection (IN) and the inline solution set (HTree)
+         * are simpler access paths. The only support element visitation, a full
+         * scan of the access path (this is the same as saying that there are no
+         * join variables), or probing to find all solutions which join on some
+         * join variable(s). This is in contrast to the {@link SPOAccessPath},
+         * which supports key-range constraints (prefix) and range constraints
+         * (prefix with key range on a data type value).
+         */
+        String INLINE = "inline";
         
     }
     
