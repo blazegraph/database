@@ -129,8 +129,9 @@ public class VocabURIShortIV<V extends BigdataURI> extends AbstractInlineIV<V, S
 
 	public String toString() {
 		
-		return "Vocab(" + Short.toString(value) + ")";
-		
+        return "Vocab(" + Short.toString(value) + ")"
+                + (hasValue() ? "[" + getValue().stringValue() + "]" : "");
+
 	}
 	
 	/**
