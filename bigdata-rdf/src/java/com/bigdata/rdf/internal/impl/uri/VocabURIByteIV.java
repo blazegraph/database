@@ -139,7 +139,8 @@ public class VocabURIByteIV<V extends BigdataURI> extends AbstractInlineIV<V, By
 
 	public String toString() {
 		
-		return "Vocab(" + Byte.toString(value) + ")";
+        return "Vocab(" + Byte.toString(value) + ")"
+                + (hasValue() ? "[" + getValue().stringValue() + "]" : "");
 		
 	}
 

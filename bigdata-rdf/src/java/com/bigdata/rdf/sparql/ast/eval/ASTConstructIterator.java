@@ -94,6 +94,11 @@ public class ASTConstructIterator implements
      * template by the constructor.
      */
     private List<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
+
+    /**
+     * A factory for blank node identifiers, which are scoped to a solution.
+     */
+    private int bnodeIdFactory = 0;
     
     private boolean open = true;
 
@@ -312,16 +317,53 @@ public class ASTConstructIterator implements
      * 
      *         FIXME BNode() in the CONSTRUCT template (probably shows up as a
      *         function node in the statement pattern).
-     * 
-     *         FIXME Blank nodes are scoped to a solution (this is not handling
-     *         blank nodes at all).
      */
     private BigdataValue getValue(final TermNode term,
             final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
 
         if (term instanceof ConstantNode) {
 
-            return term.getValue();
+            final BigdataValue value = term.getValue();
+            
+            if(value instanceof BigdataBNode) {
+
+                /*
+                 * Scope the bnode ID to the solution. The same ID in each
+                 * solution is mapped to the same bnode. The same ID in a new
+                 * solution is mapped to a new BNode.
+                 */
+                
+                BigdataBNode bnode = (BigdataBNode) value;
+                
+                final String id = bnode.getID();
+                
+                final BigdataBNode tmp = bnodes.get(id);
+                
+                if( tmp != null ) {
+
+                    // We've already seen this ID for this solution.
+                    return tmp;
+                    
+                }
+
+                /*
+                 * This is the first time we have seen this ID for this
+                 * solution. We create a new blank node with an identifier which
+                 * will be unique across the solutions.
+                 */
+
+                // new bnode, which will be scoped to this solution.
+                bnode = f.createBNode("b"
+                        + Integer.valueOf(bnodeIdFactory++).toString());
+
+                // put into the per-solution cache.
+                bnodes.put(id, bnode);
+
+                return bnode;
+
+            }
+            
+            return value;
 
         } else if(term instanceof VarNode) {
 
