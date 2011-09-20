@@ -277,10 +277,10 @@ public class ASTConstructIterator implements
             final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
 
         // resolve values from template and/or solution.
-        final BigdataValue s = getValue(varOrBNode(pat.s()), solution, bnodes);
-        final BigdataValue p = getValue(varOrBNode(pat.p()), solution, bnodes);
-        final BigdataValue o = getValue(varOrBNode(pat.o()), solution, bnodes);
-        final BigdataValue c = pat.c() == null ? null : getValue(varOrBNode(pat.c()),
+        final BigdataValue s = getValue(pat.s(), solution, bnodes);
+        final BigdataValue p = getValue(pat.p(), solution, bnodes);
+        final BigdataValue o = getValue(pat.o(), solution, bnodes);
+        final BigdataValue c = pat.c() == null ? null : getValue(pat.c(),
                 solution, bnodes);
 
         // filter out unbound values.
@@ -367,12 +367,6 @@ public class ASTConstructIterator implements
         
     }
     
-    private TermNode varOrBNode(final TermNode t) {
-
-        return t;
-
-    }
-
     /**
      * Scope the bnode ID to the solution. The same ID in each solution is
      * mapped to the same bnode. The same ID in a new solution is mapped to a
