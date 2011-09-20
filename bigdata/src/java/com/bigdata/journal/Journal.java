@@ -319,6 +319,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             protected void activateTx(final TxState state) {
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
                 if(bufferStrategy instanceof RWStrategy) {
+//                  Logger.getLogger("TransactionTrace").info("OPEN: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
                     ((RWStrategy)bufferStrategy).getRWStore().activateTx();
                 }
                 super.activateTx(state);
@@ -328,6 +329,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 super.deactivateTx(state);
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
                 if(bufferStrategy instanceof RWStrategy) {
+//                  Logger.getLogger("TransactionTrace").info("DONE: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
                     ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
                 }
             }
