@@ -1054,6 +1054,15 @@ public class TestTriplePatternBuilder extends
         assertSameAST(sparql, expected, actual);
 
     }
+    
+    /*
+     * Note: For the RDF Collections tests, you basically have to work out by
+     * trial and error the actual names of the RDF Variables which will be
+     * assigned by the visitor when it interprets the parse tree. The variable
+     * names are based on a prefix and a counter. The actual names are therefore
+     * dependent on the query and the path through the visitor pattern. This is
+     * a bit of a PITA.
+     */
 
     /**
      * Unit test for the RDF Collections syntax (from SPARQL 1.1 Last Call
@@ -1114,9 +1123,9 @@ public class TestTriplePatternBuilder extends
 
                 final VarNode x = new VarNode("x");
                 final VarNode b0 = makeAnon(new VarNode("-anon-11"));
-                final VarNode b1 = makeAnon(new VarNode("-anon-12"));
-                final VarNode b2 = makeAnon(new VarNode("-anon-13"));
-                final VarNode b3 = makeAnon(new VarNode("-anon-14"));
+                final VarNode b1 = makeAnon(new VarNode("-anon-1-12"));
+                final VarNode b2 = makeAnon(new VarNode("-anon-1-23"));
+                final VarNode b3 = makeAnon(new VarNode("-anon-1-34"));
                 
                 final ConstantNode rdfFirst = new ConstantNode(
                         makeIV(valueFactory.createURI(RDF.FIRST.stringValue())));
@@ -1228,10 +1237,10 @@ public class TestTriplePatternBuilder extends
                 expected.setWhereClause(whereClause);
 
                 final VarNode b0 = makeAnon(new VarNode("-anon-11"));
-                final VarNode b1 = makeAnon(new VarNode("-anon-12"));
-                final VarNode b2 = makeAnon(new VarNode("-anon-13"));
-                final VarNode b3 = makeAnon(new VarNode("-anon-14"));
-                final VarNode b4 = makeAnon(new VarNode("-anon-15"));
+                final VarNode b1 = makeAnon(new VarNode("-anon-1-12"));
+                final VarNode b2 = makeAnon(new VarNode("-anon-23"));
+                final VarNode b3 = makeAnon(new VarNode("-anon-1-24"));
+                final VarNode b4 = makeAnon(new VarNode("-anon-35"));
                 
                 final ConstantNode rdfFirst = new ConstantNode(
                         makeIV(valueFactory.createURI(RDF.FIRST.stringValue())));
@@ -1262,14 +1271,14 @@ public class TestTriplePatternBuilder extends
                 whereClause.addChild(new StatementPatternNode(b0, rdfFirst, ONE   , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b0, rdfRest , b1    , null/* c */, Scope.DEFAULT_CONTEXTS));
 
-                whereClause.addChild(new StatementPatternNode(b1, rdfFirst, b2    , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b2, p,        q     , null/* c */, Scope.DEFAULT_CONTEXTS));
+                whereClause.addChild(new StatementPatternNode(b1, rdfFirst, b2    , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b1, rdfRest , b3    , null/* c */, Scope.DEFAULT_CONTEXTS));
                 
-                whereClause.addChild(new StatementPatternNode(b3, rdfFirst, b4    , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b4, rdfFirst, TWO   , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b4, rdfRest,  rdfNil, null/* c */, Scope.DEFAULT_CONTEXTS));
                 
+                whereClause.addChild(new StatementPatternNode(b3, rdfFirst, b4    , null/* c */, Scope.DEFAULT_CONTEXTS));
                 whereClause.addChild(new StatementPatternNode(b3, rdfRest , rdfNil, null/* c */, Scope.DEFAULT_CONTEXTS));
 
             }
@@ -1557,7 +1566,7 @@ public class TestTriplePatternBuilder extends
                 final VarNode w = new VarNode("w");
                 
                 final VarNode b0 = makeAnon(new VarNode("-anon-11"));
-                final VarNode b1 = makeAnon(new VarNode("-anon-1-1"));
+                final VarNode b1 = makeAnon(new VarNode("-anon-1-12"));
                 
                 final ConstantNode rdfFirst = new ConstantNode(
                         makeIV(valueFactory.createURI(RDF.FIRST.stringValue())));
