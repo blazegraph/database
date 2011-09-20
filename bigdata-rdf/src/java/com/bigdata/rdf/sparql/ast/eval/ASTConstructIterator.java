@@ -277,10 +277,10 @@ public class ASTConstructIterator implements
             final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
 
         // resolve values from template and/or solution.
-        final BigdataValue s = getValue(pat.s(), solution, bnodes);
-        final BigdataValue p = getValue(pat.p(), solution, bnodes);
-        final BigdataValue o = getValue(pat.o(), solution, bnodes);
-        final BigdataValue c = pat.c() == null ? null : getValue(pat.c(),
+        final BigdataValue s = getValue(varOrBNode(pat.s()), solution, bnodes);
+        final BigdataValue p = getValue(varOrBNode(pat.p()), solution, bnodes);
+        final BigdataValue o = getValue(varOrBNode(pat.o()), solution, bnodes);
+        final BigdataValue c = pat.c() == null ? null : getValue(varOrBNode(pat.c()),
                 solution, bnodes);
 
         // filter out unbound values.
@@ -314,9 +314,6 @@ public class ASTConstructIterator implements
      *            A map used to scope blank nodes to the solution.
      * 
      * @return The as-bound value.
-     * 
-     *         FIXME BNode() in the CONSTRUCT template (probably shows up as a
-     *         function node in the statement pattern).
      */
     private BigdataValue getValue(final TermNode term,
             final BindingSet solution, final Map<String, BigdataBNode> bnodes) {
@@ -327,39 +324,7 @@ public class ASTConstructIterator implements
             
             if(value instanceof BigdataBNode) {
 
-                /*
-                 * Scope the bnode ID to the solution. The same ID in each
-                 * solution is mapped to the same bnode. The same ID in a new
-                 * solution is mapped to a new BNode.
-                 */
-                
-                BigdataBNode bnode = (BigdataBNode) value;
-                
-                final String id = bnode.getID();
-                
-                final BigdataBNode tmp = bnodes.get(id);
-                
-                if( tmp != null ) {
-
-                    // We've already seen this ID for this solution.
-                    return tmp;
-                    
-                }
-
-                /*
-                 * This is the first time we have seen this ID for this
-                 * solution. We create a new blank node with an identifier which
-                 * will be unique across the solutions.
-                 */
-
-                // new bnode, which will be scoped to this solution.
-                bnode = f.createBNode("b"
-                        + Integer.valueOf(bnodeIdFactory++).toString());
-
-                // put into the per-solution cache.
-                bnodes.put(id, bnode);
-
-                return bnode;
+                return getBNode(((BigdataBNode) value).getID(), bnodes);
 
             }
             
@@ -367,9 +332,30 @@ public class ASTConstructIterator implements
 
         } else if(term instanceof VarNode) {
 
-            final String varname = ((VarNode) term).getValueExpression()
-                    .getName();
+            /*
+             * I can't quite say whether or not this is a hack, so let me
+             * explain what is going on instead. When the SPARQL grammar parses
+             * a blank node in a query, it is *always* turned into an anonymous
+             * variable. So, when we interpret the CONSTRUCT template, we are
+             * going to see anonymous variables and we have to recognize them
+             * and treat them as if they were really blank nodes.
+             * 
+             * The code here tests VarNode.isAnonymous() and, if the variable is
+             * anonymous, it uses the variable's *name* as a blank node
+             * identifier (ID). It then obtains a unique within scope blank node
+             * which is correlated with that blank node ID.
+             */
+            
+            final VarNode v = (VarNode) term;
 
+            final String varname = v.getValueExpression().getName();
+
+            if(v.isAnonymous()) {
+                
+                return getBNode(varname, bnodes); 
+                
+            }
+            
             return (BigdataValue) solution.getValue(varname);
 
         } else {
@@ -380,5 +366,45 @@ public class ASTConstructIterator implements
         }
         
     }
+    
+    private TermNode varOrBNode(final TermNode t) {
 
+        return t;
+
+    }
+
+    /**
+     * Scope the bnode ID to the solution. The same ID in each solution is
+     * mapped to the same bnode. The same ID in a new solution is mapped to a
+     * new BNode.
+     */
+    private BigdataBNode getBNode(final String id,
+            final Map<String, BigdataBNode> bnodes) {
+
+        final BigdataBNode tmp = bnodes.get(id);
+
+        if (tmp != null) {
+
+            // We've already seen this ID for this solution.
+            return tmp;
+
+        }
+
+        /*
+         * This is the first time we have seen this ID for this solution. We
+         * create a new blank node with an identifier which will be unique
+         * across the solutions.
+         */
+
+        // new bnode, which will be scoped to this solution.
+        final BigdataBNode bnode = f.createBNode("b"
+                + Integer.valueOf(bnodeIdFactory++).toString());
+
+        // put into the per-solution cache.
+        bnodes.put(id, bnode);
+
+        return bnode;
+
+    }
+    
 }
