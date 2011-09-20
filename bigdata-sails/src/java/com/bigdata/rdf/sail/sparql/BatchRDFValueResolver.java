@@ -39,6 +39,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.sparql.ASTVisitorBase;
 import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
@@ -143,45 +144,79 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             throw new MalformedQueryException(e);
             
         }
-        
+
+        /*
+         * Build up the vocabulary. This is everything in the parse tree plus
+         * some key vocabulary items which correspond to syntactic sugar in
+         * SPARQL.
+         */
+        {
+            
+            final BigdataValueFactory f = context.valueFactory;
+
+            final Map<Value, BigdataValue> vocab = context.vocab;
+
+            // RDF Collection syntactic sugar vocabulary items.
+            vocab.put(RDF.FIRST, f.asValue(RDF.FIRST));
+            vocab.put(RDF.REST, f.asValue(RDF.REST));
+            vocab.put(RDF.NIL, f.asValue(RDF.NIL));
+ 
+            /*
+             * RDF Values actually appearing in the parse tree.
+             */
+            final Iterator<BigdataValue> itr = nodes.values().iterator();
+            
+            while (itr.hasNext()) {
+            
+                final BigdataValue value = itr.next();
+                
+                vocab.put(value, value);
+                
+            }
+            
+        }
+
         /*
          * Batch resolve the BigdataValue objects against the database. This
          * sets their IVs as a side-effect.
          */
-        
-        final BigdataValue[] values = nodes.values().toArray(
-                new BigdataValue[0]);
-        
-        context.lexicon.addTerms(values, values.length, true/* readOnly */);
-        
-        // cache the BigdataValues on the IVs for later
-        for (BigdataValue value : values) {
+        {
 
-            final IV iv = value.getIV();
+            final BigdataValue[] values = context.vocab.values().toArray(
+                    new BigdataValue[0]);
 
-            if (iv == null) {
+            context.lexicon.addTerms(values, values.length, true/* readOnly */);
 
-                /*
-                 * Since the term identifier is NULL this value is not known
-                 * to the kb.
-                 */
+            // cache the BigdataValues on the IVs for later
+            for (BigdataValue value : values) {
 
-                if (log.isInfoEnabled())
-                    log.info("Not in knowledge base: " + value);
+                final IV iv = value.getIV();
 
-                /*
-                 * Create a dummy iv and cache the unknown value on it so
-                 * that it can be used during query evaluation.
-                 */
-                final IV dummy = TermId.mockIV(VTE.valueOf(value));
+                if (iv == null) {
 
-                value.setIV(dummy);
+                    /*
+                     * Since the term identifier is NULL this value is not known
+                     * to the kb.
+                     */
 
-                dummy.setValue(value);
+                    if (log.isInfoEnabled())
+                        log.info("Not in knowledge base: " + value);
 
-            } else {
+                    /*
+                     * Create a dummy iv and cache the unknown value on it so
+                     * that it can be used during query evaluation.
+                     */
+                    final IV dummy = TermId.mockIV(VTE.valueOf(value));
 
-                iv.setValue(value);
+                    value.setIV(dummy);
+
+                    dummy.setValue(value);
+
+                } else {
+
+                    iv.setValue(value);
+
+                }
 
             }
 
@@ -189,19 +224,30 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
         /*
          * Set the BigdataValue object on each ASTRDFValue node.
+         * 
+         * Note: This resolves each Value against the vocabulary cache. This is
+         * necessary in case more than one ASTRDFValue instance exists for the
+         * same BigdataValue. Otherwise we would fail to have a side-effect on
+         * some ASTRDFValue nodes.
          */
-        final Iterator<Map.Entry<ASTRDFValue, BigdataValue>> itr = nodes
-                .entrySet().iterator();
-        
-        while(itr.hasNext()) {
+        {
             
-            final Map.Entry<ASTRDFValue,BigdataValue> e = itr.next();
-   
-            final ASTRDFValue node = e.getKey();
-            
-            final BigdataValue value = e.getValue();
+            final Iterator<Map.Entry<ASTRDFValue, BigdataValue>> itr = nodes
+                    .entrySet().iterator();
 
-            node.setRDFValue(value);
+            while (itr.hasNext()) {
+
+                final Map.Entry<ASTRDFValue, BigdataValue> e = itr.next();
+
+                final ASTRDFValue node = e.getKey();
+
+                final BigdataValue value = e.getValue();
+
+                final BigdataValue resolvedValue = context.vocab.get(value);
+                
+                node.setRDFValue(resolvedValue);
+
+            }
             
         }
 

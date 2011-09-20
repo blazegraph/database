@@ -103,8 +103,7 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * which compares the current solution with the prior solution.
  * 
  * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
- * DistinctTermScan (?parallelize with DISTINCT filter on a cluster). What other
- * patterns can we optimize?
+ * DistinctTermScan? (We are doing something very similar for GRAPH ?g {}).
  * 
  * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
  * solutions.
@@ -140,42 +139,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * <p>
  * The spec does have some rules are how to rewrite things. We might take a look
  * at that.
- * 
- * 
- * <pre>
- * 
- * TODO From BigdataEvaluationStrategyImpl3#945
- * 
- * Prunes the sop tree of optional join groups containing values
- * not in the lexicon.
- * 
- *         sopTree = stb.pruneGroups(sopTree, groupsToPrune);
- * 
- * 
- * If after pruning groups with unrecognized values we end up with a
- * UNION with no subqueries, we can safely just return an empty
- * iteration.
- * 
- *         if (SOp2BOpUtility.isEmptyUnion(sopTree.getRoot())) {
- *             return new EmptyIteration<BindingSet, QueryEvaluationException>();
- *         }
- * </pre>
- * 
- * and also if we encounter a value not in the lexicon, we can still continue
- * with the query if the value is in either an optional tail or an optional join
- * group (i.e. if it appears on the right side of a LeftJoin). We can also
- * continue if the value is in a UNION. Otherwise we can stop evaluating right
- * now.
- * 
- * <pre>
- *                 } catch (UnrecognizedValueException ex) {
- *                     if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
- *                         throw new UnrecognizedValueException(ex);
- *                     } else {
- *                         groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
- *                     }
- *                 }
- * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
@@ -346,10 +309,45 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * 
          * These rules should be triggered if a join is known to fail, which
          * includes the case of an unknown IV in a statement pattern as well
-         * <code>GRAPH uri {}</code> where uri is not a named graph.  
+         * <code>GRAPH uri {}</code> where uri is not a named graph.
          * 
-         * FIXME Isolate pruning logic since we need to use it in more than
-         * one place.
+         * <pre>
+         * 
+         * TODO From BigdataEvaluationStrategyImpl3#945
+         * 
+         * Prunes the sop tree of optional join groups containing values
+         * not in the lexicon.
+         * 
+         *         sopTree = stb.pruneGroups(sopTree, groupsToPrune);
+         * 
+         * 
+         * If after pruning groups with unrecognized values we end up with a
+         * UNION with no subqueries, we can safely just return an empty
+         * iteration.
+         * 
+         *         if (SOp2BOpUtility.isEmptyUnion(sopTree.getRoot())) {
+         *             return new EmptyIteration<BindingSet, QueryEvaluationException>();
+         *         }
+         * </pre>
+         * 
+         * and also if we encounter a value not in the lexicon, we can still
+         * continue with the query if the value is in either an optional tail or
+         * an optional join group (i.e. if it appears on the right side of a
+         * LeftJoin). We can also continue if the value is in a UNION. Otherwise
+         * we can stop evaluating right now.
+         * 
+         * <pre>
+         *                 } catch (UnrecognizedValueException ex) {
+         *                     if (sop.getGroup() == SOpTreeBuilder.ROOT_GROUP_ID) {
+         *                         throw new UnrecognizedValueException(ex);
+         *                     } else {
+         *                         groupsToPrune.add(sopTree.getGroup(sop.getGroup()));
+         *                     }
+         *                 }
+         * </pre>
+         * 
+         * FIXME Isolate pruning logic since we need to use it in more than one
+         * place.
          */
 //        add(new ASTUnknownIVOptimizer()); // FIXME
         

@@ -45,7 +45,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
@@ -123,7 +127,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
         private final String testURI;
         
         private final String queryFileURL;
-        private final String dataFileURL;
+        private final String[] dataFileURLs;
         private final String resultFileURL;
 
         private final boolean laxCardinality;
@@ -164,9 +168,28 @@ public class AbstractDataDrivenSPARQLTestCase extends
                     false/* laxCardinality */, false/* checkOrder */);
             
         }
-        
+
+        public TestHelper(final String testURI, final String queryFileURL,
+                final String[] dataFileURLs, final String resultFileURL)
+                throws Exception {
+            
+            this(testURI, queryFileURL, dataFileURLs, resultFileURL,
+                    false/* laxCardinality */, false/* checkOrder */);
+            
+        }
+
         public TestHelper(final String testURI, final String queryFileURL,
                 final String dataFileURL, final String resultFileURL,
+                final boolean laxCardinality, final boolean checkOrder)
+                throws Exception {
+            
+            this(testURI, queryFileURL, new String[] { dataFileURL },
+                    resultFileURL, laxCardinality, checkOrder);
+
+        }
+        
+        public TestHelper(final String testURI, final String queryFileURL,
+                final String[] dataFileURLs, final String resultFileURL,
                 final boolean laxCardinality, final boolean checkOrder)
                 throws Exception {
 
@@ -175,7 +198,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             this.testURI = testURI;
             this.queryFileURL = queryFileURL;
-            this.dataFileURL = dataFileURL;
+            this.dataFileURLs = dataFileURLs;
             this.resultFileURL = resultFileURL;
             this.laxCardinality = laxCardinality;
             this.checkOrder = checkOrder;
@@ -185,13 +208,16 @@ public class AbstractDataDrivenSPARQLTestCase extends
             if (log.isInfoEnabled())
                 log.info("\nquery:\n" + queryStr);
 
-            if (dataFileURL != null) {
+            if (dataFileURLs != null) {
 
-                final long nparsed = loadData(dataFileURL);
+                for (String dataFileURL : dataFileURLs) {
 
-                if (log.isInfoEnabled())
-                    log.info("\nLoaded " + nparsed + " statements from "
-                            + dataFileURL);
+                    final long nparsed = loadData(dataFileURL);
+
+                    if (log.isInfoEnabled())
+                        log.info("\nLoaded " + nparsed + " statements from "
+                                + dataFileURL);
+                }
                 
             }
 
@@ -782,8 +808,10 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             final AddStatementHandler handler = new AddStatementHandler();
 
+            handler.setContext(new URIImpl(new File(resource).toURI().toString()));
+            
             rdfParser.setRDFHandler(handler);
-
+                        
             /*
              * Run the parser, which will cause statements to be inserted.
              */
@@ -824,6 +852,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             private final StatementBuffer<Statement> buffer;
 
+            private Resource context = null;
+            
             private long n = 0L;
 
             public AddStatementHandler() {
@@ -832,15 +862,25 @@ public class AbstractDataDrivenSPARQLTestCase extends
 
             }
 
+            public void setContext(final Resource context) {
+
+                this.context = context;
+                
+            }
+            
             public void handleStatement(final Statement stmt)
                     throws RDFHandlerException {
 
-                if (log.isDebugEnabled())
-                    log.debug(stmt.toString());
+                final Resource s = stmt.getSubject();
+                final URI p = stmt.getPredicate();
+                final Value o = stmt.getObject();
+                final Resource c = stmt.getContext() == null ? this.context
+                        : stmt.getContext();
 
-                buffer.add(stmt.getSubject(), stmt.getPredicate(),
-                        stmt.getObject(), stmt.getContext(),
-                        StatementEnum.Explicit);
+                if (log.isDebugEnabled())
+                    log.debug("<" + s + "," + p + "," + o + "," + c + ">");
+
+                buffer.add(s, p, o, c, StatementEnum.Explicit);
 
                 n++;
 

@@ -30,7 +30,9 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.parser.sparql.ast.ASTBlankNodePropertyList;
+import org.openrdf.query.parser.sparql.ast.ASTCollection;
 import org.openrdf.query.parser.sparql.ast.ASTObjectList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyList;
 import org.openrdf.query.parser.sparql.ast.ASTPropertyListPath;
@@ -178,61 +180,49 @@ public class TriplePatternExprBuilder extends ValueExprBuilder {
         
     }
     
+    /**
+     * Handle the RDF Collection syntax.
+     */
+    @Override
+    public VarNode visit(final ASTCollection node, Object data)
+            throws VisitorException {
+
+        final String listVarName = node.getVarName();
+        final VarNode rootListVar = context.createAnonVar(listVarName);
+
+        TermNode listVar = rootListVar;
+
+        final int childCount = node.jjtGetNumChildren();
+        
+        for (int i = 0; i < childCount; i++) {
+
+            final TermNode childValue = (TermNode) node.jjtGetChild(i)
+                    .jjtAccept(this, null);
+
+            graphPattern.addSP(listVar, context.createConstVar(RDF.FIRST),
+                    childValue);
+
+            TermNode nextListVar;
+            if (i == childCount - 1) {
+                nextListVar = context.createConstVar(RDF.NIL);
+            } else {
+                nextListVar = context.createAnonVar(listVarName + "-" + (i + 1));
+            }
+
+            graphPattern.addSP(listVar, context.createConstVar(RDF.REST),
+                    nextListVar);
+
+            listVar = nextListVar;
+
+        }
+
+        return rootListVar;
+    }
+
     //
     // FIXME Property paths (Implement).
     //
 
-//    final public VarNode visit(final ASTCollection node, Object data)
-//            throws VisitorException {
-//        throw new UnsupportedOperationException("property path");
-//    }
-//
-//    final public VarNode visit(final ASTPathAlternative node, Object data)
-//            throws VisitorException {
-//        throw new UnsupportedOperationException("property path");
-//    }
-//
-//    final public VarNode visit(final ASTPathOneInPropertySet node, Object data)
-//            throws VisitorException {
-//        throw new UnsupportedOperationException("property path");
-//    }
-//
-//    final public VarNode visit(final ASTPathSequence node,
-//            Object data) throws VisitorException {
-//        throw new UnsupportedOperationException("property path");
-//    }      
-
-//  @Override
-//  public Var visit(ASTCollection node, Object data)
-//      throws VisitorException
-//  {
-//      String listVarName = node.getVarName();
-//      Var rootListVar = createAnonVar(listVarName);
-//
-//      Var listVar = rootListVar;
-//
-//      int childCount = node.jjtGetNumChildren();
-//      for (int i = 0; i < childCount; i++) {
-//          ValueExpr childValue = (ValueExpr)node.jjtGetChild(i).jjtAccept(this, null);
-//
-//          Var childVar = valueExpr2Var(childValue);
-//          graphPattern.addRequiredSP(listVar, createConstVar(RDF.FIRST), childVar);
-//
-//          Var nextListVar;
-//          if (i == childCount - 1) {
-//              nextListVar = createConstVar(RDF.NIL);
-//          }
-//          else {
-//              nextListVar = createAnonVar(listVarName + "-" + (i + 1));
-//          }
-//
-//          graphPattern.addRequiredSP(listVar, createConstVar(RDF.REST), nextListVar);
-//          listVar = nextListVar;
-//      }
-//
-//      return rootListVar;
-//  }
-//
 //  @Override
 //  public Object visit(ASTPathAlternative pathAltNode, Object data)
 //      throws VisitorException

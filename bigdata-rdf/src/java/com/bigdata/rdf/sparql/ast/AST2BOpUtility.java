@@ -2285,6 +2285,8 @@ public class AST2BOpUtility {
          * take out this code block.  They should no longer have a code path 
          * for [expander != null] since we will not have attached the free text
          * search expander.
+         * 
+         * FIXME Do the case where [s] is bound before I cut out this code.
          */
         // create a solution expander for free text search if necessary
         IAccessPathExpander<ISPO> expander = null;

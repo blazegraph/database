@@ -335,6 +335,58 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * Complex optional semantics: 2 (dawg-optional-complex-2).
+     * 
+     * <pre>
+     * Complex optional: LeftJoin(Join(BGP(..),Graph(var,{..})),Union(..,..))
+     * </pre>
+     * 
+     * <pre>
+     * PREFIX  foaf:   <http://xmlns.com/foaf/0.1/>
+     * PREFIX    ex:   <http://example.org/things#>
+     * SELECT ?id ?ssn
+     * WHERE 
+     * { 
+     *     ?person 
+     *         a foaf:Person;
+     *         foaf:name ?name . 
+     *     GRAPH ?x { 
+     *         [] foaf:name ?name;
+     *            foaf:nick ?nick
+     *     } 
+     *     OPTIONAL { 
+     *         { ?person ex:empId ?id } UNION { ?person ex:ssn ?ssn } 
+     *     } 
+     * }
+     * </pre>
+     * 
+     * <pre>
+     * :dawg-optional-complex-2 a mf:QueryEvaluationTest ;
+     *     mf:name    "Complex optional semantics: 2" ;
+     *     rdfs:comment
+     *             "Complex optional: LeftJoin(Join(BGP(..),Graph(var,{..})),Union(..,..))" ;
+     *     dawgt:approval dawgt:Approved ;
+     *     dawgt:approvedBy <http://lists.w3.org/Archives/Public/public-rdf-dawg/2007JulSep/att-0096/21-dawg-minutes.html> ;
+     *     mf:action
+     *     [ qt:query  <q-opt-complex-2.rq> ;
+     *       qt:graphData <complex-data-1.ttl>;
+     *       qt:data   <complex-data-2.ttl> ] ;
+     *     mf:result  <result-opt-complex-2.ttl> .
+     * </pre>
+     */
+    public void test_opt_complex_2() throws Exception {
+
+        new TestHelper(
+                "opt-complex-2", // testURI,
+                "opt-complex-2.rq",// queryFileURL
+                new String[] { "opt-complex-2-data.ttl",
+                        "opt-complex-2-graphData.ttl" },// dataFileURL
+               "opt-complex-2-result.ttl"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
      * Reification of the default graph (dawg-construct-reification-1).
      * 
      * <pre>

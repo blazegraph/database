@@ -33,10 +33,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.parser.sparql.ast.VisitorException;
+
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -63,6 +71,17 @@ public class BigdataASTContext {
     protected final BigdataValueFactory valueFactory;
 
     /**
+     * A mapping of parsed RDF Values and well known vocabulary items used when
+     * generating the AST to resolved {@link BigdataValue}s. This includes
+     * everything which was parsed plus certain well-known items such as
+     * {@link RDF#FIRST}, {@link RDF#REST}, and {@link RDF#NIL} which are only
+     * used when handling syntactic sugar constructions.
+     * 
+     * @see BatchRDFValueResolver
+     */
+    protected final Map<Value,BigdataValue> vocab;
+    
+    /**
      * Counter used to generate unique (within query) variable names.
      */
     private int constantVarID = 1;
@@ -78,6 +97,8 @@ public class BigdataASTContext {
         this.lex = lexicon.getNamespace();
 
         this.conf = lexicon.getLexiconConfiguration();
+        
+        this.vocab = new LinkedHashMap<Value, BigdataValue>();
 
     }
 
@@ -101,6 +122,23 @@ public class BigdataASTContext {
         
         return var;
         
+    }
+
+    /**
+     * Return a constant for a pre-defined vocabulary item.
+     * 
+     * @throws VisitorException
+     */
+    protected ConstantNode createConstVar(final Value value)
+            throws VisitorException {
+
+        final BigdataValue v = vocab.get(value);
+
+        if (v == null)
+            throw new VisitorException("Undefined vocabulary: " + value);
+
+        return new ConstantNode(v.getIV());
+
     }
 
 }
