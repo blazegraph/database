@@ -36,8 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.util.InnerCause;
-
 /**
  * Pattern using a {@link FutureTask} to force synchronization only on tasks
  * waiting for the same computation. This is based on Java Concurrency in
@@ -84,6 +82,13 @@ abstract public class Memoizer<A, V> implements Computable<A, V> {
                 if (f == null) {
                     willRun = true; // Note: MUST set before running!
                     f = ft;
+                    /*
+                     * Note: MAY throw out RuntimeException but WILL set
+                     * exception on FutureTask. Thus the thread which invokes
+                     * ft.run() will have any uncaught exception tossed out of
+                     * ft.run() while other threads will see that exception
+                     * wrapped as an ExecutionException when they call f.get().
+                     */
                     ft.run(); // call to c.compute() happens here.
                 }
             }
@@ -105,22 +110,38 @@ abstract public class Memoizer<A, V> implements Computable<A, V> {
 				e2.initCause(e);
 				throw e2;
             } catch (ExecutionException e) {
-                if (!willRun
-                        && InnerCause.isInnerCause(e,
-                                InterruptedException.class)) {
+                if (!willRun) {
+//                        && InnerCause.isInnerCause(e,
+//                                InterruptedException.class)) {
                     /*
                      * Since the task was executed by another thread (ft.run()),
-                     * remove the interrupted task and retry.
+                     * remove the task and retry.
                      * 
                      * Note: Basically, what has happened is that the thread
                      * which got to cache.putIfAbsent() first ran the Computable
-                     * and was interrupted while doing so, so that thread needs
-                     * to propagate the InterruptedException back to its caller.
+                     * and something was thrown out of ft.run(), so the thread
+                     * which ran the task needs to propagate the
+                     * InterruptedException back to its caller.
+                     * 
+                     * Typically this situation arises when the thread actually
+                     * running the task in ft.run() was interrupted, resulting
+                     * in an wrapped InterruptedException or a wrapped
+                     * ClosedByInterruptException.
+                     * 
                      * However, other threads which concurrently request the
                      * same computation MUST NOT see the InterruptedException
                      * since they were not actually interrupted. Therefore, we
                      * yank out the FutureTask and retry for any thread which
                      * did not run the task itself.
+                     * 
+                     * If there is a real underlying error, this forces each
+                     * thread who is requesting computation to attempt the
+                     * computation and report back the error in their own
+                     * thread. If the exception is a transient, with the most
+                     * common example being an interrupt, then the operation
+                     * will succeed for the next thread which attempts ft.run()
+                     * and all other threads waiting on f.get() will observe the
+                     * successfully computed Future.
                      */ 
                     cache.remove(arg, f);
                     // Retry.
