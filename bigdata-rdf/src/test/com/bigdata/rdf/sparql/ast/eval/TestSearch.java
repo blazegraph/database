@@ -107,12 +107,12 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * FIXME Unit test for search when the subject is bound (we currently check
-     * to verify that the subject is a variable in {@link ASTSearchOptimizer} so
-     * this will require some code changes.)
+     * Unit test for search when the subject is a constant.
      */
-    public void test_search_subject_is_bound() {
-        fail("write test");
+    public void test_search_subject_is_bound() throws Exception {
+        
+        new TestHelper("search-subject-is-bound-1").runTest();
+        
     }
 
     /**
