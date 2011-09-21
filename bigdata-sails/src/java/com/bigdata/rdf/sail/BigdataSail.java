@@ -317,12 +317,17 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DEFAULT_NATIVE_SPARQL = "false";
         
         /**
-         * Option (default <code>true</code>) may be used to explicitly
-         * disable query-time expansion for entailments NOT computed during
-         * closure. In particular, this may be used to disable the query time
-         * expansion of (x rdf:type rdfs:Resource) and owl:sameAs. (Those
-         * entailments are fast for the {@link LocalTripleStore} but have not
-         * been optimized for scale-out deployments.)
+         * Option (default <code>true</code>) may be used to explicitly disable
+         * query-time expansion for entailments NOT computed during closure. In
+         * particular, this may be used to disable the query time expansion of
+         * (x rdf:type rdfs:Resource) and owl:sameAs.
+         * <p>
+         * Note: Query time expanders are not supported in scale-out. They
+         * involve an expander pattern on the IAccessPath and that is not
+         * compatible with local reads against sharded indices. While it is
+         * possible to do remote access path reads on the shards and layer the
+         * expanders over the remote access path, this is not as efficient as
+         * using distributed local access path reads.
          * 
          * @see #DEFAULT_QUERY_TIME_EXPANDER
          */
@@ -956,10 +961,12 @@ public class BigdataSail extends SailBase implements Sail {
 
         this.quads = database.isQuads();
         
+        final boolean scaleOut = (database.getIndexManager() instanceof IBigdataFederation);
+        
         checkProperties(properties);
         
         // truthMaintenance
-        if (database.getAxioms() instanceof NoAxioms || quads) {
+        if (database.getAxioms() instanceof NoAxioms || quads || scaleOut) {
 
             /*
              * If there is no axioms model then inference is not enabled and
@@ -1021,8 +1028,17 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         // queryTimeExpander
-        {
+        if (scaleOut) {
             
+            /*
+             * Note: Query time expanders are not supported in scale-out. They
+             * involve an expander pattern on the IAccessPath and that is not
+             * compatible with local reads against sharded indices.
+             */
+            queryTimeExpander = false;
+            
+        } else {
+
             queryTimeExpander = Boolean.parseBoolean(properties.getProperty(
                     BigdataSail.Options.QUERY_TIME_EXPANDER,
                     BigdataSail.Options.DEFAULT_QUERY_TIME_EXPANDER));
