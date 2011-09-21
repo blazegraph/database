@@ -39,6 +39,9 @@ import com.bigdata.rdf.store.BD;
  *          TODO Correct rejection test when a magic predicate for search
  *          appears outside of a named query clause.
  * 
+ *          TODO Correct rejection test when the subject of a magic predicate
+ *          for search is a constant.
+ * 
  *          TODO Correct rejection test when an unknown magic predicate in the
  *          {@link BD#SEARCH_NAMESPACE} is observed.
  * 
@@ -103,18 +106,6 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     public void test_search_match_all_terms() throws Exception {
         
         new TestHelper("search-match-all-terms").runTest();
-        
-    }
-
-    /**
-     * Unit test for search when the subject is a constant. (In this case, the
-     * "subject" is the resource to be discovered and will have one or more
-     * literals linked by some predicate where those literals are matched by the
-     * free text search.)
-     */
-    public void test_search_subject_is_bound() throws Exception {
-        
-        new TestHelper("search-subject-is-bound-1").runTest();
         
     }
 

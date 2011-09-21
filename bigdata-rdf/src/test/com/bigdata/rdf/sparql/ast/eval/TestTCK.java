@@ -412,4 +412,57 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * <pre>
+     * SELECT
+     * WHERE { ?a ?a ?b . }
+     * </pre>
+     * 
+     * Note: This will drag in the SPORelation on the cluster if the backchain
+     * access path for <code>(?foo rdf:type rdfs:Resource)</code> is enabled. I
+     * have explicitly disabled the backchainers in scale-out so that people
+     * will not observe this problem. This was done in the Sail, which is where
+     * they are configured.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/32
+     */
+    public void test_dawg_triple_pattern_03() throws Exception {
+
+        new TestHelper(
+                "dawg-tp-03", // testURI,
+                "dawg-tp-03.rq",// queryFileURL
+                "dawg-tp-03.ttl",// dataFileURL
+                "dawg-tp-03-result.ttl"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
+     * <pre>
+     * PREFIX foaf:       <http://xmlns.com/foaf/0.1/>
+     * SELECT ?name ?mbox
+     * WHERE { ?x foaf:name ?name .
+     *            OPTIONAL { ?x foaf:mbox ?mbox }
+     *       }
+     * ORDER BY ASC(?mbox)
+     * </pre>
+     * 
+     * Both this test (<code>sort-3</code>) and
+     * <code>sparql11-aggregate-group-01</code> (an aggregation query, which I
+     * believe is a Sesame specific test rather than a DAWG compliance test) are
+     * hanging in scale-out CI runs. I suspect that this has to do with failing
+     * to correctly trigger the last pass evaluation required by both sort and
+     * aggregation.
+     */
+    public void test_sort_3() throws Exception {
+
+        new TestHelper(
+                "sort-3", // testURI,
+                "sort-3.rq",// queryFileURL
+                "sort-3.ttl",// dataFileURL
+                "sort-3-result.rdf"// resultFileURL
+                ).runTest();
+
+    }
+
 }

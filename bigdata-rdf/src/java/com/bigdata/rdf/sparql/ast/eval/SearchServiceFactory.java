@@ -45,7 +45,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.lexicon.ITextIndexer;
@@ -70,11 +69,6 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO This code does not yet support a bound value for the searchVar.
- *          It assumes that the searchVar is a real variable. For bigdata, we
- *          would have to look for a {@link Constant} with the
- *          {@link Constant.Annotations#VAR} annotation.
  * 
  *          TODO Add support for slicing the join using tools like CUTOFF (to
  *          limit the #of solutions) and specifying a {@link RangeBOp} (to
@@ -301,9 +295,6 @@ public class SearchServiceFactory implements ServiceFactory {
 
         private final AbstractTripleStore store;
         
-        private final boolean isBound = false; // TODO support bound searchVar.
-        private final IV boundVal = null;// TODO support bound searchVar
-
         private final Literal query;
         private final IVariable<?>[] vars;
         private final Literal minRank;
@@ -463,12 +454,6 @@ public class SearchServiceFactory implements ServiceFactory {
                     return true;
                 while (src.hasNext()) {
                     current = src.next();
-                    if (isBound) {
-                        if (!boundVal.equals(current.getDocId())) {
-                            // Drop hit.
-                            continue;
-                        }
-                    }
                     return true;
                 }
                 return current != null;
