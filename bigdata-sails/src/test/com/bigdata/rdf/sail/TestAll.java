@@ -81,6 +81,7 @@ public class TestAll extends TestCase {
         
         final TestSuite suite = new TestSuite("Sesame 2.x integration");
 
+        // test suite for the SPARQL parse tree => bigdata AST translation.
         suite.addTest(com.bigdata.rdf.sail.sparql.TestAll.suite());
         
         // test suite for extracting query hints from a SPARQL query.
