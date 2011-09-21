@@ -94,7 +94,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 	<target name="prepare">
 		<!-- setup ${version} for regular or snapshot. -->
 		<tstamp>
-			<format property="today" pattern="ddMMyy" locale="en,US" />
+			<format property="today" pattern="yyyyMMdd" locale="en,US" />
 			<format property="osgiDate" pattern="yyyyMMdd" locale="en,US" />
 		</tstamp>
 		<condition property="version" value="bigdata-${build.ver}-${today}" else="bigdata-${build.ver}">
@@ -216,7 +216,39 @@ public class BuildInfo {
 			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
 				<include name="META-INF/**" />
 			</fileset>
+			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
+			<fileset dir="." includes="bigdata-war/src/**"/>
+			<!-- Copy the bigdata license. -->
+			<fileset file="${bigdata.dir}/LICENSE.txt"/>
 		</copy>
+		<!-- Copy licenses for any project from which have imported something. -->
+		<mkdir dir="${build.dir}/classes/LEGAL"/>
+		<copy toDir="${build.dir}/classes/LEGAL" flatten="true">
+			<fileset file="${bigdata.dir}/bigdata/LEGAL/apache-license-2_0.txt"/>
+			<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/sesame2.x-license.txt"/>
+		</copy>
+	  <!-- Generate a combined NOTICE file for anything which we imported
+	  	   into the source tree from which the JAR was generated. -->
+	  <concat destfile="${build.dir}/classes/NOTICE" fixlastline="true" overwrite="yes">
+	  	<filterchain>
+	      <fixcrlf/>
+		</filterchain>
+	  	<header filtering="yes" trimleading="yes">
+	  	          Combined NOTICE files for bigdata JAR source code.
+	  	          ==================================================
+	    </header>
+		<fileset file="${bigdata.dir}/NOTICE"/>
+		<fileset file="${bigdata.dir}/bigdata/LEGAL/NOTICE"/>
+		<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/NOTICE"/>
+		<fileset file="${bigdata.dir}/bigdata-sails/LEGAL/NOTICE"/>
+		<fileset file="${bigdata.dir}/bigdata-jini/LEGAL/NOTICE"/>
+	  	<footer filtering="yes" trimleading="yes">
+				  ==================================================
+				  Source code for included Open Source software is available
+				  from the respective websites of the copyright holders of the
+				  included software.
+		</footer>
+	  </concat>
 	</target>
 
 	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
@@ -231,15 +263,13 @@ public class BuildInfo {
 	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
 		<jar destfile="${build.dir}/${version}.jar">
 			<fileset dir="${build.dir}/classes" excludes="test/**" />
-			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
-			<fileset dir="." includes="bigdata-war/src/**"/>
 			<manifest>
 				<!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
 			</manifest>
 		</jar>
 	</target>
 
-	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
+	<!-- This generates an osgi bundle jar, but does not bundle the dependencies.
 		 See 'bundleJar'. -->
 	<target name="osgi" depends="compile, bundle" description="Generates the osgi bundle jar (see also bundleJar).">
 		<taskdef resource="aQute/bnd/ant/taskdef.properties" classpath="bigdata/lib/bnd-0.0.384.jar" />
@@ -254,7 +284,6 @@ public class BuildInfo {
 				<attribute name="Bundle-DocURL" value="http://www.bigdata.com" />
 				<attribute name="Bundle-Description" value="Bigdata Source" />
 			</manifest>
-			<fileset dir="bigdata/src/java" />
 			<fileset dir="bigdata/src/java" />
 			<fileset dir="bigdata-jini/src/java" />
 			<fileset dir="bigdata-rdf/src/java" />
@@ -283,28 +312,42 @@ public class BuildInfo {
 		 -->
 	<target name="javadoc" depends="prepare" if="javadoc">
 		<mkdir dir="${build.dir}/docs/api" />
-		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" overview="../bigdata/overview.html" windowtitle="bigdata&#174;" classpathref="build.classpath">
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
+			      author="true" version="true" use="true"
+			    overview="${bigdata.dir}/overview.html"
+			 windowtitle="bigdata&#174;"
+			classpathref="build.classpath"
+			>
 			<arg value="-J-Xmx1000m" />
 			<packageset dir="${bigdata.dir}/bigdata/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata/src/samples" />
 			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
 			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
 		<bottom>
-			<![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+			<![CDATA[<i>Copyright &#169; 2006-2011 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
 	<tag name="todo" scope="all" description="TODO:" />
 	<tag name="issue" scope="all" description="ISSUE:" />
 	<!--tag name="FIXME" scope="all" description="FIXME:"/-->
-	<link href="http://java.sun.com/j2se/1.5.0/docs/api/" />
-	<link href="http://openrdf.org/doc/sesame/api/" />
+	<link href="http://download.oracle.com/javase/6/docs/api/" />
+	<link href="http://www.openrdf.org/doc/sesame2/api/" />
+	<link href="http://lucene.apache.org/java/3_0_0/api/"/>
 </javadoc>
 </target>
 
 <target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
-     <copy toDir="${build.dir}/lib" flatten="true">
+	<!-- Copy all of the LEGAL directories.  Do not flatten to avoid collisions. -->
+    <copy toDir="${build.dir}/LEGAL" flatten="false">
+	  <fileset dir="${bigdata.dir}">
+		<include name="**/LEGAL/*" />
+	  </fileset>
+	</copy>
+    <copy toDir="${build.dir}/lib" flatten="true">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
 		<include name="**/*.so" />
@@ -326,6 +369,59 @@ public class BuildInfo {
 		<include name="**/*.jar" />
 	</fileset>
      </copy>
+</target>
+
+<!--    
+    Note: you can not filter the files in the source jars using 
+    zipgroupfileset.  And you can not specify a wildcard of source files
+    using zipfileset.  This leaves you with the choice of either creating
+    an uberjar and the filtering out the notice files or filtering out
+    the notice files for each source jar explicitly.
+    -->
+<target name="gather-copyright-notice-files"
+    	description="Locate combine all NOTICE(.txt) files for dependencies.">
+  <!-- Build an uber 'notice.jar' file from which we can later extract the
+	   individual NOTICE files.  This excludes the bigdata JAR to avoid
+	   recursively including the aggregated NOTICE file in that JAR.  -->
+  <jar destfile="${build.dir}/notice.jar">
+  	<zipgroupfileset dir="${build.dir}/lib"
+  		includes="*.jar"
+  	    excludes="bigdata-${version}.jar"
+	/>
+  </jar>
+  <!-- Generate a combined NOTICE file. -->
+  <concat destfile="${build.dir}/NOTICE" fixlastline="true" overwrite="yes">
+  	<filterchain>
+      <fixcrlf/>
+	</filterchain>
+  	<header filtering="yes" trimleading="yes">
+          Combined NOTICE files for bigdata WAR.
+          ======================================
+    </header>
+  	<!-- NOTICE files for modules used to generate the bigdata JAR. -->
+	<fileset file="${bigdata.dir}/NOTICE"/>
+	<fileset file="${bigdata.dir}/bigdata/LEGAL/NOTICE"/>
+	<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/NOTICE"/>
+	<fileset file="${bigdata.dir}/bigdata-sails/LEGAL/NOTICE"/>
+	<fileset file="${bigdata.dir}/bigdata-jini/LEGAL/NOTICE"/>
+	<!-- Reach into the uber 'notice.jar' and pull out all notice files for 
+	     dependencies. -->
+	<zipfileset src="${build.dir}/notice.jar">
+  		<patternset>
+  			<include name="NOTICE" />
+  			<include name="NOTICE.txt" />
+  			<include name="META-INF/NOTICE" />
+  			<include name="META-INF/NOTICE.txt" />
+  		</patternset>
+	</zipfileset>
+  	<footer filtering="yes" trimleading="yes">
+			  ==================================================
+			  Source code for included Open Source software is available
+			  from the respective websites of the copyright holders of the
+			  included software.
+	</footer>
+  </concat>
+  <delete file="${build.dir}/notice.jar"/>
 </target>
 
 	<!-- 
@@ -365,7 +461,7 @@ public class BuildInfo {
 	</target>
 
 	<!--depends="bundleJar"-->
-	<target name="war" depends="bundleJar, autojar-strip-fastutil" 
+	<target name="war" depends="bundleJar, autojar-strip-fastutil, gather-copyright-notice-files" 
 		description="Generates a WAR artifact.">
 		<delete file="${build.dir}/bigdata.war"/>
 		<echo message="Building WAR"/>
@@ -375,10 +471,17 @@ public class BuildInfo {
 		  <fileset dir="bigdata-war/src/html"/>
 		  <fileset dir="bigdata-war/src/jsp"/>
 		  <fileset dir="bigdata-war/src/images"/>
+          <!-- Copy the bigdata license. -->
+		  <file file="${bigdata.dir}/LICENSE.txt"/>
+          <!-- Copy all of the LEGAL directories. -->
+		  <fileset dir="${build.dir}" includes="LEGAL/**/*"/>
+		  <!-- Copy the aggregated NOTICE files. -->
+		  <file file="${build.dir}/NOTICE"/>
+		  <!-- Basic RWStore configuration. -->
 		  <file file="bigdata-war/src/resources/RWStore.properties"/>
 		  <!-- bigdata jar plus some dependencies as filtered by autojar.
 		  <lib file="${build.dir}/bigdataPlus.jar"/> -->
-		  <!-- The stripped version of fasutil. -->
+		  <!-- The stripped version of fastutil. -->
 		  <lib file="${build.dir}/fastutil-stripped.jar"/>
 		  <lib dir="${build.dir}/lib">
 		  	<exclude name="fastutil*.jar"/>
@@ -402,7 +505,7 @@ public class BuildInfo {
 		  	<!-- zookeeper only used in scale-out. -->
 	  		<exclude name="apache/zookeeper*.jar"/>
 	  		<!-- jini only used in scale-out. -->
-		  	<exclude name="jini/**.jar"/>
+		  	<exclude name="jini/**/*.jar"/>
 		  </lib>
 		  <classes file="bigdata-war/src/resources/log4j.properties"/>
 		</war>
@@ -434,7 +537,7 @@ public class BuildInfo {
 	</fileset>
 </copy>
 </target>
-
+	
 <target name="release" depends="release-prepare" description="create source and binary tarballs.">
 <mkdir dir="${release.dir}" />
 <!-- binary distribution. -->

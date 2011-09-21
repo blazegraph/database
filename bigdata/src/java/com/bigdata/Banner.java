@@ -33,6 +33,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Formatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +43,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.Depends.Dependency;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.util.InnerCause;
 
@@ -91,8 +93,46 @@ public class Banner {
 
             if (!quiet) {
 
-                System.out.println(banner);
+                final StringBuilder sb = new StringBuilder(banner);
+         
+                // Add in the dependencies.
+                {
+                    int maxNameLen = 0, maxProjectLen = 0, maxLicenseLen = 0;
+                    for (Dependency dep : com.bigdata.Depends.depends()) {
+                        if (dep.getName().length() > maxNameLen)
+                            maxNameLen = dep.getName().length();
+                        if (dep.projectURL().length() > maxProjectLen)
+                            maxProjectLen = dep.projectURL().length();
+                        if (dep.licenseURL().length() > maxLicenseLen)
+                            maxLicenseLen = dep.licenseURL().length();
+                    }
+                    maxNameLen = Math.min(80, maxNameLen);
+                    maxProjectLen = Math.min(80, maxProjectLen);
+                    maxLicenseLen = Math.min(80, maxLicenseLen);
 
+                    final Formatter f = new Formatter(sb);
+
+                    final String fmt1 = "" //
+                            + "%-" + maxNameLen + "s"//
+//                            + " %-" + maxProjectLen + "s" //
+                            + " %-" + maxLicenseLen + "s"//
+                            + "\n";
+
+                    f.format(fmt1, "Dependency", "License");
+                    
+                    for (Dependency dep : com.bigdata.Depends.depends()) {
+
+                        f.format(fmt1, //
+                                dep.getName(),// 
+//                                dep.projectURL(),//
+                                dep.licenseURL()//
+                                );
+
+                    }
+                }
+                
+                System.out.println(sb);
+                
             }
 
             /*
@@ -293,7 +333,7 @@ public class Banner {
      */
     public static void main(final String[] args) {
         
-        System.out.println(banner);
+        banner();
 
     }
     
@@ -314,7 +354,7 @@ public class Banner {
         "\n"+SystemUtil.cpuInfo() + " #CPU="+SystemUtil.numProcessors() +//
         "\n"+System.getProperty("java.vendor")+" "+System.getProperty("java.version")+
         getBuildString()+ // Note: Will add its own newline if non-empty.
-        "\n"
+        "\n\n"
         ;
     
 }

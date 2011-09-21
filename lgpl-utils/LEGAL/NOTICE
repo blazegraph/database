@@ -1,0 +1,25 @@
+
+This module contains several LGPL utility classes, most of which were derived
+from other projects and modified to support specific features. Where possible,
+the changes are propagated back to the original projects and these placeholder
+classes are then replaced by an updated dependency on the corresponding project.
+The classes are compiled into their own lgpl-utils dependency. 
+
+---
+Portions of this software are derived from the fastutil project.
+
+Copyright (C) 2002-2011 Sebastiano Vigna 
+
+---
+Portions of this software are derived from the dsiutils project.
+
+Copyright (C) 2002-2009 Sebastiano Vigna
+
+---
+Portions of this software are derived from the infinispan project.
+
+Copyright 2010 Red Hat Inc. and/or its affiliates and other
+contributors as indicated by the @author tags. All rights reserved.
+See the copyright.txt in the distribution for a full listing of
+individual contributors.
+
