@@ -107,7 +107,10 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Unit test for search when the subject is a constant.
+     * Unit test for search when the subject is a constant. (In this case, the
+     * "subject" is the resource to be discovered and will have one or more
+     * literals linked by some predicate where those literals are matched by the
+     * free text search.)
      */
     public void test_search_subject_is_bound() throws Exception {
         
