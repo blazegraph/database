@@ -250,64 +250,29 @@
 
   </p>
 
-  <h2>HA Architecture</h2>
-  
-  <p>
-
-          There are two alternatives here.  The data service (DS) is
-	  the container for the index partitions (key-range shards).
-	  There are logical data services and physical data services.
-	  Clients always write on the master DS for a given logical
-	  DS.  The #of physical DS per logical DS is <i>k</i>.  For
-	  HA, <i>k</i> is greater than ONE (1).
-
-  </p><p>
-	  <em>Alternative 1.</em> Clients read from any physical DS
-	  for a given logical DS. Storage is either on either local
-	  disk or SAN/NAS. Local disk is acceptable for this
-	  alternative because the data are replicated across multiple
-	  machines, which provides built in media redundancy. For each
-	  logical DS, master pipelines writes to a failover chain of
-	  <i>k</i> secondary DS. That pipeline is flushed during the
-	  commit protocol by the master. The commit succeeds once the
-	  writes are on stable storage on the master and the
-	  secondaries or fails and is rolled back. If the master
-	  fails, then the 1st secondary is elected as the new master.
-	  Master election has handled by zookeeper.
-
-  </p><p>
-
-          <em>Alternative 2.</em> Storage is a shared volume
-	  (SAN/NAS).  The secondaries DS are registered but inactive
-	  until the master fails, at which point the 1st secondary in
-	  the failover chain re-opens the same persistence store from
-	  the service directory on the SAN/NAS.
-
-  </p>
-
-  <h2>Standalone Journals and Embedded Federations</h2>
+  <h2>Standalone Journals</h2>
   
   <p>
   
   	  While bigdata&#174; is targeted at scale-out federations,
   	  it can also be deployed as simple persistence store using
-  	  just the <code>com.bigdata.journal.Journal</code> API or as
-  	  an <em>embedded federation</em>.
+  	  just the <code>com.bigdata.journal.Journal</code> API.
 
   </p><p>
 
-	  The journal can scale up to 4TB, but it is a WORM (Write
-	  Once Read Many) aka also known as an immortal database or a
-	  log-structured store.  This works great for some
-	  applications, and it is used for the data service write
-	  buffers.  There is also a read-write (RW) version of the journal which is
+	  The read-write (RWStore) version of the journal can scale up to 50 billion 
+	  triples or quads and is
 	  capable of reclaiming storage by releasing historical commit points, aging
 	  them out of the backing file in a manner very similar to how the scale-out
 	  database releases historical commit points.  The read/write store is good
 	  for standalone database instances, especially when the data have a lot of
 	  skew and when the new data are arriving continually while older data should
 	  be periodically released (for example, in a monitoring application where
-	  historical events may be released after 30 days).  The read/write store is
+	  historical events may be released after 30 days).
+
+  </p><p>
+	  
+	  The read/write store is
 	  also used in the scale-out architecture for the transaction manager and the
 	  aggregated performance counters.  However, the data services use a WORM
 	  store to buffer writes, asynchronously migrate the buffered writes onto
@@ -315,17 +280,6 @@
 	  One an index partition (aka shard) reaches ~ 200MB on the disk (dynamic
 	  sharding).  Index partitions are moved from time to time to load balance
 	  the cluster.
-
-  </p><p> 
-
-	  Either the standalone database or the embedded federation may be used to test
-	  things out on a single machine.  The standalone database is backed by a 
-	  single journal (either a WORM or read/write store).  The embedded federation
-	  starts instances of each of the services, and also starts N data services,
-	  all running in the same JVM.  You can use the embedded federation to write
-	  unit tests for federation specific behaviors (those which depend on dynamically
-	  partitioned indices), but it is easier to prototype against a standalone database
-	  instance.
   
   </p>
   
@@ -338,15 +292,6 @@
       rows, at rates of over 300,000 rows per second.  Overall, 100s of billions
       of rows have been put down safely on disk.
 
-   </p><p>
-
-          We are actively working on HA support and plan to have a fully tested
-          HA solution and a greatly simplified HA install available in Q2, 2010.
-          The initial HA solution will be based on a shared nothing architecture,
-          but can be deployed against either local disk or shared disk systems.
-          HA will be available for both the standalone database (based on 
-          replicated writes across a failover chain) and the clustered database.
-   
    </p>
    
       <ul>
