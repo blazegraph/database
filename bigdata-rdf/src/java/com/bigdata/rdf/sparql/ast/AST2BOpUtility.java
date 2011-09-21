@@ -17,6 +17,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
@@ -179,11 +180,13 @@ public class AST2BOpUtility {
          * main query.
          */
 
+        // TODO Attach the query plan to the ASTContainer?
         queryPlan = (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);
+            log.info(BOpUtility.toString(astContainer));
         }
 
         return queryPlan;
