@@ -346,6 +346,18 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          *                 }
          * </pre>
          * 
+         * 
+         * ASTPruneUnknownTerms : If an unknown terms appears in a
+         * StatementPatternNode then we get to either fail the query or prune
+         * that part of the query. If it appears in an optional, then prune the
+         * optional. if it appears in union, the prune that part of the union.
+         * if it appears at the top-level then there are no solutions for that
+         * query. This is part of what
+         * BigdataEvaluationStrategyImpl3#toPredicate(final StatementPattern
+         * stmtPattern) is doing. Note that toVE() as called from that method
+         * will throw an UnknownValueException if the term is not known to the
+         * database.
+         * 
          * FIXME Isolate pruning logic since we need to use it in more than one
          * place.
          */
