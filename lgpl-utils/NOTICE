@@ -1,0 +1,21 @@
+
+This product includes software from the fastutil project (http://fastutil.dsi.unimi.it/).  
+Copyright (C) 2002-2011 Sebastiano Vigna 
+License: http://www.apache.org/licenses/LICENSE-2.0.html
+----
+
+This product includes software from the dsiutils project (http://dsiutils.dsi.unimi.it/).  
+Copyright (C) 2002-2009 Sebastiano Vigna
+License: http://www.gnu.org/licenses/lgpl-2.1.html
+----
+
+This product includes software developed by the infinispan project (http://www.jboss.org/infinispan).
+Copyright 2010 Red Hat Inc. and/or its affiliates and other
+contributors as indicated by the @author tags. All rights reserved.
+See the copyright.txt in the distribution for a full listing of
+individual contributors.
+License: http://www.opensource.org/licenses/lgpl-2.1.php
+----
+
+Source code for included Open Source software is available from the respective
+websites of the copyright holders of the included software.

@@ -85,7 +85,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 		</fileset>
 	</path>
 
-	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
+	<target name="clean" description="cleans everything in [build.dir].">
 		<delete dir="${build.dir}" />
 		<delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
 		<delete dir="${bigdata.dir}/dist" quiet="true" />
@@ -218,37 +218,7 @@ public class BuildInfo {
 			</fileset>
 			<!-- Copy WAR resources for the embedded NanoSparqlServer -->
 			<fileset dir="." includes="bigdata-war/src/**"/>
-			<!-- Copy the bigdata license. -->
-			<fileset file="${bigdata.dir}/LICENSE.txt"/>
 		</copy>
-		<!-- Copy licenses for any project from which have imported something. -->
-		<mkdir dir="${build.dir}/classes/LEGAL"/>
-		<copy toDir="${build.dir}/classes/LEGAL" flatten="true">
-			<fileset file="${bigdata.dir}/bigdata/LEGAL/apache-license-2_0.txt"/>
-			<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/sesame2.x-license.txt"/>
-		</copy>
-	  <!-- Generate a combined NOTICE file for anything which we imported
-	  	   into the source tree from which the JAR was generated. -->
-	  <concat destfile="${build.dir}/classes/NOTICE" fixlastline="true" overwrite="yes">
-	  	<filterchain>
-	      <fixcrlf/>
-		</filterchain>
-	  	<header filtering="yes" trimleading="yes">
-	  	          Combined NOTICE files for bigdata JAR source code.
-	  	          ==================================================
-	    </header>
-		<fileset file="${bigdata.dir}/NOTICE"/>
-		<fileset file="${bigdata.dir}/bigdata/LEGAL/NOTICE"/>
-		<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/NOTICE"/>
-		<fileset file="${bigdata.dir}/bigdata-sails/LEGAL/NOTICE"/>
-		<fileset file="${bigdata.dir}/bigdata-jini/LEGAL/NOTICE"/>
-	  	<footer filtering="yes" trimleading="yes">
-				  ==================================================
-				  Source code for included Open Source software is available
-				  from the respective websites of the copyright holders of the
-				  included software.
-		</footer>
-	  </concat>
 	</target>
 
 	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
@@ -263,6 +233,17 @@ public class BuildInfo {
 	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
 		<jar destfile="${build.dir}/${version}.jar">
 			<fileset dir="${build.dir}/classes" excludes="test/**" />
+			<!-- Copy the copyright top-level NOTICE file. -->
+	    	<fileset file="${bigdata.dir}/NOTICE"/>
+			<!-- Copy the copyright top-level LICENSE file. -->
+	    	<fileset file="${bigdata.dir}/LICENSE.txt"/>
+			<!-- Copy licenses for any project from which have imported something. -->
+		    <fileset dir="${bigdata.dir}/bigdata">
+		        <include name="LEGAL/apache-license-2_0.txt"/>
+			</fileset>
+		    <fileset dir="${bigdata.dir}/bigdata-rdf">
+				<include name="LEGAL/sesame2.x-license.txt"/>
+			</fileset>
 			<manifest>
 				<!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
 			</manifest>
@@ -341,12 +322,6 @@ public class BuildInfo {
 </target>
 
 <target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
-	<!-- Copy all of the LEGAL directories.  Do not flatten to avoid collisions. -->
-    <copy toDir="${build.dir}/LEGAL" flatten="false">
-	  <fileset dir="${bigdata.dir}">
-		<include name="**/LEGAL/*" />
-	  </fileset>
-	</copy>
     <copy toDir="${build.dir}/lib" flatten="true">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
@@ -369,59 +344,6 @@ public class BuildInfo {
 		<include name="**/*.jar" />
 	</fileset>
      </copy>
-</target>
-
-<!--    
-    Note: you can not filter the files in the source jars using 
-    zipgroupfileset.  And you can not specify a wildcard of source files
-    using zipfileset.  This leaves you with the choice of either creating
-    an uberjar and the filtering out the notice files or filtering out
-    the notice files for each source jar explicitly.
-    -->
-<target name="gather-copyright-notice-files"
-    	description="Locate combine all NOTICE(.txt) files for dependencies.">
-  <!-- Build an uber 'notice.jar' file from which we can later extract the
-	   individual NOTICE files.  This excludes the bigdata JAR to avoid
-	   recursively including the aggregated NOTICE file in that JAR.  -->
-  <jar destfile="${build.dir}/notice.jar">
-  	<zipgroupfileset dir="${build.dir}/lib"
-  		includes="*.jar"
-  	    excludes="bigdata-${version}.jar"
-	/>
-  </jar>
-  <!-- Generate a combined NOTICE file. -->
-  <concat destfile="${build.dir}/NOTICE" fixlastline="true" overwrite="yes">
-  	<filterchain>
-      <fixcrlf/>
-	</filterchain>
-  	<header filtering="yes" trimleading="yes">
-          Combined NOTICE files for bigdata WAR.
-          ======================================
-    </header>
-  	<!-- NOTICE files for modules used to generate the bigdata JAR. -->
-	<fileset file="${bigdata.dir}/NOTICE"/>
-	<fileset file="${bigdata.dir}/bigdata/LEGAL/NOTICE"/>
-	<fileset file="${bigdata.dir}/bigdata-rdf/LEGAL/NOTICE"/>
-	<fileset file="${bigdata.dir}/bigdata-sails/LEGAL/NOTICE"/>
-	<fileset file="${bigdata.dir}/bigdata-jini/LEGAL/NOTICE"/>
-	<!-- Reach into the uber 'notice.jar' and pull out all notice files for 
-	     dependencies. -->
-	<zipfileset src="${build.dir}/notice.jar">
-  		<patternset>
-  			<include name="NOTICE" />
-  			<include name="NOTICE.txt" />
-  			<include name="META-INF/NOTICE" />
-  			<include name="META-INF/NOTICE.txt" />
-  		</patternset>
-	</zipfileset>
-  	<footer filtering="yes" trimleading="yes">
-			  ==================================================
-			  Source code for included Open Source software is available
-			  from the respective websites of the copyright holders of the
-			  included software.
-	</footer>
-  </concat>
-  <delete file="${build.dir}/notice.jar"/>
 </target>
 
 	<!-- 
@@ -461,7 +383,7 @@ public class BuildInfo {
 	</target>
 
 	<!--depends="bundleJar"-->
-	<target name="war" depends="bundleJar, autojar-strip-fastutil, gather-copyright-notice-files" 
+	<target name="war" depends="bundleJar, autojar-strip-fastutil" 
 		description="Generates a WAR artifact.">
 		<delete file="${build.dir}/bigdata.war"/>
 		<echo message="Building WAR"/>
@@ -473,10 +395,13 @@ public class BuildInfo {
 		  <fileset dir="bigdata-war/src/images"/>
           <!-- Copy the bigdata license. -->
 		  <file file="${bigdata.dir}/LICENSE.txt"/>
+		  <!-- Copy the top-level NOTICE file. -->
+		  <file file="${bigdata.dir}/NOTICE"/>
           <!-- Copy all of the LEGAL directories. -->
-		  <fileset dir="${build.dir}" includes="LEGAL/**/*"/>
-		  <!-- Copy the aggregated NOTICE files. -->
-		  <file file="${build.dir}/NOTICE"/>
+		  <fileset dir="${bigdata.dir}/bigdata" includes="LEGAL/*"/>
+		  <fileset dir="${bigdata.dir}/bigdata-rdf" includes="LEGAL/*"/>
+		  <fileset dir="${bigdata.dir}/bigdata-sails" includes="LEGAL/*"/>
+		  <fileset dir="${bigdata.dir}/bigdata-jini" includes="LEGAL/*"/>
 		  <!-- Basic RWStore configuration. -->
 		  <file file="bigdata-war/src/resources/RWStore.properties"/>
 		  <!-- bigdata jar plus some dependencies as filtered by autojar.
@@ -511,157 +436,6 @@ public class BuildInfo {
 		</war>
 	</target>
 	
-<target name="release-prepare" depends="jar, bundle, javadoc" description="create a release.">
-<!-- The source tree. -->
-<copy toDir="${build.dir}/bigdata/src">
-	<fileset dir="${bigdata.dir}/bigdata/src" />
-</copy>
-<copy toDir="${build.dir}/bigdata-jini/src">
-	<fileset dir="${bigdata.dir}/bigdata-jini/src" />
-</copy>
-<copy toDir="${build.dir}/bigdata-rdf/src">
-	<fileset dir="${bigdata.dir}/bigdata-rdf/src" />
-</copy>
-<copy toDir="${build.dir}/bigdata-sails/src">
-	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
-</copy>
-<!-- common files for the root of the archive. -->
-<copy tofile="${build.dir}/build.properties" file="build.properties" />
-<copy tofile="${build.dir}/build.xml" file="build.xml" />
-<copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
-<copy tofile="${build.dir}/overview.html" file="overview.html" />
-<copy tofile="${build.dir}/README-JINI" file="README-JINI" />
-<copy toDir="${build.dir}/LEGAL" flatten="true">
-	<fileset dir="${bigdata.dir}">
-		<include name="**/LEGAL/*" />
-	</fileset>
-</copy>
-</target>
-	
-<target name="release" depends="release-prepare" description="create source and binary tarballs.">
-<mkdir dir="${release.dir}" />
-<!-- binary distribution. -->
-<tar destfile="${release.dir}/${version}-bin.tgz" compression="gzip">
-	<!-- binary distribution (docs, but no source). -->
-	<tarfileset dir="${build.dir}" prefix="${version}">
-		<!-- common files from the root of the archive. -->
-		<include name="build.properties" />
-		<include name="build.xml" />
-		<include name="LICENSE.txt" />
-		<include name="overview.html" />
-		<include name="README-JINI" />
-		<include name="LEGAL/*" />
-		<!-- src, classes, jar, lib, docs. -->
-		<exclude name="bigdata/src/**" />
-		<exclude name="bigdata-jini/src/**" />
-		<exclude name="bigdata-rdf/src/**" />
-		<exclude name="bigdata-sails/src/**" />
-		<exclude name="classes/**" />
-		<include name="${version}.jar" />
-		<include name="lib/**" />
-		<include name="docs/**" />
-	</tarfileset>
-</tar>
-<!-- source distribution. -->
-<!-- Note: use GNU long file names for paths GT 100 characters. -->
-<tar destfile="${release.dir}/${version}-src.tgz" compression="gzip">
-	<!-- source, but no jar, compiled, docs, etc. -->
-	<tarfileset dir="${build.dir}" prefix="${version}">
-		<!-- common files from the root of the archive. -->
-		<include name="build.properties" />
-		<include name="build.xml" />
-		<include name="LICENSE.txt" />
-		<include name="overview.html" />
-		<include name="README-JINI" />
-		<include name="LEGAL/*" />
-		<!-- src, classes, jar, lib, docs. -->
-		<include name="bigdata/src/**" />
-		<include name="bigdata-jini/src/**" />
-		<include name="bigdata-rdf/src/**" />
-		<include name="bigdata-sails/src/**" />
-		<include name="lgpl-utils/src/**" />
-		<include name="src/**" />
-		<exclude name="classes/**" />
-		<exclude name="${version}.jar" />
-		<exclude name="lib/**" />
-		<exclude name="docs/**" />
-	</tarfileset>
-</tar>
-</target>
-
-<!-- Note: I use a public/private key to do this.  You can uncomment the
-	     ssh.password lines if you are going to authenticate directly.
-	     
-	     Note: If you do not have the public key for frs.sourceforge.net cached
-	     in your SSH repository then this will not work since it requests that
-	     you confirm the public key interactively.
-	     -->
-<target name="upload" depends="release" description="copy release files to server.">
-<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
-<!-- unless automated by public/private key
-		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
-		-->
-<exec executable="${ssh.scp}">
-	<!-- verbose protocol. -->
-	<arg value="-v" />
-	<!-- compression. -->
-	<arg value="-C" />
-	<!-- pscp specific
-			<arg value="-l"/><arg value="${ssh.username}"/>
-			<arg value="-pw"/><arg value="${ssh.password}"/>
-			-->
-	<!-- from -->
-	<arg value="${release.dir}/${version}-bin.tgz" />
-	<!-- to -->
-	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
-</exec>
-<exec executable="${ssh.scp}">
-	<!-- verbose protocol. -->
-	<arg value="-v" />
-	<!-- compression. -->
-	<arg value="-C" />
-	<!-- pscp specific
-			<arg value="-l"/><arg value="${ssh.username}"/>
-			<arg value="-pw"/><arg value="${ssh.password}"/>
-			-->
-	<!-- from -->
-	<arg value="${release.dir}/${version}-src.tgz" />
-	<!-- to -->
-	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
-</exec>
-</target>
-
-<target name="publish-api" depends="javadoc" description="copy javadoc to server.">
-<fail message="Javadoc not generated.">
-	<condition>
-		<not>
-			<available file="${build.dir}/docs/api" type="dir" />
-		</not>
-	</condition>
-</fail>
-<input message="username:" addproperty="ssh.username2" defaultValue="${ssh.username2}" />
-<!--
-<input message="password:" addproperty="ssh.password2" defaultValue="${ssh.password2}" />
--->
-<exec executable="${ssh.scp}">
-	<!-- recursive. -->
-	<arg value="-r" />
-	<!-- verbose protocol (too much info, but let's you observe progress during recursive copy). -->
-	<arg value="-v" />
-	<!-- compression. -->
-	<arg value="-C" />
-	<!-- pscp specific.
-	<arg value="-l" />
-	<arg value="${ssh.username2}" />
-	<arg value="-pw" />
-	<arg value="${ssh.password2}" />-->
-	<!-- from -->
-	<arg value="${build.dir}/docs" />
-	<!-- to -->
-	<arg value="${ssh.username2}@shell.speakeasy.net:systap.com/bigdata/" />
-</exec>
-</target>
-
 <target name="banner" depends="jar" description="Displays the banner (verifies runtime classpath).">
 
 <java classname="com.bigdata.Banner" failonerror="true" fork="false" logerror="true">
@@ -957,18 +731,18 @@ ${postInstallMessage}</echo>
 
       <!-- Create staging directories -->
       <property name="dist.dir" location="${bigdata.dir}/dist/bigdata" />
-
       <property name="dist.bin" location="${dist.dir}/bin" />
       <property name="dist.bin.config" location="${dist.bin}/config" />
       <property name="dist.lib" location="${dist.dir}/lib" />
       <property name="dist.lib.dl" location="${dist.dir}/lib-dl" />
       <property name="dist.lib.ext" location="${dist.dir}/lib-ext" />
       <property name="dist.var" location="${dist.dir}/var" />
-
       <property name="dist.var.config" location="${dist.var}/config" />
       <property name="dist.var.config.policy" location="${dist.var.config}/policy" />
       <property name="dist.var.config.logging" location="${dist.var.config}/logging" />
       <property name="dist.var.config.jini" location="${dist.var.config}/jini" />
+      <property name="dist.doc" location="${dist.dir}/doc" />
+      <property name="dist.doc.legal" location="${dist.dir}/doc/LEGAL" />
 
       <delete dir="${dist.dir}" quiet="true" />
       <mkdir dir="${dist.dir}" />
@@ -981,6 +755,8 @@ ${postInstallMessage}</echo>
       <mkdir dir="${dist.var.config.policy}" />
       <mkdir dir="${dist.var.config.logging}" />
       <mkdir dir="${dist.var.config.jini}" />
+      <mkdir dir="${dist.doc}" />
+      <mkdir dir="${dist.doc.legal}" />
 
       <!-- Copy the jar files created by the jar target to        -->
       <!-- an application-specific but non-version-specific       -->
@@ -998,7 +774,6 @@ ${postInstallMessage}</echo>
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
 
       <!-- Utility libraries -->
-
       <copy file="${bigdata.lib}/unimi/colt-1.2.0.jar"
             tofile="${dist.lib}/colt.jar" />
       <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar"
@@ -1196,6 +971,20 @@ ${postInstallMessage}</echo>
             todir="${dist.var.config.jini}" />
       <copy file="${src.resources.config}/jini/startAll.config"
             todir="${dist.var.config.jini}" />
+    	
+	  <!-- Stage top-level license file and copyright NOTICE file. -->
+	  <copy toDir="${dist.doc}">
+        <fileset file="${bigdata.dir}/LICENSE.txt"/>
+        <fileset file="${bigdata.dir}/NOTICE"/>
+	  </copy>
+	  
+      <!-- Stage license files for dependencies (LEGAL).  -->
+      <copy toDir="${dist.doc.legal}" flatten="true">
+        <fileset dir="${bigdata.dir}">
+    	  <include name="**/LEGAL/*" />
+    	</fileset>
+      </copy>
+    	
     </target>
 
     <!--                                                    -->
@@ -1235,9 +1024,9 @@ ${postInstallMessage}</echo>
 	bigdata/var/policy - java policy files
 	bigdata/var/policy/policy.all - policy with all permissions granted.
 	bigdata/var/policy/service.policy
+	bigdata/doc/LEGAL - license files for dependencies.
 	bigdata/doc/LICENSE.txt - bigdata license file.
-	bigdata/doc/NOTICE - combined copyright notice file.
-	bigdata/doc/LEGAL - directory containing license files for all dependencies.
+	bigdata/doc/NOTICE - copyright NOTICE files.
 	-->
     <target name="deploy-artifact" depends="clean, stage"
             description="Create compressed tar file for deployment.">
@@ -1345,9 +1134,10 @@ ${postInstallMessage}</echo>
           <include name="build.properties" />
           <include name="build.xml" />
           <include name="LICENSE.txt" />
+          <include name="NOTICE" />
           <include name="overview.html" />
           <include name="README-JINI" />
-          <include name="LEGAL/*" />
+          <include name="**/LEGAL/*" />
 
           <include name="bigdata/src/**" />
           <include name="bigdata-jini/src/**" />

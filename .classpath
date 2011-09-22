@@ -67,7 +67,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.5.0-onejar.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.5.0-onejar.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.5.0.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.5.0.jar" sourcepath="/org.openrdf.sesame-2.5.0"/>
 	<classpathentry kind="output" path="bin"/>
