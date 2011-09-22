@@ -1,2 +1,0 @@
-querymix=queries/update
-querymix=queries/explore

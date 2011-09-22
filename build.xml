@@ -1235,6 +1235,9 @@ ${postInstallMessage}</echo>
 	bigdata/var/policy - java policy files
 	bigdata/var/policy/policy.all - policy with all permissions granted.
 	bigdata/var/policy/service.policy
+	bigdata/doc/LICENSE.txt - bigdata license file.
+	bigdata/doc/NOTICE - combined copyright notice file.
+	bigdata/doc/LEGAL - directory containing license files for all dependencies.
 	-->
     <target name="deploy-artifact" depends="clean, stage"
             description="Create compressed tar file for deployment.">
@@ -2198,99 +2201,6 @@ ${postInstallMessage}</echo>
 <delete verbose="true">
 	<dirset dir="${java.io.tmpdir}" includes="sparql-*" />
 </delete>
-</target>
-
-<!--                                                                   -->
-<!--                    PERFORMANCE TESTS                              -->
-<!--                                                                   -->
-
-<target name="run-performance-tests" depends="testCompile" description="Runs a variety of performance tests.">
-<!-- Note: This depends on the stage target. -->
-<path id="run.class.path.id">
-	<pathelement location="${junit.jar}" />
-	<pathelement location="${bigdata-test.jar}" />
-	<pathelement location="${junit-ext.jar}" />
-	<pathelement location="${sesame-sparql-test.jar}" />
-	<pathelement location="${sesame-store-test.jar}" />
-	<pathelement location="${dist.lib}/bigdata.jar" />
-	<pathelement location="${dist.lib}/colt.jar" />
-	<pathelement location="${dist.lib}/highscalelib.jar" />
-	<pathelement location="${dist.lib}/dsiutils.jar" />
-	<pathelement location="${dist.lib}/lgplutils.jar" />
-	<pathelement location="${dist.lib}/fastutil.jar" />
-    <pathelement location="${dist.lib}/icu4j.jar" />
-	<pathelement location="${dist.lib}/icu4j-charset.jar" />
-	<pathelement location="${dist.lib}/iris.jar" />
-	<pathelement location="${dist.lib}/jgrapht.jar" />
-	<pathelement location="${dist.lib}/jsk-lib.jar" />
-	<pathelement location="${dist.lib}/jsk-platform.jar" />
-	<pathelement location="${dist.lib}/log4j.jar" />
-	<pathelement location="${dist.lib}/lucene-analyzer.jar" />
-	<pathelement location="${dist.lib}/lucene-core.jar" />
-	<pathelement location="${dist.lib}/openrdf-sesame.jar" />
-	<pathelement location="${dist.lib}/slf4j.jar" />
-	<pathelement location="${dist.lib}/slf4j-log4j.jar" />
-	<pathelement location="${dist.lib}/nxparser.jar" />
-	<pathelement location="${dist.lib}/zookeeper.jar" />
-    <pathelement location="${dist.lib}/jetty-continuation.jar" />
-    <pathelement location="${dist.lib}/jetty-http.jar" />
-    <pathelement location="${dist.lib}/jetty-io.jar" />
-    <pathelement location="${dist.lib}/jetty-server.jar" />
-    <pathelement location="${dist.lib}/jetty-util.jar" />
-    <pathelement location="${dist.lib}/jetty-webapp.jar" />
-    <pathelement location="${dist.lib}/jetty-servlet.jar" />
-    <pathelement location="${dist.lib}/jetty-security.jar" />
-    <pathelement location="${dist.lib}/jetty-xml.jar" />
-    <pathelement location="${dist.lib}/servlet-api.jar" />
-</path>
-<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
-<!-- Generate the LUBM dataset. 
-		<mkdir dir="${data}"/>
-		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
-			<classpath>
-				<path refid="run.class.path.id"/>
-				<pathelement location="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
-			</classpath>
-			<jvmarg value="-server"/>
-			<jvmarg value="-Xmx400m"/>
-			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
-			<arg value="-subdirs"/>
-			<arg value="-compress"/>
-			<arg value="GZip"/>
-			<arg value="-univ"/>
-			<arg value="50"/>
-			<arg value="-onto"/>
-			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl"/>
-		</java>
-		-->
-<!-- Delete the generated LUBM data set.
-		<delete dir="${data}"/>
-		-->
-<!-- Run the data load, closure and query performance tests. -->
-<copy file="bigdata/src/resources/logging/log4j-perf-tests.properties" todir="${perf.run.dir}" />
-<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${perf.run.dir}" />
-<java classname="com.bigdata.test.ExperimentDriver" dir="${perf.run.dir}" fork="yes">
-	<classpath refid="run.class.path.id" />
-	<jvmarg value="-server" />
-	<jvmarg value="-Xmx2g" />
-	<!-- Override the temporary directory to the specified run directory. -->
-	<jvmarg value="-Djava.io.tmpdir=${perf.run.dir}" />
-	<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties" />
-	<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl" />
-	<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50" />
-	<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql" />
-	<arg value="testLubm.xml" />
-</java>
-<!-- Copy the results from the performance run @todo w/ append! 
-		
-		Consider an after-action to do that and then delete the perf.run.dir.
-		
-		<copy file="${perf.run.dir}/com.bigdata.rdf.stress.LoadClosureAndQueryTest.exp.csv" todir="."/>
-		-->
-<!-- Delete the runs directory, but FIRST copy out the results (with append).
-		<copy></copy>
-		<delete dir=${perf.run.dir}/>
-		-->
 </target>
 
 <!--                                                                   -->

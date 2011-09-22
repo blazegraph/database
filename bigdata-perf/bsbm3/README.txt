@@ -1,14 +1,20 @@
-This directory contains a setup for running BSBM v3 against bigdata.  The main
-files are:
+This directory contains a setup for running BSBM v3 against bigdata.  
 
-- bsbmtools - the bsbm3 source distribution.
+In addition to the files in this directory, you will need the bsbmtools
+distribution.  This is available from
+http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark.  Please consult
+bsbmtools and the online documentation for BSBM for current information on
+how to generate test data sets and the correct procedure for running the
+benchmark. 
+
+The files in this directory include:
 
 - build.properties - configuration properties for the ant script.
 
-- build.xml - an ant script which may be used to generate a BSBM data set, load
-              the data set into a bigdata database instance, start a SPARQL 
-              end point for that database instance, and run the BSBM benchmark
-              against that SPARQL end point.
+- build.xml - an ant script which may be used to load a generated data set 
+              a local bigdata database instance and start a SPARQL 
+              end point for that database instance.  You will then run the
+              benchmark against that SPARQL end point.
 
 - RWStore.properties - configuration properties for a bigdata database instance
                        suitable for BSBM and backed by the RW persistence engine
@@ -32,9 +38,11 @@ Other requirements include:
                          
 To get started:
 
-1. Edit bigdata-perf/bsbm3/build.properties.
+0. Generate a suitable data set.
 
-1. In the top-level directory of the bigdata source tree, review build.properties
+2. Edit bigdata-perf/bsbm3/build.properties.
+
+3. In the top-level directory of the bigdata source tree, review build.properties
    and then do:
    
    a. "ant bundleJar".
@@ -42,18 +50,14 @@ To get started:
    Note: You will need to rerun this ant target any time you update the code
    from SVN or if you make edits to the source tree.
    
-2. Change to the bigdata-perf/bsbm3 directory:
+4. Change to the bigdata-perf/bsbm3 directory:
 
-   a. "ant run-generator" (generates the BSBM data set).
-   
    b. "ant run-load" (loads the generated data set into a bigdata instance).
    
    c. "ant start-nano-server" (starts the SPARQL end point).
-   
-   d. "ant run-query" (runs the benchmark).
 
-There are a variety of other ant tasks in that directory which may be used to
-run load and run the BSBM qualification data set, etc. 
+5. Follow the procedure for BSBM tools to run the benchmark against the SPARQL
+   end point.
 
 Performance should be extremely good for the reduced query mix, which can be
 enabled by editing:

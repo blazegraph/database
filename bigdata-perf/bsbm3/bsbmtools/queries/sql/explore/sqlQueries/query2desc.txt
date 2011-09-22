@@ -1,3 +1,0 @@
-QueryType=select
-
-ProductXYZ=ProductURI
