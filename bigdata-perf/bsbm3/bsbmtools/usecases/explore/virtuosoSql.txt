@@ -1,1 +1,0 @@
-querymix=queries/sql/explore/virtSQLqueries

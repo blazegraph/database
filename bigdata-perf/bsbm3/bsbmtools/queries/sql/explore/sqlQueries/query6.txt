@@ -1,4 +1,0 @@
-SELECT nr, label
-FROM product
-WHERE label like "%@word1@%";
-

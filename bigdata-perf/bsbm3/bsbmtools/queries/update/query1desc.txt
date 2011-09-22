@@ -1,3 +1,0 @@
-QueryType=Update
-
-updateData=UpdateTransactionData
