@@ -52,12 +52,10 @@ import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Tuple;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IsolatedFusedView;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -504,12 +502,8 @@ public class AccessPath<R> implements IAccessPath<R> {
                 if (indexLocalFilter != null)
                     tmp.addFilter(indexLocalFilter);
                 
-                tmp.addFilter(new TupleFilter(){
-                    private static final long serialVersionUID = 1L;
-                    @Override
-                    protected boolean isValid(ITuple tuple) {
-                        return sameVarConstraint.isValid(tuple.getObject());
-                    }});
+                tmp.addFilter(new SameVariableConstraintTupleFilter<R>(
+                        sameVarConstraint));
 
                 this.indexLocalFilter = tmp;
                 
@@ -535,7 +529,7 @@ public class AccessPath<R> implements IAccessPath<R> {
         toKey = keyOrder.getToKey(keyBuilder, predicate);
         
     }
-
+    
     public String toString() {
 
         return getClass().getName()
