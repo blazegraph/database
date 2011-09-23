@@ -25,16 +25,17 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
+import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
@@ -212,7 +213,7 @@ public class AST2BOpUtility {
         if (root == null)
             throw new IllegalArgumentException("No group node");
 
-        PipelineOp left = null;
+        PipelineOp left = addStartOpOnCluster(ctx);
 
         /*
          * Named subqueries.
@@ -1144,6 +1145,23 @@ public class AST2BOpUtility {
 
     }
 
+	/**
+	 * 
+	 * @param ctx
+	 * @return The {@link StartOp} iff this query will run on a cluster and
+	 *         otherwise <code>null</code>.
+	 * 
+	 *         TODO This is just experimental.
+	 */
+	private static final PipelineOp addStartOpOnCluster(final AST2BOpContext ctx) {
+	
+		if (false && ctx.isCluster())
+			return addStartOp(ctx);
+		
+    	return null;
+    	
+    }
+    
     /**
      * Adds a {@link StartOp}.
      * <p>
@@ -1153,6 +1171,8 @@ public class AST2BOpUtility {
      * this is really necessary is when the top-level query plan would otherwise
      * be empty (a <code>null</code>). In this case, the {@link StartOp} just
      * copies its inputs to its outputs (which is all it ever does).
+     * 
+     * @return The {@link StartOp}.
      */
     private static final PipelineOp addStartOp(final AST2BOpContext ctx) {
 
@@ -1476,14 +1496,7 @@ public class AST2BOpUtility {
                 continue;
             }
 
-            final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
-                    subgroup, ctx);
-
-            left = new SubqueryOp(leftOrEmpty(left), //
-                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
-                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
-                    new NV(SubqueryOp.Annotations.OPTIONAL, false)//
-            );
+			left = _addSubquery(left, subgroup, ctx);
 
         }
 
@@ -1566,15 +1579,8 @@ public class AST2BOpUtility {
 
             } else {
 
-                final PipelineOp subquery = convertJoinGroupOrUnion(
-                        null/* left */, subgroup, ctx);
-
-                left = new SubqueryOp(leftOrEmpty(left), //
-                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                        new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
-                        new NV(SubqueryOp.Annotations.OPTIONAL, true)//
-                );
-
+            	left = _addSubquery(left, subgroup, ctx);
+            	
             }
 
         }
@@ -1583,6 +1589,46 @@ public class AST2BOpUtility {
 
     }
 
+	private static PipelineOp _addSubquery(//
+			PipelineOp left,//
+			final IGroupNode<IGroupMemberNode> subgroup,//
+			final AST2BOpContext ctx//
+			) {
+
+		final boolean optional = subgroup.isOptional();
+		
+        final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
+                subgroup, ctx);
+
+		if (ctx.isCluster()
+				&& BOpUtility.visitAll((BOp) subgroup,
+						NamedSubqueryInclude.class).hasNext()) {
+			/*
+			 * Since something in the subgroup (or recursively in some
+			 * sub-subgroup) will require access to a named solution set, we
+			 * add a CopyOp() to force the solutions to be materialized on
+			 * the top-level query controller before issuing the subquery.
+			 * 
+			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/379#comment:1
+			 */
+			left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+						BOpEvaluationContext.CONTROLLER),//
+				}));
+
+        }
+        
+        left = new SubqueryOp(leftOrEmpty(left), //
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
+                new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
+        );
+
+        return left;
+        
+    }
+    
     /**
      * Wrap with an operator which will be evaluated on the query controller so
      * the results will be streamed back to the query controller in scale-out.
