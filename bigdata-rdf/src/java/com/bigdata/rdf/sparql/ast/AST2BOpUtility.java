@@ -2259,6 +2259,7 @@ public class AST2BOpUtility {
                         + inlineMaterializeOp);
             }
 
+            // Join against the lexicon to materialize the Value.
             final PipelineOp lexJoinOp = applyQueryHints(
                     new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
                             NV.asMap(new NV[] {//
