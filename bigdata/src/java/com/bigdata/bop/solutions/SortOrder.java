@@ -47,6 +47,16 @@ public class SortOrder<E> implements ISortOrder<E> {
     private final boolean asc;
 
     /**
+     * Either <code>ASC ( expr ) or DESC ( expr )</code>.
+     */
+    @Override
+    public String toString() {
+
+    	return (asc ? "ASC" : "DESC") + "(" + expr + ")";
+    	
+    }
+    
+    /**
      * 
      * @param expr
      *            The value expression.
