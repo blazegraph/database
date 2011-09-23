@@ -142,7 +142,14 @@ public class Rule2BOpUtility {
      * graph processing could be handed off to the
      * {@link DefaultGraphSolutionExpander}.
      */
-    private static boolean enableDecisionTree = true;
+    private static final boolean enableDecisionTree = true;
+
+    /**
+     * Flag to conditionally force the use of REMOTE access paths in scale-out
+     * joins. This is intended as a tool when analyzing query patterns in
+     * scale-out. It should normally be <code>false</code>.
+     */
+    public static final boolean forceRemoteAPs = false;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
@@ -1117,9 +1124,9 @@ public class Rule2BOpUtility {
             final Properties queryHints) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
-        if (scaleOut) {
+        if (scaleOut && !forceRemoteAPs) {
             /*
-             * All triples queries can run shard-wise.
+             * All triples queries can run shard-wise in scale-out.
              */
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
@@ -1162,7 +1169,7 @@ public class Rule2BOpUtility {
             final DatasetNode dataset, final Properties queryHints) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
-        if (scaleOut) {
+        if (scaleOut && !forceRemoteAPs) {
             /*
              * All named graph patterns in scale-out are partitioned (sharded).
              */
@@ -1378,12 +1385,6 @@ public class Rule2BOpUtility {
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
-        /*
-         * @todo raise this into the caller and do one per rule rather than once
-         * per access path. While a query can mix default and named graph access
-         * paths, there is only one named graph collection and one default graph
-         * collection within the scope of that query.
-         */
         final DataSetSummary summary = dataset == null ? null
                 : dataset.getDefaultGraphs();
 
@@ -1430,7 +1431,7 @@ public class Rule2BOpUtility {
             pred = pred.asBound((IVariable<?>) pred.get(3),
                     new Constant<IV<?, ?>>(summary.firstContext));
 
-            if (scaleOut) {
+            if (scaleOut && !forceRemoteAPs) {
                 // use a partitioned join.
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.SHARDED));

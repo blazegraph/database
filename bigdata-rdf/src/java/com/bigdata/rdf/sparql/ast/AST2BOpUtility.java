@@ -2259,22 +2259,41 @@ public class AST2BOpUtility {
                         + inlineMaterializeOp);
             }
 
-            // Join against the lexicon to materialize the Value.
-            final PipelineOp lexJoinOp = applyQueryHints(
-                    new PipelineJoin(leftOrEmpty(inlineMaterializeOp),
-                            NV.asMap(new NV[] {//
-                                    new NV(BOp.Annotations.BOP_ID, lexJoinId),
-                                    new NV(PipelineJoin.Annotations.PREDICATE,
-                                            lexPred.clone()),
-                                    new NV(PipelineOp.Annotations.SINK_REF,
-                                            endId), })), ctx.queryHints);
+            {
+                // annotations for this join.
+                final List<NV> anns = new LinkedList<NV>();
 
-            if (log.isDebugEnabled()) {
-                log.debug("adding lex join op: " + lexJoinOp);
+                // TODO Why is lexPred being cloned?
+                Predicate pred = (Predicate) lexPred.clone();
+                
+                anns.add(new NV(BOp.Annotations.BOP_ID, lexJoinId));
+                anns.add(new NV(PipelineOp.Annotations.SINK_REF, endId));
+                
+                if (ctx.isCluster() && !Rule2BOpUtility.forceRemoteAPs) {
+                    // use a partitioned join.
+                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.SHARDED));
+                    pred = (Predicate) pred.setProperty(
+                            Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+                }
+
+                anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+                // Join against the lexicon to materialize the Value.
+                final PipelineOp lexJoinOp = applyQueryHints(
+                        //
+                        new PipelineJoin(leftOrEmpty(inlineMaterializeOp), //
+                                anns.toArray(new NV[anns.size()])),
+                        ctx.queryHints);
+
+                if (log.isDebugEnabled()) {
+                    log.debug("adding lex join op: " + lexJoinOp);
+                }
+
+                left = lexJoinOp;
+
             }
-
-            left = lexJoinOp;
-
+            
         }
 
         return left;
@@ -2300,16 +2319,6 @@ public class AST2BOpUtility {
      * @return The {@link Predicate} which models the access path constraints
      *         for that statement pattern.
      * 
-     *         TODO We need to add support for inline access paths here for data
-     *         set joins. This will probably replace the
-     *         {@link DefaultGraphSolutionExpander} and
-     *         {@link NamedGraphSolutionExpander}. Joins against an inline
-     *         access path (a hash table attached to the predicate and backed by
-     *         the data set) are a more general way to represent the data set,
-     *         provide the same mechanisms for parallelism during query
-     *         evaluation, and allow us to reorder the data set joins just as we
-     *         would any other join.
-     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
      *      DataSetJoin with an "inline" access path.)
      */
@@ -2332,11 +2341,11 @@ public class AST2BOpUtility {
          * 
          * TODO Remove this code block for BD.SEARCH. This is now handled by an
          * AST rewrite. Review the tests on [s, p, o] immediately below when we
-         * take out this code block.  They should no longer have a code path 
-         * for [expander != null] since we will not have attached the free text
-         * search expander.
-         * 
-         * FIXME Do the case where [s] is bound before I cut out this code.
+         * take out this code block (I think that we should never observer a
+         * null for the statement pattern's value expression other than for the
+         * context position). There will no longer be a code path for [expander
+         * != null] since we will not have attached the free text search
+         * expander.
          */
         // create a solution expander for free text search if necessary
         IAccessPathExpander<ISPO> expander = null;
@@ -2435,7 +2444,15 @@ public class AST2BOpUtility {
                 anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp
                         .getScope()));
                 if (dataset == null) {
-                    // attach the appropriate expander : @todo drop expanders.
+                    /*
+                     * attach the appropriate expander
+                     * 
+                     * TODO drop expanders. This is all handled by the decision
+                     * tree in Rule2BOpUtility. That decision tree strips off
+                     * the expander which is layered on here. Once we drop the
+                     * expanders here we can get right of the logic to strip
+                     * them off in Rule2BOpUtility.
+                     */
                     if (cvar == null) {
                         /*
                          * There is no dataset and there is no graph variable,
@@ -2465,7 +2482,7 @@ public class AST2BOpUtility {
                     // attach the DataSet.
                     anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
                             dataset));
-                    // attach the appropriate expander : @todo drop expanders.
+                    // attach the appropriate expander : TODO drop expanders.
                     switch (sp.getScope()) {
                     case DEFAULT_CONTEXTS: {
                         if (dataset.getDefaultGraphs() != null) {
@@ -2551,9 +2568,18 @@ public class AST2BOpUtility {
                     ElementFilter.newInstance(filter)));
 
         // free text search expander or named graphs expander
-        if (expander != null)
+        if (expander != null) {
+            /*
+             * TODO This is an old code path for when we handled free text
+             * search and named graphs / default graphs using an expander
+             * pattern. It can be commented out and eventually removed if there
+             * is no other way in which an IPredicate can get an
+             * ACCESS_PATH_EXPANDER annotation (in which case the annotation
+             * should also go away).
+             */
             anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER,
                     expander));
+        }
 
         // timestamp
         anns.add(new NV(Annotations.TIMESTAMP, database.getSPORelation()
