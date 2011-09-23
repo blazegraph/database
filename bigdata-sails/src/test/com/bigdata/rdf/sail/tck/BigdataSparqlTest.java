@@ -184,7 +184,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
      */
     static final Collection<String> testURIs = Arrays.asList(new String[] {
     		// 8, 9, 14-19, 23-30
-    		
+
 //    	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
 //        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
 //        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1", 
@@ -347,7 +347,7 @@ extends SPARQLQueryTest // Sesame TupleExpr based evaluation
         final Enumeration<Test> e1 = suite.tests();
         while (e1.hasMoreElements()) {
             final Test aTest = e1.nextElement();
-            log.warn(aTest.toString());
+//            log.warn(aTest.toString());
             if (aTest instanceof TestSuite) {
                 final SPARQLQueryTest test = getSingleTest((TestSuite) aTest,
                         testURI);
