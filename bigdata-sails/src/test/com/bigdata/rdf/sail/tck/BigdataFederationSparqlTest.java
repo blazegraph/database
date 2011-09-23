@@ -70,8 +70,8 @@ import com.bigdata.service.jini.JiniFederation;
  * @version $Id$
  */
 public class BigdataFederationSparqlTest 
-extends SPARQLQueryTest
-//extends SPARQLASTQueryTest
+//extends SPARQLQueryTest
+extends SPARQLASTQueryTest
 {
 
     /**
@@ -238,7 +238,7 @@ extends SPARQLQueryTest
 	 * <p>
 	 * Note: These properties can not be cached across tests since they have to
 	 * be slightly different for some of the tests to handle things like tests
-	 * which will fail with inlining enabled ot tests which require Unicode
+	 * which will fail with inlining enabled versus tests which require Unicode
 	 * collation strength of IDENTICAL.
 	 */
     private Properties getProperties () throws Exception

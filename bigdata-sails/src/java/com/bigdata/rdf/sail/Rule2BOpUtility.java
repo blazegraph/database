@@ -77,21 +77,13 @@ import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.internal.constraints.IsInlineBOp;
-import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
-import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
-import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
@@ -148,8 +140,13 @@ public class Rule2BOpUtility {
      * Flag to conditionally force the use of REMOTE access paths in scale-out
      * joins. This is intended as a tool when analyzing query patterns in
      * scale-out. It should normally be <code>false</code>.
+     * 
+     * FIXME Make this [false]. It is currently enabled so we can go to native
+     * SPARQL evaluation in CI.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
      */
-    public static final boolean forceRemoteAPs = false;
+    public static final boolean forceRemoteAPs = true;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
