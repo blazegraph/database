@@ -185,6 +185,18 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     static final Collection<String> testURIs = Arrays.asList(new String[] {
     		// 8, 9, 14-19, 23-30
 
+    		// Throwing NotSerializableException - something is dragging in the SPOAccessPath
+    		// @see http://sourceforge.net/apps/trac/bigdata/ticket/379
+//          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/triple-match/manifest#dawg-triple-pattern-003",
+
+          // Hanging with error locating named subquery solution
+    		// @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:1
+//          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
+
+            // Hanging, presumably due to failure to trigger last pass evaluation for SORT.
+    		// @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:3
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/sort/manifest#dawg-sort-3",
+
 //    	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
 //        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
 //        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1", 
