@@ -314,7 +314,7 @@ public class BigdataSail extends SailBase implements Sail {
                 .getPackage().getName()
                 + ".nativeSparql";
         
-        public static final String DEFAULT_NATIVE_SPARQL = "false";
+        public static final String DEFAULT_NATIVE_SPARQL = "true";
         
         /**
          * Option (default <code>true</code>) may be used to explicitly disable
