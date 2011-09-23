@@ -186,7 +186,7 @@ public class AST2BOpUtility {
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);
-            log.info(BOpUtility.toString(astContainer));
+            log.info(BOpUtility.toString(queryPlan));
         }
 
         return queryPlan;

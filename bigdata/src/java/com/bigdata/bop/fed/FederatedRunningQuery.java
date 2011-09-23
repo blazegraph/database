@@ -156,6 +156,8 @@ public class FederatedRunningQuery extends ChunkedRunningQuery {
         
         allocationContexts.clear();
         
+        super.releaseNativeMemoryForQuery();
+        
     }
 
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
