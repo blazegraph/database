@@ -1,0 +1,10 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+:graphA {
+    _:a rdfs:label "Alice" .
+}
+
+:graphB {
+    _:b rdfs:label "Bob" .
+}

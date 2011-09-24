@@ -38,13 +38,11 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -510,172 +508,175 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         }
 
     }
-    
-    public void testWithNamedGraphs() throws Exception {
-        
-        final BigdataSail sail = getSail();
-        try {
-            
-        if (sail.getDatabase().isQuads() == false) {
-            return;
-        }
-        
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        final BigdataSailRepositoryConnection cxn = 
-            (BigdataSailRepositoryConnection) repo.getConnection();
-        try {
 
-            cxn.setAutoCommit(false);
-            
-            final BNode a = new BNodeImpl("_:a");
-            final BNode b = new BNodeImpl("_:b");
-            final Literal alice = new LiteralImpl("Alice");
-            final Literal bob = new LiteralImpl("Bob");
-            final URI graphA = new URIImpl("http://www.bigdata.com/graphA");
-            final URI graphB = new URIImpl("http://www.bigdata.com/graphB");
-            
-/**/            
-            cxn.add(
-                    a,
-                    RDFS.LABEL,
-                    alice,
-                    graphA
-                    );
-            
-            /*
-             * Graph B.
-             */
-            cxn.add(
-                    b,
-                    RDFS.LABEL,
-                    bob,
-                    graphB
-                    );
-/**/
-
-            /*
-             * Note: The either flush() or commit() is required to flush the
-             * statement buffers to the database before executing any operations
-             * that go around the sail.
-             */
-            cxn.flush();//commit();
-            
-/**/            
-            if (log.isInfoEnabled()) {
-                log.info("\n" + sail.getDatabase().dumpStore());
-            }
-            
-            { // run the query with no graphs specified
-                final String query = 
-                    "select ?s " + 
-                    "from <"+graphA+"> " +
-                    "where " +
-                    "{ " +
-                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
-                    "}";
-                
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                answer.add(createBindingSet(new BindingImpl("s", alice)));
-                
-                compare(result, answer);
-            }
-
-            { // run the query with graphA specified as the default graph
-                final String query = 
-                    "select ?s " + 
-                    "from <"+graphA+"> " +
-                    "where " +
-                    "{ " +
-                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
-                    "}";
-                
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                answer.add(createBindingSet(new BindingImpl("s", alice)));
-                
-                compare(result, answer);
-            }
-
-            { // run the query with graphB specified as the default graph
-                final String query = 
-                    "select ?s " + 
-                    "from <"+graphB+"> " +
-                    "where " +
-                    "{ " +
-                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
-                    "}";
-                
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                //answer.add(createBindingSet(new BindingImpl("s", alice)));
-                
-                compare(result, answer);
-            }
-
-            { // run the query with graphB specified as the default graph
-                final String query = 
-                    "select ?s ?o " + 
-                    "from <"+graphB+"> " +
-                    "where " +
-                    "{ " +
-                    "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
-                    "}";
-                
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                //answer.add(createBindingSet(new BindingImpl("s", alice)));
-                
-                compare(result, answer);
-            }
-
-            { // run the query with graphB specified as the default graph
-                final String query = 
-                    "select ?s ?o " + 
-                    "from <"+graphB+"> " +
-                    "where " +
-                    "{ " +
-                    "    ?s <"+RDFS.LABEL+"> ?o1 . " +
-                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
-                    "}";
-                
-                final TupleQuery tupleQuery = 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
-                TupleQueryResult result = tupleQuery.evaluate();
-
-                Collection<BindingSet> answer = new LinkedList<BindingSet>();
-                //answer.add(createBindingSet(new BindingImpl("s", alice)));
-                
-                compare(result, answer);
-            }
-
-        } finally {
-            cxn.close();
-        }
-        } finally {
-            sail.__tearDownUnitTest();
-        }
-        
-    }
+//    Note: This test was migrated to com.bigdata.rdf.sparql.ast.eval.TestSearch
+//    and is found in test_search_named_graphs10a()...e().
+//    
+//    public void testWithNamedGraphs() throws Exception {
+//        
+//        final BigdataSail sail = getSail();
+//        try {
+//            
+//        if (sail.getDatabase().isQuads() == false) {
+//            return;
+//        }
+//        
+//        sail.initialize();
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//        final BigdataSailRepositoryConnection cxn = 
+//            (BigdataSailRepositoryConnection) repo.getConnection();
+//        try {
+//
+//            cxn.setAutoCommit(false);
+//            
+//            final BNode a = new BNodeImpl("_:a");
+//            final BNode b = new BNodeImpl("_:b");
+//            final Literal alice = new LiteralImpl("Alice");
+//            final Literal bob = new LiteralImpl("Bob");
+//            final URI graphA = new URIImpl("http://www.bigdata.com/graphA");
+//            final URI graphB = new URIImpl("http://www.bigdata.com/graphB");
+//            
+///**/            
+//            cxn.add(
+//                    a,
+//                    RDFS.LABEL,
+//                    alice,
+//                    graphA
+//                    );
+//            
+//            /*
+//             * Graph B.
+//             */
+//            cxn.add(
+//                    b,
+//                    RDFS.LABEL,
+//                    bob,
+//                    graphB
+//                    );
+///**/
+//
+//            /*
+//             * Note: The either flush() or commit() is required to flush the
+//             * statement buffers to the database before executing any operations
+//             * that go around the sail.
+//             */
+//            cxn.flush();//commit();
+//            
+///**/            
+//            if (log.isInfoEnabled()) {
+//                log.info("\n" + sail.getDatabase().dumpStore());
+//            }
+//            
+//            { // run the query with no graphs specified
+//                final String query = 
+//                    "select ?s " + 
+//                    "from <"+graphA+"> " +
+//                    "where " +
+//                    "{ " +
+//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "}";
+//                
+//                final TupleQuery tupleQuery = 
+//                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//                tupleQuery.setIncludeInferred(true /* includeInferred */);
+//                TupleQueryResult result = tupleQuery.evaluate();
+//
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+//            }
+//
+//            { // run the query with graphA specified as the default graph
+//                final String query = 
+//                    "select ?s " + 
+//                    "from <"+graphA+"> " +
+//                    "where " +
+//                    "{ " +
+//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "}";
+//                
+//                final TupleQuery tupleQuery = 
+//                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//                tupleQuery.setIncludeInferred(true /* includeInferred */);
+//                TupleQueryResult result = tupleQuery.evaluate();
+//
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+//            }
+//
+//            { // run the query with graphB specified as the default graph
+//                final String query = 
+//                    "select ?s " + 
+//                    "from <"+graphB+"> " +
+//                    "where " +
+//                    "{ " +
+//                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "}";
+//                
+//                final TupleQuery tupleQuery = 
+//                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//                tupleQuery.setIncludeInferred(true /* includeInferred */);
+//                TupleQueryResult result = tupleQuery.evaluate();
+//
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+//            }
+//
+//            { // run the query with graphB specified as the default graph
+//                final String query = 
+//                    "select ?s ?o " + 
+//                    "from <"+graphB+"> " +
+//                    "where " +
+//                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+//                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "}";
+//                
+//                final TupleQuery tupleQuery = 
+//                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//                tupleQuery.setIncludeInferred(true /* includeInferred */);
+//                TupleQueryResult result = tupleQuery.evaluate();
+//
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+//            }
+//
+//            { // run the query with graphB specified as the default graph
+//                final String query = 
+//                    "select ?s ?o " + 
+//                    "from <"+graphB+"> " +
+//                    "where " +
+//                    "{ " +
+//                    "    ?s <"+RDFS.LABEL+"> ?o1 . " +
+//                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+//                    "}";
+//                
+//                final TupleQuery tupleQuery = 
+//                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//                tupleQuery.setIncludeInferred(true /* includeInferred */);
+//                TupleQueryResult result = tupleQuery.evaluate();
+//
+//                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+//                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+//                
+//                compare(result, answer);
+//            }
+//
+//        } finally {
+//            cxn.close();
+//        }
+//        } finally {
+//            sail.__tearDownUnitTest();
+//        }
+//        
+//    }
 
     /**
      * FIXME This should be migrated to the data-driven test suite in

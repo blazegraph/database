@@ -169,6 +169,138 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * Run the query with no graphs specified.
+     * 
+     * <pre>
+     * SELECT ?s 
+     * WHERE {
+     *     ?s bd:search "Alice" .
+     * }
+     * </pre>
+     * <p>
+     * Note: The first and second condition in the old test were identical. The
+     * first condition was modified to run with no graphs specified when the
+     * tests were migrated to this format.
+     * <p>
+     * Note: This is the first of a series of tests which are a port of
+     * com.bigdata.rdf.sail.TestSearchQuery#testWithNamedGraphs(). Some errors
+     * in that test were corrected when the tests were migrated to this format.
+     */
+    public void test_search_named_graphs10a() throws Exception {
+
+        new TestHelper(//
+                "search-named-graphs10", // testURI
+                "search-named-graphs10a.rq", // queryFileURI
+                "search-named-graphs10.trig",// dataFileURI
+                "search-named-graphs10a.srx"// resultFileURI
+        ).runTest();
+
+    }
+
+    /**
+     * Run the query with graphA specified as the default graph.
+     * 
+     * <pre>
+     * SELECT ?s 
+     * FROM :graphA
+     * WHERE {
+     *     ?s bd:search "Alice" .
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_search_named_graphs10b() throws Exception {
+
+        new TestHelper(//
+                "search-named-graphs10", // testURI
+                "search-named-graphs10b.rq", // queryFileURI
+                "search-named-graphs10.trig",// dataFileURI
+                "search-named-graphs10b.srx"// resultFileURI
+        ).runTest();
+
+    }
+
+    /**
+     * Run the query with graphB specified as the default graph
+     * 
+     * <pre>
+     * SELECT ?s 
+     * FROM :graphB
+     * WHERE {
+     *     ?s bd:search "Alice" .
+     * }
+     * </pre>
+     * 
+     * FIXME This is failing, presumably from a failure to filter the solutions
+     * for the search variable against the graph which is being searched.  It
+     * appears that we are not filtering when it is the default graph which is
+     * restricted, just when it is the named graph which is restricted.
+     */
+    public void test_search_named_graphs10c() throws Exception {
+
+        new TestHelper(//
+                "search-named-graphs10", // testURI
+                "search-named-graphs10c.rq", // queryFileURI
+                "search-named-graphs10.trig",// dataFileURI
+                "search-named-graphs10c.srx"// resultFileURI
+        ).runTest();
+
+    }
+
+    /**
+     * Run the query with graphB specified as the default graph and also pull
+     * out the subject from the search variable.
+     * 
+     * <pre>
+     * SELECT ?s ?o 
+     * FROM :graphB
+     * WHERE {
+     *     ?s rdfs:label ?o .
+     *     ?o bd:search "Alice" .
+     * }
+     * </pre>
+     */
+    public void test_search_named_graphs10d() throws Exception {
+
+        new TestHelper(//
+                "search-named-graphs10", // testURI
+                "search-named-graphs10d.rq", // queryFileURI
+                "search-named-graphs10.trig",// dataFileURI
+                "search-named-graphs10d.srx"// resultFileURI
+        ).runTest();
+
+    }
+
+    /**
+     * Run the query with graphA specified as the default graph and also pull
+     * out the subject from the search variable.
+     * 
+     * <pre>
+     * SELECT ?s ?o 
+     * FROM :graphA
+     * WHERE {
+     *     ?s rdfs:label ?o .
+     *     ?o bd:search "Alice" .
+     * }
+     * </pre>
+     * <p>
+     * Note: Note: this was running against graphB in the old test suite, but we
+     * do that in the case above. It has been modified to run against graphA in
+     * this test suite.
+     */
+    public void test_search_named_graphs10e() throws Exception {
+
+        new TestHelper(//
+                "search-named-graphs10", // testURI
+                "search-named-graphs10e.rq", // queryFileURI
+                "search-named-graphs10.trig",// dataFileURI
+                "search-named-graphs10e.srx"// resultFileURI
+        ).runTest();
+
+    }
+
+    /**
      * Unit test for a query with magic search predicates in the main WHERE
      * clause. These predicates should be translated into a {@link ServiceNode}
      * which is then lifted into a named subquery.
