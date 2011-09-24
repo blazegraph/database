@@ -43,6 +43,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -127,7 +128,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             for (NamedSubqueryRoot namedSubquery : queryRoot
                     .getNamedSubqueries()) {
 
-                extractSearches(context.db, namedSubquery,
+                extractSearches(context.db, queryRoot, namedSubquery,
                         (GroupNodeBase<IGroupMemberNode>) namedSubquery
                                 .getWhereClause());
 
@@ -142,7 +143,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
              * they appear within the main WHERE clause.
              */
             
-            extractSearches(context.db, queryRoot,
+            extractSearches(context.db, queryRoot, queryRoot,
                     (GroupNodeBase<IGroupMemberNode>) queryRoot
                             .getWhereClause());
 
@@ -213,6 +214,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
      * same group.
      */
     private void extractSearches(final AbstractTripleStore database,
+            final QueryRoot queryRoot,
             final QueryBase queryBase,
             final GroupNodeBase<IGroupMemberNode> group) {
 
@@ -291,7 +293,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
                     @SuppressWarnings("unchecked")
                     final GroupNodeBase<IGroupMemberNode> subGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
-                    extractSearches(database, queryBase, subGroup);
+                    extractSearches(database, queryRoot, queryBase, subGroup);
 
                 }
 
@@ -323,8 +325,8 @@ public class ASTSearchOptimizer implements IASTOptimizer {
 
                 group.addChild(serviceNode);
 
-                if (group.getContext() != null)
-                    enforceNamedGraphConstraint(searchVar, group);
+//                if (group.getContext() != null)
+                enforceGraphConstraint(queryRoot, searchVar, group);
                 
                 if (log.isInfoEnabled())
                     log.info("Rewrote group: " + group);
@@ -337,19 +339,26 @@ public class ASTSearchOptimizer implements IASTOptimizer {
     
     /**
      * If there is no join to the subject position for the search variable (?s
-     * ?p ?searchVar) and the search appears in a graph context, then we insert
-     * one now. This basically imposes a constraint that the search results will
-     * only be reported for the bindings which the graph variable may take on.
-     * It also serves to bind the graph variable, which could otherwise not be
-     * bound as nothing was actually joined against a statement index.
+     * ?p ?searchVar) and the search is restricted to a subset of the named
+     * graphs (either via a dataset declaration or through a GRAPH graph
+     * context), then we insert a join to the subject position now. This join
+     * basically imposes a constraint that the search results will only be
+     * reported for the statement appearing in graphs which are visible to the
+     * query. For a <code>GRAPH ?g {...}</code> group without an explicit
+     * subject join, it also serves to bind the graph variable, which could
+     * otherwise not be bound as nothing was actually joined against a statement
+     * index.
      * 
+     * @param queryRoot
+     *            Used to gain access to the {@link DatasetNode}.
      * @param searchVar
      *            The search variable (the literal whose text is the free text
      *            query).
      * @param group
      *            The group in which the search magic predicates appear.
      */
-    private void enforceNamedGraphConstraint(final IVariable<?> searchVar,
+    private void enforceGraphConstraint(final QueryRoot queryRoot,
+            final IVariable<?> searchVar,
             final GroupNodeBase<IGroupMemberNode> group) {
 
         StatementPatternNode subjectJoin = null;
@@ -370,21 +379,86 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             
         }
 
-        if (subjectJoin != null)
+        if (subjectJoin != null) {
+            /*
+             * There is an explicit subject join (?subj _ ?lit), so we do not
+             * need to do anything more.
+             */
             return;
-        
-        // Add the join to impose the named graph constraint.
-        group.addChild(new StatementPatternNode(//
-                new VarNode(Var.var().getName()),// s
-                new VarNode(Var.var().getName()),// p
-                new VarNode(searchVar.getName()),// o
-                group.getContext(), // c
-                Scope.NAMED_CONTEXTS // scope
-        ));
+        }
 
-        if (log.isInfoEnabled())
-            log.info("Added subject join to imposed named graph constraint: "
-                    + group);
+        /*
+         * We may need to impose a constraint.
+         */
+        if (group.getContext() != null) {
+
+            /*
+             * This group is, or is embedded within, a GRAPH group.
+             * 
+             * We need to impose a constraint since the graph variable might
+             * otherwise not be bound and bindings for ?lit for statements not
+             * in the named graph would otherwise be visible.
+             */
+            
+            // Add the join to impose the named graph constraint.
+            group.addChild(new StatementPatternNode(//
+                    new VarNode(Var.var().getName()),// s
+                    new VarNode(Var.var().getName()),// p
+                    new VarNode(searchVar.getName()),// o
+                    group.getContext(), // c
+                    Scope.NAMED_CONTEXTS // scope
+            ));
+
+            if (log.isInfoEnabled())
+                log.info("Added subject join to imposed named graph constraint: "
+                        + group);
+
+        } else {
+            
+            /*
+             * This is a default graph group.
+             * 
+             * We need to impose a constraint IFF the default graph data set is
+             * non-null. Otherwise it would be possible to observe solutions for
+             * ?lit when there was no statement in the default graph which used
+             * that binding of ?lit.
+             */
+            
+            final DatasetNode datasetNode = queryRoot.getDataset();
+
+            if (datasetNode == null) {
+                /*
+                 * All graphs are in the default graph so no constraint is
+                 * required.
+                 */
+                return;
+            }
+
+            if (datasetNode.getDefaultGraphs() == null
+                    && datasetNode.getDefaultGraphFilter() != null) {
+                /*
+                 * All graphs are in the default graph so no constraint is
+                 * required. (We have to check for a filter if the default
+                 * graphs were not specified since the filter can also restrict
+                 * what is visible.)
+                 */
+                return;
+            }
+            
+            // Add the join to impose the default graph constraint.
+            group.addChild(new StatementPatternNode(//
+                    new VarNode(Var.var().getName()),// s
+                    new VarNode(Var.var().getName()),// p
+                    new VarNode(searchVar.getName()),// o
+                    null, // // c
+                    Scope.DEFAULT_CONTEXTS // scope
+            ));
+
+            if (log.isInfoEnabled())
+                log.info("Added subject join to imposed default graph constraint: "
+                        + group);
+
+        }
 
     }
 
