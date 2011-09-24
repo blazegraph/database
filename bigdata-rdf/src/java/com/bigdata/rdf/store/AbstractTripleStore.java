@@ -43,6 +43,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -1312,7 +1313,11 @@ abstract public class AbstractTripleStore extends
                 Options.CONSTRAIN_XXXC_SHARDS,
                 Options.DEFAULT_CONSTRAIN_XXXC_SHARDS)); 
         
-        // setup namespace mapping for serialization utility methods.
+        /*
+         * Setup namespace mapping for serialization utility methods.
+         * 
+         * TODO Why not leverage the defined Vocabulary?
+         */
         addNamespace(RDF.NAMESPACE, "rdf");
         addNamespace(RDFS.NAMESPACE, "rdfs");
         addNamespace(OWL.NAMESPACE, "owl");
@@ -1466,8 +1471,7 @@ abstract public class AbstractTripleStore extends
                  * Setup the vocabulary.
                  */
                 {
-                    
-                    assert vocab == null;
+                    assert vocabRef.get() == null;
 
                     try {
 
@@ -1475,7 +1479,8 @@ abstract public class AbstractTripleStore extends
                                 .getConstructor(new Class[] { String.class });
 
                         // save reference.
-                        vocab = ctor.newInstance(new Object[] { LEXICON_NAMESPACE });
+                        vocabRef.set(ctor
+                                .newInstance(new Object[] { LEXICON_NAMESPACE }));
 
                     } catch (Exception ex) {
 
@@ -1484,7 +1489,7 @@ abstract public class AbstractTripleStore extends
                     }
 
                     // initialize.
-                    ((BaseVocabulary) vocab).init();
+                    ((BaseVocabulary) vocabRef.get()).init();
 
                 }
                 
@@ -1551,7 +1556,7 @@ abstract public class AbstractTripleStore extends
 //                    setProperty(TripleStoreSchema.AXIOMS,axioms);
 
                     // vocabulary.
-                    map.put(TripleStoreSchema.VOCABULARY, vocab);
+                    map.put(TripleStoreSchema.VOCABULARY, vocabRef.get());
 //                    setProperty(TripleStoreSchema.VOCABULARY,vocab);
 
                     if (lexiconRelation.isTextIndex()) {
@@ -1631,7 +1636,7 @@ abstract public class AbstractTripleStore extends
 
                 axioms = null;
                 
-                vocab = null;
+                vocabRef.set(null);
                 
             }
 
@@ -1727,10 +1732,14 @@ abstract public class AbstractTripleStore extends
         if (!lexicon)
             throw new IllegalStateException();
 
+        Vocabulary vocab = vocabRef.get();
+        
         if (vocab == null) {
 
-            synchronized (this) {
+            synchronized (vocabRef) {
 
+                vocab = vocabRef.get();
+                
                 if (vocab == null) {
 
                     /*
@@ -1756,6 +1765,12 @@ abstract public class AbstractTripleStore extends
 								+ vocab.getClass().getName() + ", size="
 								+ vocab.size());
 
+                    if (!this.vocabRef.compareAndSet(null/* expect */, vocab)) {
+                        
+                        throw new AssertionError();
+                        
+                    }
+					
                 }
                 
             }
@@ -1765,7 +1780,13 @@ abstract public class AbstractTripleStore extends
         return vocab;
         
     }
-    private volatile Vocabulary vocab;
+    
+    /**
+     * Note: This is used both as a monitor object and as an atomic reference.
+     * 
+     * @see #getVocabulary()
+     */
+    private final AtomicReference<Vocabulary> vocabRef = new AtomicReference<Vocabulary>();
     
     /**
      * The {@link SPORelation} (triples and their access paths).

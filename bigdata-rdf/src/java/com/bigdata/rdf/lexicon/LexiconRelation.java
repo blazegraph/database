@@ -98,6 +98,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ArrayAccessPath;
@@ -471,11 +472,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 /*
                  * Setup the lexicon configuration.
                  */
+                
+                final Vocabulary vocab = getContainer().getVocabulary();
+                
                 lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
                         inlineLiterals, inlineTextLiterals,
                         maxInlineTextLength, inlineBNodes, inlineDateTimes,
-                        rejectInvalidXSDValues, xFactory, getContainer()
-                                .getVocabulary());
+                        rejectInvalidXSDValues, xFactory, vocab);
 
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(
