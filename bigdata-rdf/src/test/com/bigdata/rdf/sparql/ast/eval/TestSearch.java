@@ -231,11 +231,6 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
      *     ?s bd:search "Alice" .
      * }
      * </pre>
-     * 
-     * FIXME This is failing, presumably from a failure to filter the solutions
-     * for the search variable against the graph which is being searched.  It
-     * appears that we are not filtering when it is the default graph which is
-     * restricted, just when it is the named graph which is restricted.
      */
     public void test_search_named_graphs10c() throws Exception {
 
