@@ -55,7 +55,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.IServiceCounters;
@@ -1119,70 +1118,84 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          */
         protected void startDeferredTasks() throws IOException {
 
-            // elapsed time since we started running this task.
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            // Wait for the service ID to become available, trying every
-            // two seconds, while logging failures.
-            while (true) {
-                if (getServiceUUID() != null) {
-                    break;
+            try {
+                
+                // elapsed time since we started running this task.
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                // Wait for the service ID to become available, trying every
+                // two seconds, while logging failures.
+                while (true) {
+                    if (getServiceUUID() != null) {
+                        break;
+                    }
+                    if (elapsed > 1000 * 10)
+                        log.warn(ERR_NO_SERVICE_UUID + " : iface="
+                                + getServiceIface() + ", name="
+                                + getServiceName() + ", elapsed=" + elapsed);
+                    else if (log.isInfoEnabled())
+                        log.info(ERR_NO_SERVICE_UUID);
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                    }
                 }
-                if (elapsed > 1000 * 10)
-                    log.warn(ERR_NO_SERVICE_UUID + " : iface="
-                            + getServiceIface() + ", name=" + getServiceName()
-                            + ", elapsed=" + elapsed);
-                else if (log.isInfoEnabled())
-                     log.info(ERR_NO_SERVICE_UUID);
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
+
+                // Wait for the service to become ready, trying every
+                // two seconds, while logging failures.
+                while (true) {
+                    if (isServiceReady()) {
+                        break;
+                    }
+                    if (elapsed > 1000 * 10)
+                        log.warn(ERR_SERVICE_NOT_READY + " : iface="
+                                + getServiceIface() + ", name="
+                                + getServiceName() + ", elapsed=" + elapsed);
+                    else if (log.isInfoEnabled())
+                        log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                    }
                 }
+
+                /*
+                 * start collection on various work queues.
+                 * 
+                 * Note: The data service starts collection for its queues
+                 * (actually, the concurrency managers queues) once it is up and
+                 * running.
+                 * 
+                 * @todo have it collect using the same scheduled thread pool.
+                 */
+                startQueueStatisticsCollection();
+
+                // start collecting performance counters (if enabled).
+                startPlatformStatisticsCollection();
+
+                // // notify the load balancer of this service join.
+                // notifyJoin();
+
+                // start reporting to the load balancer.
+                startReportTask();
+
+                // start the local httpd service reporting on this service.
+                startHttpdService();
+
+                // notify delegates that deferred startup has occurred.
+                AbstractFederation.this.didStart();
+
+            } catch (IllegalStateException ex) {
+                /*
+                 * If the federation was concurrently closed, log @ WARN and
+                 * return rather than throwing out the exception.
+                 */
+                if (!isOpen()) {
+                    log.warn("Shutdown: deferred tasks will not start.");
+                    return;
+                }
+                throw ex;
             }
-
-            // Wait for the service to become ready, trying every
-            // two seconds, while logging failures.
-            while (true) {
-                if (isServiceReady()) {
-                    break;
-                }
-                if (elapsed > 1000 * 10)
-                    log.warn(ERR_SERVICE_NOT_READY + " : iface="
-                            + getServiceIface() + ", name=" + getServiceName()
-                            + ", elapsed=" + elapsed);
-                else if (log.isInfoEnabled())
-                    log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                }
-            }
-            
-            /*
-             * start collection on various work queues.
-             * 
-             * Note: The data service starts collection for its queues
-             * (actually, the concurrency managers queues) once it is up and
-             * running.
-             * 
-             * @todo have it collect using the same scheduled thread pool.
-             */
-            startQueueStatisticsCollection();
-            
-            // start collecting performance counters (if enabled).
-            startPlatformStatisticsCollection();
-
-//            // notify the load balancer of this service join.
-//            notifyJoin();
-            
-            // start reporting to the load balancer.
-            startReportTask();
-
-            // start the local httpd service reporting on this service.
-            startHttpdService();
-            
-            // notify delegates that deferred startup has occurred.
-            AbstractFederation.this.didStart();
 
         }
 
