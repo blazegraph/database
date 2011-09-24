@@ -137,7 +137,7 @@ public class Depends {
 
     }
 
-    private final static Dep jini = new ApacheDep("jini",
+    private final static Dep jini = new ApacheDep("river",
             "http://river.apache.org/");
 
     private final static Dep zookeeper = new ApacheDep("zookeeper",
