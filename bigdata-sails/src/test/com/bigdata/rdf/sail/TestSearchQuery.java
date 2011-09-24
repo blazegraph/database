@@ -151,98 +151,98 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 //        
 //    }
     
-    public void test_query() throws SailException, IOException,
-            RDFHandlerException, QueryEvaluationException {
-
-        // overridden to use a disk-backed file.
-        final Properties properties = super.getProperties();
-
-        // use a disk-based mode since we will re-open the store to test restart
-        // safety.
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-
-        properties.setProperty(Options.CREATE_TEMP_FILE, "false");
-
-        properties.setProperty(Options.FILE, file.toString());
-
-        BigdataSail sail = getSail(properties);
-
-        try {
-
-            sail.initialize();
-            
-//            if (!sail.database.getStatementIdentifiers()) {
+//    public void test_query() throws SailException, IOException,
+//            RDFHandlerException, QueryEvaluationException {
 //
-//                log.warn("Statement identifiers are not enabled");
+//        // overridden to use a disk-backed file.
+//        final Properties properties = super.getProperties();
 //
-//                return;
+//        // use a disk-based mode since we will re-open the store to test restart
+//        // safety.
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+//
+//        properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+//
+//        properties.setProperty(Options.FILE, file.toString());
+//
+//        BigdataSail sail = getSail(properties);
+//
+//        try {
+//
+//            sail.initialize();
+//            
+////            if (!sail.database.getStatementIdentifiers()) {
+////
+////                log.warn("Statement identifiers are not enabled");
+////
+////                return;
+////
+////            }
+//
+//            /*
+//             * Load data into the sail.
+//             */
+//            {
+//
+//                final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(
+//                        sail.database, 100/* capacity */);
+//
+//                sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
+//                        new LiteralImpl("Yellow Rose"));
+//
+//                sb.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
+//                        new LiteralImpl("Red Rose"));
+//
+//                sb.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
+//                        new LiteralImpl("Old Yellow House"));
+//
+//                sb.flush();
+//
+//                /*
+//                 * Commit the changes to the database.
+//                 */
+//                sail.getDatabase().commit();
 //
 //            }
-
-            /*
-             * Load data into the sail.
-             */
-            {
-
-                final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(
-                        sail.database, 100/* capacity */);
-
-                sb.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
-                        new LiteralImpl("Yellow Rose"));
-
-                sb.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
-                        new LiteralImpl("Red Rose"));
-
-                sb.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
-                        new LiteralImpl("Old Yellow House"));
-
-                sb.flush();
-
-                /*
-                 * Commit the changes to the database.
-                 */
-                sail.getDatabase().commit();
-
-            }
-
-            if (log.isInfoEnabled())
-                log
-                        .info("#statements before search: "
-                                + sail.database.getStatementCount(null/* c */,
-                                        true/* exact */));
-
-            doSearchTest(((BigdataSail) sail).getConnection());
-
-            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
-
-            if (log.isInfoEnabled())
-                log
-                        .info("#statements before restart: "
-                                + sail.database.getStatementCount(null/* c */,
-                                        true/* exact */));
-
-            // re-open the SAIL.
-            sail = reopenSail(sail);
-
-            sail.initialize();
-
-            if (log.isInfoEnabled())
-                log
-                        .info("#statements after restart: "
-                                + sail.database.getStatementCount(null/* c */,
-                                        true/* exact */));
-
-            doSearchTest(((BigdataSail) sail).getConnection());
-
-            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
-            
-        } finally {
-
-            sail.__tearDownUnitTest();
-
-        }
-        
-    }
+//
+//            if (log.isInfoEnabled())
+//                log
+//                        .info("#statements before search: "
+//                                + sail.database.getStatementCount(null/* c */,
+//                                        true/* exact */));
+//
+//            doSearchTest(((BigdataSail) sail).getConnection());
+//
+//            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
+//
+//            if (log.isInfoEnabled())
+//                log
+//                        .info("#statements before restart: "
+//                                + sail.database.getStatementCount(null/* c */,
+//                                        true/* exact */));
+//
+//            // re-open the SAIL.
+//            sail = reopenSail(sail);
+//
+//            sail.initialize();
+//
+//            if (log.isInfoEnabled())
+//                log
+//                        .info("#statements after restart: "
+//                                + sail.database.getStatementCount(null/* c */,
+//                                        true/* exact */));
+//
+//            doSearchTest(((BigdataSail) sail).getConnection());
+//
+//            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
+//            
+//        } finally {
+//
+//            sail.__tearDownUnitTest();
+//
+//        }
+//        
+//    }
 
     /**
      * This runs a hand-coded query corresponding to a SPARQL query using the
