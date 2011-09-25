@@ -99,10 +99,12 @@ export JAVA_OPTS="-server -ea \
 #
 # Other things required by the 'bigdata' script.
 #
+# $lockCmd - The command used to obtain the bigdata subsystem lock.
 # $lockFile - The bigdata subsystem lock file.
 # $pidFile  - The bigdata services manager pid is written on this file.
 # $stateFile  - The runstate for the bigdata services managers is read from this file.
 # 
+export lockCmd="@LOCK_CMD@"
 export lockFile=@LOCK_FILE@
 export pidFile=${LAS}/pid
 export stateFile=@STATE_FILE@
