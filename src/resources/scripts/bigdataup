@@ -51,7 +51,7 @@ if [ ! -d "$LAS" ]; then
 fi
 
 # Create the subsystem lock file IFF it does not exist.
-lockfile -r 1 -1 "$lockFile"
+$lockCmd "$lockFile"
 if [ 0 != $? ]; then
     echo $"`date` : `hostname` : could not obtain lock."
     exit 1;
