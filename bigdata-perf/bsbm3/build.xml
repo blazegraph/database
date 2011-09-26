@@ -11,7 +11,6 @@
 		<fileset dir="${bigdata.build.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
-		<path refid="build.classpath" />
 	</path>
 
 	<target name="clean" description="cleans everything in [build.dir]">
