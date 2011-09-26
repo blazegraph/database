@@ -85,6 +85,7 @@ public class TestAll extends TestCase {
          * 
          */
         suite.addTestSuite(TestFilter.class);
+        suite.addTestSuite(TestCloseable.class);
 
         // @todo test Striterator
         
