@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import cutthecrap.utils.striterators.IStriterator.ITailOp;
+import com.bigdata.striterator.*;
 
 /**
  * Striterator
@@ -42,10 +43,13 @@ import cutthecrap.utils.striterators.IStriterator.ITailOp;
  * The IFilter objects passed to addFilter allow selection criteria for the iterated objects.
  *	The <code>addTypeFilter</code> method allows easy specification of a class type restriction.
  */
-public class Striterator implements IStriterator, ITailOp {
+public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
 	volatile List<IFilter> filters = null; // Note: NOT serializable.
     private volatile Iterator realSource;
 	private volatile Iterator m_src = null;
+	
+	/* field accessible to sub-classes */
+	protected boolean isOpen = true;
 
     /**
      * Deserialization constructor.
@@ -74,10 +78,17 @@ public class Striterator implements IStriterator, ITailOp {
 
     /** delegates hasNext request to source iterator **/
     public boolean hasNext() {
+    	if (!isOpen)
+    		return false;
+    	
         if (m_src == null)
             compile(realSource);
         
-        return m_src.hasNext();
+        boolean ret = m_src.hasNext();
+        if (!ret) {
+        	close();
+        }
+        return ret;
     }
 
     /** delegates next request to source iterator **/
@@ -220,5 +231,18 @@ public class Striterator implements IStriterator, ITailOp {
 		} else {
 			return this;
 		}
+	}
+
+	/**
+	 * The base close implementation ends the iteration with no other side-effects.
+	 * 
+	 * Users should override this method for any required side-effects but must also invoke
+	 * this "super" method.
+	 */
+	public void close() {
+		if (realSource instanceof ICloseableIterator)
+			((ICloseableIterator) realSource).close();
+		
+		isOpen = false;
 	}
 }
