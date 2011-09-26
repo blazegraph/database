@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sail;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -168,13 +169,13 @@ public class DataSetSummary {
      * @return An ordered set of the distinct {@link IV}s.
      */
     @SuppressWarnings("unchecked")
-    public LinkedHashSet<IV> getGraphs() {
+    public Set<IV> getGraphs() {
+        return graphs!=null?graphs:Collections.<IV>emptySet();
+    	//final LinkedHashSet<IV> s = new LinkedHashSet<IV>();
 
-    	final LinkedHashSet<IV> s = new LinkedHashSet<IV>();
+    	//s.addAll(graphs);
     	
-    	s.addAll(graphs);
-    	
-    	return s;
+    	//return s;
     	
 //        final IV[] a = new IV[nknown];
 //
