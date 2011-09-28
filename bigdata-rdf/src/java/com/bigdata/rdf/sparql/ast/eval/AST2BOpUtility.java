@@ -2337,7 +2337,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             /*
              * Either triple store mode or provenance mode.
              */
-            if (database.isStatementIdentifiers() && cvar.getValue() != null) {
+            if (cvar != null && database.isStatementIdentifiers()
+                    && cvar.getValue() != null) {
                 /*
                  * Note: The context position is used as a statement identifier
                  * (SID). SIDs may be used to retrieve provenance statements
