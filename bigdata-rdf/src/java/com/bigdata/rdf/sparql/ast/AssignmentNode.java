@@ -6,6 +6,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * AST node models the assignment of a value expression to a variable.

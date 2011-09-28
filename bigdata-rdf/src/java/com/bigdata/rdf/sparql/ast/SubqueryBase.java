@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sail.QueryType;
 
 /**
  * AST node for subqueries.

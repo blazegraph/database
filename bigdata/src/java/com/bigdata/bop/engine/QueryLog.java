@@ -44,8 +44,8 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 import com.bigdata.striterator.IKeyOrder;
 
 /**

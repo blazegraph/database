@@ -41,6 +41,7 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.BD;
 
 /**

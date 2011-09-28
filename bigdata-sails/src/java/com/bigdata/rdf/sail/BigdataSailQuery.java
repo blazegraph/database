@@ -29,6 +29,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**

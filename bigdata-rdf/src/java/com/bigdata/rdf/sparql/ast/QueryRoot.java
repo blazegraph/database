@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sail.QueryType;
 
 /**
  * The top-level Query.

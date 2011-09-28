@@ -27,9 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.ModifiableBOpBase;
 
 /**
  * Some utility methods for AST/IV conversions.

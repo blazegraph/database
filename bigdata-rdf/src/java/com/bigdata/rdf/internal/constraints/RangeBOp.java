@@ -39,7 +39,7 @@ import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Operator used to impose a key-range constraint on an access path.
+ * Operator used to impose a key-range constraint on a variable on access path.
  * 
  * @author mrpersonick
  */
@@ -53,8 +53,12 @@ final public class RangeBOp extends BOpBase
 	
 //	private static final Logger log = Logger.getLogger(RangeBOp.class);
 	
-	public interface Annotations extends ImmutableBOp.Annotations {
+    public interface Annotations extends ImmutableBOp.Annotations {
 
+        /**
+         * The variable whose range is restricted by the associated
+         * {@link #FROM} and/or {@link #TO} filters.
+         */
 		String VAR = RangeBOp.class.getName() + ".var";
 
 		/** The inclusive lower bound. */
@@ -65,6 +69,9 @@ final public class RangeBOp extends BOpBase
 		
     }
     
+    /** Cached to/from lookups. */
+    private transient volatile IValueExpression<IV> to, from;
+
 	@SuppressWarnings("rawtypes")
     public RangeBOp(final IVariable<IV> var,
     		final IValueExpression<IV> from, 
@@ -121,9 +128,6 @@ final public class RangeBOp extends BOpBase
 		return to;
     }
 
-	// cache to/from lookups.
-    private transient volatile IValueExpression<IV> to, from;
-    
     final public Range get(final IBindingSet bs) {
         
 //    	log.debug("getting the asBound value");
@@ -239,6 +243,11 @@ final public class RangeBOp extends BOpBase
 	}
 
 
+	/*
+	 * TODO The default BOp equals() and hashCode() should be fine.
+	 */
+	
+	// TODO This looks dangerous. It is only considering the variable!
     final public boolean equals(final IVariableOrConstant op) {
 
     	if (op == null)

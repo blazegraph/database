@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sparql.ast;
 
 /**
  * Type safe enumeration reporting the high level type of the query. This

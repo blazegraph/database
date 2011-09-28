@@ -26,7 +26,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 
 /**
@@ -165,7 +164,7 @@ public class NamedSubqueryRoot extends SubqueryBase {
      * 
      * @see Annotations#DEPENDS_ON
      */
-    final String[] getDependsOn() {
+    public final String[] getDependsOn() {
         
         return (String[]) getRequiredProperty(Annotations.DEPENDS_ON);
         

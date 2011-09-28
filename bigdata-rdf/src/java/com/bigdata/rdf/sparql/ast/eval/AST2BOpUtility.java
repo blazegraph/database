@@ -1,17 +1,14 @@
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
@@ -19,7 +16,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -31,7 +27,6 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
@@ -68,7 +63,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
@@ -79,26 +73,57 @@ import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
-import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.sail.FreeTextSearchExpander;
-import com.bigdata.rdf.sail.Rule2BOpUtility;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ASTUtil;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.ExistsNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupByNode;
+import com.bigdata.rdf.sparql.ast.HavingNode;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.NotExistsNode;
+import com.bigdata.rdf.sparql.ast.OrderByExpr;
+import com.bigdata.rdf.sparql.ast.OrderByNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ServiceCall;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.SliceNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
-import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
+import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.ElementFilter;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
+
+import cutthecrap.utils.striterators.FilterBase;
+import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.NOPFilter;
 
 /**
  * Query plan generator converts an AST into a query plan made up of
@@ -111,7 +136,7 @@ import com.bigdata.relation.rule.Rule;
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
  *      >Query Evaluation</a>.
  */
-public class AST2BOpUtility {
+public class AST2BOpUtility extends Rule2BOpUtility {
 
     private static final transient Logger log = Logger
             .getLogger(AST2BOpUtility.class);
@@ -2004,54 +2029,6 @@ public class AST2BOpUtility {
     }
 
     /**
-     * Apply any query hints to the operator as annotations of that operator.
-     * 
-     * @param op
-     *            The operator.
-     * @param queryHints
-     *            The query hints.
-     * 
-     * @return A copy of that operator to which the query hints (if any) have
-     *         been applied. If there are no query hints then the original
-     *         operator is returned.
-     * 
-     *         TODO It would be nice if this would only apply those query hints
-     *         to an operator which are known to be annotations understood by
-     *         that operator. This information is basically available from the
-     *         inner Annotation interface for a given operator class, but that
-     *         is not really all that accessible. [The way it is now, the query
-     *         hints get sprayed onto every operator and that will make the
-     *         query much fatter for NIO on a cluster.]
-     *         <p>
-     *         We can use (hintURI bd:hint hintValue) in statement patterns to
-     *         place hints more precisely within the AST.
-     */
-    private static PipelineOp applyQueryHints(PipelineOp op,
-            final Properties queryHints) {
-
-        if (queryHints == null)
-            return op;
-
-        final Enumeration<?> pnames = queryHints.propertyNames();
-
-        while (pnames.hasMoreElements()) {
-
-            final String name = (String) pnames.nextElement();
-
-            final String value = queryHints.getProperty(name);
-
-            if (log.isInfoEnabled())
-                log.info("Query hint: [" + name + "=" + value + "]");
-
-            op = (PipelineOp) op.setProperty(name, value);
-
-        }
-
-        return op;
-
-    }
-
-    /**
      * If the value expression that needs the materialized variables can run
      * without a {@link NotMaterializedException} then just route to the
      * <i>rightId</i> (around the rest of the materialization pipeline steps).
@@ -2336,255 +2313,156 @@ public class AST2BOpUtility {
         if (log.isDebugEnabled()) {
             log.debug(predValue);
         }
-        /*
-         * Old free text search integration point.
-         * 
-         * TODO Remove this code block for BD.SEARCH. This is now handled by an
-         * AST rewrite. Review the tests on [s, p, o] immediately below when we
-         * take out this code block (I think that we should never observer a
-         * null for the statement pattern's value expression other than for the
-         * context position). There will no longer be a code path for [expander
-         * != null] since we will not have attached the free text search
-         * expander.
-         */
-        // create a solution expander for free text search if necessary
-        IAccessPathExpander<ISPO> expander = null;
-        {  
-        if (predValue != null && BD.SEARCH.equals(predValue)) {
-            final Value objValue = sp.o().getValue();
-            if (log.isDebugEnabled()) {
-                log.debug(objValue);
-            }
-            if (objValue != null && objValue instanceof Literal) {
-                expander = new FreeTextSearchExpander(database,
-                        (Literal) objValue);
-            }
-        }
-        }
 
-        // @todo why is [s] handled differently?
-        // because [s] is the variable in free text searches, no need to test
-        // to see if the free text search expander is in place
         final IVariableOrConstant<IV> s = sp.s().getValueExpression();
-        if (s == null) {
-            return null;
-        }
+        final IVariableOrConstant<IV> p = sp.p().getValueExpression();
+        final IVariableOrConstant<IV> o = sp.o().getValueExpression();
 
-        final IVariableOrConstant<IV> p;
-        if (expander == null) {
-            p = sp.p().getValueExpression();
-        } else {
-            p = new Constant<IV>(TermId.mockIV(VTE.BNODE));
-        }
-        if (p == null) {
-            return null;
-        }
-
-        final IVariableOrConstant<IV> o;
-        if (expander == null) {
-            o = sp.o().getValueExpression();
-        } else {
-            o = new Constant<IV>(TermId.mockIV(VTE.BNODE));
-        }
-        if (o == null) {
-            return null;
-        }
+        // The graph term/variable iff specified by the query.
+        final TermNode cvar = sp.c();
+        final IVariableOrConstant<IV> c = cvar == null ? null : cvar
+                .getValueExpression();
 
         // The annotations for the predicate.
         final List<NV> anns = new LinkedList<NV>();
 
-        final IVariableOrConstant<IV> c;
+        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
+                new String[] { database.getSPORelation().getNamespace() }));
+
+        // timestamp
+        anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database
+                .getSPORelation().getTimestamp()));
 
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
              */
-            final TermNode cTerm = sp.c();
-            if (cTerm == null) {
-                // context position is not used.
-                c = null;
-            } else {
-                final Value val = cTerm.getValue();
-                if (val != null && database.isStatementIdentifiers()) {
-                    /*
-                     * Note: The context position is used as a statement
-                     * identifier (SID). SIDs may be used to retrieve provenance
-                     * statements (statements about statement) using high-level
-                     * query. SIDs are represented as blank nodes and is not
-                     * possible to have them bound in the original query. They
-                     * only become bound during query evaluation.
-                     */
-                    throw new IllegalArgumentException(
-                            "Context position is a statement identifier and may not be bound in the original query: "
-                                    + sp);
-                }
-                c = ((VarNode) cTerm).getValueExpression();
+            if (database.isStatementIdentifiers() && cvar.getValue() != null) {
+                /*
+                 * Note: The context position is used as a statement identifier
+                 * (SID). SIDs may be used to retrieve provenance statements
+                 * (statements about statement) using high-level query. SIDs are
+                 * represented as blank nodes and is not possible to have them
+                 * bound in the original query. They only become bound during
+                 * query evaluation.
+                 */
+                throw new IllegalArgumentException(
+                        "Context position is a statement identifier and may not be bound in the original query: "
+                                + sp);
             }
         } else {
             /*
              * Quad store mode.
              */
-            if (expander != null) {
-                /*
-                 * This code path occurs when we are doing a free text search
-                 * for this access path using the FreeTestSearchExpander. There
-                 * is no need to do any named or default graph expansion work on
-                 * a free text search access path.
-                 * 
-                 * TODO Remove code path as free text search is now handled by
-                 * an AST rewrite into a SERVICE.
-                 */
-                c = null;
-            } else {
-                // the graph variable iff specified by the query.
-                final TermNode cvar = sp.c();
-                // quads mode.
-                anns.add(new NV(Rule2BOpUtility.Annotations.QUADS, true));
-                // attach the Scope.
-                anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp
-                        .getScope()));
-                if (dataset == null) {
-                    /*
-                     * attach the appropriate expander
-                     * 
-                     * TODO drop expanders. This is all handled by the decision
-                     * tree in Rule2BOpUtility. That decision tree strips off
-                     * the expander which is layered on here. Once we drop the
-                     * expanders here we can get right of the logic to strip
-                     * them off in Rule2BOpUtility.
-                     */
-                    if (cvar == null) {
-                        /*
-                         * There is no dataset and there is no graph variable,
-                         * so the default graph will be the RDF Merge of ALL
-                         * graphs in the quad store.
-                         * 
-                         * This code path uses an "expander" which strips off
-                         * the context information and filters for the distinct
-                         * (s,p,o) triples to realize the RDF Merge of the
-                         * source graphs for the default graph.
-                         */
-                        c = null;
-                        expander = new DefaultGraphSolutionExpander(null/* ALL */);
-                    } else {
-                        /*
-                         * There is no data set and there is a graph variable,
-                         * so the query will run against all named graphs and
-                         * [cvar] will be bound to the context of each (s,p,o,c)
-                         * in turn. This handles constructions such as:
-                         * 
-                         * "SELECT * WHERE {graph ?g {?g :p :o } }"
-                         */
-                        expander = new NamedGraphSolutionExpander(null/* ALL */);
-                        c = cvar.getValueExpression();
+
+            // quads mode.
+            anns.add(new NV(Rule2BOpUtility.Annotations.QUADS, true));
+            // attach the Scope.
+            anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp.getScope()));
+
+            /*
+             * Note: For a default graph access path, [cvar] can not become
+             * bound since the context will is stripped from the visited ISPOs.
+             */
+            if (dataset != null) {
+                // attach the DataSet.
+                anns.add(new NV(Rule2BOpUtility.Annotations.DATASET, dataset));
+                switch (sp.getScope()) {
+                case DEFAULT_CONTEXTS: {
+                    if (dataset.getDefaultGraphFilter() != null) {
+                        anns.add(new NV(
+                                IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                ElementFilter.newInstance(dataset
+                                        .getDefaultGraphFilter())));
                     }
-                } else { // dataset != null
-                    // attach the DataSet.
-                    anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
-                            dataset));
-                    // attach the appropriate expander : TODO drop expanders.
-                    switch (sp.getScope()) {
-                    case DEFAULT_CONTEXTS: {
-                        if (dataset.getDefaultGraphs() != null) {
-                            /*
-                             * Query against the RDF merge of zero or more
-                             * source graphs.
-                             */
-                            expander = new DefaultGraphSolutionExpander(dataset
-                                    .getDefaultGraphs().getGraphs());
-                        } else if (dataset.getDefaultGraphFilter() != null) {
-                            anns.add(new NV(
-                                    IPredicate.Annotations.INDEX_LOCAL_FILTER,
-                                    ElementFilter.newInstance(dataset
-                                            .getDefaultGraphFilter())));
-                        }
-                        /*
-                         * Note: cvar can not become bound since context is
-                         * stripped for the default graph.
-                         */
-                        if (cvar == null)
-                            c = null;
-                        else
-                            c = cvar.getValueExpression();
-                        break;
+                    break;
+                }
+                case NAMED_CONTEXTS: {
+                    if (dataset.getNamedGraphFilter() != null) {
+                        anns.add(new NV(
+                                IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                ElementFilter.newInstance(dataset
+                                        .getNamedGraphFilter())));
                     }
-                    case NAMED_CONTEXTS: {
-                        if (dataset.getNamedGraphs() != null) {
-                            /*
-                             * Query against zero or more named graphs.
-                             */
-                            expander = new NamedGraphSolutionExpander(dataset
-                                    .getNamedGraphs().getGraphs());
-                        } else if (dataset.getNamedGraphFilter() != null) {
-                            anns.add(new NV(
-                                    IPredicate.Annotations.INDEX_LOCAL_FILTER,
-                                    ElementFilter.newInstance(dataset
-                                            .getNamedGraphFilter())));
-                        }
-                        if (cvar == null) {// || !cvar.hasValue()) {
-                            c = null;
-                        } else {
-                            c = cvar.getValueExpression();
-                        }
-                        break;
-                    }
-                    default:
-                        throw new AssertionError();
-                    }
+                    break;
+                }
+                default:
+                    throw new AssertionError();
                 }
             }
-        }
+        } // quads
 
         /*
-         * This applies a filter to the access path to remove any inferred
-         * triples when [includeInferred] is false.
+         * Layer on filters which can run on the local access path (close to the
+         * data).
          * 
-         * @todo We can now stack filters so are we missing out here by not
-         * layering in other filters as well? [In order to rotate additional
-         * constraints onto an access path we would need to either change
-         * IPredicate and AbstractAccessPath to process an IConstraint[] or
-         * write a delegation pattern that let's us wrap one filter inside of
-         * another.]
+         * Note: We can now stack filters so there may be other things which can
+         * be leveraged here.
+         * 
+         * FIXME Handle StatementPatternNode#EXISTS here (This turns into an
+         * iterator with a limit of ONE (1) on the {@link SPOAccessPath}. This
+         * should turn into a LIMIT annotation on the access path (which does
+         * not currently recognize an offset/limit annotation; instead you use
+         * an alternative iterator call).
          */
-        final IElementFilter<ISPO> filter = !query.getIncludeInferred() ? ExplicitSPOFilter.INSTANCE
-                : null;
+        {
 
-        // Decide on the correct arity for the predicate.
-        final BOp[] vars;
-        if (!database.isQuads() && !database.isStatementIdentifiers()) {
-            vars = new BOp[] { s, p, o };
-        } else if (c == null) {
-            vars = new BOp[] { s, p, o, com.bigdata.bop.Var.var() };
-        } else {
-            vars = new BOp[] { s, p, o, c };
+            final List<IFilter> filters = new LinkedList<IFilter>();
+
+            if (Boolean.valueOf(sp.getProperty(
+                    StatementPatternNode.Annotations.DISTINCT,
+                    StatementPatternNode.Annotations.DEFAULT_DISTINCT))) {
+
+                /*
+                 * Visit only the distinct values for the first key component.
+                 * 
+                 * FIXME We MUST pin the choice of the index for this filter. In
+                 * order to do that we need to interact with the join ordering
+                 * since we typically want to run this first in a join group.
+                 * 
+                 * TODO GRAPH ?g {} can use this to visit the distinct named
+                 * graphs for which there exists a statement in the database.
+                 * 
+                 * FIXME One exception where we can not use PARALLEL without
+                 * also imposing DISTINCT is the @DISTINCT annotation in
+                 * scale-out. This is because a given IV in the first key
+                 * component could span more than one shard.
+                 */
+                filters.add(new DistinctTermAdvancer(database.isQuads() ? 4 : 3));
+                
+            }
+
+            if (!query.getIncludeInferred()) {
+                /*
+                 * Filter out anything which is not an Explicit statement.
+                 */
+                filters.add(ElementFilter
+                        .newInstance(ExplicitSPOFilter.INSTANCE));
+            }
+
+            final int nfilters = filters.size();
+            final IFilter filter;
+            if (nfilters > 0) {
+                if (nfilters == 1) {
+                    // Just the one filter.
+                    filter = filters.get(0);
+                } else {
+                    // Stack multiple filters.
+                    final FilterBase tmp = new NOPFilter();
+                    for (IFilter f : filters) {
+                        tmp.addFilter(f);
+                    }
+                    filter = tmp;
+                }
+                /*
+                 * Attach a filter on elements visited by the access path.
+                 */
+                anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                        filter));
+            }
+
         }
-
-        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
-                new String[] { database.getSPORelation().getNamespace() }));//
-
-        // filter on elements visited by the access path.
-        if (filter != null)
-            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
-                    ElementFilter.newInstance(filter)));
-
-        // free text search expander or named graphs expander
-        if (expander != null) {
-            /*
-             * TODO This is an old code path for when we handled free text
-             * search and named graphs / default graphs using an expander
-             * pattern. It can be commented out and eventually removed if there
-             * is no other way in which an IPredicate can get an
-             * ACCESS_PATH_EXPANDER annotation (in which case the annotation
-             * should also go away).
-             */
-            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER,
-                    expander));
-        }
-
-        // timestamp
-        anns.add(new NV(Annotations.TIMESTAMP, database.getSPORelation()
-                .getTimestamp()));
-
+        
         /*
          * Explicitly set the access path / iterator flags.
          * 
@@ -2597,24 +2475,30 @@ public class AST2BOpUtility {
          * semantics then you will need to remote the READONLY flag for the
          * mutable access paths.
          */
-        anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
-                | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
+        {
+         
+            final int flags = IRangeQuery.DEFAULT | IRangeQuery.PARALLEL
+                    | IRangeQuery.READONLY;
+            
+            anns.add(new NV(IPredicate.Annotations.FLAGS, flags));
+            
+        }
 
-        return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
+        {
+        
+            // Decide on the correct arity for the predicate.
+            final BOp[] vars;
+            if (!database.isQuads() && !database.isStatementIdentifiers()) {
+                vars = new BOp[] { s, p, o };
+            } else if (c == null) {
+                vars = new BOp[] { s, p, o, com.bigdata.bop.Var.var() };
+            } else {
+                vars = new BOp[] { s, p, o, c };
+            }
 
-    }
+            return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
 
-    /**
-     * Return either <i>left</i> wrapped as the sole member of an array or
-     * {@link BOp#NOARGS} iff <i>left</i> is <code>null</code>.
-     * 
-     * @param left
-     *            The prior operator in the pipeline (optional).
-     * @return The array.
-     */
-    static private BOp[] leftOrEmpty(final PipelineOp left) {
-
-        return left == null ? BOp.NOARGS : new BOp[] { left };
+        }
 
     }
 
@@ -2699,7 +2583,19 @@ public class AST2BOpUtility {
 
     /*
      * TODO Integrate code to attach RangeBOps to predicates. (This code is from
-     * the old BigdataEvaluationStrategyImpl3 class.)
+     * the old BigdataEvaluationStrategyImpl3 class. It should be moved into an
+     * IASTOptimizer for recognizing range constraints.)
+     * 
+     * TODO Ranges can be just upper or lower. They do not need to be both. They
+     * can even be an excluded middle.
+     * 
+     * TODO The big thing about handling range constraints is make sure that we
+     * query each part of the OS(C)P index which corresponds to a datatype which
+     * could have a value legally promotable within the context in which the
+     * LT/LTE/GT/GTE filter(s) occur. For example, x>5 && x<10 needs to do a
+     * key-range scan for xsd:int, xsd:integer, .... The big win comes when we
+     * can recognize a datatype constraint at the same time such that we only
+     * touch one part of the index for that key range of values.
      */
 //  private void attachRangeBOps(final SOpGroup g) {
 //

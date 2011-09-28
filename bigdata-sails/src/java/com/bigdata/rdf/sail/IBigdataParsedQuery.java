@@ -29,7 +29,9 @@ package com.bigdata.rdf.sail;
 
 import java.util.Properties;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * Interface providing access to more state of the original SPARQL query AST.

@@ -77,11 +77,4 @@ For more information about bigdata, please see the following links:
 
 About bigdata: 
 
-Bigdata® is a horizontally-scaled, general purpose storage and computing fabric
-for ordered data (B+Trees), designed to operate on either a single server or a
-cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range
-shards in order to remove any realistic scaling limits - in principle, bigdata®
-may be deployed on 10s, 100s, or even thousands of machines and new capacity may
-be added incrementally without requiring the full reload of all data. The bigdata®
-RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL),
-and datum level provenance. 
+Bigdata® is a horizontally-scaled, general purpose storage and computing fabric for ordered data (B+Trees), designed to operate on either a single server or a cluster of commodity hardware. Bigdata® uses dynamically partitioned key-range shards in order to remove any realistic scaling limits - in principle, bigdata® may be deployed on 10s, 100s, or even thousands of machines and new capacity may be added incrementally without requiring the full reload of all data. The bigdata® RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL), and datum level provenance. 

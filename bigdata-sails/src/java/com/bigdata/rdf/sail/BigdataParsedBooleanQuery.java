@@ -32,6 +32,8 @@ import java.util.Properties;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedBooleanQuery;
 
+import com.bigdata.rdf.sparql.ast.QueryType;
+
 /**
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

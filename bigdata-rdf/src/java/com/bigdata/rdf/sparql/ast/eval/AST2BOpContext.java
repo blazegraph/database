@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sparql.ast;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Properties;
 import java.util.UUID;
@@ -9,7 +9,11 @@ import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.QueryHints;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;

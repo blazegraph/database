@@ -26,7 +26,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sail.QueryType;
 
 /**
  * A SPARQL 1.1 style subquery.

@@ -71,8 +71,8 @@ import com.bigdata.rdf.sail.BigdataParsedBooleanQuery;
 import com.bigdata.rdf.sail.BigdataParsedGraphQuery;
 import com.bigdata.rdf.sail.BigdataParsedTupleQuery;
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
-import com.bigdata.rdf.sail.QueryHints;
-import com.bigdata.rdf.sail.QueryType;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * Overridden version of the {@link SPARQLParser} class which extracts
