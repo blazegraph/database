@@ -34,6 +34,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.store.BD;
 
 /**

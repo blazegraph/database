@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
  * Created on Jan 2, 2011
  */
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sparql.ast;
 
 /**
  * The known query optimizers.

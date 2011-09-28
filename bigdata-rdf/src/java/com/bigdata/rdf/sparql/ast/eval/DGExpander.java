@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collection;
 import java.util.LinkedList;

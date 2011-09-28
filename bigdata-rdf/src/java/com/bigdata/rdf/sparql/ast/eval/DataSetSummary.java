@@ -1,4 +1,4 @@
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -168,53 +168,9 @@ public class DataSetSummary {
      * 
      * @return An ordered set of the distinct {@link IV}s.
      */
-    @SuppressWarnings("unchecked")
     public Set<IV> getGraphs() {
-        return graphs!=null?graphs:Collections.<IV>emptySet();
-    	//final LinkedHashSet<IV> s = new LinkedHashSet<IV>();
 
-    	//s.addAll(graphs);
-    	
-    	//return s;
-    	
-//        final IV[] a = new IV[nknown];
-//
-//        final Iterator<? extends URI> itr = graphs.iterator();
-//
-//        int nknown = 0;
-//
-//        while (itr.hasNext()) {
-//
-//            final BigdataURI uri = (BigdataURI) itr.next();
-//
-//            final IV id = uri.getIV();
-//
-//            if (id != null) {
-//
-//                a[nknown++] = id;
-//
-//            }
-//
-//        } // while
-//
-//        /*
-//         * Put the graphs into termId order. Since the individual access paths
-//         * will be formed by binding [c] to each graphId in turn, evaluating
-//         * those access paths in graphId order will make better use of the
-//         * B+Tree cache as the reads will tend to be more clustered.
-//         */
-//        Arrays.sort(a);
-//
-//        // Populate hash set which will maintain the sorted order.
-//        final LinkedHashSet<IV> s = new LinkedHashSet<IV>(nknown);
-//
-//        for (int i = 0; i < nknown; i++) {
-//
-//            s.add(a[i]);
-//
-//        }
-//
-//        return s;
+        return graphs != null ? graphs : Collections.<IV> emptySet();
 
     }
 

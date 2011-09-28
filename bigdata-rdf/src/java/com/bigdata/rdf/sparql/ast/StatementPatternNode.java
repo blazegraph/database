@@ -12,6 +12,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.htree.HTree;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -21,10 +24,25 @@ import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * A node in the AST representing a statement pattern.
+ * <p>
+ * Note: The annotations on the class are mostly interpreted by the
+ * toPredicate() method in {@link AST2BOpUtility} and by the logic in
+ * {@link Rule2BOpUtility} which handles the default and named graph access
+ * patterns.
+ * <p>
+ * Note: If a variable is bound, then we bind that slot of the predicate. If a
+ * variable can take some enumerated set of values, then we use an
+ * {@link #INLINE} access path to model that "IN" constraint. If the value for a
+ * variable must lie within some key range, then we handle that case using
+ * {@link RangeBOp}. If we have no information about a variable, then we just
+ * leave the variable unbound.
  * 
- * TODO This should inherit the context dynamically from the parent rather than
- * requiring the context to be specified explicitly. See
- * {@link ASTGraphGroupOptimizer}.
+ * TODO We should also handle datatype constraints on a variable here. For
+ * example, if a variable is known to be numeric, or known to be xsd:int, then
+ * we can immediately reject any bindings which would violate that type
+ * constraint. To do this right, we need to notice those type constraints and
+ * propagate them backwards in the plan so we can reject bindings as early as
+ * possible.
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
@@ -32,10 +50,12 @@ public class StatementPatternNode extends
 
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends GroupMemberNodeBase.Annotations {
+    public interface Annotations extends GroupMemberNodeBase.Annotations {
 
         /**
          * The {@link Scope} (required).
+         * 
+         * @see ASTGraphGroupOptimizer
          */
         String SCOPE = "scope";
         
@@ -87,7 +107,7 @@ public class StatementPatternNode extends
      
         /**
          * Boolean flag indicates that the distinct solutions for the statement
-         * pattern are required.
+         * pattern are required ({@value #DEFAULT_DISTINCT}).
          * <p>
          * Note: This is a hint that the {@link DistinctTermAdvancer} should be
          * used to visit the distinct {@link ISPO}s having a common prefix. This
@@ -96,10 +116,12 @@ public class StatementPatternNode extends
          * specified).
          * <p>
          * Note: For only partly historical reasons, this is not used to mark
-         * default graph access. A default graph access path visits strips the
-         * context and then applies a DISTINCT filter to the resulting triples.
+         * default graph access. A default graph access path strips the context
+         * and then applies a DISTINCT filter to the resulting triples.
          */
         String DISTINCT = "distinct";
+        
+        boolean DEFAULT_DISTINCT = false;
         
         /**
          * The existence of at least one solution will be verified otherwise the
@@ -144,14 +166,23 @@ public class StatementPatternNode extends
          * which case the can not be modeled as {@link ISPO}s.)
          * <p>
          * Both the column projection (IN) and the inline solution set (HTree)
-         * are simpler access paths. The only support element visitation, a full
-         * scan of the access path (this is the same as saying that there are no
-         * join variables), or probing to find all solutions which join on some
-         * join variable(s). This is in contrast to the {@link SPOAccessPath},
-         * which supports key-range constraints (prefix) and range constraints
-         * (prefix with key range on a data type value).
+         * are simpler access paths. They only support element visitation, a
+         * full scan of the access path (this is the same as saying that there
+         * are no join variables), or probing to find all solutions which join
+         * on some join variable(s). This is in contrast to the
+         * {@link SPOAccessPath}, which supports key-range constraints (prefix)
+         * and range constraints (prefix with key range on a data type value).
          */
         String INLINE = "inline";
+        
+        /**
+         * An optional attribute whose value is an {@link RangeBOp} which models
+         * the key-range constraint on the access path. The {@link RangeBOp} is
+         * used when there are filters which impose a GT/GTE and/or LT/LTE
+         * restriction on the values which a variable may take on for that
+         * access path. 
+         */
+        String RANGE = "range";
         
     }
     

@@ -27,7 +27,6 @@ package com.bigdata.rdf.internal.constraints;
 import java.io.Serializable;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 
 /**
  * Represents a numerical range of IVs - a lower bound and an upper bound.

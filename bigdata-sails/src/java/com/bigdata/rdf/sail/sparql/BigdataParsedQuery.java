@@ -35,8 +35,8 @@ import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
-import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * Class extends {@link ParsedQuery} for API compliance with {@link QueryParser}

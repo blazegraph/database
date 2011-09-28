@@ -61,7 +61,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;

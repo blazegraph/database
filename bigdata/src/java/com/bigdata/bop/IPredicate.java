@@ -542,7 +542,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /*
      * Note: the return value can not be parameterized without breaking code.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public IVariableOrConstant get(int index);
 
     /**
@@ -696,6 +696,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * Return a copy of this predicate with a different {@link IVariableOrConstant}
      * for the arg specified by the supplied index parameter.
      */
+    @SuppressWarnings("rawtypes")
     public IPredicate<E> setArg(int index, IVariableOrConstant arg);
 
 	/**

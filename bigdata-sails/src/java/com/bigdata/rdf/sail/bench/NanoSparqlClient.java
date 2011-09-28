@@ -66,8 +66,8 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
 import com.bigdata.counters.CAT;
 import com.bigdata.jsr166.LinkedBlockingQueue;
 import com.bigdata.rdf.sail.IBigdataParsedQuery;
-import com.bigdata.rdf.sail.QueryType;
 import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * A flyweight utility for issuing queries to an http SPARQL endpoint.

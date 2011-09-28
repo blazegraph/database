@@ -42,9 +42,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
-import com.bigdata.rdf.sail.QueryType;
-import com.bigdata.rdf.sparql.ast.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
@@ -58,8 +55,11 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * Rewrites aspects of queries where bottom-up evaluation would produce

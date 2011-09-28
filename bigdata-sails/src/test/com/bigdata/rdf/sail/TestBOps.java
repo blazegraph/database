@@ -46,6 +46,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 

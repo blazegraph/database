@@ -45,6 +45,7 @@ import org.openrdf.repository.sail.SailTupleQuery;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sop.SOpTree;
 import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 

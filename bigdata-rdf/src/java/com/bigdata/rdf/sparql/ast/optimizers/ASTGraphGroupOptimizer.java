@@ -35,10 +35,6 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sail.DataSetSummary;
-import com.bigdata.rdf.sail.Rule2BOpUtility;
-import com.bigdata.rdf.sparql.ast.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -51,6 +47,10 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
+import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 
 /**
  * Handles a variety of special constructions related to graph graph groups.

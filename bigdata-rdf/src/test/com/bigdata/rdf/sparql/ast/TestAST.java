@@ -42,7 +42,6 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.sail.QueryType;
 
 /**
  * TODO This does not really "test" much, just exercises some basic aspects of

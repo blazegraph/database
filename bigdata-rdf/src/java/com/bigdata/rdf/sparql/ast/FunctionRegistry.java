@@ -61,6 +61,7 @@ import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.store.BD;
 

@@ -35,6 +35,8 @@ import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.evaluation.EvaluationStrategy;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 /**
  * Extended interface.
  * 

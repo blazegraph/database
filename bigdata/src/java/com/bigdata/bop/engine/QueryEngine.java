@@ -64,7 +64,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sail.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
