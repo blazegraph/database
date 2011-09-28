@@ -152,7 +152,30 @@ public class BuildInfo {
 	<loadfile property="buildinfo" srcFile="${buildinfo.file}"/>
 	<echo message="${buildinfo}"/>
 	</target>
-		
+	
+    <!-- Note: I had to explicitly specify the location of the jdepend jar
+         in Preferences => Ant => Runtime in order to get this to work under
+         eclipse. This is odd since eclipse bundles the jar with the ant
+         plugin. 
+
+	     http://www.ryanlowe.ca/blog/archives/001038_junit_ant_task_doesnt_work_in_eclipse.php
+	     
+	     outputfile="${build.dir}/docs/jdepend-report.txt"
+    -->
+    <target name="jdepend" depends="jar">
+    <jdepend format="xml"
+        	 outputfile="${build.dir}/docs/jdepend-report.xml">
+        <exclude name="java.*"/>
+        <exclude name="javax.*"/>
+        <classespath>
+          <pathelement location="${build.dir}/${version}.jar" />
+        </classespath>
+    </jdepend>
+        <style basedir="${build.dir}/docs" destdir="${build.dir}/docs"
+                includes="jdepend-report.xml" 
+                style="${ant.home}/etc/jdepend.xsl" />
+    </target>
+
 	<!-- Note: javac error results often if verbose is disabled. -->
 	<!-- I was able to perform a build with 1.6.0_07. -->
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
