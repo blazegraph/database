@@ -222,7 +222,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         /*
          * Recursion, but only into group nodes.
          */
-        for (int i = 0; i < arity; i++) {
+        for (int i = 0; i < op.arity(); i++) {
 
             final BOp child = op.get(i);
 
