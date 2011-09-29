@@ -223,8 +223,18 @@ public class TestPredicate extends TestCase2 {
                     assertTrue("i=" + i, p2.get(i).isConstant());
                     // equals (same data)
                     assertEquals("i=" + i, c, p2.get(i));
-                    // same ref (no deep copy for constants).
-                    assertTrue("i=" + i, c == p2.get(i));
+                    /*
+                     * asBound() needs to associate the constant with the variable in
+                     * order for the binding to be propagated to the variable. This
+                     * was not true historically when we visited IElements on access
+                     * paths, but it is true now that we are visting IBindingSets on
+                     * access paths.
+                     * 
+                     * See
+                     * https://sourceforge.net/apps/trac/bigdata/ticket/209#comment:7.
+                     */
+//                    // same ref (no deep copy for constants).
+//                    assertTrue("i=" + i, c == p2.get(i));
                 } else {
                     // p2 should still be a variable.
                     assertTrue("i=" + i, p2.get(i).isVar());

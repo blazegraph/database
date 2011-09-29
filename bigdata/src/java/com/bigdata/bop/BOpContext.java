@@ -41,6 +41,7 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -351,12 +352,11 @@ public class BOpContext<E> extends BOpContextBase {
 
             // verify constraint.
             return BOpUtility.isConsistent(constraints, bindings);
-        
+
         }
-        
+
         // no constraint.
-        return true;
-        
+        return true;        
     }
 
     /**
@@ -374,12 +374,17 @@ public class BOpContext<E> extends BOpContextBase {
      *            The predicate.
      * @param bindingSet
      *            The binding set, which is modified as a side-effect.
+     * 
+     *            TODO Make this method package private once we convert to using
+     *            an inline access path.
      */
     @SuppressWarnings("unchecked")
     static public void copyValues(final IElement e, final IPredicate<?> pred,
             final IBindingSet bindingSet) {
 
-        for (int i = 0; i < pred.arity(); i++) {
+        final int arity = pred.arity();
+        
+        for (int i = 0; i < arity; i++) {
 
             final IVariableOrConstant<?> t = pred.get(i);
 
@@ -444,8 +449,6 @@ public class BOpContext<E> extends BOpContextBase {
 //     *            predicate.
 //     * @param out
 //     *            The array into which the values are copied.
-//     * 
-//     *            TODO Unit tests.
 //     * 
 //     * @deprecated This fails to propagate the binding for a variable which was
 //     *             replaced by Constant/2 from the predicate. Use the variant
@@ -525,54 +528,77 @@ public class BOpContext<E> extends BOpContextBase {
      * @return The solution with the combined bindings and <code>null</code> if
      *         the bindings were not consistent, if a constraint was violated,
      *         etc.
+     * 
+     *         FIXME Strip out [leftIsPipeline] entirely from the API, including
+     *         the API of all callers.
      */
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     static public IBindingSet bind(final IBindingSet left,
             final IBindingSet right, final boolean leftIsPipeline,
             final IConstraint[] constraints, final IVariable[] varsToKeep) {
 
-        /*
-         * Note: The binding sets from the query pipeline are always chosen as
-         * the destination into which we will copy the bindings. This allows us
-         * to preserve any state attached to those solutions (this is not
-         * something that we do right now).
-         * 
-         * Note: We clone the destination binding set in order to avoid a side
-         * effect on that binding set if the join fails.
-         */
-        final IBindingSet src = leftIsPipeline ? right : left;
-        final IBindingSet dst = leftIsPipeline ? left.clone() : right.clone();
+//        /*
+//         * Note: The binding sets from the query pipeline are always chosen as
+//         * the destination into which we will copy the bindings. This allows us
+//         * to preserve any state attached to those solutions (this is not
+//         * something that we do right now).
+//         * 
+//         * Note: We clone the destination binding set in order to avoid a side
+//         * effect on that binding set if the join fails.
+//         */
+//        final IBindingSet src = leftIsPipeline ? right : left;
+//        final IBindingSet dst = leftIsPipeline ? left.clone() : right.clone();
+        final IBindingSet src = right;
+        final IBindingSet dst = left.clone();
+
+//        log.error("LEFT :" + left); 
+//        log.error("RIGHT:" + right);
 
         // Propagate bindings from src => dst
         {
 
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = src
+            final Iterator<Map.Entry<IVariable, IConstant>> sitr = src
                     .iterator();
 
-            while (itr.hasNext()) {
+            while (sitr.hasNext()) {
 
-                final Map.Entry<IVariable, IConstant> e = itr.next();
+                final Map.Entry<IVariable, IConstant> e = sitr.next();
 
+                // A variable in the source solution.
                 final IVariable<?> var = (IVariable<?>) e.getKey();
 
-                final IConstant<?> val = e.getValue();
+                // The binding for that variable in the source solution.
+                final IConstant<?> sval = e.getValue();
 
-                if (val != null) {
+                if (sval != null) {
 
-                    final IConstant<?> oval = dst.get(var);
+                    // The binding for that variable in the destination solution.
+                    final IConstant<?> dval = dst.get(var);
 
-                    if (oval != null) {
+                    if (dval != null) {
 
-                        if (!val.equals(oval)) {
+                        if (!sval.equals(dval)) {
 
                             // Bindings are not consistent.
+//                            log.error("FAIL : " + var + " have " + sval + " and " + dval); 
                             return null;
 
-                        } // else already bound to the same value.
+                        } else if (sval.get() instanceof IV<?, ?>) { 
+                            /*
+                             * Already bound to the same value; Check cached
+                             * Value on the IVs.
+                             */
+                            final IV siv = (IV) sval.get();
+                            final IV div = (IV) dval.get();
+                            if (siv.hasValue() && !div.hasValue()) {
+                                // Propagate the cached Value to the dst.
+                                div.setValue(siv.getValue());
+                            }
+                        }
 
                     } else {
 
-                        dst.set(var, val);
+                        dst.set(var, sval);
 
                     }
 
@@ -585,11 +611,18 @@ public class BOpContext<E> extends BOpContextBase {
         // Test constraint(s)
         if (constraints != null && !BOpUtility.isConsistent(constraints, dst)) {
 
+//            log.error("FAIL : CONSTRAINTS : " + constraints);
             return null;
 
         }
 
-        // strip off unnecessary variables.
+        /*
+         * Strip off unnecessary variables.
+         * 
+         * Note: We can't strip of variables until after we have verified that
+         * the solutions may join since a conflict in a variable to be stripped
+         * out should still cause the join to fail.
+         */
         if (varsToKeep != null && varsToKeep.length > 0) {
 
             final Iterator<Map.Entry<IVariable, IConstant>> itr = dst
@@ -616,8 +649,9 @@ public class BOpContext<E> extends BOpContextBase {
 
                 if (!found) {
 
-                    // strip out this binding.
-                    dst.clear(var);
+//                    // strip out this binding.
+//                    dst.clear(var);
+                    itr.remove();
                     
                 }
 
@@ -625,7 +659,12 @@ public class BOpContext<E> extends BOpContextBase {
 
         }
 
-        // Bindings are consistent. Constraints (if any) were not violated.
+        /* 
+         * Bindings are consistent. Constraints (if any) were not violated.
+         */
+
+//        log.error("JOIN :" + dst);
+
         return dst;
 
     }
@@ -696,9 +735,15 @@ public class BOpContext<E> extends BOpContextBase {
 
                         final IBindingSet bset = new ListBindingSet();
 
-                        // propagate bindings from the element to the bset.
+                        /*
+                         * Propagate bindings from the element to the binding
+                         * set.
+                         * 
+                         * Note: This is responsible for handling the semantics
+                         * of Constant/2 (when a predicate has a Constant which
+                         * binds a variable).
+                         */
                         copyValues(e, pred, bset);
-
                         return bset;
 
                     }

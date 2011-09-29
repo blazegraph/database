@@ -2721,7 +2721,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             if (VTE.valueOf(val) != iv.getVTE()) {
 
                 /*
-                 * The VTE is not consistent so the access path is proveably
+                 * The VTE is not consistent so the access path is provably
                  * empty.
                  */
                 

@@ -39,10 +39,12 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.SampleIndex;
 import com.bigdata.bop.ap.SampleIndex.SampleType;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.htree.HTree;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.striterator.IChunkedIterator;
 
 /**
@@ -221,6 +223,10 @@ public class Vertex implements Serializable {
      *            need to become bound.
      * @param elements
      *            The sampled elements as materialized from the index.
+     * 
+     *            FIXME Replace with inline access path based on
+     *            {@link IBindingSetAccessPath}. The data can be stored on an
+     *            {@link HTree}.
      */
     static private IBindingSet[] elementsToBindingSets(
             final IPredicate<?> pred, final Object[] elements) {
@@ -229,8 +235,12 @@ public class Vertex implements Serializable {
 
         for (int i = 0; i < sourceSample.length; i++) {
 
-            final IBindingSet bset = new HashBindingSet();
+            final IBindingSet bset = new ListBindingSet();
 
+            /*
+             * TODO Make this method package private once we convert to using an
+             * inline access path.
+             */
             BOpContext.copyValues((IElement) elements[i], pred, bset);
 
             sourceSample[i] = bset;

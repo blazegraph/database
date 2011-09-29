@@ -38,6 +38,9 @@ import com.bigdata.bop.IVariable;
  * operation.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * 
+ * @deprecated This is not currently supported.  It was implemented, but we did
+ * not find improved performance for it.
  */
 public interface IStarJoin<E> extends IPredicate<E> {
 

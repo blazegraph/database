@@ -69,6 +69,12 @@ public class TestAll extends TestCase {
         // Specialized RDF filters
         suite.addTest(com.bigdata.bop.rdf.filter.TestAll.suite());
 
+        /*
+         * Test suite for logic which "joins" two solutions, propagating
+         * bindings and verifying constraints.
+         */
+        suite.addTestSuite(TestBind.class);
+        
         // Specialized RDF join operators
         suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
 

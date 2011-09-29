@@ -55,14 +55,13 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.controller.SubqueryHashJoinOp;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -420,12 +419,12 @@ public class TestHTreeHashJoin extends TestCase2 {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -543,12 +542,12 @@ public class TestHTreeHashJoin extends TestCase2 {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -660,12 +659,12 @@ public class TestHTreeHashJoin extends TestCase2 {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -777,12 +776,12 @@ public class TestHTreeHashJoin extends TestCase2 {
             
             IBindingSet tmp;
 
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Brad"));
             tmp.set(y, new Constant<String>("Fred"));
             list.add(tmp);
             
-            tmp = new HashBindingSet();
+            tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             list.add(tmp);
             
@@ -900,16 +899,16 @@ public class TestHTreeHashJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source;
         {
          
-            final IBindingSet bset1 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
             
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
             {
              
                 bset2.set(x, new Constant<String>("Luke"));
                 
             }
             
-            final IBindingSet bset3 = new HashBindingSet();
+            final IBindingSet bset3 = new ListBindingSet();
             {
              
                 bset3.set(x, new Constant<String>("Mary"));
@@ -1061,16 +1060,16 @@ public class TestHTreeHashJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source;
         {
          
-            final IBindingSet bset1 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
             
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
             {
              
                 bset2.set(x, new Constant<String>("Luke"));
                 
             }
             
-            final IBindingSet bset3 = new HashBindingSet();
+            final IBindingSet bset3 = new ListBindingSet();
             {
              
                 bset3.set(x, new Constant<String>("Mary"));

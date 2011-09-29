@@ -331,8 +331,6 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final int arity = arity();
         
-//        boolean modified = false;
-        
         for (int i = 0; i < arity; i++) {
 
             final IVariableOrConstant<?> t = (IVariableOrConstant<?>) get(i);
@@ -349,9 +347,18 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 continue;
             }
 
-            tmp._set(i, val.clone());
-            
-//            modified = true;
+            /*
+             * asBound() needs to associate the constant with the variable in
+             * order for the binding to be propagated to the variable. This
+             * was not true historically when we visited IElements on access
+             * paths, but it is true now that we are visting IBindingSets on
+             * access paths.
+             * 
+             * See
+             * https://sourceforge.net/apps/trac/bigdata/ticket/209#comment:7.
+             */
+            tmp._set(i, new Constant(var, val.get()));
+//            tmp._set(i, val.clone());
 
         }
         

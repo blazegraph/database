@@ -50,6 +50,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
@@ -68,6 +69,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThreadLocalBufferFactory;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -77,6 +79,7 @@ import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
@@ -1604,13 +1607,26 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 				stats.accessPathRangeCount.add(rangeCount);
 
-				if (accessPath.getPredicate() instanceof IStarJoin<?>) {
+                if (accessPath.getPredicate() instanceof IStarJoin<?>) {
 
-					handleStarJoin();
+                    /*
+                     * Star join. This has not yet proven to be more efficient.
+                     * Presumably we wind up with sufficiently good IO locality
+                     * with a normal pipeline join that the star join does not
+                     * improve matters further.
+                     */
+					
+                    handleStarJoin();
 
 				} else {
 
-					handleJoin();
+				    if(true && accessPath instanceof IBindingSetAccessPath) {
+				        // Handle join in terms of an IBindingSet iterator.
+                        handleJoin2();
+				    } else {
+				        // Handle join in terms of an IElement[] iterator.
+				        handleJoin();
+				    }
 
 				}
 
@@ -1618,9 +1634,10 @@ public class PipelineJoin<E> extends PipelineOp implements
 
 			}
 
-			/**
-			 * A vectored pipeline join (chunk at a time processing).
-			 */
+            /**
+             * A vectored pipeline join (chunk at a time processing) for
+             * {@link IElement}s.
+             */
 			protected void handleJoin() {
 
 				// Obtain the iterator for the current join dimension.
@@ -1727,6 +1744,154 @@ public class PipelineJoin<E> extends PipelineOp implements
 				}
 
 			}
+
+            /**
+             * A vectored pipeline join (chunk at a time processing) based on
+             * the visitation of {@link IBindingSet}s
+             */
+            protected void handleJoin2() {
+
+                // Obtain the iterator for the current join dimension.
+                final ICloseableIterator<IBindingSet> itr = ((IBindingSetAccessPath<?>) accessPath)
+                        .solutions(stats);
+
+                try {
+
+                    // Each thread gets its own buffer.
+                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
+                            .get();
+
+                    // #of input solutions consumed (pre-increment).
+                    stats.inputSolutions.add(bindingSets.length); 
+
+                    while (itr.hasNext()) {
+
+                        halted();
+                        
+                        int bindex = 0;
+                        int naccepted = 0;
+                        
+                        final IBindingSet right = itr.next(); // access path solutions
+                        
+                        for (IBindingSet left : bindingSets) { // upstream pipeline solutions.
+
+                            // join solutions.
+                            final IBindingSet bset = context.bind(left, right,
+                                    true/* leftIsPipeline */, constraints,
+                                    variablesToKeep);
+                            
+                            if (bset != null) {
+                                // solutions joined.
+                                if (limit != Long.MAX_VALUE
+                                        && exactOutputCount.incrementAndGet() > limit) {
+                                    // break query @ limit.
+                                    if (log.isInfoEnabled())
+                                        log.info("Breaking query @ limit: limit=" + limit
+                                                + ", exactOutputCount="
+                                                + exactOutputCount.get());
+                                    halt((Void) null);
+                                    break;
+                                }
+
+                                // Accept this binding set.
+                                unsyncBuffer.add(bset);
+
+                                // #of binding sets accepted.
+                                naccepted++;
+                                
+                                // #of elements accepted for this binding set.
+                                this.naccepted[bindex]++;
+
+                                // #of output solutions generated.
+                                stats.outputSolutions.increment(); 
+
+                            }
+
+                            bindex++;
+
+                        }
+
+                        if (log.isDebugEnabled())
+                            if (naccepted == 0) {
+                                log.debug("Rejected solution: " + right);
+                            } else {
+                                log.debug("Accepted solution for " + naccepted
+                                        + " of " + bindingSets.length
+                                        + " possible bindingSet combinations: "
+                                        + right);
+                            }
+
+                    } // next chunk.
+
+                    if (optional) {
+
+                        /*
+                         * Note: when NO binding sets were accepted AND the
+                         * predicate is OPTIONAL then we output the _original_
+                         * binding set(s) to the sink join task(s). The
+                         * CONSTRAINT(s) are NOT applied for the optional
+                         * solutions.
+                         */
+
+                        // Thread-local buffer iff optional sink is in use.
+                        final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = threadLocalBufferFactory2 == null ? null
+                                : threadLocalBufferFactory2.get();
+
+                        for (int bindex = 0; bindex < bindingSets.length; bindex++) {
+
+                            if (naccepted[bindex] > 0)
+                                continue;
+
+                            final IBindingSet bs = bindingSets[bindex];
+
+                            if (log.isTraceEnabled())
+                                log
+                                        .trace("Passing on solution which fails an optional join: "
+                                                + bs);
+
+                            if (limit != Long.MAX_VALUE
+                                    && exactOutputCount.incrementAndGet() > limit) {
+                                // break query @ limit.
+                                if (log.isInfoEnabled())
+                                    log.info("Breaking query @ limit: limit=" + limit
+                                            + ", exactOutputCount="
+                                            + exactOutputCount.get());
+                                halt((Void) null);
+                                break;
+                            }
+
+                            if (unsyncBuffer2 == null) {
+                                // use the default sink.
+                                unsyncBuffer.add(bs);
+                            } else {
+                                // use the alternative sink.
+                                unsyncBuffer2.add(bs);
+                            }
+
+                            stats.outputSolutions.increment();
+
+                        }
+
+                    }
+                    return;
+
+                } catch (Throwable t) {
+
+                    // ensure query halts.
+                    halt(t);
+                    if (getCause() != null) {
+                        // abnormal termination.
+                        throw new RuntimeException(t);
+                    }
+                    // normal termination - ignore exception.
+
+                } finally {
+
+                    itr.close();
+
+                }
+
+            }
 
 			protected void handleStarJoin() {
 

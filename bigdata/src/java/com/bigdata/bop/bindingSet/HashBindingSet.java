@@ -462,12 +462,11 @@ public class HashBindingSet implements IBindingSet {
 
     }
 
-    /**
-     * Iterator does not support removal, set, or concurrent modification.
-     */
     public Iterator<Entry<IVariable, IConstant>> iterator() {
 
-        return Collections.unmodifiableMap(current()).entrySet().iterator();
+//        return Collections.unmodifiableMap(current()).entrySet().iterator();
+        
+        return current().entrySet().iterator();
         
     }
 

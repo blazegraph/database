@@ -233,6 +233,15 @@ public class AbstractDataDrivenSPARQLTestCase extends
             final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
                     + queryFileURL;
 
+            /*
+             * FIXME This winds up using the UNISOLATED view to issue the
+             * queries since the [store] reference is the one that we used to
+             * load the data. The test harness lacks a means to distinguish a
+             * read-only query from an update. That could be captured by an
+             * extension of the manifest. We could also capture the concept of
+             * the triple/sids/quads mode distinction and even other
+             * configuration properties for the KB instance.
+             */
             astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, baseURI);
 

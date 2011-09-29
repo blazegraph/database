@@ -414,9 +414,10 @@ public class ListBindingSet implements IBindingSet {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public Iterator<Map.Entry<IVariable, IConstant>> iterator() {
 		
-		return (Iterator<Map.Entry<IVariable, IConstant>>) ((List) Collections
-				.unmodifiableList(current())).iterator();
-		
+//		return (Iterator<Map.Entry<IVariable, IConstant>>) ((List) Collections
+//				.unmodifiableList(current())).iterator();
+        return (Iterator<Map.Entry<IVariable, IConstant>>) ((List) current())
+                .iterator();
 	}
 
 	@SuppressWarnings("rawtypes")

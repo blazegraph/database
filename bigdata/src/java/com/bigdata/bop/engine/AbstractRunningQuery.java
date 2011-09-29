@@ -543,8 +543,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
                 final BOpStats queryStats = statsMap.get(query.getId());
 
-                queryBuffer = new BlockingBufferWithStats<IBindingSet[]>(query,
-                        queryStats);
+                queryBuffer = newQueryBuffer(query, queryStats);
 
                 queryIterator = new QueryResultIterator<IBindingSet[]>(this,
                         queryBuffer.iterator());
@@ -568,6 +567,25 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     }
 
+    /**
+     * Return the buffer that will be used to absorb solutions. The solutions
+     * will be drained from the buffer using its iterator.
+     * 
+     * @param query
+     *            The root of the query plan.
+     * @param queryStats
+     *            Used to track statistics on the solutions to the query (#of
+     *            chunks, #of units).
+     *            
+     * @return The buffer.
+     */
+    protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
+            final PipelineOp query, final BOpStats queryStats) {
+
+        return new BlockingBufferWithStats<IBindingSet[]>(query, queryStats);
+        
+    }
+    
     /**
      * Pre-populate a map with {@link BOpStats} objects for the query. Only the
      * child operands are visited. Operators in subqueries are not visited since

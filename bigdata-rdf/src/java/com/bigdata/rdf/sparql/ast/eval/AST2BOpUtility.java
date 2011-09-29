@@ -41,9 +41,7 @@ import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
 import com.bigdata.bop.solutions.GroupByOp;
@@ -59,22 +57,14 @@ import com.bigdata.bop.solutions.PipelinedAggregationOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
-import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
 import com.bigdata.rdf.internal.constraints.InBOp;
-import com.bigdata.rdf.internal.constraints.IsInlineBOp;
-import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
-import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
-import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
@@ -2023,255 +2013,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
                         new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 })), ctx.queryHints);
-
-        return left;
-
-    }
-
-    /**
-     * If the value expression that needs the materialized variables can run
-     * without a {@link NotMaterializedException} then just route to the
-     * <i>rightId</i> (around the rest of the materialization pipeline steps).
-     * This happens in the case of a value expression that only "sometimes"
-     * needs materialized values, but not always (i.e. materialization
-     * requirement depends on the data flowing through). A good example of this
-     * is {@link CompareBOp}, which can sometimes work on internal values and
-     * sometimes can't.
-     * 
-     * TODO Consider the efficiency of the steps which are being taken. Should
-     * we test for the most common cases first, or for those with the least
-     * latency to "fix"?
-     * 
-     * @see TryBeforeMaterializationConstraint
-     */
-    @SuppressWarnings("rawtypes")
-    public static PipelineOp addMaterializationSteps(PipelineOp left,
-            final int rightId, final IValueExpression<IV> ve,
-            final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
-
-        /*
-         * If the constraint "c" can run without a NotMaterializedException then
-         * bypass the rest of the pipeline by routing the solutions to rightId.
-         */
-        final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                new NeedsMaterializationBOp(ve));
-
-        left = applyQueryHints(
-                new ConditionalRoutingOp(
-                        leftOrEmpty(left),
-                        NV.asMap(new NV[] {//
-                                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),
-                                new NV(
-                                        ConditionalRoutingOp.Annotations.CONDITION,
-                                        c2),
-                                new NV(PipelineOp.Annotations.ALT_SINK_REF,
-                                        rightId), })), ctx.queryHints);
-
-        return addMaterializationSteps(left, rightId, vars, ctx);
-
-    }
-
-    /**
-     * Adds a series of materialization steps to materialize terms needed
-     * downstream. To materialize the variable <code>?term</code>, the pipeline
-     * looks as follows:
-     * 
-     * <pre>
-     * (A) leftId      : The upstream operator
-     * (B) condId1     : if !materialized then condId2 (fall through) else rightId 
-     * (C) condId2     : if inline then inlineMatId (fall through) else lexJoinId
-     * (D) inlineMatId : InlineMaterializeOp; goto rightId.
-     * (E) lexJoinId   : LexJoin (fall through).
-     * (F) rightId     : the downstream operator.
-     * </pre>
-     * 
-     * <pre>
-     * left 
-     * ->
-     * ConditionalRoutingOp1 (condition=!IsMaterialized(?term), alt=right)
-     * ->
-     * ConditionalRoutingOp2 (condition=IsInline(?term), alt=PipelineJoin)
-     * ->
-     * InlineMaterializeOp (predicate=LexPredicate(?term), sink=right)
-     * ->
-     * PipelineJoin (predicate=LexPredicate(?term))
-     * ->
-     * right
-     * </pre>
-     * 
-     * @param left
-     *            the left (upstream) operator that immediately proceeds the
-     *            materialization steps
-     * @param rightId
-     *            the id of the right (downstream) operator that immediately
-     *            follows the materialization steps
-     * @param vars
-     *            the terms to materialize
-     * 
-     * @return the final bop added to the pipeline by this method
-     * 
-     * @see TryBeforeMaterializationConstraint
-     * 
-     * TODO make [vars] a Set.
-     */
-    @SuppressWarnings("rawtypes")
-    private static PipelineOp addMaterializationSteps(PipelineOp left,
-            final int rightId, final Collection<IVariable<IV>> vars,
-            final AST2BOpContext ctx) {
-
-        final Iterator<IVariable<IV>> it = vars.iterator();
-
-        int firstId = ctx.nextId();
-
-        while (it.hasNext()) {
-
-            final IVariable<IV> v = it.next();
-
-            // Generate bopIds for the routing targets for this variable.
-            final int condId1 = firstId;
-            final int condId2 = ctx.nextId();
-            final int inlineMaterializeId = ctx.nextId();
-            final int lexJoinId = ctx.nextId();
-
-            final int endId;
-
-            if (!it.hasNext()) {
-
-                /*
-                 * If there are no more terms to materialize, the terminus of
-                 * this materialization pipeline is the "right" (downstream)
-                 * operator that was passed in.
-                 */
-                endId = rightId;
-
-            } else {
-
-                /*
-                 * If there are more terms, the terminus of this materialization
-                 * pipeline is the 1st operator of the next materialization
-                 * pipeline.
-                 */
-                endId = firstId = ctx.nextId();
-
-            }
-
-            final IConstraint c1 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                    new IsMaterializedBOp(v, false/* materialized */));
-
-            final PipelineOp condOp1 = applyQueryHints(
-                    new ConditionalRoutingOp(
-                            leftOrEmpty(left),
-                            NV.asMap(new NV[] {//
-                                    new NV(BOp.Annotations.BOP_ID, condId1),
-                                    new NV(
-                                            ConditionalRoutingOp.Annotations.CONDITION,
-                                            c1),
-                                    new NV(PipelineOp.Annotations.SINK_REF,
-                                            condId2),
-                                    new NV(PipelineOp.Annotations.ALT_SINK_REF,
-                                            endId), })), ctx.queryHints);
-
-            if (log.isDebugEnabled()) {
-                log.debug("adding 1st conditional routing op: " + condOp1);
-            }
-
-            final IConstraint c2 = new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                    new IsInlineBOp(v, true/* inline */));
-
-            final PipelineOp condOp2 = applyQueryHints(
-                    new ConditionalRoutingOp(
-                            leftOrEmpty(condOp1),
-                            NV.asMap(new NV[] {//
-                                    new NV(BOp.Annotations.BOP_ID, condId2),
-                                    new NV(
-                                            ConditionalRoutingOp.Annotations.CONDITION,
-                                            c2),
-                                    new NV(PipelineOp.Annotations.SINK_REF,
-                                            inlineMaterializeId),
-                                    new NV(PipelineOp.Annotations.ALT_SINK_REF,
-                                            lexJoinId), })), ctx.queryHints);
-
-            if (log.isDebugEnabled()) {
-                log.debug("adding 2nd conditional routing op: " + condOp2);
-            }
-
-            final Predicate lexPred;
-            {
-
-                /*
-                 * Note: Use the timestamp of the triple store view unless this
-                 * is a read/write transaction, in which case we need to use the
-                 * unisolated view in order to see any writes which it may have
-                 * performed (lexicon writes are always unisolated).
-                 */
-
-                long timestamp = ctx.db.getTimestamp();
-                if (TimestampUtility.isReadWriteTx(timestamp))
-                    timestamp = ITx.UNISOLATED;
-
-                final String ns = ctx.db.getLexiconRelation().getNamespace();
-
-                lexPred = LexPredicate.reverseInstance(ns, timestamp, v);
-
-            }
-
-            if (log.isDebugEnabled()) {
-                log.debug("lex pred: " + lexPred);
-            }
-
-            final PipelineOp inlineMaterializeOp = applyQueryHints(
-                    new InlineMaterializeOp(
-                            leftOrEmpty(condOp2),
-                            NV.asMap(new NV[] {//
-                                    new NV(BOp.Annotations.BOP_ID,
-                                            inlineMaterializeId),
-                                    new NV(
-                                            InlineMaterializeOp.Annotations.PREDICATE,
-                                            lexPred.clone()),
-                                    new NV(PipelineOp.Annotations.SINK_REF,
-                                            endId), })), ctx.queryHints);
-
-            if (log.isDebugEnabled()) {
-                log.debug("adding inline materialization op: "
-                        + inlineMaterializeOp);
-            }
-
-            {
-                // annotations for this join.
-                final List<NV> anns = new LinkedList<NV>();
-
-                // TODO Why is lexPred being cloned?
-                Predicate pred = (Predicate) lexPred.clone();
-                
-                anns.add(new NV(BOp.Annotations.BOP_ID, lexJoinId));
-                anns.add(new NV(PipelineOp.Annotations.SINK_REF, endId));
-                
-                if (ctx.isCluster() && !Rule2BOpUtility.forceRemoteAPs) {
-                    // use a partitioned join.
-                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.SHARDED));
-                    pred = (Predicate) pred.setProperty(
-                            Predicate.Annotations.REMOTE_ACCESS_PATH, false);
-                }
-
-                anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
-
-                // Join against the lexicon to materialize the Value.
-                final PipelineOp lexJoinOp = applyQueryHints(
-                        //
-                        new PipelineJoin(leftOrEmpty(inlineMaterializeOp), //
-                                anns.toArray(new NV[anns.size()])),
-                        ctx.queryHints);
-
-                if (log.isDebugEnabled()) {
-                    log.debug("adding lex join op: " + lexJoinOp);
-                }
-
-                left = lexJoinOp;
-
-            }
-            
-        }
 
         return left;
 

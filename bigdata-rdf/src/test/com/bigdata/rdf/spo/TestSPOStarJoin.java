@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Properties;
+
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -15,14 +16,13 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.spo.SPOStarJoin.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -383,7 +383,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
     }
 
     protected IBindingSet createBindingSet(final IBinding... bindings) {
-        final IBindingSet bindingSet = new HashBindingSet();
+        final IBindingSet bindingSet = new ListBindingSet();
         if (bindings != null) {
             for (IBinding b : bindings) {
                 bindingSet.set(b.getVar(), b.getVal());

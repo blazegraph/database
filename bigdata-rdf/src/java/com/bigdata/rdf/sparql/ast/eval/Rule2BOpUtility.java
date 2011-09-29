@@ -50,7 +50,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.controller.AbstractSubqueryOp;
@@ -564,7 +564,7 @@ public class Rule2BOpUtility extends AST2BOpBase {
 
         final IKeyOrder[] a = new IKeyOrder[tailCount];
 
-        final IBindingSet bindingSet = new HashBindingSet();
+        final IBindingSet bindingSet = new ListBindingSet();
 
         for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
 

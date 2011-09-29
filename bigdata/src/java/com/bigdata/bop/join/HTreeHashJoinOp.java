@@ -57,6 +57,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.rwstore.sector.MemStore;
@@ -553,8 +554,8 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            HashJoinUtility.hashJoin(BOpContext.solutions(
-                    accessPath.iterator()/*left*/, pred, joinVars, stats),
+            HashJoinUtility.hashJoin(
+                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
                     unsyncBuffer, joinVars, selectVars, constraints,
                     rightSolutions, joinSet, optional, false/*leftIsPipeline*/);
 
