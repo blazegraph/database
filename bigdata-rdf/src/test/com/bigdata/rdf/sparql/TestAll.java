@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sparql.ast.eval;
+package com.bigdata.rdf.sparql;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -55,38 +55,11 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("AST Evaluation");
+        final TestSuite suite = new TestSuite("SPARQL");
 
-        /*
-         * Data driven tests.
-         */
-        
-        // Basic query.
-        suite.addTestSuite(TestBasicQuery.class);
-        
-        // Different kinds of subqueries.
-        suite.addTestSuite(TestSubQuery.class);
+        // SPARQL parser, AST, AST optimizers, and AST evaluation.
+        suite.addTest(com.bigdata.rdf.sparql.ast.TestAll.suite());
 
-        // Test suite for aggregation queries.
-        suite.addTestSuite(TestAggregationQuery.class);
-
-        // Full text search
-        suite.addTestSuite(TestSearch.class);
-
-        // Complex queries.
-        suite.addTestSuite(TestComplexQuery.class);
-        
-        /*
-         * Some persnickety DAWK test cases, mainly things dealing with bottom
-         * up evaluation semantics.
-         */
-        suite.addTestSuite(TestTCK.class);
-
-        /*
-         * Tests corresponding to various trouble tickets.
-         */
-        suite.addTestSuite(TestTickets.class);
-        
         return suite;
         
     }
