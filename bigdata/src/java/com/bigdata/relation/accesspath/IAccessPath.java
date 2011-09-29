@@ -30,7 +30,6 @@ package com.bigdata.relation.accesspath;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -39,13 +38,12 @@ import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
-import cutthecrap.utils.striterators.IFilter;
-
 /**
- * An abstraction for efficient reads on an {@link IRelation} using the index
- * selected by an {@link IPredicate} constraint. Like their {@link #iterator()},
- * implementations of this interface are NOT required to be thread-safe. They
- * are designed for a single-threaded consumer.
+ * An abstraction for efficient reads of {@link IElement}s from a
+ * {@link IRelation} using the index selected by an {@link IPredicate}
+ * constraint. Like their {@link #iterator()}, implementations of this interface
+ * are NOT required to be thread-safe. They are designed for a single-threaded
+ * consumer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -54,46 +52,13 @@ import cutthecrap.utils.striterators.IFilter;
  *            The generic type of the [R]elation elements of the
  *            {@link IRelation}.
  */
-public interface IAccessPath<R> extends Iterable<R> {
-
-    /**
-     * The constraints on the {@link IAccessPath}.
-     */
-    public IPredicate<R> getPredicate();
+public interface IAccessPath<R> extends IAbstractAccessPath<R> { //extends Iterable<R> {
 
     /**
      * The order in which the elements will be visited.
      */
     public IKeyOrder<R> getKeyOrder();
     
-    /**
-     * True iff the access path is empty (there are no matches for the
-     * {@link IPredicate}) This is more conclusive than {@link #rangeCount()}
-     * since you MAY have a non-zero range count when the key range is in fact
-     * empty (there may be "deleted" index entries within the key range).
-     */
-    public boolean isEmpty();
-
-    /**
-     * Return the maximum #of elements spanned by the {@link IPredicate}.
-     * <p>
-     * Note: When there is an {@link IFilter} on the {@link IPredicate} the
-     * exact range count MUST apply that {@link IFilter}, which means that it
-     * will be required to traverse the index counting tuples which pass the
-     * {@link IFilter}. However, {@link IFilter}s are ignored for the fast
-     * range count.
-     * 
-     * @param exact
-     *            When <code>true</code>, the result will be an exact count and
-     *            may require a key-range scan. When <code>false</code>, the
-     *            result will be an upper bound IFF delete markers are
-     *            provisioned for the backing index (delete markers are required
-     *            for transactions and for scale-out indices).
-     * 
-     * @see IRangeQuery
-     */
-    public long rangeCount(boolean exact);
-
     /**
      * The index selected for the access path.
      * <p>

@@ -34,6 +34,7 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
@@ -90,6 +91,10 @@ public class ConditionalRoutingOp extends PipelineOp {
      */
     public ConditionalRoutingOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
+    }
+
+    public ConditionalRoutingOp(BOp[] args, NV... anns) {
+        this(args, NV.asMap(anns));
     }
 
     /**

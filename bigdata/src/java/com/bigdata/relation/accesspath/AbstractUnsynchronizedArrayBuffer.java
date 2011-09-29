@@ -158,7 +158,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
      *         {@link #overflow()}
      */
     @SuppressWarnings("unchecked")
-    public boolean add2(E e) {
+    public boolean add2(final E e) {
 
         if (e == null)
             throw new IllegalArgumentException();

@@ -32,8 +32,6 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.bigdata.bop.controller.SubqueryOp;
-
 /**
  * Interface for a set of bindings. The set of variables values is extensible
  * and the bound values are loosely typed.
@@ -108,10 +106,6 @@ public interface IBindingSet extends Cloneable, Serializable {
 
 	/**
 	 * Visits the bindings.
-	 * 
-	 * @todo The unit tests verify that the implementations do not permit
-	 *       mutation using the iterator, but that is not actually specified by
-	 *       the API as forbidden.
 	 */
     public Iterator<Map.Entry<IVariable,IConstant>> iterator();
 

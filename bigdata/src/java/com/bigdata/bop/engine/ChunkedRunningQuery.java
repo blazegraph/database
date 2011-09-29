@@ -222,6 +222,9 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         if (!msg.isMaterialized())
             throw new IllegalStateException();
 
+//        if (SolutionsLog.solutionsLog.isInfoEnabled())
+//            SolutionsLog.log(msg);
+        
         final BSBundle bundle = new BSBundle(msg.getBOpId(), msg
                 .getPartitionId());
 
@@ -1084,7 +1087,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * other operator evaluation pass attempts to write on the query
                  * buffer.
                  */
-                sink = new NoCloseBuffer<IBindingSet[]>(getQueryBuffer());
+                sink = new NoCloseBuffer<IBindingSet[]>(getQueryId(), bopId,
+                        partitionId, getQueryBuffer());
             } else {
 //                final BOp targetOp = getBOpIndex().get(sinkId);
 //                final Integer toGroupId = (Integer) targetOp
@@ -1174,7 +1178,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             return 
 //            new SinkTransitionBuffer(
                     new HandleChunkBuffer(
-                    ChunkedRunningQuery.this, bopId, sinkId, op
+                    ChunkedRunningQuery.this, bopId, partitionId, sinkId, op
                             .getChunkCapacity(), sinkMessagesOut, stats)
 //            ,
 //                    sinkTransitionMetadata)
@@ -1233,15 +1237,34 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      * This is used to prevent a {@link PipelineOp} from accidentally closing
      * the query buffer.
      */
-    private static class NoCloseBuffer<E> extends DelegateBuffer<E> {
+    private class NoCloseBuffer<E> extends DelegateBuffer<E> {
 
-        public NoCloseBuffer(final IBlockingBuffer<E> delegate) {
+        private final UUID queryId;
+        private final int bopId;
+        final int partitionId;
+        
+        public NoCloseBuffer(final UUID queryId, final int bopId,
+                final int partitionId, final IBlockingBuffer<E> delegate) {
+        
+//        public NoCloseBuffer(final IBlockingBuffer<E> delegate) {
 
             super(delegate);
             
+            this.queryId = queryId;
+            this.bopId = bopId;
+            this.partitionId = partitionId;
+
         }
 
-//        public void add(E e) {
+        public void add(final E e) {
+            super.add(e);
+            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+                SolutionsLog
+                        .log(queryId, bopId, partitionId, (IBindingSet[]) e);
+            }
+        }
+
+        // public void add(E e) {
 //            log.error(Arrays.toString((Object[])e));
 //            super.add(e);
 //        }
@@ -1281,6 +1304,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
         private final ChunkedRunningQuery q;
 
         private final int bopId;
+        
+        private final int partitionId;
 
         private final int sinkId;
 
@@ -1319,11 +1344,13 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
          * @param stats
          */
         public HandleChunkBuffer(final ChunkedRunningQuery q, final int bopId,
+                final int partitionId,
                 final int sinkId, final int chunkCapacity,
 //                final SinkTransitionMetadata sinkTransitionMetadata,
                 final AtomicInteger sinkMessagesOut, final BOpStats stats) {
             this.q = q;
             this.bopId = bopId;
+            this.partitionId = partitionId;
             this.sinkId = sinkId;
             this.chunkCapacity = chunkCapacity;
 //            this.sinkTransitionMetadata = sinkTransitionMetadata;
@@ -1344,6 +1371,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             
             if(!open)
                 throw new BufferClosedException();
+
+            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+                SolutionsLog
+                        .log(q.getQueryId(), bopId, partitionId, (IBindingSet[]) e);
+            }
 
 //            for (IBindingSet bset : e) {
 //                sinkTransitionMetadata.handleBindingSet(bset);

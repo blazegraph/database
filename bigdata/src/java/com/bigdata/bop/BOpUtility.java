@@ -476,6 +476,30 @@ public class BOpUtility {
     }
 
     /**
+     * Return the variables from the operator's arguments.
+     * 
+     * @param op
+     *            The operator.
+     *            
+     * @return An iterator visiting its {@link IVariable} arguments.
+     */
+    @SuppressWarnings("unchecked")
+    static public Iterator<IVariable<?>> getDistinctArgumentVariables(final BOp op) {
+
+        return new Striterator(op.argIterator())
+                .addFilter(new Filter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean isValid(final Object arg0) {
+                        return arg0 instanceof IVariable<?>;
+                    }
+                }).makeUnique();
+
+    }
+
+    /**
      * The #of arguments to this operation which are variables. This method does
      * not report on variables in child nodes nor on variables in attached
      * {@link IConstraint}, etc.

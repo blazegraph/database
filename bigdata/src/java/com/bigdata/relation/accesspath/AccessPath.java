@@ -36,14 +36,19 @@ import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.bop.cost.BTreeCostModel;
 import com.bigdata.bop.cost.DiskCostModel;
 import com.bigdata.bop.cost.IndexSegmentCostModel;
 import com.bigdata.bop.cost.ScanCostReport;
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -81,6 +86,7 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.FilterBase;
@@ -108,7 +114,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       {@link IRelation#getKeyOrder(IPredicate)} should also be updated to
  *       reflect the allowance for non-perfect access paths.
  */
-public class AccessPath<R> implements IAccessPath<R> {
+public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
@@ -677,6 +683,15 @@ public class AccessPath<R> implements IAccessPath<R> {
         
     }
 
+    public ICloseableIterator<IBindingSet> solutions(final BaseJoinStats stats) {
+
+        final IVariable<?>[] vars = BOpUtility.toArray(BOpUtility
+                .getDistinctArgumentVariables(predicate));
+
+        return BOpContext.solutions(iterator(), predicate, vars, stats);
+
+    }
+    
     final public IChunkedOrderedIterator<R> iterator() {
         
         return iterator(0L/* offset */, 0L/* limit */, 0);

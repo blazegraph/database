@@ -54,14 +54,13 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -790,7 +789,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 			}
 		};
 		
-		final IBindingSet bs = new HashBindingSet();
+		final IBindingSet bs = new ListBindingSet();
 		
 		{
 			final AndBOp and = new AndBOp(T, T);
@@ -869,7 +868,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 			}
 		};
 		
-		final IBindingSet bs = new HashBindingSet();
+		final IBindingSet bs = new ListBindingSet();
 		
 		{
 			final OrBOp or = new OrBOp(T, T);

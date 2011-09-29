@@ -172,13 +172,8 @@ public class TestPipelineJoin extends TestCase2 {
     public void test_join_noSharedVariables_emptySourceSolution()
             throws InterruptedException, ExecutionException {
 
-//        final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        
-//        final BOp startOp =                 new CopyOp(new BOp[] {}, NV.asMap(new NV[] {//
-//				new NV(Predicate.Annotations.BOP_ID, startId),//
-//				}));
 
 		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
 				new Constant<String>("Mary"), Var.var("x") }, NV

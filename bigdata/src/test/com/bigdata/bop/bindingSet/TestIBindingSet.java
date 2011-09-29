@@ -195,28 +195,43 @@ public abstract class TestIBindingSet extends TestCase2 {
      */
     public void testIterator ()
     {
-        Var<?> var1 = Var.var ( "a" ) ;
-        Var<?> var2 = Var.var ( "b" ) ;
-        Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
-        Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+        final Var<?> var1 = Var.var("a");
+        final Var<?> var2 = Var.var("b");
+        final Constant<Integer> val1 = new Constant<Integer>(1);
+        final Constant<Integer> val2 = new Constant<Integer>(2);
 
-        IBindingSet bs = newBindingSet ( new IVariable [] { var1, var2 }, new IConstant [] { val1, val2 } ) ;
+        final IBindingSet bs = newBindingSet(//
+                new IVariable[] { var1, var2 },//
+                new IConstant[] { val1, val2 }//
+                );
 
-        int n = 0 ;
-        for ( Iterator<Map.Entry<IVariable,IConstant>> i = bs.iterator (); i.hasNext (); )
-        {
-            Map.Entry<IVariable,IConstant> e = i.next () ;
-            IVariable<?> var = e.getKey () ;
+        int nvisited = 0 ;
+        for (Iterator<Map.Entry<IVariable, IConstant>> i = bs.iterator(); i
+                .hasNext();) {
+
+            final Map.Entry<IVariable, IConstant> e = i.next();
+            final IVariable<?> var = e.getKey();
 
             if      ( var1 == var ) assertTrue ( "wrong value", val1 == e.getValue () ) ;
             else if ( var2 == var ) assertTrue ( "wrong value", val2 == e.getValue () ) ;
             else fail ( "unexpected variable: " + var ) ;
 
-            try { i.remove () ; fail ( "UnsupportedOperationException expected, iterator remove" ) ; }
-            catch ( UnsupportedOperationException ex ) {}
-            n++ ;
+//            try {
+//                i.remove();
+//                fail("UnsupportedOperationException expected, iterator remove");
+//            } catch (UnsupportedOperationException ex) {
+//            }
+            i.remove();
+            nvisited++;
         }
-        assertTrue ( "wrong count", 2 == n ) ;
+        assertEquals("size", 2, nvisited);
+
+        // Should be empty afterwards.
+        assertEquals(newBindingSet(//
+                new IVariable[] {},//
+                new IConstant[] {}//
+                ), bs);
+
     }
 
     /**

@@ -36,6 +36,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
@@ -80,7 +81,7 @@ public class InlineMaterializeOp<E> extends PipelineOp {
      * 
      * @param op
      */
-    public InlineMaterializeOp(final InlineMaterializeOp op) {
+    public InlineMaterializeOp(final InlineMaterializeOp<E> op) {
         super(op);
     }
 
@@ -90,9 +91,12 @@ public class InlineMaterializeOp<E> extends PipelineOp {
      * @param args
      * @param anns
      */
-    public InlineMaterializeOp(final BOp[] args, 
-    		final Map<String, Object> anns) {
+    public InlineMaterializeOp(final BOp[] args, final Map<String, Object> anns) {
         super(args, anns);
+    }
+    
+    public InlineMaterializeOp(final BOp[] args, final NV... anns) {
+        super(args, NV.asMap(anns));
     }
 
 	/**
