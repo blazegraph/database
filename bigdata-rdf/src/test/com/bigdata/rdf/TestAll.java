@@ -66,12 +66,15 @@ public class TestAll extends TestCase {
         // axioms test suite (w/o triple store) [Note: axioms test suite is now proxied.]
         //suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
 
-        // test suite for RDF specific operators.
-        suite.addTest( com.bigdata.bop.rdf.TestAll.suite() );
-
         // test RDF Value and Statement object model (Sesame compliance).
         suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
         
+        // test suite for RDF specific operators.
+        suite.addTest( com.bigdata.bop.rdf.TestAll.suite() );
+
+        // SPARQL, including the parser, AST, AST optimizers, & AST evaluation.
+        suite.addTest(com.bigdata.rdf.sparql.TestAll.suite());
+
         // test various RDF database implementations.
         suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 
