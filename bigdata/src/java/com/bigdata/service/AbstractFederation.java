@@ -510,11 +510,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
-    final /*synchronized*/ public CounterSet getCounters() {
+    final synchronized public CounterSet getCounters() {
 
-//        if (countersRoot == null) {
+        if (countersRoot == null) {
 
-        final CounterSet countersRoot = new CounterSet();
+        countersRoot = new CounterSet();
         {
 
             final AbstractStatisticsCollector tmp = statisticsCollector;
@@ -551,12 +551,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     serviceRoot, getServiceName(), getServiceIface(), client
                             .getProperties());
 
-//        }
+        }
 
         return countersRoot;
         
     }
-//    private CounterSet countersRoot;
+    private CounterSet countersRoot;
     private CounterSet serviceRoot;
 
     public CounterSet getHostCounterSet() {
@@ -1450,6 +1450,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
                 return;
 
+            }
+            
+            if(serviceUUID.equals(loadBalancerService.getServiceUUID())) {
+            	// Do not notify ourselves.
+            	return;
             }
 
 			/*
