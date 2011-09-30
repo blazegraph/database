@@ -539,7 +539,7 @@ public class AST2BOpBase {
                      * which it may have performed (lexicon writes are always
                      * unisolated).
                      */
-                    timestamp = ITx.READ_COMMITTED;
+                    timestamp = ITx.UNISOLATED;
                 }
 
                 final String ns = ctx.db.getLexiconRelation().getNamespace();
