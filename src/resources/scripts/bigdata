@@ -246,7 +246,7 @@ case "$1" in
 	    rm -rf "$LAS"
 	fi
 	if [ -s "$eventLog" -o -s "$errorLog" -o -s "$detailLog" -o -s "$ruleLog" ]; then
-	    lockfile -r 1 -1 "$logLockFile"
+	    $lockCmd "$logLockFile"
 	    if [ 0 == $? ]; then
 #           Granted lock in the log directory so we can rename the log
 #           files.
