@@ -263,7 +263,7 @@ V extends Serializable//
          */
         String RDF_FORMAT = "rdfFormat";
 
-        String DEFAULT_RDF_FORMAT = RDFFormat.RDFXML.toString();
+        String DEFAULT_RDF_FORMAT = RDFFormat.RDFXML.getName();
 
 //        /**
 //         * The maximum #of times an attempt will be made to load any given file.
