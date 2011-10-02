@@ -510,6 +510,15 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This method must use stateful counters because the federation
+     * services all need to be able to report their history. If this were to
+     * return a new {@link CounterSet} each time, then the services would not
+     * remember any history (including the load balancer). Returning a new
+     * object every time here basically throws away the data we want.
+     */
     final synchronized public CounterSet getCounters() {
 
         if (countersRoot == null) {
