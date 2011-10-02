@@ -1160,6 +1160,15 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 }
 
                 /*
+				 * Start collecting performance counters (if enabled).
+				 * 
+				 * Note: This needs to be done first since the counters from the
+				 * platform will otherwise not be incorporated into those
+				 * reported by the federation.
+				 */
+                startPlatformStatisticsCollection();
+
+                /*
                  * start collection on various work queues.
                  * 
                  * Note: The data service starts collection for its queues
@@ -1169,9 +1178,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  * @todo have it collect using the same scheduled thread pool.
                  */
                 startQueueStatisticsCollection();
-
-                // start collecting performance counters (if enabled).
-                startPlatformStatisticsCollection();
 
                 // // notify the load balancer of this service join.
                 // notifyJoin();

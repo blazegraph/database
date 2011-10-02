@@ -168,10 +168,10 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 //
 //    }
     
-//    /**
-//     * {@link CounterSet} hierarchy.
-//     */
-//    private CounterSet countersRoot;
+    /**
+     * {@link CounterSet} hierarchy.
+     */
+    private CounterSet countersRoot;
 
     /**
      * Return the counter hierarchy. The returned hierarchy only includes those
@@ -182,11 +182,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Note: Subclasses MUST extend this method to initialize their own
      * counters.
      */
-    /*synchronized*/public CounterSet getCounters() {
+    synchronized public CounterSet getCounters() {
         
-//        if (countersRoot == null) {
+        if (countersRoot == null) {
 
-        final CounterSet 
+//        final CounterSet 
             countersRoot = new CounterSet();
 
             // os.arch
@@ -214,7 +214,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                     + IHostCounters.Info_ProcessorInfo,
                     new OneShotInstrument<String>(SystemUtil.cpuInfo()));
             
-//        }
+        }
         
         return countersRoot;
         
