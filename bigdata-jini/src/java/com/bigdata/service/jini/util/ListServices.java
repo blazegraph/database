@@ -100,7 +100,7 @@ public class ListServices {
     public static void main(final String[] args) throws InterruptedException,
             ConfigurationException, IOException, ExecutionException {
 
-        final JiniFederation fed = JiniClient.newInstance(args).connect();
+        final JiniFederation<?> fed = JiniClient.newInstance(args).connect();
 
         final int repeatCount = (Integer) fed
                 .getClient()
@@ -159,13 +159,13 @@ public class ListServices {
      */
     static class DiscoverAndListTask implements Callable<String> {
         
-        final JiniFederation fed;
+        final JiniFederation<?> fed;
 
         final long discoveryDelay;
 
         final boolean showServiceItems;
 
-        public DiscoverAndListTask(final JiniFederation fed)
+        public DiscoverAndListTask(final JiniFederation<?> fed)
                 throws ConfigurationException {
 
             this.fed = fed;
