@@ -208,7 +208,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 	 *            {@link StatementEnum#MASK_OVERRIDE} bit set (this is only set
 	 *            when serializing values for a remote procedure that will write
 	 *            on the index, it is never set in the index itself).
-	 * @param userFalg
+	 * @param userFlag
 	 *            <code>true</code> iff you want the
 	 *            {@link StatementEnum#MASK_USER_FLAG} bit set.
 	 * @param type
