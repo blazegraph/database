@@ -39,7 +39,6 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
@@ -177,8 +176,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         
         final int n = keys.size();//getKeyCount();
 
-        // used to generate the values that we write on the index.
-        final ByteArrayBuffer tmp = new ByteArrayBuffer(1);
+//        // used to generate the values that we write on the index.
+//        final ByteArrayBuffer tmp = new ByteArrayBuffer(1);
 
         final SPOTupleSerializer tupleSer = (SPOTupleSerializer) 
         	ndx.getIndexMetadata().getTupleSerializer();
@@ -243,7 +242,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  */
 
                 ndx.insert(key, tupleSer.serializeVal(
-                		tmp, false/* override */, userFlag, newType));
+                		/*tmp,*/ false/* override */, userFlag, newType));
 
                 if (isPrimaryIndex && DEBUG) {
                     log.debug("new SPO: key=" + BytesUtil.toString(key));
@@ -275,7 +274,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         assert newType != StatementEnum.Explicit;
                         
                         ndx.insert(key, tupleSer.serializeVal(
-                        		tmp, false/* override */, userFlag, 
+                        		/*tmp,*/ false/* override */, userFlag, 
 //                        		false /* no sid for type=inferred */, 
                         		newType));
 
@@ -302,7 +301,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 //                    	final boolean newSid = maxType == StatementEnum.Explicit;
                     	
                         ndx.insert(key, tupleSer.serializeVal(
-                        		tmp, false/* override */, 
+                        		/*tmp,*/ false/* override */, 
                         		userFlag, 
 //                        		newSid, 
                         		maxType));
