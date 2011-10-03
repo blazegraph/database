@@ -74,12 +74,13 @@ public class ChunkMergeSortHelper {
      * {@link Comparable}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     final static private class MyIntComparator implements IntComparator {
 
+        @SuppressWarnings("rawtypes")
         private final Comparable[] a;
 
+        @SuppressWarnings("rawtypes")
         public MyIntComparator(final Comparable[] a) {
 
             this.a = a;
@@ -87,7 +88,7 @@ public class ChunkMergeSortHelper {
         }
 
         @SuppressWarnings("unchecked")
-        public int compare(int o1, int o2) {
+        public int compare(final int o1, final int o2) {
 
             return a[o1].compareTo(a[o2]);
 
@@ -99,7 +100,6 @@ public class ChunkMergeSortHelper {
      * Implementation swaps object references in an array.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     final static private class MySwapper implements Swapper {
 
