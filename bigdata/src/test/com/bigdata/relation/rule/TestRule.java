@@ -365,7 +365,7 @@ public class TestRule extends AbstractRuleTestCase {
             // verify "v" bound in body[1].
             assertTrue(r1.getTail(1).get(0).isConstant());
 
-            assertTrue(rdfProperty == r1.getTail(1).get(0));
+            assertTrue(rdfProperty.equals(r1.getTail(1).get(0)));
 
         }
 
@@ -388,7 +388,7 @@ public class TestRule extends AbstractRuleTestCase {
             // verify "x" bound in body[0].
             assertTrue(r2.getTail(0).get(2).isConstant());
             
-            assertTrue(rdfProperty == r2.getTail(0).get(2));
+            assertTrue(rdfProperty.equals(r2.getTail(0).get(2)));
 
         }
 
