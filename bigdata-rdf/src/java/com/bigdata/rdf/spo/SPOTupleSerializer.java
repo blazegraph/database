@@ -34,6 +34,7 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -231,7 +232,12 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
 		buf.putByte(b);
 
-		return buf.toByteArray();
+		final byte[] a = buf.toByteArray();
+
+        assert a.length == 1 : "Expecting one byte, but have "
+                + BytesUtil.toString(a);
+		
+		return a;
 
 	}
 
