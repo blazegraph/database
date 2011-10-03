@@ -571,11 +571,13 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             	
             }
 
-			if (vmd.mergePriority > 0d || forceCompactingMerges) {
+            if (vmd.mergePriority > 0d
+                    || (forceCompactingMerges && vmd.sourceCount > 1)) {
 
 				/*
 				 * Schedule a merge if the priority is non-zero or if compacting
-				 * merges are being forced.
+				 * merges are being forced (but not if there is only one source
+				 * in the view since there would be nothing to compact).
 				 */
 
 				mergeList
