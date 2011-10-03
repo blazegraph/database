@@ -29,10 +29,10 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 /**
  * Data driven test suite.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
+ *
  *          FIXME Add a unit test with 2 or more named subqueries. This will
  *          allow us to check for correct evaluation with parallel STEPS of the
  *          named subqueries.
@@ -40,7 +40,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     /**
-     * 
+     *
      */
     public TestSubQuery() {
     }
@@ -67,13 +67,19 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 //                false, // laxCardinality
 //                true // checkOrder
                 ).runTest();
-        
+
+    }
+
+    public void test_sparql_subquery_limiting_resource_pattern() throws Exception {
+
+        new TestHelper("subquery-lpr").runTest();
+
     }
 
     public void test_sparql_subselect() throws Exception {
 
         new TestHelper("sparql-subselect").runTest();
-        
+
     }
 
     /**
