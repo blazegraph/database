@@ -8,6 +8,15 @@
 cd `dirname $0`
 source ./bigdataenv
 
+# Note: The following are both very good ideas.  You SHOULD uncomment these
+# on your system, assuming that the relevant files can be found.
+
+# Do not swap out applications while there is free memory.
+#/sbin/sysctl -w vm.swappiness=0
+
+# Raise the limit on the #of open files.
+#ulimit -u 40960
+
 # Verify critical environment variables.
 if [ -z "$lockFile" ]; then
     echo $"`date` : hostname : environment not setup."
