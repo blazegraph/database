@@ -1452,6 +1452,8 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    nowarn="no"
 </echo>
+      <echo>    encoding="${javac.encoding}"
+</echo>
       <echo>    source="${javac.source}"
 </echo>
       <echo>    target="${javac.target}"
@@ -1465,6 +1467,7 @@ ${postInstallMessage}</echo>
              deprecation="no"
              destdir="${classes.test.dir}"
              nowarn="no"
+             encoding="${javac.encoding}"
              source="${javac.source}"
              target="${javac.target}"
              classpath="${javac.test.classpath}"
