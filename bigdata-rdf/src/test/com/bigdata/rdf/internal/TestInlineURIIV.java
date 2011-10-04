@@ -1,5 +1,8 @@
 package com.bigdata.rdf.internal;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import junit.framework.TestCase2;
 
 import org.openrdf.model.impl.URIImpl;
@@ -7,7 +10,6 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 
 /**
@@ -57,4 +59,24 @@ public class TestInlineURIIV extends TestCase2 {
 		
 	}
 	
+    public void test_encodeDecode_comparator() {
+        
+        final List<IV<?,?>> ivs = new LinkedList<IV<?,?>>();
+        {
+
+            ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")));
+            ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/")));
+            ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com/foo")));
+            ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com:80/foo")));
+
+        }
+        
+        final IV<?, ?>[] e = ivs.toArray(new IV[0]);
+
+        AbstractEncodeDecodeKeysTestCase.doEncodeDecodeTest(e);
+
+        AbstractEncodeDecodeKeysTestCase.doComparatorTest(e);
+    
+    }
+    
 }

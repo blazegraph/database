@@ -29,10 +29,11 @@ package com.bigdata.rdf.store;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,9 +51,9 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -95,6 +96,7 @@ abstract public class AbstractTestCase
 {
 
     /** A <code>null</code> {@link IV} reference (NOT a NullIV object). */
+    @SuppressWarnings("rawtypes")
     protected final IV NULL = null;
     
     //
@@ -515,9 +517,11 @@ abstract public class AbstractTestCase
 
                 // @todo convert term identifiers before rendering.
                 if (log.isInfoEnabled())
-                log.info("Iterator empty but still expecting: " + map.values());
+                    log.info("Iterator empty but still expecting: "
+                            + map.values());
 
-                fail("Expecting: " + map.size() + " more statements: "+map.values());
+                fail("Expecting: " + map.size() + " more statements: "
+                        + map.values());
 
             }
 
@@ -541,8 +545,8 @@ abstract public class AbstractTestCase
      *       iterator we can not sort expected into the same order. therefore
      *       this should test for the same statements in any order
      */
-    static public void assertSameStatements(String msg, Statement[] expected,
-            BigdataStatementIterator actual) {
+    static public void assertSameStatements(final String msg,
+            final Statement[] expected, final BigdataStatementIterator actual) {
 
         int i = 0;
 
@@ -584,7 +588,8 @@ abstract public class AbstractTestCase
      * Validates that the same statements are found in each of the statement
      * indices.
      */
-    static public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
+    static public void assertStatementIndicesConsistent(
+            final AbstractTripleStore db, final int maxerrors) {
 
         if (log.isInfoEnabled())
             log.info("Verifying statement indices");
@@ -599,35 +604,25 @@ abstract public class AbstractTestCase
             from = SPOKeyOrder.FIRST_QUAD_INDEX;
             to = SPOKeyOrder.LAST_QUAD_INDEX;
         }
-        
+
         for (int i = from; i <= to; i++) {
 
             for (int j = from; j <= to; j++) {
 
-                if (i == j)
+                if (i <= j) {
+                    // Just compare the upper diagonal.
                     continue;
+                }
 
-                assertSameStatements(db, SPOKeyOrder.valueOf(i), SPOKeyOrder
-                        .valueOf(j), nerrs, maxerrors);
+                assertSameStatements(db, SPOKeyOrder.valueOf(i),
+                        SPOKeyOrder.valueOf(j), nerrs, maxerrors);
 
             }
 
         }
-        
-//        // scan SPO, checking...
-//        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs, maxerrors);
-//        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs, maxerrors);
-//
-//        // scan POS, checking...
-//        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs, maxerrors);
-//        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs, maxerrors);
-//        
-//        // scan OSP, checking...
-//        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs, maxerrors);
-//        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs, maxerrors);
-        
-        assertEquals(0,nerrs.get());
-        
+
+        assertEquals(0, nerrs.get());
+
     }
     
     /**
@@ -701,15 +696,15 @@ abstract public class AbstractTestCase
                 final byte[][] keys = new byte[expectedChunk.length][];
                 final byte[][] vals = null;
 
-                for(int i=0; i<expectedChunk.length; i++) {
-                    
-                    keys[i] = tupleSer.serializeKey( expectedChunk[i] );
-                    
+                for (int i = 0; i < expectedChunk.length; i++) {
+
+                    keys[i] = tupleSer.serializeKey(expectedChunk[i]);
+
                 }
                 
                 final AtomicLong nfound = new AtomicLong();
 
-                final IResultHandler resultHandler = new IResultHandler<ResultBitBuffer, Long>() {
+                final IResultHandler<?, ?> resultHandler = new IResultHandler<ResultBitBuffer, Long>() {
 
                     public void aggregate(ResultBitBuffer result, Split split) {
 
@@ -781,7 +776,6 @@ abstract public class AbstractTestCase
      * some RDF/XML file are present in the KB.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static protected class StatementVerifier extends BasicRioLoader {
 
@@ -877,7 +871,7 @@ abstract public class AbstractTestCase
 
         private void verifyStatements(final int n, final Statement[] a) {
 
-            final HashMap<Value, BigdataValue> termSet = new HashMap<Value, BigdataValue>(
+            final Map<Value, BigdataValue> termSet = new LinkedHashMap<Value, BigdataValue>(
                     n);
             {
 
@@ -941,7 +935,7 @@ abstract public class AbstractTestCase
              */
             {
                 
-                final HashSet<IV<?,?>> ivs  = new HashSet<IV<?,?>>(termSet.size());
+                final Set<IV<?,?>> ivs  = new LinkedHashSet<IV<?,?>>(termSet.size());
                 
                 for(BigdataValue term : termSet.values()) {
                     

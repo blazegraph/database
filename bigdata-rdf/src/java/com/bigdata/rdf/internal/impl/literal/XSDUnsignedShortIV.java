@@ -58,9 +58,22 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
     }
 
     /**
-     * Promote the unsigned short into a signed int.
+     * Promote the <code>unsigned short</code> into a <code>signed int</code>.
      */
     public final int promote() {
+
+//        int v = value<0?-value:value;
+//        return v;
+//        
+//        long v = value < 0 ? -value : value;
+//
+//        if (value < 0) {
+//
+//            v = v + 0x8000L;
+//
+//        }
+//
+//        return (int) v;
 
         int v = value;
         
@@ -74,7 +87,22 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
             
         }
 
-        return v;
+        return v & 0xffff;
+//        return ((int) (short) v) & 0xffff;
+     
+//        long v = value;
+//        
+//        if (v < 0) {
+//            
+//            v = v + 0x8000L;
+//
+//        } else {
+//            
+//            v = v - 0x8000L;
+//            
+//        }
+//
+//        return (int)(v & 0xffffL);
 
     }
     
@@ -109,10 +137,17 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
         return (long) promote();
     }
 
+    /*
+     * From the spec: If the argument is a numeric type or a typed literal with
+     * a datatype derived from a numeric type, the EBV is false if the operand
+     * value is NaN or is numerically equal to zero; otherwise the EBV is true.
+     */
     @Override
     public boolean booleanValue() {
-        return promote() == 0 ? false : true;
+        return value != UNSIGNED_ZERO ? true : false;
     }
+
+    static private final short UNSIGNED_ZERO = (short)0x8000;//(short) -32768;
 
     @Override
     public byte byteValue() {
@@ -136,7 +171,7 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
 
     @Override
     public short shortValue() {
-        return (short)promote();
+        return (short) promote();
     }
     
     @Override
@@ -155,13 +190,14 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDUnsignedShortIV<?>) {
+        if (this == o)
+            return true;
+        if (o instanceof XSDUnsignedShortIV<?>) {
             return this.value == ((XSDUnsignedShortIV<?>) o).value;
         }
         return false;
     }
-    
+
     /**
      * Return the hash code of the short value.
      * 
@@ -174,16 +210,21 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
     public int byteLength() {
         return 1 + Bytes.SIZEOF_SHORT;
     }
-    
+
+    @SuppressWarnings("rawtypes")
     @Override
     public int _compareTo(final IV o) {
-         
-        final int value = promote();
+
+        final XSDUnsignedShortIV<?> t = (XSDUnsignedShortIV<?>) o;
+
+        return value == t.value ? 0 : value < t.value ? -1 : 1;
         
-        final int value2 = ((XSDUnsignedByteIV) o).promote();
-        
-        return value == value2 ? 0 : value < value2 ? -1 : 1;
-        
+//        final int value = promote();
+//
+//        final int value2 = t.promote();
+//
+//        return value == value2 ? 0 : value < value2 ? -1 : 1;
+
     }
-   
+
 }

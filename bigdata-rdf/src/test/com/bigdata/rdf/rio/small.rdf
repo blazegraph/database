@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rdf:RDF
 	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-	xmlns:ns1="http://bigdata.com/test/ontology#"
-	xmlns:ns5="http://www.w3.org/2002/07/owl#"
 	xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 	xmlns:foaf="http://xmlns.com/foaf/0.1/"
-	xmlns:ns2="http://bigdata.com/test/ontology#">
+	>
 
 <!-- ONTOLOGY -->
 

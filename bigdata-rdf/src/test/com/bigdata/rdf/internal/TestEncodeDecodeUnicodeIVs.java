@@ -146,6 +146,8 @@ public class TestEncodeDecodeUnicodeIVs extends
                 new UnicodeBNodeIV<BigdataBNode>("baz"),//
                 new UnicodeBNodeIV<BigdataBNode>("12"),//
                 new UnicodeBNodeIV<BigdataBNode>("1298"),//
+                new UnicodeBNodeIV<BigdataBNode>("asassdao"),//
+                new UnicodeBNodeIV<BigdataBNode>("1"),//
         };
 
         doEncodeDecodeTest(e);

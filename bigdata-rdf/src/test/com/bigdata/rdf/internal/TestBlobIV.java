@@ -312,4 +312,34 @@ public class TestBlobIV extends TestCase2 {
 
 	}
 
+    public void test_blobIV_encodeDecode_compareTo() {
+
+        final Random r = new Random();
+
+        final IV<?, ?>[] e = new IV[100 * VTE.values().length];
+
+        int n = 0;
+
+        for (int i = 0; i < 100; i++) {
+
+            for (VTE vte : VTE.values()) {
+
+                final int hashCode = r.nextInt();
+
+                final int counter = Short.MAX_VALUE - r.nextInt(2 ^ 16);
+
+                final BlobIV<?> v = new BlobIV(vte, hashCode, (short) counter);
+
+                e[n++] = v;
+                
+            }
+
+        }
+
+        AbstractEncodeDecodeKeysTestCase.doEncodeDecodeTest(e);
+
+        AbstractEncodeDecodeKeysTestCase.doComparatorTest(e);
+
+    }
+
 }

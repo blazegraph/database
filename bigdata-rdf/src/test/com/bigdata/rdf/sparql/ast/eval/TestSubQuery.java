@@ -70,6 +70,58 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * <pre>
+     * PREFIX : <http://example.org/>
+     * SELECT * 
+     * WHERE {
+     *      ?s :p ?o .
+     *      { 
+     *         SELECT ?s { ?s a :ty } ORDER BY ?s LIMIT 3
+     *      } 
+     * }
+     * </pre>
+     * 
+     * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
+     * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
+     * should only get the statements where ?s is s1,s2,s3.
+     * <p>
+     * I haven't debugged bigdata so I don't know exactly what it is doing, but
+     * it seems that currently with the bigdata evaluation, for each solution
+     * produced from ?s :p ?o, the subquery is run, and it seems that the ?s
+     * binding in the subquery is getting constrained by the ?s from the inbound
+     * solution, so results of the subquery are not always s1,s2,s3, depending
+     * on the inbound solution.
+     * <p>
+     * thompsonbry wrote: Normally bottom up evaluation only differs when you
+     * are missing a shared variable such that the bindings for variables having
+     * the same name are actually not correlated.
+     * <P>
+     * This is a bit of an odd case with an interaction between the order/limit
+     * and the as-bound evaluation which leads to the "wrong" result. We
+     * probably do not want to always do bottom up evaluation for a subquery
+     * (e.g., by lifting it into a named subquery). Are you suggesting that
+     * there is this special case which needs to be recognized where the
+     * subquery MUST be evaluated first because the order by/limit combination
+     * means that the results of the outer query joined with the inner query
+     * could be different in this case?
+     * <p>
+     * mroycsi wrote: This is [a] pattern that is well known and commonly used
+     * with sparql 1.1 subqueries. It is definitely a case where the subquery
+     * needs to be evaluated first due to the limit clause. The order clause
+     * probably doesn't matter if there isn't a limit since all the results are
+     * just joined, so order doesn't matter till the solution gets to the order
+     * by operations.
+     * <p>
+     * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
+     * does LIMIT by itself. But if you have both it matters and we need to run
+     * the subquery first.
+     * 
+     * FIXME Write an AST optimizer which looks for the presence of an ORDER BY
+     * and LIMIT on the subquery. If both exists, then we need to do bottom up
+     * evaluation. Right now that means that we will lift out the subquery into
+     * a named subquery.
+     */
     public void test_sparql_subquery_limiting_resource_pattern() throws Exception {
 
         new TestHelper("subquery-lpr").runTest();

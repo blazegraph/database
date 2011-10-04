@@ -122,10 +122,19 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
         return (long) promote();
     }
 
+    /*
+     * From the spec: If the argument is a numeric type or a typed literal with
+     * a datatype derived from a numeric type, the EBV is false if the operand
+     * value is NaN or is numerically equal to zero; otherwise the EBV is true.
+     */
     @Override
     public boolean booleanValue() {
-        return promote() == 0 ? false : true;
+
+        return value != UNSIGNED_ZERO ? true : false;
+            
     }
+
+    private static final byte UNSIGNED_ZERO = (byte)0x80;//(byte) -128;
 
     @Override
     public byte byteValue() {
@@ -168,8 +177,9 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDUnsignedByteIV<?>) {
+        if (this == o)
+            return true;
+        if (o instanceof XSDUnsignedByteIV<?>) {
             return this.value == ((XSDUnsignedByteIV<?>) o).value;
         }
         return false;
@@ -188,14 +198,19 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
         return 1 + 1;
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public int _compareTo(final IV o) {
          
-        final short value = promote();
+        final XSDUnsignedByteIV<?> t = (XSDUnsignedByteIV<?>) o;
         
-        final short value2 = ((XSDUnsignedByteIV) o).promote();
+        return value == t.value ? 0 : value < t.value ? -1 : 1;
         
-        return value == value2 ? 0 : value < value2 ? -1 : 1;
+//        final short value = promote();
+//        
+//        final short value2 = t.promote();
+//        
+//        return value == value2 ? 0 : value < value2 ? -1 : 1;
         
     }
 

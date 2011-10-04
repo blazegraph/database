@@ -438,6 +438,7 @@ public class Justification implements Comparable<Justification> {
         
         keyBuilder.reset();
 
+        @SuppressWarnings("rawtypes")
         final IV[] ivs = jst.ivs;
 
         for (int i = 0; i < ivs.length; i++) {
@@ -450,7 +451,7 @@ public class Justification implements Comparable<Justification> {
 
     }
     
-    public boolean equals(Justification o) {
+    public boolean equals(final Justification o) {
 
         // Note: ignores transient [rule].
 
@@ -465,26 +466,22 @@ public class Justification implements Comparable<Justification> {
      * Places the justifications into an ordering that clusters them based on
      * the entailment is being justified.
      */
-    public int compareTo(Justification o) {
+    public int compareTo(final Justification o) {
 
         // the length of the longer ids[].
-        
         final int len = ivs.length > o.ivs.length ? ivs.length : o.ivs.length;
-        
+
         // compare both arrays until a difference emerges or one is exhausted.
-        
-        for(int i=0; i<len; i++) {
-            
-            if(i>=ivs.length) {
-                
+        for (int i = 0; i < len; i++) {
+
+            if (i >= ivs.length) {
+
                 // shorter with common prefix is ordered first.
-                
                 return -1;
-                
-            } else if(i>=o.ivs.length) {
-                
+
+            } else if (i >= o.ivs.length) {
+
                 // shorter with common prefix is ordered first.
-                
                 return 1;
                 
             }
@@ -504,7 +501,6 @@ public class Justification implements Comparable<Justification> {
         }
 
         // identical values and identical lengths.
-
         assert ivs.length == o.ivs.length;
         
         return 0;
@@ -517,7 +513,7 @@ public class Justification implements Comparable<Justification> {
         
     }
 
-    public String toString(AbstractTripleStore db) {
+    public String toString(final AbstractTripleStore db) {
 
         StringBuilder sb = new StringBuilder();
 
@@ -535,17 +531,17 @@ public class Justification implements Comparable<Justification> {
             // #of triple patterns in the tail.
             final int m = (ivs.length / N) - 1;
 
-            for( int i=0; i<m; i++) {
+            for (int i = 0; i < m; i++) {
 
                 sb.append("\t(");
 
-                for( int j=0; j<N; j++ ) {
-                    
-                    IV id = ivs[i*N+N+j];
-                    
+                for (int j = 0; j < N; j++) {
+
+                    final IV<?,?> id = ivs[i * N + N + j];
+
                     sb.append((db == null ? "" + id : db.toString(id)));
 
-                    if (j+1 < N)
+                    if (j + 1 < N)
                         sb.append(", ");
 
                 }
@@ -555,33 +551,33 @@ public class Justification implements Comparable<Justification> {
                 if (i + 1 < m) {
 
                     sb.append(", \n");
-                    
+
                 }
-                
+
             }
-            
+
             sb.append("\n\t-> ");
-            
+
         }
-        
+
         // head
         {
 
             sb.append("(");
 
             // Note: test on i<ids.length useful when unit tests report errors
-            for (int i = 0; i < N && i<ivs.length; i++) {
+            for (int i = 0; i < N && i < ivs.length; i++) {
 
-                IV id = ivs[i];
-                
+                final IV<?,?> id = ivs[i];
+
                 sb.append((db == null ? "" + id : db.toString(id)));
 
-                if (i+1 < N)
+                if (i + 1 < N)
                     sb.append(", ");
 
             }
             sb.append(")");
-            
+
         }
 
         return sb.toString();

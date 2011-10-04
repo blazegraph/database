@@ -98,7 +98,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * related to related to IV type parameters. I've taken the liberty to suppress
  * them all.
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked","rawtypes"})
 public class IVUtility {
 
 //    private static final transient Logger log = Logger.getLogger(IVUtility.class);
@@ -154,10 +154,6 @@ public class IVUtility {
     
     /**
      * This provides a dumb comparison across IVs.
-     * 
-     * @deprecated This does not follow either the total ordering of the
-     *             unsigned byte[] keys or the ordering for RDF Values. As
-     *             such it can not be used reliably for much of anything.
      */
     public static int compare(final IV iv1, final IV iv2) {
         

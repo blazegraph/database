@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
@@ -45,9 +46,10 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation;
-import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;
+import com.bigdata.service.IBigdataClient;
 
 /**
  * Test suite for {@link AsynchronousStatementBufferFactory}. To run this test
@@ -62,6 +64,8 @@ import com.bigdata.service.EmbeddedFederation;
  *          tokens).
  * 
  *          FIXME variant to test async w/ sids (once written).
+ *          
+ *          FIXME Test with BLOBS (some objects need to be "large").
  * 
  * @todo The {@link AsynchronousStatementBufferFactory} works with either
  *       triples or quads. However, we are not running
@@ -104,29 +108,43 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     private static final boolean parallel = true;
     
+//    protected AbstractTripleStore getStore() {
+//
+//        return getStore(getProperties());
+//
+//    }
+
     /**
      * Note: This is overridden to turn off features not supported by this
      * loader.
      */
-    protected AbstractTripleStore getStore() {
+    public Properties getProperties() {
 
-        final Properties properties = new Properties(getProperties());
+        final Properties properties = new Properties(super.getProperties());
 
+        // Disable reporting.
+        properties.setProperty(IBigdataClient.Options.REPORT_DELAY, "0");
+        properties.setProperty(IBigdataClient.Options.COLLECT_QUEUE_STATISTICS, "false");
+        properties.setProperty(IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
+        // One DS is enough.
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+
+        // Minimize the #of threads so things are simpler to debug.
+        properties.setProperty(ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE,"0");
+        
         properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
 
-        properties.setProperty(
-                AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
+        properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
 
-//        properties.setProperty(
-//                AbstractTripleStore.Options.QUADS, "true");
+//        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
 
         // no closure so we don't need the axioms either.
-        properties.setProperty(
-                AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
 
-        // no vocab required.
+        // enable a vocabulary so some things will be inlined.
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
-                NoVocabulary.class.getName());
+                AbstractTripleStore.Options.DEFAULT_VOCABULARY_CLASS);
 
         {
 
@@ -140,38 +158,128 @@ public class TestAsynchronousStatementBufferFactory extends
              */
             final String namespace = "test1";
 
-            final String pname = com.bigdata.config.Configuration
-                    .getOverrideProperty(namespace + "."
-                            + LexiconRelation.NAME_LEXICON_RELATION + "."
-                            + LexiconKeyOrder.BLOBS,
-                            IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS);
+            {
+                final String pname = com.bigdata.config.Configuration
+                        .getOverrideProperty(namespace + "."
+                                + LexiconRelation.NAME_LEXICON_RELATION + "."
+                                + LexiconKeyOrder.TERM2ID,
+                                IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS);
 
-            final String pval = "" + TimeUnit.SECONDS.toNanos(1);
-            
-            System.out.println("Override: " + pname + "=" + pval);
-            
-            // Put an idle timeout on the sink of 1s.
-            properties.setProperty(pname, pval);
-            
+                final String pval = "" + TimeUnit.SECONDS.toNanos(1);
+
+                if (log.isInfoEnabled())
+                    log.info("Override: " + pname + "=" + pval);
+
+                // Put an idle timeout on the sink of 1s.
+                properties.setProperty(pname, pval);
+            }
+
+            {
+                final String pname = com.bigdata.config.Configuration
+                        .getOverrideProperty(namespace + "."
+                                + LexiconRelation.NAME_LEXICON_RELATION + "."
+                                + LexiconKeyOrder.BLOBS,
+                                IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS);
+
+                final String pval = "" + TimeUnit.SECONDS.toNanos(1);
+
+                if (log.isInfoEnabled())
+                    log.info("Override: " + pname + "=" + pval);
+
+                // Put an idle timeout on the sink of 1s.
+                properties.setProperty(pname, pval);
+            }
+
         }
         
         // @todo comment out or will fail during verify.
 //        properties.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
 
-        return getStore(properties);
-
+        return properties;
+        
     }
-
+    
     /**
      * Test with the "small.rdf" data set.
-     * 
-     * @throws Exception
      */
     public void test_loadAndVerify_small() throws Exception {
         
         final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
 
-        doLoadAndVerifyTest(resource);
+        doLoadAndVerifyTest(resource, getProperties());
+
+    }
+
+    /**
+     * Test with the "small.rdf" data set in quads mode.
+     */
+    public void test_loadAndVerify_small_quadsMode() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
+
+        final Properties p = getProperties();
+        
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        
+        doLoadAndVerifyTest(resource, p);
+
+    }
+
+    /**
+     * Test with the "little.ttl" data set in quads mode (triples data loaded
+     * into a quads mode kb).
+     */
+    public void test_loadAndVerify_little_ttl_quadsMode() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.ttl";
+
+        final Properties p = getProperties();
+        
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        
+        doLoadAndVerifyTest(resource, p);
+
+    }
+    
+    /**
+     * Test with the "little.trig" data set in quads mode (quads data loaded
+     * into a quads mode kb)
+     */
+    public void test_loadAndVerify_little_trig_quadsMode() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.trig";
+
+        final Properties p = getProperties();
+        
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        
+        doLoadAndVerifyTest(resource, p);
+
+    }
+
+    /**
+     * Test with the "smallWithBlobs.rdf" data set.
+     */
+    public void test_loadAndVerify_smallWithBlobs() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithBlobs.rdf";
+
+        doLoadAndVerifyTest(resource, getProperties());
+
+    }
+
+    /**
+     * Test with the "smallWithBlobs.rdf" data set in quads mode.
+     */
+    public void test_loadAndVerify_smallWithBlobs_quadsMode() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithBlobs.rdf";
+
+        final Properties p = getProperties();
+        
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+
+        doLoadAndVerifyTest(resource, p);
 
     }
 
@@ -221,36 +329,60 @@ public class TestAsynchronousStatementBufferFactory extends
 
     /**
      * Test with the "sample data.rdf" data set.
-     * 
-     * @throws Exception
      */
     public void test_loadAndVerify_sampleData() throws Exception {
         
         final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/sample data.rdf";
 
-        doLoadAndVerifyTest( resource );
+        doLoadAndVerifyTest( resource, getProperties() );
         
     }
    
     /**
-     * Uses a modest file (~40k statements).
+     * Test with the "sample data.rdf" data set in quads mode.
      */
-    public void test_loadAndVerify_modest() throws Exception {
+    public void test_loadAndVerify_sampleData_quadsMode() throws Exception {
         
-//      final String file = "../rdf-data/nciOncology.owl";
-//        final String file = "../rdf-data/alibaba_v41.rdf";
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/sample data.rdf";
+
+        final Properties p = getProperties();
+
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+
+        doLoadAndVerifyTest( resource, p );
+        
+    }
+   
+    /**
+     * Uses a modest file (~40k statements).  This is BSBM data so it has some
+     * BLOBs in it.
+     */
+    public void test_loadAndVerify_bsbm_pc100() throws Exception {
+        
         final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
 
-        if (!new File(file).exists()) {
+        final Properties p = getProperties();
 
-            fail("Resource not found: " + file + ", test skipped: " + getName());
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
 
-            return;
-            
-        }
-
-        doLoadAndVerifyTest( file );
+        doLoadAndVerifyTest(file, p);
         
+    }
+
+    /**
+     * Uses a modest file (~40k statements). This is BSBM data so it has some
+     * BLOBs in it. This loads the data in quads mode.
+     */
+    public void test_loadAndVerify_bsbm_pc100_quadsMode() throws Exception {
+
+        final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
+
+        final Properties p = getProperties();
+
+        p.setProperty(AbstractTripleStore.Options.QUADS, "true");
+
+        doLoadAndVerifyTest(file, p);
+
     }
 
 	/**
@@ -265,7 +397,7 @@ public class TestAsynchronousStatementBufferFactory extends
         
         final String file = "bigdata-rdf/src/resources/data/lehigh/U1";
 
-        doLoadAndVerifyTest(file);
+        doLoadAndVerifyTest(file, getProperties());
         
     }
 
@@ -290,9 +422,10 @@ public class TestAsynchronousStatementBufferFactory extends
      * 
      * @throws Exception
      */
-    protected void doLoadAndVerifyTest(final String resource) throws Exception {
+    protected void doLoadAndVerifyTest(final String resource,
+            final Properties properties) throws Exception {
 
-        final AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore(properties);
 
         try {
         

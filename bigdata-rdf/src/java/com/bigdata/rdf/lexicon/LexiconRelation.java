@@ -1122,7 +1122,19 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          */
         metadata.setMaxRecLen(0);
 
-		return metadata;
+        if ((getIndexManager() instanceof IBigdataFederation<?>)
+                && ((IBigdataFederation<?>) getIndexManager()).isScaleOut()) {
+
+            /*
+             * Apply a constraint such that all entries within the same
+             * collision bucket lie in the same shard.
+             */
+            
+            metadata.setSplitHandler(new BlobsIndexSplitHandler());
+
+        }
+
+        return metadata;
 
     }
 
@@ -1400,7 +1412,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
      */
-    private boolean isBlob(final Value v) {
+    public boolean isBlob(final Value v) {
 
         if (blobsThreshold == 0)
             return true;
@@ -2392,7 +2404,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @see ILexiconConfiguration#createInlineIV(Value)
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     final public IV getInlineIV(final Value value) {
         
         return getLexiconConfiguration().createInlineIV(value);

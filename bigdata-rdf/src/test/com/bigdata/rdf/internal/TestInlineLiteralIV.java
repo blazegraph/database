@@ -1,5 +1,8 @@
 package com.bigdata.rdf.internal;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import junit.framework.TestCase2;
 
 import org.openrdf.model.URI;
@@ -78,6 +81,41 @@ public class TestInlineLiteralIV extends TestCase2 {
 
 		assertEquals(key.length, actual.byteLength());
 		
+	}
+
+	public void test_encodeDecode_comparator() {
+        
+	    final List<IV<?,?>> ivs = new LinkedList<IV<?,?>>();
+        {
+
+            final URI datatype = new URIImpl("http://www.bigdata.com");
+            
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(""));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" "));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1"));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12"));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123"));
+            
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("","en",null/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ","en",null/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1","en",null/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12","fr",null/*datatype*/));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123","de",null/*datatype*/));
+
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("", null, datatype));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(" ", null, datatype));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("1", null, datatype));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("12", null, datatype));
+            ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>("123", null, datatype));
+
+        }
+        
+        final IV<?, ?>[] e = ivs.toArray(new IV[0]);
+
+        AbstractEncodeDecodeKeysTestCase.doEncodeDecodeTest(e);
+
+        AbstractEncodeDecodeKeysTestCase.doComparatorTest(e);
+    
 	}
 	
 }

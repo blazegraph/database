@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
-import java.util.Arrays;
 
 import junit.framework.TestCase2;
 
@@ -36,6 +35,8 @@ import org.semanticweb.yars.nx.dt.numeric.XSDUnsignedByte;
 
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
@@ -84,7 +85,7 @@ public class TestUnsignedIVs extends TestCase2 {
      * Points of interest in the value space as reported by {@link KeyBuilder}.
      * 
      * <pre>
-     * kmin(-128)=[0]
+     * kmin(-128)=[0] // unsigned zero
      * km1(-1)=[127]
      * k0(0)=[128]
      * kp1(1)=[129]
@@ -97,10 +98,6 @@ public class TestUnsignedIVs extends TestCase2 {
      * There are lots of little edges for when something is interpreted as
      * signed and unsigned and especially the ordering implied by those things
      * using different comparators.
-     * 
-     * TODO It might be more efficient to promote() in the xsd:unsigned
-     * constructors or to use set the promote()'d value on a transient cache so
-     * we can reuse it.
      */
     public void test_xsd_unsignedByte() {
 
@@ -127,13 +124,6 @@ public class TestUnsignedIVs extends TestCase2 {
         // Verify IV self-reports as unsigned.
         assertTrue(MIN_VALUE.isUnsignedNumeric());
 
-        // Verify boolean conversion (there are fence posts here).
-        assertTrue(MIN_VALUE.booleanValue());
-        assertTrue(MINUS_ONE.booleanValue());
-        assertFalse(ZERO.booleanValue());
-        assertTrue(ONE.booleanValue());
-        assertTrue(MAX_VALUE.booleanValue());
-        
         /*
          * Test promote().
          */
@@ -143,9 +133,12 @@ public class TestUnsignedIVs extends TestCase2 {
         assertEquals((short) 129, ONE.promote());
         assertEquals((short) 255, MAX_VALUE.promote());
 
-        /*
-         * TODO Check more promotions?
-         */
+        // Verify boolean conversion (there are fence posts here).
+        assertFalse(MIN_VALUE.booleanValue());
+        assertTrue(MINUS_ONE.booleanValue());
+        assertTrue(ZERO.booleanValue());
+        assertTrue(ONE.booleanValue());
+        assertTrue(MAX_VALUE.booleanValue());
         
         /*
          * Test encoding/decoding.
@@ -165,28 +158,8 @@ public class TestUnsignedIVs extends TestCase2 {
         };
 
         TestEncodeDecodeKeys.doEncodeDecodeTest(e);
-
-        /*
-         * Test ordering.
-         */
-        final IV[] a = e.clone();
-
-        Arrays.sort(a);
-
-        for (int i = 0; i < a.length; i++) {
-
-            final IV expected = e[i];
-
-            final IV actual = a[i];
-            
-            if (!expected.equals(actual)) {
-
-                fail("expected[" + i + "]=" + expected + ", but actual[" + i
-                        + "]=" + actual);
-
-            }
-
-        }
+        
+        TestEncodeDecodeKeys.doComparatorTest(e);
         
     }
 
@@ -196,7 +169,7 @@ public class TestUnsignedIVs extends TestCase2 {
      * Points of interest in the value space as reported by {@link KeyBuilder}.
      * 
      * <pre>
-     * kmin(-32768)=[0, 0]
+     * kmin(-32768)=[0, 0] // unsigned zero.
      * km1(-1)=[127, 255]
      * k0(0)=[128, 0]
      * kp1(1)=[128, 1]
@@ -206,7 +179,7 @@ public class TestUnsignedIVs extends TestCase2 {
     public void test_xsd_unsignedShort() {
         
         /*
-         * Setup values of interest. These appear in their order when
+         * Setup values of interest. These appear in their given order when
          * interpreted as unsigned data.
          */
 
@@ -228,21 +201,27 @@ public class TestUnsignedIVs extends TestCase2 {
         // Verify IV self-reports as unsigned.
         assertTrue(MIN_VALUE.isUnsignedNumeric());
         
-        // Verify boolean conversion (there are fence posts here).
-        assertTrue(MIN_VALUE.booleanValue());
-        assertTrue(MINUS_ONE.booleanValue());
-        assertFalse(ZERO.booleanValue());
-        assertTrue(ONE.booleanValue());
-        assertTrue(MAX_VALUE.booleanValue());
-
         /*
          * Test promote().
          */
         assertEquals(0, MIN_VALUE.promote());
-        assertEquals(32767, MINUS_ONE.promote());
-        assertEquals(32768, ZERO.promote());
-        assertEquals(32769, ONE.promote());
-        assertEquals(65535, MAX_VALUE.promote());
+        assertEquals(Short.MAX_VALUE, MINUS_ONE.promote());
+        assertEquals(((int) Short.MAX_VALUE) + 1/* 32768 */, ZERO.promote());
+        assertEquals(((int) Short.MAX_VALUE) + 2/* 32769 */, ONE.promote());
+        assertEquals(0xffff/*2^16-1 */, MAX_VALUE.promote());
+
+        assertEquals(0x00000000, MIN_VALUE.promote());
+        assertEquals(0x00007fff/*Short.MAX_VALUE*/, MINUS_ONE.promote());
+        assertEquals(0x00008000/*((int) Short.MAX_VALUE) + 1 := 32768 */, ZERO.promote());
+        assertEquals(0x00008001/*((int) Short.MAX_VALUE) + 2 := 32769 */, ONE.promote());
+        assertEquals(0x0000ffff/*2^16-1 */, MAX_VALUE.promote());
+
+        // Verify boolean conversion (there are fence posts here).
+        assertFalse(MIN_VALUE.booleanValue());
+        assertTrue(MINUS_ONE.booleanValue());
+        assertTrue(ZERO.booleanValue());
+        assertTrue(ONE.booleanValue());
+        assertTrue(MAX_VALUE.booleanValue());
 
         /*
          * Test encoding/decoding.
@@ -263,27 +242,141 @@ public class TestUnsignedIVs extends TestCase2 {
 
         TestEncodeDecodeKeys.doEncodeDecodeTest(e);
 
+        TestEncodeDecodeKeys.doComparatorTest(e);
+
+    }
+    
+    public void test_xsd_unsignedInt() {
+        
         /*
-         * Test ordering.
+         * Setup values of interest. These appear in their order when
+         * interpreted as unsigned data.
          */
-        final IV[] a = e.clone();
 
-        Arrays.sort(a);
+        final XSDUnsignedIntIV<BigdataLiteral> MIN_VALUE = new XSDUnsignedIntIV<BigdataLiteral>(
+                Integer.MIN_VALUE);
 
-        for (int i = 0; i < a.length; i++) {
+        final XSDUnsignedIntIV<BigdataLiteral> MINUS_ONE = new XSDUnsignedIntIV<BigdataLiteral>(
+                -1);
 
-            final IV expected = e[i];
+        final XSDUnsignedIntIV<BigdataLiteral> ZERO = new XSDUnsignedIntIV<BigdataLiteral>(
+                0);
 
-            final IV actual = a[i];
-            
-            if (!expected.equals(actual)) {
+        final XSDUnsignedIntIV<BigdataLiteral> ONE = new XSDUnsignedIntIV<BigdataLiteral>(
+                1);
 
-                fail("expected[" + i + "]=" + expected + ", but actual[" + i
-                        + "]=" + actual);
+        final XSDUnsignedIntIV<BigdataLiteral> MAX_VALUE = new XSDUnsignedIntIV<BigdataLiteral>(
+                Integer.MAX_VALUE);
 
-            }
+        // Verify IV self-reports as unsigned.
+        assertTrue(MIN_VALUE.isUnsignedNumeric());
+        
+        /*
+         * Test promote().
+         */
+        assertEquals(0L, MIN_VALUE.promote());
+        assertEquals((long) Integer.MAX_VALUE, MINUS_ONE.promote());
+        assertEquals(((long) Integer.MAX_VALUE) + 1, ZERO.promote());
+        assertEquals(((long) Integer.MAX_VALUE) + 2, ONE.promote());
+        assertEquals(0xffffffffL, MAX_VALUE.promote());
+        //
+        assertEquals(0x00000000L, MIN_VALUE.promote());
+        assertEquals(0x7fffffffL, MINUS_ONE.promote());
+        assertEquals(0x80000000L, ZERO.promote());
+        assertEquals(0x80000001L, ONE.promote());
+        assertEquals(0xffffffffL, MAX_VALUE.promote());
 
-        }
+        // Verify boolean conversion (there are fence posts here).
+        assertFalse(MIN_VALUE.booleanValue());
+        assertTrue(MINUS_ONE.booleanValue());
+        assertTrue(ZERO.booleanValue());
+        assertTrue(ONE.booleanValue());
+        assertTrue(MAX_VALUE.booleanValue());
+
+        /*
+         * Test encoding/decoding.
+         * 
+         * Note: The values in this array are given in their natural _unsigned_
+         * order. After the encode/decode test we will sort this array using the
+         * comparator for the IV. If the IV comparator semantics are correct the
+         * array SHOULD NOT be reordered by the sort.
+         */
+        
+        final IV<?, ?>[] e = {//
+                MIN_VALUE,
+                MINUS_ONE,
+                ZERO,
+                ONE,
+                MAX_VALUE,
+        };
+
+        TestEncodeDecodeKeys.doEncodeDecodeTest(e);
+
+        TestEncodeDecodeKeys.doComparatorTest(e);
+
+    }
+    
+    public void test_xsd_unsignedLong() {
+        
+        /*
+         * Setup values of interest. These appear in their order when
+         * interpreted as unsigned data.
+         */
+
+        final XSDUnsignedLongIV<BigdataLiteral> MIN_VALUE = new XSDUnsignedLongIV<BigdataLiteral>(
+                Long.MIN_VALUE);
+
+        final XSDUnsignedLongIV<BigdataLiteral> MINUS_ONE = new XSDUnsignedLongIV<BigdataLiteral>(
+                -1L);
+
+        final XSDUnsignedLongIV<BigdataLiteral> ZERO = new XSDUnsignedLongIV<BigdataLiteral>(
+                0L);
+
+        final XSDUnsignedLongIV<BigdataLiteral> ONE = new XSDUnsignedLongIV<BigdataLiteral>(
+                1L);
+
+        final XSDUnsignedLongIV<BigdataLiteral> MAX_VALUE = new XSDUnsignedLongIV<BigdataLiteral>(
+                Long.MAX_VALUE);
+
+        // Verify IV self-reports as unsigned.
+        assertTrue(MIN_VALUE.isUnsignedNumeric());
+        
+        /*
+         * Test promote().
+         */
+        assertEquals(BigInteger.valueOf(0x0000000000000000L), MIN_VALUE.promote());
+        assertEquals(BigInteger.valueOf(0x7fffffffffffffffL), MINUS_ONE.promote());
+        assertEquals(BigInteger.valueOf(0x8000000000000000L), ZERO.promote());
+        assertEquals(BigInteger.valueOf(0x8000000000000001L), ONE.promote());
+        assertEquals(BigInteger.valueOf(0xffffffffffffffffL), MAX_VALUE.promote());
+
+        // Verify boolean conversion (there are fence posts here).
+        assertFalse(MIN_VALUE.booleanValue());
+        assertTrue(MINUS_ONE.booleanValue());
+        assertTrue(ZERO.booleanValue());
+        assertTrue(ONE.booleanValue());
+        assertTrue(MAX_VALUE.booleanValue());
+
+        /*
+         * Test encoding/decoding.
+         * 
+         * Note: The values in this array are given in their natural _unsigned_
+         * order. After the encode/decode test we will sort this array using the
+         * comparator for the IV. If the IV comparator semantics are correct the
+         * array SHOULD NOT be reordered by the sort.
+         */
+        
+        final IV<?, ?>[] e = {//
+                MIN_VALUE,
+                MINUS_ONE,
+                ZERO,
+                ONE,
+                MAX_VALUE,
+        };
+
+        TestEncodeDecodeKeys.doEncodeDecodeTest(e);
+
+        TestEncodeDecodeKeys.doComparatorTest(e);
 
     }
     

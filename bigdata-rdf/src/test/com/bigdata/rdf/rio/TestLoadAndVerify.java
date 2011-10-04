@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.io.File;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
@@ -119,6 +118,47 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
     }
 
     /**
+     * Test with the "little.ttl" data set.
+     */
+    public void test_loadAndVerify_little_ttl() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.ttl";
+
+        doLoadAndVerifyTest(resource, parallel);
+
+    }
+    
+    /**
+     * Test with the "little.trig" data set (iff in quads mode).
+     */
+    public void test_loadAndVerify_little_trig_quadsMode() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.trig";
+
+        final Properties p = getProperties();
+
+        if (!Boolean.valueOf(p.getProperty(AbstractTripleStore.Options.QUADS,
+                AbstractTripleStore.Options.DEFAULT_QUADS))) {
+            // IFF in quads mode.
+            return;
+        }
+        
+        doLoadAndVerifyTest(resource, parallel);
+
+    }
+
+    /**
+     * Test with the "smallWithBlobs.rdf" data set.
+     */
+    public void test_loadAndVerify_smallWithBlobs() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithBlobs.rdf";
+
+        doLoadAndVerifyTest( resource, parallel );
+    
+    }
+
+    /**
      * Test with the "sample data.rdf" data set.
      * 
      * @throws Exception
@@ -132,21 +172,11 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
     }
    
     /**
-     * Uses a modest (40k statements) file.
+     * Uses a modest (40k statements) file (BSBM PC 100).
      */
-    public void test_loadAndVerify_modest() throws Exception {
+    public void test_loadAndVerify_bsbm_pc100() throws Exception {
         
-//      final String file = "../rdf-data/nciOncology.owl";
-//        final String file = "../rdf-data/alibaba_v41.rdf";
         final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
-
-        if (!new File(file).exists()) {
-
-            fail("Resource not found: " + file + ", test skipped: " + getName());
-
-            return;
-            
-        }
 
         doLoadAndVerifyTest( file, parallel );
         

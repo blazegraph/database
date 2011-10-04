@@ -1,5 +1,8 @@
 package com.bigdata.rdf.internal;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -72,7 +75,44 @@ public class TestLiteralDatatypeIV extends TestCase2 {
 		doTest(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
 				new FullyInlineTypedLiteralIV<BigdataLiteral>("12"), datatypeIV)//
 				);
+		
+		final IV<?,?>[] e;
+		{
 
+            final List<IV<?, ?>> ivs = new LinkedList<IV<?, ?>>();
+
+            ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+                    new FullyInlineTypedLiteralIV<BigdataLiteral>(""),
+                    datatypeIV)//
+            );
+
+            ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+                    new FullyInlineTypedLiteralIV<BigdataLiteral>("abc"),
+                    datatypeIV)//
+            );
+
+            ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+                    new FullyInlineTypedLiteralIV<BigdataLiteral>(" "),
+                    datatypeIV)//
+            );
+
+            ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+                    new FullyInlineTypedLiteralIV<BigdataLiteral>("1"),
+                    datatypeIV)//
+            );
+
+            ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
+                    new FullyInlineTypedLiteralIV<BigdataLiteral>("12"),
+                    datatypeIV)//
+            );
+
+	        e = ivs.toArray(new IV[0]);
+	        
+		}
+		
+        TestEncodeDecodeKeys.doEncodeDecodeTest(e);
+        TestEncodeDecodeKeys.doComparatorTest(e);
+		
 	}
 
 	private void doTest(final PartlyInlineTypedLiteralIV<BigdataLiteral> iv) {

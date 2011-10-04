@@ -66,24 +66,52 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
     }
 
     /**
-     * Promote the unsigned int into a signed {@link BigInteger}.
+     * Promote the <code>unsigned long</code> into a signed {@link BigInteger}.
      */
-    final BigInteger promote() {
+    public final BigInteger promote() {
 
-        final BigInteger v;
+        long v = value;
         
-        if (value < 0) {
-
-            v = BigInteger.valueOf(value - 0x80000000);
+        if (v < 0) {
+            
+            v = v + 0x8000000000000000L;
 
         } else {
             
-            v = BigInteger.valueOf(0x80000000 + value);
+            v = v - 0x8000000000000000L;
             
         }
 
-        return v;
+        return BigInteger.valueOf(v);
 
+//        final BigInteger v;
+//        
+//        if (value < 0) {
+//
+//            v = BigInteger.valueOf(value - 0x80000000);
+//
+//        } else {
+//            
+//            v = BigInteger.valueOf(0x80000000 + value);
+//            
+//        }
+//
+//        return v;
+
+//        final BigInteger v = BigInteger.valueOf(value);
+//
+//        if (value < 0) {
+//
+//            v = v.subtract(BigInteger.valueOf(0x80000000)); // TODO extract constant.
+//
+//        } else {
+//            
+//            v = v.add(BigInteger.valueOf(0x80000000));// TODO extract constant.
+//            
+//        }
+//        
+//        return v;
+        
     }
 
     final public BigInteger getInlineValue() {
@@ -107,10 +135,21 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
         return promote().longValue();
     }
 
+    /*
+     * From the spec: If the argument is a numeric type or a typed literal with
+     * a datatype derived from a numeric type, the EBV is false if the operand
+     * value is NaN or is numerically equal to zero; otherwise the EBV is true.
+     */
     @Override
     public boolean booleanValue() {
-        return promote().intValue() == 0 ? false : true;//TODO Can be optimized using the known signed representation of the unsigned ZERO (all xsd:unsigned classes).
+        /*
+         * TODO This can be optimized using the known signed representation of
+         * the unsigned ZERO (this is true for all of the xsd:unsigned classes).
+         */
+        return value != UNSIGNED_ZERO ? true : false;
     }
+
+    static private final long UNSIGNED_ZERO = 0x8000000000000000L;
 
     @Override
     public byte byteValue() {
@@ -153,13 +192,14 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDUnsignedLongIV<?>) {
+        if (this == o)
+            return true;
+        if (o instanceof XSDUnsignedLongIV<?>) {
             return this.value == ((XSDUnsignedLongIV<?>) o).value;
         }
         return false;
     }
-    
+
     /**
      * Return the hash code of the long value.
      */
@@ -171,14 +211,13 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
         return 1 + Bytes.SIZEOF_LONG;
     }
     
+    @SuppressWarnings("rawtypes")
     @Override
-    public int _compareTo(final IV o) {// TODO Could be reworked to be natively aware of the signed representation.
+    public int _compareTo(final IV o) {
+ 
+        final XSDUnsignedLongIV<?> t = (XSDUnsignedLongIV<?>) o;
         
-        final BigInteger value = promote();
-        
-        final BigInteger value2 = ((XSDUnsignedLongIV) o).promote();
-        
-        return value.compareTo(value2);
+        return value == t.value ? 0 : value < t.value ? -1 : 1;
         
     }
     
