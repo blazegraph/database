@@ -32,7 +32,6 @@ import java.io.IOException;
 import com.bigdata.bop.IElement;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.impl.TermId;
 
 /**
  * Abstract base class for {@link BigdataValue} implementations.

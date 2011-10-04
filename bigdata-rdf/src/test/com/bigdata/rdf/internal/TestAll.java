@@ -107,7 +107,7 @@ public class TestAll extends TestCase {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/334 
          */
-//        suite.addTestSuite(TestEncodeDecodeUnicodeIVs.class);
+        suite.addTestSuite(TestEncodeDecodeUnicodeIVs.class);
 
         /*
          * Test suite for inlining of xsd unsigned data types.
@@ -116,8 +116,11 @@ public class TestAll extends TestCase {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/246
          */
-//        suite.addTestSuite(TestUnsignedIVs.class);
-//        suite.addTestSuite(TestUnsignedIntegerIVs.class);
+        suite.addTestSuite(TestUnsignedIVs.class);
+        suite.addTestSuite(TestUnsignedIntegerIVs.class);
+        
+        // Encode/decode and *comparator* for mixed VIs.
+        suite.addTestSuite(TestEncodeDecodeMixedIVs.class);
         
         /*
          * Note: This is an old and never finished test suite. All it does is

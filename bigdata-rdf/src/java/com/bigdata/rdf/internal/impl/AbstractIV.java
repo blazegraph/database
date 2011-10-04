@@ -198,12 +198,6 @@ import com.bigdata.rdf.model.BigdataValue;
  * single RDF Value (materialization must be deterministic). This can be seen as
  * normalization imposed by the database.
  * 
- * @todo Note: There can be more than one URI for the same XSD datatype (there
- *       is more than one accepted namespace - see <a
- *       href="http://www.w3.org/TR/xmlschema-2/#namespaces"> XML Schema
- *       Datatypes namespaces </a>). I propose that we collapse these by default
- *       onto a canonical datatype URI.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
  *          $

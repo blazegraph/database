@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -172,8 +173,23 @@ public class TestRollbacks extends QuadsTestCase {
     	
     }
 
+    static private final AtomicInteger runCount = new AtomicInteger();
+    
     private void doTest(final int maxCounter) throws InterruptedException, Exception {
-    	final BigdataSail sail = getSail();
+
+        /*
+         * Note: Each run needs to be in a distinct namespace since we otherwise
+         * can have side-effects through the BigdataValueFactoryImpl for a given
+         * namespace.
+         */
+        
+        final Properties properties = new Properties(getProperties());
+        
+        properties.setProperty(BigdataSail.Options.NAMESPACE,
+                "kb" + runCount.incrementAndGet());
+        
+        final BigdataSail sail = getSail(properties);
+        
         try {
         	// Note: Modified to use the BigdataSailRepository rather than the base SailRepository class.
             final BigdataSailRepository repo = new BigdataSailRepository(sail);

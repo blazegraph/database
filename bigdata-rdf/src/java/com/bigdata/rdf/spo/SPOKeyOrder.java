@@ -310,11 +310,6 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     /**
      * Return the comparator that places {@link ISPO}s into the natural order
      * for the associated index.
-     * 
-     * @todo performance comparison if we get rid of the {@link SPOComparator},
-     *       {@link POSComparator}, and {@link OSPComparator} and just use the
-     *       {@link GeneralComparator}.  Will the hot spot compiler do better
-     *       with just one class handling all of those comparisons?
      */
     final public Comparator<ISPO> getComparator() {
 
@@ -340,9 +335,6 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
     /**
      * Generalized comparator for {@link ISPO}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class GeneralComparator implements Comparator<ISPO> {
 
@@ -365,11 +357,11 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             // compare terms one by one in the appropriate key order
             for (int i = 0; i < keyMap.length; i++) {
                 
-                final IV t1 = o1.get(keyMap[i]);
+                final IV<?, ?> t1 = o1.get(keyMap[i]);
                 
-                final IV t2 = o2.get(keyMap[i]);
+                final IV<?, ?> t2 = o2.get(keyMap[i]);
                 
-                int ret = IVUtility.compare(t1, t2);
+                final int ret = IVUtility.compare(t1, t2);
                 
                 if (ret != 0) {
                 

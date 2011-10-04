@@ -234,6 +234,8 @@ public class SPOIndexWriter implements Callable<Long> {
         // dense array of statements to write.
         final ISPO[] denseStmts = reportMutation ? new ISPO[numStmts] : null;
 
+//        final boolean quads = keyOrder.getKeyArity() == 4;
+        
         for (int i = 0; i < numStmts; i++) {
 
             final ISPO spo = stmts[i];
@@ -244,6 +246,10 @@ public class SPOIndexWriter implements Callable<Long> {
             if (!spo.isFullyBound())
                 throw new IllegalArgumentException("Not fully bound: "
                         + spo.toString());
+
+//            if (quads && spo.c() == null) {
+//                throw new IllegalArgumentException("context not bound: " + spo);
+//            }
             
             // skip statements that match the filter.
             if (filter != null && filter.isValid(spo))

@@ -42,7 +42,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * Implementation for inline {@link Literal}s. Literals may be plain (just a
  * label), have a datatype URI, or have a language code. In each case, all
  * information is inlined. This class is mainly targeted at inlining small plain
- * literals and language code literals, but may also be used to fully inlining
+ * literals and language code literals, but may also be used to fully inline
  * literals in scale-out (which can be an attractive option).
  * <p>
  * Note: Optimized support for <code>xsd:string</code> inlining is provided by
@@ -194,35 +194,38 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof FullyInlineTypedLiteralIV<?>) {
-            final FullyInlineTypedLiteralIV<?> t = (FullyInlineTypedLiteralIV<?>)o;
-            if (!label.equals(t.getLabel()))
-                return false;
 
-            if (language != null) {
+        if (!(o instanceof FullyInlineTypedLiteralIV<?>))
+            return false;
 
-                // the language code is case insensitive.
-                return language.equalsIgnoreCase(t.getLanguage());
+        final FullyInlineTypedLiteralIV<?> t = (FullyInlineTypedLiteralIV<?>) o;
 
-            } else if (t.getLanguage() != null) {
+        if (!label.equals(t.getLabel()))
+            return false;
 
-                return false;
+        if (language != null) {
 
-            }
+            // the language code is case insensitive.
+            return language.equalsIgnoreCase(t.getLanguage());
 
-            if (datatype != null) {
+        } else if (t.getLanguage() != null) {
 
-                return datatype.equals(t.getDatatype());
+            return false;
 
-            } else if (t.getDatatype() != null) {
-
-                return false;
-                
-            }
-            
-            return true;
         }
-        return false;
+
+        if (datatype != null) {
+
+            return datatype.equals(t.getDatatype());
+
+        } else if (t.getDatatype() != null) {
+
+            return false;
+
+        }
+
+        return true;
+        
     }
 
     /**

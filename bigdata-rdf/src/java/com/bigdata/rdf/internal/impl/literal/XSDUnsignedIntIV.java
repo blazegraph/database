@@ -66,23 +66,37 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
     }
     
     /**
-     * Promote the unsigned int into a signed long.
+     * Promote the <code>unsigned int</code> into a <code>signed long</code>.
      */
-    final long promote() {
+    public final long promote() {
 
-        long v = value;
+//        long v = value;
+//        
+//        if (v < 0) {
+//
+//            v = v - 0x80000000L;
+//
+//        } else {
+//            
+//            v = 0x80000000L + v;
+//            
+//        }
+//
+//        return (long) (v & 0xffffffffL);
+
+        int v = value;
         
         if (v < 0) {
-
-            v = v - 0x80000000;
+            
+            v = v + 0x80000000;
 
         } else {
             
-            v = 0x80000000 + v;
+            v = v - 0x80000000;
             
         }
 
-        return v;
+        return ((long) v) & 0xffffffffL;
 
     }
 
@@ -109,10 +123,20 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
         return (long) promote();
     }
 
+    /*
+     * From the spec: If the argument is a numeric type or a typed literal with
+     * a datatype derived from a numeric type, the EBV is false if the operand
+     * value is NaN or is numerically equal to zero; otherwise the EBV is true.
+     */
     @Override
     public boolean booleanValue() {
-        return promote() == 0 ? false : true;
+
+        return value != UNSIGNED_ZERO ? true : false;
+        
     }
+
+//    static private final int UNSIGNED_ZERO = ((int) Integer.MAX_VALUE) + 1;
+    static private final int UNSIGNED_ZERO = 0x80000000;
 
     @Override
     public byte byteValue() {
@@ -155,8 +179,9 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDUnsignedIntIV<?>) {
+        if (this == o)
+            return true;
+        if (o instanceof XSDUnsignedIntIV<?>) {
             return this.value == ((XSDUnsignedIntIV<?>) o).value;
         }
         return false;
@@ -175,15 +200,20 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
         return 1 + Bytes.SIZEOF_INT;
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public int _compareTo(final IV o) {
-         
-        final long value = promote();
+
+        final XSDUnsignedIntIV<?> t = (XSDUnsignedIntIV<?>) o;
+
+        return value == t.value ? 0 : value < t.value ? -1 : 1;
         
-        final long value2 = ((XSDUnsignedIntIV) o).promote();
-        
-        return value == value2 ? 0 : value < value2 ? -1 : 1;
-        
+//        final long value = promote();
+//
+//        final long value2 = t.promote();
+//
+//        return value == value2 ? 0 : value < value2 ? -1 : 1;
+
     }
-    
+
 }

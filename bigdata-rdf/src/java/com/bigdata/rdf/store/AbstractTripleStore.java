@@ -934,25 +934,25 @@ abstract public class AbstractTripleStore extends
 
         String DEFAULT_INLINE_XSD_DATATYPE_LITERALS = "true";
 
-		/**
-		 * Inline ANY literal having fewer than {@link #MAX_INLINE_TEXT_LENGTH}
-		 * characters (default {@value #DEFAULT_INLINE_TEXT_LITERALS}).
-		 * <p>
-		 * Note: This option exists mainly to support a scale-out design in
-		 * which everything is inlined into the statement indices. This design
-		 * extreme is similar to the YARS2 system with its ISAM files and has
-		 * the advantage that little or nothing is stored within the lexicon.
-		 * <p>
-		 * Inlining of large literals via this option is NOT compatible with
-		 * {@link #TEXT_INDEX}. The problem is that we need to index literals
-		 * which are inlined as well as those which are not inlined. While the
-		 * full text index does support this, indexing fully inline literals
-		 * only makes sense for reasonably short literals. This is because the
-		 * {@link IV} of the inlined literal (a) embeds its (compressed) Unicode
-		 * representation; and (b) is replicated for each token within that
-		 * literal. For large literals, this causes a substantial expansion in
-		 * the full text index.
-		 */
+        /**
+         * Inline ANY literal having fewer than {@link #MAX_INLINE_TEXT_LENGTH}
+         * characters (default {@value #DEFAULT_INLINE_TEXT_LITERALS}).
+         * <p>
+         * Note: This option exists mainly to support a scale-out design in
+         * which everything is inlined into the statement indices. This design
+         * is similar to the YARS2 system with its ISAM files and has the
+         * advantage that little or nothing is stored within the lexicon.
+         * <p>
+         * Inlining of large literals via this option is NOT compatible with
+         * {@link #TEXT_INDEX}. The problem is that we need to index literals
+         * which are inlined as well as those which are not inlined. While the
+         * full text index does support this, indexing fully inline literals
+         * only makes sense for reasonably short literals. This is because the
+         * {@link IV} of the inlined literal (a) embeds its (compressed) Unicode
+         * representation; and (b) is replicated for each token within that
+         * literal. For large literals, this causes a substantial expansion in
+         * the full text index.
+         */
 		String INLINE_TEXT_LITERALS = AbstractTripleStore.class.getName()
 				+ ".inlineTextLiterals";
 
@@ -966,7 +966,7 @@ abstract public class AbstractTripleStore extends
 		 * node IDs, etc. The {@link XSDStringExtension} is registered by the
 		 * {@link DefaultExtensionFactory} when GT ZERO (0).
 		 * <p>
-		 * Note: URIs may be readily inlined using this mechansim without
+		 * Note: URIs may be readily inlined using this mechanism without
 		 * causing an interaction with the full text index since they are not
 		 * indexed by the full text index. However, inlining literals in this
 		 * manner causes the compressed Unicode representation of the literal to
@@ -1018,7 +1018,7 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_INLINE_DATE_TIMES = "true";
 
         /**
-         * The default timezone to be used to a) encode inline xsd:datetime
+         * The default time zone to be used to a) encode inline xsd:datetime
          * literals that do not have a time zone specified and b) decode
          * xsd:datetime literals from the statement indices where they are
          * stored as UTC milliseconds since the epoch (default
