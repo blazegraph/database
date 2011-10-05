@@ -94,9 +94,10 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.AssignTermId;
+import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.BlobsWriteProc;
-import com.bigdata.rdf.lexicon.BlobsWriteProc.TermsWriteProcConstructor;
+import com.bigdata.rdf.lexicon.BlobsWriteProc.BlobsWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.lexicon.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
@@ -106,6 +107,7 @@ import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -126,6 +128,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IRunnableBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedUnboundedChunkBuffer;
+import com.bigdata.search.TextIndexWriteProc;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
@@ -396,6 +399,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         return defaultFormat;
         
     }
+    
+    /**
+     * When <code>true</code> and the full text index is enabled, then also
+     * index datatype literals.
+     */
+    private final boolean indexDatatypeLiterals;
 
     /*
      * Asynchronous index write buffers.
@@ -417,6 +426,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * so we do not double count).
      */
     private final LongAggregator statementResultHandler = new LongAggregator();
+
+    /**
+     * Counts tuples written on the full text index.
+     */
+    private final LongAggregator textResultHandler = new LongAggregator();
 
     /**
      * The timestamp set when {@link #notifyStart()} is invoked. This is done
@@ -1468,7 +1482,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                         .newWriteBuffer(
                                 new BlobsWriteProcAsyncResultHandler(false/* readOnly */),
                                 new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
-                                new TermsWriteProcConstructor(
+                                new BlobsWriteProcConstructor(
                                         false/* readOnly */, lexiconRelation
                                                 .isStoreBlankNodes()));
             }
@@ -1476,34 +1490,38 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // TEXT
             {
 
-                if (tripleStore.getLexiconRelation().isTextIndex()) {
+                if (lexiconRelation.isTextIndex()) {
 
                     /*
-                     * FIXME text index. This can be partly handled by factoring
-                     * out a filter to be applied to a striterator. However,
-                     * true async writes need to reach into the full text index
-                     * package. Probably there should be a KVO ctor which knows
-                     * how to form the key and value from the object for a given
-                     * index, e.g., using the tupleSerializer. I could probably
-                     * clean things up enormously in that manner and just write
-                     * filters rather than custom glue for sync and async index
-                     * writes.
+                     * FIXME Must hook in once the tids are available so we can
+                     * tokenize the RDF Literals (Note: only the literals, and
+                     * only those literals that will be indexed) and write out
+                     * the tuples on the text index.
+                     * 
+                     * TODO Unit tests. Must enable the full text index and must
+                     * verify that both TermIds and BlobIVs were indexed. Inline
+                     * Unicode IVs also need to be indexed (they are small,
+                     * unless we change to [s] centric full text indexing).
                      */
-                    throw new UnsupportedOperationException();
-                    // this.buffer_text = ((IScaleOutClientIndex)
-                    // lexiconRelation.getId2TermIndex())
-                    // .newWriteBuffer(
-                    // indexWriteQueueCapacity,
-                    // indexPartitionWriteQueueCapacity,
-                    // resultHandler,
-                    // new DefaultDuplicateRemover<BigdataValue>(true/* testRefs
-                    // */),
-                    // ctor);
+                    
+                    final BigdataRDFFullTextIndex tmp = (BigdataRDFFullTextIndex) lexiconRelation
+                            .getSearchEngine();
+
+                    buffer_text = ((IScaleOutClientIndex) tmp.getIndex()).newWriteBuffer(
+                                    textResultHandler,// counts tuples written on index
+                                    new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                                    TextIndexWriteProc.IndexWriteProcConstructor.NO_OVERWRITE);
+
+                    indexDatatypeLiterals = Boolean
+                            .parseBoolean(lexiconRelation.getProperties().getProperty(
+                                    AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
+                                    AbstractTripleStore.Options.DEFAULT_TEXT_INDEX_DATATYPE_LITERALS));
 
                 } else {
 
                     buffer_text = null;
-
+                    indexDatatypeLiterals = false;
+                    
                 }
                 
             }
@@ -2306,6 +2324,17 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         });
 
         /**
+         * The #of tuples written on the full text index (this does not count
+         * triples that were already present on the index).
+         */
+        counterSet.addCounter("fullTextTupleWriteCount", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(textResultHandler.getResult().longValue());
+            }
+        });
+
+        /**
          * The #of triples written on the SPO index (this does not count triples
          * that were already present on the index).
          */
@@ -2904,8 +2933,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * index).
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(final LexiconRelation r,
-            final Iterator<V> itr, final int chunkSize) {
+    private static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(
+            final LexiconRelation r, final Iterator<V> itr, final int chunkSize) {
 
         return new ChunkedWrappedIterator(new Striterator(itr)
                 .addFilter(new Filter() {
@@ -2929,6 +2958,51 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         if (r.isBlob(v))
                             return false;
+
+                        return true;
+
+                    }
+
+                }), chunkSize, BigdataValue.class);
+
+    }
+
+    /**
+     * Return iterator visiting only the {@link BigdataLiteral}s that we want
+     * to write on the full text index.
+     * @param r
+     * @param itr
+     * @param chunkSize
+     * @return
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static <V extends BigdataValue> IChunkedIterator<V> newTextIterator(
+            final LexiconRelation r, final Iterator<V> itr,
+            final int chunkSize, final boolean indexDatatypeLiterals) {
+
+        return new ChunkedWrappedIterator(
+                new Striterator(itr).addFilter(new Filter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    /*
+                     * Filter hides blank nodes since we do not write them onto
+                     * the TEXT index.
+                     */
+                    @Override
+                    public boolean isValid(final Object obj) {
+
+                        if (!(obj instanceof BigdataLiteral)) {
+                            // Only index Literals.
+                            return false;
+                        }
+
+                        final BigdataLiteral lit = (BigdataLiteral) obj;
+
+                        if (!indexDatatypeLiterals && lit.getDatatype() != null) {
+                            // Ignore datatype literals.
+                            return false;
+                        }
 
                         return true;
 
@@ -3160,148 +3234,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         }
 
     }
-
-//    /**
-//     * Asynchronous writes on the BLOBS index.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     */
-//    static class AsyncBlobsIndexWriteTask implements Callable<Void> {
-//
-//        final private transient static Logger log = Logger
-//                .getLogger(AsyncBlobsIndexWriteTask.class);
-//
-//        private final KVOLatch latch;
-//
-//        private final BigdataValueSerializer valSer;
-//        
-//        private final BlobsTupleSerializer tupleSer;
-//
-//        private final IChunkedIterator<BigdataValue> src;
-//
-//        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
-//
-//        /**
-//         * 
-//         * @param latch
-//         * @param r
-//         * @param src
-//         *            The visits chunks of distinct {@link Value}s.
-//         * @param buffer
-//         */
-//        public AsyncBlobsIndexWriteTask(final KVOLatch latch,
-//                final LexiconRelation r,
-//                final IChunkedIterator<BigdataValue> src,
-//                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
-//
-//            if (latch == null)
-//                throw new IllegalArgumentException();
-//
-//            if (r == null)
-//                throw new IllegalArgumentException();
-//
-//            if (src == null)
-//                throw new IllegalArgumentException();
-//
-//            if (buffer == null)
-//                throw new IllegalArgumentException();
-//
-//            this.latch = latch;
-//
-//            this.valSer = r.getValueFactory().getValueSerializer();
-//            
-//            this.tupleSer = (BlobsTupleSerializer) r.getIndex(
-//                    LexiconKeyOrder.BLOBS).getIndexMetadata()
-//                    .getTupleSerializer();
-//
-//            this.src = src;
-//
-//            this.buffer = buffer;
-//
-//        }
-//
-//        /**
-//         * Reshapes the {@link #src} into {@link KVOC}[]s a chunk at a time and
-//         * submits each chunk to the write buffer for the TERMS index.
-//         */
-//        public Void call() throws Exception {
-//
-//            // This is thread-safe (stateless).
-//            final BlobsIndexHelper h = new BlobsIndexHelper();
-//
-//            /*
-//             * These are thread-local instances, which is why we defer obtaining
-//             * them until call() is executing.
-//             */
-////            final LexiconKeyBuilder keyBuilder = tupleSer
-////                    .getLexiconKeyBuilder();
-//            final IKeyBuilder keyBuilder = h.newKeyBuilder();
-//            final DataOutputBuffer out = new DataOutputBuffer(512);
-//            final ByteArrayBuffer tmp = new ByteArrayBuffer(512);
-//
-//            latch.inc();
-//
-//            try {
-//
-//                while (src.hasNext()) {
-//
-//                    final BigdataValue[] chunkIn = src.nextChunk();
-//
-//                    final KVOC<BigdataValue>[] chunkOut = new KVOC[chunkIn.length];
-//
-//                    int i = 0;
-//
-//                    for (BigdataValue v : chunkIn) {
-//
-//                        final byte[] key = h.makePrefixKey(keyBuilder.reset(), v);
-//                        
-//                        final byte[] val = valSer.serialize(v, out.reset(), tmp);
-//                        
-//                        // Assign a sort key to each Value.
-//                        chunkOut[i++] = new KVOC<BigdataValue>(key, val, v,
-//                                latch)
-//                        // {
-//                        // @Override
-//                        // public void done() {
-//                        // /*
-//                        // * verify that the term identifier is assigned
-//                        // * before we decrement the latch.
-//                        // */
-//                        // if (obj.getTermId() == IRawTripleStore.NULL)
-//                        // throw new AssertionError("No termid? "
-//                        // + this);
-//                        // super.done();
-//                        // }
-//                        // }
-//                        ;
-//
-//                    }
-//
-//                    // Place in KVO sorted order (by the byte[] keys).
-//                    Arrays.sort(chunkOut);
-//
-//                    if (log.isInfoEnabled())
-//                        log.info("Adding chunk to TERMS master: chunkSize="
-//                                + chunkOut.length);
-//
-//                    // add chunk to async write buffer
-//                    buffer.add(chunkOut);
-//
-//                }
-//
-//            } finally {
-//
-//                latch.dec();
-//
-//            }
-//
-//            // Done.
-//            return null;
-//
-//        }
-//
-//    }
     
     /**
      * Asynchronous writes on the ID2TERM index.
@@ -3436,6 +3368,96 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     buffer.add(dense);
 
                 }
+
+            } finally {
+
+                latch.dec();
+
+            }
+
+            // Done.
+            return null;
+
+        }
+
+    }
+
+    /**
+     * Asynchronous writes on the TEXT index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static class AsyncTextIndexWriteTask implements Callable<Void> {
+
+        final protected transient static Logger log = Logger
+                .getLogger(AsyncTextIndexWriteTask.class);
+
+        private final KVOLatch latch;
+
+        private final BigdataRDFFullTextIndex textIndex;
+        
+        private final IChunkedIterator<BigdataValue> src;
+
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
+
+        /**
+         * 
+         * @param src
+         *            The visits chunks of distinct {@link BigdataLiteral}s with
+         *            their TIDs assigned.  Anything which should not be indexed
+         *            has already been filtered out.
+         */
+        public AsyncTextIndexWriteTask(final KVOLatch latch,
+                final BigdataRDFFullTextIndex textIndex,
+                final IChunkedIterator<BigdataValue> src,
+                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
+
+            if (latch == null)
+                throw new IllegalArgumentException();
+
+            if (textIndex == null)
+                throw new IllegalArgumentException();
+
+            if (src == null)
+                throw new IllegalArgumentException();
+
+            if (buffer == null)
+                throw new IllegalArgumentException();
+
+            this.latch = latch;
+
+            this.textIndex = textIndex;
+            
+            this.src = src;
+
+            this.buffer = buffer;
+
+        }
+
+        /**
+         * FIXME This will on the full text index using the
+         * {@link BigdataRDFFullTextIndex} class. That class will wind up doing
+         * gathered batch inserts in chunks of up to the capacity set inline in
+         * the method below. However, it will use Sync RPC rather than the ASYNC
+         * [buffer_text] index write pipeline. While this should be enough to
+         * write unit tests for the full text indexing feature, it is not going
+         * to scale well.
+         * 
+         * @see BigdataRDFFullTextIndex
+         */
+        public Void call() throws Exception {
+
+            latch.inc();
+
+            try {
+                
+                /* 
+                 * TODO capacity for the full text index writes.
+                 */
+                final int capacity = 100000;
+                
+                textIndex.index(capacity, src);
 
             } finally {
 
@@ -4363,9 +4385,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             if (buffer_text != null) {
 
-                // FIXME full text index.
-                throw new UnsupportedOperationException();
-                // tasks.add(new AsyncTextWriteTask());
+                tasks.add(new AsyncTextIndexWriteTask(documentRestartSafeLatch,
+                        (BigdataRDFFullTextIndex) lexiconRelation
+                                .getSearchEngine(), newTextIterator(
+                                lexiconRelation, values.values().iterator(),
+                                producerChunkSize, indexDatatypeLiterals),
+                        buffer_text));
 
             }
 

@@ -366,35 +366,35 @@ public class TokenBuffer<V extends Comparable<V>> {
         
     }
 
-    static private class ReadOnlyTermDocKey<V extends Comparable<V>> implements
-            ITermDocKey<V> {
-
-        private final String token;
-
-        private final V docId;
-
-        private final int fieldId;
-
-        private ReadOnlyTermDocKey(final String token, final V docId,
-                final int fieldId) {
-            this.token = token;
-            this.docId = docId;
-            this.fieldId = fieldId;
-        }
-
-        public String getToken() {
-            return token;
-        }
-
-        public V getDocId() {
-            return docId;
-        }
-
-        public int getFieldId() {
-            return fieldId;
-        }
-
-    }
+//    static private class ReadOnlyTermDocKey<V extends Comparable<V>> implements
+//            ITermDocKey<V> {
+//
+//        private final String token;
+//
+//        private final V docId;
+//
+//        private final int fieldId;
+//
+//        private ReadOnlyTermDocKey(final String token, final V docId,
+//                final int fieldId) {
+//            this.token = token;
+//            this.docId = docId;
+//            this.fieldId = fieldId;
+//        }
+//
+//        public String getToken() {
+//            return token;
+//        }
+//
+//        public V getDocId() {
+//            return docId;
+//        }
+//
+//        public int getFieldId() {
+//            return fieldId;
+//        }
+//
+//    }
     
     /**
      * Writes on the index.

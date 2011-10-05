@@ -408,7 +408,7 @@ public class TestBlobsIndex extends TestCase2 {
 				final boolean readOnly = true;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -432,7 +432,7 @@ public class TestBlobsIndex extends TestCase2 {
 				final boolean readOnly = false;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -532,7 +532,7 @@ public class TestBlobsIndex extends TestCase2 {
 				final boolean readOnly = true;
 				final WriteTaskStats stats = new WriteTaskStats();
 
-				final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+				final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -636,7 +636,7 @@ public class TestBlobsIndex extends TestCase2 {
                 final boolean readOnly = false;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -686,7 +686,7 @@ public class TestBlobsIndex extends TestCase2 {
                 final boolean readOnly = false;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
@@ -1008,7 +1008,7 @@ public class TestBlobsIndex extends TestCase2 {
                 final boolean storeBlankNodes = true;
                 final WriteTaskStats stats = new WriteTaskStats();
 
-                final BlobsWriteProc.TermsWriteProcConstructor ctor = new BlobsWriteProc.TermsWriteProcConstructor(
+                final BlobsWriteProc.BlobsWriteProcConstructor ctor = new BlobsWriteProc.BlobsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,

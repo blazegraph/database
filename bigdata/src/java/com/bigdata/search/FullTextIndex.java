@@ -271,7 +271,6 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
      * Options understood by the {@link FullTextIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
        
@@ -870,7 +869,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
     		final Reader r, final boolean filterStopwords) {
 
         /*
-         * Note: This stripping out stopwords by default.
+         * Note: This is stripping out stopwords by default.
          * 
          * @todo is it using a language family specific stopword list?
          */

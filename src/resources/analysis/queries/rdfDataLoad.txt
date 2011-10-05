@@ -16,6 +16,7 @@
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesRestartSafePerSec)&depth=7&correlated=true&period=Minutes&file=service/cs/toldTriplesRestartSafePerSec
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesRestartSafeCount)&depth=8&correlated=true&file=service/cs/toldTriplesRestartSafeCount
 
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(fullTextTupleWriteCount)&depth=8&correlated=true&file=service/cs/fullTextTupleWriteCount
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesWriteCount)&depth=8&correlated=true&file=service/cs/toldTriplesWriteCount
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentTIDsWaitingCount)&depth=8&correlated=true&file=service/cs/documentTIDsWaitingCount
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentTIDsReadyCount)&depth=8&correlated=true&file=service/cs/documentTIDsReadyCount
@@ -32,8 +33,8 @@ http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(poolPausedCount)&depth=8&co
 # services (parser, term2Id writers, other index writers, file deletes)
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/parserServiceQueueLength
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/parserServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/tidsWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/tidsWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceAverageActiveCount
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/otherWriterServiceQueueLength
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/otherWriterServiceAverageActiveCount
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/deleteService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/deleteServiceAverageQueueLength

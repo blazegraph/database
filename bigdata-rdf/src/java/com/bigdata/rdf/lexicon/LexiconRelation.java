@@ -167,7 +167,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
 	}
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     protected Class<ITextIndexer> determineTextIndexerClass() {
 
         final String className = getProperty(
@@ -1216,6 +1216,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         must also verify that (a) the prefix match is at the start of the
      *         literal; and (b) the match is contiguous.
      */
+    @SuppressWarnings("rawtypes")
     public Iterator<IV> prefixScan(final Literal lit) {
 
         if (lit == null)
@@ -1240,7 +1241,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *         must also verify that (a) the prefix match is at the start of the
      *         literal; and (b) the match is contiguous.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<IV> prefixScan(final Literal[] lits) {
 
         if (lits == null || lits.length == 0)
@@ -1603,7 +1604,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         final KVO<BigdataValue>[] a;
         try {
-            // write on the TERMS index (rync sharded RPC in scale-out)
+            // write on the BLOBS index (rync sharded RPC in scale-out)
             a = new BlobsWriteTask(getBlobsIndex(), valueFactory, readOnly,
                     storeBlankNodes, numTerms, terms, stats).call();
         } catch (Exception ex) {
@@ -1632,7 +1633,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             try {
                 /*
-                 * Note: a[] is in TERMS index order at this point and can
+                 * Note: a[] is in BLOBS index order at this point and can
                  * contain both duplicates and terms that already have term
                  * identifiers and therefore are already in the index.
                  * 
@@ -1643,7 +1644,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  * Therefore, instead of a[], we use an iterator that resolves
                  * the distinct terms in a[] (it is dense) to do the indexing.
                  */
-                @SuppressWarnings("unchecked")
+                @SuppressWarnings({ "unchecked", "rawtypes" })
                 final Iterator<BigdataValue> itr = new Striterator(
                         new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
                         .addFilter(new Resolver() {
@@ -1748,6 +1749,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                      * the indexing.
                      */
 
+                    @SuppressWarnings({ "unchecked", "rawtypes" })
                     final Iterator<BigdataValue> itr = new Striterator(
                             new ChunkedArrayIterator(ndistinct, a, null/* keyOrder */))
                             .addFilter(new Resolver() {
@@ -1811,15 +1813,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         if (getTimestamp() != ITx.UNISOLATED)
             throw new UnsupportedOperationException();
-        
-        if(!textIndex)
+
+        if (!textIndex)
             throw new UnsupportedOperationException();
-        
+
         final ITextIndexer<?> textIndexer = getSearchEngine();
-        
+
         // destroy the existing text index.
         textIndexer.destroy();
-        
+
         // create a new index.
         textIndexer.create();
 
@@ -1829,6 +1831,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             final IIndex terms = getId2TermIndex();
 
             // used to decode the
+            @SuppressWarnings("rawtypes")
             final ITupleSerializer tupSer = terms.getIndexMetadata()
                     .getTupleSerializer();
 
@@ -1840,14 +1843,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * out non-literal terms before they are shipped from a remote index
              * shard.
              */
-            final Iterator<BigdataValue> itr = new Striterator(terms
-                    .rangeIterator(null/* fromKey */, null/* toKey */,
+            final Iterator<BigdataValue> itr = new Striterator(
+                    terms.rangeIterator(null/* fromKey */, null/* toKey */,
                             0/* capacity */, IRangeQuery.DEFAULT,
                             new TupleFilter<BigdataValue>() {
                                 private static final long serialVersionUID = 1L;
 
                                 protected boolean isValid(
                                         final ITuple<BigdataValue> obj) {
+                                    @SuppressWarnings("rawtypes")
                                     final IV iv = (IV) tupSer
                                             .deserializeKey(obj);
                                     if (iv != null && iv.isLiteral()) {
@@ -1860,7 +1864,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 protected Object resolve(final Object obj) {
                     final BigdataLiteral lit = (BigdataLiteral) tupSer
-                            .deserialize((ITuple) obj);
+                            .deserialize((ITuple<?>) obj);
                     // System.err.println("lit: "+lit);
                     return lit;
                 }
@@ -1878,51 +1882,57 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         // BlobIVs
         {
-        // the index to scan for the RDF Literals.
-        final IIndex terms = getBlobsIndex();
+            // the index to scan for the RDF Literals.
+            final IIndex terms = getBlobsIndex();
 
-        // used to decode the
-        final ITupleSerializer tupSer = terms.getIndexMetadata()
-                .getTupleSerializer();
+            // used to decode the
+            @SuppressWarnings("rawtypes")
+            final ITupleSerializer tupSer = terms.getIndexMetadata()
+                    .getTupleSerializer();
 
-        /*
-         * Visit all plain, language code, and datatype literals in the lexicon.
-         * 
-         * Note: This uses a filter on the ITupleIterator in order to filter out
-         * non-literal terms before they are shipped from a remote index shard.
-         */
-        final Iterator<BigdataValue> itr = new Striterator(terms
-                .rangeIterator(null/* fromKey */, null/* toKey */,
-                        0/* capacity */, IRangeQuery.DEFAULT,
-                        new TupleFilter<BigdataValue>() {
-                            private static final long serialVersionUID = 1L;
-                            protected boolean isValid(
-                                    final ITuple<BigdataValue> obj) {
-                                final IV iv = (IV) tupSer.deserializeKey(obj);
-                                if (iv != null && iv.isLiteral()) {
-                                    return true;
+            /*
+             * Visit all plain, language code, and datatype literals in the
+             * lexicon.
+             * 
+             * Note: This uses a filter on the ITupleIterator in order to filter
+             * out non-literal terms before they are shipped from a remote index
+             * shard.
+             */
+            final Iterator<BigdataValue> itr = new Striterator(
+                    terms.rangeIterator(null/* fromKey */, null/* toKey */,
+                            0/* capacity */, IRangeQuery.DEFAULT,
+                            new TupleFilter<BigdataValue>() {
+                                private static final long serialVersionUID = 1L;
+
+                                protected boolean isValid(
+                                        final ITuple<BigdataValue> obj) {
+                                    @SuppressWarnings("rawtypes")
+                                    final IV iv = (IV) tupSer
+                                            .deserializeKey(obj);
+                                    if (iv != null && iv.isLiteral()) {
+                                        return true;
+                                    }
+                                    return false;
                                 }
-                                return false;
-                            }
-                        })).addFilter(new Resolver() {
-            private static final long serialVersionUID = 1L;
+                            })).addFilter(new Resolver() {
+                private static final long serialVersionUID = 1L;
 
-            protected Object resolve(final Object obj) {
-                final BigdataLiteral lit = (BigdataLiteral) tupSer
-                        .deserialize((ITuple) obj);
-//                System.err.println("lit: "+lit);
-                return lit;
+                protected Object resolve(final Object obj) {
+                    final BigdataLiteral lit = (BigdataLiteral) tupSer
+                            .deserialize((ITuple<?>) obj);
+                    // System.err.println("lit: "+lit);
+                    return lit;
+                }
+            });
+
+            final int capacity = 10000;
+
+            while (itr.hasNext()) {
+
+                textIndexer.index(capacity, itr);
+
             }
-        });
 
-        final int capacity = 10000;
-
-        while (itr.hasNext()) {
-
-            textIndexer.index(capacity, itr);
-
-        }
-        
         }
 
     }
@@ -2229,7 +2239,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @return The {@link BigdataValue} -or- <code>null</code> iff there is no
      *         {@link BigdataValue} for that term identifier in the lexicon.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     final public BigdataValue getTerm(final IV iv) {
     	
     	return getValue(iv, true);
@@ -2247,7 +2257,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *            {@link IV} against the TERMS index iff none of the fast paths
      *            succeed.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     final private BigdataValue getValue(final IV iv, final boolean readFromIndex) {
 
         // if (false) { // alternative forces the standard code path.
@@ -2366,7 +2376,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @see #getTerms(Collection), Use this method to resolve {@link Value} to
      *      their {@link IV}s efficiently.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     final public IV getIV(final Value value) {
 
         if (value == null)
@@ -2423,7 +2433,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *            
      * @return The {@link IV} for the value
      */
-    @SuppressWarnings("unchecked")
     private IV<?,?> getTermId(final Value value) {
 
         if(isBlob(value)) {
@@ -2569,7 +2578,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             protected Object resolve(final Object val) {
 
-                return ((ITuple) val).getObject();
+                return ((ITuple<?>) val).getObject();
 
             }
 
@@ -2703,7 +2712,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @see LexPredicate
      * @see LexiconKeyOrder
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Override
     public IAccessPath<BigdataValue> newAccessPath(
             final IIndexManager localIndexManager, 

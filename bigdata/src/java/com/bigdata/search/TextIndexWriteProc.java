@@ -67,12 +67,12 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
             
         }
         
-        public TextIndexWriteProc newInstance(IRabaCoder keySer,
-                IRabaCoder valSer,int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public TextIndexWriteProc newInstance(final IRabaCoder keySer,
+                final IRabaCoder valSer, final int fromIndex,
+                final int toIndex, final byte[][] keys, final byte[][] vals) {
 
-            return new TextIndexWriteProc(keySer, valSer, fromIndex, toIndex, keys,
-                    vals, overwrite);
+            return new TextIndexWriteProc(keySer, valSer, fromIndex, toIndex,
+                    keys, vals, overwrite);
 
         }
 
@@ -87,9 +87,9 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
     
     private boolean overwrite;
     
-    protected TextIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
-            int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            boolean overwrite) {
+    protected TextIndexWriteProc(final IRabaCoder keySer,
+            final IRabaCoder valSer, final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals, final boolean overwrite) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
         
