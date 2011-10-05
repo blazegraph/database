@@ -271,7 +271,7 @@ public class SPOIndexWriter implements Callable<Long> {
                      * triples mode if its context position is not bound. 
                      */
                     throw new IllegalArgumentException(
-                            "context bound, but not quads: " + spo);
+                            "context bound, but not quads or sids: " + spo);
                 }
             }
             

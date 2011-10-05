@@ -100,7 +100,7 @@ public class NanoSparqlServer {
      * @param args
      *            USAGE:<br/>
      *            To start the server:<br/>
-     *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
+     *            <code>(options) <i>port</i> <i>namespace</i> (propertyFile|configFile) )</code>
      *            <p>
      *            <i>Where:</i>
      *            <dl>

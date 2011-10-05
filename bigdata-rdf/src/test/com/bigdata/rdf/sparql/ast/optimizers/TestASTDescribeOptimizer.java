@@ -93,13 +93,15 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
         // Add some data.
         {
 
+            final BigdataURI g = f.createURI("http://www.bigdata.com");
+            
             final BigdataStatement[] stmts = new BigdataStatement[] {//
 
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -107,8 +109,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -116,7 +118,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Mike"), null, // context
+                            f.createLiteral("Mike"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -124,7 +127,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Bryan"), null, // context
+                            f.createLiteral("Bryan"), //
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -132,7 +136,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/DC"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("DC"), null, // context
+                            f.createLiteral("DC"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -277,13 +282,15 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
         // Add some data.
         {
 
+            final BigdataURI g = f.createURI("http://www.bigdata.com");
+            
             final BigdataStatement[] stmts = new BigdataStatement[] {//
 
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()), //
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -291,8 +298,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -300,7 +307,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Mike"), null, // context
+                            f.createLiteral("Mike"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -308,7 +316,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Bryan"), null, // context
+                            f.createLiteral("Bryan"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -316,7 +325,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/DC"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("DC"), null, // context
+                            f.createLiteral("DC"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -487,13 +497,15 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
         // Add some data.
         {
 
+            final BigdataURI g = f.createURI("http://www.bigdata.com");
+            
             final BigdataStatement[] stmts = new BigdataStatement[] {//
 
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -501,8 +513,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDF.TYPE.toString()),
-                            f.createURI(FOAFVocabularyDecl.Person
-                                    .toString()), null, // context
+                            f.createURI(FOAFVocabularyDecl.Person.toString()),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -510,7 +522,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Mike"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Mike"), null, // context
+                            f.createLiteral("Mike"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -518,7 +531,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/Bryan"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("Bryan"), null, // context
+                            f.createLiteral("Bryan"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
@@ -526,7 +540,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     new BigdataStatementImpl(
                             f.createURI("http://www.bigdata.com/DC"),
                             f.createURI(RDFS.LABEL.toString()),
-                            f.createLiteral("DC"), null, // context
+                            f.createLiteral("DC"),//
+                            g, // context
                             StatementEnum.Explicit,//
                             false// userFlag
                     ),
