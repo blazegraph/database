@@ -95,6 +95,10 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      */
     public LexiconKeyBuilder getLexiconKeyBuilder() {
         
+        /*
+         * FIXME We should save off a reference to this to reduce heap churn
+         * and then use that reference in this class.
+         */
         return new LexiconKeyBuilder(getKeyBuilder());
         
     }
