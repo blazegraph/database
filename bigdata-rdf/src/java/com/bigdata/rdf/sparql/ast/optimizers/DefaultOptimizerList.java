@@ -379,13 +379,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTSimpleOptionalOptimizer());
         
         /**
-         * Validates named subquery / include patterns, identifies the join
-         * variables, and annotates the named subquery root and named subquery
-         * include with those join variables.
-         */
-        add(new ASTNamedSubqueryOptimizer());
-        
-        /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate
          * 
          * FIXME This is not implemented yet. We should do this if there are no
@@ -407,6 +400,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSparql11SubqueryOptimizer());
 
+        /**
+         * Validates named subquery / include patterns, identifies the join
+         * variables, and annotates the named subquery root and named subquery
+         * include with those join variables.
+         */
+        add(new ASTNamedSubqueryOptimizer());
+        
     }
 
 }

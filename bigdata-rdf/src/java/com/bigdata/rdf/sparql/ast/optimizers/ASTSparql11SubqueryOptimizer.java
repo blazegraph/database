@@ -34,13 +34,17 @@ import java.util.UUID;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
+import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -79,6 +83,17 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        /*
+         * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER BY. Due
+         * to the interaction of the LIMIT and ORDER BY clause, these subqueries
+         * MUST be run first since they can produce different results if they
+         * are run "as-bound".
+         */
+        
+        liftSubqueryWithLimitAndOrderBy(sa, queryRoot.getWhereClause());
+        
         if(false) {
             
             rewriteSparql11Subqueries(queryRoot);
@@ -89,10 +104,57 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         
     }
 
+    /**
+     * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER BY. Due to
+     * the interaction of the LIMIT and ORDER BY clause, these subqueries MUST
+     * be run first since they can produce different results if they are run
+     * "as-bound".
+     */
+    private void liftSubqueryWithLimitAndOrderBy(
+            final StaticAnalysis sa,
+            final GraphPatternGroup<IGroupMemberNode> group) {
+
+        final int arity = group.arity();
+
+        for (int i = 0; i < arity; i++) {
+
+            final BOp child = (BOp) group.get(i);
+
+            if (child instanceof SubqueryRoot) {
+
+                final SubqueryRoot subquery = (SubqueryRoot) child;
+
+                final SliceNode slice = subquery.getSlice();
+                
+                if(slice == null)
+                    continue;
+
+                final OrderByNode orderBy = subquery.getOrderBy();
+                
+                if(orderBy == null)
+                    continue;
+                
+                liftSparql11Subquery(sa, subquery);
+                
+            } else if (child instanceof GraphPatternGroup<?>) {
+
+                // recursion.
+                liftSubqueryWithLimitAndOrderBy(sa,
+                        ((GraphPatternGroup<IGroupMemberNode>) child));
+
+            } else if (child instanceof ServiceNode) {
+            
+                // Do not rewrite things inside of a SERVICE node.
+                continue;
+                
+            }
+
+        }
+        
+    }
+
     static private void rewriteSparql11Subqueries(final QueryRoot queryRoot){
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-        
         final Striterator itr2 = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
 
@@ -106,39 +168,44 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
         }
         
-        if (queryRoot.getNamedSubqueries() == null) {
-        
-            queryRoot.setNamedSubqueries(new NamedSubqueriesNode());
-            
+    }
+    
+    private void liftSparql11Subquery(final StaticAnalysis sa,
+            final SubqueryRoot root) {
+
+        final IGroupNode<IGroupMemberNode> parent = root.getParent();
+
+        parent.removeChild(root);
+
+        final String newName = UUID.randomUUID().toString();
+
+        final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
+
+        parent.addChild(include);
+
+        final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                root.getQueryType(), newName);
+
+        nsr.setConstruct(root.getConstruct());
+        nsr.setGroupBy(root.getGroupBy());
+        nsr.setHaving(root.getHaving());
+        nsr.setOrderBy(root.getOrderBy());
+        nsr.setProjection(root.getProjection());
+        nsr.setSlice(root.getSlice());
+        nsr.setWhereClause(root.getWhereClause());
+
+        NamedSubqueriesNode namedSubqueries = sa.getQueryRoot()
+                .getNamedSubqueries();
+
+        if (namedSubqueries == null) {
+
+            namedSubqueries = new NamedSubqueriesNode();
+
+            sa.getQueryRoot().setNamedSubqueries(namedSubqueries);
+
         }
 
-        for (SubqueryRoot root : subqueries) {
-
-            final IGroupNode<IGroupMemberNode> parent = root.getParent();
-
-            parent.removeChild(root);
-
-            final String newName = UUID.randomUUID().toString();
-
-            final NamedSubqueryInclude include = new NamedSubqueryInclude(
-                    newName);
-
-            parent.addChild(include);
-
-            final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
-                    root.getQueryType(), newName);
-
-            nsr.setConstruct(root.getConstruct());
-            nsr.setGroupBy(root.getGroupBy());
-            nsr.setHaving(root.getHaving());
-            nsr.setOrderBy(root.getOrderBy());
-            nsr.setProjection(root.getProjection());
-            nsr.setSlice(root.getSlice());
-            nsr.setWhereClause(root.getWhereClause());
-
-            queryRoot.getNamedSubqueries().add(nsr);
-
-        }
+        namedSubqueries.add(nsr);
 
     }
 

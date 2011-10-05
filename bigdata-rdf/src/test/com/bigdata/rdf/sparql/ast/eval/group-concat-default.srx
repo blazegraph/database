@@ -13,7 +13,7 @@
       	<uri>http://example.org/s1</uri>
       </binding>
       <binding name="phrase">
-      	<literal>a;walk;in;the;park</literal>
+      	<literal>a;in;park;the;walk</literal>
       </binding>
     </result>
     <result>
@@ -21,7 +21,7 @@
       	<uri>http://example.org/s2</uri>
       </binding>
       <binding name="phrase">
-      	<literal>hi;4;now</literal>
+      	<literal>4;hi;now</literal>
       </binding>
     </result>
   </results>
