@@ -41,7 +41,7 @@ import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -140,6 +140,7 @@ public class LexiconConfiguration<V extends BigdataValue>
      * Mapping from the {@link IV} for the datatype URI of a registered
      * extension to the {@link IExtension}.
      */
+    @SuppressWarnings("rawtypes")
     private final Map<IV, IExtension<BigdataValue>> iv2ext;
 
     /**
@@ -209,6 +210,7 @@ public class LexiconConfiguration<V extends BigdataValue>
     	
     }
     
+    @SuppressWarnings("rawtypes")
     public LexiconConfiguration(//
 //            final int blobsThreshold,
             final boolean inlineXSDDatatypeLiterals,//
@@ -251,6 +253,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    @SuppressWarnings("unchecked")
     public void initExtensions(final LexiconRelation lex) {
 
         xFactory.init(lex);
@@ -270,7 +273,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
 
         // The datatypeIV for the ExtensionIV.
@@ -286,7 +289,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public IV createInlineIV(final Value value) {
 
         final IV iv;
@@ -685,7 +688,7 @@ public class LexiconConfiguration<V extends BigdataValue>
              * Inline as [Unicode].
              */
 
-            return new UnicodeBNodeIV<BigdataBNode>(id);
+            return new FullyInlineUnicodeBNodeIV<BigdataBNode>(id);
 
         }
 

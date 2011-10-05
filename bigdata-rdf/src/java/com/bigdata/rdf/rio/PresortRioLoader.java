@@ -96,27 +96,38 @@ public class PresortRioLoader extends BasicRioLoader implements RDFHandler
     
     public RDFHandler newRDFHandler() {
         
-        defaultGraphURI =   null != defaultGraph && 4 == buffer.getDatabase ().getSPOKeyArity ()
+        defaultGraphURI = null != defaultGraph && buffer.getDatabase().isQuads()
         	              ? buffer.getDatabase ().getValueFactory ().createURI ( defaultGraph )
         			      : null
         			      ;
+
         return this;
+        
     }
 
-    public void handleStatement( final Statement stmt ) {
+    public void handleStatement(final Statement stmt) {
 
-        if(log.isDebugEnabled()) {
-            
+        if (log.isDebugEnabled()) {
+
             log.debug(stmt);
             
         }
 
         Resource graph = stmt.getContext() ;
-        if (    null == graph
-        	 && null != defaultGraphURI ) // only true when we know we are loading a quad store
-        	graph = defaultGraphURI ;
+        
+        if (null == graph && null != defaultGraphURI) {
+            
+            /*
+             * Only true when we know we are loading a quad store.
+             */
+
+            graph = defaultGraphURI;
+            
+        }
+
         // buffer the write (handles overflow).
-        buffer.add( stmt.getSubject(), stmt.getPredicate(), stmt.getObject(), graph );
+        buffer.add(stmt.getSubject(), stmt.getPredicate(), stmt.getObject(),
+                graph);
 
         stmtsAdded++;
         

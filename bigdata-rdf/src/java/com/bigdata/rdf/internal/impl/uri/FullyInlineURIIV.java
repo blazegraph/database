@@ -25,11 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.impl.uri;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IInlineUnicode;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -123,7 +124,7 @@ public class FullyInlineURIIV<V extends BigdataURI> extends AbstractInlineIV<V, 
             // Cache the byteLength if not yet set.
 
             byteLength = 1 // flags
-                    + IVUtility.byteLengthUnicode(uri.stringValue())//
+                    + IVUnicode.byteLengthUnicode(uri.stringValue())//
                     ;
         }
 
@@ -146,9 +147,12 @@ public class FullyInlineURIIV<V extends BigdataURI> extends AbstractInlineIV<V, 
     @Override
     public int _compareTo(final IV o) {
 
-        final String id2 = ((FullyInlineURIIV<?>) o).uri.stringValue();
+        final FullyInlineURIIV<?> t = (FullyInlineURIIV<?>) o;
+
+        return IVUnicode.IVUnicodeComparator.INSTANCE.compare(
+                uri.stringValue(), t.uri.stringValue());
         
-        return uri.stringValue().compareTo(id2);
+//        return uri.stringValue().compareTo(id2);
 //        return id == id2 ? 0 : id < id2 ? -1 : 1;
         
     }

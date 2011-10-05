@@ -49,10 +49,6 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.NullOutputStream;
-import com.bigdata.io.compression.NoCompressor;
-import com.bigdata.io.compression.UnicodeHelper;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
@@ -63,7 +59,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -102,39 +98,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 public class IVUtility {
 
 //    private static final transient Logger log = Logger.getLogger(IVUtility.class);
-    
-    /**
-     * Helper instance for compression/decompression of Unicode string data.
-     */
-    public static UnicodeHelper un = new UnicodeHelper(
-//            new BOCU1Compressor()
-//          new SCSUCompressor()
-            new NoCompressor()
-            );
 
-    /**
-     * Return the byte length of the compressed representation of a unicode
-     * string.
-     * <p>
-     * This does all the work to compress something and then returns you the
-     * length. Caller's need to be smart about how and when they find the byte
-     * length of an IV representing some inlined Unicode data since we basically
-     * have to serialize the String to find the length.
-     * 
-     * @param s
-     *            The string.
-     * 
-     * @return Its compressed byte length.
-     */
-    public static int byteLengthUnicode(final String s) {
-        try {
-            return un.encode(s, new NullOutputStream(), new ByteArrayBuffer(s
-                    .length()));
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-    
     public static boolean equals(final IV iv1, final IV iv2) {
         
         // same IV or both null
@@ -954,13 +918,13 @@ public class IVUtility {
             // #of bytes read.
             final int nbytes;
             try {
-                nbytes = un.decode(new ByteArrayInputStream(key, o,
+                nbytes = IVUnicode.decode(new ByteArrayInputStream(key, o,
                         key.length - o), sb);
                 str1 = sb.toString();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            return new UnicodeBNodeIV<BigdataBNode>(str1,
+            return new FullyInlineUnicodeBNodeIV<BigdataBNode>(str1,
                     1/* flags */+ nbytes);
         }
         default:
@@ -1002,7 +966,7 @@ public class IVUtility {
             // #of bytes read.
             final int nbytes;
             try {
-                nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+                nbytes = IVUnicode.decode(new ByteArrayInputStream(key, o, key.length
                         - o), sb);
                 str1 = sb.toString();
             } catch (IOException e) {
@@ -1128,7 +1092,7 @@ public class IVUtility {
             // #of bytes read.
             final int nread;
             try {
-                nread = un.decode(new ByteArrayInputStream(key, o, key.length
+                nread = IVUnicode.decode(new ByteArrayInputStream(key, o, key.length
                         - o), sb);
                 str1 = sb.toString();
             } catch (IOException e) {
@@ -1193,7 +1157,7 @@ public class IVUtility {
         final StringBuilder sb = new StringBuilder();
         // first inline string value
         try {
-            final int nbytes = un.decode(new ByteArrayInputStream(key, o, key.length
+            final int nbytes = IVUnicode.decode(new ByteArrayInputStream(key, o, key.length
                     - o), sb);
             str1 = sb.toString();
             nread += nbytes;
@@ -1205,7 +1169,7 @@ public class IVUtility {
         if (nstrings == 2) {
             sb.setLength(0); // reset buffer.
             try {
-                final int nbytes = un.decode(new ByteArrayInputStream(key,
+                final int nbytes = IVUnicode.decode(new ByteArrayInputStream(key,
                         o, key.length - o), sb);
                 str2 = sb.toString();
                 nread += nbytes;

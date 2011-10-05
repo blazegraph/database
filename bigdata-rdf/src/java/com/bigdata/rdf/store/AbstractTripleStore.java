@@ -958,23 +958,23 @@ abstract public class AbstractTripleStore extends
 
 		String DEFAULT_INLINE_TEXT_LITERALS = "false";
 
-		/**
-		 * The maximum length of a String value which may be inlined into the
-		 * statement indices (default {@value #DEFAULT_MAX_INLINE_STRING_LENGTH}
-		 * ). Depending on the configuration, this may applies to literal label
-		 * (and datatypeURI or language code), URI local names, full URIs, blank
-		 * node IDs, etc. The {@link XSDStringExtension} is registered by the
-		 * {@link DefaultExtensionFactory} when GT ZERO (0).
-		 * <p>
-		 * Note: URIs may be readily inlined using this mechanism without
-		 * causing an interaction with the full text index since they are not
-		 * indexed by the full text index. However, inlining literals in this
-		 * manner causes the compressed Unicode representation of the literal to
-		 * be duplicated within the full text index for each token in that
-		 * literal. See {@link #TEXT_INDEX} and {@link #INLINE_TEXT_LITERALS}.
-		 * 
-		 * @see DefaultExtensionFactory
-		 */
+		        /**
+         * The maximum length of a String value which may be inlined into the
+         * statement indices (default {@value #DEFAULT_MAX_INLINE_STRING_LENGTH}
+         * ). Depending on the configuration, this may applies to literal label
+         * (and datatypeURI or language code), URI local names, full URIs, blank
+         * node IDs, etc. The {@link XSDStringExtension} is registered by the
+         * {@link DefaultExtensionFactory} when GT ZERO (0).
+         * <p>
+         * Note: URIs may be readily inlined using this mechanism without
+         * causing an interaction with the full text index since they are not
+         * indexed by the full text index. However, inlining literals in this
+         * manner causes the Unicode representation of the literal to be
+         * duplicated within the full text index for each token in that literal.
+         * See {@link #TEXT_INDEX} and {@link #INLINE_TEXT_LITERALS}.
+         * 
+         * @see DefaultExtensionFactory
+         */
         String MAX_INLINE_TEXT_LENGTH = AbstractTripleStore.class.getName()
                 + ".maxInlineTextLength";
 

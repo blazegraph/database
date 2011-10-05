@@ -49,7 +49,7 @@ import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
@@ -105,7 +105,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
      * ordering is most problematic as they need to obey the collation order
      * imposed by the {@link AbstractTripleStore.Options}.
      */
-    static private boolean fullyInlineUnicode = false;
+    static private boolean fullyInlineUnicode = true;
     
     public void test_encodeDecode_comparator() throws DatatypeConfigurationException {
 
@@ -149,16 +149,16 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                 /*
                  * BNODEs
                  */
-                if (fullyInlineUnicode) {// FIXME comparator is broken.
+                if (fullyInlineUnicode) {
                     // blank nodes with Unicode IDs.
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("FOO"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("_bar"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("bar"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("baz"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("12"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("1298"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("asassdao"));
-                    ivs.add(new UnicodeBNodeIV<BigdataBNode>("1"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("FOO"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("_bar"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("bar"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("baz"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("12"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("1298"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("asassdao"));
+                    ivs.add(new FullyInlineUnicodeBNodeIV<BigdataBNode>("1"));
                 }
 
                 // blank nodes with numeric IDs.
@@ -186,7 +186,6 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                 ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com:80/foo")));
                 ivs.add(new FullyInlineURIIV<BigdataURI>(new URIImpl("http://www.bigdata.com")));
                 if (fullyInlineUnicode) {
-                    // FIXME comparator is broken.
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.TYPE));
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.SUBJECT));
                     ivs.add(new FullyInlineURIIV<BigdataURI>(RDF.BAG));
@@ -197,7 +196,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                  * Literals
                  */
                 
-                if (fullyInlineUnicode) {// FIXME Comparator is broken.
+                if (fullyInlineUnicode) {
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
                             "foo", null/* language */, null/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
@@ -214,7 +213,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                             null/* language */, null/* datatype */));
                 }
 
-                if (fullyInlineUnicode) {// FIXME Comparator is broken.
+                if (fullyInlineUnicode) {
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
                             "foo", "en"/* language */, null/* datatype */));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
@@ -261,7 +260,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                             "de"/* language */, null/* datatype */));
                 }
 
-                if (fullyInlineUnicode) { // FIXME Comparator is broken.
+                if (fullyInlineUnicode) {
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
                             "foo", null/* language */, dt1));
                     ivs.add(new FullyInlineTypedLiteralIV<BigdataLiteral>(
@@ -589,7 +588,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
             {
 
                 // URIs
-                if (fullyInlineUnicode) { // FIXME comparator is broken.
+                if (fullyInlineUnicode) {
                     ivs.add(new PartlyInlineURIIV<BigdataURI>(
                             new FullyInlineTypedLiteralIV<BigdataLiteral>("bar"),
                             namespaceIV));
@@ -629,7 +628,6 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                         datatypeIV));
 
                 if (fullyInlineUnicode) {
-                    // FIXME Comparator is broken.
                     ivs.add(new PartlyInlineTypedLiteralIV<BigdataLiteral>(
                             new FullyInlineTypedLiteralIV<BigdataLiteral>(""),
                             datatypeIV));
@@ -680,7 +678,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                             datatypeIV2));
                 }
 
-                if(fullyInlineUnicode){ // FIXME Comparator is broken.
+                if(fullyInlineUnicode){
                     ivs.add(new PartlyInlineURIIV<BigdataURI>(
                             new FullyInlineTypedLiteralIV<BigdataLiteral>("bar"),// localName
                             new VocabURIShortIV<BigdataURI>((short) 1) // namespace
@@ -723,7 +721,7 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                     ));
                 }
 
-                if(fullyInlineUnicode){ // FIXME Comparator is broken.
+                if (fullyInlineUnicode) {
 
                     final IV<?, ?> datatypeIVa = new VocabURIShortIV<BigdataURI>(
                             (short) 1);

@@ -385,24 +385,25 @@ public class TestAsynchronousStatementBufferFactory extends
 
     }
 
-	/**
-	 * LUBM U(1).
-	 * <p>
-	 * Note: This unit test can hang under JDK 1.6.0_17 if you have been running
-	 * the entire test suite and you do not specify <code>-XX:+UseMembar</code>
-	 * to the JVM. This is a JVM bug. The <code>-XX:+UseMembar</code> option is
-	 * the workaround.
-	 */
-    public void test_loadAndVerify_U1() throws Exception {
-        
-        final String file = "bigdata-rdf/src/resources/data/lehigh/U1";
-
-        doLoadAndVerifyTest(file, getProperties());
-        
-    }
+//	/**
+//	 * LUBM U(1).
+//	 * <p>
+//	 * Note: This unit test can hang under JDK 1.6.0_17 if you have been running
+//	 * the entire test suite and you do not specify <code>-XX:+UseMembar</code>
+//	 * to the JVM. This is a JVM bug. The <code>-XX:+UseMembar</code> option is
+//	 * the workaround. [This is also very slow to run, especially with the lexicon
+//   * validation.]
+//	 */
+//    public void test_loadAndVerify_U1() throws Exception {
+//        
+//        final String file = "bigdata-rdf/src/resources/data/lehigh/U1";
+//
+//        doLoadAndVerifyTest(file, getProperties());
+//        
+//    }
 
 //    /**
-//     * FIXME Do not leave this unit test in -- it takes too long to validate the
+//     * Do not leave this unit test in -- it takes too long to validate the
 //     * loaded data: LUBM U(10)
 //     */
 //    public void test_loadAndVerify_U10() throws Exception {
@@ -428,47 +429,38 @@ public class TestAsynchronousStatementBufferFactory extends
         final AbstractTripleStore store = getStore(properties);
 
         try {
-        
-        if (!(store.getIndexManager() instanceof AbstractScaleOutFederation)) {
 
-            log.warn("Test requires scale-out index views.");
-            
-            return;
-            
-        }
-        
-//        if (store.isQuads()) {
-//
-//            log.warn("Quads not supported yet.");
-//            
-//            return;
-//            
-//        }
-        
+            if (!(store.getIndexManager() instanceof AbstractScaleOutFederation)) {
+
+                log.warn("Test requires scale-out index views.");
+
+                return;
+
+            }
+
             doLoad(store, resource, parallel);
 
             if (log.isDebugEnabled()) {
-        
+
                 log.debug("dumping store...");
-                
-				log.debug("LEXICON:\n"
-								+ DumpLexicon.dump(store
-										.getLexiconRelation()));
+
+                log.debug("LEXICON:\n"
+                        + DumpLexicon.dump(store.getLexiconRelation()));
 
                 // raw statement indices.
                 {
-                    
+
                     final Iterator<SPOKeyOrder> itr = store.isQuads() ? SPOKeyOrder
-                            .quadStoreKeyOrderIterator()
-                            : SPOKeyOrder.tripleStoreKeyOrderIterator();
+                            .quadStoreKeyOrderIterator() : SPOKeyOrder
+                            .tripleStoreKeyOrderIterator();
 
                     while (itr.hasNext()) {
-                     
+
                         final SPOKeyOrder keyOrder = itr.next();
-                        
-                        log.debug("\n---"+keyOrder + "---\n"
+
+                        log.debug("\n---" + keyOrder + "---\n"
                                 + store.getSPORelation().dump(keyOrder));
-                    
+
                     }
 
                 }
@@ -477,8 +469,8 @@ public class TestAsynchronousStatementBufferFactory extends
                 {
 
                     final Iterator<SPOKeyOrder> itr = store.isQuads() ? SPOKeyOrder
-                            .quadStoreKeyOrderIterator()
-                            : SPOKeyOrder.tripleStoreKeyOrderIterator();
+                            .quadStoreKeyOrderIterator() : SPOKeyOrder
+                            .tripleStoreKeyOrderIterator();
 
                     while (itr.hasNext()) {
 
@@ -487,12 +479,14 @@ public class TestAsynchronousStatementBufferFactory extends
                         log.debug("\n" + keyOrder + "\n"
                                 + store.getSPORelation().dump(keyOrder));
 
-                        log.debug("\n---"+keyOrder+"---\n"
+                        log.debug("\n---"
+                                + keyOrder
+                                + "---\n"
                                 + store.dumpStore(store/* resolveTerms */,
                                         true/* explicit */, true/* inferred */,
-                                        true/* axioms */, true/* justifications */,
-                                        keyOrder));
-                        
+                                        true/* axioms */,
+                                        true/* justifications */, keyOrder));
+
                     }
 
                 }

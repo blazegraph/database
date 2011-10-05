@@ -91,6 +91,12 @@ public class SPOIndexWriter implements Callable<Long> {
 
 	private final boolean primaryIndex;
 
+	/** <code>true</code> iff this is a quads mode index. */
+	private final boolean quads;
+	
+	/** <code>true</code> iff this is a SIDs mode index. */
+	private final boolean sids;
+	
     /**
      * Writes statements on a statement index (batch api).
      * 
@@ -177,7 +183,11 @@ public class SPOIndexWriter implements Callable<Long> {
         this.ndx = spoRelation.getIndex(keyOrder);
         
         assert ndx != null;
-        
+
+        quads = keyOrder.getKeyArity() == 4;
+
+        sids = spoRelation.statementIdentifiers;
+
     }
 
     /**
@@ -234,8 +244,6 @@ public class SPOIndexWriter implements Callable<Long> {
         // dense array of statements to write.
         final ISPO[] denseStmts = reportMutation ? new ISPO[numStmts] : null;
 
-//        final boolean quads = keyOrder.getKeyArity() == 4;
-        
         for (int i = 0; i < numStmts; i++) {
 
             final ISPO spo = stmts[i];
@@ -247,9 +255,25 @@ public class SPOIndexWriter implements Callable<Long> {
                 throw new IllegalArgumentException("Not fully bound: "
                         + spo.toString());
 
-//            if (quads && spo.c() == null) {
-//                throw new IllegalArgumentException("context not bound: " + spo);
-//            }
+            if (quads) {
+                if (spo.c() == null) {
+                    /*
+                     * Do not permit an ISPO to be written onto a quads mode
+                     * index without the [c] position bound.
+                     */
+                    throw new IllegalArgumentException("context not bound: "
+                            + spo);
+                }
+            } else if (!sids) {
+                if (spo.c() != null) {
+                    /*
+                     * Do not permit an ISPO to be written onto the index in
+                     * triples mode if its context position is not bound. 
+                     */
+                    throw new IllegalArgumentException(
+                            "context bound, but not quads: " + spo);
+                }
+            }
             
             // skip statements that match the filter.
             if (filter != null && filter.isValid(spo))

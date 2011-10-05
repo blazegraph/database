@@ -38,11 +38,12 @@ import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IExtensionIV;
 import com.bigdata.rdf.internal.IInlineUnicode;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -662,7 +663,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             case XSDString: {
                 final FullyInlineURIIV<?> iv = (FullyInlineURIIV<?>) this;
                 final String uriString = iv.getInlineValue().stringValue();
-                final byte[] b = IVUtility.un.encode1(uriString);
+                final byte[] b = IVUnicode.encode1(uriString);
                 keyBuilder.append(b);
                 iv.setByteLength(1/* flags */+ b.length);
 				break;
@@ -685,8 +686,8 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                 keyBuilder.append((UUID) getInlineValue());
                 break;
             case XSDString: {
-                final UnicodeBNodeIV<?> iv = (UnicodeBNodeIV<?>) this;
-                final byte[] b = IVUtility.un.encode1(iv.getInlineValue());
+                final FullyInlineUnicodeBNodeIV<?> iv = (FullyInlineUnicodeBNodeIV<?>) this;
+                final byte[] b = IVUnicode.encode1(iv.getInlineValue());
                 keyBuilder.append(b);
                 iv.setByteLength(1/* flags */+ b.length);
                 break;
@@ -796,14 +797,14 @@ public abstract class AbstractIV<V extends BigdataValue, T>
                 // handle language code or datatype URI.
                 if (iv.getLanguage() != null) {
                     // language code
-                    keyBuilder.append(IVUtility.un.encode1(iv.getLanguage()));
+                    keyBuilder.append(IVUnicode.encode1(iv.getLanguage()));
                 } else if (iv.getDatatype() != null) {
                     // datatype URI
-                    keyBuilder.append(IVUtility.un.encode1(iv.getDatatype()
+                    keyBuilder.append(IVUnicode.encode1(iv.getDatatype()
                             .stringValue()));
                 }
                 // the literal's label
-                keyBuilder.append(IVUtility.un.encode1(iv.getLabel()));
+                keyBuilder.append(IVUnicode.encode1(iv.getLabel()));
                 // figure the final length of the key.
                 final int len = keyBuilder.len() - pos0;
                 // cache the byteLength on the IV.
@@ -816,7 +817,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
              */
             // append the term code (note: plain literal!!!)  
             keyBuilder.append((byte) ITermIndexCodes.TERM_CODE_LIT);
-            final byte[] b = IVUtility.un.encode1((String) t.getInlineValue());
+            final byte[] b = IVUnicode.encode1((String) t.getInlineValue());
             keyBuilder.append(b);
             ((IInlineUnicode) t)
                     .setByteLength(1/* flags */+ 1/* termCode */+ b.length);
