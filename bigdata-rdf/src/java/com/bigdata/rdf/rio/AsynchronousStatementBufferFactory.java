@@ -320,14 +320,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     final private transient static Logger log = Logger
             .getLogger(AsynchronousStatementBufferFactory.class);
-    
-    /**
-     * FIXME BLOBS. Remove constant used to conditionally enable BLOBS support
-     * while I debug things (We could also conditionally disable the
-     * TERM2ID/ID2TERM indices so I could verify that things work correctly
-     * either way).
-     */
-    private static final boolean ENABLE_BLOBS = true;
 
     /**
      * The database into which the statements will be written.
@@ -1243,7 +1235,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     try {
                         // run the parser.
                         new PresortRioLoader(buffer).loadRdf(reader, baseURL,
-                                rdfFormat, defaultGraph, parserOptions);
+                                rdfFormat, defaultGraph == null ? baseURL
+                                        : defaultGraph, parserOptions);
                     } finally {
                         reader.close();
                     }
@@ -1330,7 +1323,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *            The default {@link RDFFormat} which will be assumed.
      * @param defaultGraph
      *            The value that will be used for the graph/context co-ordinate when
-     *            loading data represented in a triple format into a quad store.
+     *            loading data represented in a triple format into a quad store. If
+     *            not given, then the context will be the resource identifier for
+     *            the resource being parsed.
      * @param parserOptions
      *            Options for the {@link RDFParser}.
      * @param deleteAfter
@@ -1411,12 +1406,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         this.deleteAfter = deleteAfter;
 
         this.pauseParserPoolStatementThreshold = pauseParsedPoolStatementThreshold;
-        
-//        if (tripleStore.getSPOKeyArity() != 3) {
-//
-//            throw new UnsupportedOperationException("Quads not supported");
-//            
-//        }
 
         if (tripleStore.isStatementIdentifiers()) {
 
@@ -1464,7 +1453,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             }
 
             // BLOBS
-            if(ENABLE_BLOBS){
+            {
 
                 final AsynchronousIndexWriteConfiguration config = tripleStore
                         .getLexiconRelation().getBlobsIndex()
@@ -1482,10 +1471,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 new TermsWriteProcConstructor(
                                         false/* readOnly */, lexiconRelation
                                                 .isStoreBlankNodes()));
-            } else {
-                buffer_blobs = null;
             }
-           
+
             // TEXT
             {
 

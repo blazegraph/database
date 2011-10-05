@@ -107,6 +107,7 @@ public class TestAll extends TestCase {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/334 
          */
+        suite.addTestSuite(TestIVUnicode.class);
         suite.addTestSuite(TestEncodeDecodeUnicodeIVs.class);
 
         /*

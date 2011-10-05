@@ -37,8 +37,6 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
 
-import com.bigdata.rdf.model.BigdataURI;
-
 /**
  * Parses data but does not load it into the indices.
  * 
@@ -204,7 +202,7 @@ public class BasicRioLoader implements IRioLoader {
         if (log.isInfoEnabled())
             log.info("format=" + rdfFormat + ", options=" + options);
         
-        this.defaultGraph = defaultGraph ;
+        this.defaultGraph = defaultGraph;
 
         final RDFParser parser = getParser(rdfFormat);
 

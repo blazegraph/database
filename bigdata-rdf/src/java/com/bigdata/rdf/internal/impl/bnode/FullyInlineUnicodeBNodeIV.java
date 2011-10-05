@@ -23,10 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.impl.bnode;
 
+import org.openrdf.model.BNode;
+
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IInlineUnicode;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -41,7 +43,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @see AbstractTripleStore.Options
  */
-public class UnicodeBNodeIV<V extends BigdataBNode> extends
+public class FullyInlineUnicodeBNodeIV<V extends BigdataBNode> extends
         AbstractBNodeIV<V, String> implements IInlineUnicode {
 
     private static final long serialVersionUID = 1L;
@@ -52,7 +54,7 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
     
-    public UnicodeBNodeIV(final String id) {
+    public FullyInlineUnicodeBNodeIV(final String id) {
 
         super(DTE.XSDString);
 
@@ -65,7 +67,7 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
      * @param id The
      * @param byteLength The byte length of this {@link IV}.
      */
-    public UnicodeBNodeIV(final String id, final int byteLength) {
+    public FullyInlineUnicodeBNodeIV(final String id, final int byteLength) {
 
         super(DTE.XSDString);
 
@@ -86,19 +88,19 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
     public boolean equals(Object o) {
         if (this == o)
             return true;
-        if (o instanceof UnicodeBNodeIV<?>) {
-            return this.id.equals(((UnicodeBNodeIV<?>) o).id);
+        if (o instanceof FullyInlineUnicodeBNodeIV<?>) {
+            return this.id.equals(((FullyInlineUnicodeBNodeIV<?>) o).id);
         }
         return false;
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
     public int _compareTo(final IV o) {
          
-        final String id2 = ((UnicodeBNodeIV<?>) o).id;
-        
-        return id.compareTo(id2);
-//        return id == id2 ? 0 : id < id2 ? -1 : 1;
+        final FullyInlineUnicodeBNodeIV<?> t = (FullyInlineUnicodeBNodeIV<?>) o;
+
+        return IVUnicode.IVUnicodeComparator.INSTANCE.compare(id, t.id);
         
     }
     
@@ -112,7 +114,7 @@ public class UnicodeBNodeIV<V extends BigdataBNode> extends
 
         if (byteLength == 0) {
         
-            byteLength = 1/* flags */+ IVUtility.byteLengthUnicode(id);
+            byteLength = 1/* flags */+ IVUnicode.byteLengthUnicode(id);
             
         }
         

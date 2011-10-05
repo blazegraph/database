@@ -33,7 +33,7 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.rdf.internal.impl.bnode.UnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
@@ -140,14 +140,14 @@ public class TestEncodeDecodeUnicodeIVs extends
     public void test_encodeDecode_Inline_BNode_UnicodeID() {
 
         final IV<?, ?>[] e = {//
-                new UnicodeBNodeIV<BigdataBNode>("FOO"),//
-                new UnicodeBNodeIV<BigdataBNode>("_bar"),//
-                new UnicodeBNodeIV<BigdataBNode>("bar"),//
-                new UnicodeBNodeIV<BigdataBNode>("baz"),//
-                new UnicodeBNodeIV<BigdataBNode>("12"),//
-                new UnicodeBNodeIV<BigdataBNode>("1298"),//
-                new UnicodeBNodeIV<BigdataBNode>("asassdao"),//
-                new UnicodeBNodeIV<BigdataBNode>("1"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("FOO"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("_bar"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("bar"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("baz"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("12"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("1298"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("asassdao"),//
+                new FullyInlineUnicodeBNodeIV<BigdataBNode>("1"),//
         };
 
         doEncodeDecodeTest(e);

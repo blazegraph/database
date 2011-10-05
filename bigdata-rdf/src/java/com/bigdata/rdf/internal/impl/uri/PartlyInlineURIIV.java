@@ -1,6 +1,5 @@
 package com.bigdata.rdf.internal.impl.uri;
 
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.INonInlineExtensionCodes;
@@ -64,7 +63,5 @@ public class PartlyInlineURIIV<V extends BigdataURI> extends
 	public String getLocalName() {
 		return getDelegate().stringValue();
 	}
-	
-
 
 }

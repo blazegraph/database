@@ -30,7 +30,7 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IInlineUnicode;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -249,12 +249,12 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
             byteLength = 1 // flags
                     + 1 // termCode
                     + ((termCode == ITermIndexCodes.TERM_CODE_LCL) //
-                    ? IVUtility.byteLengthUnicode(language)//
+                    ? IVUnicode.byteLengthUnicode(language)//
                             : (termCode == ITermIndexCodes.TERM_CODE_DTL) //
-                            ? IVUtility.byteLengthUnicode(datatype
+                            ? IVUnicode.byteLengthUnicode(datatype
                                     .stringValue()) //
                                     : 0) + //
-                    IVUtility.byteLengthUnicode(label)//
+                    IVUnicode.byteLengthUnicode(label)//
             ;
 
         }
@@ -303,21 +303,22 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
 
         switch (termCode) {
         case ITermIndexCodes.TERM_CODE_LIT:
-            return label.compareTo(t.label);
+            return IVUnicode.IVUnicodeComparator.INSTANCE.compare(label,t.label);
         case ITermIndexCodes.TERM_CODE_LCL:
-            ret = language.compareTo(t.language);
+            ret = IVUnicode.IVUnicodeComparator.INSTANCE.compare(language,t.language);
             if (ret < 0)
                 return -1;
             if (ret > 0)
                 return 1;
-            return label.compareTo(t.label);
+            return IVUnicode.IVUnicodeComparator.INSTANCE.compare(label,t.label);
         case ITermIndexCodes.TERM_CODE_DTL:
-            ret = datatype.stringValue().compareTo(t.datatype.stringValue());
+            ret = IVUnicode.IVUnicodeComparator.INSTANCE.compare(datatype.stringValue(),t.datatype.stringValue());
+//            ret = datatype.stringValue().compareTo(t.datatype.stringValue());
             if (ret < 0)
                 return -1;
             if (ret > 0)
                 return 1;
-            return label.compareTo(t.label);
+            return IVUnicode.IVUnicodeComparator.INSTANCE.compare(label,t.label);
         default:
             throw new AssertionError();
         }
