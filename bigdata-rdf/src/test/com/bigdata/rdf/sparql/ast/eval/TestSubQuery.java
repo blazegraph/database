@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
+
 /**
  * Data driven test suite.
  *
@@ -116,11 +118,8 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
      * thompsonbry wrote: Ok. ORDER BY by itself does not matter and neither
      * does LIMIT by itself. But if you have both it matters and we need to run
      * the subquery first.
-     * 
-     * FIXME Write an AST optimizer which looks for the presence of an ORDER BY
-     * and LIMIT on the subquery. If both exists, then we need to do bottom up
-     * evaluation. Right now that means that we will lift out the subquery into
-     * a named subquery.
+     * <p>
+     * Note: This is handled by {@link ASTSparql11SubqueryOptimizer}.
      */
     public void test_sparql_subquery_limiting_resource_pattern() throws Exception {
 
