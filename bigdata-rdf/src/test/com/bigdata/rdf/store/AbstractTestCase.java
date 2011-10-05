@@ -49,8 +49,12 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.btree.proc.IResultHandler;
@@ -59,9 +63,11 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.TestHelper;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.BasicRioLoader;
 import com.bigdata.rdf.spo.ISPO;
@@ -584,6 +590,150 @@ abstract public class AbstractTestCase
 
     }
 
+    /**
+     * Verify that TERM2ID and ID2TERM have the same range count and that
+     * all ID2TERM entries resolve a TERM2ID entry and that each TERM2ID
+     * entry leads to an ID2TERM entry.
+     * 
+     * @param store2
+     */
+    static public void assertLexiconIndicesConsistent(
+            final AbstractTripleStore store) {
+
+        final IIndex t2id = store.getLexiconRelation().getTerm2IdIndex();
+
+        final IIndex id2t = store.getLexiconRelation().getId2TermIndex();
+
+        final BigdataValueSerializer<BigdataValue> valSer = store
+                .getValueFactory().getValueSerializer();
+
+        /*
+         * First, scan the TERMS index and verify that each IV maps to an entry
+         * in the ID2TERMS index which maps back to the original entry in the
+         * TERMS index.
+         */
+        {
+
+            final ITupleSerializer t2idTupleSer = t2id.getIndexMetadata()
+                    .getTupleSerializer();
+
+            final IKeyBuilder keyBuilder = id2t.getIndexMetadata()
+                    .getTupleSerializer().getKeyBuilder();
+
+            final ITupleIterator<IV> itr = t2id.rangeIterator();
+
+            while (itr.hasNext()) {
+
+                final IV<?, ?> iv = (IV) itr.next().getObject();
+
+                keyBuilder.reset();
+
+                final byte[] ivAsKey = iv.encode(keyBuilder).getKey();
+
+                // TODO inefficient point lookup.
+                final byte[] encodedValue = id2t.lookup(ivAsKey);
+
+                assertNotNull(encodedValue);
+
+                // Decode the Value.
+                final BigdataValue decodedValue = valSer
+                        .deserialize(encodedValue);
+
+                // Generate key for T2ID index.
+                final byte[] term2IdKey = t2idTupleSer
+                        .serializeKey(decodedValue);
+
+                // TODO inefficient point lookup.
+                final byte[] encodedIV = t2id.lookup(term2IdKey);
+
+                if (encodedIV == null) {
+
+                    fail("No entry in TERMS index: v=" + decodedValue + ", iv="
+                            + iv);
+
+                }
+
+                if (!BytesUtil.bytesEqual(ivAsKey, encodedIV)) {
+                    /*
+                     * The IV that we got back by round tripping back through
+                     * the TERMS2ID index does not agree with the IV we obtained
+                     * from the iterator scanning the TERMS2ID index.
+                     */
+                    fail("IV: original=" + BytesUtil.toString(ivAsKey)
+                            + ", afterRoundTrip="
+                            + BytesUtil.toString(encodedIV));
+                }
+
+            }
+
+        }
+
+        /*
+         * Scan the ID2TERM index, verifying that each entry maps to an entry in
+         * the TERMS2ID index which is associated with the same IV.
+         */
+        {
+
+            final ITupleSerializer t2idTupleSer = t2id.getIndexMetadata()
+                    .getTupleSerializer();
+
+            final IKeyBuilder keyBuilder = id2t.getIndexMetadata()
+                    .getTupleSerializer().getKeyBuilder();
+
+            final ITupleIterator<BigdataValue> itr = id2t.rangeIterator();
+
+            while (itr.hasNext()) {
+
+                final BigdataValue v = itr.next().getObject();
+
+                final IV<?, ?> iv = v.getIV();
+
+                assertNotNull(v.stringValue(), iv);
+
+                // Generate key for T2ID index.
+                final byte[] term2IdKey = t2idTupleSer.serializeKey(v);
+
+                // TODO inefficient point lookup.
+                final byte[] encodedIV = t2id.lookup(term2IdKey);
+
+                if (encodedIV == null) {
+
+                    fail("No entry in TERMS index: v=" + v + ", iv=" + iv);
+
+                }
+
+                final IV<?, ?> decodedIV = IVUtility.decodeFromOffset(
+                        encodedIV, 0/* offset */);
+
+                if (!iv.equals(decodedIV)) {
+                    /*
+                     * The IV that we got back by round tripping back through
+                     * the TERMS2ID index does not agree with the IV we obtained
+                     * from the iterator scanning the ID2TERMS index.
+                     */
+                    fail("IV: original=" + iv + ", afterRoundTrip=" + decodedIV
+                            + " for value=" + v);
+                }
+
+            }
+
+        }
+
+        /*
+         * Verify that the range counts on TERM2ID and ID2TERM are the same.
+         */
+        {
+
+            final long rc1 = t2id.rangeCount();
+            final long rc2 = id2t.rangeCount();
+
+            assertEquals("lexicon range counts: t2id=" + rc1 + ", id2t=" + rc2,
+                    rc1, rc2);
+
+        }
+
+    }
+    
     /**
      * Validates that the same statements are found in each of the statement
      * indices.

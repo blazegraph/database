@@ -117,7 +117,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 	}
 
-	public static class TermsWriteProcConstructor extends
+	public static class BlobsWriteProcConstructor extends
 			AbstractKeyArrayIndexProcedureConstructor<BlobsWriteProc> {
 
 		private final boolean readOnly;
@@ -129,7 +129,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
-        public TermsWriteProcConstructor(final boolean readOnly,
+        public BlobsWriteProcConstructor(final boolean readOnly,
                 final boolean toldBNodes) {
 
             this.readOnly = readOnly;
@@ -150,7 +150,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-    } // class TermsWriteProcConstructor
+    } // class BlobsWriteProcConstructor
 
 	/**
 	 * For each term whose serialized key is mapped to the current index

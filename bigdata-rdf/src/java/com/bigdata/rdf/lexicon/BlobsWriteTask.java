@@ -12,7 +12,7 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
-import com.bigdata.rdf.lexicon.BlobsWriteProc.TermsWriteProcConstructor;
+import com.bigdata.rdf.lexicon.BlobsWriteProc.BlobsWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.Split;
@@ -224,7 +224,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
                     
                 }
                 
-                final AbstractKeyArrayIndexProcedureConstructor ctor = new TermsWriteProcConstructor(
+                final AbstractKeyArrayIndexProcedureConstructor ctor = new BlobsWriteProcConstructor(
                         readOnly, storeBlankNodes);
 
 				// run the procedure.

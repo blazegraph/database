@@ -32,6 +32,14 @@ public class ReadOnlyTermDocRecord<V extends Comparable<V>>
 
     }
 
+    public String toString(){
+
+        return getClass().getName() + "{text=" + text + ", docId=" + docId
+                + ", fieldId=" + fieldId + ", termFreq=" + termFreq
+                + ", termWeight=" + termWeight + "}";
+        
+    }
+    
     public String getToken() {
 
         if (text == null)

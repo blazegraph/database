@@ -3,8 +3,6 @@ package com.bigdata.rdf.lexicon;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -12,8 +10,8 @@ import com.bigdata.rdf.model.BigdataValue;
  */
 class FullTextIndexWriterTask implements Callable<Long> {
 
-    static private final transient Logger log = Logger
-            .getLogger(FullTextIndexWriterTask.class);
+//    static private final transient Logger log = Logger
+//            .getLogger(FullTextIndexWriterTask.class);
 
     private final ITextIndexer<?> textIndexer;
     

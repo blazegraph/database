@@ -35,9 +35,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -48,7 +50,6 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.EmbeddedClient;
-import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
 
 /**
@@ -65,19 +66,10 @@ import com.bigdata.service.IBigdataClient;
  * 
  *          FIXME variant to test async w/ sids (once written).
  *          
- *          FIXME Test with BLOBS (some objects need to be "large").
- * 
- * @todo The {@link AsynchronousStatementBufferFactory} works with either
- *       triples or quads. However, we are not running
- *       {@link EmbeddedFederation} proxy test suite for quads yet, so you have
- *       to explicitly turn on quads in {@link #getProperties()} in order to run
- *       this test suite for quads.
- * 
  * @todo The async API is only defined at this time for scale-out index views,
  *       so maybe move this into the scale-out proxy test suite.
  * 
  * @see TestScaleOutTripleStoreWithEmbeddedFederation
- * @see RDFFileLoadTask
  */
 public class TestAsynchronousStatementBufferFactory extends
         AbstractRIOTestCase {
@@ -133,7 +125,7 @@ public class TestAsynchronousStatementBufferFactory extends
         // Minimize the #of threads so things are simpler to debug.
         properties.setProperty(ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_CORE_POOL_SIZE,"0");
         
-        properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "false");
+        properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "true");
 
         properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
 
@@ -447,6 +439,22 @@ public class TestAsynchronousStatementBufferFactory extends
                 log.debug("LEXICON:\n"
                         + DumpLexicon.dump(store.getLexiconRelation()));
 
+                if (store.getLexiconRelation().isTextIndex()) {
+
+                    // Full text index.
+                    
+                    final ITupleIterator<?> itr = ((BigdataRDFFullTextIndex) store
+                            .getLexiconRelation().getSearchEngine()).getIndex()
+                            .rangeIterator();
+
+                    while (itr.hasNext()) {
+
+                        log.debug(itr.next().getObject());
+                        
+                    }
+                    
+                }
+                
                 // raw statement indices.
                 {
 
