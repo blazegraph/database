@@ -2913,10 +2913,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
     /**
      * Wrap a {@link BigdataValue}[] with a chunked iterator which filters out
-     * blank nodes (blank nodes are not written onto the reverse index).
+     * blank nodes and blobs (neither of which is written onto the reverse
+     * index).
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(
+    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(final LexiconRelation r,
             final Iterator<V> itr, final int chunkSize) {
 
         return new ChunkedWrappedIterator(new Striterator(itr)
@@ -2927,11 +2928,22 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     /*
                      * Filter hides blank nodes since we do not write them onto
                      * the reverse index.
+                     * 
+                     * Filter does not visit blobs since we do not want to write
+                     * those onto the reverse index either.
                      */
                     @Override
-                    public boolean isValid(Object obj) {
+                    public boolean isValid(final Object obj) {
 
-                        return !(obj instanceof BNode);
+                        final BigdataValue v = (BigdataValue) obj;
+
+                        if (v instanceof BNode)
+                            return false;
+
+                        if (r.isBlob(v))
+                            return false;
+
+                        return true;
 
                     }
 
@@ -4358,8 +4370,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             };
 
             tasks.add(new AsyncId2TermIndexWriteTask(documentRestartSafeLatch,
-                    valueFactory, newId2TIterator(values.values().iterator(),
-                            producerChunkSize), buffer_id2t));
+                    valueFactory, newId2TIterator(lexiconRelation, values
+                            .values().iterator(), producerChunkSize),
+                    buffer_id2t));
 
             if (buffer_text != null) {
 
