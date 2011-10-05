@@ -641,20 +641,13 @@ public class DataLoader {
     public LoadStats loadData(final Reader reader, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-//        try {
+        final LoadStats totals = new LoadStats();
 
-            final LoadStats totals = new LoadStats();
+        loadData3(totals, reader, baseURL, rdfFormat, null/* defaultGraph */,
+                true/* endOfBatch */);
 
-            loadData3(totals, reader, baseURL, rdfFormat, null, true/*endOfBatch*/);
-            
-            return totals;
-        
-//        } finally {
-//            
-//            reader.close();
-//            
-//        }
-        
+        return totals;
+
     }
 
     /**
@@ -669,19 +662,11 @@ public class DataLoader {
     public LoadStats loadData(final InputStream is, final String baseURL,
             final RDFFormat rdfFormat) throws IOException {
 
-//        try {
+        final LoadStats totals = new LoadStats();
 
-            final LoadStats totals = new LoadStats();
-            
-            loadData3(totals, is, baseURL, rdfFormat, null, true/* endOfBatch */);
-            
-            return totals;
-            
-//        } finally {
-//            
-//            is.close();
-//            
-//        }
+        loadData3(totals, is, baseURL, rdfFormat, null/* defaultGraph */, true/* endOfBatch */);
+
+        return totals;
 
     }
 
@@ -699,18 +684,19 @@ public class DataLoader {
 
         if (url == null)
             throw new IllegalArgumentException();
-        
-        if(log.isInfoEnabled())
+
+        if (log.isInfoEnabled())
             log.info("loading: " + url);
 
         final InputStream is = url.openStream();
-        
+
         try {
-        
+
             final LoadStats totals = new LoadStats();
             
-            loadData3(totals, is, baseURL, rdfFormat, null, true/*endOfBatch*/);
-            
+            loadData3(totals, is, baseURL, rdfFormat,
+                    url.toString()/* defaultGraph */, true/* endOfBatch */);
+
             return totals;
         
         } finally {
@@ -743,8 +729,15 @@ public class DataLoader {
         if (log.isInfoEnabled())
             log.info("loading: " + resource);
 
+        // The stringValue() of the URI of the resource from which the data will
+        // be read.
+        String defaultGraph = null;
+        
         // try the classpath
         InputStream rdfStream = getClass().getResourceAsStream(resource);
+
+        if (rdfStream != null)
+            defaultGraph = getClass().getResource(resource).toString();
 
         if (rdfStream == null) {
 
@@ -755,6 +748,10 @@ public class DataLoader {
             // of the input string.
             rdfStream = getClass().getClassLoader().getResourceAsStream(
                     resource);
+            
+            if (rdfStream != null)
+                defaultGraph = getClass().getClassLoader()
+                        .getResource(resource).toString();
 
             if (rdfStream == null) {
 
@@ -766,8 +763,10 @@ public class DataLoader {
 
                 if (file.exists()) {
 
+                    defaultGraph = file.toURI().toString();
+                    
                     loadFiles(totals, 0/* depth */, file, baseURL, rdfFormat,
-                            null, filter, endOfBatch);
+                            defaultGraph, filter, endOfBatch);
 
                     return;
 
@@ -795,7 +794,8 @@ public class DataLoader {
 
         try {
 
-            loadData3(totals, reader, baseURL, rdfFormat, null, endOfBatch);
+            loadData3(totals, reader, baseURL, rdfFormat, defaultGraph,
+                    endOfBatch);
 
         } catch (Exception ex) {
 

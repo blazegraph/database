@@ -383,6 +383,9 @@ public class TripleStoreUtility {
         properties.setProperty(Options.AXIOMS_CLASS,
                 NoAxioms.class.getName());
 
+        properties.setProperty(Options.STATEMENT_IDENTIFIERS,
+                "" + db.isStatementIdentifiers());
+
         final TempTripleStore tmp = new TempTripleStore(properties);
 
         try {
