@@ -1,5 +1,7 @@
-Here is the summary by Matt Roy on how the rdf:type data were generated. The
-various queries referenced below are found in this directory.
+Here is the summary by Cambridge Semantics on how the rdf:type data were
+generated. The various queries referenced below are found in this directory.
+
+  ----
 
 BaseURI=http://www.rdfabout.com/rdf/usgov/congress/people
 InputFile=./people.rdf OutputFile=./trig/people.trig BaseURI=http://www.rdfabout.com/rdf/usgov/congress/people

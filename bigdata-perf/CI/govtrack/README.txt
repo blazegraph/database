@@ -5,8 +5,9 @@ provide stable basis for CI, the snapshot is used when running the queries
 against these data.
 
 The trig directory in the govtrack.zip file are those triples from [2], placed
-into named graphs by Matt Roy.  The additions directory are additional quads
-inferred by Matt in order to have more complete rdf:type statements.
+into named graphs by Cambridge Semantics.  The additions directory are additional
+quads inferred by Cambridge Semantics in order to have more complete rdf:type 
+statements.  See the background directory for more information on this process.
 
 [1] http://www.govtrack.us/
 [2] http://www.govtrack.us/data/rdf/
