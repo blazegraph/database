@@ -1,0 +1,44 @@
+SELECT 
+	?_var1 
+	(GROUP_CONCAT(DISTINCT ?_var2 ; separator=";")  AS ?_var3) 
+	(GROUP_CONCAT(DISTINCT ?_var4 ; separator=";")  AS ?_var5) 
+	(GROUP_CONCAT(DISTINCT ?_var6 ; separator=";")  AS ?_var7) 
+	(GROUP_CONCAT(DISTINCT ?_var8 ; separator=";")  AS ?_var9) 
+	(GROUP_CONCAT(DISTINCT ?_var10 ; separator=";") AS ?_var11)
+
+WITH {
+	SELECT *
+	WHERE {
+		?_var12 <http://www.rdfabout.com/rdf/schema/usbill/vote> ?_var1. 
+		?_var13 <http://www.rdfabout.com/rdf/schema/usbill/hadAction> ?_var12. 
+		?_var1 <http://www.rdfabout.com/rdf/schema/vote/heldBy> ?_var14. 
+		?_var14 <http://www.w3.org/2000/01/rdf-schema#label> "The United States Senate". 
+		?_var1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.rdfabout.com/rdf/schema/vote/Vote>
+	}
+} AS %_set1
+ WHERE {
+	
+	INCLUDE %_set1
+	. 
+	OPTIONAL {
+		?_var1 <http://www.rdfabout.com/rdf/schema/vote/threshold> ?_var2
+	}. 
+	OPTIONAL {
+		?_var1 <http://www.rdfabout.com/rdf/schema/vote/winner> ?_var4
+	}. 
+	OPTIONAL {
+		?_var1 <http://purl.org/dc/elements/1.1/title> ?_var6
+	}. 
+	OPTIONAL {
+		?_var1 <http://www.rdfabout.com/rdf/schema/vote/heldBy> ?_var14. 
+		?_var14 <http://www.w3.org/2000/01/rdf-schema#label> ?_var8.
+	}. 
+	OPTIONAL {
+		?_var12 <http://www.rdfabout.com/rdf/schema/usbill/vote> ?_var1. 
+		?_var13 <http://www.rdfabout.com/rdf/schema/usbill/hadAction> ?_var12. 
+		?_var13 <http://www.rdfabout.com/rdf/schema/usbill/number> ?_var10.
+	}
+}
+GROUP BY ?_var1
+ORDER BY ?_var1
+LIMIT 500
