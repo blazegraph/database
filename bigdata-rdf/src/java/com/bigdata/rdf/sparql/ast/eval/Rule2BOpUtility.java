@@ -147,6 +147,7 @@ public class Rule2BOpUtility extends AST2BOpBase {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine, final Properties queryHints) {
 
+        // TODO StartOp is not required.
         final PipelineOp startOp = applyQueryHints(new StartOp(BOp.NOARGS,
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, idFactory
@@ -156,7 +157,9 @@ public class Rule2BOpUtility extends AST2BOpBase {
                 })),queryHints);
 
         if (rule.getTailCount() == 0) {
-        	return startOp;
+            // TODO Why would we every evaluation an empty rule?
+            throw new RuntimeException("Empty rule?");
+//        	return startOp;
         }
 
     	return convert(rule,
@@ -166,46 +169,38 @@ public class Rule2BOpUtility extends AST2BOpBase {
 
     }
 
-    public static PipelineOp convert(final IRule<?> rule,
-    		final PipelineOp pipelineOp,
-    		final Set<IVariable<?>> knownBound,
-            final AtomicInteger idFactory, final AbstractTripleStore db,
-            final QueryEngine queryEngine, final Properties queryHints) {
-
-//        // true iff the database is in quads mode.
-//        final boolean isQuadsQuery = db.isQuads();
-
-//        final PipelineOp startOp = applyQueryHints(new StartOp(BOpBase.NOARGS,
-//                NV.asMap(new NV[] {//
-//                        new NV(Predicate.Annotations.BOP_ID, idFactory
-//                                .incrementAndGet()),//
-//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-//                                BOpEvaluationContext.CONTROLLER),//
-//                })),queryHints);
-//
-//        if (rule.getTailCount() == 0) {
-//        	return startOp;
-//        }
-//
-//        PipelineOp left = startOp;
-//
-//        if (conditionals != null) { // @todo lift into CONDITION on SubqueryOp
-//        	for (IConstraint c : conditionals) {
-//        		final int condId = idFactory.incrementAndGet();
-//                final PipelineOp condOp = applyQueryHints(
-//                	new ConditionalRoutingOp(new BOp[]{left},
-//                        NV.asMap(new NV[]{//
-//                            new NV(BOp.Annotations.BOP_ID,condId),
-//                            new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-//                        })), queryHints);
-//                left = condOp;
-//                if (log.isDebugEnabled()) {
-//                	log.debug("adding conditional routing op: " + condOp);
-//                }
-//        	}
-//        }
-
-    	PipelineOp left = pipelineOp;
+    /**
+     * Extend a query plan to include the evaluation of the required joins and
+     * constraints described by the {@link IRule}.
+     * 
+     * @param rule
+     *            The rule to be converted. This may consist of only required
+     *            joins. The rule MUST NOT contain any OPTIONAL predicates. The
+     *            caller is responsible for evaluating OPTIONAL predicates,
+     *            optional subqueries, and constraints for variables which might
+     *            not be bound by the required joins.
+     * @param left
+     *            The upstream operator (if any) in the pipeline (may be
+     *            <code>null</code>).
+     * @param knownBound
+     *            The set of variables which are known to be bound. This is used
+     *            to determine when the constraints associated with the rule
+     *            will be evaluated.
+     * @param idFactory
+     *            Used to assign IDs to generated operators.
+     * @param db
+     * @param queryEngine
+     * @param queryHints
+     * @return
+     */
+    public static PipelineOp convert(//
+            final IRule<?> rule,//
+            PipelineOp left,//
+            final Set<IVariable<?>> knownBound,//
+            final AtomicInteger idFactory, //
+            final AbstractTripleStore db,//
+            final QueryEngine queryEngine, //
+            final Properties queryHints) {
 
         /*
          * First put the tails in the correct order based on the logic in
@@ -236,9 +231,6 @@ public class Rule2BOpUtility extends AST2BOpBase {
         case None: {
             /*
              * Do not run the join optimizer.
-             *
-             * @todo Do we need to move any of the joins to the front, e.g.,
-             * magic search, or should everything just be left the way it is?
              */
             order = new int[rule.getTailCount()];
             for (int i = 0; i < order.length; i++) {
@@ -291,11 +283,6 @@ public class Rule2BOpUtility extends AST2BOpBase {
         case Runtime: {
             /*
              * The runtime query optimizer.
-             *
-             * FIXME MikeP: I have modified the JoinGraph so that it can report
-             * the permutation order. However, the code here needs to isolate
-             * the join graph rather than running against all predicates in the
-             * tail. As it is, it will reorder optionals.
              *
              * FIXME We can not optimize quads here using the runtime query
              * optimizer since we have not yet generated the full query plan. In
@@ -373,15 +360,16 @@ public class Rule2BOpUtility extends AST2BOpBase {
 //                .computeRequiredVarsForEachTail(rule, order);
 
         /*
-         * Create an array of predicates in the decided evaluation with various
-         * annotations providing details from the query optimizer.
+         * Create an array of predicates in the decided evaluation order with
+         * various annotations providing details from the query optimizer.
          */
         final Predicate<?>[] preds = new Predicate[rule.getTailCount()];
         for (int i = 0; i < order.length; i++) {
 
-            // assign a bop id to the predicate
-            Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
-                    idFactory.incrementAndGet());
+            Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]);
+            
+            // Verify that the predicate has the required ID annotation.
+            pred.getId();
 
             /*
              * Decorate the predicate with the assigned index (this is purely
@@ -407,9 +395,20 @@ public class Rule2BOpUtility extends AST2BOpBase {
 
         /*
          * Analyze the predicates and constraints to decide which constraints
-         * will run with which predicates.  @todo does not handle optionals
-         * correctly, but we do not pass optionals in to Rule2BOpUtility
-         * from SOp2BOpUtility anymore so ok for now
+         * will run with which predicates.
+         * 
+         * Two comments from MikeP on Rule2BOp which may bear on the RTO
+         * integration:
+         * 
+         * 1. I no longer pass optional tails into Rule2BOp, I handle them
+         * directly in SOp2BOp. Has to do with making sure they run after
+         * non-optional subqueries (nested unions). So the static/runtime
+         * optimizers never even see them anymore.
+         * 
+         * 2. Constraints that use variables not bound by the time the required
+         * predicates are run are not passed into Rule2BOp either – those are
+         * handled as ConditionalRoutingOps? after the optionals and subqueries
+         * have run. So you don't need to worry about those either.
          */
         final IConstraint[][] assignedConstraints;
 		{

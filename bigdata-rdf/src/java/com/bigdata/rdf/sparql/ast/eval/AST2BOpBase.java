@@ -607,11 +607,15 @@ public class AST2BOpBase {
 
     }
 
-    public static PipelineOp join(final AbstractTripleStore db,
-            final QueryEngine queryEngine,
-            PipelineOp left, Predicate pred,
-            final Collection<IConstraint> constraints,
-            final BOpContextBase context, final AtomicInteger idFactory,
+    // TODO JAVADOC
+    public static PipelineOp join(//
+            final AbstractTripleStore db,//
+            final QueryEngine queryEngine,//
+            PipelineOp left,//
+            Predicate pred,//
+            final Collection<IConstraint> constraints,//
+            final BOpContextBase context, //
+            final AtomicInteger idFactory,//
             final Properties queryHints) {
 
         final int joinId = idFactory.incrementAndGet();
