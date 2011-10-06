@@ -57,28 +57,30 @@ public class TestComplexQuery extends AbstractDataDrivenSPARQLTestCase {
     
     }
 
-    /**
-     * FIXME I think that this is a bad test. The <code>?phrase</code> binding
-     * can be computed from the solutions in any order since there is no ORDER
-     * BY clause in the query, and even an ORDER BY will only order the groups
-     * but might not order the GROUP_CONCAT operation (unless we group first and
-     * then aggregate).
-     * 
-     * <pre>
-     * PREFIX : <http://example.org/>
-     * SELECT ?s (GROUP_CONCAT(?o ; separator=";") AS ?phrase) 
-     * {
-     *   ?s :p ?o .
-     * }
-     * GROUP BY ?s
-     * </pre>
-     * 
-     * The test (and the test files) should probably be removed.
-     */
-    public void test_group_concat_default() throws Exception {
-
-        new TestHelper("group-concat-default").runTest();
-
-    }
+//    /**
+//     * TODO In order to verify the behavior of GROUP_CONCAT, the test harness
+//     * needs to verify that the actual solutions are some permutation of the
+//     * possible solutions. The <code>?phrase</code> binding can be computed from
+//     * the solutions in any order since there is no ORDER BY clause in the
+//     * query, and even an ORDER BY will only order the groups but might not
+//     * order the GROUP_CONCAT operation (unless we group first and then
+//     * aggregate).
+//     * 
+//     * <pre>
+//     * PREFIX : <http://example.org/>
+//     * SELECT ?s (GROUP_CONCAT(?o ; separator=";") AS ?phrase) 
+//     * {
+//     *   ?s :p ?o .
+//     * }
+//     * GROUP BY ?s
+//     * </pre>
+//     * 
+//     * The test (and the test files) should probably be removed.
+//     */
+//    public void test_group_concat_default() throws Exception {
+//
+//        new TestHelper("group-concat-default").runTest();
+//
+//    }
     
 }
