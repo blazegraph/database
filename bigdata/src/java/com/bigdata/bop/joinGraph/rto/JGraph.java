@@ -84,7 +84,7 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  * dominated paths.
  * 
  * TODO Compare the cumulative expected cardinality of a join path with the
- * tuples read of a join path. The latter allows us to also explore alternative
+ * tuples read on a join path. The latter allows us to also explore alternative
  * join strategies, such as the parallel subquery versus scan and filter
  * decision for named graph and default graph SPARQL queries.
  * 
@@ -108,7 +108,7 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  *       the hash join but there will still be a lower cardinality to the join
  *       path since we are feeding in fewer solutions to be joined.
  * 
- * @todo Look at the integration with the SAIL. We decorate the joins with some
+ * @todo Look at the integration with the SAIL. We need decorate to joins with some
  *       annotations. Those will have to be correctly propagated to the "edges"
  *       in order for edge sampling and incremental evaluation (or final
  *       evaluation) to work. The {@link DataSetJoin} essentially inlines one of
@@ -159,7 +159,7 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
  *       other case, the set of inputs is fixed and is provided instead of a
  *       single empty binding set as the starting condition. This second case is
  *       actually a bit more complicated since we can not use a random sample of
- *       vertices unless the do not share any variables with the initial binding
+ *       vertices unless they do not share any variables with the initial binding
  *       sets. When there is a shared variable, we need to do a cutoff join of
  *       the edge with the initial binding sets. When there is not a shared
  *       variable, we can sample the vertex and then do a cutoff join.

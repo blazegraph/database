@@ -467,7 +467,9 @@ public class SOp2BOpUtility {
     	for (SOp sop : group) {
     		final BOp bop = sop.getBOp();
     		if (bop instanceof Predicate) {
-    			preds.add((Predicate) bop);
+    		    Predicate pred = (Predicate) bop;
+    		    pred = pred.setBOpId(idFactory.incrementAndGet());
+    			preds.add(pred);
     		}
     	}
     	

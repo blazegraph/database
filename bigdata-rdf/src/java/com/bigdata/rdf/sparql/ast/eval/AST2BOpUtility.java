@@ -1076,7 +1076,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * Note: This corresponds to a very common use case where the named
              * subquery is used to constrain the remainder of the join group.
              * 
-             * Note: If there ARE join variables the the named subquery include
+             * Note: If there ARE join variables then the named subquery include
              * MUST NOT be run until after the join variables have been bound.
              * Failure to observe this rule will cause the unbound variable to
              * be included when computing the hash code of a solution and the
@@ -1396,6 +1396,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @param sa
      * @param ctx
      * @return
+     * 
+     *         TODO In order for the RTO to consider the ordering of required
+     *         subqueries joins they must be combined with the required standard
+     *         joins. Note that, at present, subqueries are represented in the
+     *         AST as groups while joins are represented by statement patterns.
      */
     private static final PipelineOp addJoins(PipelineOp left,
             final JoinGroupNode joinGroup, final StaticAnalysis sa,
@@ -1416,12 +1421,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         }
 
         final List<IConstraint> constraints = new LinkedList<IConstraint>();
+        {
+            for (FilterNode filter : sa.getJoinFilters(joinGroup)) {
 
-        for (FilterNode filter : sa.getJoinFilters(joinGroup)) {
+                constraints
+                        .add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                                filter.getValueExpression()));
 
-            constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                    filter.getValueExpression()));
-
+            }
         }
 
         @SuppressWarnings("rawtypes")
@@ -1436,8 +1443,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
         /*
-         * TODO Pull code up for this. (note that Rule2BOpUtility is also
-         * handling materialization steps for joins.
+         * Note: Rule2BOpUtility is also handling materialization steps for
+         * joins.
          */
 
         left = Rule2BOpUtility.convert(rule, left, knownBound, ctx.idFactory,
@@ -2073,6 +2080,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         // timestamp
         anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database
                 .getSPORelation().getTimestamp()));
+
+        // bopId for the predicate.
+        anns.add(new NV(IPredicate.Annotations.BOP_ID, ctx.idFactory
+                .incrementAndGet()));
 
         if (!database.isQuads()) {
             /*
