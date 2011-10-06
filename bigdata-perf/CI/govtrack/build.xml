@@ -1,0 +1,62 @@
+<!-- $Id$ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
+<project name="CI" basedir=".">
+
+	<property file="build.properties" />
+
+	<path id="runtime.classpath">
+		<!-- The bigdata dependencies (for the nano-server). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="clean"
+	    description="Cleans everything in [build.dir] (including the source data and the loaded database image)">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<copy toDir="${build.dir}/bin">
+			<!-- copy logging and journal configuration file. -->
+			<fileset file="${ci.dir}/*.properties" />
+		</copy>
+	</target>
+
+	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
+	<target name="run-load" depends="prepare"
+		    description="Load a data set.">
+		<!-- delete file if it exists so we load into a new journal. -->
+		<delete file="${ci.journalFile}" />
+		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true"
+		    dir="${build.dir}/bin">
+			<arg line="-namespace ${ci.namespace} ${ci.journalPropertyFile} ${ci.outputFile}.${ci.outputType}${ci.compressType}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${ci.journalFile}
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="start-sparql-server" depends="prepare"
+		    description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true"
+		    dir="${build.dir}/bin">
+			<arg line="${ci.nanoServerPort} ${ci.namespace} ${ci.journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${ci.journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+		
+</project>
