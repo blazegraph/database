@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.NV;
 
 /**
  * UNION()[maxParallel(default all); subqueries=ops]
@@ -75,6 +76,12 @@ public class Union extends AbstractSubqueryOp {
 //        if (args.length < 2)
 //            throw new IllegalArgumentException();
 
+    }
+
+    public Union(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
+        
     }
 
 }

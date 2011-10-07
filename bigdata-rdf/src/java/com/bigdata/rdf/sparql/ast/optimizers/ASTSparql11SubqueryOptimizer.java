@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
@@ -96,7 +96,17 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         
         if(false) {
             
-            rewriteSparql11Subqueries(queryRoot);
+            /*
+             * Note: This may be enabled to lift all SPARQL 1.1 subqueries into
+             * named subqueries. However, I think that the better way to handle
+             * this is to run the subqueries either as-bound "chunked" or with
+             * ALL solutions from the parent as their inputs (the extreme case
+             * of chunked). This can also be applied to handling OPTIONAL groups.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/377
+             */
+            
+            rewriteSparql11Subqueries(sa, queryRoot);
             
         }
 
@@ -153,19 +163,26 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         
     }
 
-    static private void rewriteSparql11Subqueries(final QueryRoot queryRoot){
+    private void rewriteSparql11Subqueries(final StaticAnalysis sa,
+            final QueryRoot queryRoot) {
 
         final Striterator itr2 = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
 
         itr2.addTypeFilter(SubqueryRoot.class);
 
-        final List<SubqueryRoot> subqueries  = new ArrayList<SubqueryRoot>();
+        final List<SubqueryRoot> subqueries  = new LinkedList<SubqueryRoot>();
 
         while (itr2.hasNext()) {
 
             subqueries.add((SubqueryRoot)itr2.next());
 
+        }
+        
+        for(SubqueryRoot subquery : subqueries) {
+            
+            liftSparql11Subquery(sa, subquery);
+            
         }
         
     }
