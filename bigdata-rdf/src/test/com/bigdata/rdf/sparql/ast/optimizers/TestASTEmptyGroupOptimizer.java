@@ -94,7 +94,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
                 BD.SEARCH.toString()));
 
         final IV mikeIV = TermId.mockIV(VTE.LITERAL);
-        bdSearchIV.setValue(store.getValueFactory().createLiteral("mike"));
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
 
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);

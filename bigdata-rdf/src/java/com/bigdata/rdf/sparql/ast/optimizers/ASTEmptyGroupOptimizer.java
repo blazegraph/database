@@ -38,6 +38,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -220,19 +221,29 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         }
 
         /*
-         * Recursion, but only into group nodes.
+         * Recursion, but only into group nodes (including within subqueries).
          */
         for (int i = 0; i < op.arity(); i++) {
 
             final BOp child = op.get(i);
 
-            if (!(child instanceof GroupNodeBase<?>))
-                continue;
+            if (child instanceof GroupNodeBase<?>) {
 
-            @SuppressWarnings("unchecked")
-            final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
+                @SuppressWarnings("unchecked")
+                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
-            eliminateEmptyGroups(childGroup);
+                eliminateEmptyGroups(childGroup);
+
+            } else if (child instanceof QueryBase) {
+
+                final QueryBase subquery = (QueryBase) child;
+
+                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) subquery
+                        .getWhereClause();
+
+                eliminateEmptyGroups(childGroup);
+
+            }
 
         }
 

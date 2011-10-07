@@ -1,0 +1,25 @@
+prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+
+Select ?feature ((?sumF*(?countTotal-?countF))/(?countF*(?sumTotal-?sumF)) As ?priceRatio)
+  {
+    { Select (count(?price) As ?countTotal) (sum(xsd:float(xsd:string(?price))) As ?sumTotal)
+      {
+        ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> .
+        ?offer bsbm:product ?product ;
+               bsbm:price ?price .
+      }
+    }
+    { Select ?feature (count(?price2) As ?countF) (sum(xsd:float(xsd:string(?price2))) As ?sumF)
+      {
+        ?product2 a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> ;
+                 bsbm:productFeature ?feature .
+        ?offer2 bsbm:product ?product2 ;
+               bsbm:price ?price2 .
+      }
+      Group By ?feature
+    }
+  }
+ Order By desc(?priceRatio) ?feature
+ Limit 100

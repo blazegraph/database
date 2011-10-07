@@ -119,27 +119,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * (lift it into the parent). (This sort of thing is not directly expressible in
  * the SPARQL syntax but it might arise through other AST transforms.)
  * 
- * TODO Nested unions should be flattened. This only works until one of the join
- * groups (A, B, or C) introduces something else in the which should apply to
- * just that child union.
- * 
- * <pre>
- *       UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
- * </pre>
- * 
- * Mike's example of where this does not work is:
- * 
- * <pre>
- *       { ?s ?p1 ?o } UNION { ?x ?y ?x . { ?s ?p2 ?o } UNION { ?s ?p3 ?o } }
- * </pre>
- * 
- * In this example, the right hand side of the first union involves a join with
- * the second union, represented here as F(). UNION(A,F(UNION(B,C))). We can not
- * lift that inner union beyond F().
- * <p>
- * The spec does have some rules are how to rewrite things. We might take a look
- * at that.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
  *          thompsonbry$
@@ -246,6 +225,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * join group.
          */
         add(new ASTExistsOptimizer());
+
+        /**
+         * Flatten UNIONs where possible.
+         * 
+         * UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
+         */
+        add(new ASTFlattenUnionsOptimizer());
         
         /**
          * Handles a variety of special constructions related to graph graph
