@@ -72,6 +72,9 @@ public class TestAll extends TestCase {
         // Unit tests for elimination of unnecessary join groups.
         suite.addTestSuite(TestASTEmptyGroupOptimizer.class);
 
+        // Unit tests for flattening of UNIONs.
+        suite.addTestSuite(TestASTFlattenUnionsOptimizer.class);
+
         // Unit tests for rewrites of GRAPH ... { ... } patterns.
         suite.addTestSuite(TestASTGraphGroupOptimizer.class);
 

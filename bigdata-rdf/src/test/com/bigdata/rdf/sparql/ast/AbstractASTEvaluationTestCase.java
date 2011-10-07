@@ -38,6 +38,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -48,6 +49,10 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -211,4 +216,20 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 //
 //    }
 
+    /**
+     * Return a (Mock) IV for a Value.
+     * 
+     * @param v
+     *            The value.
+     *            
+     * @return The Mock IV.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    protected IV makeIV(final Value v) {
+        final BigdataValue bv = store.getValueFactory().asValue(v);
+        final IV iv = TermId.mockIV(VTE.URI);
+        iv.setValue(bv);
+        return iv;
+    }
+    
 }
