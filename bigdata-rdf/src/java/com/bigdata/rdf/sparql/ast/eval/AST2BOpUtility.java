@@ -472,7 +472,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final int maxParallelSubqueries = Math.min(steps.length, 10);
             
             // Run the steps in parallel.
-            left = new Steps(leftOrEmpty(left), //
+            left = new Union(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//

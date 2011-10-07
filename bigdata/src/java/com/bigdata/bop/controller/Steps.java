@@ -75,9 +75,18 @@ public class Steps extends AbstractSubqueryOp {
 
         super(args, annotations);
 
-        if (getMaxParallel() != 1)
-            throw new IllegalArgumentException(Annotations.MAX_PARALLEL + "="
-                    + getMaxParallel());
+        if (getMaxParallelSubqueries() != 1) {
+            /*
+             * This version of the operator runs the subquery steps in a strict
+             * sequence. This is appropriate for things like the fast closure
+             * program, where some steps must execute in the given order while
+             * others may execute concurrently. Use UNION if you want to have
+             * concurrent evaluation of the subqueries.
+             */
+            throw new IllegalArgumentException(Annotations.MAX_PARALLEL_SUBQUERIES + "="
+                    + getMaxParallelSubqueries());
+        }
+        
 
     }
 
