@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-
 import java.util.Properties;
 
 import junit.framework.TestCase2;
@@ -44,7 +43,6 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
@@ -55,7 +53,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.Dechunkerator;
 
 /**
  * Test suite for {@link Union}.
@@ -91,11 +88,9 @@ public class TestUnion extends TestCase2 {
 
     }
 
-    static private final String namespace = "ns";
+    private Journal jnl;
 
-    Journal jnl;
-
-    QueryEngine queryEngine;
+    private QueryEngine queryEngine;
 
     public void setUp() throws Exception {
 
@@ -113,6 +108,8 @@ public class TestUnion extends TestCase2 {
      * Create and populate relation in the {@link #namespace}.
      */
     private void loadData(final Journal store) {
+
+        final String namespace = "ns";
 
         // create the relation.
         final R rel = new R(store, namespace, ITx.UNISOLATED, new Properties());
@@ -199,10 +196,7 @@ public class TestUnion extends TestCase2 {
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
+                runningQuery);
 
     }
 
@@ -253,10 +247,7 @@ public class TestUnion extends TestCase2 {
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
+                runningQuery);
 
     }
 
@@ -277,14 +268,14 @@ public class TestUnion extends TestCase2 {
         
         final IBindingSet[] bindingSets1 = new IBindingSet[1];
         {
-            final IBindingSet tmp = new HashBindingSet();
+            final IBindingSet tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Leon"));
             bindingSets1[0] = tmp;
         }
         
         final IBindingSet[] bindingSets2 = new IBindingSet[1];
         {
-            final IBindingSet tmp = new HashBindingSet();
+            final IBindingSet tmp = new ListBindingSet();
             tmp.set(x, new Constant<String>("Mary"));
             tmp.set(y, new Constant<String>("John"));
             bindingSets2[0] = tmp;
@@ -340,10 +331,7 @@ public class TestUnion extends TestCase2 {
 
         // verify solutions.
         AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
+                runningQuery);
 
     }
 

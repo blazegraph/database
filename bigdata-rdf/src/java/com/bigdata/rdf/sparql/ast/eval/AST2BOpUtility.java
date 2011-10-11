@@ -1691,10 +1691,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     /**
      * Add DISTINCT semantics to the pipeline.
      * 
-     * TODO If the expected cardinality is large then prefer
-     * {@link DistinctBindingSetsWithHTreeOp} rather than
-     * {@link DistinctBindingSetOp}.
-     * 
      * TODO Support parallel decomposition of distinct on a cluster (DISTINCT
      * can be run on each node if we hash partition the DISTINCT operator based
      * on the variables on which DISTINCT will be imposed and the results when
