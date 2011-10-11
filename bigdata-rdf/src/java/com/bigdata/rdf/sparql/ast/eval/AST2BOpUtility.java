@@ -33,6 +33,7 @@ import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
@@ -875,8 +876,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-        // The bopId for the UNION or STEP.
-        final int thisId = ctx.nextId();
+//        // The bopId for the UNION or STEP.
+//        final int thisId = ctx.nextId();
+
+        /*
+         * We are going to route all the subqueries here when they're done,
+         * by replacing the SINK_REF on the topmost operator in the subquery.
+         */
+        final int downstreamId = ctx.nextId();
 
         final BOp[] subqueries = new BOp[arity];
 
@@ -886,9 +893,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             // convert the child
             if (child instanceof JoinGroupNode) {
 
+            	/*
+            	 * This work because convertJoinGroup returns the topmost operator
+            	 * in the subquery pipeline, and this is the one whose SINK_REF
+            	 * we need to change.
+            	 */
                 subqueries[i++] = convertJoinGroup(null/* left */,
-                        (JoinGroupNode) child, ctx);
-
+                        (JoinGroupNode) child, ctx)
+                        // route all "subqueries" to the same place 
+                        	.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                
             } else {
 
                 throw new RuntimeException("Illegal child type for union: "
@@ -898,20 +912,81 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-        final LinkedList<NV> anns = new LinkedList<NV>();
-        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+        /*
+         * Should kinda look like this:
+         * 
+         *       slice := SLICE()[bopId=5]
+         *       subquery4 := startBOp()[bopId=41]->...->endBOp(...)[sinkRef=5]
+         *       subquery3 := startBOp()[bopId=31]->...->endBOp(...)[sinkRef=5]
+         *       subquery2 := startBOp()[bopId=21]->...->endBOp(...)[sinkRef=5]
+         *       subquery1 := startBOp()[bopId=11]->...->endBOp(...)[sinkRef=5]
+         *       tee3   := TEE( tee2 )[bopId=03;sinkRef=31;altSinkRef=41]
+         *       tee2   := TEE( tee1 )[bopId=02;sinkRef=03;altSinkRef=21]
+         *       tee1   := TEE( left )[bopId=01;sinkRef=02;altSinkRef=11]
+         *       left
+         */
 
-        // if (union.getParent() == null) {
-        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-                BOpEvaluationContext.CONTROLLER));
-        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-        // }
-
-        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
-                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-
-        return union;
+        int thisTeeId = ctx.nextId();
+        int nextTeeId = ctx.nextId();
+        
+        /*
+         * We need one less Tee than we have subqueries.
+         */
+        for (int j = 0; j < (subqueries.length-1); j++) {
+        	
+            final LinkedList<NV> anns = new LinkedList<NV>();
+            anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
+            
+            if (j < (subqueries.length-2)) {
+            
+            	// not the last one
+            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
+            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
+            			BOpUtility.getPipelineStart(subqueries[i])));
+            	
+            } else {
+            	
+            	// last one
+            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, 
+            			BOpUtility.getPipelineStart(subqueries[i])));
+            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
+            			BOpUtility.getPipelineStart(subqueries[i+1])));
+            	
+            }
+            
+        	left = applyQueryHints(new Tee(leftOrEmpty(left),
+                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+        	
+			thisTeeId = nextTeeId;
+        	nextTeeId = ctx.nextId();
+        			
+        }
+        
+        /*
+         * All the subqueries get routed here when they are done.
+         * 
+         * FIXME not sure this is the right operator to use?
+         */
+		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+				}));
+        
+//        final LinkedList<NV> anns = new LinkedList<NV>();
+//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+//
+//        // if (union.getParent() == null) {
+//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                BOpEvaluationContext.CONTROLLER));
+//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+//        // }
+//
+//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
+//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+//
+//        return union;
+        
+        return left;
 
     }
 
