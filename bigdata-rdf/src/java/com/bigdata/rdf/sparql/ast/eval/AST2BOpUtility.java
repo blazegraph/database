@@ -885,7 +885,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         final int downstreamId = ctx.nextId();
 
-        final BOp[] subqueries = new BOp[arity];
+        final PipelineOp[] subqueries = new PipelineOp[arity];
 
         int i = 0;
         for (IGroupMemberNode child : unionNode) {
@@ -898,8 +898,17 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             	 * in the subquery pipeline, and this is the one whose SINK_REF
             	 * we need to change.
             	 */
-                subqueries[i++] = convertJoinGroup(null/* left */,
-                        (JoinGroupNode) child, ctx)
+            	final BOp subquery = convertJoinGroup(null/* left */,
+                        (JoinGroupNode) child, ctx);
+            	
+            	if (log.isDebugEnabled()) {
+            		
+            		log.debug(subquery);
+            		log.debug(BOpUtility.getPipelineStart(subquery));
+            		
+            	}
+            	
+                subqueries[i++] = (PipelineOp) subquery
                         // route all "subqueries" to the same place 
                         	.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
                 
@@ -942,15 +951,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             	// not the last one
             	anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
             	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[i])));
+            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
             	
             } else {
             	
             	// last one
             	anns.add(new NV(PipelineOp.Annotations.SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[i])));
+            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
             	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[i+1])));
+            			BOpUtility.getPipelineStart(subqueries[j+1]).getId()));
             	
             }
             
@@ -960,6 +969,18 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 			thisTeeId = nextTeeId;
         	nextTeeId = ctx.nextId();
         			
+        }
+        
+        /*
+         * FIXME We need to actually get the subqueries into the pipeline somehow.
+         */
+        for (PipelineOp subquery : subqueries) {
+        	
+        	/*
+        	 * This does not work, but we need to do something like it.
+        	 */
+        	left = (PipelineOp) subquery.setArg(0, left);
+        	
         }
         
         /*
