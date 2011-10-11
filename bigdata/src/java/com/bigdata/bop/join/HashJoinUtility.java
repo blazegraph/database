@@ -327,12 +327,63 @@ public class HashJoinUtility {
                          * Note: the hash key is based on the entire solution
                          * for this htree.
                          * 
-                         * TODO This can have duplicate entries for a given
-                         * rightSolution. Do we want that? If not, is it
-                         * necessary (or worth the cost) to filter out the
-                         * duplicate entries?
+                         * TODO This code does allows duplicate solutions into
+                         * the joinSet. There is code below which does not
+                         * permit this. We might need to refactor that code into
+                         * a utility method (together with how we obtain the
+                         * appropriate hash code) and use it to filter out
+                         * duplicates for the joinSet and/or the rightSolutions.
                          */
+                        
                         joinSet.insert(rightSolution);
+                        
+//                        final int joinSetHashCode = rightSolution.hashCode();
+//                        
+//                        // visit all joinSet solutions having the same hash code
+//                        @SuppressWarnings("unchecked")
+//                        final ITupleIterator<IBindingSet> xitr = joinSet
+//                                .lookupAll(joinSetHashCode);
+//
+//                        boolean found = false;
+//                        while (!found && xitr.hasNext() ) {
+//
+//                            final ITuple<IBindingSet> xt = xitr.next();
+//
+//                            /*
+//                             * Note: The map entries must be the full source
+//                             * binding set, not just the join variables, even
+//                             * though the key and equality in the key is defined
+//                             * in terms of just the join variables.
+//                             * 
+//                             * Note: Solutions which have the same hash code but
+//                             * whose bindings are inconsistent will be rejected
+//                             * by bind() below.
+//                             */
+//                            final IBindingSet aSolution = xt.getObject();
+//                            
+//                            if (rightSolution.equals(aSolution)) {
+//
+//                                if (log.isDebugEnabled())
+//                                    log.debug("Solution already in joinSet: "
+//                                            + rightSolution);
+//                                
+//                                found = true;
+//                                
+//                                break;
+//                                
+//                            }
+//
+//                        }
+//
+//                        if (!found) {
+//                         
+//                            joinSet.insert(rightSolution);
+//                            
+//                            if (log.isDebugEnabled())
+//                                log.debug("Solution added to joinSet: "
+//                                        + rightSolution);
+//                            
+//                        }
 
                     }
 

@@ -473,6 +473,25 @@ public class HashIndexOp extends PipelineOp {
                     if (attrs.putIfAbsent(namedSetRef, solutions) != null)
                         throw new AssertionError();
 
+                    if (optional) {
+
+                        /*
+                         * The join set is used to handle optionals. It is saved
+                         * under a named solution set reference based on the
+                         * original named solution set reference, but with a
+                         * slightly different named set name.
+                         */
+                        final NamedSolutionSetRef joinSetRef = new NamedSolutionSetRef(
+                                namedSetRef.queryId, namedSetRef.namedSet
+                                        + ".joinSet", joinVars);
+
+                        HTree joinSet = HTree.create(store, metadata.clone());
+
+                        if (attrs.putIfAbsent(joinSetRef, joinSet) != null)
+                            throw new AssertionError();
+                        
+                    }
+                    
                 } else {
                     
                     this.first = false;
@@ -497,9 +516,6 @@ public class HashIndexOp extends PipelineOp {
 
                 if(context.isLastInvocation()) {
 
-                    // Output the buffered solutions.
-                    outputSolutions();
-                    
                     /*
                      * Note: The [HTree] object is already present on the
                      * IQueryAttributes. However, it is the mutable HTree
@@ -507,10 +523,20 @@ public class HashIndexOp extends PipelineOp {
                      * by check pointing the HTree and updating the reference on
                      * the IQueryAttributes. That would allow the consumer of
                      * the HTree to be safe for concurrent readers.
+                     * 
+                     * Note: We must checkpoint the solution set before we
+                     * output anything. Otherwise the chunks output by this
+                     * operator could appear at the SolutionSetHashJoinOp before
+                     * this operator is done and it would have the mutable view
+                     * of the HTree rather than the concurrent read-only view of
+                     * the HTree.
                      */
                     
                     // Checkpoint and save the solution set.
                     saveSolutionSet();
+                    
+                    // Output the buffered solutions.
+                    outputSolutions();
                     
                 }
                 

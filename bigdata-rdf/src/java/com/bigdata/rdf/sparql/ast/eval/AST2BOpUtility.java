@@ -41,6 +41,8 @@ import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.HashIndexOp;
+import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
@@ -1611,16 +1613,19 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
 
+    /**
+     * This method handles UNION and OPTIONAL subgroups.
+     *  
+     * @param left
+     * @param subgroup
+     * @param ctx
+     * @return
+     */
 	private static PipelineOp _addSubquery(//
 			PipelineOp left,//
 			final IGroupNode<IGroupMemberNode> subgroup,//
 			final AST2BOpContext ctx//
 			) {
-
-		final boolean optional = subgroup.isOptional();
-		
-        final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
-                subgroup, ctx);
 
 		if (ctx.isCluster()
 				&& BOpUtility.visitAll((BOp) subgroup,
@@ -1640,13 +1645,95 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 				}));
 
         }
-        
-        left = new SubqueryOp(leftOrEmpty(left), //
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
-                new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
-                new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
-        );
 
+        final boolean optional = subgroup.isOptional();
+
+        /*
+         * FIXME Enable new sub-group evaluation code path. There is currently a
+         * problem with duplicate solutions for OPTIONAL groups. I have not
+         * tested this against non-optional groups (e.g., UNION), but I suspect
+         * that the problem only exists with OPTIONAL groups and is linked to
+         * the handling of the joinSet used to detect and report optional
+         * solutions. If so, then the fix is to HashJoinUtility#330 where there
+         * is a TODO for what appears to be this issue.
+         */
+        if(false) { 
+
+		    /*
+		     * Model a sub-group by building a hash index at the start of the
+		     * group. We then run the group.  Finally, we do a hash join of
+		     * the hash index against the solutions in the group.  If the
+		     * group is optional, then the hash join is also optional.
+		     * 
+		     * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
+		     */
+            final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
+
+            // Find the set of variables which will be definately bound by the
+            // time the sub-group is evaluated.
+            final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
+                    (GraphPatternGroup<?>) subgroup,
+                    new LinkedHashSet<IVariable<?>>());
+
+            @SuppressWarnings("rawtypes")
+            final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);
+	        
+		    // Pass all variable bindings along.
+	        @SuppressWarnings("rawtypes")
+	        final IVariable[] selectVars = null;
+	        
+	        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+	                ctx.queryId, solutionSetName, joinVars);
+
+	        final HashIndexOp op = new HashIndexOp(leftOrEmpty(left),//
+	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+	                        BOpEvaluationContext.CONTROLLER),//
+	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+	                new NV(PipelineOp.Annotations.LAST_PASS, true),//
+	                new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+	                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+	                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+	                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+	        );
+
+            final PipelineOp subquery = convertJoinGroupOrUnion(op/* left */,
+                    subgroup, ctx);
+
+	        left = new SolutionSetHashJoinOp(
+	                new BOp[] { subquery },//
+	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+	                        BOpEvaluationContext.CONTROLLER),//
+	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+	                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+	                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+	                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+	                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
+	                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+	                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+	        );
+
+        } else {
+
+            /*
+             * Model the sub-group with a subquery operator.
+             * 
+             * Note: The problem with this approach is that we wind up issuing
+             * one subquery per source solution, which has a lot of overhead.
+             */
+		    
+            final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
+                    subgroup, ctx);
+
+            left = new SubqueryOp(leftOrEmpty(left), //
+                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()), //
+                    new NV(SubqueryOp.Annotations.SUBQUERY, subquery), //
+                    new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
+            );
+        
+		}
+		
         return left;
         
     }

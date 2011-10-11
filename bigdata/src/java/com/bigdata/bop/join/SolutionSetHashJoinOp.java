@@ -238,9 +238,10 @@ public class SolutionSetHashJoinOp extends PipelineOp {
         private final HTree rightSolutions;
 
         /**
-         * This is not an optional join, so this is always <code>null</code>.
+         * The set of distinct source solutions which joined. This set is
+         * maintained iff the join is optional.
          */
-        private final HTree joinSet = null;
+        private final HTree joinSet;
 
         @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
@@ -283,10 +284,34 @@ public class SolutionSetHashJoinOp extends PipelineOp {
             rightSolutions = (HTree) attrs.get(namedSetRef);
 
             if (rightSolutions == null) {
-             
+                
                 // The solution set was not found!
                 
                 throw new RuntimeException("Not found: " + namedSetRef);
+                
+            }
+
+            if (optional) {
+                
+                final NamedSolutionSetRef joinSetRef = new NamedSolutionSetRef(
+                        namedSetRef.queryId, namedSetRef.namedSet + ".joinSet",
+                        joinVars);
+
+                final HTree joinSet = (HTree) attrs.get(joinSetRef);
+
+                if (joinSet == null) {
+                    
+                    // The join set was not found!
+                    
+                    throw new RuntimeException("Not found: " + joinSetRef);
+                    
+                }
+                
+                this.joinSet = joinSet;
+            
+            } else {
+                
+                this.joinSet = null;
                 
             }
 

@@ -57,6 +57,10 @@ import com.bigdata.striterator.ChunkedArrayIterator;
 /**
  * Test suite for {@link HashIndexOp}.
  * 
+ * TODO Test variant with non-empty join vars.
+ * 
+ * TODO Test variant with SELECT projects only the selected variables.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -324,10 +328,6 @@ public class TestHashIndexOp extends TestCase2 {
      * {@link HashIndexOp} immediately with a {@link SolutionSetHashJoinOp} as
      * this is basically a complex NOP. However, this does provide a simple test
      * of the most basic mechanisms for those two operators.
-     * 
-     * TODO Variant with non-empty join vars.
-     * 
-     * TODO Variant with SELECT projects only the selected variables.
      */
     public void test_hashIndexOp_01() throws Exception {
 
@@ -351,6 +351,99 @@ public class TestHashIndexOp extends TestCase2 {
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(HashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+        );
+
+        final SolutionSetHashJoinOp op2 = new SolutionSetHashJoinOp(
+                new BOp[] { op },//
+                new NV(BOp.Annotations.BOP_ID, 2),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
+                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+        );
+
+        final PipelineOp query = op2;
+
+        // The source solutions.
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final IBindingSet[] bindingSets1 = new IBindingSet[1];
+        {
+            final IBindingSet tmp = new ListBindingSet();
+            tmp.set(x, new Constant<String>("Leon"));
+            bindingSets1[0] = tmp;
+        }
+        
+        final IBindingSet[] bindingSets2 = new IBindingSet[1];
+        {
+            final IBindingSet tmp = new ListBindingSet();
+            tmp.set(x, new Constant<String>("Mary"));
+            tmp.set(y, new Constant<String>("John"));
+            bindingSets2[0] = tmp;
+        }
+        
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+        new ListBindingSet(//
+            new IVariable[] { x },//
+            new IConstant[] { new Constant<String>("Leon") }//
+            ), //
+        new ListBindingSet(//
+            new IVariable[] { x, y },//
+            new IConstant[] { new Constant<String>("Mary"), 
+                new Constant<String>("John") }//
+        ),//
+        };
+
+        final IRunningQuery runningQuery = queryEngine.eval(queryId, query,
+                newBindingSetIterator(new IBindingSet[][] { bindingSets1,
+                        bindingSets2 }));
+
+        // verify solutions.
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
+                runningQuery);
+        
+    }
+
+    /**
+     * Unit test of variant with an OPTIONAL join.
+     * <p>
+     * Note: Since there are no intervening joins or filters, this produces the
+     * same output as the unit test above. However, in this case the joinSet
+     * will have been created by the {@link HashIndexOp} and utilized by the
+     * {@link SolutionSetHashJoinOp}.
+     */
+    public void test_hashIndexOp_02() throws Exception {
+
+        final UUID queryId = UUID.randomUUID();
+        
+        final String solutionSetName = "set1";
+        
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = new IVariable[]{};
+        
+        @SuppressWarnings("rawtypes")
+        final IVariable[] selectVars = null;
+        
+        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                queryId, solutionSetName, joinVars);
+
+        final HashIndexOp op = new HashIndexOp(BOp.NOARGS,//
+                new NV(BOp.Annotations.BOP_ID, 1),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                new NV(HashIndexOp.Annotations.OPTIONAL, true),//
                 new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//

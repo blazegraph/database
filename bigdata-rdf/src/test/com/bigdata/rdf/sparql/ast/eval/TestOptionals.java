@@ -85,7 +85,9 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
                 "complex-optional-01",// testURI
                 "complex-optional-01.rq", // queryURI
                 "complex-optional-01.ttl", // dataURI
-                "complex-optional-01.srx" // resultURI
+                "complex-optional-01.srx"  // resultURI
+//                ,true// laxCardinality
+//                ,false // checkOrder
                 ).runTest();
         
     }
