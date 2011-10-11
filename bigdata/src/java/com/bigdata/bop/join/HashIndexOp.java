@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.controller;
+package com.bigdata.bop.join;
 
 import java.util.Map;
 import java.util.UUID;
@@ -33,26 +33,24 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.controller.NamedSubqueryOp;
+import com.bigdata.bop.controller.SubqueryJoinAnnotations;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.HashJoinUtility;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -60,38 +58,50 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.rwstore.sector.MemStore;
 
 /**
- * Evaluation of a subquery, producing a named result set. This operator passes
- * through any source binding sets without modification. The subquery is
- * evaluated exactly once, the first time this operator is invoked for a given
- * query plan. No bindings are pushed into the subquery. If some variables are
- * known to be bound, then they should be rewritten into constants or their
- * bindings should be inserted into the subquery using LET() operator.
+ * Operator builds an {@link HTree} index from the source solutions. Once all
+ * source solutions have been materialized on the {@link HTree}, the source
+ * solutions are output on the default sink. The set of variables to be copied
+ * to the sink may be restricted by an annotation.
+ * <p>
+ * There are two basic use cases for the {@link HashIndexOp}, both of which rely
+ * on a {@link SolutionSetHashJoinOp} to re-integrate the results buffered on
+ * the {@link HTree}.
+ * <p>
+ * The first use case is when we will run an OPTIONAL group. In this case, an
+ * OPTIONAL hash join will be used and a buffered solution will be output if
+ * there was no solution in the optional group for that buffered solution. All
+ * known bound variables should be used as the join variables. All variables
+ * should be selected.
+ * <p>
+ * The second use case is when we will run a sub-select. In this case, only the
+ * variables which are projected by the subquery should be selected. Those will
+ * also serve as the join variables. The hash join will integrate the solutions
+ * from the subquery with the buffered solutions using those join variables. The
+ * integrated solutions will be the net output of the hash join.
  * <p>
  * This operator is NOT thread-safe. It relies on the query engine to provide
- * synchronization for the "run-once" contract of the subquery. The operator
- * MUST be run on the query controller.
+ * synchronization. The operator MUST be run on the query controller.
  * 
- * @see NamedSubqueryIncludeOp
+ * @see SolutionSetHashJoinOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class NamedSubqueryOp extends PipelineOp {
+public class HashIndexOp extends PipelineOp {
 
-    static private final transient Logger log = Logger
-            .getLogger(NamedSubqueryOp.class);
+//    static private final transient Logger log = Logger
+//            .getLogger(HashIndexOp.class);
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryAnnotations, HTreeAnnotations,
-            HashJoinAnnotations {
+    public interface Annotations extends HTreeAnnotations, HashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
@@ -102,7 +112,25 @@ public class NamedSubqueryOp extends PipelineOp {
          * 
          * @see NamedSolutionSetRef
          */
-        final String NAMED_SET_REF = "namedSetRef";
+        final String NAMED_SET_REF = NamedSubqueryOp.Annotations.NAMED_SET_REF;
+
+        /**
+         * An optional {@link IVariable}[] identifying the variables to be
+         * projected in the {@link IBindingSet}s written out by the operator.
+         * All variables are retained unless this annotation is specified. This
+         * is normally set to the <em>projection</em> of the subquery.
+         * 
+         * @see JoinAnnotations#SELECT
+         */
+        final String SELECT = JoinAnnotations.SELECT;
+        
+        /**
+         * Boolean annotation is <code>true</code> iff the solutions will be
+         * re-integrated into the query plan using an OPTIONAL join.
+         */
+        final String OPTIONAL = SubqueryJoinAnnotations.OPTIONAL;
+
+        final boolean DEFAULT_OPTIONAL = SubqueryJoinAnnotations.DEFAULT_OPTIONAL;
         
     }
 
@@ -142,7 +170,7 @@ public class NamedSubqueryOp extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public NamedSubqueryOp(final NamedSubqueryOp op) {
+    public HashIndexOp(final HashIndexOp op) {
         super(op);
     }
     
@@ -152,7 +180,7 @@ public class NamedSubqueryOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public NamedSubqueryOp(final BOp[] args,
+    public HashIndexOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -164,12 +192,24 @@ public class NamedSubqueryOp extends PipelineOp {
         }
 
         if (getMaxParallel() != 1) {
+            /*
+             * Parallel evaluation is not allowed. This operator writes on an
+             * HTree and that object is not thread-safe for mutation.
+             */
             throw new IllegalArgumentException(
                     PipelineOp.Annotations.MAX_PARALLEL + "="
                             + getMaxParallel());
         }
 
-        getRequiredProperty(Annotations.SUBQUERY);
+        if (!isLastPassRequested()) {
+            /*
+             * Last pass evaluation must be requested. This operator will not
+             * produce any outputs until all source solutions have been
+             * buffered.
+             */
+            throw new IllegalArgumentException(PipelineOp.Annotations.LAST_PASS
+                    + "=" + isLastPassRequested());
+        }
 
         getRequiredProperty(Annotations.NAMED_SET_REF);
 
@@ -188,12 +228,24 @@ public class NamedSubqueryOp extends PipelineOp {
 
     }
 
-    public NamedSubqueryOp(final BOp[] args, NV... annotations) {
+    public HashIndexOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
     }
 
+    /**
+     * Return <code>true</code> iff the solutions on the hash index will be
+     * re-integrated using an OPTIONAL join.
+     * 
+     * @see Annotations#OPTIONAL
+     */
+    public boolean isOptional() {
+       
+        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+        
+    }
+    
     /**
      * @see Annotations#ADDRESS_BITS
      */
@@ -277,10 +329,9 @@ public class NamedSubqueryOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-        private final NamedSolutionSetStats stats;
+        private final HashIndexOp op;
         
-        /** The subquery which is evaluated for each input binding set. */
-        private final PipelineOp subquery;
+        private final NamedSolutionSetStats stats;
         
         /** Metadata to identify the named solution set. */
         private final NamedSolutionSetRef namedSetRef;
@@ -289,7 +340,13 @@ public class NamedSubqueryOp extends PipelineOp {
          * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
          * we will hang the named solution set.
          */
-        final IQueryAttributes attrs;
+        private final IQueryAttributes attrs;
+
+        /**
+         * The {@link IVariable}[]s to be projected.
+         */
+        @SuppressWarnings("rawtypes")
+        private final IVariable[] selected; 
         
         /**
          * The join variables.
@@ -299,10 +356,15 @@ public class NamedSubqueryOp extends PipelineOp {
         
         /**
          * <code>true</code> iff this is the first time the task is being
-         * invoked, in which case we will evaluate the subquery and save its
-         * result set on {@link #solutions}.
+         * invoked, in which case we allocate the {@link #solutions} map.
          */
         private final boolean first;
+        
+        /**
+         * <code>true</code> iff the solutions will be reintegrated by an
+         * OPTIONAL join. 
+         */
+        private final boolean optional;
         
         /**
          * The generated solution set (hash index using the specified join
@@ -310,7 +372,7 @@ public class NamedSubqueryOp extends PipelineOp {
          */
         private final HTree solutions;
         
-        public ControllerTask(final NamedSubqueryOp op,
+        public ControllerTask(final HashIndexOp op,
                 final BOpContext<IBindingSet> context) {
 
             if (op == null)
@@ -321,10 +383,13 @@ public class NamedSubqueryOp extends PipelineOp {
 
             this.context = context;
 
-            this.stats = ((NamedSolutionSetStats) context.getStats());
+            this.op = op;
             
-            this.subquery = (PipelineOp) op
-                    .getRequiredProperty(Annotations.SUBQUERY);
+            this.stats = ((NamedSolutionSetStats) context.getStats());
+
+            this.selected = (IVariable[]) op.getProperty(Annotations.SELECT);
+            
+            this.optional = op.isOptional();
 
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
@@ -404,7 +469,10 @@ public class NamedSubqueryOp extends PipelineOp {
 //                        throw new AssertionError();
 
                     this.first = true;
-                    
+                 
+                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
+                        throw new AssertionError();
+
                 } else {
                     
                     this.first = false;
@@ -423,34 +491,29 @@ public class NamedSubqueryOp extends PipelineOp {
         public Void call() throws Exception {
             
             try {
-                
-                if(first) {
 
-                    // Generate the result set and write it on the HTree.
-                    new SubqueryTask(new ListBindingSet(), subquery, context)
-                            .call();
+                // Buffer all source solutions.
+                acceptSolutions();
 
+                if(context.isLastInvocation()) {
+
+                    // Output the buffered solutions.
+                    outputSolutions();
+                    
+                    /*
+                     * Note: The [HTree] object is already present on the
+                     * IQueryAttributes. However, it is the mutable HTree
+                     * object. We convert it to an immutable HTree object here
+                     * by check pointing the HTree and updating the reference on
+                     * the IQueryAttributes. That would allow the consumer of
+                     * the HTree to be safe for concurrent readers.
+                     */
+                    
+                    // Checkpoint and save the solution set.
+                    saveSolutionSet();
+                    
                 }
-
-                // source.
-                final IAsynchronousIterator<IBindingSet[]> source = context
-                        .getSource();
-
-                // default sink
-                final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
-
-                BOpUtility.copy(//
-                        source, //
-                        sink,//
-                        null, // sink2
-                        null, // mergeSolution (aka parent's source solution).
-                        null, // selectVars (aka projection).
-                        null, // constraints
-                        context.getStats()//
-                        );
-
-                sink.flush();
-
+                
                 // Done.
                 return null;
 
@@ -460,11 +523,59 @@ public class NamedSubqueryOp extends PipelineOp {
 
                 context.getSink().close();
                 
-                if (context.getSink2() != null)
-                    context.getSink2().close();
+//                if (context.getSink2() != null)
+//                    context.getSink2().close();
 
             }
             
+        }
+
+        /**
+         * Buffer intermediate resources on the {@link HTree}.
+         */
+        private void acceptSolutions() {
+
+            HashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+                    stats, solutions, optional);
+
+        }
+
+        /**
+         * Output the buffered solutions.
+         */
+        private void outputSolutions() {
+
+            // default sink
+            final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
+            
+            final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
+                    op.getChunkCapacity(), sink);
+
+            // source.
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<IBindingSet> solutionsIterator = solutions.rangeIterator();
+            
+            while(solutionsIterator.hasNext()) {
+
+                final ITuple<IBindingSet> tuple = solutionsIterator.next();
+
+                IBindingSet bset = tuple.getObject();
+
+                if (selected != null) {
+
+                    // Drop variables which are not projected.
+                    bset = bset.copy(selected);
+
+                }
+
+                unsyncBuffer.add(bset);
+
+            }
+
+            unsyncBuffer.flush();
+
+            sink.flush();
+
         }
 
         /**
@@ -475,147 +586,25 @@ public class NamedSubqueryOp extends PipelineOp {
          * {@link HTree} which is safe for concurrent readers.
          */
         private void saveSolutionSet() {
-            
+
             // Checkpoint the HTree.
             final Checkpoint checkpoint = solutions.writeCheckpoint2();
-            
+
             // Get a read-only view of the HTree.
             final HTree readOnly = HTree.load(solutions.getStore(),
                     checkpoint.getCheckpointAddr(), true/* readOnly */);
 
-//            final IQueryAttributes attrs = context.getRunningQuery()
-//                    .getAttributes();
+            // final IQueryAttributes attrs = context.getRunningQuery()
+            // .getAttributes();
 
-            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
+            if (attrs.putIfAbsent(namedSetRef, readOnly) == null) {
+                /*
+                 * Note: We are expecting the attribute to already exist.
+                 */
                 throw new AssertionError();
+            }
 
         }
-        
-        /**
-         * Run a subquery.
-         */
-        private class SubqueryTask implements Callable<Void> {
-
-            /**
-             * The evaluation context for the parent query.
-             */
-            private final BOpContext<IBindingSet> parentContext;
-
-            /**
-             * The source binding set.
-             */
-            private final IBindingSet bset;
-
-            /**
-             * The root operator for the subquery.
-             */
-            private final BOp subQueryOp;
-
-            public SubqueryTask(final IBindingSet bset, final BOp subQuery,
-                    final BOpContext<IBindingSet> parentContext) {
-
-                this.bset = bset;
-                
-                this.subQueryOp = subQuery;
-
-                this.parentContext = parentContext;
-
-            }
-
-            public Void call() throws Exception {
-
-            	// The subquery
-                IRunningQuery runningSubquery = null;
-            	// The iterator draining the subquery
-                IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = null;
-                try {
-
-                    final QueryEngine queryEngine = parentContext.getRunningQuery()
-                            .getQueryEngine();
-                    
-                    runningSubquery = queryEngine.eval((PipelineOp) subQueryOp,
-                            bset);
-
-					try {
-						
-						// Iterator visiting the subquery solutions.
-						subquerySolutionItr = runningSubquery.iterator();
-
-						// Buffer the solutions on the hash index.
-                        final long ncopied = HashJoinUtility.acceptSolutions(
-                                subquerySolutionItr, joinVars, stats,
-                                solutions, false/* optional */);
-
-						// Wait for the subquery to halt / test for errors.
-						runningSubquery.get();
-
-                        // Report the #of solutions in the named solution set.
-                        stats.solutionSetSize.addAndGet(ncopied);
-
-                        // Publish the solution set on the query context.
-                        saveSolutionSet();
-
-                        if (log.isInfoEnabled())
-                            log.info("Solution set " + namedSetRef + " has "
-                                    + ncopied + " solutions.");
-                        
-					} catch (InterruptedException ex) {
-
-						// this thread was interrupted, so cancel the subquery.
-						runningSubquery
-								.cancel(true/* mayInterruptIfRunning */);
-
-						// rethrow the exception.
-						throw ex;
-						
-					}
-					
-                } catch (Throwable t) {
-
-					if (runningSubquery == null
-							|| runningSubquery.getCause() != null) {
-						/*
-						 * If things fail before we start the subquery, or if a
-						 * subquery fails (due to abnormal termination), then
-						 * propagate the error to the parent and rethrow the
-						 * first cause error out of the subquery.
-						 * 
-						 * Note: IHaltable#getCause() considers exceptions
-						 * triggered by an interrupt to be normal termination.
-						 * Such exceptions are NOT propagated here and WILL NOT
-						 * cause the parent query to terminate.
-						 */
-                        throw new RuntimeException(ControllerTask.this.context
-                                .getRunningQuery().halt(
-                                        runningSubquery == null ? t
-                                                : runningSubquery.getCause()));
-                    }
-					
-                } finally {
-
-					try {
-
-						// ensure subquery is halted.
-						if (runningSubquery != null)
-							runningSubquery
-									.cancel(true/* mayInterruptIfRunning */);
-						
-					} finally {
-
-						// ensure the subquery solution iterator is closed.
-						if (subquerySolutionItr != null)
-							subquerySolutionItr.close();
-
-					}
-					
-                }
-
-                // Done.
-                return null;
-                
-            }
-
-        } // SubqueryTask
 
     } // ControllerTask
 

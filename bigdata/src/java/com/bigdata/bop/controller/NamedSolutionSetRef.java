@@ -50,23 +50,34 @@ public class NamedSolutionSetRef implements Serializable {
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * The {@link UUID} of the {@link IRunningQuery} which generated the named
+     * solution set. This is where you need to look to find the data.
+     */
     public final UUID queryId;
 
+    /**
+     * The application level name for the named solution set.
+     */
     public final String namedSet;
 
+    /** The join variables (required, but may be an empty array). */
+    @SuppressWarnings("rawtypes")
     public final IVariable[] joinVars;
 
     /**
      * 
      * @param queryId
      *            The {@link UUID} of the {@link IRunningQuery} which generated
-     *            the named solution set. This is where you need to look to find
-     *            the data.
+     *            the named solution set (required). This is where you need to
+     *            look to find the data.
      * @param namedSet
-     *            The application level name for the named solution set.
+     *            The application level name for the named solution set
+     *            (required).
      * @param joinVars
-     *            The join variables.
+     *            The join variables (required, but may be an empty array).
      */
+    @SuppressWarnings("rawtypes")
     public NamedSolutionSetRef(final UUID queryId, final String namedSet,
             final IVariable[] joinVars) {
 

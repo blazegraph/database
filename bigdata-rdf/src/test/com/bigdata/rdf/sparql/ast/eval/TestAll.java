@@ -64,6 +64,9 @@ public class TestAll extends TestCase {
         // Basic query.
         suite.addTestSuite(TestBasicQuery.class);
         
+        // Test suite for OPTIONAL groups.
+        suite.addTestSuite(TestOptionals.class);
+        
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
 
