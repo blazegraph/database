@@ -698,8 +698,9 @@ public class BOpUtility {
     }
 
     /**
-     * Return the left-deep child of the operator, halting at a leaf or earlier
-     * if a control operator is found.
+     * Return the left-deep child of the operator.
+     * <p>
+     * Note: This does not protect against loops in the operator tree.
      * 
      * @param op
      *            The operator.
@@ -708,10 +709,6 @@ public class BOpUtility {
      * 
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
-     * 
-     * @todo This does not protect against loops in the operator tree.
-     * 
-     * @todo unit tests.
      */
     static public BOp getPipelineStart(BOp op) {
 
@@ -719,12 +716,12 @@ public class BOpUtility {
             throw new IllegalArgumentException();
 
         while (true) {
-            if (op.getProperty(BOp.Annotations.CONTROLLER,
-                    BOp.Annotations.DEFAULT_CONTROLLER)) {
-                // Halt at a control operator.
-                return op;
-            }
-            if(op.arity()==0) {
+//            if (op.getProperty(BOp.Annotations.CONTROLLER,
+//                    BOp.Annotations.DEFAULT_CONTROLLER)) {
+//                // Halt at a control operator.
+//                return op;
+//            }
+            if (op.arity() == 0) {
                 // No children.
                 return op;
             }
