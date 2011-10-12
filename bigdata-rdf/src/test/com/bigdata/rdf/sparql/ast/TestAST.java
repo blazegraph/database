@@ -316,7 +316,7 @@ public class TestAST extends TestCase {
 
     	query.setNamedSubqueries(subqueries);
 
-        // FIXME Add INCLUDE operator paired to a named subquery result. 
+        // TODO Add INCLUDE operator paired to a named subquery result. 
 
         if (log.isInfoEnabled())
             log.info("\n"+query.toString());

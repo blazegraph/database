@@ -191,18 +191,43 @@ public class QueryRoot extends QueryBase {
     /**
      * Return the node for the named subqueries -or- <code>null</code> if there
      * it does not exist.
+     * 
+     * @see #getNamedSubqueriesNotNull()
      */
     public NamedSubqueriesNode getNamedSubqueries() {
         
         return (NamedSubqueriesNode) getProperty(Annotations.NAMED_SUBQUERIES);
         
     }
-    
+
+    /**
+     * Return the node for the named subqueries. If the node does not exist then
+     * it is created, set on the {@link QueryRoot} and returned. This helps out
+     * with what is otherwise an awkward conditional construction pattern.
+     */
+    public NamedSubqueriesNode getNamedSubqueriesNotNull() {
+
+        NamedSubqueriesNode tmp = (NamedSubqueriesNode) getProperty(Annotations.NAMED_SUBQUERIES);
+
+        if (tmp == null) {
+
+            tmp = new NamedSubqueriesNode();
+
+            setProperty(Annotations.NAMED_SUBQUERIES, tmp);
+
+        }
+
+        return tmp;
+        
+    }
+
     /**
      * Set or clear the named subqueries node.
      * 
      * @param namedSubqueries
      *            The named subqueries not (may be <code>null</code>).
+     * 
+     * @see #getNamedSubqueriesNotNull()
      */
     public void setNamedSubqueries(final NamedSubqueriesNode namedSubqueries) {
 

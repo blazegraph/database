@@ -1156,4 +1156,12 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
     }
 
+    /**
+     * FIXME Write unit tests for
+     * {@link StaticAnalysis#getJoinVars(SubqueryRoot, Set)} and friends.
+     */
+    public void test_getJoinVars() {
+        fail("write tests");
+    }
+    
 }

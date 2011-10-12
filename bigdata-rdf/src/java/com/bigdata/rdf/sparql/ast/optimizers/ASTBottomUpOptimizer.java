@@ -50,7 +50,6 @@ import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -463,17 +462,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             
             nsr.setWhereClause(p);
 
-            NamedSubqueriesNode namedSubqueries = queryRoot
-                    .getNamedSubqueries();
-
-            if (namedSubqueries == null) {
-            
-                queryRoot
-                        .setNamedSubqueries(namedSubqueries = new NamedSubqueriesNode());
-                
-            }
-            
-            namedSubqueries.add(nsr);
+            queryRoot.getNamedSubqueriesNotNull().add(nsr);
             
         }
         

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -1442,6 +1443,101 @@ public class StaticAnalysis {
     
         return terms;
     
+    }
+
+    /**
+     * Identify the join variables for the specified INCLUDE for the position
+     * within the query in which it appears.
+     * 
+     * @param aNamedSubquery
+     *            The named subquery.
+     * @param anInclude
+     *            An include for that subquery.
+     */
+    @SuppressWarnings("rawtypes")
+    public Set<IVariable<?>> getJoinVars(
+            final NamedSubqueryRoot aNamedSubquery,
+            final NamedSubqueryInclude anInclude, final Set<IVariable<?>> vars) {
+
+        if (true) {
+
+            /*
+             * FIXME There is no reason why this should be disabled.  All of the
+             * code to support it is in place in ASTNamedSubqueryOptimizer.
+             */
+
+            return Collections.emptySet();
+
+        } else {
+
+            return getJoinVars(aNamedSubquery, anInclude, vars);
+
+        }
+
+    }
+    
+    /**
+     * Identify the join variables for the specified subquery for the position
+     * within the query in which it appears.
+     * 
+     * @param aSubquery
+     *            The subquery.
+     * @param vars
+     * 
+     * @return The join variables.
+     */
+    public Set<IVariable<?>> getJoinVars(final SubqueryRoot subquery,
+            final Set<IVariable<?>> vars) {
+
+        return getJoinVars(subquery, subquery, vars);
+
+    }
+    
+    /**
+     * Identify the join variables for the specified subquery for the position
+     * within the query in which it appears.
+     * 
+     * @param aSubquery
+     *            Either a {@link NamedSubqueryRoot} or a {@link SubqueryRoot}.
+     * @param theNode
+     *            The node which represents the subquery in the join group. For
+     *            a named subquery, this will be a {@link NamedSubqueryInclude}.
+     *            For a {@link SubqueryRoot}, it is just the
+     *            {@link SubqueryRoot} itself.
+     * 
+     * @return The join variables.
+     * 
+     *         FIXME This code must figure out which variables "must" be bound
+     *         by both the the subquery and context in which the INCLUDE appears
+     *         and return just those variables. The problem is that we can not
+     *         really decide this until we decide the evaluation order since the
+     *         named subquery include could run at any point in the required
+     *         joins. That includes the pipelined statement pattern joins, the
+     *         inline access path joins, the named subquery joins, the service
+     *         node joins, etc. The code currently assumes that a
+     *         {@link NamedSubqueryInclude} will "run first" in the group while
+     *         a {@link SubqueryRoot} will run after any INCLUDE and any
+     *         required {@link StatementPatternNode}.
+     */
+    private Set<IVariable<?>> getJoinVars(final SubqueryBase aSubquery,
+            final IGroupMemberNode theNode, final Set<IVariable<?>> vars) {
+
+        final Set<IVariable<?>> boundBySubquery = getDefinatelyProducedBindings(aSubquery);
+
+        final Set<IVariable<?>> incomingBindings = getIncomingBindings(
+                theNode.getParentJoinGroup(), new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * This is only those variables which are bound on entry into the group
+         * in which the INCLUDE appears *and* which are "must" bound variables
+         * projected by the subquery.
+         */
+        boundBySubquery.retainAll(incomingBindings);
+
+        vars.addAll(boundBySubquery);
+
+        return vars;
+
     }
 
 }
