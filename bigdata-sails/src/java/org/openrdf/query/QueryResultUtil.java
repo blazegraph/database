@@ -22,10 +22,15 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 
 /**
-* Class offering utility methods related to query results.
-*
-* @author Arjohn Kampman
-*/
+ * Class offering utility methods related to query results.
+ * 
+ * @author Arjohn Kampman
+ * 
+ * @deprecated Once the issue is resolve this version of the class should be
+ *             deleted in favor of the one bundled with Sesame.
+ * 
+ * @see http://www.openrdf.org/issues/browse/SES-853
+ */
 public class QueryResultUtil {
 
 	/**
