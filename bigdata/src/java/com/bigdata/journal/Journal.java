@@ -294,10 +294,31 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
+    /**
+     * Ensure that the WORM mode of the journal always uses
+     * {@link Long#MAX_VALUE} for
+     * {@link AbstractTransactionService.Options#MIN_RELEASE_AGE}.
+     * 
+     * @param properties
+     *            The properties.
+     *            
+     * @return The argument, with the minReleaseAge overridden if necessary.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/391
+     */
+    private Properties checkProperties(final Properties properties) {
+        if (getBufferStrategy() instanceof WORMStrategy) {
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, ""
+                            + Long.MAX_VALUE);
+        }
+        return properties;
+    }
+
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
-                properties, this) {
+                checkProperties(properties), this) {
 
             {
                 
