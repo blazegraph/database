@@ -55,8 +55,21 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Operator joins a solution set into the pipeline.  The solution set can be
- * constructed by a {@link NamedSubqueryOp} or a 
+ * Operator joins a solution set into the pipeline. The solution set must be be
+ * constructed by a {@link NamedSubqueryOp} or a {@link HashIndexOp}. While this
+ * JOIN requires the RHS {@link HTree} to be fully materialized, evaluation of
+ * the LHS source solutions is pipelined. Parallel evaluation of source chunks
+ * is permitted, but the RHS {@link HTree} must have been checkpointed before
+ * this operator begins evaluation (the read-only {@link HTree} is thread-safe
+ * for concurrent readers).
+ * 
+ * <h2>Handling OPTIONAL</h2>
+ * 
+ * {@link PipelineOp.Annotations#LAST_PASS} evaluation MUST be requested for an
+ * OPTIONAL JOIN because we must have ALL solutions on hand in order to decide
+ * which solutions did not join. If the JOIN is OPTIONAL, then solutions which
+ * join will be output for each source chunk but the "optional" solutions will
+ * not be reported until ALL source chunks have been processed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: NamedSubqueryIncludeOp.java 5178 2011-09-12 19:09:23Z
@@ -162,6 +175,32 @@ public class SolutionSetHashJoinOp extends PipelineOp {
                     + " requires " + Annotations.LAST_PASS);
         }
         
+        if (isOptional() && !isLastPassRequested()) {
+
+            /*
+             * An optional join requires that we observe all solutions before we
+             * report "optional" solutions so we can identify those which do not
+             * join.
+             */
+
+            throw new UnsupportedOperationException(Annotations.OPTIONAL
+                    + " requires " + Annotations.LAST_PASS);
+        
+        }
+
+        // The RHS HTree annotation must be specified.
+        getRequiredProperty(Annotations.NAMED_SET_REF);
+        
+        // Join variables must be specified.
+        final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
+
+        for (IVariable<?> var : joinVars) {
+
+            if (var == null)
+                throw new IllegalArgumentException(Annotations.JOIN_VARS);
+
+        }
+
     }
 
     public SolutionSetHashJoinOp(final BOp[] args, NV... annotations) {
@@ -405,7 +444,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
                     selectVars, constraints, rightSolutions/* hashIndex */,
                     joinSet, optional, true/* leftIsPipeline */);
 
-            if (optional) {
+            if (optional && context.isLastInvocation()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
