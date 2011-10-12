@@ -134,39 +134,6 @@ public class HashIndexOp extends PipelineOp {
         
     }
 
-//    /**
-//     * Return the {@link IQueryAttributes} key for a given named set having the
-//     * specified join variables.
-//     * 
-//     * @param namedSet
-//     *            The named set.
-//     * @param joinvars
-//     *            The join variables.
-//     * 
-//     * @return The key.
-//     */
-//    public static String getSolutionSetName(final String namedSet,
-//            final VarNode[] joinvars) {
-//
-//        final StringBuilder sb = new StringBuilder();
-//
-//        sb.append("namedSet{name=" + namedSet + ",joinvars=[");
-//
-//        for (int i = 0; i < joinvars.length; i++) {
-//
-//            if (i > 0)
-//                sb.append(",");
-//
-//            sb.append(joinvars[i].getValueExpression().getName());
-//
-//        }
-//
-//        sb.append("])");
-//
-//        return sb.toString();
-//
-//    }
-
     /**
      * Deep copy constructor.
      */
