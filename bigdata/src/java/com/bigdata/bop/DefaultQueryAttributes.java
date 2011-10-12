@@ -60,4 +60,8 @@ public class DefaultQueryAttributes implements IQueryAttributes {
         return map.remove(key, value);
     }
 
+    public String toString() {
+        return super.toString() + map;
+    }
+    
 }
