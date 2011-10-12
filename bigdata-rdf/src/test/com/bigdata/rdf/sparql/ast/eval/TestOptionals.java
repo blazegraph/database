@@ -76,6 +76,23 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * Note: The FILTER will always fail. This means that the OPTIONAL group
+     * will never produce any solutions. Thus only the original solutions from
+     * the statement pattern outside of the optional will be reported as
+     * solutions for the query. This tests the correct eventual triggering of
+     * the optional hash join at the end of the optional group.
+     */
+    public void test_optional_with_filter_that_fails() throws Exception {
+
+        new TestHelper("optional-with-filter-that-fails-01",// testURI
+                "optional-with-filter-that-fails-01.rq", // queryURI
+                "optional-with-filter-that-fails-01.ttl", // dataURI
+                "optional-with-filter-that-fails-01.srx" // resultURI
+        ).runTest();
+
+    }
+
+    /**
      * Unit test for an optional which is too complex to be handled as a simple
      * optional (it involves more than one statement pattern).
      */

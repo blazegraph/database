@@ -1,0 +1,19 @@
+prefix xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+select ?x ?o
+where {
+  ?x rdf:type foaf:Person
+  OPTIONAL {
+  ?x rdfs:label ?o
+  FILTER (strlen(?o) > "blah")
+  }
+}
+
+# Note: The FILTER will always fail.  This means that the OPTIONAL group will
+# never produce any solutions.  Thus only the original solutions from the
+# statement pattern outside of the optional will be reported as solutions
+# for the query.  This tests the correct eventual triggering of the optional
+# hash join at the end of the optional group.
