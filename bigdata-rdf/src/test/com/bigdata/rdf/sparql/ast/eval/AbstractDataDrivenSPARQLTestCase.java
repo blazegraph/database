@@ -477,34 +477,34 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 }
             }
 
-            if (!resultsEqual) {
-
-                // Note: code block shows the expected and actual results.
-                if (!resultsEqual && true) {
-                    queryResultTable.beforeFirst();
-                    expectedResultTable.beforeFirst();
-                    final StringBuilder message = new StringBuilder(2048);
-                    message.append("\n============ ");
-                    message.append(getName());
-                    message.append(" =======================\n");
-                    message.append("Expected result: \n");
-                    while (expectedResultTable.hasNext()) {
-                        message.append(expectedResultTable.next());
-                        message.append("\n");
-                    }
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-                    message.append("Query result: \n");
-                    while (queryResultTable.hasNext()) {
-                        message.append(queryResultTable.next());
-                        message.append("\n");
-                    }
-                    message.append("=============");
-                    StringUtil.appendN('=', getName().length(), message);
-                    message.append("========================\n");
-                    log.error(message);
+            // Note: code block shows the expected and actual results.
+            if (!resultsEqual && true) {
+                queryResultTable.beforeFirst();
+                expectedResultTable.beforeFirst();
+                final StringBuilder message = new StringBuilder(2048);
+                message.append("\n============ ");
+                message.append(getName());
+                message.append(" =======================\n");
+                message.append("Expected result: \n");
+                while (expectedResultTable.hasNext()) {
+                    message.append(expectedResultTable.next());
+                    message.append("\n");
                 }
+                message.append("=============");
+                StringUtil.appendN('=', getName().length(), message);
+                message.append("========================\n");
+                message.append("Query result: \n");
+                while (queryResultTable.hasNext()) {
+                    message.append(queryResultTable.next());
+                    message.append("\n");
+                }
+                message.append("=============");
+                StringUtil.appendN('=', getName().length(), message);
+                message.append("========================\n");
+                log.error(message);
+            }
+
+            if (!resultsEqual) {
 
                 queryResultTable.beforeFirst();
                 expectedResultTable.beforeFirst();

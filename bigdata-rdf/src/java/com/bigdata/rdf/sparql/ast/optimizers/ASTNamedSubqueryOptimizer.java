@@ -27,26 +27,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -306,14 +302,22 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * cross product of the solutions must be tested and filtered for those
      * solutions which join. This is a lot of effort when compared with a hash
      * join. Having the right join variables is very important for performance.
-     *
+     * 
      * @param namedSubqueries
      * @param allIncludes
+     * 
+     *            FIXME Factor out the logic for determining the join variables
+     *            into the {@link StaticAnalysis} class, but leave the logic
+     *            here which assigns the join variables to the
+     *            {@link NamedSubqueryRoot} and {@link NamedSubqueryInclude}
+     *            nodes.
      */
     private void assignJoinVars(//
             final QueryRoot queryRoot,
             final NamedSubqueriesNode namedSubqueries,
             final NamedSubqueryInclude[] allIncludes) {
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
         for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
@@ -356,8 +360,11 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
                      * variables using a static analysis of the query.
                      */
 
-                    joinvars = staticAnalysis(queryRoot, aNamedSubquery,
-                            anInclude);
+                    final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
+                    
+                    sa.getJoinVars(aNamedSubquery, anInclude, set);
+                    
+                    joinvars = set.toArray(new IVariable[set.size()]);
 
                     // Sort.
                     Arrays.sort(joinvars);
@@ -459,9 +466,9 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             /*
              * List of named solutions on which each named subquery depends.
              */
-            final Map<NamedSubqueryRoot, List<String>> subqueryToIncludes = new HashMap<NamedSubqueryRoot, List<String>>();
+            final Map<NamedSubqueryRoot, List<String>> subqueryToIncludes = new LinkedHashMap<NamedSubqueryRoot, List<String>>();
 
-            final Map<String, NamedSubqueryRoot> nameToSubquery = new HashMap<String, NamedSubqueryRoot>();
+            final Map<String, NamedSubqueryRoot> nameToSubquery = new LinkedHashMap<String, NamedSubqueryRoot>();
 
             for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
@@ -471,7 +478,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
             for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
-                final List<String> includes = new ArrayList<String>();
+                final List<String> includes = new LinkedList<String>();
 
                 subqueryToIncludes.put(aNamedSubquery, includes);
 
@@ -527,65 +534,6 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             }
             queryRoot.setNamedSubqueries(newNode);
         }
-    }
-
-    /**
-     * Identify the join variables for the specified INCLUDE for the position
-     * within the query in which it appears.
-     * 
-     * @param queryRoot
-     * @param aNamedSubquery
-     * @param anInclude
-     * @return
-     * 
-     *         FIXME This code must figure out which variables "must" be bound
-     *         by both the the subquery and context in which the INCLUDE appears
-     *         and return just those variables. The problem is that we can not
-     *         really decide this until we decide the evaluation order since the
-     *         named subquery include could run at any point in the required
-     *         joins. That includes the pipelined statement pattern joins, the
-     *         inline access path joins, the named subquery joins, the service
-     *         node joins, etc. The code currently assumes that the named
-     *         subquery include join will "run first" in the group.
-     */
-    @SuppressWarnings("rawtypes")
-    private IVariable[] staticAnalysis(final QueryRoot queryRoot,
-            final NamedSubqueryRoot aNamedSubquery,
-            final NamedSubqueryInclude anInclude) {
-
-        if (true) {
-           
-            return new IVariable[0];
-            
-        } else {
-
-            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-
-            final Set<IVariable<?>> boundBySubquery = sa
-                    .getDefinatelyProducedBindings(aNamedSubquery);
-
-            final Set<IVariable<?>> incomingBindings = sa.getIncomingBindings(
-                    anInclude.getParentJoinGroup(),
-                    new LinkedHashSet<IVariable<?>>());
-
-            /*
-             * This is only those variables which are bound on entry into the
-             * group in which the INCLUDE appears *and* which are "must" bound
-             * variables projected by the subquery.
-             */
-            boundBySubquery.retainAll(incomingBindings);
-
-            // Convert to an array.
-            final IVariable[] vars = boundBySubquery
-                    .toArray(new IVariable[boundBySubquery.size()]);
-
-            // Put the variable[] into a consistent, predictable order.
-            Arrays.sort(vars);
-
-            return vars;
-
-        }
-
     }
 
     /**

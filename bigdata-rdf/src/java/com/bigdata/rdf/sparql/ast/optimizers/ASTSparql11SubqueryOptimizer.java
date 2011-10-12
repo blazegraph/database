@@ -27,49 +27,54 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
-import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Lift {@link SubqueryRoot}s into named subqueries when appropriate.
- * 
- * FIXME We should do this if there are no join variables for the SPARQL 1.1
- * subquery. That will prevent multiple evaluations of the SPARQL 1.1 subquery
- * since the named subquery is run once before the main WHERE clause.
- * <p>
- * This optimizer needs to examine the required statement patterns and decide
- * whether we are better off running the named subquery pipelined after the
- * required statement patterns, using a hash join after the required statement
- * patterns, or running it as a named subquery and then joining in the named
- * solution set (and again, either before or after everything else).
- * 
- * FIXME If a subquery does not share ANY variables which MUST be bound in the
- * parent's context then rewrite the subquery into a named/include pattern so it
- * will run exactly once. (If it does not share any variables at all then it
- * will produce a cross product and, again, we want to run that subquery once.)
- * 
- * @see SubqueryRoot.Annotations#RUN_ONCE
+ * Lift {@link SubqueryRoot}s into named subqueries when appropriate. This
+ * includes the following cases:
+ * <ul>
+ * <li>Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER BY. Due to
+ * the interaction of the LIMIT and ORDER BY clause, these subqueries MUST be
+ * run first since they can produce different results if they are run
+ * "as-bound".</li>
+ * <li>Lift out SPARQL 1.1 subqueries involving aggregates. This typically
+ * provides more efficient evaluation than repeated as-bound evaluation of the
+ * sub-select. It also prevents inappropriate sharing of the internal state of
+ * the {@link IAggregate} functions.</li>
+ * <li>Lift out SPARQL 1.1 subqueries if there are no incoming bound variables
+ * which are also projected by the subquery. Such subqueries must be lifted or
+ * we will simply be doing the same work over and over since no bindings will be
+ * projected into the subquery.</li>
+ * <li>Lift out SPARQL 1.1 subqueries if {@link SubqueryRoot#isRunOnce()} is
+ * <code>true</code>.
+ * </ul>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTSparql11SubqueryOptimizer.java 5193 2011-09-15 14:18:56Z
@@ -78,21 +83,33 @@ import cutthecrap.utils.striterators.Striterator;
 public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
-        
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        // First, process any pre-existing named subqueries.
+        {
+            
+            final NamedSubqueriesNode namedSubqueries = queryRoot
+                    .getNamedSubqueries();
+
+            if (namedSubqueries != null) {
+
+                for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
+
+                    liftSubqueries(context, sa, namedSubquery.getWhereClause());
+
+                }
+
+            }
+
+        }
         
-        /*
-         * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER BY. Due
-         * to the interaction of the LIMIT and ORDER BY clause, these subqueries
-         * MUST be run first since they can produce different results if they
-         * are run "as-bound".
-         */
-        
-        liftSubqueryWithLimitAndOrderBy(sa, queryRoot.getWhereClause());
+        // Now process the main where clause.
+        liftSubqueries(context, sa, queryRoot.getWhereClause());
         
         if(false) {
             
@@ -106,7 +123,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/377
              */
             
-            rewriteSparql11Subqueries(sa, queryRoot);
+            rewriteSparql11Subqueries(context, sa, queryRoot);
             
         }
 
@@ -115,12 +132,9 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
     }
 
     /**
-     * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER BY. Due to
-     * the interaction of the LIMIT and ORDER BY clause, these subqueries MUST
-     * be run first since they can produce different results if they are run
-     * "as-bound".
+     * Apply all optimizations.
      */
-    private void liftSubqueryWithLimitAndOrderBy(
+    private void liftSubqueries(final AST2BOpContext context,
             final StaticAnalysis sa,
             final GraphPatternGroup<IGroupMemberNode> group) {
 
@@ -129,27 +143,16 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         for (int i = 0; i < arity; i++) {
 
             final BOp child = (BOp) group.get(i);
+ 
+            if (child instanceof GraphPatternGroup<?>) {
 
-            if (child instanceof SubqueryRoot) {
-
-                final SubqueryRoot subquery = (SubqueryRoot) child;
-
-                final SliceNode slice = subquery.getSlice();
-                
-                if(slice == null)
-                    continue;
-
-                final OrderByNode orderBy = subquery.getOrderBy();
-                
-                if(orderBy == null)
-                    continue;
-                
-                liftSparql11Subquery(sa, subquery);
-                
-            } else if (child instanceof GraphPatternGroup<?>) {
-
-                // recursion.
-                liftSubqueryWithLimitAndOrderBy(sa,
+                /*
+                 * Note: Do recursion *before* we do the rewrite so we will
+                 * rewrite Sub-Sub-Selects.
+                 * 
+                 * FIXME Unit test for sub-sub-select optimization.
+                 */
+                liftSubqueries(context, sa,
                         ((GraphPatternGroup<IGroupMemberNode>) child));
 
             } else if (child instanceof ServiceNode) {
@@ -159,12 +162,97 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
                 
             }
 
+            if (!(child instanceof SubqueryRoot)) {
+                continue;
+            }
+
+            final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
+
+            if (subqueryRoot.getQueryType() == QueryType.ASK) {
+
+                /*
+                 * FIXME Look at what would be involved in lifting an ASK
+                 * sub-query. There are going to be at least two cases. If there
+                 * is no join variable, then we always want to lift the ASK
+                 * sub-query as it is completely independent of the parent
+                 * group. If there is a join variable, then we need to project
+                 * solutions which include the join variables from the subquery
+                 * and the "ASK". At that point we can hash join against the
+                 * projected solutions and the ASK succeeds if the hash join
+                 * succeeds. [Add unit tests for this too.]
+                 */
+                
+                continue;
+                
+            }
+            
+            if (subqueryRoot.getSlice() != null
+                    && subqueryRoot.getOrderBy() != null) {
+
+                /*
+                 * Lift out SPARQL 1.1 subqueries which use both LIMIT and ORDER
+                 * BY. Due to the interaction of the LIMIT and ORDER BY clause,
+                 * these subqueries MUST be run first since they can produce
+                 * different results if they are run "as-bound".
+                 */
+
+                liftSparql11Subquery(context, sa, subqueryRoot);
+
+                continue;
+
+            }
+
+            if (AST2BOpUtility.isAggregate(subqueryRoot)) {
+
+                /*
+                 * Lift out SPARQL 1.1 subqueries which use {@link IAggregate}s.
+                 * This typically provides more efficient evaluation than
+                 * repeated as-bound evaluation of the sub-select. It also
+                 * prevents inappropriate sharing of the internal state of the
+                 * {@link IAggregate} functions.
+                 */
+
+                liftSparql11Subquery(context, sa, subqueryRoot);
+
+                continue;
+
+            }
+
+            if (subqueryRoot.isRunOnce()) {
+
+                /*
+                 * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
+                 * annotation was specified.
+                 */
+
+                liftSparql11Subquery(context, sa, subqueryRoot);
+
+                continue;
+
+            }
+
+            final Set<IVariable<?>> joinVars = sa.getJoinVars(
+                    subqueryRoot, new LinkedHashSet<IVariable<?>>());
+
+            if (joinVars.isEmpty()) {
+
+                /*
+                 * Lift out SPARQL 1.1 subqueries for which the RUN_ONCE
+                 * annotation was specified.
+                 */
+
+                liftSparql11Subquery(context, sa, subqueryRoot);
+
+                continue;
+
+            }
+
         }
         
     }
 
-    private void rewriteSparql11Subqueries(final StaticAnalysis sa,
-            final QueryRoot queryRoot) {
+    private void rewriteSparql11Subqueries(final AST2BOpContext context,
+            final StaticAnalysis sa, final QueryRoot queryRoot) {
 
         final Striterator itr2 = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
@@ -181,48 +269,64 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         
         for(SubqueryRoot subquery : subqueries) {
             
-            liftSparql11Subquery(sa, subquery);
+            liftSparql11Subquery(context, sa, subquery);
             
         }
         
     }
     
-    private void liftSparql11Subquery(final StaticAnalysis sa,
-            final SubqueryRoot root) {
+    private void liftSparql11Subquery(final AST2BOpContext context,
+            final StaticAnalysis sa, final SubqueryRoot subqueryRoot) {
 
-        final IGroupNode<IGroupMemberNode> parent = root.getParent();
-
-        parent.removeChild(root);
-
-        final String newName = UUID.randomUUID().toString();
+        final String newName = "-subSelect-" + context.nextId();
 
         final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
 
-        parent.addChild(include);
+        final IGroupNode<IGroupMemberNode> parent = subqueryRoot.getParent();
 
-        final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
-                root.getQueryType(), newName);
+        /*
+         * Note: A SubqueryRoot normally starts out as the sole child of a
+         * JoinGroupNode. However, other rewrites may have written out that
+         * JoinGroupNode and it does not appear to be present for an ASK
+         * subquery.
+         * 
+         * Therefore, when the parent of the SubqueryRoot is a JoinGroupNode
+         * having the SubqueryRoot as its only child, we use the parent's parent
+         * in order to replace the JoinGroupNode when we lift out the
+         * SubqueryRoot. Otherwise we use the parent since there is no wrapping
+         * JoinGroupNode (or if there is, it has some other stuff in there as
+         * well).
+         */
+         
+        if ((parent instanceof JoinGroupNode) && ((BOp) parent).arity() == 1
+                && parent.getParent() != null) {
+            
+            final IGroupNode<IGroupMemberNode> pp = parent.getParent();
 
-        nsr.setConstruct(root.getConstruct());
-        nsr.setGroupBy(root.getGroupBy());
-        nsr.setHaving(root.getHaving());
-        nsr.setOrderBy(root.getOrderBy());
-        nsr.setProjection(root.getProjection());
-        nsr.setSlice(root.getSlice());
-        nsr.setWhereClause(root.getWhereClause());
+            // Replace the sub-select with the include.
+            if (((ASTBase) pp).replaceWith((BOp) parent, include) == 0)
+                throw new AssertionError();
 
-        NamedSubqueriesNode namedSubqueries = sa.getQueryRoot()
-                .getNamedSubqueries();
+        } else {
 
-        if (namedSubqueries == null) {
-
-            namedSubqueries = new NamedSubqueriesNode();
-
-            sa.getQueryRoot().setNamedSubqueries(namedSubqueries);
-
+            // Replace the sub-select with the include.
+            if (((ASTBase) parent).replaceWith((BOp) subqueryRoot, include) == 0)
+                throw new AssertionError();
+            
         }
 
-        namedSubqueries.add(nsr);
+        final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                subqueryRoot.getQueryType(), newName);
+
+        nsr.setConstruct(subqueryRoot.getConstruct());
+        nsr.setGroupBy(subqueryRoot.getGroupBy());
+        nsr.setHaving(subqueryRoot.getHaving());
+        nsr.setOrderBy(subqueryRoot.getOrderBy());
+        nsr.setProjection(subqueryRoot.getProjection());
+        nsr.setSlice(subqueryRoot.getSlice());
+        nsr.setWhereClause(subqueryRoot.getWhereClause());
+
+        sa.getQueryRoot().getNamedSubqueriesNotNull().add(nsr);
 
     }
 

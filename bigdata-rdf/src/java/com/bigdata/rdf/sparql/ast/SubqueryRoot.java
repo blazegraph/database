@@ -26,6 +26,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 
 /**
  * A SPARQL 1.1 style subquery.
@@ -35,14 +36,15 @@ public class SubqueryRoot extends SubqueryBase {
     public interface Annotations extends SubqueryBase.Annotations {
         
         /**
-         * Annotation provides a query hint that the subquery should be
-         * transformed into a named subquery, lifting its evaluation out of the
-         * main body of the query and replacing the subquery with an INCLUDE.
+         * Annotation provides a query hint indicating whether or not the
+         * subquery should be transformed into a named subquery, lifting its
+         * evaluation out of the main body of the query and replacing the
+         * subquery with an INCLUDE. When <code>true</code>, the subquery will
+         * be lifted out. When <code>false</code>, the subquery will not be
+         * lifted unless other semantics require that it be lifted out
+         * regardless.
          * 
-         * FIXME This annotation is not yet interpreted by anything. Another way
-         * to handle this would be to pair the {@link NamedSubqueryRoot} and the
-         * {@link NamedSubqueryInclude} together where the {@link SubqueryRoot}
-         * appears such that we do the work only once.
+         * @see ASTSparql11SubqueryOptimizer
          */
         String RUN_ONCE = "runOnce";
         
@@ -95,4 +97,28 @@ public class SubqueryRoot extends SubqueryBase {
         
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to also report the {@link Annotations#RUN_ONCE} annotation.
+     */
+    @Override
+    public String toString(final int indent) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(super.toString(indent));
+        
+        final boolean runOnce = isRunOnce();
+
+        sb.append("\n");
+
+        sb.append(indent(indent));
+
+        sb.append("@" + Annotations.RUN_ONCE + "=" + runOnce);
+
+        return sb.toString();
+
+    }
+
 }

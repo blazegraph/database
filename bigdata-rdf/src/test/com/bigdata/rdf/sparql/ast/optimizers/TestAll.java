@@ -90,6 +90,9 @@ public class TestAll extends TestCase {
         // Unit tests for enforcing bottom-up evaluation semantics.
         suite.addTestSuite(TestASTBottomUpOptimizer.class);
 
+        // Unit tests for SPARQL 1.1 subquery optimizations.
+        suite.addTestSuite(TestASTSparql11SubqueryOptimizer.class);
+
         return suite;
 
     }

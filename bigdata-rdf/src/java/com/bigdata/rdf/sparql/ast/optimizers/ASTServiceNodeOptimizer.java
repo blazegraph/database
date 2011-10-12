@@ -250,17 +250,7 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
             final JoinGroupNode whereClause = new JoinGroupNode(serviceNode);
             namedSubqueryRoot.setWhereClause(whereClause);
 
-            NamedSubqueriesNode namedSubqueries = queryRoot
-                    .getNamedSubqueries();
-
-            if (namedSubqueries == null) {
-
-                queryRoot
-                        .setNamedSubqueries(namedSubqueries = new NamedSubqueriesNode());
-
-            }
-
-            namedSubqueries.add(namedSubqueryRoot);
+            queryRoot.getNamedSubqueriesNotNull().add(namedSubqueryRoot);
 
         }
 

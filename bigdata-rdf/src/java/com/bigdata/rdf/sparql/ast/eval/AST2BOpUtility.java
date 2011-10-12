@@ -718,7 +718,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * @return <code>true</code>if it is an aggregation query.
      */
-    private static boolean isAggregate(final QueryBase query) {
+    public static boolean isAggregate(final QueryBase query) {
 
         return isAggregate(query.getProjection(), query.getGroupBy(),
                 query.getHaving());
@@ -854,7 +854,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      *         property for a union right now.
      */
     @SuppressWarnings("unused")
-	private static PipelineOp convertUnion(PipelineOp left,
+    private static PipelineOp convertUnion(PipelineOp left,
             final UnionNode unionNode, final AST2BOpContext ctx) {
 
         if (unionNode.isOptional()) {
@@ -885,17 +885,17 @@ if (true) {
          */
         final int downstreamId = ctx.nextId();
 
-        /*
+            	/*
          * Pre-generate the ids for the Tee operators.
-         */
+            	 */
         final int[] subqueryIds = new int[arity];
-        
+            	
         for (int i = 0; i < arity; i++) {
-        	
+            		
         	subqueryIds[i] = ctx.nextId();
-        	
-        }
-        
+            		
+            	}
+            	
         /*
          * Should kinda look like this:
          * 
@@ -933,7 +933,7 @@ if (true) {
             	
     			thisTeeId = nextTeeId;
             	nextTeeId = ctx.nextId();
-            			
+            	
             } else {
             	
             	/*
@@ -955,13 +955,13 @@ if (true) {
 
         int i = 0;
         for (IGroupMemberNode child : unionNode) {
-
+        			
             // convert the child
             if (child instanceof JoinGroupNode) {
-
-                /*
+        
+        /*
                  * Need to make sure the first operator in the group has the right Id.
-                 */
+         */
         		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
         				new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
         				}));
@@ -975,13 +975,13 @@ if (true) {
             		log.debug(BOpUtility.getPipelineStart(subquery));
             		
             	}
-            	
-            	/*
+        	
+        	/*
             	 * Route all "subqueries" to the same place. This works because 
             	 * convertJoinGroup returns the topmost operator in the 
             	 * subquery pipeline, and this is the one whose SINK_REF
             	 * we need to change.
-            	 */
+        	 */
 //                subqueries[i++] = (PipelineOp) subquery
             	left = (PipelineOp) subquery
             		.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
@@ -992,9 +992,9 @@ if (true) {
                         + child.getClass());
 
             }
-
+        	
         }
-
+        
         /*
          * All the subqueries get routed here when they are done.
          */
@@ -1097,7 +1097,7 @@ if (true) {
      */
     private static PipelineOp convertJoinGroup(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
-    	
+
         final StaticAnalysis sa = ctx.sa;
         
         // /*
@@ -1790,7 +1790,7 @@ if (true) {
          * sub-group (which are flowing through the pipeline). The hash join is
          * optional iff the sub-group is optional.
          */
-        if(true) { 
+        if(false) { 
 
 		    /*
 		     * Model a sub-group by building a hash index at the start of the
