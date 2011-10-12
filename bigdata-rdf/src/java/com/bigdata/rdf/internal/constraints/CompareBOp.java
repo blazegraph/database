@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -37,13 +35,10 @@ import org.openrdf.query.algebra.evaluation.util.QueryEvaluationUtil;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
-import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
 
@@ -186,8 +181,10 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	if (left instanceof LiteralExtensionIV &&
     			right instanceof LiteralExtensionIV) {
     	
-    		final IV leftDatatype = ((LiteralExtensionIV) left).getExtensionIV();
+    		@SuppressWarnings("rawtypes")
+            final IV leftDatatype = ((LiteralExtensionIV) left).getExtensionIV();
     		
+            @SuppressWarnings("rawtypes")
     		final IV rightDatatype = ((LiteralExtensionIV) right).getExtensionIV();
     		
     		if (leftDatatype.equals(rightDatatype)) {
@@ -247,11 +244,13 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 //		final Literal l2 = right.isInline() ? (Literal) right : right.getValue();
 		final Literal l2 = (Literal) right;
 		
-		log.debug(l1);
-		log.debug(l2);
-		
-    	try {
-    	
+        if (log.isDebugEnabled()) {
+            log.debug(l1);
+            log.debug(l2);
+        }
+
+        try {
+
     		// use the Sesame implementation directly
     		final boolean accept = 
     				QueryEvaluationUtil.compareLiterals(l1, l2, op);
@@ -301,6 +300,7 @@ public class CompareBOp extends XSDBooleanIVValueExpression
 		
 	}
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public boolean accept(final IBindingSet s) {
         
     	final IV left = get(0).get(s);
@@ -355,5 +355,4 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	
     }
     
-
 }

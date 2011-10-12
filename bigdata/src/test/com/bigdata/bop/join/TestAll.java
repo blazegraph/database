@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.join;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -70,6 +69,7 @@ public class TestAll extends TestCase {
         // Test suite for building a hash index from solutions and joining that
         // hash index back into the pipeline.
         suite.addTestSuite(TestHashIndexOp.class);
+        suite.addTestSuite(TestSolutionSetHashJoin.class);
         
         return suite;
         
