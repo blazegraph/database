@@ -361,7 +361,10 @@ public class MutableValueBuffer implements IRaba {
         assert values[index] != null;
         assert nvalues > 0;
         
-        values[index] = null;
+		System.arraycopy(values, index+1, values, index, nvalues-index-1);
+
+		values[nvalues-1] = null;
+        
         
         return --nvalues;
       

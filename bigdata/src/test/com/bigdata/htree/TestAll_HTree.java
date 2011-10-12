@@ -119,6 +119,11 @@ public class TestAll_HTree extends TestCase {
          */
         suite.addTestSuite(TestRawRecords.class);
 
+        /*
+         * test index with removed tuples.
+         */
+        suite.addTestSuite(TestRemovals.class);
+
 //        /* TODO Support bloom filters?
 //        
 //         * Test bloom filters for a BTree (vs an IndexSegment, which is handled

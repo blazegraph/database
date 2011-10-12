@@ -136,7 +136,9 @@ public class AbstractHTreeTestCase extends TestCase2 {
 
 		if (actual.hasNext()) {
 
-			fail("Iterator will deliver too many objects.");
+			final byte[] actualValue = actual.next();
+
+			fail("Iterator will deliver too many objects object=" + actualValue);
 
 		}
 
