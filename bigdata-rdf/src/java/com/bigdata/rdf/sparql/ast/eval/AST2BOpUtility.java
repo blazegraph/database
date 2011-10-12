@@ -853,7 +853,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      *         as an optional union, but we are not handling the optional
      *         property for a union right now.
      */
-    private static PipelineOp convertUnion(PipelineOp left,
+    @SuppressWarnings("unused")
+	private static PipelineOp convertUnion(PipelineOp left,
             final UnionNode unionNode, final AST2BOpContext ctx) {
 
         if (unionNode.isOptional()) {
@@ -876,7 +877,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-if (false) {
+if (true) {
         	
         /*
          * We are going to route all the subqueries here when they're done,
@@ -884,50 +885,25 @@ if (false) {
          */
         final int downstreamId = ctx.nextId();
 
-        final PipelineOp[] subqueries = new PipelineOp[arity];
-
-        int i = 0;
-        for (IGroupMemberNode child : unionNode) {
-
-            // convert the child
-            if (child instanceof JoinGroupNode) {
-
-            	/*
-            	 * This work because convertJoinGroup returns the topmost operator
-            	 * in the subquery pipeline, and this is the one whose SINK_REF
-            	 * we need to change.
-            	 */
-            	final BOp subquery = convertJoinGroup(null/* left */,
-                        (JoinGroupNode) child, ctx);
-            	
-            	if (log.isDebugEnabled()) {
-            		
-            		log.debug(subquery);
-            		log.debug(BOpUtility.getPipelineStart(subquery));
-            		
-            	}
-            	
-                subqueries[i++] = (PipelineOp) subquery
-                        // route all "subqueries" to the same place 
-                        	.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
-                
-            } else {
-
-                throw new RuntimeException("Illegal child type for union: "
-                        + child.getClass());
-
-            }
-
+        /*
+         * Pre-generate the ids for the Tee operators.
+         */
+        final int[] subqueryIds = new int[arity];
+        
+        for (int i = 0; i < arity; i++) {
+        	
+        	subqueryIds[i] = ctx.nextId();
+        	
         }
-
+        
         /*
          * Should kinda look like this:
          * 
-         *       slice := SLICE()[bopId=5]
-         *       subquery4 := startBOp()[bopId=41]->...->endBOp(...)[sinkRef=5]
-         *       subquery3 := startBOp()[bopId=31]->...->endBOp(...)[sinkRef=5]
-         *       subquery2 := startBOp()[bopId=21]->...->endBOp(...)[sinkRef=5]
-         *       subquery1 := startBOp()[bopId=11]->...->endBOp(...)[sinkRef=5]
+         *       copy := CopyOp( lastBOp4 )[bopId=5]
+         *       subquery4 := firstBOp4( lastBOp3 )[bopId=41]->...->lastBOp4(...)[sinkRef=5]
+         *       subquery3 := firstBOp3( lastBOp2 )[bopId=31]->...->lastBOp3(...)[sinkRef=5]
+         *       subquery2 := firstBOp2( lastBOp1 )[bopId=21]->...->lastBOp2(...)[sinkRef=5]
+         *       subquery1 := firstBOp1( tee3 )[bopId=11]->...->lastBOp1(...)[sinkRef=5]
          *       tee3   := TEE( tee2 )[bopId=03;sinkRef=31;altSinkRef=41]
          *       tee2   := TEE( tee1 )[bopId=02;sinkRef=03;altSinkRef=21]
          *       tee1   := TEE( left )[bopId=01;sinkRef=02;altSinkRef=11]
@@ -940,52 +916,87 @@ if (false) {
         /*
          * We need one less Tee than we have subqueries.
          */
-        for (int j = 0; j < (subqueries.length-1); j++) {
+        for (int j = 0; j < (arity-1); j++) {
         	
             final LinkedList<NV> anns = new LinkedList<NV>();
             anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
             
-            if (j < (subqueries.length-2)) {
+            if (j < (arity-2)) {
             
-            	// not the last one
+            	/* 
+            	 * Not the last one - send the Tee to the next Tee and the next 
+            	 * subquery.
+            	 */
             	anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
-            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
+            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
+//            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
             	
+    			thisTeeId = nextTeeId;
+            	nextTeeId = ctx.nextId();
+            			
             } else {
             	
-            	// last one
-            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
-            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, 
-            			BOpUtility.getPipelineStart(subqueries[j+1]).getId()));
+            	/*
+            	 * Last one - send the Tee to the last two subqueries.
+            	 */
+            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
+//            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
+            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
+//            			BOpUtility.getPipelineStart(subqueries[j+1]).getId()));
             	
             }
             
         	left = applyQueryHints(new Tee(leftOrEmpty(left),
                     NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
         	
-			thisTeeId = nextTeeId;
-        	nextTeeId = ctx.nextId();
-        			
         }
         
-        /*
-         * FIXME We need to actually get the subqueries into the pipeline somehow.
-         */
-        for (PipelineOp subquery : subqueries) {
-        	
-        	/*
-        	 * This does not work, but we need to do something like it.
-        	 */
-        	left = (PipelineOp) subquery.setArg(0, left);
-        	
+//        final PipelineOp[] subqueries = new PipelineOp[arity];
+
+        int i = 0;
+        for (IGroupMemberNode child : unionNode) {
+
+            // convert the child
+            if (child instanceof JoinGroupNode) {
+
+                /*
+                 * Need to make sure the first operator in the group has the right Id.
+                 */
+        		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+        				new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+        				}));
+            	
+            	final BOp subquery = convertJoinGroup(left,
+                        (JoinGroupNode) child, ctx);
+            	
+            	if (log.isDebugEnabled()) {
+            		
+            		log.debug(subquery);
+            		log.debug(BOpUtility.getPipelineStart(subquery));
+            		
+            	}
+            	
+            	/*
+            	 * Route all "subqueries" to the same place. This works because 
+            	 * convertJoinGroup returns the topmost operator in the 
+            	 * subquery pipeline, and this is the one whose SINK_REF
+            	 * we need to change.
+            	 */
+//                subqueries[i++] = (PipelineOp) subquery
+            	left = (PipelineOp) subquery
+            		.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                
+            } else {
+
+                throw new RuntimeException("Illegal child type for union: "
+                        + child.getClass());
+
+            }
+
         }
-        
+
         /*
          * All the subqueries get routed here when they are done.
-         * 
-         * FIXME not sure this is the right operator to use?
          */
 		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
 				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
@@ -1086,7 +1097,7 @@ if (false) {
      */
     private static PipelineOp convertJoinGroup(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
-
+    	
         final StaticAnalysis sa = ctx.sa;
         
         // /*
@@ -1779,7 +1790,7 @@ if (false) {
          * sub-group (which are flowing through the pipeline). The hash join is
          * optional iff the sub-group is optional.
          */
-        if(false) { 
+        if(true) { 
 
 		    /*
 		     * Model a sub-group by building a hash index at the start of the
