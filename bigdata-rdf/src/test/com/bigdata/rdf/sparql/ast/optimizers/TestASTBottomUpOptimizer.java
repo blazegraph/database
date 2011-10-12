@@ -236,8 +236,9 @@ public class TestASTBottomUpOptimizer extends
          * FIXME This is failing because the INCLUDE is being wrapped by an
          * OPTIONAL group to maintain the OPTIONAL semantics of the lifted
          * group. The NamedSubqueryIncludeOp should be modified to support
-         * OPTIONAL and ASTBottomUpOptimized modified to appropriate mark the
-         * INCLUDE as optional, at which point this problem will go away.
+         * OPTIONAL and ASTBottomUpOptimizer modified to mark the INCLUDE as
+         * optional, at which point this problem will go away. [It may be that
+         * we can do this now using the SolutionSetHashJoinOp.]
          */
         assertEquals("modifiedClause", modifiedClause,
                 queryRoot.getWhereClause());        
