@@ -492,48 +492,6 @@ abstract public class AbstractHTree implements ICounterSetAccess {
      */
     AbstractPage loadChild(final DirectoryPage parent, final int index) {
 
-//        if (false && store instanceof Journal
-//                && ((Journal) store).getReadExecutor() != null) {
-//
-//            /*
-//             * This code path materializes the child node using the read
-//             * service. This has the effect of bounding the #of concurrent IO
-//             * requests against the local disk based on the allowed parallelism
-//             * for that read service.
-//             */
-//
-//            final Executor s = ((Journal) store).getReadExecutor();
-//
-//            final FutureTask<AbstractNode<?>> ft = new FutureTask<AbstractNode<?>>(
-//                    new Callable<AbstractNode<?>>() {
-//
-//                        public AbstractNode<?> call() throws Exception {
-//
-//                            return memo.compute(new LoadChildRequest(parent,
-//                                    index));
-//
-//                        }
-//
-//                    });
-//            
-//            s.execute(ft);
-//
-//            try {
-//
-//                return ft.get();
-//
-//            } catch (InterruptedException e) {
-//
-//                throw new RuntimeException(e);
-//
-//            } catch (ExecutionException e) {
-//
-//                throw new RuntimeException(e);
-//
-//            }
-//
-//        } else {
-
             try {
 
                 return memo.compute(new LoadChildRequest(parent, index));

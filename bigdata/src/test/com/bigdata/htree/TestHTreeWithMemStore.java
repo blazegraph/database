@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.htree;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.UUID;
 
 import junit.framework.TestCase;
@@ -43,6 +44,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
@@ -319,8 +321,8 @@ public class TestHTreeWithMemStore extends TestCase {
          */
         final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                //new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
-                new SimpleRabaCoder(),// keys
+                new FrontCodedRabaCoder(4),// Note: reports true for isKeys()!
+                // new SimpleRabaCoder(),// keys
                 new SimpleRabaCoder() // vals
                 );
         
@@ -347,8 +349,8 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 10000;
-    private static final int s_retentionQueueCapacity = 20;
+    private static final int s_limit = 20;
+    private static final int s_retentionQueueCapacity = 30;
 
     /**
      * Note: If the retention queue is less than the maximum depth of the HTree
@@ -408,6 +410,10 @@ public class TestHTreeWithMemStore extends TestCase {
                                 + Arrays.toString(htree.lookupFirst(key)));
 
                 }
+                
+//                System.out.println(htree.PP());
+//                Iterator values = htree.values();
+//                while (values.hasNext()) values.next();
 
                 final long elapsedLookupFirstTime = System.currentTimeMillis()
                         - beginLookupFirst;
@@ -446,7 +452,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
             }
 
-//          log.error("Pretty Print of final state:\n" + htree.PP());
+            log.error("Pretty Print of final state:\n" + htree.PP());
 
         } finally {
 

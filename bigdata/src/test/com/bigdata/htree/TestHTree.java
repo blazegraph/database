@@ -962,6 +962,8 @@ public class TestHTree extends AbstractHTreeTestCase {
 							+ c.distinctBitsRequired());
 	
 				assertTrue(c.distinctBitsRequired() == 1);
+				
+				System.out.println(htree.PP());
             } catch (Throwable t) {
             	if (log.isInfoEnabled())
             		log.info("Pretty Print Error: " + htree.PP());

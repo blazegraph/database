@@ -48,15 +48,15 @@ class BucketPageTupleIterator<E> implements
 	private boolean findNextSlot() {
 		if (currentBucketPage == null)
 			throw new IllegalStateException();
-		final int slotsPerPage = currentBucketPage.slotsOnPage();
 		final IRaba keys = currentBucketPage.getKeys();
-		for (; nextNonEmptySlot < slotsPerPage; nextNonEmptySlot++) {
+		for (; nextNonEmptySlot < keys.size(); nextNonEmptySlot++) {
 			if (keys.isNull(nextNonEmptySlot))
 				continue;
 			return true;
 		}
 		// The current page is exhausted.  We need to fetch another page.
 		currentBucketPage = null;
+		
 		return false;
 	}
 	

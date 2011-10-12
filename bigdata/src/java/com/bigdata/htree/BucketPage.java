@@ -178,6 +178,9 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	}
 
 	public boolean isLeaf() {
+		if (data == null)
+			throw new AssertionError("data == null");
+		
 		return data.isLeaf();
 	}
 
@@ -381,24 +384,62 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 *         the application allows <code>null</code> values into the index.
 	 */
 	final byte[] lookupFirst(final byte[] key, final int buddyOffset) {
+		final int index = lookupIndex(key);
+		
+		if (index == -1)
+			return null;
+		
+		if (hasRawRecords()) {
+			long addr = getRawRecord(index);
+			
+			if (addr != IRawStore.NULL)
+				return getBytes(readRawRecord(addr));
+		}
+
+		return getValues().get(index);
+	}
+	
+	final byte[] getBytes(ByteBuffer buf) {
+
+		if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
+				&& buf.limit() == buf.capacity()) {
+
+			/*
+			 * Return the backing array.
+			 */
+
+			return buf.array();
+
+		}
+
+		/*
+		 * Copy the expected data into a byte[] using a read-only view on the
+		 * buffer so that we do not mess with its position, mark, or limit.
+		 */
+		final byte[] a;
+		{
+
+			buf = buf.asReadOnlyBuffer();
+
+			final int len = buf.remaining();
+
+			a = new byte[len];
+
+			buf.get(a);
+
+		}
+
+		return a;
+
+	}
+
+	final int lookupIndex(final byte[] key) {
 
 		if (key == null)
 			throw new IllegalArgumentException();
 
 		// #of slots on the page.
 		final int slotsOnPage = slotsOnPage();
-
-		// // #of address slots in each buddy hash table.
-		// final int slotsPerBuddy = (1 << globalDepth);
-
-		// // #of buddy tables on a page.
-		// final int nbuddies = (slotsOnPage) / slotsPerBuddy;
-
-		// final int lastSlot = buddyOffset + slotsPerBuddy;
-
-		// range check buddyOffset.
-		if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-			throw new IndexOutOfBoundsException();
 
 		/*
 		 * Locate the first unassigned tuple in the buddy bucket.
@@ -410,22 +451,17 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 * raba.
 		 */
 		final IRaba keys = getKeys();
-		// for (int i = buddyOffset; i < lastSlot; i++) {
-		// if (!keys.isNull(i)) {
-		// if(BytesUtil.bytesEqual(key,keys.get(i))) {
-		// return getValues().get(i);
-		// }
-		// }
-		// }
+
 		final int nkeys = keys.size();
 		for (int i = 0; i < nkeys; i++) {
 			if (!keys.isNull(i)) {
 				if (BytesUtil.bytesEqual(key, keys.get(i))) {
-					return getValues().get(i);
+					return i;
 				}
 			}
 		}
-		return null;
+		
+		return -1;
 	}
 
 	/**
@@ -478,18 +514,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		// #of slots on the page.
 		final int slotsOnPage = slotsOnPage();
 
-		// #of address slots in each buddy hash table.
-		// final int slotsPerBuddy = (1 << globalDepth);
-
-		// #of buddy tables on a page.
-		// final int nbuddies = (slotsOnPage) / slotsPerBuddy;
-
-		// final int lastSlot = buddyOffset + slotsPerBuddy;
-
-		// range check buddyOffset.
-		// if (buddyOffset < 0 || buddyOffset >= slotsOnPage)
-		// throw new IndexOutOfBoundsException();
-
         /*
          * Note: This is one of the few gateways for mutation of a leaf via the
          * main btree API (insert, lookup, delete). By ensuring that we have a
@@ -535,8 +559,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		}
 			
 		/*
-		 * There is only one buddy on the page. Now we have to figure out
-		 * whether or not all keys are duplicates.
+		 * Now we have to figure out whether or not all keys are duplicates.
 		 */
 		boolean identicalKeys = true;
 		for (int i = 0; i < slotsOnPage; i++) {
@@ -780,7 +803,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 */
 		private boolean findNextSlot() {
 			final IRaba keys = getKeys();
-			for (; nextNonEmptySlot < slotsPerPage; nextNonEmptySlot++) {
+			for (; nextNonEmptySlot < keys.size(); nextNonEmptySlot++) {
 				if (keys.isNull(nextNonEmptySlot))
 					continue;
 				return true;
@@ -791,7 +814,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 		public boolean hasNext() {
 
-			return nextNonEmptySlot < slotsPerPage;
+			return nextNonEmptySlot < getKeys().size();
 
 		}
 
@@ -894,13 +917,13 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 */
 	private String PPVAL(final int index) {
 
-		if (index>getKeys().capacity()) {
+		if (getKeys().size() <= index)
+			return "-";
+
+		if (index > getKeys().capacity()) {
 			throw new RuntimeException("index="+index+", keys.size="+getKeys().size()+", keys.capacity="+getKeys().capacity());
 		}
 		
-		if (getKeys().isNull(index))
-			return "-";
-
 		final byte[] key = getKeys().get(index);
 
 		final String keyStr = BytesUtil.toString(key) + "("
@@ -1352,6 +1375,66 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	@Override
 	boolean isClean() {
 		return !isDirty();
+	}
+
+	public int removeAll(final byte[] key) {
+		if (isReadOnly()) {
+			BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
+			
+			return copy.removeAll(key);
+		}
+		
+		// non-optimal
+		int ret = 0;
+		while (removeFirst(key) != null) ret++;
+		
+		return ret;
+	}
+	
+	/**
+	 * Must check for rawRecords and remove the references.
+	 */
+	public byte[] removeFirst(final byte[] key) {
+		if (isReadOnly()) {
+			BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
+			
+			return copy.removeFirst(key);
+		}
+		
+		final int index = lookupIndex(key);
+		
+		if (index == -1)
+			return null;
+		
+		// get byte[], reading rawRecord if necessary
+		final long addr = hasRawRecords() ? getRawRecord(index) : IRawStore.NULL;
+		final byte[] ret;
+		if (addr != IRawStore.NULL) {
+			ret = getBytes(htree.readRawRecord(addr));
+			
+			htree.deleteRawRecord(addr);					
+		} else {
+			ret = data.getValues().get(index);
+		}
+		
+		// Now remove reference from data
+		((MutableBucketData) data).remove(index);
+		
+		
+		return ret;
+		
+	}
+
+	/**
+	 * Since the BucketPage orders its keys the first key will be the
+	 * "lowest" in sort order.
+	 * 
+	 * @return first key value
+	 */
+	public byte[] getFirstKey() {
+		assert data.getKeys().size() > 0;
+		
+		return data.getKeys().get(0);
 	}
 
 }

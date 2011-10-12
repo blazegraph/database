@@ -369,7 +369,9 @@ public class MutableKeyBuffer implements IRaba {
         assert keys[index] != null;
         assert nkeys > 0;
         
-        keys[index] = null;
+		System.arraycopy(keys, index+1, keys, index, nkeys-index-1);
+
+		keys[nkeys-1] = null;
         
         return --nkeys;
       

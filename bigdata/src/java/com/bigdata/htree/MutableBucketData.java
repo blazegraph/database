@@ -537,5 +537,27 @@ public class MutableBucketData implements ILeafData {
 			versionTimestamps[insIndex] = 0; // current version
 		}
 	}
+	
+	/**
+	 * 
+	 * @param index - slot to be removed
+	 */
+	public void remove(final int index) {
+		if (hasDeleteMarkers()) {
+			deleteMarkers[index] = true;
+		} else {
+			keys.remove(index);
+			vals.remove(index);
+
+			if (hasRawRecords()) {
+				System.arraycopy(rawRecords, index+1, rawRecords, index, vals.nvalues-index);
+				rawRecords[vals.nvalues] = false;
+			}
+			if (hasVersionTimestamps()) {
+				System.arraycopy(versionTimestamps, index+1, versionTimestamps, index, vals.nvalues-index);
+				versionTimestamps[vals.nvalues] = 0; // current version
+			}
+		}
+	}
 
 }
