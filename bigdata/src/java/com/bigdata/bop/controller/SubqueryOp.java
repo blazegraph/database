@@ -145,7 +145,7 @@ public class SubqueryOp extends PipelineOp {
          * Note: We need to have distinct {@link IAggregate} objects in each
          * subquery issued since they have internal state in order to prevent
          * inappropriate sharing of state across invocations of the subquery.
-         * */
+         */
         String IS_AGGREGATE = Annotations.class.getName() + ".isAggregate";
 
         boolean DEFAULT_IS_AGGREGATE = false;
