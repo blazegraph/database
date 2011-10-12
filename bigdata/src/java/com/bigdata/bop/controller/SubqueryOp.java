@@ -81,18 +81,8 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * by the subquery but which appear in the subquery as well, then such variables
  * in the subquery are effectively distinct from those having the same name
  * which appear in the parent query. In order to have correct bottom-up
- * evaluation semantics under these conditions, such variables in the subquery
- * MUST be renamed. The easiest way to handle this is to always rename such
- * variables unless they are projected out of the subquery. (If a variable is
- * projected out of the subquery then it should not be renamed in order to have
- * the in scope bindings for that variable in the parent flow into the
- * subquery.)
- * <p>
- * A BIND() used to rename a variable in the projection of the subquery should
- * be interpreted as the projection of both the source and target variable,
- * otherwise the bind is only imposed when leaving the subquery and a binding
- * already available in the parent's context will not be utilized by the
- * subquery, causing it to do more work.
+ * evaluation semantics under these conditions.  This is handled by "projecting"
+ * only those variables into the subquery which it will project out.
  * 
  * @todo Rename as SubqueryPipelineJoinOp.
  * 
