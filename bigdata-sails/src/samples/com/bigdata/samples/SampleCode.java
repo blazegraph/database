@@ -44,6 +44,9 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
@@ -393,40 +396,77 @@ public class SampleCode {
 
     /**
      * Demonstrate execution of historical query using a read-only transaction.
+     * <p>
+     * Note: Bigdata preserves historical commit points until their release age
+     * expires. This behavior is controlled by the deployment mode (RW, WORM, or
+     * cluster) and by
+     * {@link AbstractTransactionService.Options#MIN_RELEASE_AGE}. Except for
+     * the WORM deployment mode, you MUST guard a historical commit point on
+     * which you want to read using a read-lock. The read-lock itself is just a
+     * read-only connection. It can be obtained for any historical commit point
+     * that you want to "pin" and can be released once you are no longer need to
+     * "pin" that commit point.
+     * <p>
+     * The read-lock is not required for the WORM deployment because it never
+     * releases historical commit points.
      * 
      * @param repo
      * @throws Exception
      */
-    public void executeHistoricalQuery(Repository repo) throws Exception {
+    public void executeHistoricalQuery(final Repository repo) throws Exception {
 
         if (!(repo instanceof BigdataSailRepository)) {
             return;
         }
         
-        URI MIKE = new URIImpl(BD.NAMESPACE+"Mike");
-        URI BRYAN = new URIImpl(BD.NAMESPACE+"Bryan");
-        URI PERSON = new URIImpl(BD.NAMESPACE+"Person");
+        final IIndexManager indexManager = ((BigdataSailRepository) repo)
+                .getDatabase().getIndexManager();
         
-        RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
+        final boolean isJournal = indexManager instanceof Journal;
+        
+        final boolean isWorm = isJournal
+                && ((Journal) indexManager).getBufferStrategy().getBufferMode()
+                        .getStoreType() == StoreTypeEnum.WORM;
+
+        final URI MIKE = new URIImpl(BD.NAMESPACE+"Mike");
+        final URI BRYAN = new URIImpl(BD.NAMESPACE+"Bryan");
+        final URI PERSON = new URIImpl(BD.NAMESPACE+"Person");
+        
+        final RepositoryConnection cxn = repo.getConnection();
         try {
+            cxn.setAutoCommit(false);
+
             cxn.remove((Resource)null, (URI)null, (Value)null);
             cxn.commit();
             
             cxn.add(MIKE, RDF.TYPE, PERSON);
             cxn.commit();
 
-            long time = System.currentTimeMillis();
+            final long time = System.currentTimeMillis();
             
-            Thread.sleep(1000);
+            // Need a readLock connection if not a Worm store
+            final RepositoryConnection readLock = isWorm ? null :
+                ((BigdataSailRepository) repo).getReadOnlyConnection();
             
-            cxn.add(BRYAN, RDF.TYPE, PERSON);
-            cxn.commit();
+            final RepositoryConnection history;
+            try {
+
+                Thread.sleep(1000);
+
+                cxn.add(BRYAN, RDF.TYPE, PERSON);
+                cxn.commit();
+
+                history = ((BigdataSailRepository) repo)
+                        .getReadOnlyConnection(time);
+
+            } finally {
+                
+                if (readLock != null)
+                    readLock.close();
+                
+            }
             
-            RepositoryConnection history = 
-                ((BigdataSailRepository) repo).getReadOnlyConnection(time);
-            
-            String query = 
+            final String query = 
                 "select ?s " +
                 "where { " +
                 "  ?s <"+RDF.TYPE+"> <"+PERSON+"> " +
