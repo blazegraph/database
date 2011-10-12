@@ -853,8 +853,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      *         as an optional union, but we are not handling the optional
      *         property for a union right now.
      */
-    @SuppressWarnings("unused")
-	private static PipelineOp convertUnion(PipelineOp left,
+    private static PipelineOp convertUnion(PipelineOp left,
             final UnionNode unionNode, final AST2BOpContext ctx) {
 
         if (unionNode.isOptional()) {
@@ -995,7 +994,7 @@ if (false) {
         return left;
         
 } else {
-		
+
         final PipelineOp[] subqueries = new PipelineOp[arity];
 
         int i = 0;
@@ -1006,7 +1005,7 @@ if (false) {
 
                 subqueries[i++] = (PipelineOp) convertJoinGroup(null/* left */,
                         (JoinGroupNode) child, ctx);
-                
+
             } else {
 
                 throw new RuntimeException("Illegal child type for union: "
@@ -1033,8 +1032,8 @@ if (false) {
                 NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
 
         return union;
-        
-}
+
+    }
 
     }
 
@@ -1772,13 +1771,13 @@ if (false) {
         final boolean optional = subgroup.isOptional();
 
         /*
-         * FIXME Enable new sub-group evaluation code path. There is currently a
-         * problem with duplicate solutions for OPTIONAL groups. I have not
-         * tested this against non-optional groups (e.g., UNION), but I suspect
-         * that the problem only exists with OPTIONAL groups and is linked to
-         * the handling of the joinSet used to detect and report optional
-         * solutions. If so, then the fix is to HashJoinUtility#330 where there
-         * is a TODO for what appears to be this issue.
+         * Enable new sub-group evaluation code path. This is based on a hash
+         * index which is generated from the source solutions before we begin to
+         * evaluate the sub-group. A hash join is appended to the pipeline after
+         * the sub-group operators and unifies the solutions from the parent
+         * group (which are in the hash index) with the solutions from the
+         * sub-group (which are flowing through the pipeline). The hash join is
+         * optional iff the sub-group is optional.
          */
         if(false) { 
 
@@ -1813,7 +1812,7 @@ if (false) {
 	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 	                        BOpEvaluationContext.CONTROLLER),//
 	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(PipelineOp.Annotations.LAST_PASS, true),//
+	                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
 	                new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
 	                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
 	                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
@@ -1823,17 +1822,24 @@ if (false) {
             final PipelineOp subquery = convertJoinGroupOrUnion(op/* left */,
                     subgroup, ctx);
 
+            // lastPass is required if the join is optional.
+            final boolean lastPass = optional; // iff optional.
+
+            // true if we will release the HTree as soon as the join is done.
+            // Note: also requires lastPass.
+            final boolean release = lastPass && true;
+            
 	        left = new SolutionSetHashJoinOp(
 	                new BOp[] { subquery },//
 	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
 	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 	                        BOpEvaluationContext.CONTROLLER),//
 	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+	                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 	                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 	                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-	                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
-	                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+	                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
+	                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
 	                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
 	        );
 
