@@ -30,8 +30,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
