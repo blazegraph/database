@@ -853,7 +853,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      *         as an optional union, but we are not handling the optional
      *         property for a union right now.
      */
-    private static PipelineOp convertUnion(PipelineOp left,
+    @SuppressWarnings("unused")
+	private static PipelineOp convertUnion(PipelineOp left,
             final UnionNode unionNode, final AST2BOpContext ctx) {
 
         if (unionNode.isOptional()) {
@@ -876,9 +877,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-//        // The bopId for the UNION or STEP.
-//        final int thisId = ctx.nextId();
-
+if (false) {
+        	
         /*
          * We are going to route all the subqueries here when they're done,
          * by replacing the SINK_REF on the topmost operator in the subquery.
@@ -991,23 +991,50 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
 				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
 				}));
-        
-//        final LinkedList<NV> anns = new LinkedList<NV>();
-//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
-//
-//        // if (union.getParent() == null) {
-//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-//                BOpEvaluationContext.CONTROLLER));
-//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-//        // }
-//
-//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
-//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-//
-//        return union;
-        
+
         return left;
+        
+} else {
+		
+        final PipelineOp[] subqueries = new PipelineOp[arity];
+
+        int i = 0;
+        for (IGroupMemberNode child : unionNode) {
+
+            // convert the child
+            if (child instanceof JoinGroupNode) {
+
+                subqueries[i++] = (PipelineOp) convertJoinGroup(null/* left */,
+                        (JoinGroupNode) child, ctx);
+                
+            } else {
+
+                throw new RuntimeException("Illegal child type for union: "
+                        + child.getClass());
+
+            }
+
+        }
+
+        // The bopId for the UNION or STEP.
+        final int thisId = ctx.nextId();
+
+        final LinkedList<NV> anns = new LinkedList<NV>();
+        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+
+        // if (union.getParent() == null) {
+        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+                BOpEvaluationContext.CONTROLLER));
+        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+        // }
+
+        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
+                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+
+        return union;
+        
+}
 
     }
 
