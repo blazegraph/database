@@ -156,14 +156,11 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * }
      * </pre>
      * 
-     * @see ASTBottomUpOptimizer
+     * Note: Because this is a badly designed left join, it is translated into a
+     * named subquery. However, the translated query will fail if the "OPTIONAL"
+     * semantics are not being attached to the INCLUDE.
      * 
-     *      FIXME This appears to be failing because the "OPTIONAL" semantics
-     *      are not being attached to the INCLUDE.
-     *      <p>
-     *      Modify {@link NamedSubqueryIncludOp} to support optional semantics
-     *      and modify {@link ASTBottomUpOptimizer} to mark the INCLUDE as
-     *      optional.
+     * @see ASTBottomUpOptimizer
      */
     public void test_two_nested_opt() throws Exception {
 
