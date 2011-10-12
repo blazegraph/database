@@ -365,21 +365,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTSimpleOptionalOptimizer());
         
         /**
-         * Lift {@link SubqueryRoot}s into named subqueries when appropriate
+         * Lift {@link SubqueryRoot}s into named subqueries when appropriate.
          * 
-         * FIXME This is not implemented yet. We should do this if there are no
-         * join variables for the SPARQL 1.1 subquery. That will prevent
-         * multiple evaluations of the SPARQL 1.1 subquery since the named
-         * subquery is run once before the main WHERE clause.
-         * <p>
-         * This optimizer needs to examine the required statement patterns and
-         * decide whether we are better off running the named subquery pipelined
-         * after the required statement patterns, using a hash join after the
-         * required statement patterns, or running it as a named subquery and
-         * then joining in the named solution set (and again, either before or
-         * after everything else).
-         * 
-         * FIXME This similar, but still different from, recognizing when we
+         * FIXME This similar too, but still different from, recognizing when we
          * should be breaking out some of the joins into their own subqueries
          * and then uniting those subqueries using a hash join (BSBM Q5, search
          * in search).
