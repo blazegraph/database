@@ -349,7 +349,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 20;
+    private static final int s_limit = 10000;
     private static final int s_retentionQueueCapacity = 30;
 
     /**
@@ -452,7 +452,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
             }
 
-            log.error("Pretty Print of final state:\n" + htree.PP());
+            // log.error("Pretty Print of final state:\n" + htree.PP());
 
         } finally {
 
