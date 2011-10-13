@@ -12,6 +12,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -21,8 +23,8 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 
 /**
@@ -48,15 +50,19 @@ public class DeleteServlet extends BigdataRDFServlet {
 	protected void doDelete(final HttpServletRequest req,
 			final HttpServletResponse resp) throws IOException {
 
-        final String queryStr = req.getRequestURI();
+        final String queryStr = req.getParameter("query");
 
         if (queryStr != null) {
             
             doDeleteWithQuery(req, resp);
             
         } else {
-  
-        	resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            
+            doDeleteWithAccessPath(req, resp);
+            
+//        } else {
+//  
+//        	resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         	
         }
            
@@ -367,6 +373,86 @@ public class DeleteServlet extends BigdataRDFServlet {
 
     }
     
+    /**
+     * Delete all statements described by an access path.
+     */
+    private void doDeleteWithAccessPath(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final long begin = System.currentTimeMillis();
+        
+        final String namespace = getNamespace(req);
+
+        final Resource s;
+        final URI p;
+        final Value o;
+        final Resource c;
+        try {
+            s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
+            p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
+            o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
+            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+        } catch (IllegalArgumentException ex) {
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    ex.getLocalizedMessage());
+            return;
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("delete with access path: (s=" + s + ", p=" + p + ", o="
+                    + o + ", c=" + c + ")");
+
+        try {
+
+            try {
+
+                BigdataSailRepositoryConnection conn = null;
+                try {
+
+                    conn = getBigdataRDFContext().getUnisolatedConnection(
+                            namespace);
+
+                    // Remove all statements matching that access path.
+                    final long nmodified = conn.getSailConnection()
+                            .getBigdataSail().getDatabase()
+                            .removeStatements(s, p, o, c);
+                    
+                    // Commit the mutation.
+                    conn.commit();
+
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    reportModifiedCount(resp, nmodified, elapsed);
+
+                } catch(Throwable t) {
+                    
+                    if(conn != null)
+                        conn.rollback();
+                    
+                    throw new RuntimeException(t);
+                    
+                } finally {
+
+                    if (conn != null)
+                        conn.close();
+
+                }
+
+            } catch (Throwable t) {
+
+                throw BigdataRDFServlet.launderThrowable(t, resp, "");
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
     static private transient final Resource[] nullArray = new Resource[]{};
     
 }

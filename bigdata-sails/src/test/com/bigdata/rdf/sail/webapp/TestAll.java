@@ -58,9 +58,24 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
        
+        /*
+         * Test suite utility class for building XML/HTML documents.
+         */
         suite.addTestSuite(TestXMLBuilder.class);
         
-//        suite.addTestSuite(TestNanoSparqlServer.class);
+        /*
+         * Test suite for utility class to encode and decode RDF Values for
+         * interchange via the REST API.
+         */
+        suite.addTestSuite(TestEncodeDecodeValue.class);
+        
+        /*
+         * Core test suite for REST API behavior. This test suite is run for
+         * each mode of the database (triples, sids, quads).
+         * 
+         * Note: The test suite can also be run against a federation using the
+         * main() routine in TestNanoSparqlServerWithProxyIndexManager.
+         */
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
