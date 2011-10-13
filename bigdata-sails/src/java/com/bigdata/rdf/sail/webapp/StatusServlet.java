@@ -289,7 +289,7 @@ public class StatusServlet extends BigdataRDFServlet {
 					
 				}
 
-				current.node("h2", "Query Evaluation Statistics").node("p");
+				current.node("h2", "Query Evaluation Statistics").node("p").close();
 
 				// Format as a table, writing onto the response.
 				QueryLog.getTableXHTML(queryStr, query, w,

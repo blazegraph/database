@@ -283,9 +283,13 @@ public class InsertServlet extends BigdataRDFServlet {
 
                         final String contentType = hconn.getContentType();
 
-                        final RDFFormat format = RDFFormat
-                                .forMIMEType(contentType);
-
+                        RDFFormat format = RDFFormat.forMIMEType(contentType);
+                        
+                        if(format == null) {
+                            // Try to get the RDFFormat from the URL's file path.
+                            format = RDFFormat.forFileName(url.getFile());
+                        }
+                        
                         if (format == null) {
                         	buildResponse(resp, HTTP_BADREQUEST,
                                     MIME_TEXT_PLAIN,
