@@ -685,6 +685,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         }
         case SELECT: {
 
+            /*
+             * FIXME Replace with pattern using a HashIndexOp before the
+             * sub-select and a SolutionSetHashJoinOp after the sub-select. The
+             * HashIndexOp must "project" only the variables which are projected
+             * by the sub-select in order to maintain the correct lexical scope
+             * for variable bindings. The hash join re-unites the solutions from
+             * the sub-select with the solutions in the hash index.
+             */
+            
             final ProjectionNode projection = subquery.getProjection();
 
             final IVariable<?>[] vars = projection.getProjectionVars();
@@ -998,10 +1007,17 @@ if (true) {
         /*
          * All the subqueries get routed here when they are done.
          */
-		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
-				}));
-
+//		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+//				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+//				new NV(BOp.Annotations.EVALUATION_CONTEXT,BOpEvaluationContext.CONTROLLER),
+//				}));
+		 left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
+		         NV.asMap(new NV[] {//
+		          new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+		                      new NV(BOp.Annotations.EVALUATION_CONTEXT,
+		                              BOpEvaluationContext.CONTROLLER)//
+		          })), ctx.queryHints);
+		 
         return left;
         
 } else {
@@ -1215,7 +1231,9 @@ if (true) {
              * MUST NOT be run until after the join variables have been bound.
              * Failure to observe this rule will cause the unbound variable to
              * be included when computing the hash code of a solution and the
-             * join will not produce the correct solutions.
+             * join will not produce the correct solutions. [If it is desired to
+             * always run named subqueries first then you need to make sure that
+             * the join variables array is empty for the INCLUDE.]
              */
             for (IGroupMemberNode child : joinGroup) {
                 if (child instanceof NamedSubqueryInclude) {
@@ -1229,7 +1247,7 @@ if (true) {
             }
 
             /*
-             * Add the joins (statement patterns) and the filters on those
+             * Add required statement pattern joins and the filters on those
              * joins.
              * 
              * Note: This winds up handling materialization steps as well (it
@@ -1238,7 +1256,8 @@ if (true) {
             left = addJoins(left, joinGroup, sa, ctx);
 
             /*
-             * Add SPARQL 1.1 style subqueries.
+             * Add SPARQL 1.1 style subqueries which were not lifted out into
+             * named subqueries.
              */
             for (IGroupMemberNode child : joinGroup) {
                 if (child instanceof SubqueryRoot) {

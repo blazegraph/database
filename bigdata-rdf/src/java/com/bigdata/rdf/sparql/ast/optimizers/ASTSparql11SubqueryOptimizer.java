@@ -76,6 +76,13 @@ import cutthecrap.utils.striterators.Striterator;
  * <code>true</code>.
  * </ul>
  * 
+ * FIXME The code to lift out sub-selects if there are no join variables has
+ * been disabled since we are not correctly computing the join variables at this
+ * point. Deciding the join variables requires that we either apply heuristics
+ * or the RTO to decide on a join ordering. Once the join order is known we can
+ * then recognize which variables will be definitely bound at the point in the
+ * join group where the subquery would be evaluated.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTSparql11SubqueryOptimizer.java 5193 2011-09-15 14:18:56Z
  *          thompsonbry $
@@ -231,6 +238,13 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
             }
 
+            /*
+             * FIXME We can not correctly predict the join variables at this
+             * time because that depends on the actual evaluation order. This
+             * has been commented out for now because it will otherwise cause
+             * all sub-selects to be lifted out.
+             */
+            if(false) {
             final Set<IVariable<?>> joinVars = sa.getJoinVars(
                     subqueryRoot, new LinkedHashSet<IVariable<?>>());
 
@@ -245,6 +259,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
                 continue;
 
+            }
             }
 
         }
