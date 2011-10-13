@@ -836,7 +836,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         } else if (groupNode instanceof JoinGroupNode) {
 
-            return convertJoinGroup(left, (JoinGroupNode) groupNode, ctx);
+            return convertJoinGroup(left, (JoinGroupNode) groupNode, ctx, true/* needsEndOp */);
 
         } else {
 
@@ -897,7 +897,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             if (child instanceof JoinGroupNode) {
         
                 subqueries[i++] = convertJoinGroup(left,
-                        (JoinGroupNode) child, ctx);
+                        (JoinGroupNode) child, ctx, false/* needsEndOp */);
                 
             } else {
 
@@ -930,6 +930,17 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
     
+    /**
+     * Create a pipeline that simulates a union by subquery by using a series
+     * of Tee operators and some creative routing of the SINK and ALT_SINK.
+     * 
+     * @param left
+     * @param subqueries
+     * 			The mini-pipelines to union together. These MUST be references
+     * 			to the top-most (last) operator in the subquery.
+     * @param ctx
+     * @return
+     */
     private static PipelineOp unionUsingTee(PipelineOp left,
             final PipelineOp[] subqueries, final AST2BOpContext ctx) {
         
@@ -1089,7 +1100,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * TODO Think about how hash joins fit into this.
      */
     private static PipelineOp convertJoinGroup(PipelineOp left,
-            final JoinGroupNode joinGroup, final AST2BOpContext ctx) {
+            final JoinGroupNode joinGroup, final AST2BOpContext ctx, 
+            final boolean needsEndOp) {
 
         final StaticAnalysis sa = ctx.sa;
         
@@ -1283,7 +1295,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * Add the end operator if necessary.
          */
-        if (joinGroup.getParent() != null) {
+        if (needsEndOp && joinGroup.getParent() != null) {
             left = addEndOp(left, ctx);
         }
 
