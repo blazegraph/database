@@ -450,24 +450,24 @@ public class TestMutableKeyBuffer extends TestCase2 {
             log.info(kbuf.toString());
         assertEquals("nkeys", 3, kbuf.nkeys);
         assertFalse(kbuf.isFull());
-        assertEquals(k1, kbuf.keys[1]);
-        assertEquals(k2, kbuf.keys[2]);
-        assertEquals(k3, kbuf.keys[3]);
-        assertNull(kbuf.keys[0]);
+        assertEquals(k1, kbuf.keys[0]);
+        assertEquals(k2, kbuf.keys[1]);
+        assertEquals(k3, kbuf.keys[2]);
+        assertNull(kbuf.keys[3]);
 
         // remove the last key, leaving 2 keys.
-        assertEquals("nkeys", 2, kbuf.remove(3));
+        assertEquals("nkeys", 2, kbuf.remove(2));
         if (log.isInfoEnabled())
             log.info(kbuf.toString());
         assertEquals("nkeys", 2, kbuf.nkeys);
         assertFalse(kbuf.isFull());
-        assertEquals(k1, kbuf.keys[1]);
-        assertEquals(k2, kbuf.keys[2]);
-        assertNull(kbuf.keys[0]);
+        assertEquals(k1, kbuf.keys[0]);
+        assertEquals(k2, kbuf.keys[1]);
+        assertNull(kbuf.keys[2]);
         assertNull(kbuf.keys[3]);
 
         // insert a key in the 1st position (3 keys in the buffer).
-        kbuf.set(0, k1);
+        kbuf.insert(0, k1);
         if (log.isInfoEnabled())
             log.info(kbuf.toString());
         assertEquals("nkeys", 3, kbuf.nkeys);
@@ -477,7 +477,7 @@ public class TestMutableKeyBuffer extends TestCase2 {
         assertEquals(k2, kbuf.keys[2]);
         assertNull(kbuf.keys[3]);
 
-        // insert a key in the last position (buffer is full again).
+        // set a key in the last position (buffer is full again).
         kbuf.set(3, k2);
         if (log.isInfoEnabled())
             log.info(kbuf.toString());
