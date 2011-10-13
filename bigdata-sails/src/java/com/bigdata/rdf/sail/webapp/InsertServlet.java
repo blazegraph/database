@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
@@ -21,8 +22,8 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**
  * Handler for INSERT operations.
@@ -143,6 +144,25 @@ public class InsertServlet extends BigdataRDFServlet {
 
         }
 
+        /*
+         * Allow the caller to specify the default context.
+         */
+        final Resource defaultContext;
+        {
+            final String s = req.getParameter("context-uri");
+            if (s != null) {
+                try {
+                    defaultContext = new URIImpl(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+                defaultContext = null;
+            }
+        }
+
         try {
             
             final AtomicLong nmodified = new AtomicLong(0L);
@@ -170,7 +190,7 @@ public class InsertServlet extends BigdataRDFServlet {
                         .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                 rdfParser.setRDFHandler(new AddStatementHandler(conn
-                        .getSailConnection(), nmodified));
+                        .getSailConnection(), nmodified, defaultContext));
 
                 /*
                  * Run the parser, which will cause statements to be inserted.
@@ -254,6 +274,25 @@ public class InsertServlet extends BigdataRDFServlet {
             
         }
 
+        /*
+         * Allow the caller to specify the default context.
+         */
+        final Resource defaultContext;
+        {
+            final String s = req.getParameter("context-uri");
+            if (s != null) {
+                try {
+                    defaultContext = new URIImpl(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+                defaultContext = null;
+            }
+        }
+
         try {
 
             final AtomicLong nmodified = new AtomicLong(0L);
@@ -266,6 +305,11 @@ public class InsertServlet extends BigdataRDFServlet {
 
                 for (URL url : urls) {
 
+                    // Use the default context if one was given and otherwise
+                    // the URI from which the data are being read.
+                    final Resource defactoContext = defaultContext == null ? new URIImpl(
+                            url.toExternalForm()) : defaultContext;
+                    
                     URLConnection hconn = null;
                     try {
 
@@ -325,7 +369,7 @@ public class InsertServlet extends BigdataRDFServlet {
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                         rdfParser.setRDFHandler(new AddStatementHandler(conn
-                                .getSailConnection(), nmodified));
+                                .getSailConnection(), nmodified, defactoContext));
 
                         /*
                          * Run the parser, which will cause statements to be
@@ -391,11 +435,19 @@ public class InsertServlet extends BigdataRDFServlet {
 
         private final BigdataSailConnection conn;
         private final AtomicLong nmodified;
-        
+        private final Resource[] defaultContexts;
+
         public AddStatementHandler(final BigdataSailConnection conn,
-                final AtomicLong nmodified) {
+                final AtomicLong nmodified, final Resource defaultContext) {
             this.conn = conn;
             this.nmodified = nmodified;
+            final boolean quads = conn.getTripleStore().isQuads();
+            if (quads && defaultContext != null) {
+                // The default context may only be specified for quads.
+                this.defaultContexts = new Resource[] { defaultContext };
+            } else {
+                this.defaultContexts = new Resource[0];
+            }
         }
 
         public void handleStatement(final Statement stmt)
@@ -407,7 +459,7 @@ public class InsertServlet extends BigdataRDFServlet {
                         stmt.getSubject(), //
                         stmt.getPredicate(), //
                         stmt.getObject(), //
-                        (Resource[]) (stmt.getContext() == null ? new Resource[] { }
+                        (Resource[]) (stmt.getContext() == null ?  defaultContexts
                                 : new Resource[] { stmt.getContext() })//
                         );
 

@@ -10,6 +10,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
@@ -117,6 +119,25 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         }
 
+        /*
+         * Allow the caller to specify the default context.
+         */
+        final Resource defaultContext;
+        {
+            final String s = req.getParameter("context-uri");
+            if (s != null) {
+                try {
+                    defaultContext = new URIImpl(s);
+                } catch (IllegalArgumentException ex) {
+                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                            ex.getLocalizedMessage());
+                    return;
+                }
+            } else {
+                defaultContext = null;
+            }
+        }
+
         if (log.isInfoEnabled())
             log.info("update with query: " + queryStr);
 
@@ -213,7 +234,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
                         rdfParser.setRDFHandler(new AddStatementHandler(conn
-                                .getSailConnection(), nmodified));
+                                .getSailConnection(), nmodified, defaultContext));
 
                         /*
                          * Run the parser, which will cause statements to be

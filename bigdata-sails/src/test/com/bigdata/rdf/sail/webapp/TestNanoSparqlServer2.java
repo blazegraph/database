@@ -2,9 +2,11 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.LineNumberReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -51,6 +53,7 @@ import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
@@ -1068,6 +1071,64 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         
     }
 
+    // TODO Write test for UPDATE where we override the default context using
+    // the context-uri.
+    public void test_POST_INSERT_triples_with_BODY_and_defaultContext()
+            throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        // Load the resource into the KB.
+        doInsertByBody("POST", requestPath, packagePath
+                + "insert_triples_with_defaultContext.ttl", new URIImpl(
+                "http://example.org"));
+        
+        // Verify that the data were inserted into the appropriate context.
+        {
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.method = "GET";
+            opts.queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
+            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
+        }
+
+    }
+    
+    public void test_POST_INSERT_triples_with_URI_and_defaultContext() throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+        
+        // Load the resource into the KB.
+        {
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.method = "POST";
+            opts.requestParams = new LinkedHashMap<String, String[]>();
+            // set the resource to load.
+            opts.requestParams.put("uri", new String[] { new File(packagePath
+                    + "insert_triples_with_defaultContext.ttl").toURI()
+                    .toString() });
+            // set the default context.
+            opts.requestParams.put("context-uri",
+                    new String[] { "http://example.org" });
+            assertEquals(
+                    7,
+                    getMutationResult(doSparqlQuery(opts, requestPath)).mutationCount);
+        }
+
+        // Verify that the data were inserted into the appropriate context.
+        {
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.method = "GET";
+            opts.queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
+            assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
+        }
+        
+    }
+
     /**
      * Test ability to load data from a URI.
      */
@@ -1650,7 +1711,7 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
      * Insert a resource into the {@link NanoSparqlServer}.  This is used to
      * load resources in the test package into the server.
      */
-    private void doInsertbyURL(final String method, final String servlet,
+    private MutationResult doInsertbyURL(final String method, final String servlet,
             final String resource) throws Exception {
 
         final String uri = new File(resource).toURI().toString();
@@ -1665,8 +1726,7 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
             opts.requestParams = new LinkedHashMap<String, String[]>();
             opts.requestParams.put("uri", new String[] { uri });
 
-            final MutationResult result = getMutationResult(doSparqlQuery(opts,
-                    requestPath));
+            return getMutationResult(doSparqlQuery(opts, requestPath));
 
         } catch (Throwable t) {
             // clean up the connection resources
@@ -1677,6 +1737,204 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
 
     }
 
+    /**
+     * Read the contents of a file.
+     * 
+     * @param file
+     *            The file.
+     * @return It's contents.
+     */
+    private static String readFromFile(final File file) throws IOException {
+
+        final LineNumberReader r = new LineNumberReader(new FileReader(file));
+
+        try {
+
+            final StringBuilder sb = new StringBuilder();
+
+            String s;
+            while ((s = r.readLine()) != null) {
+
+                if (r.getLineNumber() > 1)
+                    sb.append("\n");
+
+                sb.append(s);
+
+            }
+
+            return sb.toString();
+
+        } finally {
+
+            r.close();
+
+        }
+
+    }
+    
+    private static Graph readGraphFromFile(final File file) throws RDFParseException, RDFHandlerException, IOException {
+        
+        final RDFFormat format = RDFFormat.forFileName(file.getName());
+        
+        final RDFParserFactory rdfParserFactory = RDFParserRegistry
+                .getInstance().get(format);
+
+        if (rdfParserFactory == null) {
+            throw new RuntimeException("Parser not found: file=" + file
+                    + ", format=" + format);
+        }
+
+        final RDFParser rdfParser = rdfParserFactory
+                .getParser();
+
+        rdfParser.setValueFactory(new ValueFactoryImpl());
+
+        rdfParser.setVerifyData(true);
+
+        rdfParser.setStopAtFirstError(true);
+
+        rdfParser
+                .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+        final StatementCollector rdfHandler = new StatementCollector();
+        
+        rdfParser.setRDFHandler(rdfHandler);
+
+        /*
+         * Run the parser, which will cause statements to be
+         * inserted.
+         */
+
+        final FileReader r = new FileReader(file);
+        try {
+            rdfParser.parse(r, file.toURI().toString()/* baseURL */);
+        } finally {
+            r.close();
+        }
+        
+        final Graph g = new GraphImpl();
+        
+        g.addAll(rdfHandler.getStatements());
+
+        return g;
+
+    }
+    
+    /**
+     * Write a graph on a buffer suitable for sending as an HTTP request body.
+     * 
+     * @param format
+     *            The RDF Format to use.
+     * @param g
+     *            The graph.
+     *            
+     * @return The serialized data.
+     * 
+     * @throws RDFHandlerException
+     */
+    static private byte[] writeOnBuffer(final RDFFormat format, final Graph g)
+            throws RDFHandlerException {
+
+        final RDFWriterFactory writerFactory = RDFWriterRegistry.getInstance()
+                .get(format);
+
+        if (writerFactory == null)
+            fail("RDFWriterFactory not found: format=" + format);
+
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        final RDFWriter writer = writerFactory.getWriter(baos);
+
+        writer.startRDF();
+
+        for (Statement stmt : g) {
+
+            writer.handleStatement(stmt);
+
+        }
+
+        writer.endRDF();
+
+        return baos.toByteArray();
+
+    }
+    
+    /**
+     * Reads a resource and sends it using an INSERT with BODY request to be
+     * loaded into the database.
+     * 
+     * @param method
+     * @param servlet
+     * @param resource
+     * @return
+     * @throws Exception
+     */
+    private MutationResult doInsertByBody(final String method,
+            final String servlet, final String resource,
+            final URI defaultContext) throws Exception {
+
+        final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
+        
+        final Graph g = readGraphFromFile(new File(resource));
+
+        final byte[] wireData = writeOnBuffer(rdfFormat, g);
+        
+        HttpURLConnection conn = null;
+        try {
+
+            final URL url = new URL(m_serviceURL
+                    + servlet
+                    + (defaultContext == null ? ""
+                            : ("?context-uri=" + URLEncoder.encode(
+                                    defaultContext.stringValue(), "UTF-8"))));
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(method);
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            conn.setUseCaches(false);
+            conn.setReadTimeout(0);
+
+            conn.setRequestProperty("Content-Type",
+                    rdfFormat.getDefaultMIMEType());
+
+            final byte[] data = wireData;
+
+            conn.setRequestProperty("Content-Length",
+                    Integer.toString(data.length));
+
+            final OutputStream os = conn.getOutputStream();
+            try {
+                os.write(data);
+                os.flush();
+            } finally {
+                os.close();
+            }
+            // conn.connect();
+
+            final int rc = conn.getResponseCode();
+
+            if (log.isInfoEnabled()) {
+                log.info("*** RESPONSE: " + rc + " for " + method);
+                // log.info("*** RESPONSE: " + getResponseBody(conn));
+            }
+
+            if (rc < 200 || rc >= 300) {
+
+                throw new IOException(conn.getResponseMessage());
+
+            }
+
+            return getMutationResult(conn);
+
+        } catch (Throwable t) {
+            // clean up the connection resources
+            if (conn != null)
+                conn.disconnect();
+            throw new RuntimeException(t);
+        }
+
+    }
+    
     private static String getResponseBody(final HttpURLConnection conn)
             throws IOException {
 
