@@ -460,18 +460,122 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         } else {
 
-            final PipelineOp[] steps = new PipelineOp[nfirst];
+            /*
+             * We are going to route all the subqueries here when they're done,
+             * by replacing the SINK_REF on the topmost operator in the subquery.
+             */
+            final int downstreamId = ctx.nextId();
 
-            int i = 0;
+            /*
+             * Pre-generate the ids for the Tee operators.
+             */
+            final int[] subqueryIds = new int[nfirst];
+                    
+            for (int i = 0; i < nfirst; i++) {
+                        
+                subqueryIds[i] = ctx.nextId();
+                        
+            }
+                    
+            /*
+             * Should kinda look like this:
+             * 
+             *       copy := CopyOp( lastBOp4 )[bopId=5]
+             *       subquery4 := firstBOp4( lastBOp3 )[bopId=41]->...->lastBOp4(...)[sinkRef=5]
+             *       subquery3 := firstBOp3( lastBOp2 )[bopId=31]->...->lastBOp3(...)[sinkRef=5]
+             *       subquery2 := firstBOp2( lastBOp1 )[bopId=21]->...->lastBOp2(...)[sinkRef=5]
+             *       subquery1 := firstBOp1( tee3 )[bopId=11]->...->lastBOp1(...)[sinkRef=5]
+             *       tee3   := TEE( tee2 )[bopId=03;sinkRef=31;altSinkRef=41]
+             *       tee2   := TEE( tee1 )[bopId=02;sinkRef=03;altSinkRef=21]
+             *       tee1   := TEE( left )[bopId=01;sinkRef=02;altSinkRef=11]
+             *       left
+             */
 
-            for (NamedSubqueryRoot subqueryRoot : runFirst) {
-
-                steps[i++] = createNamedSubquery(null/* left */, subqueryRoot,
-                        ctx);
-
+            int thisTeeId = ctx.nextId();
+            int nextTeeId = ctx.nextId();
+            
+            /*
+             * We need one less Tee than we have subqueries.
+             */
+            for (int j = 0; j < (nfirst-1); j++) {
+                
+                final LinkedList<NV> anns = new LinkedList<NV>();
+                anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
+                
+                if (j < (nfirst-2)) {
+                
+                    /* 
+                     * Not the last one - send the Tee to the next Tee and the next 
+                     * subquery.
+                     */
+                    anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
+                    anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
+                    
+                    thisTeeId = nextTeeId;
+                    nextTeeId = ctx.nextId();
+                    
+                } else {
+                    
+                    /*
+                     * Last one - send the Tee to the last two subqueries.
+                     */
+                    anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
+                    anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
+                    
+                }
+                
+                left = applyQueryHints(new Tee(leftOrEmpty(left),
+                        NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+                
             }
             
-            left = unionUsingTee(left, steps, ctx);
+            int i = 0;
+            for (NamedSubqueryRoot subqueryRoot : runFirst) {
+                        
+                /*
+                 * Need to make sure the first operator in the group has the right Id.
+                 */
+                left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+                        }));
+                
+                final PipelineOp subquery = createNamedSubquery(left, 
+                		subqueryRoot, ctx);
+                
+                /*
+                 * Route all "subqueries" to the same place. This works because 
+                 * the subqueries array is passed in as references to the topmost
+                 * (last) operator in the subquery pipeline, and this is the one 
+                 * whose SINK_REF we need to change.
+                 */
+                left = (PipelineOp) subquery
+                    .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                    
+            }
+            
+            /*
+             * All the subqueries get routed here when they are done.
+             */
+             left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
+                     NV.asMap(new NV[] {//
+                      new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+                      new NV(BOp.Annotations.EVALUATION_CONTEXT, 
+                                  BOpEvaluationContext.CONTROLLER)//
+                      })), ctx.queryHints);
+
+        	
+//            final PipelineOp[] steps = new PipelineOp[nfirst];
+//
+//            int i = 0;
+//
+//            for (NamedSubqueryRoot subqueryRoot : runFirst) {
+//
+//                steps[i++] = createNamedSubquery(null/* left */, subqueryRoot,
+//                        ctx);
+//
+//            }
+//            
+//            left = unionUsingTee(left, steps, ctx);
 
 //            // Do not run the subqueries with unlimited parallelism.
 //            final int maxParallelSubqueries = Math.min(steps.length, 10);
@@ -888,64 +992,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-        final PipelineOp[] subqueries = new PipelineOp[arity];
-
-        int i = 0;
-        for (IGroupMemberNode child : unionNode) {
-                    
-            // convert the child
-            if (child instanceof JoinGroupNode) {
-        
-                subqueries[i++] = convertJoinGroup(left,
-                        (JoinGroupNode) child, ctx, false/* needsEndOp */);
-                
-            } else {
-
-                throw new RuntimeException("Illegal child type for union: "
-                        + child.getClass());
-
-            }
-            
-        }
-        
-        return unionUsingTee(left, subqueries, ctx);
-
-//        // The bopId for the UNION or STEP.
-//        final int thisId = ctx.nextId();
-//
-//        final LinkedList<NV> anns = new LinkedList<NV>();
-//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
-//
-//        // if (union.getParent() == null) {
-//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-//                BOpEvaluationContext.CONTROLLER));
-//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-//        // }
-//
-//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
-//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-//
-//        return union;
-
-    }
-    
-    /**
-     * Create a pipeline that simulates a union by subquery by using a series
-     * of Tee operators and some creative routing of the SINK and ALT_SINK.
-     * 
-     * @param left
-     * @param subqueries
-     * 			The mini-pipelines to union together. These MUST be references
-     * 			to the top-most (last) operator in the subquery.
-     * @param ctx
-     * @return
-     */
-    private static PipelineOp unionUsingTee(PipelineOp left,
-            final PipelineOp[] subqueries, final AST2BOpContext ctx) {
-        
-        final int arity = subqueries.length;
-        
         /*
          * We are going to route all the subqueries here when they're done,
          * by replacing the SINK_REF on the topmost operator in the subquery.
@@ -1015,27 +1061,40 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             
         }
         
-        /*
-         * Add the subqueries themselves to the pipeline.
-         */
-        for (int i = 0; i < arity; i++) {
+//        final PipelineOp[] subqueries = new PipelineOp[arity];
+
+        int i = 0;
+        for (IGroupMemberNode child : unionNode) {
+                    
+            // convert the child
+            if (child instanceof JoinGroupNode) {
         
-            /*
-             * Need to make sure the first operator in the group has the right Id.
-             */
-            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
-                    }));
-            
-            /*
-             * Route all "subqueries" to the same place. This works because 
-             * the subqueries array is passed in as references to the topmost
-             * (last) operator in the subquery pipeline, and this is the one 
-             * whose SINK_REF we need to change.
-             */
-            left = (PipelineOp) subqueries[i]
-                .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                /*
+                 * Need to make sure the first operator in the group has the right Id.
+                 */
+                left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+                        }));
                 
+                final PipelineOp subquery = convertJoinGroup(left,
+                        (JoinGroupNode) child, ctx, false/* needsEndOp */);
+                
+                /*
+                 * Route all "subqueries" to the same place. This works because 
+                 * the subqueries array is passed in as references to the topmost
+                 * (last) operator in the subquery pipeline, and this is the one 
+                 * whose SINK_REF we need to change.
+                 */
+                left = (PipelineOp) subquery
+                    .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                
+            } else {
+
+                throw new RuntimeException("Illegal child type for union: "
+                        + child.getClass());
+
+            }
+            
         }
         
         /*
@@ -1050,7 +1109,149 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         return left;
 
+//        return unionUsingTee(left, subqueries, ctx);
+
+//        // The bopId for the UNION or STEP.
+//        final int thisId = ctx.nextId();
+//
+//        final LinkedList<NV> anns = new LinkedList<NV>();
+//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+//
+//        // if (union.getParent() == null) {
+//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                BOpEvaluationContext.CONTROLLER));
+//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+//        // }
+//
+//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
+//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+//
+//        return union;
+
     }
+    
+//    /**
+//     * Create a pipeline that simulates a union by subquery by using a series
+//     * of Tee operators and some creative routing of the SINK and ALT_SINK.
+//     * 
+//     * @param left
+//     * @param subqueries
+//     * 			The mini-pipelines to union together. These MUST be references
+//     * 			to the top-most (last) operator in the subquery.
+//     * @param ctx
+//     * @return
+//     */
+//    private static PipelineOp unionUsingTee(PipelineOp left,
+//            final PipelineOp[] subqueries, final AST2BOpContext ctx) {
+//        
+//        final int arity = subqueries.length;
+//        
+//        /*
+//         * We are going to route all the subqueries here when they're done,
+//         * by replacing the SINK_REF on the topmost operator in the subquery.
+//         */
+//        final int downstreamId = ctx.nextId();
+//
+//        /*
+//         * Pre-generate the ids for the Tee operators.
+//         */
+//        final int[] subqueryIds = new int[arity];
+//                
+//        for (int i = 0; i < arity; i++) {
+//                    
+//            subqueryIds[i] = ctx.nextId();
+//                    
+//        }
+//                
+//        /*
+//         * Should kinda look like this:
+//         * 
+//         *       copy := CopyOp( lastBOp4 )[bopId=5]
+//         *       subquery4 := firstBOp4( lastBOp3 )[bopId=41]->...->lastBOp4(...)[sinkRef=5]
+//         *       subquery3 := firstBOp3( lastBOp2 )[bopId=31]->...->lastBOp3(...)[sinkRef=5]
+//         *       subquery2 := firstBOp2( lastBOp1 )[bopId=21]->...->lastBOp2(...)[sinkRef=5]
+//         *       subquery1 := firstBOp1( tee3 )[bopId=11]->...->lastBOp1(...)[sinkRef=5]
+//         *       tee3   := TEE( tee2 )[bopId=03;sinkRef=31;altSinkRef=41]
+//         *       tee2   := TEE( tee1 )[bopId=02;sinkRef=03;altSinkRef=21]
+//         *       tee1   := TEE( left )[bopId=01;sinkRef=02;altSinkRef=11]
+//         *       left
+//         */
+//
+//        int thisTeeId = ctx.nextId();
+//        int nextTeeId = ctx.nextId();
+//        
+//        /*
+//         * We need one less Tee than we have subqueries.
+//         */
+//        for (int j = 0; j < (arity-1); j++) {
+//            
+//            final LinkedList<NV> anns = new LinkedList<NV>();
+//            anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
+//            
+//            if (j < (arity-2)) {
+//            
+//                /* 
+//                 * Not the last one - send the Tee to the next Tee and the next 
+//                 * subquery.
+//                 */
+//                anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
+//                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
+//                
+//                thisTeeId = nextTeeId;
+//                nextTeeId = ctx.nextId();
+//                
+//            } else {
+//                
+//                /*
+//                 * Last one - send the Tee to the last two subqueries.
+//                 */
+//                anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
+//                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
+//                
+//            }
+//            
+//            left = applyQueryHints(new Tee(leftOrEmpty(left),
+//                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+//            
+//        }
+//        
+//        /*
+//         * Add the subqueries themselves to the pipeline.
+//         */
+//        for (int i = 0; i < arity; i++) {
+//        
+//            /*
+//             * Need to make sure the first operator in the group has the right Id.
+//             */
+//            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+//                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+//                    }));
+//            
+//            /*
+//             * Route all "subqueries" to the same place. This works because 
+//             * the subqueries array is passed in as references to the topmost
+//             * (last) operator in the subquery pipeline, and this is the one 
+//             * whose SINK_REF we need to change.
+//             */
+//            left = (PipelineOp) subqueries[i]
+//                .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+//                
+//        }
+//        
+//        /*
+//         * All the subqueries get routed here when they are done.
+//         */
+//         left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
+//                 NV.asMap(new NV[] {//
+//                  new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+//                  new NV(BOp.Annotations.EVALUATION_CONTEXT, 
+//                              BOpEvaluationContext.CONTROLLER)//
+//                  })), ctx.queryHints);
+//
+//        return left;
+//
+//    }
 
     /**
      * Join group consists of: statement patterns, constraints, and sub-groups
