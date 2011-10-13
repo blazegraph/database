@@ -1453,24 +1453,24 @@ public class StaticAnalysis {
      *            The named subquery.
      * @param anInclude
      *            An include for that subquery.
+     * 
+     *            FIXME This is currently disabled and will always return an
+     *            empty set. This has the effect of forcing named subquery
+     *            INCLUDEs to run before the required statement pattern joins in
+     *            a join group. This needs to be changed as part of the RTO
+     *            integration.
      */
-    @SuppressWarnings("rawtypes")
     public Set<IVariable<?>> getJoinVars(
             final NamedSubqueryRoot aNamedSubquery,
             final NamedSubqueryInclude anInclude, final Set<IVariable<?>> vars) {
 
         if (true) {
 
-            /*
-             * FIXME There is no reason why this should be disabled.  All of the
-             * code to support it is in place in ASTNamedSubqueryOptimizer.
-             */
-
             return Collections.emptySet();
 
         } else {
 
-            return getJoinVars(aNamedSubquery, anInclude, vars);
+            return _getJoinVars(aNamedSubquery, anInclude, vars);
 
         }
 
@@ -1489,7 +1489,7 @@ public class StaticAnalysis {
     public Set<IVariable<?>> getJoinVars(final SubqueryRoot subquery,
             final Set<IVariable<?>> vars) {
 
-        return getJoinVars(subquery, subquery, vars);
+        return _getJoinVars(subquery, subquery, vars);
 
     }
     
@@ -1514,23 +1514,32 @@ public class StaticAnalysis {
      *         named subquery include could run at any point in the required
      *         joins. That includes the pipelined statement pattern joins, the
      *         inline access path joins, the named subquery joins, the service
-     *         node joins, etc. The code currently assumes that a
-     *         {@link NamedSubqueryInclude} will "run first" in the group while
-     *         a {@link SubqueryRoot} will run after any INCLUDE and any
-     *         required {@link StatementPatternNode}.
+     *         node joins, etc. The code will currently only report join
+     *         variables based on those variables which are known bound on entry
+     *         to the group. Thus it completely ignores the order of evaluation
+     *         of the required joins in the join group. This is an RTO
+     *         integration issue.
      */
-    private Set<IVariable<?>> getJoinVars(final SubqueryBase aSubquery,
+    private Set<IVariable<?>> _getJoinVars(final SubqueryBase aSubquery,
             final IGroupMemberNode theNode, final Set<IVariable<?>> vars) {
 
+        /*
+         * The variables which are projected by the subquery which will be
+         * definitely bound based on an analysis of the subquery.
+         */
         final Set<IVariable<?>> boundBySubquery = getDefinatelyProducedBindings(aSubquery);
 
+        /*
+         * The variables which are definitely bound on entry to the join group
+         * in which the subquery appears.
+         */
         final Set<IVariable<?>> incomingBindings = getIncomingBindings(
                 theNode.getParentJoinGroup(), new LinkedHashSet<IVariable<?>>());
-
+        
         /*
          * This is only those variables which are bound on entry into the group
-         * in which the INCLUDE appears *and* which are "must" bound variables
-         * projected by the subquery.
+         * in which the subquery join appears *and* which are "must" bound
+         * variables projected by the subquery.
          */
         boundBySubquery.retainAll(incomingBindings);
 

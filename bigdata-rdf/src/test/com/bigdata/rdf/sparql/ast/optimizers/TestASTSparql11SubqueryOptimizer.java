@@ -823,6 +823,16 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
         final IQueryNode actual = rewriter.optimize(context,
                 given/* queryNode */, bsets);
 
+        /*
+         * FIXME This failing because we are not computing the join variables
+         * correctly (the analysis needs to depend on the actual evaluation
+         * order, and that needs to be decided either by heuristics or by the
+         * RTO). Since we are not computing the join variables correctly I have
+         * disabled the code in the AST optimizer for SPARQL 1.1 subqueries to
+         * NOT lift sub-selects for which no join variables are predicted. Since
+         * it can not predict the join variables correctly, it is actually
+         * lifting everything when that code is enabled.
+         */
         assertSameAST(expected, actual);
 
     }

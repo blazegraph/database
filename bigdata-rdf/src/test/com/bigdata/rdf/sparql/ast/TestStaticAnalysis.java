@@ -264,9 +264,14 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
      * those which MUST be bound on entry into the group in which the subquery
      * solution set is included within the main query.
      * 
-     * The join should be on <code>?x</code> in this example.
+     * FIXME The join should be on <code>?x</code> in this example. However, the
+     * join variables are currently predicated as <code>[]</code> since the
+     * analysis is based only on those variables which are known bound on entry
+     * to the join group, and that is always an empty set for the top-level join
+     * group. This is an RTO integration issue.
      * 
-     * @throws MalformedQueryException 
+     * FIXME Write more unit tests for
+     * {@link StaticAnalysis#getJoinVars(SubqueryRoot, Set)} and friends.
      */
     public void test_static_analysis_join_vars() throws MalformedQueryException {
         final String queryStr = "" +
@@ -329,6 +334,27 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         }
 
+        // the join variables as reported by static analysis.
+        //
+        // FIXME Per the comment at the top of this method.
+        {
+
+            final Set<IVariable<?>> expectedJoinVars = new LinkedHashSet<IVariable<?>>();
+//            expectedJoinVars.add(Var.var("x"));
+
+            final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) queryRoot
+                    .getNamedSubqueries().get(0);
+
+            final NamedSubqueryInclude anInclude = BOpUtility.visitAll(
+                    queryRoot, NamedSubqueryInclude.class).next();
+
+            final Set<IVariable<?>> vars = sa.getJoinVars(namedSubquery,
+                    anInclude, new LinkedHashSet<IVariable<?>>());
+
+            assertEquals(expectedJoinVars, vars);
+
+        }
+        
     }
     
     /**
@@ -1156,12 +1182,4 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
     }
 
-    /**
-     * FIXME Write unit tests for
-     * {@link StaticAnalysis#getJoinVars(SubqueryRoot, Set)} and friends.
-     */
-    public void test_getJoinVars() {
-        fail("write tests");
-    }
-    
 }
