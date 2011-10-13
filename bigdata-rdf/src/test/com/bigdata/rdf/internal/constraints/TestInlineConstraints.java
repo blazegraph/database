@@ -114,6 +114,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
+        
+        final AtomicInteger idFactory = new AtomicInteger(0);
 
         try {
 
@@ -167,8 +169,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, age, a) 
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -221,6 +223,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
         
+        final AtomicInteger idFactory = new AtomicInteger(0);
+
         try {
 
             // do not run if we are not inlining
@@ -273,8 +277,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, age, a) 
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -328,6 +332,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
         
+        final AtomicInteger idFactory = new AtomicInteger(0);
+
         try {
 
             // do not run if we are not inlining
@@ -380,8 +386,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_less_than", null, // head
                                 new IPredicate[] {
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, age, a) 
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -436,6 +442,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
         
+        final AtomicInteger idFactory = new AtomicInteger(0);
+
         try {
 
             // do not run if we are not inlining
@@ -488,8 +496,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_less_than", null, // head
                                 new IPredicate[] {
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, age, a) 
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -545,6 +553,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
+
+        final AtomicInteger idFactory = new AtomicInteger(0);
 
         try {
 
@@ -604,9 +614,9 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_math", null, // head
                                 new IPredicate[] {
-                        			toPredicate(db, d, age, dAge),
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, age, a) 
+                        			toPredicate(db, idFactory, d, age, dAge),
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -657,6 +667,8 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
+
+        final AtomicInteger idFactory = new AtomicInteger(0);
 
         try {
 
@@ -718,8 +730,8 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IRule rule =
                         new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
-                                    toPredicate(db, s, type, x),
-                                    toPredicate(db, s, birthday, a) 
+                                    toPredicate(db, idFactory, s, type, x),
+                                    toPredicate(db, idFactory, s, birthday, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
@@ -955,6 +967,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 //    }
     
     private IPredicate toPredicate(final AbstractTripleStore database,
+    		final AtomicInteger idFactory,
     		final IVariableOrConstant<IV> s,
     		final IVariableOrConstant<IV> p,
     		final IVariableOrConstant<IV> o) {
@@ -987,6 +1000,8 @@ public class TestInlineConstraints extends ProxyTestCase {
          */
         anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
                 | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
+        
+        anns.add(new NV(BOp.Annotations.BOP_ID, idFactory.incrementAndGet()));
         
         return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
     	
