@@ -470,19 +470,21 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         ctx);
 
             }
-
-            // Do not run the subqueries with unlimited parallelism.
-            final int maxParallelSubqueries = Math.min(steps.length, 10);
             
-            // Run the steps in parallel.
-            left = new Union(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(Steps.Annotations.SUBQUERIES, steps),//
-                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
-                            maxParallelSubqueries)//
-            );
+            left = unionUsingTee(left, steps, ctx);
+
+//            // Do not run the subqueries with unlimited parallelism.
+//            final int maxParallelSubqueries = Math.min(steps.length, 10);
+//            
+//            // Run the steps in parallel.
+//            left = new Union(leftOrEmpty(left), //
+//                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+//                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.CONTROLLER),//
+//                    new NV(Steps.Annotations.SUBQUERIES, steps),//
+//                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
+//                            maxParallelSubqueries)//
+//            );
 
         }
 
@@ -886,25 +888,70 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-if (true) {
-        	
+        final PipelineOp[] subqueries = new PipelineOp[arity];
+
+        int i = 0;
+        for (IGroupMemberNode child : unionNode) {
+                    
+            // convert the child
+            if (child instanceof JoinGroupNode) {
+        
+                subqueries[i++] = convertJoinGroup(left,
+                        (JoinGroupNode) child, ctx);
+                
+            } else {
+
+                throw new RuntimeException("Illegal child type for union: "
+                        + child.getClass());
+
+            }
+            
+        }
+        
+        return unionUsingTee(left, subqueries, ctx);
+
+//        // The bopId for the UNION or STEP.
+//        final int thisId = ctx.nextId();
+//
+//        final LinkedList<NV> anns = new LinkedList<NV>();
+//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
+//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
+//
+//        // if (union.getParent() == null) {
+//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
+//                BOpEvaluationContext.CONTROLLER));
+//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
+//        // }
+//
+//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
+//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+//
+//        return union;
+
+    }
+    
+    private static PipelineOp unionUsingTee(PipelineOp left,
+            final PipelineOp[] subqueries, final AST2BOpContext ctx) {
+        
+        final int arity = subqueries.length;
+        
         /*
          * We are going to route all the subqueries here when they're done,
          * by replacing the SINK_REF on the topmost operator in the subquery.
          */
         final int downstreamId = ctx.nextId();
 
-            	/*
+        /*
          * Pre-generate the ids for the Tee operators.
-            	 */
+         */
         final int[] subqueryIds = new int[arity];
-            	
+                
         for (int i = 0; i < arity; i++) {
-            		
-        	subqueryIds[i] = ctx.nextId();
-            		
-            	}
-            	
+                    
+            subqueryIds[i] = ctx.nextId();
+                    
+        }
+                
         /*
          * Should kinda look like this:
          * 
@@ -926,141 +973,71 @@ if (true) {
          * We need one less Tee than we have subqueries.
          */
         for (int j = 0; j < (arity-1); j++) {
-        	
+            
             final LinkedList<NV> anns = new LinkedList<NV>();
             anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
             
             if (j < (arity-2)) {
             
-            	/* 
-            	 * Not the last one - send the Tee to the next Tee and the next 
-            	 * subquery.
-            	 */
-            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
-            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
-//            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
-            	
-    			thisTeeId = nextTeeId;
-            	nextTeeId = ctx.nextId();
-            	
-            } else {
-            	
-            	/*
-            	 * Last one - send the Tee to the last two subqueries.
-            	 */
-            	anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
-//            			BOpUtility.getPipelineStart(subqueries[j]).getId()));
-            	anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
-//            			BOpUtility.getPipelineStart(subqueries[j+1]).getId()));
-            	
-            }
-            
-        	left = applyQueryHints(new Tee(leftOrEmpty(left),
-                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-        	
-        }
-        
-//        final PipelineOp[] subqueries = new PipelineOp[arity];
-
-        int i = 0;
-        for (IGroupMemberNode child : unionNode) {
-        			
-            // convert the child
-            if (child instanceof JoinGroupNode) {
-        
-        /*
-                 * Need to make sure the first operator in the group has the right Id.
-         */
-        		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-        				new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
-        				}));
-            	
-            	final BOp subquery = convertJoinGroup(left,
-                        (JoinGroupNode) child, ctx);
-            	
-            	if (log.isDebugEnabled()) {
-            		
-            		log.debug(subquery);
-            		log.debug(BOpUtility.getPipelineStart(subquery));
-            		
-            	}
-        	
-        	/*
-            	 * Route all "subqueries" to the same place. This works because 
-            	 * convertJoinGroup returns the topmost operator in the 
-            	 * subquery pipeline, and this is the one whose SINK_REF
-            	 * we need to change.
-        	 */
-//                subqueries[i++] = (PipelineOp) subquery
-            	left = (PipelineOp) subquery
-            		.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                /* 
+                 * Not the last one - send the Tee to the next Tee and the next 
+                 * subquery.
+                 */
+                anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
+                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
+                
+                thisTeeId = nextTeeId;
+                nextTeeId = ctx.nextId();
                 
             } else {
-
-                throw new RuntimeException("Illegal child type for union: "
-                        + child.getClass());
-
+                
+                /*
+                 * Last one - send the Tee to the last two subqueries.
+                 */
+                anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
+                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
+                
             }
-        	
+            
+            left = applyQueryHints(new Tee(leftOrEmpty(left),
+                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
+            
+        }
+        
+        /*
+         * Add the subqueries themselves to the pipeline.
+         */
+        for (int i = 0; i < arity; i++) {
+        
+            /*
+             * Need to make sure the first operator in the group has the right Id.
+             */
+            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
+                    }));
+            
+            /*
+             * Route all "subqueries" to the same place. This works because 
+             * the subqueries array is passed in as references to the topmost
+             * (last) operator in the subquery pipeline, and this is the one 
+             * whose SINK_REF we need to change.
+             */
+            left = (PipelineOp) subqueries[i]
+                .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                
         }
         
         /*
          * All the subqueries get routed here when they are done.
          */
-//		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-//				new NV(Predicate.Annotations.BOP_ID, downstreamId),//
-//				new NV(BOp.Annotations.EVALUATION_CONTEXT,BOpEvaluationContext.CONTROLLER),
-//				}));
-		 left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
-		         NV.asMap(new NV[] {//
-		          new NV(Predicate.Annotations.BOP_ID, downstreamId),//
-		                      new NV(BOp.Annotations.EVALUATION_CONTEXT,
-		                              BOpEvaluationContext.CONTROLLER)//
-		          })), ctx.queryHints);
-		 
+         left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
+                 NV.asMap(new NV[] {//
+                  new NV(Predicate.Annotations.BOP_ID, downstreamId),//
+                  new NV(BOp.Annotations.EVALUATION_CONTEXT, 
+                              BOpEvaluationContext.CONTROLLER)//
+                  })), ctx.queryHints);
+
         return left;
-        
-} else {
-
-        final PipelineOp[] subqueries = new PipelineOp[arity];
-
-        int i = 0;
-        for (IGroupMemberNode child : unionNode) {
-
-            // convert the child
-            if (child instanceof JoinGroupNode) {
-
-                subqueries[i++] = (PipelineOp) convertJoinGroup(null/* left */,
-                        (JoinGroupNode) child, ctx);
-
-            } else {
-
-                throw new RuntimeException("Illegal child type for union: "
-                        + child.getClass());
-
-            }
-
-        }
-
-        // The bopId for the UNION or STEP.
-        final int thisId = ctx.nextId();
-
-        final LinkedList<NV> anns = new LinkedList<NV>();
-        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
-
-        // if (union.getParent() == null) {
-        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-                BOpEvaluationContext.CONTROLLER));
-        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-        // }
-
-        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
-                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-
-        return union;
-
-    }
 
     }
 
@@ -1314,21 +1291,21 @@ if (true) {
 
     }
 
-	/**
-	 * 
-	 * @param ctx
-	 * @return The {@link StartOp} iff this query will run on a cluster and
-	 *         otherwise <code>null</code>.
-	 * 
-	 *         TODO This is just experimental.
-	 */
-	private static final PipelineOp addStartOpOnCluster(final AST2BOpContext ctx) {
-	
-		if (false && ctx.isCluster())
-			return addStartOp(ctx);
-		
-    	return null;
-    	
+    /**
+     * 
+     * @param ctx
+     * @return The {@link StartOp} iff this query will run on a cluster and
+     *         otherwise <code>null</code>.
+     * 
+     *         TODO This is just experimental.
+     */
+    private static final PipelineOp addStartOpOnCluster(final AST2BOpContext ctx) {
+    
+        if (false && ctx.isCluster())
+            return addStartOp(ctx);
+        
+        return null;
+        
     }
     
     /**
@@ -1672,7 +1649,7 @@ if (true) {
                 continue;
             }
 
-			left = _addSubquery(left, subgroup, ctx);
+            left = _addSubquery(left, subgroup, ctx);
 
         }
 
@@ -1755,8 +1732,8 @@ if (true) {
 
             } else {
 
-            	left = _addSubquery(left, subgroup, ctx);
-            	
+                left = _addSubquery(left, subgroup, ctx);
+                
             }
 
         }
@@ -1773,28 +1750,28 @@ if (true) {
      * @param ctx
      * @return
      */
-	private static PipelineOp _addSubquery(//
-			PipelineOp left,//
-			final IGroupNode<IGroupMemberNode> subgroup,//
-			final AST2BOpContext ctx//
-			) {
+    private static PipelineOp _addSubquery(//
+            PipelineOp left,//
+            final IGroupNode<IGroupMemberNode> subgroup,//
+            final AST2BOpContext ctx//
+            ) {
 
-		if (ctx.isCluster()
-				&& BOpUtility.visitAll((BOp) subgroup,
-						NamedSubqueryInclude.class).hasNext()) {
-			/*
-			 * Since something in the subgroup (or recursively in some
-			 * sub-subgroup) will require access to a named solution set, we
-			 * add a CopyOp() to force the solutions to be materialized on
-			 * the top-level query controller before issuing the subquery.
-			 * 
-			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/379#comment:1
-			 */
-			left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-				new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
-						BOpEvaluationContext.CONTROLLER),//
-				}));
+        if (ctx.isCluster()
+                && BOpUtility.visitAll((BOp) subgroup,
+                        NamedSubqueryInclude.class).hasNext()) {
+            /*
+             * Since something in the subgroup (or recursively in some
+             * sub-subgroup) will require access to a named solution set, we
+             * add a CopyOp() to force the solutions to be materialized on
+             * the top-level query controller before issuing the subquery.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/379#comment:1
+             */
+            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                }));
 
         }
 
@@ -1811,14 +1788,14 @@ if (true) {
          */
         if(false) { 
 
-		    /*
-		     * Model a sub-group by building a hash index at the start of the
-		     * group. We then run the group.  Finally, we do a hash join of
-		     * the hash index against the solutions in the group.  If the
-		     * group is optional, then the hash join is also optional.
-		     * 
-		     * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
-		     */
+            /*
+             * Model a sub-group by building a hash index at the start of the
+             * group. We then run the group.  Finally, we do a hash join of
+             * the hash index against the solutions in the group.  If the
+             * group is optional, then the hash join is also optional.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
+             */
             final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
             // Find the set of variables which will be definately bound by the
@@ -1829,25 +1806,25 @@ if (true) {
 
             @SuppressWarnings("rawtypes")
             final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);
-	        
-		    // Pass all variable bindings along.
-	        @SuppressWarnings("rawtypes")
-	        final IVariable[] selectVars = null;
-	        
-	        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-	                ctx.queryId, solutionSetName, joinVars);
+            
+            // Pass all variable bindings along.
+            @SuppressWarnings("rawtypes")
+            final IVariable[] selectVars = null;
+            
+            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                    ctx.queryId, solutionSetName, joinVars);
 
-	        final HashIndexOp op = new HashIndexOp(leftOrEmpty(left),//
-	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-	                        BOpEvaluationContext.CONTROLLER),//
-	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-	                new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
-	                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-	                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-	                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-	        );
+            final HashIndexOp op = new HashIndexOp(leftOrEmpty(left),//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            );
 
             final PipelineOp subquery = convertJoinGroupOrUnion(op/* left */,
                     subgroup, ctx);
@@ -1859,19 +1836,19 @@ if (true) {
             // Note: also requires lastPass.
             final boolean release = lastPass && true;
             
-	        left = new SolutionSetHashJoinOp(
-	                new BOp[] { subquery },//
-	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-	                        BOpEvaluationContext.CONTROLLER),//
-	                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-	                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
-	                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-	                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-	                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
-	                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
-	                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-	        );
+            left = new SolutionSetHashJoinOp(
+                    new BOp[] { subquery },//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                    new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            );
 
         } else {
 
@@ -1881,7 +1858,7 @@ if (true) {
              * Note: The problem with this approach is that we wind up issuing
              * one subquery per source solution, which has a lot of overhead.
              */
-		    
+            
             final PipelineOp subquery = convertJoinGroupOrUnion(null/* left */,
                     subgroup, ctx);
 
@@ -1891,8 +1868,8 @@ if (true) {
                     new NV(SubqueryOp.Annotations.OPTIONAL, optional)//
             );
         
-		}
-		
+        }
+        
         return left;
         
     }
@@ -1915,8 +1892,8 @@ if (true) {
     private static final PipelineOp addEndOp(PipelineOp left,
             final AST2BOpContext ctx) {
 
-		if (left != null
-				&& ctx.isCluster()
+        if (left != null
+                && ctx.isCluster()
                 && !left.getEvaluationContext().equals(
                         BOpEvaluationContext.CONTROLLER)) {
 
