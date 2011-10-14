@@ -87,10 +87,11 @@ public class NanoSparqlClient {
 	 */
 	static final String MIME_RDF_XML = "application/rdf+xml";
 
-	/**
-	 * The default connection timeout (ms).
-	 */
-	static private final int DEFAULT_TIMEOUT = 60*1000;
+    /**
+     * The default connection timeout (ms). A value of ZERO (0) means NO
+     * timeout.
+     */
+	static private final int DEFAULT_TIMEOUT = 0;
 
 //	/**
 //	 * Helper class to figure out the type of a query.
