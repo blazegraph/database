@@ -37,6 +37,8 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
@@ -183,8 +185,11 @@ public class TestAccessPaths extends AbstractTripleStoreTestCase {
 
 		final LexiconRelation r = store.getLexiconRelation();
 
+		@SuppressWarnings("unchecked")
+        final IVariable<BigdataValue> termvar = Var.var("termvar");
+		
 		final IPredicate<BigdataValue> predicate = LexPredicate
-				.reverseInstance(r.getNamespace(), ITx.UNISOLATED,
+				.reverseInstance(r.getNamespace(), ITx.UNISOLATED, termvar,
 						new Constant<IV>(expected.getIV()));
 
 		final IKeyOrder<BigdataValue> keyOrder = r.getKeyOrder(predicate);
