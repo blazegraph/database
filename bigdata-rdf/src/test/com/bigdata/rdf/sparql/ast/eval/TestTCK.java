@@ -68,6 +68,48 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * This is not a DAWG test. The query is simple enough. However, one of the
+     * values which is bound on <code>?x</code> is a plain literal rather than a
+     * numeric datatype literal.
+     * 
+     * <pre>
+     * PREFIX : <http://example.org/>
+     * SELECT (SUM(?x) AS ?total)
+     * WHERE {
+     *   ?a :p ?x.
+     * }
+     * GROUP BY ?a
+     * </pre>
+     * 
+     * <pre>
+     * @prefix : <http://example.org/> .
+     * 
+     * :a :p "1" .
+     * :a :p 1 .
+     * :b :p 3 .
+     * :b :p 4 .
+     * </pre>
+     * 
+     * FIXME To me, it looks like the correct solution should be two groups. The
+     * group for <code>:a</code> should have an unbound value for
+     * <code>?x</code>. The group for <code>:b</code> should have a bound value
+     * of <code>"7"^^xsd:integer</code> for <code>?x</code>. This differs from
+     * the expected solution, but I believe that is because Sesame has a bad
+     * unit test for this case. I've written JeenB about this test. It is still
+     * present in sesame 2.5.0-dev.
+     */
+    public void test_sparql11_sum_03() throws Exception {
+
+        new TestHelper(
+                "sparql11-sum-03", // testURI,
+                "sparql11-sum-03.rq",// queryFileURL
+                "sparql11-sum-03.ttl",// dataFileURL
+                "sparql11-sum-03.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
      * This is not a DAWG test. There is no data for the aggregation. Sesame is
      * expecting a solution set consisting of a single solution with
      * 0^^xsd:integer. We are producing an empty solution set.
@@ -458,6 +500,29 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
                 "sort-3.rq",// queryFileURL
                 "sort-3.ttl",// dataFileURL
                 "sort-3-result.rdf"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
+     * DAWG SPARQL 1.0 test
+     * 
+     * <pre>
+     * PREFIX :         <http://example/> 
+     * PREFIX xsd:      <http://www.w3.org/2001/XMLSchema#> 
+     * SELECT DISTINCT * 
+     * WHERE { 
+     *   { ?s :p ?o } UNION { ?s :q ?o }
+     * }
+     * </pre>
+     */
+    public void test_distinct_star_1() throws Exception {
+
+        new TestHelper(
+                "distinct-star-1", // testURI,
+                "distinct-star-1.rq",// queryFileURL
+                "distinct-star-1.ttl",// dataFileURL
+                "distinct-star-1.srx"// resultFileURL
                 ).runTest();
 
     }

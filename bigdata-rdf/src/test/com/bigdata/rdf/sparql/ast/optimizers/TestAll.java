@@ -62,7 +62,10 @@ public class TestAll extends TestCase {
          * constant in an input solution with that constant.
          */
         suite.addTestSuite(TestASTBindingAssigner.class);
-        
+
+        // Unit tests for "SELECT (DISTINCT|REDUCED) *" 
+        suite.addTestSuite(TestASTWildcardProjectionOptimizer.class);
+
         // Unit tests for AST rewrite of DESCRIBE into CONSTRUCT.
         suite.addTestSuite(TestASTDescribeOptimizer.class);
 

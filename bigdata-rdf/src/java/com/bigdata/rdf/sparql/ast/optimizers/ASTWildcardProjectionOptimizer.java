@@ -144,6 +144,12 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             
             queryBase.setProjection(p2);
             
+            if(projection.isDistinct())
+                p2.setDistinct(true);
+
+            if(projection.isReduced())
+                p2.setReduced(true);
+            
             for(IVariable<?> var : varSet) {
             
                 p2.addProjectionVar(new VarNode(var.getName()));

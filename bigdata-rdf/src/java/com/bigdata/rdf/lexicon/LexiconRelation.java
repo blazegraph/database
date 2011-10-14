@@ -2858,8 +2858,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
         case NoneBound: {
             /*
-             * TODO Could be supported. This is a full index scan. We would want
-             * to filter out the NullIVs during the scan.
+             * TODO Could be supported. This is a full index scan on both the
+             * IV2TERM and BLOBS indices.
              */
         }
         default:

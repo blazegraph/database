@@ -54,6 +54,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
@@ -68,8 +69,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
 import com.bigdata.rdf.internal.constraints.NeedsMaterializationBOp;
@@ -78,6 +79,7 @@ import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -544,7 +546,14 @@ public class AST2BOpBase {
 
                 final String ns = ctx.db.getLexiconRelation().getNamespace();
 
-                lexPred = LexPredicate.reverseInstance(ns, timestamp, v);
+                // An anonymous variable whose name is based on the variable in
+                // the query whose Value we are trying to materialize from the
+                // IV.
+                final IVariable<BigdataValue> anonvar = Var.var("--"
+                        + v.getName() + "-" + ctx.nextId());
+                
+                lexPred = LexPredicate.reverseInstance(ns, timestamp, anonvar,
+                        v);
 
             }
 
