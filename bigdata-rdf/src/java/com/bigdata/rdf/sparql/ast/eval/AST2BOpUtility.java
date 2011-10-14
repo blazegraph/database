@@ -460,6 +460,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         } else {
 
+    if(false) {
             /*
              * We are going to route all the subqueries here when they're done,
              * by replacing the SINK_REF on the topmost operator in the subquery.
@@ -563,6 +564,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                                   BOpEvaluationContext.CONTROLLER)//
                       })), ctx.queryHints);
 
+    } else {
         	
 //            final PipelineOp[] steps = new PipelineOp[nfirst];
 //
@@ -591,6 +593,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 //            );
 
         }
+    }
 
         // Run the remaining steps in sequence.
         for (NamedSubqueryRoot subqueryRoot : remainder) {
