@@ -60,8 +60,8 @@ public class TestSolutionSetHashJoin extends TestCase2 {
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[]{Var.var("x")};
 
-        @SuppressWarnings("rawtypes")
-        final IVariable[] selected = new IVariable[]{Var.var("y")};
+//        @SuppressWarnings("rawtypes")
+//        final IVariable[] selected = new IVariable[]{Var.var("y")};
         
         final UUID queryId = UUID.randomUUID();
         

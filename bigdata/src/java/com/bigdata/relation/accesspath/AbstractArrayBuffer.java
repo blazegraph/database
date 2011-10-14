@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
-import org.apache.log4j.Logger;
 
 /**
  * A thread-safe buffer backed by a fixed capacity array. Concrete
@@ -39,11 +38,11 @@ import org.apache.log4j.Logger;
  */
 abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
-    protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
+//    protected static final Logger log = Logger.getLogger(AbstractArrayBuffer.class);
+//    
+//    protected static final boolean INFO = log.isInfoEnabled();
+//
+//    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The capacity of the backing buffer.
@@ -123,11 +122,11 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
                 
                 // rejected by the filter.
                 
-                if(DEBUG) {
-                    
-                    log.debug("rejected: element="+e+", filter="+filter);
-                    
-                }
+//                if(DEBUG) {
+//                    
+//                    log.debug("rejected: element="+e+", filter="+filter);
+//                    
+//                }
 
                 return false;
 
@@ -145,11 +144,11 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
         if (e == null)
             throw new IllegalArgumentException();
 
-        if(DEBUG) {
-            
-            log.debug("element="+e);
-            
-        }
+//        if(DEBUG) {
+//            
+//            log.debug("element="+e);
+//            
+//        }
         
         if (accept(e)) {
 
@@ -191,22 +190,22 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
         if (size > 0) {
 
-            if (INFO) {
-
-                log.info("flushing buffer with " + size + " elements");
-                
-            }
+//            if (INFO) {
+//
+//                log.info("flushing buffer with " + size + " elements");
+//                
+//            }
             
             final long nwritten = flush(size, buffer);
             
             counter += nwritten;
             
-            if (INFO) {
-
-                log.info("wrote " + nwritten + " elements, cumulative total="
-                        + counter);
-                
-            }
+//            if (INFO) {
+//
+//                log.info("wrote " + nwritten + " elements, cumulative total="
+//                        + counter);
+//                
+//            }
             
             clearBuffer();
             
@@ -220,11 +219,11 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     
     synchronized public void reset() {
         
-        if(INFO) {
-            
-            log.info("Resetting buffer state and counter.");
-            
-        }
+//        if(INFO) {
+//            
+//            log.info("Resetting buffer state and counter.");
+//            
+//        }
         
         clearBuffer();
         

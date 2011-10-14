@@ -54,12 +54,26 @@ public class TestUnsynchronizedArrayBuffer extends TestCase2 {
    
     }
 
-    final int chunkCapacity = 10;
+    private final int chunkCapacity = 10;
     
-    final int chunkOfChunksCapacity = 5;
+    private final int chunkOfChunksCapacity = 5;
     
-    TestArrayBuffer<String[]> syncBuffer = new TestArrayBuffer<String[]>(
+    private TestArrayBuffer<String[]> syncBuffer = new TestArrayBuffer<String[]>(
             chunkOfChunksCapacity);
+    
+    private UnsynchronizedArrayBuffer<String> unsyncBuffer = new UnsynchronizedArrayBuffer<String>(
+            syncBuffer, chunkCapacity);
+
+    @Override
+    protected void tearDown() throws Exception {
+
+        syncBuffer = null;
+        
+        unsyncBuffer = null;
+        
+        super.tearDown();
+        
+    }
 
     /**
      * Helper class exposes the backing buffer.
@@ -68,7 +82,7 @@ public class TestUnsynchronizedArrayBuffer extends TestCase2 {
      * @version $Id$
      * @param <E>
      */
-    protected static class TestArrayBuffer<E> extends AbstractArrayBuffer<E> {
+    private static class TestArrayBuffer<E> extends AbstractArrayBuffer<E> {
 
         TestArrayBuffer(final int capacity) {
             
@@ -103,9 +117,6 @@ public class TestUnsynchronizedArrayBuffer extends TestCase2 {
         }
         
     }
-
-    UnsynchronizedArrayBuffer<String> unsyncBuffer = new UnsynchronizedArrayBuffer<String>(
-            syncBuffer, chunkCapacity);
 
     /**
      * Test verifies state of both the {@link UnsynchronizedArrayBuffer} and the
