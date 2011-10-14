@@ -566,31 +566,31 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     } else {
         	
-//            final PipelineOp[] steps = new PipelineOp[nfirst];
-//
-//            int i = 0;
-//
-//            for (NamedSubqueryRoot subqueryRoot : runFirst) {
-//
-//                steps[i++] = createNamedSubquery(null/* left */, subqueryRoot,
-//                        ctx);
-//
-//            }
-//            
+            final PipelineOp[] steps = new PipelineOp[nfirst];
+
+            int i = 0;
+
+            for (NamedSubqueryRoot subqueryRoot : runFirst) {
+
+                steps[i++] = createNamedSubquery(null/* left */, subqueryRoot,
+                        ctx);
+
+            }
+            
 //            left = unionUsingTee(left, steps, ctx);
             
-//            // Do not run the subqueries with unlimited parallelism.
-//            final int maxParallelSubqueries = Math.min(steps.length, 10);
-//            
-//            // Run the steps in parallel.
-//            left = new Union(leftOrEmpty(left), //
-//                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.CONTROLLER),//
-//                    new NV(Steps.Annotations.SUBQUERIES, steps),//
-//                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
-//                            maxParallelSubqueries)//
-//            );
+            // Do not run the subqueries with unlimited parallelism.
+            final int maxParallelSubqueries = Math.min(steps.length, 10);
+            
+            // Run the steps in parallel.
+            left = new Union(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(Steps.Annotations.SUBQUERIES, steps),//
+                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
+                            maxParallelSubqueries)//
+            );
 
         }
     }
