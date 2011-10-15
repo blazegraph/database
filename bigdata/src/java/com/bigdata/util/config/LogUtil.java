@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.config;
 
+import java.net.URL;
+
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.xml.DOMConfigurator;
@@ -37,17 +39,24 @@ import org.apache.log4j.xml.DOMConfigurator;
  * <p>
  * This class relies on the presence of either the
  * <code>log4j.configuration</code> or the
- * <code>log4j.primary.configuration</code> property and understands files with
- * any of the following extensions {<code>.properties</code>,
- * <code>.logging</code>, <code>.xml</code> . It will log a message on
- * <em>stderr</em> if neither of those properties is defined. The class
- * deliberately does not search the CLASSPATH for a log4j configuration in an
- * effort to discourage the inadvertent use of hidden configuration files when
- * deploying bigdata.
+ * <code>log4j.primary.configuration</code> property.
+ * <p>
+ * If neither of those properties is found, then this class searches the
+ * CLASSPATH for a log4j configuration. While this is a change from the
+ * historical, searching the CLASSPATH is necessary for webapp deployments.
+ * <p>
+ * This class understands files with any of the following extensions {
+ * <code>.properties</code>, <code>.logging</code>, <code>.xml</code> . If
+ * neither configuration property is defined, if the resource identified by the
+ * property can not be located, or if a log4j configuration resource can not be
+ * located in the default location along the class path then this class will
+ * will a message on <em>stderr</em>.
  * <p>
  * A watcher is setup on the log4j configuration if one is found.
  * <p>
  * This class cannot be instantiated.
+ * 
+ * @see https://sourceforge.net/apps/trac/bigdata/ticket/394
  */
 public class LogUtil {
 
@@ -76,12 +85,41 @@ public class LogUtil {
         
     }
     
+    /**
+     * Attempt to resolve the resources with the following names in the given
+     * order and return the {@link URL} of the first such resource which is
+     * found and <code>null</code> if none of the resources are found:
+     * <ol>
+     * <li>log4j.properties</li>
+     * <li>log4j.logging</li>
+     * <li>log4j.xml</li>
+     * </ol>
+     * 
+     * @return The {@link URL} of the first such resource which was found.
+     */
+    static URL getConfigPropertyValueUrl() {
+
+        URL url = LogUtil.class.getResource("/log4j.properties");
+
+        if (url == null)
+            url = LogUtil.class.getResource("/log4j.logging");
+
+        if (url == null)
+            url = LogUtil.class.getResource("/log4j.xml");
+
+        return url;
+
+    }
+    
     // Static initialization block that retrieves and initializes 
     // the log4j logger configuration for the given VM in which this
     // class resides. Note that this block is executed only once
     // during the life of the associated VM.
     static {
 
+        /*
+         * First, attempt to resolve the configuration property.
+         */
         final String log4jConfig = getConfigPropertyValue();
         
         if( log4jConfig != null && (log4jConfig.endsWith(".properties") ||
@@ -94,8 +132,32 @@ public class LogUtil {
             DOMConfigurator.configureAndWatch(log4jConfig);
             
         } else {
-        
-            System.err.println("ERROR: " + LogUtil.class.getName()
+            
+            /*
+             * Then attempt to resolve the resource to a URL.
+             */
+            
+            final URL log4jUrl = getConfigPropertyValueUrl();
+            
+            if (log4jUrl != null &&//
+                    (log4jUrl.getFile().endsWith(".properties") || //
+                     log4jUrl.getFile().endsWith(".logging")//
+                    )) {
+
+                PropertyConfigurator.configure(log4jUrl);
+                
+            } else if (log4jUrl != null && log4jUrl.getFile().endsWith(".xml")) {
+
+                DOMConfigurator.configure(log4jUrl);
+                
+            } else {
+                
+                /*
+                 * log4j was not explicitly configured and the log4j resource
+                 * could not be located on the CLASSPATH.
+                 */
+
+                System.err.println("ERROR: " + LogUtil.class.getName()
                      + " : Could not initialize Log4J logging utility.\n"
                      + "Set system property "
                      +"'-Dlog4j.configuration="
@@ -106,6 +168,8 @@ public class LogUtil {
                      +"file:<installDir>/"
                      +"bigdata/src/resources/logging/log4j.properties'");
         
+            }
+            
         }
         
     }
@@ -121,4 +185,5 @@ public class LogUtil {
     public static Logger getLog4jRootLogger() {
         return Logger.getRootLogger();
     }
+    
 }
