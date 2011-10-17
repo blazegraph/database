@@ -66,9 +66,10 @@ public class DatasetNode extends QueryNodeBase {
 
     @SuppressWarnings("rawtypes")
 	public DatasetNode(final Set<IV> defaultGraphs, final Set<IV> namedGraphs) {
-		
-		this(new DataSetSummary(defaultGraphs), new DataSetSummary(namedGraphs));
-		
+
+        this(defaultGraphs != null ? new DataSetSummary(defaultGraphs) : null,
+                namedGraphs != null ? new DataSetSummary(namedGraphs) : null);
+
 	}
 	
 	@SuppressWarnings("rawtypes")
