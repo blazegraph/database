@@ -1,0 +1,8 @@
+prefix : <http://example.org/diagram/> 
+
+SELECT DISTINCT ?s (<http://example.org/diagram/> as ?g)
+WHERE {
+    GRAPH <http://example.org/diagram/> {
+        ?s <http://example.org/diagram/member> <http://www4.wiwiss.fu-berlin.de/diseasome/resource/genes/CIAS1> .
+    }
+}

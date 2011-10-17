@@ -63,6 +63,9 @@ public class TestAll extends TestCase {
         
         // Basic query.
         suite.addTestSuite(TestBasicQuery.class);
+
+        // Test suite for named and default graph access patterns.
+        suite.addTestSuite(TestNamedGraphs.class);
         
         // Test suite for OPTIONAL groups.
         suite.addTestSuite(TestOptionals.class);
