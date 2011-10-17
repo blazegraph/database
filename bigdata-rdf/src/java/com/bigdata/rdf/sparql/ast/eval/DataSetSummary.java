@@ -32,6 +32,17 @@ public class DataSetSummary {
 
     public static Set<IV> toInternalValues(final Set<URI> graphs) {
 		
+        /*
+         * Note: Per DAWG tests graph-02 and graph-04, a query against an empty
+         * default graph collection or an empty named graph collection should
+         * be constrained to NO graphs.  This is different from the case where
+         * the dataset is simply not specified, which is interpreted as having
+         * no constraint on the visited graphs.  If you uncomment the next two
+         * lines, both graph-02 and graph-04 in the TCK will fail.
+         */
+//        if(graphs.isEmpty())
+//            return null;
+        
 		final Set<IV> s = new LinkedHashSet<IV>();
 		
 		for (URI uri : graphs) {
