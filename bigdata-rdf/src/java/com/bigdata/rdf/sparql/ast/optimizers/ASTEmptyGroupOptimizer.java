@@ -54,8 +54,19 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * and for non-graph groups:
  * 
  * <pre>
- * { ... {} } =? { ... }
+ * { ... {} } => { ... }
  * </pre>
+ * 
+ * This is also done when the child is a UNION.
+ * 
+ * <pre>
+ * { UNION {...} } => UNION {...}
+ * </pre>
+ * 
+ * Or
+ * 
+ * { GRAPH ?g {...} } => GRAPH ?g {...}
+ * 
  * 
  * Note: An empty <code>{}</code> matches a single empty solution. Since we
  * always push in an empty solution and the join of anything with an empty
