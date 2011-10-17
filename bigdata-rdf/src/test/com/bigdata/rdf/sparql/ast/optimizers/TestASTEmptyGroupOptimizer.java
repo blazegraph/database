@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
@@ -38,17 +39,24 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for {@link ASTEmptyGroupOptimizer}.
  * 
+ * TODO Test for removal of empty UNIONs. Empty UNIONs can arise through pruning
+ * based on unknown IVs, or filters which are provably false. However, I would
+ * expect the pruning logic to eliminate the empty group in such cases.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestASTEmptyGroupOptimizer.java 5302 2011-10-07 14:28:03Z
+ *          thompsonbry $
  */
 public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
@@ -162,14 +170,6 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
      * <pre>
      * { {} } => {}
      * </pre>
-     * 
-     * but not
-     * 
-     * <pre>
-     * { GRAPH foo {} } => {}
-     * </pre>
-     * 
-     * TODO also test for removal of empty UNIONs.
      */
     public void test_eliminateJoinGroup02() {
 
@@ -182,15 +182,53 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
         {
 
-            final JoinGroupNode whereClause = new JoinGroupNode();
+            // { {} }
+            final JoinGroupNode whereClause = new JoinGroupNode(new JoinGroupNode());
             given.setWhereClause(whereClause);
 
-            final JoinGroupNode graphGroup = new JoinGroupNode();
-            graphGroup.setContext(new VarNode("g"));
-            whereClause.addChild(graphGroup);
+        }
 
-            final JoinGroupNode joinGroup = new JoinGroupNode();
-            whereClause.addChild(joinGroup);
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            // {}
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+        }
+        
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Unit test for
+     * 
+     * <pre>
+     * { { {} } } => {}
+     * </pre>
+     */
+    public void test_eliminateJoinGroup03() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // { { {} } }
+            final JoinGroupNode whereClause = new JoinGroupNode(
+                    new JoinGroupNode(new JoinGroupNode()));
+            given.setWhereClause(whereClause);
 
         }
 
@@ -201,15 +239,8 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
             final JoinGroupNode whereClause = new JoinGroupNode();
             expected.setWhereClause(whereClause);
 
-            final JoinGroupNode graphGroup = new JoinGroupNode();
-            graphGroup.setContext(new VarNode("g"));
-            whereClause.addChild(graphGroup);
-
-//            final JoinGroupNode joinGroup = new JoinGroupNode();
-//            whereClause.addChild(joinGroup);
-            
         }
-
+        
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
@@ -219,4 +250,156 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
     }
 
+    /**
+     * Unit test verifies that the rewrite of an embedded sole GRAPH pattern is
+     * the lifting of that GRAPH pattern (rather than replacing it with an empty
+     * non-GRAPH group).
+     * 
+     * <pre>
+     * { GRAPH foo {} } => GRAPH foo {}
+     * </pre>
+     */
+    public void test_eliminateJoinGroup04() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // { GRAPH ?g {} }
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            final JoinGroupNode graphGroup = new JoinGroupNode(new JoinGroupNode());
+            graphGroup.setContext(new VarNode("g"));
+            whereClause.addChild(graphGroup);
+
+            System.err.println("given:"+given);
+        }
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            // GRAPH ?g {}
+            final JoinGroupNode graphGroup = new JoinGroupNode(new JoinGroupNode());
+            graphGroup.setContext(new VarNode("g"));
+            expected.setWhereClause(graphGroup);
+
+            System.err.println("expected:"+expected);
+        }
+        
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * For this AST we need to replace the root {@link JoinGroupNode} with its
+     * child {@link UnionNode}. This means setting the child {@link UnionNode}
+     * as the whereClause on the {@link QueryBase}.
+     * 
+     * <pre>
+     * SELECT DISTINCT VarNode(s) VarNode(o)
+     *   JoinGroupNode {
+     *     UnionNode {
+     *       JoinGroupNode {
+     *         StatementPatternNode(VarNode(s), ConstantNode(TermId(2U)[http://example/p]), VarNode(o), DEFAULT_CONTEXTS)
+     *       }
+     *       JoinGroupNode {
+     *         StatementPatternNode(VarNode(s), ConstantNode(TermId(3U)[http://example/q]), VarNode(o), DEFAULT_CONTEXTS)
+     *       }
+     *     }
+     *   }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_eliminateJoinGroup05() throws Exception {
+        
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV p = makeIV(new URIImpl("http://example/p"));
+
+        @SuppressWarnings("rawtypes")
+        final IV q = makeIV(new URIImpl("http://example/q"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("o"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            final UnionNode union = new UnionNode();
+            final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                    new StatementPatternNode(new VarNode("s"),
+                            new ConstantNode(p), new VarNode("o"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            final JoinGroupNode joinGroup2 = new JoinGroupNode(
+                    new StatementPatternNode(new VarNode("s"),
+                            new ConstantNode(q), new VarNode("o"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            whereClause.addChild(union);
+            union.addChild(joinGroup1);
+            union.addChild(joinGroup2);
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("o"));
+
+            final UnionNode union = new UnionNode();
+            final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                    new StatementPatternNode(new VarNode("s"),
+                            new ConstantNode(p), new VarNode("o"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            final JoinGroupNode joinGroup2 = new JoinGroupNode(
+                    new StatementPatternNode(new VarNode("s"),
+                            new ConstantNode(q), new VarNode("o"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            expected.setWhereClause(union);
+            union.addChild(joinGroup1);
+            union.addChild(joinGroup2);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        /*
+         * FIXME The ASTEmptyGroupOptimizer needs to be refactored to handle
+         * this.  We need to replace the parent with the child and also handle
+         * the case when the parent is the top-level of the WHERE clause.
+         */
+        assertSameAST(expected, actual);
+
+    }
+    
 }
