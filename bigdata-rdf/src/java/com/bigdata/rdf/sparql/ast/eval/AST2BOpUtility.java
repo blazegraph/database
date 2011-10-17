@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -180,7 +181,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         ctx.sa = new StaticAnalysis(optimizedQuery);
         
         // The executable query plan.
-        PipelineOp queryPlan = convert(optimizedQuery, ctx);
+        PipelineOp queryPlan = convert(null/*left*/, optimizedQuery, ctx);
 
         if (queryPlan == null) {
 
@@ -225,7 +226,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * @return The query plan.
      */
-    private static PipelineOp convert(final QueryBase query,
+    private static PipelineOp convert(PipelineOp left, final QueryBase query,
             final AST2BOpContext ctx) {
 
         final GraphPatternGroup<?> root = query.getWhereClause();
@@ -233,7 +234,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         if (root == null)
             throw new IllegalArgumentException("No group node");
 
-        PipelineOp left = addStartOpOnCluster(ctx);
+        if (left == null) {
+            left = addStartOpOnCluster(ctx);
+        }
 
         /*
          * Named subqueries.
@@ -370,6 +373,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * IVs. (I think that materialization is still handled by the bulk IV
          * resolution iterators).
          */
+
+        if (log.isInfoEnabled())
+            log.info("\nsubquery: " + query + "\nplan=" + left);
 
         return left;
 
@@ -611,7 +617,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     static private PipelineOp createNamedSubquery(PipelineOp left,
             final NamedSubqueryRoot subqueryRoot, final AST2BOpContext ctx) {
 
-        final PipelineOp subqueryPlan = convert(subqueryRoot, ctx);
+        final PipelineOp subqueryPlan = convert(null/*left*/,subqueryRoot, ctx);
 
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subqueryRoot + "\nplan=" + subqueryPlan);
@@ -753,16 +759,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
-            final SubqueryRoot subquery, final AST2BOpContext ctx) {
+            final SubqueryRoot subqueryRoot, final AST2BOpContext ctx) {
 
-        final boolean aggregate = isAggregate(subquery);
-
-        final PipelineOp subqueryPlan = convert(subquery, ctx);
-
-        if (log.isInfoEnabled())
-            log.info("\nsubquery: " + subquery + "\nplan=" + subqueryPlan);
-
-        switch (subquery.getQueryType()) {
+        switch (subqueryRoot.getQueryType()) {
         case ASK: {
 
             /*
@@ -771,7 +770,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * subquery and to false if there is no solution to the subquery.
              */
 
-            final ProjectionNode projection = subquery.getProjection();
+            final boolean aggregate = isAggregate(subqueryRoot);
+
+            final ProjectionNode projection = subqueryRoot.getProjection();
 
             if (projection == null)
                 throw new RuntimeException("No projection for ASK subquery.");
@@ -784,6 +785,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             final IVariable<?> askVar = vars[0];
 
+            final PipelineOp subqueryPlan = convert(null/* left */,
+                    subqueryRoot, ctx);
+
             left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
@@ -795,28 +799,151 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             break;
         }
         case SELECT: {
-
-            /*
-             * FIXME Replace with pattern using a HashIndexOp before the
-             * sub-select and a SolutionSetHashJoinOp after the sub-select. The
-             * HashIndexOp must "project" only the variables which are projected
-             * by the sub-select in order to maintain the correct lexical scope
-             * for variable bindings. The hash join re-unites the solutions from
-             * the sub-select with the solutions in the hash index.
-             */
             
-            final ProjectionNode projection = subquery.getProjection();
+            final ProjectionNode projection = subqueryRoot.getProjection();
 
             final IVariable<?>[] vars = projection.getProjectionVars();
 
-            left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(SubqueryOp.Annotations.OPTIONAL, false),//
-                    new NV(SubqueryOp.Annotations.SELECT, vars),//
-                    new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
-            );
+            /*
+             * Enable new sub-group evaluation code path. This is based on a
+             * hash index which is generated from the source solutions before we
+             * begin to evaluate the sub-select. A hash join is appended to the
+             * pipeline after the sub-select operators and unifies the solutions
+             * from the parent group (which are in the hash index) with the
+             * solutions from the sub-select (which are flowing through the
+             * pipeline).
+             */
+            if(false) { 
 
+                /*
+                 * Model a sub-group by building a hash index at the start of the
+                 * group. We then run the group.  Finally, we do a hash join of
+                 * the hash index against the solutions in the group.  If the
+                 * group is optional, then the hash join is also optional.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
+                 */
+                final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
+
+                // Find the set of variables which will be definitely bound by the
+                // time the sub-select is evaluated.
+                final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
+                        subqueryRoot,
+                        new LinkedHashSet<IVariable<?>>());
+
+                /*
+                 * The join variables are those which are known bound on entry
+                 * to the subquery and which are also projected by the subquery.
+                 */
+                final Set<IVariable<?>> joinVarSet = new LinkedHashSet<IVariable<?>>();
+                joinVarSet.addAll(incomingBound);
+                joinVarSet.retainAll(Arrays.asList(vars));
+                @SuppressWarnings("rawtypes")
+                final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
+
+                // Only pass along the variables projected by the Subquery.
+                @SuppressWarnings("rawtypes")
+                final IVariable[] selectVarsProjectedBySubquery = vars;
+                
+                /*
+                 * FIXME We need to retain all variables which were visible in
+                 * the parent group plus anything which was projected out of the
+                 * subquery. Since there can be exogenous variables, the easiest
+                 * way to do this is to add a step which projects only those
+                 * variables which are projected out of the subquery and then to
+                 * not constrain the variables projected out of the hash join.
+                 */
+                final IVariable[] selectVarsInParent = null;
+                
+                final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                        ctx.queryId, solutionSetName, joinVars);
+
+                final boolean optional = false;// Sub-Select is not optional.
+
+                final PipelineOp op;
+                if(ctx.nativeHashJoins) {
+                    op = new HashIndexOp(leftOrEmpty(left),//
+                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                        new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+                        new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                        new NV(HashIndexOp.Annotations.SELECT, selectVarsProjectedBySubquery),//
+                        new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
+                } else {
+                    op = new JVMHashIndexOp(leftOrEmpty(left),//
+                            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                            new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+                            new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                            new NV(HashIndexOp.Annotations.SELECT, selectVarsProjectedBySubquery),//
+                            new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    ); 
+                }
+
+                // lastPass is required if the join is optional.
+                final boolean lastPass = optional; // iff optional.
+
+                // true if we will release the HTree as soon as the join is done.
+                // Note: also requires lastPass.
+                final boolean release = lastPass && true;
+
+                final PipelineOp subqueryPlan = convert(op/* left */,
+                        subqueryRoot, ctx);
+
+                if(ctx.nativeHashJoins) {
+                    left = new SolutionSetHashJoinOp(
+                        new BOp[] { subqueryPlan },//
+                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+                        new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                        new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVarsInParent),//
+                        new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                        new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                        new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                        );
+                } else {
+                    left = new JVMSolutionSetHashJoinOp(
+                        new BOp[] { subqueryPlan },//
+                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+                        new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                        new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVarsInParent),//
+                        new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                        new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                        new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                        );
+                }
+
+            } else {
+
+                final boolean aggregate = isAggregate(subqueryRoot);
+
+                final PipelineOp subqueryPlan = convert(null/* left */,
+                        subqueryRoot, ctx);
+
+                left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+                        new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                        new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+                        new NV(SubqueryOp.Annotations.SELECT, vars),//
+                        new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+                );
+            
+            }
+            
             break;
 
         }
@@ -2006,8 +2133,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         if(false) { 
 
-            final boolean useHTree = false;
-            
 		    /*
 		     * Model a sub-group by building a hash index at the start of the
 		     * group. We then run the group.  Finally, we do a hash join of
@@ -2035,7 +2160,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	                ctx.queryId, solutionSetName, joinVars);
 
 	        final PipelineOp op;
-	        if(useHTree) {
+	        if(ctx.nativeHashJoins) {
 	            op = new HashIndexOp(leftOrEmpty(left),//
 	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
 	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -2061,7 +2186,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	            ); 
 	        }
 
-            final PipelineOp subquery = convertJoinGroupOrUnion(op/* left */,
+            final PipelineOp subqueryPlan = convertJoinGroupOrUnion(op/* left */,
                     subgroup, ctx);
 
             // lastPass is required if the join is optional.
@@ -2071,9 +2196,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             // Note: also requires lastPass.
             final boolean release = lastPass && true;
             
-            if(useHTree) {
-	        left = new SolutionSetHashJoinOp(
-	                new BOp[] { subquery },//
+            if(ctx.nativeHashJoins) {
+                left = new SolutionSetHashJoinOp(
+	                new BOp[] { subqueryPlan },//
 	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
 	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 	                        BOpEvaluationContext.CONTROLLER),//
@@ -2087,7 +2212,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	        );
             } else {
                 left = new JVMSolutionSetHashJoinOp(
-                        new BOp[] { subquery },//
+                        new BOp[] { subqueryPlan },//
                         new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//

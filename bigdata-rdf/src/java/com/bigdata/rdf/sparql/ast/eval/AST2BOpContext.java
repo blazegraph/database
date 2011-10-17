@@ -8,6 +8,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -74,6 +75,14 @@ public class AST2BOpContext implements IdFactory {
      */
     boolean nativeDistinct = true;
 
+    /**
+     * When <code>true</code>, use hash joins based on the {@link HTree}.
+     * Otherwise use hash joins based on the Java collection classes. The
+     * {@link HTree} is more scalable but has higher overhead for small
+     * cardinality hash joins.
+     */
+    boolean nativeHashJoins = false;
+    
     private int varIdFactory = 0;
 
     /**
