@@ -12,8 +12,8 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 
 /**
- * Operator block evaluation for the specified {@link Annotations#DELAY} and
- * then throws an {@link PipelineDelayError}.
+ * Operator blocks evaluation (sleeps) for the specified
+ * {@link Annotations#DELAY} and then throws an {@link PipelineDelayError}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -30,7 +30,7 @@ public class PipelineDelayOp extends PipelineOp {
         /**
          * The delay imposed by the operator (milliseconds).
          */
-        String DELAY = (PipelineDelayOp.class.getName() + ".delay").intern();
+        String DELAY = PipelineDelayOp.class.getName() + ".delay";
 
     }
 
