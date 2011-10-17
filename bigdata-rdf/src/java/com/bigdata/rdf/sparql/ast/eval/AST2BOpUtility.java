@@ -43,6 +43,8 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HashIndexOp;
+import com.bigdata.bop.join.JVMHashIndexOp;
+import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
@@ -2004,6 +2006,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         if(false) { 
 
+            final boolean useHTree = false;
+            
 		    /*
 		     * Model a sub-group by building a hash index at the start of the
 		     * group. We then run the group.  Finally, we do a hash join of
@@ -2030,7 +2034,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
 	                ctx.queryId, solutionSetName, joinVars);
 
-	        final HashIndexOp op = new HashIndexOp(leftOrEmpty(left),//
+	        final PipelineOp op;
+	        if(useHTree) {
+	            op = new HashIndexOp(leftOrEmpty(left),//
 	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
 	                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 	                        BOpEvaluationContext.CONTROLLER),//
@@ -2041,6 +2047,19 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
 	                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
 	        );
+	        } else {
+	            op = new JVMHashIndexOp(leftOrEmpty(left),//
+	                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+	                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+	                            BOpEvaluationContext.CONTROLLER),//
+	                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+	                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+	                    new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+	                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+	                    new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+	                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+	            ); 
+	        }
 
             final PipelineOp subquery = convertJoinGroupOrUnion(op/* left */,
                     subgroup, ctx);
@@ -2052,6 +2071,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             // Note: also requires lastPass.
             final boolean release = lastPass && true;
             
+            if(useHTree) {
 	        left = new SolutionSetHashJoinOp(
 	                new BOp[] { subquery },//
 	                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -2065,6 +2085,21 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 	                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
 	                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
 	        );
+            } else {
+                left = new JVMSolutionSetHashJoinOp(
+                        new BOp[] { subquery },//
+                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                        new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+                        new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                        new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+                        new NV(SolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                        new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                        new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
+            }
 
         } else {
 

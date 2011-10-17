@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.Arrays;
+import java.util.Iterator;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
@@ -40,6 +43,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -77,11 +82,11 @@ public class HashJoinUtility {
      * Note: If joinVars is an empty array, then the solutions will all hash to
      * ONE (1).
      */
-    private static final int ONE = 1;
+    static private final int ONE = 1;
     
     /**
-     * Return the hash code which will be used as the key for the {@link HTree}
-     * given the ordered as-bound values for the join variables.
+     * Return the hash code which will be used as the key given the ordered
+     * as-bound values for the join variables.
      * 
      * @param joinVars
      *            The join variables.
@@ -94,8 +99,8 @@ public class HashJoinUtility {
      * @throws JoinVariableNotBoundException
      *             if there is no binding for a join variable.
      */
-    static private int hashCode(final IVariable<?>[] joinVars,
-            final IBindingSet bset) throws JoinVariableNotBoundException {
+    static int hashCode(final IVariable<?>[] joinVars, final IBindingSet bset)
+            throws JoinVariableNotBoundException {
 
         int h = ONE;
 
@@ -112,11 +117,15 @@ public class HashJoinUtility {
                 
             }
 
-            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
-
-            h = 31 * h + ch;
+//            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
+//
+//            h = 31 * h + ch;
+            h ^= c.hashCode();
             
         }
+        
+//        System.err.println("hashCode=" + h + ", joinVars="
+//                + Arrays.toString(joinVars) + " : " + bset);
 
         return h;
 
@@ -145,6 +154,11 @@ public class HashJoinUtility {
      *            solutions.
      * 
      * @return The #of solutions that were buffered.
+     * 
+     *         FIXME Does anything actually rely on the
+     *         {@link JoinVariableNotBoundException}? It would seem that this
+     *         exception could only be thrown if the joinvars[] was incorrectly
+     *         formulated as it should only include "known bound" variables.
      */
     public static long acceptSolutions(
             final ICloseableIterator<IBindingSet[]> itr,
@@ -197,6 +211,37 @@ public class HashJoinUtility {
     }
 
     /**
+     * Glue class for hash code and binding set used when the hash code is for
+     * just the join variables rather than the entire binding set.
+     */
+    private static class BS implements Comparable<BS> {
+
+        final private int hashCode;
+
+        final private IBindingSet bset;
+
+        BS(final int hashCode, final IBindingSet bset) {
+            this.hashCode = hashCode;
+            this.bset = bset;
+        }
+
+        @Override
+        public int compareTo(final BS o) {
+            if (this.hashCode < o.hashCode)
+                return -1;
+            if (this.hashCode > o.hashCode)
+                return 1;
+            return 0;
+        }
+        
+        public String toString() {
+            return getClass().getName() + "{hashCode=" + hashCode + ",bset="
+                    + bset + "}";
+        }
+        
+    }
+    
+    /**
      * Do a hash join between a stream of source solutions (left) and a hash
      * index (right). For each left solution, the hash index (right) is probed
      * for possible matches (solutions whose as-bound values for the join
@@ -238,11 +283,7 @@ public class HashJoinUtility {
      * @param leftIsPipeline
      *            <code>true</code> iff <i>left</i> is a solution from upstream
      *            in the query pipeline. Otherwise, <i>right</i> is the upstream
-     *            solution. The upstream solution may be associated with a
-     *            symbol table stack used to manage the visibility of variables
-     *            in SPARQL 1.1 subqueries. Therefore, this is the solution
-     *            which must be clone and into which the bindings must be
-     *            propagated.
+     *            solution.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Inline access
      *      path).
@@ -264,130 +305,128 @@ public class HashJoinUtility {
 
         try {
 
-            while (leftItr.hasNext()) {
+            // TODO parameter from operator annotations.
+            final int chunkSize = ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
+            
+            final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
+                    leftItr, chunkSize, IBindingSet.class);
+            
+            while (it.hasNext()) {
 
-                final IBindingSet leftSolution = leftItr.next();
-//                if(selectVars != null)
-//                    leftSolution.push(selectVars);
+                final IBindingSet[] leftSolutions = it.next();
 
-                // Compute hash code from bindings on the join vars.
-                int hashCode;
-                try {
-                    hashCode = HashJoinUtility.hashCode(joinVars, leftSolution);
-                } catch (JoinVariableNotBoundException ex) {
-                    // Drop solution
-                    if(log.isDebugEnabled())
-                        log.debug(ex);
-                    continue;
+                final BS[] a = new BS[leftSolutions.length];
+
+                int n = 0; // The #of non-dropped source solutions.
+                
+                for (int i = 0; i < a.length; i++) {
+
+                    // Compute hash code from bindings on the join vars.
+                    int hashCode;
+                    try {
+                        hashCode = HashJoinUtility.hashCode(joinVars,
+                                leftSolutions[i]);
+                        a[n++] = new BS(hashCode, leftSolutions[i]);
+                    } catch (JoinVariableNotBoundException ex) {
+                        // Drop solution
+                        if (log.isDebugEnabled())
+                            log.debug(ex);
+                        continue;
+                    }
                 }
 
-                // visit all source solutions having the same hash code
-                @SuppressWarnings("unchecked")
-                final ITupleIterator<IBindingSet> titr = rightSolutions
-                        .lookupAll(hashCode);
+                /*
+                 * Sort by the computed hash code. This not only orders the
+                 * accesses into the HTree but it also allows us to handle all
+                 * source solutions which have the same hash code with a single
+                 * scan of the appropriate collision bucket in the HTree.
+                 */
+                Arrays.sort(a, 0, n);
 
-                while (titr.hasNext()) {
+                int fromIndex = 0;
+                
+                while (fromIndex < n) {
 
-                    final ITuple<IBindingSet> t = titr.next();
+                    // The next hash code to be processed.
+                    final int hashCode = a[fromIndex].hashCode;
+
+                    // scan for the first hash code which is different.
+                    int toIndex = n; // assume upper bound.
+                    for (int i = fromIndex + 1; i < n; i++) {
+                        if (a[i].hashCode != hashCode) {
+                            toIndex = i;
+                            break;
+                        }
+                    }
+                    // #of left solutions having the same hash code.
+                    final int bucketSize = toIndex - fromIndex;
 
                     /*
-                     * Note: The map entries must be the full source binding
-                     * set, not just the join variables, even though the key and
-                     * equality in the key is defined in terms of just the join
-                     * variables.
-                     * 
-                     * Note: Solutions which have the same hash code but whose
-                     * bindings are inconsistent will be rejected by bind() below.
+                     * Note: all source solutions in [fromIndex:toIndex) have
+                     * the same hash code.
                      */
-                    final IBindingSet rightSolution = t.getObject();
+                    {
 
-                    // Join.
-                    final IBindingSet outSolution = BOpContext.bind(
-                            leftSolution, rightSolution, leftIsPipeline,
-                            constraints, selectVars);
+                        // visit all source solutions having the same hash code
+                        @SuppressWarnings("unchecked")
+                        final ITupleIterator<IBindingSet> titr = rightSolutions
+                                .lookupAll(hashCode);
 
-                    if (outSolution == null) {
+                        while (titr.hasNext()) {
 
-                        // Join failed.
-                        continue;
+                            final ITuple<IBindingSet> t = titr.next();
 
-                    }
+                            /*
+                             * Note: The map entries must be the full source
+                             * binding set, not just the join variables, even
+                             * though the key and equality in the key is defined
+                             * in terms of just the join variables.
+                             * 
+                             * Note: Solutions which have the same hash code but
+                             * whose bindings are inconsistent will be rejected
+                             * by bind() below.
+                             */
 
-                    if (log.isDebugEnabled())
-                        log.debug("Output solution: " + outSolution);
+                            final IBindingSet rightSolution = t.getObject();
 
-                    // Accept this binding set.
-                    outputBuffer.add(outSolution);
+                            for (int i = fromIndex; i < toIndex; i++) {
 
-                    if (optional) {
+                                final IBindingSet leftSolution = a[i].bset;
+                                
+                                // Join.
+                                final IBindingSet outSolution = BOpContext
+                                        .bind(leftSolution, rightSolution,
+                                                leftIsPipeline, constraints,
+                                                selectVars);
 
-                        /*
-                         * Add to 2nd hash tree of all solutions which join.
-                         * 
-                         * Note: the hash key is based on the entire solution
-                         * for this htree.
-                         * 
-                         * TODO This code does allows duplicate solutions into
-                         * the joinSet. There is code below which does not
-                         * permit this. We might need to refactor that code into
-                         * a utility method (together with how we obtain the
-                         * appropriate hash code) and use it to filter out
-                         * duplicates for the joinSet and/or the rightSolutions.
-                         */
-                        
-                        joinSet.insert(rightSolution);
-                        
-//                        final int joinSetHashCode = rightSolution.hashCode();
-//                        
-//                        // visit all joinSet solutions having the same hash code
-//                        @SuppressWarnings("unchecked")
-//                        final ITupleIterator<IBindingSet> xitr = joinSet
-//                                .lookupAll(joinSetHashCode);
-//
-//                        boolean found = false;
-//                        while (!found && xitr.hasNext() ) {
-//
-//                            final ITuple<IBindingSet> xt = xitr.next();
-//
-//                            /*
-//                             * Note: The map entries must be the full source
-//                             * binding set, not just the join variables, even
-//                             * though the key and equality in the key is defined
-//                             * in terms of just the join variables.
-//                             * 
-//                             * Note: Solutions which have the same hash code but
-//                             * whose bindings are inconsistent will be rejected
-//                             * by bind() below.
-//                             */
-//                            final IBindingSet aSolution = xt.getObject();
-//                            
-//                            if (rightSolution.equals(aSolution)) {
-//
-//                                if (log.isDebugEnabled())
-//                                    log.debug("Solution already in joinSet: "
-//                                            + rightSolution);
-//                                
-//                                found = true;
-//                                
-//                                break;
-//                                
-//                            }
-//
-//                        }
-//
-//                        if (!found) {
-//                         
-//                            joinSet.insert(rightSolution);
-//                            
-//                            if (log.isDebugEnabled())
-//                                log.debug("Solution added to joinSet: "
-//                                        + rightSolution);
-//                            
-//                        }
+                                if (outSolution == null) {
 
-                    }
+                                    // Join failed.
+                                    continue;
 
-                } // next solution with the same hash code.
+                                }
+
+                                if (log.isDebugEnabled())
+                                    log.debug("Output solution: " + outSolution);
+
+                                // Accept this binding set.
+                                outputBuffer.add(outSolution);
+
+                                if (optional) {
+
+                                    saveInJoinSet(joinSet, rightSolution);
+
+                                }
+
+                            }
+
+                        } // next rightSolution with the same hash code.
+
+                    } // end block of leftSolutions having the same hash code.
+
+                    fromIndex = toIndex;
+                    
+                } // next slice of source solutions with the same hash code.
 
             } // while(itr.hasNext()
 
@@ -399,6 +438,72 @@ public class HashJoinUtility {
 
     } // handleJoin
 
+    /**
+     * Add to 2nd hash tree of all solutions which join.
+     * <p>
+     * Note: the hash key is based on the entire solution for this htree.
+     * 
+     * TODO This code does allows duplicate solutions into the joinSet. There is
+     * code below which does not permit this. We might need to refactor that
+     * code into a utility method (together with how we obtain the appropriate
+     * hash code) and use it to filter out duplicates for the joinSet and/or the
+     * rightSolutions.
+     */
+    static private void saveInJoinSet(final HTree joinSet,
+            final IBindingSet rightSolution) {
+
+        joinSet.insert(rightSolution);
+        
+//        final int joinSetHashCode = rightSolution.hashCode();
+//        
+//        // visit all joinSet solutions having the same hash code
+//        @SuppressWarnings("unchecked")
+//        final ITupleIterator<IBindingSet> xitr = joinSet
+//                .lookupAll(joinSetHashCode);
+//
+//        boolean found = false;
+//        while (!found && xitr.hasNext() ) {
+//
+//            final ITuple<IBindingSet> xt = xitr.next();
+//
+//            /*
+//             * Note: The map entries must be the full source
+//             * binding set, not just the join variables, even
+//             * though the key and equality in the key is defined
+//             * in terms of just the join variables.
+//             * 
+//             * Note: Solutions which have the same hash code but
+//             * whose bindings are inconsistent will be rejected
+//             * by bind() below.
+//             */
+//            final IBindingSet aSolution = xt.getObject();
+//            
+//            if (rightSolution.equals(aSolution)) {
+//
+//                if (log.isDebugEnabled())
+//                    log.debug("Solution already in joinSet: "
+//                            + rightSolution);
+//                
+//                found = true;
+//                
+//                break;
+//                
+//            }
+//
+//        }
+//
+//        if (!found) {
+//         
+//            joinSet.insert(rightSolution);
+//            
+//            if (log.isDebugEnabled())
+//                log.debug("Solution added to joinSet: "
+//                        + rightSolution);
+//            
+//        }
+
+    }
+    
     /**
      * Identify and output the optional solutions. Optionals are identified
      * using a <i>joinSet</i> containing each right solution which joined with
