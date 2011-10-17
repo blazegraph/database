@@ -1079,9 +1079,13 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         if(TestMode.quads != testMode)
             return;
 
+        final String resource = packagePath
+                + "insert_triples_with_defaultContext.ttl";
+
+        final Graph g = loadGraphFromResource(resource);
+
         // Load the resource into the KB.
-        doInsertByBody("POST", requestPath, packagePath
-                + "insert_triples_with_defaultContext.ttl", new URIImpl(
+        doInsertByBody("POST", requestPath, RDFFormat.TURTLE, g, new URIImpl(
                 "http://example.org"));
         
         // Verify that the data were inserted into the appropriate context.
@@ -1126,6 +1130,60 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
             opts.queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
             assertEquals(7, countResults(doSparqlQuery(opts, requestPath)));
         }
+        
+    }
+
+    /**
+     * Test of insert and retrieval of a large literal.
+     */
+    public void test_INSERT_veryLargeLiteral() throws Exception {
+        
+
+        final Graph g = new GraphImpl();
+        
+        final URI s = new URIImpl("http://www.bigdata.com/");
+        final URI p = RDFS.LABEL;
+        final Literal o = getVeryLargeLiteral();
+        final Statement stmt = new StatementImpl(s, p, o);
+        g.add(stmt);
+        
+        // Load the resource into the KB.
+        assertEquals(
+                1L,
+                doInsertByBody("POST", requestPath, RDFFormat.RDFXML, g, null/* defaultContext */).mutationCount);
+
+        // Read back the data into a graph.
+        final Graph g2;
+        {
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.method = "GET";
+            opts.queryStr = "DESCRIBE <" + s.stringValue() + ">";
+            g2 = buildGraph(doSparqlQuery(opts, requestPath));
+        }
+        
+        assertEquals(1, g2.size());
+        
+        assertTrue(g2.match(s, p, o).hasNext());
+        
+    }
+    
+    /**
+     * Generate and return a very large literal.
+     */
+    private Literal getVeryLargeLiteral() {
+
+        final int len = 1024000;
+
+        final StringBuilder sb = new StringBuilder(len);
+
+        for (int i = 0; i < len; i++) {
+
+            sb.append(Character.toChars('A' + (i % 26)));
+
+        }
+        
+        return new LiteralImpl(sb.toString());
         
     }
 
@@ -1858,6 +1916,25 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         return baos.toByteArray();
 
     }
+
+    /**
+     * Load and return a graph from a resource.
+     * 
+     * @param resource
+     *            The resource.
+     * 
+     * @return The graph.
+     */
+    private Graph loadGraphFromResource(final String resource)
+            throws RDFParseException, RDFHandlerException, IOException {
+
+        final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
+
+        final Graph g = readGraphFromFile(new File(resource));
+
+        return g;
+
+    }
     
     /**
      * Reads a resource and sends it using an INSERT with BODY request to be
@@ -1870,15 +1947,11 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
      * @throws Exception
      */
     private MutationResult doInsertByBody(final String method,
-            final String servlet, final String resource,
+            final String servlet, final RDFFormat rdfFormat, final Graph g,
             final URI defaultContext) throws Exception {
 
-        final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
-        
-        final Graph g = readGraphFromFile(new File(resource));
-
         final byte[] wireData = writeOnBuffer(rdfFormat, g);
-        
+
         HttpURLConnection conn = null;
         try {
 
