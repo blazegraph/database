@@ -130,6 +130,9 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Simple Sub-Select unit test
+     */
     public void test_sparql_subselect() throws Exception {
 
         new TestHelper("sparql-subselect").runTest();

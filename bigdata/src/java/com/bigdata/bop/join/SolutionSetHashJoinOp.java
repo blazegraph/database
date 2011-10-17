@@ -105,8 +105,8 @@ public class SolutionSetHashJoinOp extends PipelineOp {
          * retained in the {@link IBindingSet}s written out by the operator. All
          * variables are retained unless this annotation is specified. This is
          * normally set to the <em>projection</em> of the subquery, in which
-         * case the lexical scope of the variables is will be properly managed
-         * for the subquery INCLUDE join.
+         * case the lexical scope of the variables will be properly managed for
+         * the subquery INCLUDE join.
          * 
          * @see JoinAnnotations#SELECT
          */
