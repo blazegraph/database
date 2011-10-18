@@ -90,7 +90,7 @@ public class AST2BOpContext implements IdFactory {
      * of OPTIONAL groups. It also effect handle of UNION iff UNION is modeled
      * as sub-groups rather than using a TEE pattern.
      */
-    boolean hashJoinPatternForSubGroup = false;
+    boolean hashJoinPatternForSubGroup = true;
     
     /**
      * When <code>true</code>, use a hash join pattern for sub-select
