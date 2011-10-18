@@ -1569,7 +1569,13 @@ public class TestRunState extends TestCase2 {
         expected.totalAvailableCount.incrementAndGet();
         expected.availableMap.put(startId, new AtomicLong(1L));
         expected.serviceIds.add(serviceId);
-        
+        // mock "zero" evaluations of operator requesting last pass semantics.
+        expected.totalLastPassRemainingCount.incrementAndGet();
+        expected.startedOn.put(orderId, newSet(new UUID[] { serviceId }));
+        expected.runningMap.put(orderId, new AtomicLong(0L));
+        expected.availableMap.put(orderId, new AtomicLong(0L));
+        expected.lastPassRequested.add(orderId);
+
         assertSameState(expected, actual);
 
         // step2 : start operator.
@@ -1647,7 +1653,7 @@ public class TestRunState extends TestCase2 {
 
         assertSameState(expected, actual);
 
-        // step4: start the 3nd operator.
+        // step4: start the 3rd operator.
         runState.startOp(new StartOpMessage(queryId, orderId,
                 -1/* partitionId */, serviceId, 1/* nmessages */,
                 orderOp.getEvaluationContext(),
@@ -1656,11 +1662,11 @@ public class TestRunState extends TestCase2 {
         expected.stepCount.incrementAndGet();
         expected.totalAvailableCount.decrementAndGet();
         expected.totalRunningCount.incrementAndGet();
-        expected.totalLastPassRemainingCount.incrementAndGet();
+//        expected.totalLastPassRemainingCount.incrementAndGet(); // already accounted for.
         expected.availableMap.put(orderId, new AtomicLong(0L));
         expected.runningMap.put(orderId, new AtomicLong(1L));
-        expected.startedOn.put(orderId, newSet(new UUID[] { serviceId }));
-        expected.lastPassRequested.add(orderId);
+//        expected.startedOn.put(orderId, newSet(new UUID[] { serviceId })); // already accounted for.
+//        expected.lastPassRequested.add(orderId); // already accounted for.
 
         assertSameState(expected, actual);
 
@@ -1735,17 +1741,237 @@ public class TestRunState extends TestCase2 {
 
     }
     
-    /**
-     * FIXME Write unit tests for the last pass invocation on a cluster for
-     * sharded or hash partitioned operators. These tests need to verify that
-     * the {@link RunState} expects the correct number of last pass invocations
-     * (on for each shard or service on which the query was started).
-     */
-    public void test_lastPassRequested_cluster_byServiceId() {
-        
-        fail("write tests");
-        
-    }
+//    /**
+//     * Unit tests for an operator which requests a final evaluation pass but
+//     * which was never triggered during normal evaluation. The final evaluation
+//     * pass is still triggered for such cases.
+//     * 
+//     * @see PipelineOp.Annotations#LAST_PASS
+//     */
+//    public void test_lastPassRequested_neverTriggered() throws TimeoutException,
+//            ExecutionException, InterruptedException {
+//
+//        final UUID serviceId = UUID.randomUUID();
+//
+//        final IQueryClient queryController = new MockQueryController(serviceId);
+//
+//        final int startId = 1;
+//        final int otherId = 2;
+//        final int orderId = 3;
+//
+//        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
+//                .asMap(new NV[] {//
+//                new NV(Predicate.Annotations.BOP_ID, startId),//
+//                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER),//
+//                }));
+//
+//        // Note: For this test, we will simulate dropping all solutions which 
+//        // are passed to [otherOp].
+//        final PipelineOp otherOp = new StartOp(new BOp[] { startOp },
+//                NV.asMap(new NV[] {//
+//                        new NV(Predicate.Annotations.BOP_ID, otherId),//
+//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        }));
+//
+//        final PipelineOp orderOp = new StartOp(new BOp[] { otherOp },
+//                NV.asMap(new NV[] {//
+//                        new NV(Predicate.Annotations.BOP_ID, orderId),//
+//                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+//                                BOpEvaluationContext.CONTROLLER),//
+//                        new NV(PipelineOp.Annotations.LAST_PASS,true),//
+//                        new NV(PipelineOp.Annotations.MAX_PARALLEL,1),//
+//                        }));
+//
+//        final PipelineOp query = orderOp;
+//
+//        final UUID queryId = UUID.randomUUID();
+//
+//        final long begin = System.currentTimeMillis();
+//        
+//        final long deadline = Long.MAX_VALUE;
+//
+//        final Map<Integer, BOp> bopIndex = BOpUtility.getIndex(query);
+//
+//        final InnerState expected = new InnerState(query, queryId,
+//                deadline, begin, bopIndex);
+//
+//        final InnerState actual = new InnerState(query, queryId, deadline,
+//                begin, bopIndex);
+//        
+//        final RunState runState = new RunState(actual);
+//
+//        // step0
+//        assertSameState(expected, actual);
+//        
+//        /*
+//         * step1 : startQuery, notice that a chunk is available.
+//         * 
+//         * Note: The operator is immediately registered for last pass evaluation
+//         * since it will run on the query controller.
+//         */
+//        runState.startQuery(new LocalChunkMessage<IBindingSet>(queryController,
+//                queryId, startId, -1/* partitionId */,
+//                newBindingSetIterator(new HashBindingSet())));
+//
+//        expected.started.set(true);
+//        expected.stepCount.incrementAndGet();
+//        expected.totalAvailableCount.incrementAndGet();
+//        expected.availableMap.put(startId, new AtomicLong(1L));
+//        expected.serviceIds.add(serviceId);
+//        expected.totalLastPassRemainingCount.incrementAndGet();
+//        expected.startedOn.put(orderId, newSet(new UUID[] { serviceId }));
+//        expected.runningMap.put(orderId, new AtomicLong(0L));
+//        expected.availableMap.put(orderId, new AtomicLong(0L));
+//        expected.lastPassRequested.add(orderId);
+//
+//        assertSameState(expected, actual);
+//
+//        // step2 : start operator.
+//        runState.startOp(new StartOpMessage(queryId, startId,
+//                -1/* partitionId */, serviceId, 1/* nmessages */,
+//                startOp.getEvaluationContext(),
+//                startOp.isLastPassRequested()));
+//
+//        expected.stepCount.incrementAndGet();
+//        expected.totalAvailableCount.decrementAndGet();
+//        expected.totalRunningCount.incrementAndGet();
+//        expected.availableMap.put(startId, new AtomicLong(0L));
+//        expected.runningMap.put(startId, new AtomicLong(1L));
+//        expected.startedOn.put(startId, newSet(new UUID[] { serviceId }));
+//        
+//        assertSameState(expected, actual);
+//
+//        // step3 : halt operator : the operator produced one chunk.
+//        {
+//
+//            final BOpStats stats = new BOpStats();
+//
+//            final HaltOpMessage msg = new HaltOpMessage(queryId, startId,
+//                    -1/* partitionId */, serviceId, null/* cause */,
+//                    otherId/* sinkId */, 1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+//            
+//            assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
+//
+//        }
+//
+//        expected.stepCount.incrementAndGet();
+//        expected.totalAvailableCount.incrementAndGet();
+//        expected.totalRunningCount.decrementAndGet();
+//        expected.availableMap.put(startId, new AtomicLong(0L));
+//        expected.availableMap.put(otherId, new AtomicLong(1L));
+//        expected.runningMap.put(startId, new AtomicLong(0L));
+//        
+//        assertSameState(expected, actual);
+//
+//        // start the 2nd operator: Note: This operator will drop its solutions.
+//        runState.startOp(new StartOpMessage(queryId, otherId,
+//                -1/* partitionId */, serviceId, 1/* nmessages */,
+//                otherOp.getEvaluationContext(),
+//                otherOp.isLastPassRequested()));
+//
+//        expected.stepCount.incrementAndGet();
+//        expected.totalAvailableCount.decrementAndGet();
+//        expected.totalRunningCount.incrementAndGet();
+//        expected.availableMap.put(otherId, new AtomicLong(0L));
+//        expected.runningMap.put(otherId, new AtomicLong(1L));
+//        expected.startedOn.put(otherId, newSet(new UUID[] { serviceId }));
+//
+//        assertSameState(expected, actual);
+//        
+//        /*
+//         * step3 : halt operator : the operator produced NO chunk message.
+//         * 
+//         * Note: even though nothing was output, the availableMap is updated to
+//         * now contain an entry for the target operator (orderId). It will show
+//         * that there are ZERO (0) chunks available for that operator.
+//         */
+//        {
+//
+//            final BOpStats stats = new BOpStats();
+//
+//            final HaltOpMessage msg = new HaltOpMessage(queryId, otherId,
+//                    -1/* partitionId */, serviceId, null/* cause */,
+//                    orderOp.getId()/* sinkId */, 0/* sinkMessagesOut */,
+//                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+//
+//            assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
+//
+//        }
+//        
+//        expected.stepCount.incrementAndGet();
+////        expected.totalAvailableCount.incrementAndGet();
+//        expected.totalRunningCount.decrementAndGet();
+//        expected.availableMap.put(orderId, new AtomicLong(0L));
+//        expected.runningMap.put(otherId, new AtomicLong(0L));
+//
+//        assertSameState(expected, actual);
+//
+//        /*
+//         * At this point normal evaluation (based on the flow of chunk messages)
+//         * is complete since no chunk messages were output from otherId (the 2nd
+//         * operator). However, we still need to run a final evaluation pass for
+//         * the 3rd operator since it declares the LAST_PASS annotation (and is
+//         * being run on the query controller, so we will trigger it even though
+//         * it never received a chunk message).
+//         */
+//
+//        // step4: start the last pass evaluation for the 3rd operator.
+//        assertFalse(runState
+//                .startOp(new StartOpMessage(queryId, orderId,
+//                        -1/* partitionId */, serviceId, 1/* nmessages */,
+//                        orderOp.getEvaluationContext(), orderOp
+//                                .isLastPassRequested())));
+//
+//        expected.stepCount.incrementAndGet();
+//        expected.totalAvailableCount.decrementAndGet();
+//        expected.totalRunningCount.incrementAndGet();
+//        expected.availableMap.put(orderId, new AtomicLong(-1L));
+//        expected.runningMap.put(orderId, new AtomicLong(1L));
+//        
+//        assertSameState(expected, actual);
+//
+//        /*
+//         * step6 : halt operator : the operator produced one chunk message
+//         * (which will go to the query buffer).
+//         */
+//        {
+//
+//            final BOpStats stats = new BOpStats();
+//
+//            final HaltOpMessage msg = new HaltOpMessage(queryId, orderId,
+//                    -1/* partitionId */, serviceId, null/* cause */,
+//                    null/* sinkId (queryBuffer)*/, 1/* sinkMessagesOut */,
+//                    null/* altSinkId */, 0/* altSinkMessagesOut */, stats);
+//
+//            assertEquals(RunStateEnum.AllDone, runState.haltOp(msg));
+//
+//        }
+//        
+//        expected.allDone.set(true);
+//        expected.stepCount.incrementAndGet();
+//        expected.totalRunningCount.decrementAndGet();
+//        expected.totalLastPassRemainingCount.decrementAndGet();
+//        expected.runningMap.put(orderId, new AtomicLong(0L));
+//        expected.doneOn.put(orderId, Collections.emptySet());
+//
+//        assertSameState(expected, actual);
+//
+//    }
+//    
+//    /**
+//     * FIXME Write unit tests for the last pass invocation on a cluster for
+//     * sharded or hash partitioned operators. These tests need to verify that
+//     * the {@link RunState} expects the correct number of last pass invocations
+//     * (on for each shard or service on which the query was started).
+//     */
+//    public void test_lastPassRequested_cluster_byServiceId() {
+//        
+//        fail("write tests");
+//        
+//    }
     
     /*
      * Test helpers

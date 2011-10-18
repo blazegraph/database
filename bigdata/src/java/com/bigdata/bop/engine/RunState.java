@@ -268,7 +268,7 @@ class RunState {
         final Set<UUID/* serviceId */> serviceIds = new LinkedHashSet<UUID>();
         
         /**
-         * A map associating each operators for which evaluation has begun with the
+         * A map associating each operator for which evaluation has begun with the
          * the set of distinct nodes or shards where the operator has been submitted
          * for evaluation. The {@link Set} associated with each operator will be a
          * <code>Set&lt;serviceId&gt;</code> or <code>Set&lt;shardId&gt;</code> (iff
@@ -575,6 +575,50 @@ class RunState {
 
         messagesProduced(msg.getBOpId(), 1/* nmessages */);
 
+        /*
+         * Any operator requesting last pass evaluation on the controller needs
+         * to be added to the last pass evaluation set now. This provides the
+         * guarantee that such operators will be run at least once (assuming
+         * that the query terminates normally).
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:12
+         */
+        {
+            final UUID controllerId;
+            try {
+                controllerId = msg.getQueryController().getServiceUUID();
+            } catch (RemoteException ex) {
+                // Note: Local method call. This exception is not thrown.
+                throw new RuntimeException(ex);
+            }
+            final Iterator<BOp> itr = BOpUtility.preOrderIterator(innerState.query);
+            while(itr.hasNext()) {
+                final BOp op = itr.next();
+                if (op.getEvaluationContext() != BOpEvaluationContext.CONTROLLER)
+                    continue;
+                if(!((PipelineOp) op).isLastPassRequested())
+                    continue;
+                final Integer id = (Integer) op.getProperty(BOp.Annotations.BOP_ID);
+                if (id == null)
+                    throw new NoBOpIdException(op.toString());
+                if (innerState.lastPassRequested.add(id)) {
+                    innerState.totalLastPassRemainingCount.incrementAndGet();
+                    /*
+                     * Mock an evaluation pass for this operator. It will look
+                     * as if the operator has been evaluated (various
+                     * collections have entries for that bopId) but that it was
+                     * evaluated ZERO (0) times (various counters are zero).
+                     */
+                    innerState.runningMap.put(id.intValue(), new AtomicLong());
+                    @SuppressWarnings("rawtypes")
+                    final Set set = new LinkedHashSet();
+                    set.add(controllerId);
+                    innerState.startedOn.put(id, set);
+                    messagesConsumed(id.intValue(), 0/*nmessages*/);
+                }
+            }
+        }
+        
         /*
          * Note: RunState is only used by the query controller so this will not
          * do an RMI and the RemoteException will not be thrown.
@@ -973,9 +1017,10 @@ class RunState {
                 && innerState.runningMap.containsKey(bopId)) {
 
             /*
-             * The operator has requested last pass evaluation and has in fact
-             * been evaluated (the running count map has an entry for this
-             * operator).
+             * The operator has requested last pass evaluation AND (either has
+             * in fact been evaluated (the running count map has an entry for
+             * this operator) -OR- is an operator which runs on the query
+             * controller).
              * 
              * Now we need to determine whether or not the operator should start
              * its last pass evaluation phase or if it is waiting for the last

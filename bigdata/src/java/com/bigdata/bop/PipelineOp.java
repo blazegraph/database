@@ -200,6 +200,11 @@ abstract public class PipelineOp extends BOpBase {
          * {@link IChunkMessage}. The final evaluation pass will be associated
          * with an empty {@link IChunkMessage} as its source and
          * {@link BOpContext#isLastInvocation()} will report <code>true</code>.
+         * <p>
+         * Note: A final evaluation pass will be triggered even if the operator
+         * was never triggered by a normal evaluation pass. This behavior is
+         * necessary for several language constructs. Operators are free to do
+         * nothing if they can ignore the final evaluation pass in this case.
          */
         String LAST_PASS = PipelineOp.class.getName() + ".lastPass";
 

@@ -2201,7 +2201,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 		     */
             final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-            // Find the set of variables which will be definately bound by the
+            // Find the set of variables which will be definitely bound by the
             // time the sub-group is evaluated.
             final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
                     (GraphPatternGroup<?>) subgroup,
