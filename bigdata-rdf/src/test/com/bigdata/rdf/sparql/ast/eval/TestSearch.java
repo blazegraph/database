@@ -316,76 +316,76 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
-    /**
-     * TODO Unit test for search-in-search pattern:
-     * 
-     * <pre>
-     * select ?snippet
-     * where {
-     * 
-     *   ?o bd:search "foo" .
-     *   ?snippet ?p ?o .
-     *   
-     *   ?snippet ?p1 ?o1 .
-     *   filter(isLiteral(?o1)) .
-     *   filter(regex(str(?o1),"bar")) .
-     * 
-     * }
-     * You could achieve the same result by running it like this:
-     * 
-     * select ?snippet
-     * where {
-     *   
-     *   ?o1 bd:search "foo" .
-     *   ?snippet ?p1 ?o1 .
-     * 
-     *   ?o2 bd:search "bar" .
-     *   ?snippet ?p2 ?o2 .
-     * 
-     * }
-     * 
-     * You'd want to do a hash join of the two groups of two predicates, joining on ?snippet.
-     * there needs to be pagination on both sides of the two searches or the query will croak.
-     * 
-     * So for something like snippet merge:
-     * 
-     * select ?snippet1 ?snippet2 ?mergeVal
-     * where {
-     * 
-     *   ?o1 bd:search "foo" .
-     *   ?o1 bd:rank ?rank1 .
-     *   ?snippet1 ?p1 ?o1 .
-     *   ?snippet1 <mergePredicate1> ?mergeVal .
-     * 
-     *   optional {
-     * 
-     *     ?o2 bd:search "bar" .
-     *     ?o2 bd:rank ?rank2 .
-     *     ?snippet2 ?p2 ?o2 .
-     *     ?snippet2 <mergePredicate2> ?mergeVal .
-     * 
-     *   }
-     * 
-     * }
-     * 
-     * I page through the right side of the hash join (the "bar" search) rank by rank. 
-     * When I hit the end of the right side I move one page forward on the left side
-     * and then do the whole paging of the right side over again. Right now I have no
-     * way to do an N-way merge, because the pagination would start to take forever.
-     * 
-     * ?rank1, ?rank2
-     * 1, 1
-     * 1, 2
-     * 1, 3
-     * 1, 4
-     * 2, 1
-     * 2, 2
-     * 2, 3
-     * 2, 4
-     * </pre>
-     */
-    public void test_search_in_search() {
-        fail("write test");
-    }
+//    /**
+//     * TODO Unit test for search-in-search pattern:
+//     * 
+//     * <pre>
+//     * select ?snippet
+//     * where {
+//     * 
+//     *   ?o bd:search "foo" .
+//     *   ?snippet ?p ?o .
+//     *   
+//     *   ?snippet ?p1 ?o1 .
+//     *   filter(isLiteral(?o1)) .
+//     *   filter(regex(str(?o1),"bar")) .
+//     * 
+//     * }
+//     * You could achieve the same result by running it like this:
+//     * 
+//     * select ?snippet
+//     * where {
+//     *   
+//     *   ?o1 bd:search "foo" .
+//     *   ?snippet ?p1 ?o1 .
+//     * 
+//     *   ?o2 bd:search "bar" .
+//     *   ?snippet ?p2 ?o2 .
+//     * 
+//     * }
+//     * 
+//     * You'd want to do a hash join of the two groups of two predicates, joining on ?snippet.
+//     * there needs to be pagination on both sides of the two searches or the query will croak.
+//     * 
+//     * So for something like snippet merge:
+//     * 
+//     * select ?snippet1 ?snippet2 ?mergeVal
+//     * where {
+//     * 
+//     *   ?o1 bd:search "foo" .
+//     *   ?o1 bd:rank ?rank1 .
+//     *   ?snippet1 ?p1 ?o1 .
+//     *   ?snippet1 <mergePredicate1> ?mergeVal .
+//     * 
+//     *   optional {
+//     * 
+//     *     ?o2 bd:search "bar" .
+//     *     ?o2 bd:rank ?rank2 .
+//     *     ?snippet2 ?p2 ?o2 .
+//     *     ?snippet2 <mergePredicate2> ?mergeVal .
+//     * 
+//     *   }
+//     * 
+//     * }
+//     * 
+//     * I page through the right side of the hash join (the "bar" search) rank by rank. 
+//     * When I hit the end of the right side I move one page forward on the left side
+//     * and then do the whole paging of the right side over again. Right now I have no
+//     * way to do an N-way merge, because the pagination would start to take forever.
+//     * 
+//     * ?rank1, ?rank2
+//     * 1, 1
+//     * 1, 2
+//     * 1, 3
+//     * 1, 4
+//     * 2, 1
+//     * 2, 2
+//     * 2, 3
+//     * 2, 4
+//     * </pre>
+//     */
+//    public void test_search_in_search() {
+//        fail("write test");
+//    }
     
 }
