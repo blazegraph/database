@@ -35,8 +35,8 @@ import com.bigdata.bop.bset.CopyOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.bset.Tee;
+import com.bigdata.bop.controller.JVMNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.controller.NamedSubqueryIncludeOp;
 import com.bigdata.bop.controller.NamedSubqueryOp;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
@@ -614,10 +614,22 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
 
+    /**
+     * Convert a {@link NamedSubqueryRoot} into a pipeline operator plan.
+     * 
+     * @param left
+     *            The left or <code>null</code>.
+     * @param subqueryRoot
+     *            The {@link NamedSubqueryRoot}.
+     * @param ctx
+     *            The context.
+     * @return The operator plan.
+     */
     static private PipelineOp createNamedSubquery(PipelineOp left,
             final NamedSubqueryRoot subqueryRoot, final AST2BOpContext ctx) {
 
-        final PipelineOp subqueryPlan = convert(null/*left*/,subqueryRoot, ctx);
+        final PipelineOp subqueryPlan = convert(null/* left */, subqueryRoot,
+                ctx);
 
         if (log.isInfoEnabled())
             log.info("\nsubquery: " + subqueryRoot + "\nplan=" + subqueryPlan);
@@ -628,6 +640,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                 ctx.queryId, subqueryRoot.getName(), joinVars);
 
+        if(ctx.nativeHashJoins) {
         left = new NamedSubqueryOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -638,6 +651,18 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF,
                         namedSolutionSet)//
         );
+        } else {
+            left = new JVMNamedSubqueryOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(NamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                    new NV(NamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(NamedSubqueryOp.Annotations.NAMED_SET_REF,
+                            namedSolutionSet)//
+            );
+        }
 
         return left;
 
@@ -719,14 +744,47 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final NamedSolutionSetRef namedSolutionSetRef = new NamedSolutionSetRef(
                 ctx.queryId, subqueryInclude.getName(), joinVars);
 
-        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF,
-                        namedSolutionSetRef),//
-                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
-        );
+        /*
+         * TODO This should be set based on the #of INCLUDEs for the named
+         * subquery. We can not release the associated hash index until all
+         * includes are done.
+         */
+        final boolean release = false;
+        
+        if (ctx.nativeHashJoins) {
+            left = new SolutionSetHashJoinOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
+                            namedSolutionSetRef),//
+                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS,
+                            joinVars),//
+                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE,
+                                release)//
+            );
+        } else {
+            left = new JVMSolutionSetHashJoinOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
+                            namedSolutionSetRef),//
+                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS,
+                            joinVars),//
+                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE,
+                            release)//
+            );
+        }
+        
+//        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
+//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER),//
+//                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF,
+//                        namedSolutionSetRef),//
+//                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
+//        );
 
         return left;
 
@@ -813,7 +871,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * solutions from the sub-select (which are flowing through the
              * pipeline).
              */
-            if(false) { 
+            if(ctx.hashJoinPatternForSubSelect) { 
 
                 /*
                  * Model a sub-group by building a hash index at the start of the
@@ -2131,7 +2189,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * sub-group (which are flowing through the pipeline). The hash join is
          * optional iff the sub-group is optional.
          */
-        if(false) { 
+        if(ctx.hashJoinPatternForSubGroup) { 
 
 		    /*
 		     * Model a sub-group by building a hash index at the start of the
