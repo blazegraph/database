@@ -885,10 +885,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
                 // Find the set of variables which will be definitely bound by the
                 // time the sub-select is evaluated.
-                final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
-                        subqueryRoot,
-                        new LinkedHashSet<IVariable<?>>());
-
+                final Set<IVariable<?>> incomingBound = ctx.sa
+                        .getIncomingBindings(subqueryRoot,
+                                new LinkedHashSet<IVariable<?>>());
+                
                 /*
                  * The join variables are those which are known bound on entry
                  * to the subquery and which are also projected by the subquery.

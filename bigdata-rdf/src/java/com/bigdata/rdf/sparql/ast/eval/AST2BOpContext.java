@@ -95,6 +95,15 @@ public class AST2BOpContext implements IdFactory {
     /**
      * When <code>true</code>, use a hash join pattern for sub-select
      * evaluation. When <code>false</code>, use a {@link SubqueryOp}.
+     * 
+     * FIXME The code path for this works, but it can not be enabled until we
+     * correctly report join variables for the actual evaluation order. To
+     * verify that the code works you have to hack the StaticAnalysis class 
+     * to specifically exclude the variables projected by the subquery from
+     * the set of "incomingBound" variables in the parent join group.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
+     *      static optimizer into an AST rewrite)
      */
     boolean hashJoinPatternForSubSelect = false;
     
