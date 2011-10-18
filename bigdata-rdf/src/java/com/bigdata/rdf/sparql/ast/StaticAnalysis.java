@@ -334,7 +334,26 @@ public class StaticAnalysis {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
 
-            vars.addAll(getDefinatelyProducedBindings(subquery));
+            if(true) {
+
+                /*
+                 * FIXME Although the sub-select is also a required join, this
+                 * code is being used to find the join variables for the
+                 * sub-select so we can not consider the sub-select's
+                 * contribution.
+                 * 
+                 * Note: By failing to consider the sub-select's contribution
+                 * here we are letting in any number of nasty consequences which
+                 * can range from not predicting join variables in other
+                 * circumstances to failing to bind filters early enough.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/398
+                 * (Convert the static optimizer into an AST rewrite)
+                 */
+
+                vars.addAll(getDefinatelyProducedBindings(subquery));
+                
+            }
 
         } else if (node instanceof NamedSubqueryInclude) {
 

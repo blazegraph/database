@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTSparql11SubqueryOptimizer;
 
@@ -132,6 +133,19 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * Simple Sub-Select unit test
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * SELECT ?x ?o
+     *  WHERE {
+     *     ?x rdfs:label ?o .
+     *     {
+     *       SELECT ?x WHERE {?x rdf:type foaf:Person}
+     *     }
+     * }
+     * </pre>
      */
     public void test_sparql_subselect() throws Exception {
 
@@ -139,6 +153,45 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * A unit test from the Sesame 2.5 TCK.
+     * 
+     * <pre>
+     * SELECT * { SELECT * { ?s ?p ?o } }
+     * </pre>
+     */
+    public void test_sparql11_subquery_02() throws Exception {
+        
+        new TestHelper(
+                "sparql11-subquery-02", // testURI,
+                "sparql11-subquery-02.rq",// queryFileURL
+                "sparql11-subquery-02.ttl",// dataFileURL
+                "sparql11-subquery-02.srx"// resultFileURL
+                ).runTest();
+
+    }
+    
+    /**
+     * A unit test from the Sesame 2.5 TCK.
+     * 
+     * <pre>
+     * SELECT (count(*) as ?count)
+     * WHERE { 
+     *     { SELECT ?s ?p ?o WHERE { ?s ?p ?o } }
+     * }
+     * </pre>
+     */
+    public void test_sparql11_count_subquery_01() throws Exception {
+        
+        new TestHelper(
+                "sparql11-count-subquery-01", // testURI,
+                "sparql11-count-subquery-01.rq",// queryFileURL
+                "sparql11-count-subquery-01.ttl",// dataFileURL
+                "sparql11-count-subquery-01.srx"// resultFileURL
+                ).runTest();
+        
+    }
+    
     /**
      * This is a version of {@link #test_sparql_subselect()} which uses the same
      * data and has the same results, but which uses a named subquery rather
