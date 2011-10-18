@@ -69,7 +69,7 @@ public interface QueryHints {
 	 * optimizer using
 	 * 
 	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.optimizer=None&gt;
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.optimizer=None&gt;
 	 * </pre>
 	 * 
 	 * Disabling the query optimizer can be useful if you have a query for which
@@ -89,7 +89,7 @@ public interface QueryHints {
 	 * statistics for tagged queries.
 	 * 
 	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.tag=Query12&gt;
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.tag=Query12&gt;
 	 * </pre>
 	 * 
 	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N queries)
@@ -111,7 +111,7 @@ public interface QueryHints {
 	 * product if run normally (i.e. multiple free text searches).
 	 *  
 	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.hashJoin=true&gt;
+	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.hashJoin=true&gt;
 	 * </pre>
 	 */
     String HASH_JOIN = QueryHints.class.getName() + ".hashJoin";
@@ -146,7 +146,7 @@ public interface QueryHints {
      * the query.
      * 
      * <pre>
-     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sail.QueryHints.queryId=36cff615-aaea-418a-bb47-006699702e45&gt;
+     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.queryId=36cff615-aaea-418a-bb47-006699702e45&gt;
      * </pre>
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
