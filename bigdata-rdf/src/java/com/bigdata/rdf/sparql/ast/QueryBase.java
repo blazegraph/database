@@ -225,6 +225,16 @@ abstract public class QueryBase extends QueryNodeBase implements
     @SuppressWarnings({ "rawtypes" })
     public void setWhereClause(final GraphPatternGroup whereClause) {
 
+        /*
+         * Clear the parent reference on the new where clause.
+         * 
+         * Note: This handles cases where a join group is lifted into a named
+         * subquery. If we do not clear the parent reference on the lifted join
+         * group it will still point back to its parent in the original join
+         * group.
+         */
+        whereClause.setParent(null);
+        
         setProperty(Annotations.WHERE_CLAUSE, whereClause);
 
     }
