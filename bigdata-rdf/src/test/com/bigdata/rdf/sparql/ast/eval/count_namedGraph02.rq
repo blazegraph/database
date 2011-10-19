@@ -1,0 +1,6 @@
+SELECT (COUNT(?s) AS ?size)
+WHERE { 
+    GRAPH <http://www.bigdata.com/systap> {
+        ?s ?p ?o . 
+    }
+}
