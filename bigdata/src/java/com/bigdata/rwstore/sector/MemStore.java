@@ -122,6 +122,15 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 	}
 
 	/**
+	 * Return the backing {@link IMemoryManager}.
+	 */
+    public IMemoryManager getMemoryManager() {
+
+        return m_store;
+        
+    }
+    
+	/**
 	 * Return a new view of the {@link MemStore} backed by a child
 	 * {@link IMemoryManager}. Allocations against the {@link MemStore} may be
 	 * released in bulk by {@link #close()}. The life cycle of the returned
