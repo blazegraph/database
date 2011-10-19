@@ -94,5 +94,49 @@ public class TestAggregationQuery extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
     }
-    
+
+    /**
+     * <pre>
+     * SELECT (COUNT(?s) AS ?size)
+     * FROM <http://www.bigdata.com/systap>
+     * WHERE { 
+     *     ?s ?p ?o . 
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_count_namedGraph01() throws Exception {
+     
+        new TestHelper(
+                "count_namedGraph01", // testURI,
+                "count_namedGraph01.rq",// queryFileURL
+                "count_namedGraph01.trig",// dataFileURL
+                "count_namedGraph01.srx"// resultFileURL
+                ).runTest();
+        
+    }
+
+    /**
+     * <pre>
+     * SELECT (COUNT(?s) AS ?size)
+     * WHERE { 
+     *     GRAPH <http://www.bigdata.com/systap> {
+     *         ?s ?p ?o . 
+     *     }
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_count_namedGraph02() throws Exception {
+
+        new TestHelper("count_namedGraph02", // testURI,
+                "count_namedGraph02.rq",// queryFileURL
+                "count_namedGraph02.trig",// dataFileURL
+                "count_namedGraph02.srx"// resultFileURL
+                ).runTest();
+        
+    }
+
 }
