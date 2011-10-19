@@ -90,13 +90,17 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * :b :p 4 .
      * </pre>
      * 
-     * FIXME To me, it looks like the correct solution should be two groups. The
-     * group for <code>:a</code> should have an unbound value for
-     * <code>?x</code>. The group for <code>:b</code> should have a bound value
-     * of <code>"7"^^xsd:integer</code> for <code>?x</code>. This differs from
-     * the expected solution, but I believe that is because Sesame has a bad
-     * unit test for this case. I've written JeenB about this test. It is still
-     * present in sesame 2.5.0-dev.
+     * The test as present in Sesame 2.5 is wrong. I've filed a bug report. The
+     * correct solution should be two groups. The group for <code>:a</code>
+     * should have an unbound value for <code>?x</code>. The group for
+     * <code>:b</code> should have a bound value of
+     * <code>"7"^^xsd:integer</code> for <code>?x</code>.
+     * <p>
+     * Note: This test will continue to fail in the TCK until Sesame resolve the
+     * issue, which will require both updating their test suite and also
+     * updating their error handling logic to conform with the spec.
+     * 
+     * @see http://www.openrdf.org/issues/browse/SES-862
      */
     public void test_sparql11_sum_03() throws Exception {
 
