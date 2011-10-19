@@ -365,6 +365,19 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTSimpleOptionalOptimizer());
         
         /**
+         * Rewrite a join group having complex optionals using a hash join
+         * pattern.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
+         * 
+         *      FIXME This optimizer can not be enabled until we can correctly
+         *      predict the join variables, which is blocked on
+         *      https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert
+         *      the static optimizer into an AST rewrite)
+         */
+//        add(new ASTComplexOptionalOptimizer());
+        
+        /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate.
          * 
          * FIXME This similar too, but still different from, recognizing when we
@@ -380,6 +393,15 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());
+        
+        /**
+         * TODO Add an AST optimizer which prunes out out unnecessary variables
+         * from the named and SPARQL 1.1 subquery projections. The optimizer
+         * should also cause variables to be dropped from the query plan once
+         * their bound values will no longer be utilized. The main impact of
+         * this optimizer will be on the heap and NIO traffic.
+         */
+//        add(new ASTPruneVariablesOptimizer());
         
     }
 

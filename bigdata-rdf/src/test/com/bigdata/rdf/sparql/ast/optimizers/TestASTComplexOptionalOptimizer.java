@@ -135,12 +135,8 @@ public class TestASTComplexOptionalOptimizer extends
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
      * 
-     *      TODO Pruning out unnecessary variables from the named subquery
-     *      projections should be either encapsulated by a static analysis
-     *      helper method or done by a different optimizer. Actually, a
-     *      different optimizer looks interesting. It could drop variables at
-     *      group/subquery boundaries but also in the middle of a group. That
-     *      is a long standing issue with pruning the variables eagerly.
+     * TODO We need a unit test where there are some filters which should
+     * move and some which should not.
      */
     public void test_rewriteComplexOptional() {
         /*
@@ -233,9 +229,9 @@ public class TestASTComplexOptionalOptimizer extends
                 projection.addProjectionVar(new VarNode("var1"));
             }
 
-            final String set1 = "set1";
-            final String set2 = "set2";
-            final String set3 = "set3";
+            final String set1 = "--nsr-1";
+            final String set2 = "--nsr-2";
+            final String set3 = "--nsr-3";
 
             final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
             expected.setNamedSubqueries(namedSubqueries);
@@ -283,8 +279,9 @@ public class TestASTComplexOptionalOptimizer extends
                 final ProjectionNode projection = new ProjectionNode();
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
-                projection.addProjectionVar(new VarNode("var4"));
+                projection.addProjectionVar(new VarNode("var6"));
                 projection.addProjectionVar(new VarNode("var12"));
+                projection.addProjectionVar(new VarNode("var4"));
                 
                 whereClause.addChild(new NamedSubqueryInclude(set1));
 
@@ -319,6 +316,7 @@ public class TestASTComplexOptionalOptimizer extends
                 final ProjectionNode projection = new ProjectionNode();
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
+                projection.addProjectionVar(new VarNode("var6"));
                 projection.addProjectionVar(new VarNode("var13"));
                 projection.addProjectionVar(new VarNode("var10"));
                 
@@ -355,7 +353,7 @@ public class TestASTComplexOptionalOptimizer extends
 
         }
 
-        final IASTOptimizer rewriter = new ASTSparql11SubqueryOptimizer();
+        final IASTOptimizer rewriter = new ASTComplexOptionalOptimizer();
         
         final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
                 given), store);
