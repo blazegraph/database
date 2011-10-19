@@ -1568,4 +1568,30 @@ public class StaticAnalysis {
 
     }
 
+    /**
+     * Return a {@link ProjectionNode} for all variables appearing in the WHERE
+     * clause.
+     * 
+     * @param whereClause
+     *            The where clause (or any group).
+     *            
+     * @return The projection.
+     */
+    public ProjectionNode getProjection(final GraphPatternGroup<?> whereClause) {
+
+        final Set<IVariable<?>> projectedVars = getSpannedVariables(
+                whereClause, new LinkedHashSet<IVariable<?>>());
+
+        final ProjectionNode projection = new ProjectionNode();
+
+        for (IVariable<?> v : projectedVars) {
+
+            projection.addProjectionVar(new VarNode(v.getName()));
+
+        }
+
+        return projection;
+
+    }
+
 }

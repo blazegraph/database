@@ -87,6 +87,9 @@ public class TestAll extends TestCase {
         // Unit tests for lifting of simple optionals into the parent group.
         suite.addTestSuite(TestASTSimpleOptionalOptimizer.class);
 
+        // Unit tests for optimization of complex optionals.
+        suite.addTestSuite(TestASTComplexOptionalOptimizer.class);
+
         // Unit tests for lifting pre-filters into the parent group.
         suite.addTestSuite(TestASTLiftPreFiltersOptimizer.class);
 
