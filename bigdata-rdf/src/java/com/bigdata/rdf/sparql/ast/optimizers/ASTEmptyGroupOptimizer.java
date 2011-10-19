@@ -34,12 +34,14 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -99,7 +101,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
             if (whereClause != null) {
 
-                eliminateEmptyGroups(whereClause);
+                eliminateEmptyGroups(queryRoot, whereClause);
                 
                 removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
                 
@@ -127,7 +129,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
                 if (whereClause != null) {
 
-                    eliminateEmptyGroups(whereClause);
+                    eliminateEmptyGroups(namedSubquery, whereClause);
                     
                     removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
 
@@ -149,7 +151,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
      * 
      * @param op
      */
-    private static void eliminateEmptyGroups(
+    private static void eliminateEmptyGroups(final QueryBase queryBase, 
             final GroupNodeBase<IGroupMemberNode> op) {
 
         final int arity = op.arity();
@@ -227,6 +229,49 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
                 }
 
+            } else if (arity == 1 && op.get(0) instanceof UnionNode) {
+
+                /*
+                 * We need to replace the parent with the child and also handle
+             	 * the case when the parent is the top-level of the WHERE clause.
+                 */
+
+                final JoinGroupNode parent = (JoinGroupNode) op;
+
+                final UnionNode child = (UnionNode) op.get(0);
+
+                if (parent.getContext() == child.getContext()
+                        || parent.getContext() == null
+                        || child.getContext() == null) {
+
+                	if (parent.getParent() == null) {
+                		
+                		/*
+                		 * If the parent has no parent, the parent must
+                		 * currently be the where clause.  Set the child to
+                		 * be the new where clause instead.
+                		 */
+                		
+                		queryBase.setWhereClause(child);
+                		
+                	} else {
+                		
+                		/*
+                		 * If the parent has a parent, then remove the parent
+                		 * from the grandparent and replace it with the child.
+                		 */
+                		
+                		final IGroupNode<IGroupMemberNode> grandparent = 
+                			parent.getParent();
+                		
+                		grandparent.removeChild(parent);
+                		
+                		grandparent.addChild(child);
+                		
+                	}
+                	
+                }
+
             }
 
         }
@@ -243,7 +288,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
-                eliminateEmptyGroups(childGroup);
+                eliminateEmptyGroups(queryBase, childGroup);
 
             } else if (child instanceof QueryBase) {
 
@@ -252,7 +297,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                 final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) subquery
                         .getWhereClause();
 
-                eliminateEmptyGroups(childGroup);
+                eliminateEmptyGroups(subquery, childGroup);
 
             }
 
