@@ -8,9 +8,6 @@
   </head>
   <results>
     <result>
-      <binding name="total">
-      	<literal datatype="http://www.w3.org/2001/XMLSchema#integer">1</literal>
-      </binding>
     </result>
         <result>
       <binding name="total">
