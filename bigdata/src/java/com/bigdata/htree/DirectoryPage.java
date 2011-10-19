@@ -416,7 +416,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
     	
     	BucketPage lazyChild = new BucketPage((HTree) htree, htree.addressBits);
     	lazyChild.parent = (Reference<DirectoryPage>) self;
-    	
+    	((HTree) htree).nleaves++;
     	
     	fillEmptySlots(index, lazyChild);
     	
@@ -1855,7 +1855,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final Reference<AbstractPage> a =  (Reference<AbstractPage>) (fillLowerSlots ? newPage.self : null);
 		final Reference<AbstractPage> b =  (Reference<AbstractPage>) (fillLowerSlots ? null : newPage.self);
 		
-		((HTree) htree).nleaves++; // Note: only +1 since we will delete the oldPage.
+		// nleaves is unchanged since we will create one new page and delete the old
+		// ((HTree) htree).nleaves++; // Note: only +1 since we will delete the oldPage.
 		
 		// Link the new bucket pages into the new parent directory page.
 		for (int i = 0; i < bucketRefs; i++) {
@@ -1876,6 +1877,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		if (bucketPage.isPersistent()) {
 			htree.deleteNodeOrLeaf(bucketPage.getIdentity());
 		}
+		
 		bucketPage.delete();
 	}
 
@@ -2389,7 +2391,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 				current._releaseProtection();
 			}
 			
-			System.out.println("_addLevelForOverflow, level: " + newdir.getLevel());
+			// System.out.println("_addLevelForOverflow, level: " + newdir.getLevel());
 			
 			return newdir;
 		} finally {
@@ -2454,8 +2456,11 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	private void _fillChildSlots(final int slot, final int offset, final int length, final int depth) {
 		assert !isReadOnly();
 		
-		if (slot == offset && length == 1)
+		if (slot == offset && length == 1) {
+			assert childRefs[offset] != null;
+			
 			return;
+		}
 		
 		if (slot >= offset && slot < (offset + length)) {
 			final int delta = length/2;
