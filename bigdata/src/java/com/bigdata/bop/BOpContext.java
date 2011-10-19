@@ -531,12 +531,16 @@ public class BOpContext<E> extends BOpContextBase {
      * 
      *         FIXME Strip out [leftIsPipeline] entirely from the API, including
      *         the API of all callers.
+     * 
+     *         TODO Optimize the case when left is an empty binding set, there
+     *         are no constraints, and we are keeping all variables. This
+     *         corresponds to a named subquery include.
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     static public IBindingSet bind(final IBindingSet left,
             final IBindingSet right, final boolean leftIsPipeline,
             final IConstraint[] constraints, final IVariable[] varsToKeep) {
-
+ 
 //        /*
 //         * Note: The binding sets from the query pipeline are always chosen as
 //         * the destination into which we will copy the bindings. This allows us
