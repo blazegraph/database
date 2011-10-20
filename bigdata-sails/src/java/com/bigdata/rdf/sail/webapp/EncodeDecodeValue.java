@@ -273,9 +273,9 @@ public class EncodeDecodeValue {
              * Literal.
              */
             
-            final int closeQuotePos = s.indexOf(ch, 1/* fromIndex */);
+            final int closeQuotePos = s.lastIndexOf(ch);
             
-            if (closeQuotePos == -1)
+            if (closeQuotePos == 0)
                 throw new IllegalArgumentException(s);
             
             final String label = s.substring(1, closeQuotePos);

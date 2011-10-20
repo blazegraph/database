@@ -78,6 +78,12 @@ public class TestEncodeDecodeValue extends TestCase2 {
 
         doTest("\"\"", new LiteralImpl(""));
 
+        assertEquals(new LiteralImpl("ab\"c"),
+                EncodeDecodeValue.decodeValue("\"ab\"c\""));
+
+        assertEquals(new LiteralImpl("ab\"c"),
+                EncodeDecodeValue.decodeValue("\"ab\"c\""));
+
     }
     
     /**
@@ -92,14 +98,24 @@ public class TestEncodeDecodeValue extends TestCase2 {
         assertEquals(new LiteralImpl(""),
                 EncodeDecodeValue.decodeValue("''"));
 
-        assertEquals(new LiteralImpl("ab\"c"),
-                EncodeDecodeValue.decodeValue("'ab\"c'"));
+        LiteralImpl l3 = new LiteralImpl("ab\"c");
+        Value v3 = EncodeDecodeValue.decodeValue("'ab\"c'");
+        assertEquals(l3, v3);
 
+        assertEquals(new LiteralImpl("ab'c"),
+                EncodeDecodeValue.decodeValue("'ab\'c'"));
+
+        assertEquals(new LiteralImpl("ab'c"),
+                EncodeDecodeValue.decodeValue("'ab'c'"));
+
+        doTest("\"'ab'c'\"", new LiteralImpl("'ab'c'"));
     }
 
     public void test_encodeDecode_Literal_languageCode() {
         
         doTest("\"abc\"@en", new LiteralImpl("abc","en"));
+        
+        doTest("\"'ab'c'\"@en", new LiteralImpl("'ab'c'","en"));
 
         doTest("\"\"@en", new LiteralImpl("","en"));
 
@@ -115,6 +131,9 @@ public class TestEncodeDecodeValue extends TestCase2 {
         doTest("\"\"^^<http://www.bigdata.com/dt1>", new LiteralImpl("",
                 new URIImpl("http://www.bigdata.com/dt1")));
 
+        doTest("\"'ab'c'\"^^<http://www.bigdata.com/dt1>", new LiteralImpl("'ab\'c'",
+                new URIImpl("http://www.bigdata.com/dt1")));
+
     }
 
     /**
@@ -122,9 +141,10 @@ public class TestEncodeDecodeValue extends TestCase2 {
      */
     public void test_encodeDecode_URI_escapeCodeSequence() {
         
-        doTest("<http://www.bigdata.com<>/foo>",
+        doTest("<http://www.bigdata.com/<>/foo>",
                 new URIImpl("http://www.bigdata.com/<>/foo"));
         
+         
     }
 
     /**
@@ -136,7 +156,10 @@ public class TestEncodeDecodeValue extends TestCase2 {
     public void test_encodeDecode_Literal_escapeCodeSequence() {
         
         doTest("\"ab\"c\"", new LiteralImpl("ab\"c"));
-    
+        doTest("\"ab'c\"", new LiteralImpl("ab'c"));
+               
+        doTest("\"ab&c<>\"", new LiteralImpl("ab&c<>"));
+                
     }
 
     /**
