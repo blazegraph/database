@@ -1114,7 +1114,10 @@ public class AST2BOpBase {
         if(dataset != null && summary==null){
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             // Filter for distinct SPOs.
-            if(true) {
+            if (true) { // summary.nknown < 10 * Bytes.kilobyte32) {
+                /*
+                 * JVM Based DISTINCT filter.
+                 */
                 pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
             } else {
                 /*
@@ -1124,6 +1127,11 @@ public class AST2BOpBase {
                  * manager, which means that it will use at a minimum of 1M of
                  * native memory. We need to look at the integration of the
                  * filters with the IRunningQuery to fix this.
+                 * 
+                 * TODO The HTree benefits very much from vectoring. However, in
+                 * order to vector the filter we need to be operating on IV
+                 * chunks. Maybe we can resolve this issue and the issue of
+                 * access to the memory manager at the same time?
                  */
                 pred = pred.addAccessPathFilter(HTreeDistinctFilter.newInstance());
             }
