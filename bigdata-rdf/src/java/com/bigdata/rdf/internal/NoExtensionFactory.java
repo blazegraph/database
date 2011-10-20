@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,37 +22,29 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 28, 2010
+ * Created on Oct 20, 2011
  */
 
-package com.bigdata.bop.rdf.filter;
+package com.bigdata.rdf.internal;
 
-import junit.framework.TestCase2;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
- * Test suite for {@link StripContextFilter}.
+ * A class which does not support any extensions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestStripContextFilter extends TestCase2 {
+public class NoExtensionFactory implements IExtensionFactory {
 
-    /**
-     * 
-     */
-    public TestStripContextFilter() {
+    @Override
+    public void init(LexiconRelation lex) {
+
     }
 
-    /**
-     * @param name
-     */
-    public TestStripContextFilter(String name) {
-        super(name);
+    @Override
+    public IExtension[] getExtensions() {
+        return new IExtension[]{};
     }
 
-    /** TODO Write tests for the {@link StringContextFilter}. */
-    public void test_something() {
-//        fail("write tests");
-    }
-    
 }

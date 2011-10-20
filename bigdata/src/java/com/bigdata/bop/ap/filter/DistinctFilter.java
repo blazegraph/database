@@ -101,9 +101,10 @@ public class DistinctFilter extends BOpFilterBase {
          * Note: Iterators are single threaded so we do not need to use a
          * {@link ConcurrentHashMap} here.
          */
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         private final LinkedHashSet members;
 
+        @SuppressWarnings("rawtypes")
         public DistinctFilterImpl() {
             
             members = new LinkedHashSet(getInitialCapacity(), getLoadFactor());

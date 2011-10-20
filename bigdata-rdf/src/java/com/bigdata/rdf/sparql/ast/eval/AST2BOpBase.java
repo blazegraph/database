@@ -62,6 +62,7 @@ import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.rdf.filter.HTreeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
@@ -1113,7 +1114,19 @@ public class AST2BOpBase {
         if(dataset != null && summary==null){
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+            if(true) {
+                pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+            } else {
+                /*
+                 * FIXME The HTree variant of the distinct filter is more
+                 * scalable but it does not have access to the memory manager
+                 * for the IRunningQuery and hence will allocate its own memory
+                 * manager, which means that it will use at a minimum of 1M of
+                 * native memory. We need to look at the integration of the
+                 * filters with the IRunningQuery to fix this.
+                 */
+                pred = pred.addAccessPathFilter(HTreeDistinctFilter.newInstance());
+            }
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
