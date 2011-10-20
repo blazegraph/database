@@ -71,8 +71,6 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          TODO Low level test suite per {@link HashJoinUtility}
  */
 public class JVMHashJoinUtility {
 
