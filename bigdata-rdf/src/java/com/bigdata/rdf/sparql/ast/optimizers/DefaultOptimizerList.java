@@ -376,6 +376,20 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          *      the static optimizer into an AST rewrite)
          */
 //        add(new ASTComplexOptionalOptimizer());
+
+        /**
+         * Rewrites join groups having one or more joins which would involve a
+         * full cross product as hash joins of sub-groups. This handles queries
+         * such as BSBM Q5.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/253
+         * 
+         *      FIXME This optimizer can not be enabled until we can correctly
+         *      predict the join variables, which is blocked on
+         *      https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert
+         *      the static optimizer into an AST rewrite)
+         */
+//        add(new ASTHashJoinOptimizer());
         
         /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate.

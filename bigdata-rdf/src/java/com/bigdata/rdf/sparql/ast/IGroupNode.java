@@ -33,13 +33,13 @@ public interface IGroupNode<E extends IGroupMemberNode> extends
      */
     int size();
 
-    /**
-     * Return whether or not this is an optional group. Optional groups may or
-     * may not produce variable bindings, but will not prune incoming solutions
-     * based on whether or not they bind. Optional groups might be composed of a
-     * single statement pattern, a single statement pattern with filters, or a
-     * more complex join that could include subgroups.
-     */
-    boolean isOptional();
+//    /**
+//     * Return whether or not this is an optional group. Optional groups may or
+//     * may not produce variable bindings, but will not prune incoming solutions
+//     * based on whether or not they bind. Optional groups might be composed of a
+//     * single statement pattern, a single statement pattern with filters, or a
+//     * more complex join that could include subgroups.
+//     */
+//    boolean isOptional();
 
 }

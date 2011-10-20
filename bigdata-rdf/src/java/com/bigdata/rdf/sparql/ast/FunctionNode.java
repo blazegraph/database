@@ -156,11 +156,21 @@ public class FunctionNode extends ValueExpressionNode {
      */
 
     /**
-     * Return <code>SameTerm(t1,t2)</code>
+     * Return <code>SameTerm(t1,t2)</code> (aka EQ).
      */
     static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
 
         return new FunctionNode(FunctionRegistry.EQ, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>t1 != t2</code>
+     */
+    static public FunctionNode NE(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.NE, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
 
     }

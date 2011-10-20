@@ -46,8 +46,8 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -154,7 +154,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
      */
     @SuppressWarnings("unchecked")
     private void collectOptionalGroups(
-            final IGroupNode<IGroupMemberNode> group,
+            final GraphPatternGroup<IGroupMemberNode> group,
             final Collection<JoinGroupNode> optionalGroups) {
 
         if (group instanceof JoinGroupNode && group.isOptional()
@@ -187,10 +187,10 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                 
             }
             
-            if (!(child instanceof IGroupNode<?>))
+            if (!(child instanceof GraphPatternGroup<?>))
                 continue;
 
-            collectOptionalGroups((IGroupNode<IGroupMemberNode>) child,
+            collectOptionalGroups((GraphPatternGroup<IGroupMemberNode>) child,
                     optionalGroups);
            
         }

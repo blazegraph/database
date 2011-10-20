@@ -46,7 +46,7 @@ import com.bigdata.relation.rule.eval.ISolution;
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
-        IBindingProducerNode {
+        IJoinNode {
 
     private static final long serialVersionUID = 1L;
 
@@ -280,18 +280,33 @@ public class StatementPatternNode extends
      * 
      * @see Annotations#SIMPLE_OPTIONAL
      */
+    // TODO Replace with isOptional()
     public boolean isSimpleOptional() {
+        
+        return isOptional();
+        
+    }
+    
+    /**
+     * Return <code>true</code> the {@link StatementPatternNode} was lifted out
+     * of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
+     * 
+     * @see Annotations#SIMPLE_OPTIONAL
+     */
+    public boolean isOptional() {
         
         return getProperty(Annotations.SIMPLE_OPTIONAL,
                 Annotations.DEFAULT_SIMPLE_OPTIONAL);
-        
+
     }
+    
 
     /**
      * Mark this {@link StatementPatternNode} as one which was lifted out of a
      * "simple optional" group and which therefore has "optional" semantics (we
      * will do an optional join for it).
      */
+    // TODO Rename as setOptional()
     public void setSimpleOptional(final boolean simpleOptional) {
         
         setProperty(Annotations.SIMPLE_OPTIONAL,simpleOptional);

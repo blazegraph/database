@@ -39,7 +39,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * multisets (a SPARQL <code>SERVICE</code>).
  */
 public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
-        implements IBindingProducerNode {
+        implements IJoinNode {
 
     private static final long serialVersionUID = 1L;
 
@@ -52,8 +52,8 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         String SERVICE_URI = "serviceURI";
 
         /**
-         * The {@link IGroupNode} modeling the <code>group graph pattern</code>
-         * used to invoke the service.
+         * The {@link GraphPatternGroup} modeling the
+         * <code>group graph pattern</code> used to invoke the service.
          */
         String GROUP_NODE = "groupNode";
 
@@ -115,10 +115,17 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
      * invoked.
      */
     @SuppressWarnings("unchecked")
-    public IGroupNode<IGroupMemberNode> getGroupNode() {
+    public GraphPatternGroup<IGroupMemberNode> getGroupNode() {
 
-        return (IGroupNode<IGroupMemberNode>) getProperty(Annotations.GROUP_NODE);
+        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GROUP_NODE);
 
+    }
+
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isOptional() {
+        return false;
     }
 
     @Override

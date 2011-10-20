@@ -44,6 +44,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -256,7 +257,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      */
     private void checkForBadlyDesignedLeftJoin(
             final StaticAnalysis sa,
-            final IGroupNode<IGroupMemberNode> whereClause,
+            final GraphPatternGroup<IGroupMemberNode> whereClause,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
 
         // Check all join groups.
@@ -330,7 +331,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      */
     private void checkForBadlyDesignedLeftJoin2(
             final StaticAnalysis sa,
-            final IGroupNode<IGroupMemberNode> group,
+            final GraphPatternGroup<IGroupMemberNode> group,
             final List<JoinGroupNode> badlyDesignedLeftJoins) {
 
         assert group.isOptional();
