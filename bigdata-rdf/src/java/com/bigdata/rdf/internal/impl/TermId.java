@@ -80,7 +80,7 @@ public class TermId<V extends BigdataValue>
      * 
      * @return The mock {@link IV}.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     static public TermId<?> mockIV(final VTE vte) {
 
         /*
