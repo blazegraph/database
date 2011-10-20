@@ -259,9 +259,11 @@ public class ASTServiceNodeOptimizer implements IASTOptimizer {
 
         parent.replaceWith(serviceNode, namedSubqueryInclude);
 
-        if (log.isInfoEnabled())
-            log.info("\nLifted: " + serviceNode + "\nFrom parentGroup:"
-                    + parent + "\nInto namedSubquery: " + namedSubqueryRoot);
+        if (log.isInfoEnabled()) {
+            log.info("\nLifted: " + serviceNode);
+            log.info("\nFrom parentGroup:" + parent);
+            log.info("\nInto namedSubquery: " + namedSubqueryRoot);
+        }
 
     }
 
