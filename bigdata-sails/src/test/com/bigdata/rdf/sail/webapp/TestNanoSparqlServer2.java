@@ -769,6 +769,85 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
     }
 
     /**
+     * Class representing the result of a mutation operation against the REST
+     * API.
+     * 
+     * TODO Refactor into the non-test code base along with the XML generation
+     * and XML parsing?
+     */
+    private static class RangeCountResult {
+
+        /** The range count. */
+        public final long rangeCount;
+
+        /** The elapsed time for the operation. */
+        public final long elapsedMillis;
+
+        public RangeCountResult(final long rangeCount, final long elapsedMillis) {
+            this.rangeCount = rangeCount;
+            this.elapsedMillis = elapsedMillis;
+        }
+
+    }
+
+    protected RangeCountResult getRangeCountResult(final HttpURLConnection conn) throws Exception {
+
+        checkResponseCode(conn);
+        
+        try {
+
+            final String contentType = conn.getContentType();
+
+            if (!contentType.startsWith(BigdataRDFServlet.MIME_APPLICATION_XML)) {
+
+                fail("Expecting Content-Type of "
+                        + BigdataRDFServlet.MIME_APPLICATION_XML + ", not "
+                        + contentType);
+
+            }
+
+            final SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+            
+            final AtomicLong rangeCount = new AtomicLong();
+            final AtomicLong elapsedMillis = new AtomicLong();
+
+            /*
+             * For example: <data rangeCount="5" milliseconds="112"/>
+             */
+            parser.parse(conn.getInputStream(), new DefaultHandler2(){
+
+                public void startElement(final String uri,
+                        final String localName, final String qName,
+                        final Attributes attributes) {
+
+                    if (!"data".equals(qName))
+                        fail("Expecting: 'data', but have: uri=" + uri
+                                + ", localName=" + localName + ", qName="
+                                + qName);
+
+                    rangeCount.set(Long.valueOf(attributes
+                            .getValue("rangeCount")));
+
+                    elapsedMillis.set(Long.valueOf(attributes
+                            .getValue("milliseconds")));
+                           
+                }
+                
+            });
+            
+            // done.
+            return new RangeCountResult(rangeCount.get(), elapsedMillis.get());
+
+        } finally {
+
+            // terminate the http connection.
+            conn.disconnect();
+
+        }
+
+    }
+
+    /**
 	 * Issue a "status" request against the service. 
 	 */
 	public void test_STATUS() throws Exception {
@@ -1247,6 +1326,194 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
     }
 
     /**
+     * Test the ESTCARD method (fast range count).
+     */
+    public void test_ESTCARD() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s
+                null,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(7, rangeCountResult.rangeCount);
+        
+    }
+
+    public void test_ESTCARD_s() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                new URIImpl("http://www.bigdata.com/Mike"),// s
+                null,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(3, rangeCountResult.rangeCount);
+        
+    }
+    
+    public void test_ESTCARD_p() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s
+                RDF.TYPE,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(3, rangeCountResult.rangeCount);
+        
+    }
+
+    public void test_ESTCARD_p2() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s
+                RDFS.LABEL,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(2, rangeCountResult.rangeCount);
+        
+    }
+
+    public void test_ESTCARD_o() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s
+                null,// p
+                new LiteralImpl("Mike"),// o
+                null // c
+        );
+
+        assertEquals(1, rangeCountResult.rangeCount);
+        
+    }
+
+    public void test_ESTCARD_so() throws Exception {
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.ttl");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                new URIImpl("http://www.bigdata.com/Mike"),// s,
+                RDF.TYPE,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(1, rangeCountResult.rangeCount);
+        
+    }
+
+    /**
+     * Test the ESTCARD method (fast range count).
+     */
+    public void test_ESTCARD_quads_01() throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.trig");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s,
+                null,// p
+                null,// o
+                null // c
+        );
+
+        assertEquals(7, rangeCountResult.rangeCount);
+
+    }
+    
+    public void test_ESTCARD_quads_02() throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.trig");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s,
+                null,// p
+                null,// o
+                new URIImpl("http://www.bigdata.com/")// c
+        );
+
+        assertEquals(3, rangeCountResult.rangeCount);
+
+    }
+    
+    public void test_ESTCARD_quads_03() throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.trig");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                null,// s,
+                null,// p
+                null,// o
+                new URIImpl("http://www.bigdata.com/c1")// c
+        );
+
+        assertEquals(2, rangeCountResult.rangeCount);
+
+    }
+
+    public void test_ESTCARD_quads_04() throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        doInsertbyURL("POST", requestPath, packagePath
+                + "test_estcard.trig");
+        
+        final RangeCountResult rangeCountResult = doRangeCount(//
+                requestPath,//
+                new URIImpl("http://www.bigdata.com/Mike"),// s,
+                null,// p
+                null,// o
+                new URIImpl("http://www.bigdata.com/c1")// c
+        );
+
+        assertEquals(1, rangeCountResult.rangeCount);
+
+    }
+    
+    /**
      * Select everything in the kb using a POST.
      */
     public void test_DELETE_withQuery() throws Exception {
@@ -1579,6 +1846,79 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
 				conn.disconnect();
 			throw new RuntimeException(t);
 		}
+    }
+
+    /**
+     * Submit a fast range count request.
+     * 
+     * @param servlet
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     * @return The parsed fast range count response.
+     */
+    private RangeCountResult doRangeCount(//
+            final String servlet,//
+            final Resource s,//
+            final URI p,//
+            final Value o,//
+            final Resource c//
+            ) {
+        HttpURLConnection conn = null;
+        try {
+
+            final LinkedHashMap<String, String[]> requestParams = new LinkedHashMap<String, String[]>();
+
+            requestParams.put("ESTCARD", null);
+            
+            if (s != null)
+                requestParams.put("s",
+                        new String[] { EncodeDecodeValue.encodeValue(s) });
+            
+            if (p != null)
+                requestParams.put("p",
+                        new String[] { EncodeDecodeValue.encodeValue(p) });
+            
+            if (o != null)
+                requestParams.put("o",
+                        new String[] { EncodeDecodeValue.encodeValue(o) });
+            
+            if (c != null)
+                requestParams.put("c",
+                        new String[] { EncodeDecodeValue.encodeValue(c) });
+
+            final StringBuilder urlString = new StringBuilder();
+            urlString.append(m_serviceURL).append(servlet);
+            addQueryParams(urlString, requestParams);
+
+            final URL url = new URL(urlString.toString());
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setDoOutput(false);
+            conn.setDoInput(true);
+            conn.setUseCaches(false);
+            conn.setReadTimeout(0);
+
+            conn.connect();
+
+//            if (log.isInfoEnabled())
+//                log.info(conn.getResponseMessage());
+
+            final int rc = conn.getResponseCode();
+            
+            if (rc < 200 || rc >= 300) {
+                throw new IOException(conn.getResponseMessage());
+            }
+
+            return getRangeCountResult(conn);
+            
+        } catch (Throwable t) {
+            // clean up the connection resources
+            if (conn != null)
+                conn.disconnect();
+            throw new RuntimeException(t);
+        }
     }
 
     private MutationResult doDeleteWithAccessPath(//
