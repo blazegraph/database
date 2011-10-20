@@ -31,8 +31,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -96,14 +99,14 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         // Main WHERE clause
         {
 
-            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
+            final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) queryRoot
                     .getWhereClause();
 
             if (whereClause != null) {
 
                 eliminateEmptyGroups(queryRoot, whereClause);
                 
-                removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
+//                removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
                 
             }
 
@@ -124,14 +127,14 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                 final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                         .get(i);
 
-                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+                final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
                         .getWhereClause();
 
                 if (whereClause != null) {
 
                     eliminateEmptyGroups(namedSubquery, whereClause);
                     
-                    removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
+//                    removeEmptyChildGroups((GraphPatternGroup<?>) whereClause);
 
                 }
 
@@ -152,129 +155,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
      * @param op
      */
     private static void eliminateEmptyGroups(final QueryBase queryBase, 
-            final GroupNodeBase<IGroupMemberNode> op) {
-
-        final int arity = op.arity();
-
-        if ((op instanceof JoinGroupNode)) {
-            
-            /*
-             * First check whether this operator is a join group having a single
-             * child join group, in which case we eliminate the child, lifting
-             * its children into this join group.
-             */
-            
-            if (arity == 1 && op.get(0) instanceof JoinGroupNode) {
-
-                /*
-                 * Verify that the two join groups can be merged into one. We
-                 * can do this unless they both have a different graph context.
-                 * 
-                 * Note: We can eliminate the parent even if it is optional or
-                 * has a context by setting those attributes on the child (as
-                 * long as the child does not have a different context).
-                 */
-
-                final JoinGroupNode parent = (JoinGroupNode) op;
-
-                final JoinGroupNode child = (JoinGroupNode) op.get(0);
-
-                if (parent.getContext() == child.getContext()
-                        || parent.getContext() == null
-                        || child.getContext() == null) {
-
-                    /*
-                     * Lift the children of this child into its parent.
-                     * 
-                     * TODO We probably should scan the child's annotations for
-                     * other things which could be lifted onto to the parent.
-                     * That will let us preserve hints for a join group if the
-                     * child existed only to communicate those hints.
-                     */
-
-                    if (log.isInfoEnabled())
-                        log.info("Lifting children of child group into parent: parent="
-                                + parent + ", child=" + child);
-
-                    /*
-                     * If the child has a context, then lift it onto the parent.
-                     */
-                    if (child.getContext() != null) {
-                        parent.setContext(child.getContext());
-                    }
-
-                    /*
-                     * If the child was optional, then lift that annotation onto
-                     * the parent.
-                     */
-                    if (child.isOptional()) {
-                        parent.setOptional(child.isOptional());
-                    }
-
-                    /*
-                     * Remove the child from the parent.
-                     */
-                    parent.removeChild(child);
-
-                    /*
-                     * Lift the children of the child onto the parent.
-                     */
-                    final int n = child.arity();
-
-                    for (int i = 0; i < n; i++) {
-
-                        parent.addChild((IGroupMemberNode) child.get(i));
-
-                    }
-
-                }
-
-            } else if (arity == 1 && op.get(0) instanceof UnionNode) {
-
-                /*
-                 * We need to replace the parent with the child and also handle
-             	 * the case when the parent is the top-level of the WHERE clause.
-                 */
-
-                final JoinGroupNode parent = (JoinGroupNode) op;
-
-                final UnionNode child = (UnionNode) op.get(0);
-
-                if (parent.getContext() == child.getContext()
-                        || parent.getContext() == null
-                        || child.getContext() == null) {
-
-                	if (parent.getParent() == null) {
-                		
-                		/*
-                		 * If the parent has no parent, the parent must
-                		 * currently be the where clause.  Set the child to
-                		 * be the new where clause instead.
-                		 */
-                		
-                		queryBase.setWhereClause(child);
-                		
-                	} else {
-                		
-                		/*
-                		 * If the parent has a parent, then remove the parent
-                		 * from the grandparent and replace it with the child.
-                		 */
-                		
-                		final IGroupNode<IGroupMemberNode> grandparent = 
-                			parent.getParent();
-                		
-                		grandparent.removeChild(parent);
-                		
-                		grandparent.addChild(child);
-                		
-                	}
-                	
-                }
-
-            }
-
-        }
+            final GraphPatternGroup<?> op) {
 
         /*
          * Recursion, but only into group nodes (including within subqueries).
@@ -283,69 +164,226 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
             final BOp child = op.get(i);
 
-            if (child instanceof GroupNodeBase<?>) {
+            if (child instanceof GraphPatternGroup<?>) {
 
                 @SuppressWarnings("unchecked")
-                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) child;
+                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
                 eliminateEmptyGroups(queryBase, childGroup);
+                
+                /*
+                 * If we pruned the child, then we need to decrement the index
+                 * so that we don't skip one.
+                 */
+                if (op.get(i) != child) {
+                	
+                	i--;
+                	
+                }
 
             } else if (child instanceof QueryBase) {
 
                 final QueryBase subquery = (QueryBase) child;
 
-                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) subquery
+                final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
                 eliminateEmptyGroups(subquery, childGroup);
 
+                /*
+                 * If we pruned the child, then we need to decrement the index
+                 * so that we don't skip one.
+                 */
+                if (op.get(i) != child) {
+                	
+                	i--;
+                	
+                }
+
             }
-
-        }
-
-        if (op instanceof GraphPatternGroup<?>) {
-
-            removeEmptyChildGroups((GraphPatternGroup<?>) op);
             
         }
 
-    }
+        final int arity = op.arity();
 
-    /**
-     * Remove any empty (non-GRAPH) groups (normal groups and UNIONs, but not
-     * GRAPH {}).
-     */
-    static private void removeEmptyChildGroups(final GraphPatternGroup<?> op) {
+        if (arity == 0 && 
+        		op.getContext() == null &&
+        		op.getParent() != null) {
+        	
+    		/*
+    		 * If this is an empty graph pattern group then we can just prune
+    		 * it out entirely, unless it is the where clause.
+    		 *  
+             * Also, do not prune GRAPH ?g {} or GRAPH uri {}. Those 
+             * constructions have special semantics.
+    		 */
+    		
+    		final IGroupNode<IGroupMemberNode> parent = 
+    			op.getParent();
+    		
+    		parent.removeChild(op);
+    		
+        	op.setParent(null);
+        	
+        } else if (arity == 1 && 
+        		op instanceof JoinGroupNode && 
+    			op.get(0) instanceof JoinGroupNode) {
+            
+            /*
+             * We can always merge two JoinGroupNodes into one, but we have
+             * to make sure we get the optionality right.
+             */
 
-        int n = op.arity();
+            final JoinGroupNode parent = (JoinGroupNode) op;
 
-        for (int i = 0; i < n; i++) {
+            final JoinGroupNode child = (JoinGroupNode) op.get(0);
 
-            final BOp child = op.get(i);
+            	/*
+1. JoinGroup1 [optional=false] { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=false] { É }
+2. JoinGroup1 [optional=true]  { JoinGroup2 [optional=true]  { É } } -> JoinGroup2 [optional=true]  { É }
+3. JoinGroup1 [optional=true]  { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=true]  { É }
+4. JoinGroup1 [optional=false] { JoinGroup2 [optional=true]  { É } } -> JoinGroup2 [optional=true]  { É }
+            	 */
+        	if (parent.isOptional() && !child.isOptional()) {
+        	
+        		child.setOptional(true);
+        		
+        	}
+        	
+        	swap(queryBase, parent, child);
+            	
+        } else if (arity == 1 && 
+        		op instanceof UnionNode && 
+    			op.get(0) instanceof JoinGroupNode) {
+            
+        	/*
+        	 * We can always replace a UnionNode that has a single JoinGroupNode
+        	 * with the JoinGroupNode itself.
+        	 */
+        	
+            final UnionNode parent = (UnionNode) op;
 
-            if (!(child instanceof GroupNodeBase<?>))
-                continue;
+            final JoinGroupNode child = (JoinGroupNode) op.get(0);
+            
+            swap(queryBase, parent, child);
 
-            if (((GroupNodeBase<?>) child).getContext() != null) {
-                /*
-                 * Do not prune GRAPH ?g {} or GRAPH uri {}. Those constructions
-                 * have special semantics.
-                 */
-                continue;
-            }
+        } else if (arity == 1 && 
+        		op instanceof JoinGroupNode &&
+        		!op.isOptional() &&
+    			op.get(0) instanceof UnionNode) {
+            
+        	/*
+        	 * If a JoinGroupNode contains a single UnionNode, we can lift the
+        	 * UnionNode unless the JoinGroupNode is optional.
+        	 */
+            final JoinGroupNode parent = (JoinGroupNode) op;
 
-            if (child.arity() == 0) {
+            final UnionNode child = (UnionNode) op.get(0);
+            
+            swap(queryBase, parent, child);
 
-                // remove an empty child group.
-                op.removeArg(child);
+        } else if (arity == 1 &&
+        		op.get(0) instanceof IBindingProducerNode &&
+                op.getParent() != null &&
+                !op.isOptional() &&
+                !(((IGroupNode<?>) op.getParent()) instanceof UnionNode)) {
 
-                // one less child to visit.
-                n--;
+            /*
+             * The child is something which produces bindings (hence,
+             * not a FILTER) and is neither a JoinGroupNode nor a
+             * UnionNode and the operator is neither the top level of
+             * the WHERE clause nor a UnionNode.
+             * 
+             * Just replace the parent JoinGroupNode (op) with the
+             * child.
+             */
 
-            }
+            ((ASTBase) op.getParent()).replaceWith(op, (BOp) op.get(0));
 
         }
 
+//        if (op instanceof GraphPatternGroup<?>) {
+//
+//            removeEmptyChildGroups((GraphPatternGroup<?>) op);
+//            
+//        }
+
     }
+    
+    /**
+     * Swap the parent with the child inside the grandparent.  If there is no
+     * grandparent, assume the parent is the where clause in the query base,
+     * and replace it with the child.
+     */
+    static private void swap(final QueryBase queryBase, 
+    		final GraphPatternGroup<?> parent, 
+    		final GraphPatternGroup<?> child) {
+    	
+    	if (parent.getParent() == null) {
+    		
+    		/*
+    		 * If the parent has no parent, the parent must
+    		 * currently be the where clause.  Set the child to
+    		 * be the new where clause instead.
+    		 */
+    		
+    		queryBase.setWhereClause(child);
+    		
+    	} else {
+    		
+    		/*
+    		 * If the parent has a parent, then remove the parent
+    		 * from the grandparent and replace it with the child.
+    		 */
+    		
+    		final IGroupNode<IGroupMemberNode> grandparent = 
+    			parent.getParent();
+    		
+    		grandparent.removeChild(parent);
+    		
+    		grandparent.addChild(child);
+    		
+    	}
+    	
+    	parent.setParent(null);
+    	
+    }
+
+//    /**
+//     * Remove any empty (non-GRAPH) groups (normal groups and UNIONs, but not
+//     * GRAPH {}).
+//     */
+//    static private void removeEmptyChildGroups(final GraphPatternGroup<?> op) {
+//
+//        int n = op.arity();
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            final BOp child = op.get(i);
+//
+//            if (!(child instanceof GroupNodeBase<?>))
+//                continue;
+//
+//            if (((GroupNodeBase<?>) child).getContext() != null) {
+//                /*
+//                 * Do not prune GRAPH ?g {} or GRAPH uri {}. Those constructions
+//                 * have special semantics.
+//                 */
+//                continue;
+//            }
+//
+//            if (child.arity() == 0) {
+//
+//                // remove an empty child group.
+//                op.removeArg(child);
+//
+//                // one less child to visit.
+//                n--;
+//
+//            }
+//
+//        }
+//
+//    }
 
 }

@@ -39,12 +39,15 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -871,4 +874,258 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
+    /**
+     * <pre>
+     *		WITH {
+     *		  QueryType: SELECT
+     *		  SELECT ( VarNode(_var1) AS VarNode(_var1) )
+     *		    JoinGroupNode {
+     *		      StatementPatternNode(VarNode(_var1), ConstantNode(TermId(1U)[http://example/a]), ConstantNode(TermId(2U)[http://example/b]), DEFAULT_CONTEXTS)
+     *		    }
+     *		} AS _set1
+     *		QueryType: SELECT
+     *		SELECT VarNode(_var1) VarNode(_var2) VarNode(_var4)
+     *		  JoinGroupNode {
+     *		    JoinGroupNode {
+     *		      JoinGroupNode {
+     *		        INCLUDE _set1
+     *		      }
+     *		      StatementPatternNode(VarNode(_var1), ConstantNode(TermId(3U)[http://example/c]), VarNode(_var2), DEFAULT_CONTEXTS) [simpleOptional]
+     *		      StatementPatternNode(VarNode(_var12), ConstantNode(TermId(6U)[http://example/d]), VarNode(_var1), DEFAULT_CONTEXTS)
+     *		      StatementPatternNode(VarNode(_var12), ConstantNode(TermId(7U)[http://example/e]), VarNode(_var4), DEFAULT_CONTEXTS)
+     *		    }
+     *		  }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_eliminateJoinGroup08() throws Exception {
+        
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(new URIImpl("http://example/a"));
+
+        @SuppressWarnings("rawtypes")
+        final IV b = makeIV(new URIImpl("http://example/b"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV c = makeIV(new URIImpl("http://example/c"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV d = makeIV(new URIImpl("http://example/d"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV e = makeIV(new URIImpl("http://example/e"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+        	final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, "_set1");
+        	{
+        		
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubquery.setProjection(projection);
+                projection.addProjectionExpression(new AssignmentNode(new VarNode("_var1"), new VarNode("_var1")));
+        		
+                final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                        new StatementPatternNode(new VarNode("_var1"),
+                                new ConstantNode(a), new ConstantNode(b), null/* c */,
+                                Scope.DEFAULT_CONTEXTS));
+                
+                namedSubquery.setWhereClause(joinGroup1);
+                
+        	}
+        	
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("_var1"));
+            projection.addProjectionVar(new VarNode("_var2"));
+            projection.addProjectionVar(new VarNode("_var4"));
+            
+            final JoinGroupNode joinGroup1 = new JoinGroupNode();
+            final JoinGroupNode joinGroup2 = new JoinGroupNode();
+            final JoinGroupNode joinGroup3 = new JoinGroupNode();
+            final JoinGroupNode joinGroup4 = new JoinGroupNode();
+            
+            joinGroup4.addChild(joinGroup3);
+            
+            joinGroup3.addChild(joinGroup2);
+            
+            joinGroup2.addChild(joinGroup1);
+            joinGroup2.addChild(new StatementPatternNode(new VarNode("_var1"),
+                            new ConstantNode(c), new VarNode("_var2"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            joinGroup2.addChild(new StatementPatternNode(new VarNode("_var12"),
+                            new ConstantNode(d), new VarNode("_var1"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            joinGroup2.addChild(new StatementPatternNode(new VarNode("_var12"),
+                            new ConstantNode(e), new VarNode("_var4"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            
+            joinGroup1.addChild(new NamedSubqueryInclude("_set1"));
+            
+            given.setWhereClause(joinGroup4);
+            given.getNamedSubqueriesNotNull().add(namedSubquery);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+        	final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, "_set1");
+        	{
+        		
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubquery.setProjection(projection);
+                projection.addProjectionExpression(new AssignmentNode(new VarNode("_var1"), new VarNode("_var1")));
+        		
+                final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                        new StatementPatternNode(new VarNode("_var1"),
+                                new ConstantNode(a), new ConstantNode(b), null/* c */,
+                                Scope.DEFAULT_CONTEXTS));
+                
+                namedSubquery.setWhereClause(joinGroup1);
+                
+        	}
+        	
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("_var1"));
+            projection.addProjectionVar(new VarNode("_var2"));
+            projection.addProjectionVar(new VarNode("_var4"));
+            
+            final JoinGroupNode joinGroup1 = new JoinGroupNode();
+
+//            final JoinGroupNode joinGroup2 = new JoinGroupNode();
+//            joinGroup2.addChild(new NamedSubqueryInclude("_set1"));
+//            joinGroup1.addChild(joinGroup2);
+            joinGroup1.addChild(new NamedSubqueryInclude("_set1"));
+            
+            joinGroup1.addChild(new StatementPatternNode(new VarNode("_var1"),
+                            new ConstantNode(c), new VarNode("_var2"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            joinGroup1.addChild(new StatementPatternNode(new VarNode("_var12"),
+                            new ConstantNode(d), new VarNode("_var1"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            joinGroup1.addChild(new StatementPatternNode(new VarNode("_var12"),
+                            new ConstantNode(e), new VarNode("_var4"), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+            
+            expected.setWhereClause(joinGroup1);
+            expected.getNamedSubqueriesNotNull().add(namedSubquery);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        /*
+         * FIXME The ASTEmptyGroupOptimizer needs to be refactored to handle
+         * this.  We need to replace the parent with the child and also handle
+         * the case when the parent is the top-level of the WHERE clause.
+         */
+        assertSameAST(expected, actual);
+
+    }
+    
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(subj)
+     *     JoinGroupNode {
+     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), NAMED_CONTEXTS)
+     *       StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), NAMED_CONTEXTS)
+     *       JoinGroupNode {
+     *       }
+     *       JoinGroupNode {
+     *         JoinGroupNode {
+     *         }
+     *       }
+     *     }
+     * </pre>
+     * 
+     * Remove the inner {@link JoinGroupNode}s.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_eliminateJoinGroup09() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+        bdSearchIV.setValue(store.getValueFactory().createURI(
+                BD.SEARCH.toString()));
+
+        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode graphGroup = new JoinGroupNode();
+
+            graphGroup.addChild(new JoinGroupNode());
+            graphGroup.addChild(new JoinGroupNode(new JoinGroupNode()));
+            
+            graphGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+            graphGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+            given.setWhereClause(graphGroup);
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
 }
