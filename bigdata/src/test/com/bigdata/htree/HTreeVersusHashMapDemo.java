@@ -246,7 +246,10 @@ public class HTreeVersusHashMapDemo {
 
                     for (int j = 0; j < vectorSize; j++) {
 
-                        final int rnd = r.nextInt();
+//                        final int rnd = r.nextInt(); // random, not random w/o replacement.
+//                        final int rnd = r.nextInt(nkeys); // random, not random w/o replacement.
+//                        final int rnd = i+j; // sequential
+                        final int rnd = Integer.reverse(i+j); // sequential
                         
                         keys[j] = rnd;
 
@@ -293,11 +296,11 @@ public class HTreeVersusHashMapDemo {
                 if (log.isInfoEnabled()) {
 
                     log.info("Htree Leaves: " + htree.nleaves + ", Evicted: "
-                            + counters.leavesWritten + ", Nodes: " + htree.nnodes
-                            + ", Evicted: " + counters.nodesWritten);
+                            + counters.leavesWritten + ", Nodes: "
+                            + htree.nnodes + ", Evicted: "
+                            + counters.nodesWritten + "; Load took "
+                            + (load - start) + "ms");
 
-                    log.info("Load took " + (load - start) + "ms");
-                    
                 }
 
 //                htree.writeCheckpoint();
@@ -320,7 +323,7 @@ public class HTreeVersusHashMapDemo {
         final int vectorSize = 10000;
         final long seed = -91L;
         final int addressBits = 10; // pages with 2^10 slots.
-        final int writeRetentionQueueCapacity = 500;
+        final int writeRetentionQueueCapacity = 5000;
 
         new HTreeDemo(new ReportListener(), nkeys, vectorSize, seed, addressBits,
                 writeRetentionQueueCapacity).run();
