@@ -13,6 +13,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.BOpUtility;
@@ -22,6 +25,7 @@ import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.util.HTMLUtility;
 import com.bigdata.util.InnerCause;
@@ -57,7 +61,14 @@ public class QueryServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        doQuery(req, resp);
+        if (req.getParameter("query") != null) {
+            doQuery(req, resp);
+        } else if (req.getParameter("ESTCARD") != null) {
+            doEstCard(req, resp);
+        } else {
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
+            return;
+        }
         
     }
 
@@ -413,4 +424,86 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
     
+	/**
+	 * Estimate the cardinality of an access path (fast range count).
+	 * @param req
+	 * @param resp
+	 */
+    private void doEstCard(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+
+        final long begin = System.currentTimeMillis();
+        
+        final String namespace = getNamespace(req);
+
+        final Resource s;
+        final URI p;
+        final Value o;
+        final Resource c;
+        try {
+            s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
+            p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
+            o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
+            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
+        } catch (IllegalArgumentException ex) {
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    ex.getLocalizedMessage());
+            return;
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("ESTCARD: access path: (s=" + s + ", p=" + p + ", o="
+                    + o + ", c=" + c + ")");
+
+        try {
+
+            try {
+
+                BigdataSailRepositoryConnection conn = null;
+                try {
+
+                    final long timestamp = getTimestamp(req);
+
+                    conn = getBigdataRDFContext().getQueryConnection(
+                            namespace, timestamp);
+
+                    // Range count all statements matching that access path.
+                    final long rangeCount = conn.getSailConnection()
+                            .getBigdataSail().getDatabase()
+                            .getAccessPath(s, p, o, c)
+                            .rangeCount(false/* exact */);
+                    
+                    final long elapsed = System.currentTimeMillis() - begin;
+                    
+                    reportRangeCount(resp, rangeCount, elapsed);
+
+                } catch(Throwable t) {
+                    
+                    if(conn != null)
+                        conn.rollback();
+                    
+                    throw new RuntimeException(t);
+                    
+                } finally {
+
+                    if (conn != null)
+                        conn.close();
+
+                }
+
+            } catch (Throwable t) {
+
+                throw BigdataRDFServlet.launderThrowable(t, resp, "");
+
+            }
+
+        } catch (Exception ex) {
+
+            // Will be rendered as an INTERNAL_ERROR.
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+
 }

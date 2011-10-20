@@ -279,4 +279,30 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     }
 
+    /**
+     * Report an access path range count and elapsed time back to the user agent.
+     * 
+     * @param resp
+     *            The response.
+     * @param rangeCount
+     *            The mutation count.
+     * @param elapsed
+     *            The elapsed time (milliseconds).
+     * 
+     * @throws IOException
+     */
+    protected void reportRangeCount(final HttpServletResponse resp,
+            final long rangeCount, final long elapsed) throws IOException {
+
+        final StringWriter w = new StringWriter();
+        
+        final XMLBuilder t = new XMLBuilder(w);
+
+        t.root("data").attr("rangeCount", rangeCount)
+                .attr("milliseconds", elapsed).close();
+
+        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+
+    }
+
 }
