@@ -336,12 +336,9 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
     		 * from the grandparent and replace it with the child.
     		 */
     		
-    		final IGroupNode<IGroupMemberNode> grandparent = 
-    			parent.getParent();
+    		final ASTBase grandparent = (ASTBase) parent.getParent();
     		
-    		grandparent.removeChild(parent);
-    		
-    		grandparent.addChild(child);
+    		grandparent.replaceWith(parent, child);
     		
     	}
     	
