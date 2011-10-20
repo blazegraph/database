@@ -63,6 +63,9 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestStripContextFilter.class);
 
+        // Distinct IV filter using HTree.
+        suite.addTestSuite(TestHTreeDistinctFilter.class);
+
         return suite;
         
     }

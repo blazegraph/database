@@ -23,13 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.ap.filter;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
-import com.bigdata.relation.rule.IRule;
 
 /**
  * Aggregates test suites into increasing dependency order.
