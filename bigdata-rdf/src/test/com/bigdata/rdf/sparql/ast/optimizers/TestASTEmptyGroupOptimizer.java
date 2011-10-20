@@ -27,15 +27,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -43,9 +50,12 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Test suite for {@link ASTEmptyGroupOptimizer}.
@@ -393,11 +403,6 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
                 given/* queryNode */, bsets);
 
-        /*
-         * FIXME The ASTEmptyGroupOptimizer needs to be refactored to handle
-         * this.  We need to replace the parent with the child and also handle
-         * the case when the parent is the top-level of the WHERE clause.
-         */
         assertSameAST(expected, actual);
 
     }
@@ -517,11 +522,351 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
                 given/* queryNode */, bsets);
 
+        assertSameAST(expected, actual);
+
+    }
+    
+    /**
+     * Rewrite:
+     * 
+     * <pre>
+     * SELECT ?x ?o
+     *  WHERE {
+     *     ?x rdfs:label ?o .
+     *     {
+     *       SELECT ?x WHERE {?x rdf:type foaf:Person}
+     *     }
+     * }
+     * </pre>
+     * 
+     * to
+     * 
+     * <pre>
+     * SELECT ?x ?o
+     *  WHERE {
+     *     ?x rdfs:label ?o .
+     *     SELECT ?x WHERE {?x rdf:type foaf:Person}
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_eliminateJoinGroup07() throws Exception {
+        
         /*
-         * FIXME The ASTEmptyGroupOptimizer needs to be refactored to handle
-         * this.  We need to replace the parent with the child and also handle
-         * the case when the parent is the top-level of the WHERE clause.
+         * Note: DO NOT share structures in this test!!!!
          */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfsLabel = makeIV(RDFS.LABEL);
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Sub-Select
+            final SubqueryRoot subqueryRoot = new SubqueryRoot(QueryType.SELECT);
+            {
+                
+                final ProjectionNode projection = new ProjectionNode();
+                subqueryRoot.setProjection(projection);
+                
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                subqueryRoot.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfType), new ConstantNode(foafPerson),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+
+            // QueryRoot
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("x"));
+                projection.addProjectionVar(new VarNode("o"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode joinGroup = new JoinGroupNode();
+                whereClause.addChild(joinGroup);
+
+                joinGroup.addChild(subqueryRoot);
+                
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            // Sub-Select
+            final SubqueryRoot subqueryRoot = new SubqueryRoot(QueryType.SELECT);
+            {
+                
+                final ProjectionNode projection = new ProjectionNode();
+                subqueryRoot.setProjection(projection);
+                
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                subqueryRoot.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfType), new ConstantNode(foafPerson),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+
+            // QueryRoot
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("x"));
+                projection.addProjectionVar(new VarNode("o"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(subqueryRoot);
+                
+            }
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Given:
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?v
+     * { :x :p ?v . { FILTER(?v = 1) } }
+     * </pre>
+     * 
+     * Verify that the FILTER is NOT lifted out of the join group.
+     * <p>
+     * Note: This is <code>Filter-nested - 2</code> (Filter on variable ?v which
+     * is not in scope) from the DAWG test suite. In this case, the filter can
+     * not be lifted because that change would violate the bottom up semantics
+     * for this query. In general, the lifting of filters which MAY be lifted
+     * should be handled by the {@link ASTLiftPreFiltersOptimizer} class. That
+     * class is designed to recognize pre-filters, which are filters whose
+     * variables are all known bound on entry to the group and, hence, could be
+     * run against the parent group.
+     */
+    public void test_emptyGroupOptimizer_doNotLiftFilter() {
+    
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV x = makeIV(new URIImpl("http://example/x"));
+
+        @SuppressWarnings("rawtypes")
+        final IV p = makeIV(new URIImpl("http://example/p"));
+
+        @SuppressWarnings("rawtypes")
+        final IV ONE = makeIV(new LiteralImpl("1",XSD.INTEGER));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // QueryRoot
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("v"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(x),
+                        new ConstantNode(p), new VarNode("v"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode joinGroup = new JoinGroupNode(true/*optional*/);
+                whereClause.addChild(joinGroup);
+
+                joinGroup.addChild(new FilterNode(new FunctionNode(
+                        FunctionRegistry.EQ, null/* scalarValues */,
+                        new ValueExpressionNode[] { new VarNode("v"),
+                                new ConstantNode(ONE) })));
+                
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+         
+            // QueryRoot
+            {
+                
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("v"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(x),
+                        new ConstantNode(p), new VarNode("v"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode joinGroup = new JoinGroupNode(true/*optional*/);
+                whereClause.addChild(joinGroup);
+
+                joinGroup.addChild(new FilterNode(new FunctionNode(
+                        FunctionRegistry.EQ, null/* scalarValues */,
+                        new ValueExpressionNode[] { new VarNode("v"),
+                                new ConstantNode(ONE) })));
+                
+            }
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Verify that we do not lift something out of an optional group as that
+     * would destroy the optional semantics of the thing lifted.
+     * <pre>
+     * SELECT ?x ?o
+     *  WHERE {
+     *     ?x rdfs:label ?o .
+     *     OPTIONAL {
+     *       ?x rdf:type foaf:Person
+     *     }
+     * }
+     * </pre>
+     */
+    public void test_emptyGroupOptimizer_doNotLiftFromOptionalGroup() {
+        
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfsLabel = makeIV(RDFS.LABEL);
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // QueryRoot
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("x"));
+                projection.addProjectionVar(new VarNode("o"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode joinGroup = new JoinGroupNode(true/*optional*/);
+                whereClause.addChild(joinGroup);
+
+                joinGroup.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfType), new ConstantNode(foafPerson),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+         
+            // QueryRoot
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                projection.setDistinct(true);
+                projection.addProjectionVar(new VarNode("x"));
+                projection.addProjectionVar(new VarNode("o"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final JoinGroupNode joinGroup = new JoinGroupNode(true/*optional*/);
+                whereClause.addChild(joinGroup);
+
+                joinGroup.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfType), new ConstantNode(foafPerson),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+                
+            }
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
         assertSameAST(expected, actual);
 
     }
