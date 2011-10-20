@@ -175,7 +175,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                  * If we pruned the child, then we need to decrement the index
                  * so that we don't skip one.
                  */
-                if (op.get(i) != child) {
+                if (i < op.arity() && op.get(i) != child) {
                 	
                 	i--;
                 	
@@ -194,7 +194,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                  * If we pruned the child, then we need to decrement the index
                  * so that we don't skip one.
                  */
-                if (op.get(i) != child) {
+                if (i < op.arity() && op.get(i) != child) {
                 	
                 	i--;
                 	
@@ -286,7 +286,8 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         		op.get(0) instanceof IBindingProducerNode &&
                 op.getParent() != null &&
                 !op.isOptional() &&
-                !(((IGroupNode<?>) op.getParent()) instanceof UnionNode)) {
+                !(((IGroupNode<?>) op.getParent()) instanceof UnionNode) &&
+                op.getContext() == op.getParent().getContext()) {
 
             /*
              * The child is something which produces bindings (hence,
