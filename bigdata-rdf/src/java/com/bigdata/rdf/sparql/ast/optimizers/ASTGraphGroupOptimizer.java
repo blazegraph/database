@@ -33,7 +33,6 @@ import java.util.LinkedList;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -63,8 +62,9 @@ import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
  * as their context, even if they occur within a subquery. (This is not true for
  * a named subquery which just projects its solutions but does not inherit the
  * parent's graph context. However, if we lifted the named subquery out, e.g.,
- * for bottom up evaluation semantics, then we should probably impose the GRAPH
- * constraint on the named subquery.)</dd>
+ * for bottom up evaluation semantics, then we need to impose the GRAPH
+ * constraint on the named subquery which means running this optimizer before
+ * the one which lifts out the named subquery.)</dd>
  * <dt>GRAPH ?foo { GRAPH ?bar } }</dt>
  * <dd>The easy way to enforce this constraint when there are nested graph
  * patterns is with a <code>SameTerm(?foo,?bar)</code> constraint inside of the
@@ -192,14 +192,6 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
         }
 
-//        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-//
-//        for(JoinGroupNode group : graphGroups) {
-//            
-////            liftOptionalGroup(sa, group);
-//            
-//        }
-        
         return queryNode;
         
     }
@@ -224,8 +216,10 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             //
             final AST2BOpContext context,//
             final DatasetNode dataSet,//
-            final IGroupNode<IGroupMemberNode> group, TermNode graphContext,
-            final Collection<JoinGroupNode> graphGroups) {
+            final IGroupNode<IGroupMemberNode> group, //
+            TermNode graphContext,//
+            final Collection<JoinGroupNode> graphGroups//
+            ) {
 
         if (group instanceof JoinGroupNode && group.getContext() != null) {
 
