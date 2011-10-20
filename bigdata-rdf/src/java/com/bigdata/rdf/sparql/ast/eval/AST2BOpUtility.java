@@ -2046,7 +2046,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             }
 
             @SuppressWarnings("unchecked")
-            final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
+            final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
             if (subgroup.isOptional()) {
                 continue;
@@ -2101,7 +2101,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             }
 
             @SuppressWarnings("unchecked")
-            final IGroupNode<IGroupMemberNode> subgroup = (IGroupNode<IGroupMemberNode>) child;
+            final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
             if (!subgroup.isOptional()) {
                 continue;
@@ -2155,7 +2155,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      */
 	private static PipelineOp _addSubquery(//
 			PipelineOp left,//
-			final IGroupNode<IGroupMemberNode> subgroup,//
+			final GraphPatternGroup<IGroupMemberNode> subgroup,//
 			final AST2BOpContext ctx//
 			) {
 

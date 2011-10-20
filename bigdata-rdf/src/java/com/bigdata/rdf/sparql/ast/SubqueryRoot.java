@@ -31,7 +31,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 /**
  * A SPARQL 1.1 style subquery.
  */
-public class SubqueryRoot extends SubqueryBase {
+public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
     public interface Annotations extends SubqueryBase.Annotations {
         
@@ -97,6 +97,13 @@ public class SubqueryRoot extends SubqueryBase {
         
     }
     
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isOptional() {
+        return false;
+    }
+
     /**
      * {@inheritDoc}
      * <p>

@@ -22,58 +22,26 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 5, 2011
+ * Created on Oct 20, 2011
  */
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Map;
-
-import com.bigdata.bop.BOp;
-
 /**
- * Join group or union.
+ * A marker interface for any kind of AST Node which joins stuff.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
-        GroupNodeBase<E> implements IJoinNode {
+public interface IJoinNode extends IBindingProducerNode {
 
     /**
+     * Return whether or not this is an join with "optional" semantics. Optional
+     * joins may or may not produce variable bindings, but will not reduce the
+     * incoming solutions based on whether or not they bind.
      * 
+     * TODO This will have to be expanded to cover "MINUS" as well.
      */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Required deep copy constructor.
-     */
-    public GraphPatternGroup(GraphPatternGroup<E> op) {
-
-        super(op);
-        
-    }
-
-    /**
-     * Required shallow copy constructor.
-     */
-    public GraphPatternGroup(BOp[] args, Map<String, Object> anns) {
-
-        super(args, anns);
-
-    }
+    boolean isOptional();
     
-    /**
-     * 
-     */
-    public GraphPatternGroup() {
-    }
-
-    /**
-     * @param optional
-     */
-    public GraphPatternGroup(boolean optional) {
-        super(optional);
-    }
-
 }

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -35,13 +36,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
@@ -203,18 +208,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StaticAnalysis {
+public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
-    private final QueryRoot queryRoot;
-    
-    /**
-     * Return the {@link QueryRoot} parameter given to the constructor.
-     */
-    public QueryRoot getQueryRoot() {
-       
-        return queryRoot;
-        
-    }
+    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
     
     /**
      * 
@@ -224,11 +220,8 @@ public class StaticAnalysis {
      *            analysis.
      */
     public StaticAnalysis(final QueryRoot queryRoot) {
-        
-        if(queryRoot == null)
-            throw new IllegalArgumentException();
-        
-        this.queryRoot = queryRoot;
+
+        super(queryRoot);
         
     }
     
@@ -1253,113 +1246,6 @@ public class StaticAnalysis {
 
         return filters;
 
-    }
-
-    /**
-     * Return the distinct variables in the operator tree, including on those on
-     * annotations attached to operators. Variables projected by a subquery are
-     * included, but not variables within the WHERE clause of the subquery.
-     * Variables projected by a {@link NamedSubqueryInclude} are also reported,
-     * but not those used within the WHERE clause of the corresponding
-     * {@link NamedSubqueryRoot}.
-     * 
-     * @param op
-     *            An operator.
-     * @param varSet
-     *            The variables are inserted into this {@link Set}.
-     *            
-     * @return The caller's {@link Set}.
-     */
-    public Set<IVariable<?>> getSpannedVariables(final BOp op,
-            final Set<IVariable<?>> varSet) {
-
-        if (op == null) {
-
-            return varSet;
-            
-        } else if (op instanceof IVariable<?>) {
-         
-            varSet.add((IVariable<?>)op);
-            
-        } else if(op instanceof IConstant<?>) {
-            
-            final IConstant<?> c = (IConstant<?>)op;
-            
-            final IVariable<?> var = (IVariable<?> )c.getProperty(Constant.Annotations.VAR);
-                
-            if( var != null) {
-                
-                varSet.add(var);
-                
-            }
-            
-        } else if (op instanceof SubqueryRoot) {
-
-            /*
-             * Do not recurse into a subquery, but report any variables
-             * projected by that subquery.
-             */
-
-            final SubqueryRoot subquery = (SubqueryRoot) op;
-
-            addProjectedVariables(subquery, varSet);
-            
-            // DO NOT RECURSE INTO THE SUBQUERY!
-            return varSet;
-
-        } else if (op instanceof NamedSubqueryInclude) {
-
-            final NamedSubqueryInclude namedInclude = (NamedSubqueryInclude) op;
-
-            final NamedSubqueryRoot subquery = namedInclude
-                    .getRequiredNamedSubqueryRoot(queryRoot);
-
-            addProjectedVariables(subquery, varSet);
-            
-            // DO NOT RECURSE INTO THE SUBQUERY!
-            return varSet;
-            
-        }
-        
-        /*
-         * Recursion.
-         */
-
-        final int arity = op.arity();
-
-        for (int i = 0; i < arity; i++) {
-
-            getSpannedVariables(op.get(i), varSet);
-
-        }
-
-        return varSet;
-
-    }
-
-    /**
-     * Add all variables on the {@link ProjectionNode} of the subquery to the
-     * set of distinct variables visible within the scope of the parent query.
-     * 
-     * @param subquery
-     * @param varSet
-     */
-    private void addProjectedVariables(final SubqueryBase subquery,
-            final Set<IVariable<?>> varSet) {
-        
-        final ProjectionNode proj = subquery.getProjection();
-
-        if (proj.isWildcard()) {
-            /* The subquery's projection should already have been rewritten. */
-            throw new AssertionError();
-        }
-
-        for (IVariable<?> var : proj.getProjectionVars()) {
-
-            varSet.add(var);
-
-        }
-        
     }
 
     /*

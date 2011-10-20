@@ -42,7 +42,7 @@ import com.bigdata.bop.BOp;
  */
 public class NamedSubqueryInclude extends
         GroupMemberNodeBase<NamedSubqueryInclude> implements
-        IBindingProducerNode {
+        IJoinNode {
 
     private static final long serialVersionUID = 1L;
 
@@ -191,7 +191,14 @@ public class NamedSubqueryInclude extends
         return nsr;
         
     }
-    
+
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isOptional() {
+        return false;
+    }
+
     @Override
     public String toString(int indent) {
 
