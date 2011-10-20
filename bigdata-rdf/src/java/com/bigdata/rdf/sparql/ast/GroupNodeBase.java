@@ -297,5 +297,29 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
         return sb.toString();
 
     }
+    
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Overridden to set the parent reference on the new child and clear the
+//     * parent reference on the old child.
+//     */
+//    @SuppressWarnings("unchecked")
+//    @Override
+//    public int replaceWith(final BOp oldChild, final BOp newChild) {
+//
+//    	final int i = super.replaceWith(oldChild, newChild);
+//
+//    	if (i > 0) {
+//
+//    		((E) oldChild).setParent(null);
+//    	
+//    		((E) newChild).setParent((IGroupNode<IGroupMemberNode>) this);
+//    		
+//    	}
+//    	
+//    	return i;
+//    	
+//    }
 
 }
