@@ -25,8 +25,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
-import com.bigdata.rawstore.Bytes;
-
 import junit.framework.TestCase;
 
 public class TestPseudoRandom extends TestCase {
@@ -39,20 +37,35 @@ public class TestPseudoRandom extends TestCase {
         testRange(2*1048576);
 	}
 	
-	/**
-	 * Verify that the pseudo random number generator completely
-	 * fills the half-open range.
-	 * @param range The exclusive upper bound of the half-open range.
-	 */
-	void testRange(final int range) {
+    /**
+     * Verify that the pseudo random number generator completely fills the
+     * half-open range.
+     * 
+     * @param range
+     *            The exclusive upper bound of the half-open range.
+     */
+    void testRange(final int range) {
+        testRange(range, 1/* next */);
+    }
+
+    /**
+     * Verify that the pseudo random number generator completely fills the
+     * half-open range.
+     * 
+     * @param range
+     *            The exclusive upper bound of the half-open range.
+     * @param next
+     *            The next value to visit.
+     */
+    void testRange(final int range, final int next) {
 	    
 	    final byte[] tst = new byte[range];
 		
-		final PseudoRandom psr = new PseudoRandom(range);
+		final PseudoRandom psr = new PseudoRandom(range, next);
 		
 		for (int i = 0; i < range; i++) {
 			// we want to test 0 - (range-1)
-			final int nxt = psr.next()-1;
+			final int nxt = psr.next();
 			assertTrue(nxt <= range);
 			assertTrue(tst[nxt] == 0);
 			
