@@ -74,6 +74,9 @@ public class TestAll extends TestCase {
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
 
+        // test suite for a pseudo random number generator.
+        suite.addTestSuite( TestPseudoRandom.class );
+
         suite.addTestSuite(TestByteBufferBitVector.class);
 
         suite.addTestSuite( TestCSVReader.class );
