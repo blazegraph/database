@@ -69,6 +69,9 @@ public class TestAll extends TestCase {
         // Test suite for canJoinUsingConstraints().
         suite.addTestSuite(TestStaticAnalysis_CanJoinUsingConstraints.class);
 
+        // Test suite for join set analysis.
+        suite.addTestSuite(TestJoinSetUtil.class);
+
         // Test suite for AST query rewriters/optimizers.
         suite.addTest(com.bigdata.rdf.sparql.ast.optimizers.TestAll.suite());
 

@@ -77,6 +77,7 @@ public class TestASTHashJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     /**
      * This unit test is based on BSBM Q5.
+     * 
      * <pre>
      * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
      * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -98,6 +99,14 @@ public class TestASTHashJoinOptimizer extends AbstractASTEvaluationTestCase {
      * ORDER BY ?productLabel
      * LIMIT 5
      * </pre>
+     * 
+     * TODO For this query, the only variable which is needed in the parent
+     * group after the sub-groups have been pushed down is <code>?product</code>
+     * . It is possible to recognize that we could turn those sub-groups into
+     * sub-selects and use a DISTINCT projection of just the
+     * <code>?product</code> variable. If the joins in those subgroups have more
+     * than one result per product, then that additional transform could
+     * eliminate a significiant amount of work.
      */
     @SuppressWarnings("unchecked")
     public void test_hashJoinOptimizer_BSBM_Q5() {
