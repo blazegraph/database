@@ -56,12 +56,17 @@ public class PseudoRandom {
      * @param range
      *            The exclusive upper bound of the half-open range (0:range].
      * @param next
-     *            The next number to visit.
+     *            The next number to visit in (0:range].
      */
 	public PseudoRandom(final int range, final int next) {
-		this(range);
-		
-		m_next = next;
+
+	    this(range);
+
+        if (next < 0 || next >= range)
+            throw new IllegalArgumentException();
+
+        m_next = next + 1;
+
 	}
 	
     /**
@@ -91,7 +96,7 @@ public class PseudoRandom {
 		if (m_next > m_max)
 			return next();
 		else			
-			return m_next;
+			return m_next - 1;
 	}
 	
     /**
@@ -103,9 +108,14 @@ public class PseudoRandom {
      * 
      * @return The next value in the pseudo random sequence after <i>prev</i>.
      */
-	public int next(final int prev) {
-		m_next = prev;
-		
-		return next();		
+    public int next(final int prev) {
+
+        if (prev < 0 || prev >= m_max)
+            throw new IllegalArgumentException();
+
+        m_next = prev + 1;
+
+        return next();
+
 	}
 }
