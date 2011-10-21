@@ -51,6 +51,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.util.PseudoRandom;
 
 /**
  * A simple demonstration which may be used to compare the {@link HTree}
@@ -190,7 +191,7 @@ public class HTreeVersusHashMapDemo {
 
         private final int nkeys;
         private final int vectorSize;
-        private final long seed;
+        private final IGenerator gen;
         private final int addressBits;
         private final int writeRetentionQueueCapacity;
         private final IReport report;
@@ -210,13 +211,14 @@ public class HTreeVersusHashMapDemo {
          *            The capacity of the write retention queue.
          */
         HTreeDemo(IReport report, final int nkeys, final int vectorSize,
-                final long seed, final int addressBits,
+                final IGenerator gen,
+                final int addressBits,
                 final int writeRetentionQueueCapacity) {
 
             this.report = report;
             this.nkeys = nkeys;
             this.vectorSize = vectorSize;
-            this.seed = seed;
+            this.gen = gen;
             this.addressBits = addressBits;
             this.writeRetentionQueueCapacity = writeRetentionQueueCapacity;
 
@@ -234,8 +236,6 @@ public class HTreeVersusHashMapDemo {
                 final HTree htree = getHTree(store, addressBits,
                         false/* rawRecords */, writeRetentionQueueCapacity);
 
-                final Random r = new Random(seed);
-                
                 final IKeyBuilder keyBuilder = new KeyBuilder();
 
                 final byte[] val = null; // no value stored under the key.
@@ -246,12 +246,9 @@ public class HTreeVersusHashMapDemo {
 
                     for (int j = 0; j < vectorSize; j++) {
 
-//                        final int rnd = r.nextInt(); // random, not random w/o replacement.
-//                        final int rnd = r.nextInt(nkeys); // random, not random w/o replacement.
-//                        final int rnd = i+j; // sequential
-                        final int rnd = Integer.reverse(i+j); // sequential
+                      final int rnd = gen.next(); 
                         
-                        keys[j] = rnd;
+                      keys[j] = rnd;
 
                     }
                     
@@ -313,20 +310,85 @@ public class HTreeVersusHashMapDemo {
         }
         
     }
+
+    private interface IGenerator {
+        int next();
+    }
+    
+    /**
+     * Sequential numbers starting from zero.
+     */
+    static private class SequentialGenerator implements IGenerator {
+        private int next = 0;
+        public int next() {
+            return next++;
+        }
+    }
+
+    /**
+     * Random numbers in a half-open range (does not cover all 32-bit values (no
+     * negative values)).
+     */
+    static private class RandomGenerator implements IGenerator {
+        private int next = 0;
+        private final long seed;
+        private final int range;
+        private final Random r;
+        public RandomGenerator(final long seed, final int range) {
+            this.seed = seed;
+            this.range = range;
+            this.r = new Random(seed);
+        }
+        public int next() {
+            return r.nextInt(range);
+        }
+    }
+
+    /** Pseudo random numbers without replacement covering a half-open range. */
+    static private class PseudoRandomGenerator implements IGenerator {
+        private int range;
+        private PseudoRandom pr;
+        /**
+         * 
+         * @param range The half-open range (0:range].
+         */
+        public PseudoRandomGenerator(final int range) {
+            this(range, 0/*next*/);
+        }
+        /**
+         * 
+         * @param range The half-open range (0:range].
+         * @param next The next value to visit.
+         */
+        public PseudoRandomGenerator(final int range,final int next) {
+            this.range = range;
+            this.pr = new PseudoRandom(range, next);
+        }
+        public int next() {
+            return pr.next();
+        }
+    }
     
     /**
      * @param args
      */
     public static void main(String[] args) {
 
+//      final int rnd = r.nextInt(); // random, not random w/o replacement.
+//      final int rnd = r.nextInt(nkeys); // random, not random w/o replacement.
+//      final int rnd = i+j; // sequential
+//      final int rnd = Integer.reverse(i+j); // sequential
+
         final int nkeys = 2 * Bytes.megabyte32;
         final int vectorSize = 10000;
-        final long seed = -91L;
+        final IGenerator gen = new SequentialGenerator();
+//        final IGenerator gen = new PseudoRandomGenerator(nkeys);
+//        final IGenerator gen = new RandomGenerator(-91L/*seed*/,nkeys);
         final int addressBits = 10; // pages with 2^10 slots.
         final int writeRetentionQueueCapacity = 5000;
 
-        new HTreeDemo(new ReportListener(), nkeys, vectorSize, seed, addressBits,
-                writeRetentionQueueCapacity).run();
+        new HTreeDemo(new ReportListener(), nkeys, vectorSize, gen, 
+                addressBits, writeRetentionQueueCapacity).run();
 
     }
 

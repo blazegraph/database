@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
+import com.bigdata.rawstore.Bytes;
+
 import junit.framework.TestCase;
 
 public class TestPseudoRandom extends TestCase {
@@ -33,7 +35,8 @@ public class TestPseudoRandom extends TestCase {
 		testRange(7);
 		testRange(123);
 		testRange(25764);
-		testRange(58000);
+        testRange(58000);
+        testRange(2*1048576);
 	}
 	
 	/**

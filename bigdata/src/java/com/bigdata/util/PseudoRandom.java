@@ -94,6 +94,15 @@ public class PseudoRandom {
 			return m_next;
 	}
 	
+    /**
+     * Reset the pseudo random generator to a state where it has just visited
+     * <i>prev</i>.
+     * 
+     * @param prev
+     *            The "previous" value.
+     * 
+     * @return The next value in the pseudo random sequence after <i>prev</i>.
+     */
 	public int next(final int prev) {
 		m_next = prev;
 		
