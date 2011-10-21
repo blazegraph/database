@@ -240,22 +240,29 @@ public class HTreeVersusHashMapDemo {
 
                 final byte[] val = null; // no value stored under the key.
                 
-                for (int i = 0; i < nkeys; i += vectorSize) {
+                final int[] keys = new int[vectorSize];
+                int alen;
 
-                    final int[] keys = new int[vectorSize];
+                for (int i = 0; i < nkeys; ) {
 
-                    for (int j = 0; j < vectorSize; j++) {
+                    alen = Math.min(vectorSize, nkeys - i);
+
+                    for (int j = 0; j < alen; j++) {
 
                       final int rnd = gen.next(); 
                         
                       keys[j] = rnd;
-
+                      
+//                      nvisited++;
+                      
                     }
+
+                    i += alen;
                     
                     // Vector the chunk.
-                    Arrays.sort(keys);
+                    Arrays.sort(keys, 0, alen);
 
-                    for (int j = 0; j < vectorSize; j++) {
+                    for (int j = 0; j < alen; j++) {
 
                         final int rnd = keys[j];
 
