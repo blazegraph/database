@@ -29,6 +29,7 @@ package com.bigdata.htree;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
@@ -174,10 +175,11 @@ public class HTreeVersusHashMapDemo {
             final long totalMemory = Runtime.getRuntime().totalMemory();
 
             // #of application bytes in the store.
-            final long userBytes = store.size();
+            final long userBytes = store == null ? 0L : store.size();
 
             // total extent of the store (1M increments).
-            final long mmgrBytes = ((MemoryManager) mmgr).getExtent();
+            final long mmgrBytes = mmgr == null ? 0L : ((MemoryManager) mmgr)
+                    .getExtent();
 
             System.out.println(nops + "\t" + elapsed + "\t" + insertsPerSec
                     + "\t" + freeMemory + "\t" + totalMemory + "\t" + userBytes
@@ -186,7 +188,109 @@ public class HTreeVersusHashMapDemo {
         }
 
     }
-    
+
+    /**
+     * Version stuff the keys into a Java collection.
+     */
+    private static class JavaCollectionDemo implements Runnable {
+
+        private final int nkeys;
+        private final int vectorSize;
+        private final IGenerator gen;
+        private final Set<Integer> c;
+        private final IReport report;
+
+        /**
+         * 
+         * @param nkeys
+         *            The #of keys to insert.
+         * @param vectorSize
+         *            The #of keys which are sorted (vectored) as per the
+         *            {@link HTree} variant.
+         * @param seed
+         *            The random generator seed.
+         * @param c
+         *            The Java collection.
+         */
+        JavaCollectionDemo(IReport report, final int nkeys, final int vectorSize,
+                final IGenerator gen,
+                final Set<Integer> c) {
+
+            this.report = report;
+            this.nkeys = nkeys;
+            this.vectorSize = vectorSize;
+            this.gen = gen;
+            this.c = c;
+
+        }
+        
+        public void run() {
+
+            final long start = System.currentTimeMillis();
+
+            final int[] keys = new int[vectorSize];
+            int alen;
+
+            for (int i = 0; i < nkeys;) {
+
+                alen = Math.min(vectorSize, nkeys - i);
+
+                for (int j = 0; j < alen; j++) {
+
+                    final int rnd = gen.next();
+
+                    keys[j] = rnd;
+
+                }
+
+                i += alen;
+
+                // Vector the chunk.
+                Arrays.sort(keys, 0, alen);
+
+                for (int j = 0; j < alen; j++) {
+
+                    final Integer key = keys[j];
+
+                    if (!c.contains(key)) {
+                        /*
+                         * Do not store duplicate entries since we will compare
+                         * the performance to a Set.
+                         */
+                        c.add(key);
+                    }
+
+                    final long nops = i + j;
+
+                    if (report != null && (nops % REPORT_INTERVAL) == 0L) {
+
+                        final long elapsed = System.currentTimeMillis() - start;
+
+                        report.report(nops, elapsed, null/* mmgr */, null/* mmgr */);
+
+                    }
+
+                }
+
+            }
+
+            final long load = System.currentTimeMillis();
+
+            if (log.isInfoEnabled()) {
+
+                log.info("\nHtree: Entries: " + c.size() + "; Load took "
+                        + (load - start) + "ms, Generator="
+                        + gen.getClass().getSimpleName());
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Version stuff the keys into an {@link HTree}.
+     */
     private static class HTreeDemo implements Runnable {
 
         private final int nkeys;
@@ -252,8 +356,6 @@ public class HTreeVersusHashMapDemo {
                       final int rnd = gen.next(); 
                         
                       keys[j] = rnd;
-                      
-//                      nvisited++;
                       
                     }
 
@@ -388,14 +490,20 @@ public class HTreeVersusHashMapDemo {
 
         final int nkeys = 2 * Bytes.megabyte32;
         final int vectorSize = 10000;
-        final IGenerator gen = new SequentialGenerator();
+        final IGenerator gen = true ? new SequentialGenerator() : new PseudoRandomGenerator(nkeys);
+//        final IGenerator gen = new SequentialGenerator();
 //        final IGenerator gen = new PseudoRandomGenerator(nkeys);
 //        final IGenerator gen = new RandomGenerator(-91L/*seed*/,nkeys);
         final int addressBits = 10; // pages with 2^10 slots.
         final int writeRetentionQueueCapacity = 5000;
 
-        new HTreeDemo(new ReportListener(), nkeys, vectorSize, gen, 
-                addressBits, writeRetentionQueueCapacity).run();
+        if (false) {
+            new HTreeDemo(new ReportListener(), nkeys, vectorSize, gen,
+                    addressBits, writeRetentionQueueCapacity).run();
+        } else {
+            new JavaCollectionDemo(new ReportListener(), nkeys, vectorSize,
+                    gen, new HashSet<Integer>(nkeys)).run();
+        }
 
     }
 
