@@ -99,6 +99,9 @@ public class TestAll extends TestCase {
         // Unit tests for SPARQL 1.1 subquery optimizations.
         suite.addTestSuite(TestASTSparql11SubqueryOptimizer.class);
 
+        // Unit test for optimizer which pushes down sub-groups for hash joins.
+        suite.addTestSuite(TestASTHashJoinOptimizer.class);
+
         return suite;
 
     }

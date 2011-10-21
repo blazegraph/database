@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -227,6 +228,39 @@ public class StaticAnalysisBase {
 
         }
         
+    }
+
+    /**
+     * Return <code>true</code> if the {@link FilterNode} is fully bound for the
+     * given variables.
+     * 
+     * @param f
+     *            The {@link FilterNode}
+     * @param vars
+     *            Some collection of variables which are known to be bound.
+     * @return <code>true</code> if all variables on which the filter depends
+     *         are present in that collection.
+     */
+    public boolean isFullyBound(final FilterNode f, final Set<IVariable<?>> vars) {
+
+        final Set<IVariable<?>> fvars = getSpannedVariables(f,
+                true/* filters */, new LinkedHashSet<IVariable<?>>());
+
+        fvars.removeAll(vars);
+
+        if (fvars.isEmpty()) {
+
+            /*
+             * The variables for this filter are all present in the given set of
+             * variables.
+             */
+
+            return true;
+
+        }
+
+        return false;
+
     }
 
 }

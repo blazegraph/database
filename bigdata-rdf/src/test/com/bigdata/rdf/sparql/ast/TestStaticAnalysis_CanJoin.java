@@ -146,14 +146,14 @@ public class TestStaticAnalysis_CanJoin extends TestCase2 {
 
     }
 
-    /**
-     * FIXME Write unit tests for canJoin of {@link IBindingProducerNode}s which
-     * are not just {@link StatementPatternNode}s, including {@link ServiceNode}
-     * , {@link SubqueryRoot}, etc.
-     */
-    public void test_canJoin_notJustStatementPatterns() {
-        fail("write test");
-    }
+//    /**
+//     * TODO Write unit tests for canJoin of {@link IBindingProducerNode}s which
+//     * are not just {@link StatementPatternNode}s, including {@link ServiceNode}
+//     * , {@link SubqueryRoot}, etc.
+//     */
+//    public void test_canJoin_notJustStatementPatterns() {
+//        fail("write test");
+//    }
     
     /**
      * Verify that joins are not permitted when the variables are

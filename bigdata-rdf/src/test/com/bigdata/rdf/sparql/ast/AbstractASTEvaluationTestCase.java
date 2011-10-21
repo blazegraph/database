@@ -33,6 +33,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
@@ -194,6 +195,24 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
         return set;
 
+    }
+
+    static protected final Set<VarNode> asSet(final VarNode [] a) {
+        
+        return new LinkedHashSet<VarNode>(Arrays.asList(a));
+        
+    }
+    
+    static protected final Set<FilterNode> asSet(final FilterNode [] a) {
+        
+        return new LinkedHashSet<FilterNode>(Arrays.asList(a));
+        
+    }
+
+    static protected final Set<Integer> asSet(final Integer[] a) {
+        
+        return new LinkedHashSet<Integer>(Arrays.asList(a));
+        
     }
 
 //    /**
