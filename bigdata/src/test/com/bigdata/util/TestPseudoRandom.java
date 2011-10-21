@@ -36,10 +36,16 @@ public class TestPseudoRandom extends TestCase {
 		testRange(58000);
 	}
 	
+	/**
+	 * Verify that the pseudo random number generator completely
+	 * fills the half-open range.
+	 * @param range The exclusive upper bound of the half-open range.
+	 */
 	void testRange(final int range) {
-		byte[] tst = new byte[range];
+	    
+	    final byte[] tst = new byte[range];
 		
-		PseudoRandom psr = new PseudoRandom(range);
+		final PseudoRandom psr = new PseudoRandom(range);
 		
 		for (int i = 0; i < range; i++) {
 			// we want to test 0 - (range-1)
@@ -49,7 +55,6 @@ public class TestPseudoRandom extends TestCase {
 			
 			tst[nxt] = 1;
 		}
-		
-	}
+    }
 
 }

@@ -38,29 +38,48 @@ package com.bigdata.util;
  */
 
 public class PseudoRandom {
-	int m_mask = 0;
-	int m_next = 1;
-	final int m_max;
+	final private int m_mask;// = 0;
+	private int m_next = 1;
+	final private int m_max;
 	
-	static final int[] s_masks = {0x03, 0x06, 0x0C, 0x14, 0x30, 0x60, 0xB8, 0x0110, 0x0240, 
+	private static final int[] s_masks = {
+	0x03, 0x06, 0x0C, 0x14, 0x30, 0x60, 0xB8, 0x0110, 0x0240, 
 	0x0500, 0x0CA0, 0x1B00, 0x3500, 0x6000, 0xB400, 0x00012000, 0x00020400, 
 	0x00072000, 0x00090000, 0x00140000, 0x00300000, 0x00400000, 0x00D80000, 
 	0x01200000, 0x03880000, 0x07200000, 0x09000000, 0x14000000, 0x32800000, 
 	0x48000000, 0xA3000000};
 	
+    /**
+     * Create a pseudo random number generator which will visit each integer in
+     * a half-open range.
+     * 
+     * @param range
+     *            The exclusive upper bound of the half-open range (0:range].
+     * @param next
+     *            The next number to visit.
+     */
 	public PseudoRandom(final int range, final int next) {
 		this(range);
 		
 		m_next = next;
 	}
 	
+    /**
+     * Create a pseudo random number generator which will visit each integer in
+     * a half-open range. The first visited value will be <code>1</code>.
+     * 
+     * @param range
+     *            The exclusive upper bound of the half-open range (0:range].
+     */
 	public PseudoRandom(final int range) {
+	    int m_mask = 0;
 		for (int m = 0; m < s_masks.length; m++) {
 			if (s_masks[m] > range) {
 				m_mask = s_masks[m];
 				break;
 			}
 		}
+		this.m_mask = m_mask;
 		m_max = range;
 	}
 	
