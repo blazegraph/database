@@ -292,11 +292,11 @@ public class HTreeVersusHashMapDemo {
                 
                 if (log.isInfoEnabled()) {
 
-                    log.info("Htree Leaves: " + htree.nleaves + ", Evicted: "
+                    log.info("\nHtree: Entries: "+htree.nentries+", Leaves: " + htree.nleaves + ", Evicted: "
                             + counters.leavesWritten + ", Nodes: "
                             + htree.nnodes + ", Evicted: "
                             + counters.nodesWritten + "; Load took "
-                            + (load - start) + "ms");
+                            + (load - start) + "ms, Generator="+gen.getClass().getSimpleName());
 
                 }
 
@@ -360,7 +360,7 @@ public class HTreeVersusHashMapDemo {
          * @param range The half-open range (0:range].
          * @param next The next value to visit.
          */
-        public PseudoRandomGenerator(final int range,final int next) {
+        public PseudoRandomGenerator(final int range, final int next) {
             this.range = range;
             this.pr = new PseudoRandom(range, next);
         }
