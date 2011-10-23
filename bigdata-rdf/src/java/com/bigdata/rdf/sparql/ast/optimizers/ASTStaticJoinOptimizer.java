@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -39,10 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.bop.joinGraph.IRangeCountFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
@@ -57,15 +55,13 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.relation.rule.IAccessPathExpander;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IStarJoin;
-import com.bigdata.relation.rule.eval.IJoinNexus;
 
 /**
  * This is an AST optimizer port of the old "static" optimizer - 
@@ -165,12 +161,42 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * 
      * @param op
      */
-    private void optimize(final AST2BOpContext ctx, final QueryBase queryBase, 
+    private void optimize(final AST2BOpContext ctx, final QueryRoot queryRoot, 
             IJoinNode[] ancestry, final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {
     		
     		final JoinGroupNode joinGroup = (JoinGroupNode) op;
+    		
+    		/*
+    		 * Look for service calls, since they will get run before the
+    		 * statement pattern nodes. Add any service calls into the ancestry.
+    		 */
+    		final List<ServiceNode> serviceNodes = joinGroup.getServiceNodes();
+    		
+    		if (serviceNodes.size() > 0) {
+    			
+    			final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+    			
+    			for (IJoinNode ancestor : ancestry) {
+    				
+    				tmp.add(ancestor);
+    				
+    			}
+    			
+    			for (ServiceNode service : serviceNodes) {
+    				
+        			if (log.isDebugEnabled()) {
+        				log.debug("adding a service node to ancestry:" + service);
+        			}
+        			
+    				tmp.add(service);
+    				
+    			}
+    			
+    			ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
+    			
+    		}
     		
 	    	/*
 	    	 * First optimize this group.
@@ -217,10 +243,12 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 	        		
 	        	}
 	        	
-	        	/*
-	        	 * Get the optimized join ordering.
-	        	 */
-	        	final int[] order = order(ctx, ancestry, joinGroup, spNodes);
+	            /*
+	             * Calculate the optimized join ordering.
+	             */
+	        	final StaticOptimizer opt = new StaticOptimizer(queryRoot, ancestry, spNodes);
+	        	
+	        	final int[] order = opt.getOrder();
 	        	
 	        	/*
 	        	 * Reorder the statement pattern nodes within the join group.
@@ -280,7 +308,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                optimize(ctx, queryBase, ancestry, childGroup);
+                optimize(ctx, queryRoot, ancestry, childGroup);
                 
             } else if (child instanceof QueryBase) {
 
@@ -289,7 +317,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
-                optimize(ctx, subquery, ancestry, childGroup);
+                optimize(ctx, queryRoot, ancestry, childGroup);
 
             }
             
@@ -354,28 +382,16 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     }
     
     /**
-     * Calculate the appropriate evaluation order for the given set of
-     * {@link StatementPatternNode}s, {@link JoinGroupNode}, and ancestry.
-     */
-    private final int[] order(final AST2BOpContext ctx,  
-            final IJoinNode[] ancestry, final JoinGroupNode joinGroup, 
-            final List<StatementPatternNode> spNodes) {
-    	
-    	final StaticOptimizer opt = new StaticOptimizer(spNodes);
-    	
-    	final int[] order = opt.getOrder();
-    	
-    	return order;
-    	
-    }
-
-    /**
      * This is the old static optimizer code, taken directly from
      * {@link DefaultEvaluationPlan2}, but lined up with the AST API instead of
      * the Rule and IPredicate API.
      * 
      */
     private static final class StaticOptimizer {
+    	
+    	private final QueryRoot queryRoot;
+    	
+    	private final IJoinNode[] ancestry;
     	
         private final List<StatementPatternNode> spNodes;
 
@@ -456,10 +472,22 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          * @param rule
          *            The rule.
          */
-        public StaticOptimizer(List<StatementPatternNode> spNodes) {
+        public StaticOptimizer(final QueryRoot queryRoot,
+        		final IJoinNode[] ancestry, 
+        		final List<StatementPatternNode> spNodes) {
+            
+            if (queryRoot == null)
+                throw new IllegalArgumentException();
+            
+            if (ancestry == null)
+                throw new IllegalArgumentException();
             
             if (spNodes == null)
                 throw new IllegalArgumentException();
+            
+            this.queryRoot = queryRoot;
+            
+            this.ancestry = ancestry;
             
             this.spNodes = spNodes;
             
@@ -516,13 +544,39 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final TermNode p = pred.p();
                 if (p != null && p.isConstant() && p.getValue().equals(BD.SEARCH)) {
                     if (log.isDebugEnabled()) log.debug("found a run first, tail " + i);
-                    final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
-                    while (it.hasNext()) {
-                    	runFirstVars.add(it.next());
+//                    final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+//                    while (it.hasNext()) {
+//                    	runFirstVars.add(it.next());
+//                    }
+                    final TermNode s = pred.s();
+                    if (s != null && s.isVariable()) {
+                    	runFirstVars.add((IVariable<?>) s.getValueExpression());
                     }
                     order[startIndex++] = i;
                     used[i] = true;
                 }
+            }
+            
+            /*
+             * Seems like the easiest way to handle the ancestry is the exact
+             * same way we handle the "run first" statement patterns (text search),
+             * which is that we collect up the variables that are bound and then
+             * give preferential treatment to the predicates that can join
+             * on those variables.
+             */
+        	final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            for (IJoinNode join : ancestry) {
+            	if (log.isDebugEnabled()) {
+            		log.debug("considering join node from ancestry: " + join);
+            	}
+//            	final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables((BOp) join);
+//        		while (it.hasNext()) {
+//        			runFirstVars.add(it.next());
+//        		}
+            	sa.getDefinitelyProducedBindings(join, runFirstVars, false/* recursive */);
+            }
+            if (log.isDebugEnabled()) {
+            	log.debug("bindings from ancestry: " + Arrays.toString(runFirstVars.toArray()));
             }
             
             // if there are no more tails left after the expanders, we're done
@@ -545,23 +599,47 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             }
             
             int preferredFirstTail = -1;
+            long minCardinality = Long.MAX_VALUE;
             // give preferential treatment to a tail that shares variables with the
-            // runFirst expanders
+            // runFirst expanders. collect all of them up and then choose the one
+            // that has the lowest cardinality
             for (int i = 0; i < arity; i++) {
                 // only check unused tails
                 if (used[i]) {
                     continue;
                 }
                 final StatementPatternNode pred = spNodes.get(i);
-                final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+                if (log.isDebugEnabled()) {
+                	log.debug("considering pred against ancestry: " + pred);
+                }
+                // only test the required joins
+                if (pred.isOptional()) {
+                	continue;
+                }
+                final Set<IVariable<?>> vars = sa.getDefinitelyProducedBindings(
+                		pred, new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+//                Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
+        		final Iterator<IVariable<?>> it = vars.iterator();
                 while (it.hasNext()) {
                 	if (runFirstVars.contains(it.next())) {
-                		preferredFirstTail = i;
+//                		preferredFirstTail = i;
+                		/*
+                		 * We have a shared var with either the run first
+                		 * predicates or with the ancestry.
+                		 */
+                		final long tailCardinality = cardinality(i);
+                		if (tailCardinality < minCardinality) {
+                			preferredFirstTail = i;
+                			minCardinality = tailCardinality; 
+                		}
                 	}
                 }
-                if (preferredFirstTail != -1)
-                	break;
-            }            
+//                if (preferredFirstTail != -1)
+//                	break;
+            }
+            if (log.isDebugEnabled()) {
+            	log.debug("preferred first tail: " + preferredFirstTail);
+            }
             
             // if there are only two tails left after the expanders
             if (startIndex == arity-2) {
