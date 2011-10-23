@@ -47,6 +47,7 @@ import com.bigdata.bop.join.HashIndexOp;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
+import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
@@ -1964,27 +1965,82 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             }
         }
-
-        @SuppressWarnings("rawtypes")
-        final IRule rule = new Rule("null", // name
-                null, // head
-                preds.toArray(new IPredicate[preds.size()]), // tails
-                constraints.size() > 0 // constraints
-                ? constraints.toArray(new IConstraint[constraints.size()])
-                        : null);
-
+	
         final Set<IVariable<?>> knownBound = sa.getIncomingBindings(
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
-        /*
-         * Note: Rule2BOpUtility is also handling materialization steps for
-         * joins.
-         */
+    	if (ctx.astStaticOptimizer) {
+    		
+    		/*
+    		 * If the AST static optimizer is enabled, the statement patterns
+    		 * will already be in the correct order by the time they get here.
+    		 * We simply need to add the joins and the join constraints.
+    		 */
+    		
+            final IConstraint[][] assignedConstraints;
+    		{
 
-        left = Rule2BOpUtility.convert(rule, left, knownBound, ctx.idFactory,
-                ctx.db, ctx.queryEngine, ctx.queryHints);
+    			final int nconstraints = constraints.size();
 
-        return left;
+    			final int nknownBound = knownBound != null ? knownBound.size() : 0;
+
+    			// figure out which constraints are attached to which
+    			// predicates.
+    			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+    					preds.toArray(new IPredicate[preds.size()]), 
+    					constraints.toArray(new IConstraint[constraints.size()]),
+    					nknownBound == 0 ? IVariable.EMPTY : knownBound
+    							.toArray(new IVariable<?>[nknownBound]),
+    					true// pathIsComplete
+    					);
+    			
+    		}
+
+    		/*
+             * Iterate through the predicates and join them, along with their
+             * join constraints.
+             */
+            for (int i = 0; i < preds.size(); i++) {
+
+                // assign a bop id to the predicate
+                final Predicate<?> pred = (Predicate<?>) preds.get(i);
+
+                // need to make a modifiable collection
+                final Collection<IConstraint> c = new LinkedList<IConstraint>
+                	(Arrays.asList(assignedConstraints[i]));
+
+                left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,//
+                        c, ctx.idFactory, ctx.queryHints);
+
+            }
+
+	        return left;
+    		
+    	} else {
+    	
+    		/*
+    		 * Rule2BOpUtility handles static join order optimization using
+    		 * the old DefaultEvaluationPlan2.
+    		 */
+	        @SuppressWarnings("rawtypes")
+	        final IRule rule = new Rule("null", // name
+	                null, // head
+	                preds.toArray(new IPredicate[preds.size()]), // tails
+	                constraints.size() > 0 // constraints
+	                ? constraints.toArray(new IConstraint[constraints.size()])
+	                        : null);
+	
+	        /*
+	         * Note: Rule2BOpUtility is also handling materialization steps for
+	         * joins.
+	         */
+	
+	        left = Rule2BOpUtility.convert(rule, left, knownBound, ctx.idFactory,
+	                ctx.db, ctx.queryEngine, ctx.queryHints);
+	
+	        return left;
+	        
+    	}
 
     }
 
