@@ -16,6 +16,7 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -52,7 +53,7 @@ public class AST2BOpContext implements IdFactory {
 	/**
 	 * The query hints from the original {@link #query}.
 	 */
-    final Properties queryHints;
+    public final Properties queryHints;
     
     /**
      * The unique identifier assigned to this query.
@@ -107,6 +108,14 @@ public class AST2BOpContext implements IdFactory {
      */
     boolean hashJoinPatternForSubSelect = false;
     
+    /**
+     * When <code>true</code>, use the new {@link ASTStaticJoinOptimizer}.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
+     *      static optimizer into an AST rewrite)
+     */
+    boolean astStaticOptimizer = true;
+    
     private int varIdFactory = 0;
 
     /**
@@ -138,6 +147,13 @@ public class AST2BOpContext implements IdFactory {
         this.idFactory = idFactory;
         this.db = db;
         this.optimizers = new DefaultOptimizerList();
+        /*
+         * TODO Make this a permanent optimizer.
+         */
+        if (astStaticOptimizer) {
+        	this.optimizers.add(new ASTStaticJoinOptimizer());
+        }
+        
         this.queryEngine = queryEngine;
         this.queryHints = queryHints;
 
@@ -181,6 +197,12 @@ public class AST2BOpContext implements IdFactory {
         this.db = db;
 
         this.optimizers = new DefaultOptimizerList();
+        /*
+         * TODO Make this a permanent optimizer.
+         */
+        if (astStaticOptimizer) {
+        	this.optimizers.add(new ASTStaticJoinOptimizer());
+        }
 
         /*
          * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
