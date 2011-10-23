@@ -38,7 +38,6 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -169,12 +169,16 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     		final JoinGroupNode joinGroup = (JoinGroupNode) op;
     		
     		/*
-    		 * Look for service calls, since they will get run before the
-    		 * statement pattern nodes. Add any service calls into the ancestry.
+    		 * Look for service calls and named subquery includes, since they 
+    		 * will get run before the statement pattern nodes. Add them into 
+    		 * the ancestry.
     		 */
     		final List<ServiceNode> serviceNodes = joinGroup.getServiceNodes();
     		
-    		if (serviceNodes.size() > 0) {
+    		final List<NamedSubqueryInclude> namedSubqueryIncludes =
+    			joinGroup.getNamedSubqueryIncludes();
+    		
+    		if (serviceNodes.size() > 0 || namedSubqueryIncludes.size() > 0) {
     			
     			final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
     			
@@ -191,6 +195,16 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         			}
         			
     				tmp.add(service);
+    				
+    			}
+    			
+    			for (NamedSubqueryInclude nsi : namedSubqueryIncludes) {
+    				
+        			if (log.isDebugEnabled()) {
+        				log.debug("adding a named subquery include to ancestry:" + nsi);
+        			}
+        			
+    				tmp.add(nsi);
     				
     			}
     			
