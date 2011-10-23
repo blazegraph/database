@@ -134,7 +134,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	}
 
 	/**
-	 * Return only the statement pattern child nodes in this group.
+	 * Return only the {@link ServiceNode} child nodes in this group.
 	 */
 	public List<ServiceNode> getServiceNodes() {
 		
@@ -152,6 +152,50 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		}
 		
 		return serviceNodes;
+		
+	}
+
+	/**
+	 * Return only the {@link NamedSubqueryInclude} child nodes in this group.
+	 */
+	public List<NamedSubqueryInclude> getNamedSubqueryIncludes() {
+		
+		final List<NamedSubqueryInclude> namedSubqueryIncludes = 
+			new LinkedList<NamedSubqueryInclude>();
+		
+		for (IQueryNode node : this) {
+			
+			if (node instanceof NamedSubqueryInclude) {
+				
+				namedSubqueryIncludes.add((NamedSubqueryInclude) node);
+				
+			}
+			
+		}
+		
+		return namedSubqueryIncludes;
+		
+	}
+
+	/**
+	 * Return only the {@link NamedSubqueryInclude} child nodes in this group.
+	 */
+	@SuppressWarnings("unchecked")
+	public <T> List<T> getChildren(final Class<T> type) {
+		
+		final List<T> children = new LinkedList<T>();
+		
+		for (IQueryNode node : this) {
+			
+			if (type.isAssignableFrom(node.getClass())) {
+				
+				children.add((T) node);
+				
+			}
+			
+		}
+		
+		return children;
 		
 	}
 
