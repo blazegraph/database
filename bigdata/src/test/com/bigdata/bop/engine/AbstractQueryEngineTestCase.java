@@ -612,8 +612,8 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
                 
                 actualSet.removeAll(expectedSet);
                 
-                fail("#of annotations differs: expecting " + o1 + ", actual="
-                        + o2 + ", missing=" + actualSet.toString());
+                fail("#of annotations differs: expecting" + o1 + "\nactual="
+                        + o2 + "\nmissing=\n" + actualSet.toString());
                 
             }
             
