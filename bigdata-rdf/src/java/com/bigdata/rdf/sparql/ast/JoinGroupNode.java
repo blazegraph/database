@@ -133,6 +133,28 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		
 	}
 
+	/**
+	 * Return only the statement pattern child nodes in this group.
+	 */
+	public List<ServiceNode> getServiceNodes() {
+		
+		final List<ServiceNode> serviceNodes = 
+			new LinkedList<ServiceNode>();
+		
+		for (IQueryNode node : this) {
+			
+			if (node instanceof ServiceNode) {
+				
+				serviceNodes.add((ServiceNode) node);
+				
+			}
+			
+		}
+		
+		return serviceNodes;
+		
+	}
+
     /**
      * Return any <code>LET x:= expr</code> or <code>(expr AS ?x)</code> nodes
      * in <i>this</i> group (these are modeled in exactly the same way by the
