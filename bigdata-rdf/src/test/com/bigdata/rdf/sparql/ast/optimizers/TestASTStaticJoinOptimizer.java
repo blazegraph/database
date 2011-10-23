@@ -29,13 +29,17 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -1293,6 +1297,165 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             expected.setProjection(projection);
             expected.setWhereClause(whereClause);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+    
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(x)
+     *   JoinGroupNode {
+     *     ServiceNode {
+     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
+     *     }
+     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
+     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
+     *   }
+     * </pre>
+     *
+     * Reorder as
+     * 
+     * <pre>
+     *   SELECT VarNode(x)
+     *   JoinGroupNode {
+     *     ServiceNode {
+     *       StatementPatternNode(VarNode(x), ConstantNode(bd:search), ConstantNode("foo")
+     *     }
+     *     StatementPatternNode(VarNode(x), ConstantNode(a), VarNode(y)) [CARDINALITY=2]
+     *     StatementPatternNode(VarNode(y), ConstantNode(b), ConstantNode(b)) [CARDINALITY=1]
+     *   }
+     * </pre>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_NSI01() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV search = makeIV(BD.SEARCH);
+
+        @SuppressWarnings("rawtypes")
+        final IV foo = makeIV(new LiteralImpl("foo"));
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(new URIImpl("http://example/a"));
+
+        @SuppressWarnings("rawtypes")
+        final IV b = makeIV(new URIImpl("http://example/b"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV c = makeIV(new URIImpl("http://example/c"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV d = makeIV(new URIImpl("http://example/d"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV e = makeIV(new URIImpl("http://example/e"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+        	final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, "_set1");
+        	{
+        		
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubquery.setProjection(projection);
+                projection.addProjectionExpression(new AssignmentNode(new VarNode("_var1"), new VarNode("_var1")));
+        		
+                final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                        newStatementPatternNode(new VarNode("_var1"),
+                                new ConstantNode(a), new ConstantNode(b), 1l));
+                
+                namedSubquery.setWhereClause(joinGroup1);
+                
+        	}
+        	
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("_var1"));
+            projection.addProjectionVar(new VarNode("_var2"));
+            projection.addProjectionVar(new VarNode("_var4"));
+            
+            final JoinGroupNode joinGroup1 = new JoinGroupNode();
+
+            joinGroup1.addChild(new NamedSubqueryInclude("_set1"));
+            
+            joinGroup1.addChild(newStatementPatternNode(new VarNode("_var1"),
+                    new ConstantNode(c), new VarNode("_var2"), 1l, true));
+            
+            final JoinGroupNode joinGroup2 = new JoinGroupNode(true);
+            
+            joinGroup2.addChild(newStatementPatternNode(new VarNode("_var12"),
+                    new ConstantNode(e), new VarNode("_var4"), 10l));
+            joinGroup2.addChild(newStatementPatternNode(new VarNode("_var12"),
+                    new ConstantNode(d), new VarNode("_var1"), 100l));
+            
+            joinGroup1.addChild(joinGroup2);
+            
+            given.setWhereClause(joinGroup1);
+            given.getNamedSubqueriesNotNull().add(namedSubquery);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+        	final NamedSubqueryRoot namedSubquery = new NamedSubqueryRoot(QueryType.SELECT, "_set1");
+        	{
+        		
+                final ProjectionNode projection = new ProjectionNode();
+                namedSubquery.setProjection(projection);
+                projection.addProjectionExpression(new AssignmentNode(new VarNode("_var1"), new VarNode("_var1")));
+        		
+                final JoinGroupNode joinGroup1 = new JoinGroupNode(
+                        newStatementPatternNode(new VarNode("_var1"),
+                                new ConstantNode(a), new ConstantNode(b), 1l));
+                
+                namedSubquery.setWhereClause(joinGroup1);
+                
+        	}
+        	
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.setDistinct(true);
+            projection.addProjectionVar(new VarNode("_var1"));
+            projection.addProjectionVar(new VarNode("_var2"));
+            projection.addProjectionVar(new VarNode("_var4"));
+            
+            final JoinGroupNode joinGroup1 = new JoinGroupNode();
+
+            joinGroup1.addChild(new NamedSubqueryInclude("_set1"));
+            
+            joinGroup1.addChild(newStatementPatternNode(new VarNode("_var1"),
+                    new ConstantNode(c), new VarNode("_var2"), 1l, true));
+            
+            final JoinGroupNode joinGroup2 = new JoinGroupNode(true);
+            
+            joinGroup2.addChild(newStatementPatternNode(new VarNode("_var12"),
+                    new ConstantNode(d), new VarNode("_var1"), 100l));
+            joinGroup2.addChild(newStatementPatternNode(new VarNode("_var12"),
+                    new ConstantNode(e), new VarNode("_var4"), 10l));
+            
+            joinGroup1.addChild(joinGroup2);
+            
+            expected.setWhereClause(joinGroup1);
+            expected.getNamedSubqueriesNotNull().add(namedSubquery);
             
         }
 
