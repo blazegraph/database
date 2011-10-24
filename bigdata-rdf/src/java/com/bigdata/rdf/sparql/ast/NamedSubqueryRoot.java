@@ -211,7 +211,30 @@ public class NamedSubqueryRoot extends SubqueryBase {
             sb.append(")");
 
         }
+        
+        final String[] dependsOn = (String[]) getProperty(Annotations.DEPENDS_ON);
 
+        if(dependsOn != null) {
+
+            sb.append(" DEPENDS ON (");
+
+            boolean first = true;
+
+            for (String s : dependsOn) {
+
+                if (!first)
+                    sb.append(",");
+
+                sb.append(s);
+
+                first = false;
+
+            }
+
+            sb.append(")");
+
+        }
+        
         return sb.toString();
 
     }
