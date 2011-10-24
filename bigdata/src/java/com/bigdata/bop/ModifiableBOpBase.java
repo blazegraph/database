@@ -660,6 +660,18 @@ public class ModifiableBOpBase extends CoreBaseBOp {
         return this;
 
     }
+
+    /**
+     * Unconditionally set the {@link Annotations#BOP_ID}.
+     * 
+     * @param id
+     *            The id.
+     */
+    public void setId(final int id) {
+
+        setProperty(Annotations.BOP_ID, id);
+        
+    }
     
 //    public ModifiableBOpBase deepCopy() {
 //        

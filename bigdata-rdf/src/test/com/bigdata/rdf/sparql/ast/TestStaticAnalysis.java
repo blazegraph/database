@@ -111,7 +111,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         
         expected.add(Var.var("x"));
         
-        assertEquals(expected, sa.getDefinatelyProducedBindings(queryRoot));
+        assertEquals(expected, sa.getDefinitelyProducedBindings(queryRoot));
 
         assertEquals(
                 expected,
@@ -147,7 +147,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         expectedProjected.add(Var.var("x"));
         expectedProjected.add(Var.var("y"));
         
-        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
+        assertEquals(expectedProjected, sa.getDefinitelyProducedBindings(queryRoot));
 
         final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
         
@@ -195,7 +195,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         expectedProjected.add(Var.var("x"));
         expectedProjected.add(Var.var("y"));
         
-        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
+        assertEquals(expectedProjected, sa.getDefinitelyProducedBindings(queryRoot));
 
         final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
         
@@ -243,7 +243,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         expectedProjected.add(Var.var("x"));
         expectedProjected.add(Var.var("y"));
         
-        assertEquals(expectedProjected, sa.getDefinatelyProducedBindings(queryRoot));
+        assertEquals(expectedProjected, sa.getDefinitelyProducedBindings(queryRoot));
 
         final Set<IVariable<?>> expectedWhereClause = new LinkedHashSet<IVariable<?>>();
         
@@ -263,12 +263,8 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
      * the analysis of the bindings which MUST be produced by the subquery and
      * those which MUST be bound on entry into the group in which the subquery
      * solution set is included within the main query.
-     * 
-     * FIXME The join should be on <code>?x</code> in this example. However, the
-     * join variables are currently predicated as <code>[]</code> since the
-     * analysis is based only on those variables which are known bound on entry
-     * to the join group, and that is always an empty set for the top-level join
-     * group. This is an RTO integration issue.
+     * <p>
+     * Note: The join should be on <code>?x</code> in this example.
      * 
      * FIXME Write more unit tests for
      * {@link StaticAnalysis#getJoinVars(SubqueryRoot, Set)} and friends.
@@ -301,7 +297,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             expectedProjected.add(Var.var("o"));
 
             assertEquals(expectedProjected,
-                    sa.getDefinatelyProducedBindings(queryRoot));
+                    sa.getDefinitelyProducedBindings(queryRoot));
             
         }
 
@@ -316,7 +312,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     .getNamedSubqueries().get(0);
 
             assertEquals(expectedProjected,
-                    sa.getDefinatelyProducedBindings(namedSubquery));
+                    sa.getDefinitelyProducedBindings(namedSubquery));
 
         }
 
@@ -335,12 +331,10 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         }
 
         // the join variables as reported by static analysis.
-        //
-        // FIXME Per the comment at the top of this method.
         {
 
             final Set<IVariable<?>> expectedJoinVars = new LinkedHashSet<IVariable<?>>();
-//            expectedJoinVars.add(Var.var("x"));
+            expectedJoinVars.add(Var.var("x"));
 
             final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) queryRoot
                     .getNamedSubqueries().get(0);
@@ -388,7 +382,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         final Set<IVariable<?>> expected = asSet(new String[]{"v"});
 
         // Test "must" bound bindings for the query.
-        assertEquals(expected, sa.getDefinatelyProducedBindings(queryRoot));
+        assertEquals(expected, sa.getDefinitelyProducedBindings(queryRoot));
 
         // Test "must" bound bindings for the where clause.
         assertEquals(expected, sa.getDefinitelyProducedBindings(whereClause,
@@ -446,7 +440,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
          // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "v" }),
-                sa.getDefinatelyProducedBindings(queryRoot));
+                sa.getDefinitelyProducedBindings(queryRoot));
 
         // WHERE clause
         {
@@ -605,7 +599,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "v", "w" }),
-                sa.getDefinatelyProducedBindings(queryRoot));
+                sa.getDefinitelyProducedBindings(queryRoot));
 
         // Outer group clause { :x :p ?v . }
         {
@@ -802,7 +796,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         
         // Test "must" bound bindings for the query.
         assertEquals(asSet(new String[] { "X", "Y" }),
-                sa.getDefinatelyProducedBindings(queryRoot));
+                sa.getDefinitelyProducedBindings(queryRoot));
 
         // Outer group clause { ?X :name "paul" }
         {
@@ -980,7 +974,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 expectedProjected.add(Var.var("score"));
 
                 assertEquals(expectedProjected,
-                        sa.getDefinatelyProducedBindings(queryRoot));
+                        sa.getDefinitelyProducedBindings(queryRoot));
 
             }
 

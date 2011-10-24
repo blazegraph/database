@@ -503,6 +503,9 @@ public class TestASTHashJoinOptimizer extends AbstractASTEvaluationTestCase {
         final IQueryNode actual = rewriter.optimize(context,
                 given/* queryNode */, bsets);
 
+        /*
+         * TODO This is failing because the optimizer is not finished yet. 
+         */
         assertSameAST(expected, actual);
         
     }

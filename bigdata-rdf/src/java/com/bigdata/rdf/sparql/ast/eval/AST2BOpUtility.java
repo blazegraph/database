@@ -884,19 +884,20 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                  */
                 final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-                // Find the set of variables which will be definitely bound by the
-                // time the sub-select is evaluated.
-                final Set<IVariable<?>> incomingBound = ctx.sa
-                        .getIncomingBindings(subqueryRoot,
-                                new LinkedHashSet<IVariable<?>>());
-                
-                /*
-                 * The join variables are those which are known bound on entry
-                 * to the subquery and which are also projected by the subquery.
-                 */
-                final Set<IVariable<?>> joinVarSet = new LinkedHashSet<IVariable<?>>();
-                joinVarSet.addAll(incomingBound);
-                joinVarSet.retainAll(Arrays.asList(vars));
+//                // Find the set of variables which will be definitely bound by the
+//                // time the sub-select is evaluated.
+//                final Set<IVariable<?>> incomingBound = ctx.sa
+//                        .getIncomingBindings(subqueryRoot,
+//                                new LinkedHashSet<IVariable<?>>());
+//                
+//                /*
+//                 * The join variables are those which are known bound on entry
+//                 * to the subquery and which are also projected by the subquery.
+//                 */
+//                final Set<IVariable<?>> joinVarSet = new LinkedHashSet<IVariable<?>>();
+//                joinVarSet.addAll(incomingBound);
+//                joinVarSet.retainAll(Arrays.asList(vars));
+                final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(subqueryRoot, new LinkedHashSet<IVariable<?>>());
                 @SuppressWarnings("rawtypes")
                 final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
@@ -2259,9 +2260,12 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             // Find the set of variables which will be definitely bound by the
             // time the sub-group is evaluated.
-            final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
+            final Set<IVariable<?>> incomingBound = ctx.sa.getDefinitelyIncomingBindings(
                     (GraphPatternGroup<?>) subgroup,
                     new LinkedHashSet<IVariable<?>>());
+//            final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
+//                    (GraphPatternGroup<?>) subgroup,
+//                    new LinkedHashSet<IVariable<?>>());
 
             @SuppressWarnings("rawtypes")
             final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);

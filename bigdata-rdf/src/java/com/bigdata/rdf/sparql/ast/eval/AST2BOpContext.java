@@ -106,7 +106,7 @@ public class AST2BOpContext implements IdFactory {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
      *      static optimizer into an AST rewrite)
      */
-    boolean hashJoinPatternForSubSelect = false;
+    boolean hashJoinPatternForSubSelect = true;
     
 //    /**
 //     * When <code>true</code>, use the new {@link ASTStaticJoinOptimizer}.
