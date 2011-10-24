@@ -363,6 +363,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * then cause them to be attached to the JOIN when we generate the JOIN.
          */
         add(new ASTSimpleOptionalOptimizer());
+
+        /**
+         * Run the static join order optimizer. This attaches the estimated
+         * cardinality data and uses fast algorithm to reorder the joins in each
+         * required or optional join group.
+         */
+        add(new ASTStaticJoinOptimizer());
         
         /**
          * Rewrite a join group having complex optionals using a hash join
@@ -375,7 +382,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          *      https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert
          *      the static optimizer into an AST rewrite)
          */
-//        add(new ASTComplexOptionalOptimizer());
+        add(new ASTComplexOptionalOptimizer());
 
         /**
          * Rewrites join groups having one or more joins which would involve a
