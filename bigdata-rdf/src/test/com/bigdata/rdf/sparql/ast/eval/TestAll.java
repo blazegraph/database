@@ -69,7 +69,10 @@ public class TestAll extends TestCase {
         
         // Test suite for OPTIONAL groups.
         suite.addTestSuite(TestOptionals.class);
-        
+
+        // Test suite for UNIONs.
+        suite.addTestSuite(TestUnions.class);
+
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
 
