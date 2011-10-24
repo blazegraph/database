@@ -305,12 +305,6 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * 
      * @param namedSubqueries
      * @param allIncludes
-     * 
-     *            FIXME Factor out the logic for determining the join variables
-     *            into the {@link StaticAnalysis} class, but leave the logic
-     *            here which assigns the join variables to the
-     *            {@link NamedSubqueryRoot} and {@link NamedSubqueryInclude}
-     *            nodes.
      */
     private void assignJoinVars(//
             final QueryRoot queryRoot,
