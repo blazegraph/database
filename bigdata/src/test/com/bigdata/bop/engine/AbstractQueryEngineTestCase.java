@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -572,8 +573,13 @@ abstract public class AbstractQueryEngineTestCase extends TestCase2 {
 
             } else {
 
-                if (!a1.equals(a2)) {
-
+                final boolean tst;
+                if(a1.getClass().isArray()) {
+                    tst = Arrays.equals((Object[])a1, (Object[])a2);
+                } else {
+                    tst = a1.equals(a2);
+                }
+                if(!tst) {
                     fail("Annotations differ for " + name + "  : expecting="
                             + o1 + ", actual=" + o2);
 
