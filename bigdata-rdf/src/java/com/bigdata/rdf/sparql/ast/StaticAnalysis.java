@@ -225,48 +225,48 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         
     }
     
-    /**
-     * Return the set of variables which MUST be bound coming into this group
-     * during top-down, left-to-right evaluation. The returned set is based on a
-     * non-recursive analysis of the definitely (MUST) bound variables in each
-     * of the parent groups. The analysis is non-recursive for each parent
-     * group, but all parents of this group are considered. This approach
-     * excludes information about variables which MUST or MIGHT be bound from
-     * both <i>this</i> group and child groups.
-     * <p>
-     * This method DOES NOT pay attention to bottom up variable scoping rules.
-     * Queries which are badly designed MUST be rewritten (by lifting out named
-     * subqueries) such that they become well designed and adhere to bottom-up
-     * evaluation semantics.
-     * 
-     * @param vars
-     *            Where to store the "MUST" bound variables.
-     * 
-     * @return The argument.
-     */
-    public Set<IVariable<?>> getIncomingBindings(
-            final IBindingProducerNode node, final Set<IVariable<?>> vars) {
-    
-        GraphPatternGroup<?> parent = node instanceof IGroupMemberNode ? ((IGroupMemberNode) node)
-                .getParentGraphPatternGroup() : null;
-        
-        while (parent != null) {
-
-            /*
-             * Note: This needs to be a non-recursive definition of the
-             * definitely produced bindings. Just those for *this* group for
-             * each parent considered.
-             */
-
-            getDefinitelyProducedBindings(parent, vars, false/* recursive */);
-
-            parent = parent.getParentGraphPatternGroup();
-            
-        }
-        
-        return vars;
-        
-    }
+//    /**
+//     * Return the set of variables which MUST be bound coming into this group
+//     * during top-down, left-to-right evaluation. The returned set is based on a
+//     * non-recursive analysis of the definitely (MUST) bound variables in each
+//     * of the parent groups. The analysis is non-recursive for each parent
+//     * group, but all parents of this group are considered. This approach
+//     * excludes information about variables which MUST or MIGHT be bound from
+//     * both <i>this</i> group and child groups.
+//     * <p>
+//     * This method DOES NOT pay attention to bottom up variable scoping rules.
+//     * Queries which are badly designed MUST be rewritten (by lifting out named
+//     * subqueries) such that they become well designed and adhere to bottom-up
+//     * evaluation semantics.
+//     * 
+//     * @param vars
+//     *            Where to store the "MUST" bound variables.
+//     * 
+//     * @return The argument.
+//     */
+//    public Set<IVariable<?>> getIncomingBindings(
+//            final IBindingProducerNode node, final Set<IVariable<?>> vars) {
+//    
+//        GraphPatternGroup<?> parent = node instanceof IGroupMemberNode ? ((IGroupMemberNode) node)
+//                .getParentGraphPatternGroup() : null;
+//        
+//        while (parent != null) {
+//
+//            /*
+//             * Note: This needs to be a non-recursive definition of the
+//             * definitely produced bindings. Just those for *this* group for
+//             * each parent considered.
+//             */
+//
+//            getDefinitelyProducedBindings(parent, vars, false/* recursive */);
+//
+//            parent = parent.getParentGraphPatternGroup();
+//            
+//        }
+//        
+//        return vars;
+//        
+//    }
 
     /**
      * Return the set of variables which MUST be bound coming into this group
@@ -296,31 +296,31 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * We've reached the root.
          */
         if (parent == null) {
-         
-         return vars;
-         
+        	
+        	return vars;
+        	
         }
 
         /*
          * Do the siblings of the node first.
          */
         for (IGroupMemberNode child : parent) {
-         
-         /*
-          * We've found ourself. Stop collecting vars.
-          */
-         if (child == node) {
-          
-          return vars;
-          
-         }
-         
-         if (child instanceof IBindingProducerNode) {
-          
-             getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
-             
-         }
-         
+        	
+        	/*
+        	 * We've found ourself. Stop collecting vars.
+        	 */
+        	if (child == node) {
+        		
+        		break;
+        		
+        	}
+        	
+        	if (child instanceof IBindingProducerNode) {
+        		
+            	getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
+            	
+        	}
+        	
         }
         
         /*
@@ -330,7 +330,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         return getDefinitelyIncomingBindings(parent, vars);
         
     }
-    
+
     /**
      * Return the set of variables which MUST be bound for solutions after the
      * evaluation of this group. A group will produce "MUST" bindings for
@@ -1065,7 +1065,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Get the variables known to be bound starting out.
          */
-        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+        final Set<IVariable<?>> knownBound = getDefinitelyIncomingBindings(group,
                 new LinkedHashSet<IVariable<?>>());
 
         /*
@@ -1094,7 +1094,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Get the variables known to be bound starting out.
          */
-        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+        final Set<IVariable<?>> knownBound = getDefinitelyIncomingBindings(group,
                 new LinkedHashSet<IVariable<?>>());
 
         /*
@@ -1151,7 +1151,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Get the variables known to be bound starting out.
          */
-        final Set<IVariable<?>> knownBound = getIncomingBindings(group,
+        final Set<IVariable<?>> knownBound = getDefinitelyIncomingBindings(group,
                 new LinkedHashSet<IVariable<?>>());
 
         /*
@@ -1224,7 +1224,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Get the variables known to be bound starting out.
          */
-        final Set<IVariable<?>> maybeBound = getIncomingBindings(group, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> maybeBound = getDefinitelyIncomingBindings(group, new LinkedHashSet<IVariable<?>>());
 
         /*
          * Add all "must" / "may" bound variables for this group (recursively).

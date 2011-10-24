@@ -441,7 +441,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                             .getVarsToMaterialize();
 
                     final Set<IVariable<?>> incomingBound = sa
-                            .getIncomingBindings(group,
+                            .getDefinitelyIncomingBindings(group,
                                     new LinkedHashSet<IVariable<?>>());
 
                     requiredVars.removeAll(incomingBound);

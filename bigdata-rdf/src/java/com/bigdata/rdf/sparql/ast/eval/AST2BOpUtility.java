@@ -898,6 +898,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 //                joinVarSet.addAll(incomingBound);
 //                joinVarSet.retainAll(Arrays.asList(vars));
                 final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(subqueryRoot, new LinkedHashSet<IVariable<?>>());
+
                 @SuppressWarnings("rawtypes")
                 final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
@@ -1967,7 +1968,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             }
         }
 	
-        final Set<IVariable<?>> knownBound = sa.getIncomingBindings(
+        final Set<IVariable<?>> knownBound = sa.getDefinitelyIncomingBindings(
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
     	if (true/*ctx.astStaticOptimizer*/) {
@@ -1981,9 +1982,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final IConstraint[][] assignedConstraints;
     		{
 
-    			final int nconstraints = constraints.size();
-
-    			final int nknownBound = knownBound != null ? knownBound.size() : 0;
+     			final int nknownBound = knownBound != null ? knownBound.size() : 0;
 
     			// figure out which constraints are attached to which
     			// predicates.
