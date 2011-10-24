@@ -115,8 +115,13 @@ public class JVMHashJoinUtility {
 
         for (IBindingSet bset : all) {
 
-            final Key key = makeKey(joinVars, bset);
+            final Key key = makeKey(joinVars, bset, optional);
 
+            if (key == null) {
+                // Drop solution.
+                continue;
+            }
+            
             Bucket b = map.get(key);
             
             if(b == null) {
@@ -200,7 +205,13 @@ public class JVMHashJoinUtility {
                 if (log.isDebugEnabled())
                     log.debug("Considering " + left);
 
-                final Key key = JVMHashJoinUtility.makeKey(joinVars, left);
+                final Key key = JVMHashJoinUtility.makeKey(joinVars, left,
+                        optional);
+
+                if (key == null) {
+                    // Drop solution.
+                    continue;
+                }
 
                 // Probe the hash map.
                 final Bucket b = rightSolutions.get(key);
@@ -300,11 +311,13 @@ public class JVMHashJoinUtility {
      *            The join variables.
      * @param bset
      *            The solution.
+     * @param optional
+     *            <code>true</code> iff the hash join is optional.
      * 
-     * @return The as-bound values for the join variables for that solution.
+     * @return The as-bound values for the join variables for that solution. 
      */
     static private Key makeKey(final IVariable<?>[] joinVars,
-            final IBindingSet bset) {
+            final IBindingSet bset, final boolean optional) {
 
         final IConstant<?>[] vals = new IConstant<?>[joinVars.length];
 
@@ -316,12 +329,25 @@ public class JVMHashJoinUtility {
 
         }
 
-        final int hashCode;
+        int hashCode = HashJoinUtility.ONE;
         try {
+            
             hashCode = HashJoinUtility.hashCode(joinVars, bset);
+            
         } catch (JoinVariableNotBoundException ex) {
-            throw new RuntimeException(ex + " : joinvars="
-                    + Arrays.toString(joinVars), ex);
+            
+            if (!optional) {
+                
+                // Drop solution;
+                
+                if (log.isDebugEnabled())
+                    log.debug(ex);
+
+                return null;
+
+            }
+//            throw new RuntimeException(ex + " : joinvars="
+//                    + Arrays.toString(joinVars) + ", bset=" + bset, ex);
         }
         // final int hashCode = java.util.Arrays.hashCode(vals);
 
