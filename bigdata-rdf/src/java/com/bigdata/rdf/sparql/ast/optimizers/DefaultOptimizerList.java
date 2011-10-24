@@ -384,11 +384,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * pattern.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
-         * 
-         *      FIXME This optimizer can not be enabled until we can correctly
-         *      predict the join variables, which is blocked on
-         *      https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert
-         *      the static optimizer into an AST rewrite)
          */
         add(new ASTComplexOptionalOptimizer());
 
