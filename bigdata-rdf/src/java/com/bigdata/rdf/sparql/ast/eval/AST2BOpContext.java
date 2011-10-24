@@ -16,9 +16,8 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
 
@@ -97,24 +96,10 @@ public class AST2BOpContext implements IdFactory {
      * When <code>true</code>, use a hash join pattern for sub-select
      * evaluation. When <code>false</code>, use a {@link SubqueryOp}.
      * 
-     * FIXME The code path for this works, but it can not be enabled until we
-     * correctly report join variables for the actual evaluation order. To
-     * verify that the code works you have to hack the StaticAnalysis class 
-     * to specifically exclude the variables projected by the subquery from
-     * the set of "incomingBound" variables in the parent join group.
-     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
      *      static optimizer into an AST rewrite)
      */
     boolean hashJoinPatternForSubSelect = true;
-    
-//    /**
-//     * When <code>true</code>, use the new {@link ASTStaticJoinOptimizer}.
-//     * 
-//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
-//     *      static optimizer into an AST rewrite)
-//     */
-//    boolean astStaticOptimizer = true;
     
     private int varIdFactory = 0;
 
@@ -147,12 +132,6 @@ public class AST2BOpContext implements IdFactory {
         this.idFactory = idFactory;
         this.db = db;
         this.optimizers = new DefaultOptimizerList();
-//        /*
-//         * TODO Make this a permanent optimizer.
-//         */
-//        if (astStaticOptimizer) {
-//        	this.optimizers.add(new ASTStaticJoinOptimizer());
-//        }
         
         this.queryEngine = queryEngine;
         this.queryHints = queryHints;
@@ -197,12 +176,6 @@ public class AST2BOpContext implements IdFactory {
         this.db = db;
 
         this.optimizers = new DefaultOptimizerList();
-//        /*
-//         * TODO Make this a permanent optimizer.
-//         */
-//        if (astStaticOptimizer) {
-//        	this.optimizers.add(new ASTStaticJoinOptimizer());
-//        }
 
         /*
          * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
