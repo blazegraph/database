@@ -365,6 +365,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTSimpleOptionalOptimizer());
 
         /**
+         * Rearranges the children in group nodes in order to put the same types
+         * of join nodes together. It also puts the type groups into the order
+         * in which they should be evaluated.  After this optimizer runs, the
+         * group node order is also the evaluation order.
+         */
+//        add(new ASTJoinOrderByTypeOptimizer());
+
+        /**
          * Run the static join order optimizer. This attaches the estimated
          * cardinality data and uses fast algorithm to reorder the joins in each
          * required or optional join group.

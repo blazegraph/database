@@ -269,6 +269,69 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
+     * Return the set of variables which MUST be bound coming into this group
+     * during top-down, left-to-right evaluation. The returned set is based on a
+     * non-recursive analysis of the definitely (MUST) bound variables in each
+     * of the parent groups. The analysis is non-recursive for each parent
+     * group, but all parents of this group are considered. This approach
+     * excludes information about variables which MUST or MIGHT be bound from
+     * both <i>this</i> group and child groups.
+     * <p>
+     * This method DOES NOT pay attention to bottom up variable scoping rules.
+     * Queries which are badly designed MUST be rewritten (by lifting out named
+     * subqueries) such that they become well designed and adhere to bottom-up
+     * evaluation semantics.
+     * 
+     * @param vars
+     *            Where to store the "MUST" bound variables.
+     * 
+     * @return The argument.
+     */
+    public Set<IVariable<?>> getDefinitelyIncomingBindings(
+            final IGroupMemberNode node, final Set<IVariable<?>> vars) {
+    
+        final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
+        
+        /*
+         * We've reached the root.
+         */
+        if (parent == null) {
+         
+         return vars;
+         
+        }
+
+        /*
+         * Do the siblings of the node first.
+         */
+        for (IGroupMemberNode child : parent) {
+         
+         /*
+          * We've found ourself. Stop collecting vars.
+          */
+         if (child == node) {
+          
+          return vars;
+          
+         }
+         
+         if (child instanceof IBindingProducerNode) {
+          
+             getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
+             
+         }
+         
+        }
+        
+        /*
+         * Next we recurse upwards to figure out what is definitely bound 
+         * coming into the parent.  
+         */
+        return getDefinitelyIncomingBindings(parent, vars);
+        
+    }
+    
+    /**
      * Return the set of variables which MUST be bound for solutions after the
      * evaluation of this group. A group will produce "MUST" bindings for
      * variables from its statement patterns and a LET based on an expression
@@ -344,7 +407,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                  * (Convert the static optimizer into an AST rewrite)
                  */
 
-                vars.addAll(getDefinatelyProducedBindings(subquery));
+                vars.addAll(getDefinitelyProducedBindings(subquery));
                 
             }
 
@@ -358,7 +421,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 throw new RuntimeException("No named subquery declared: name="
                         + nsi.getName());
 
-            vars.addAll(getDefinatelyProducedBindings(nsr));
+            vars.addAll(getDefinitelyProducedBindings(nsr));
 
         } else if(node instanceof ServiceNode) {
 
@@ -803,7 +866,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * will NOT be reported.
      */
     // MUST : QueryBase
-    public Set<IVariable<?>> getDefinatelyProducedBindings(final QueryBase node) {
+    public Set<IVariable<?>> getDefinitelyProducedBindings(final QueryBase node) {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
         
@@ -1369,7 +1432,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final NamedSubqueryRoot aNamedSubquery,
             final NamedSubqueryInclude anInclude, final Set<IVariable<?>> vars) {
 
-        if (true) {
+        if (false) {
 
             return Collections.emptySet();
 
@@ -1432,14 +1495,16 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * The variables which are projected by the subquery which will be
          * definitely bound based on an analysis of the subquery.
          */
-        final Set<IVariable<?>> boundBySubquery = getDefinatelyProducedBindings(aSubquery);
+        final Set<IVariable<?>> boundBySubquery = getDefinitelyProducedBindings(aSubquery);
 
         /*
          * The variables which are definitely bound on entry to the join group
          * in which the subquery appears.
          */
-        final Set<IVariable<?>> incomingBindings = getIncomingBindings(
-                theNode.getParentJoinGroup(), new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
+                theNode, new LinkedHashSet<IVariable<?>>());
+//        final Set<IVariable<?>> incomingBindings = getIncomingBindings(
+//                theNode.getParentJoinGroup(), new LinkedHashSet<IVariable<?>>());
         
         /*
          * This is only those variables which are bound on entry into the group
