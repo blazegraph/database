@@ -818,6 +818,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             getDefinitelyProducedBindings(child, childSet, recursive);
 
+            all.addAll(childSet);
+            
         }
 
         /*
