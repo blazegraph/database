@@ -1969,7 +1969,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final Set<IVariable<?>> knownBound = sa.getIncomingBindings(
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
-    	if (ctx.astStaticOptimizer) {
+    	if (true/*ctx.astStaticOptimizer*/) {
     		
     		/*
     		 * If the AST static optimizer is enabled, the statement patterns
