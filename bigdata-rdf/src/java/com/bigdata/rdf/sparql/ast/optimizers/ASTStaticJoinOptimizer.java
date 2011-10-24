@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.journal.ITx;
@@ -377,7 +378,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     	
     	if (term != null && term.isConstant()) {
     		
-    		final IV iv = term.getValue().getIV();
+    		final IV iv = ((IConstant<IV>) term.getValueExpression()).get();
     		
     		if (iv == null) {
     			
@@ -556,7 +557,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final StatementPatternNode pred = spNodes.get(i);
 //            	final IAccessPathExpander expander = pred.getAccessPathExpander();
                 final TermNode p = pred.p();
-                if (p != null && p.isConstant() && p.getValue().equals(BD.SEARCH)) {
+                if (p != null && p.isConstant() && p.getValue() != null && p.getValue().equals(BD.SEARCH)) {
                     if (log.isDebugEnabled()) log.debug("found a run first, tail " + i);
 //                    final Iterator<IVariable<?>> it = BOpUtility.getArgumentVariables(pred);
 //                    while (it.hasNext()) {
