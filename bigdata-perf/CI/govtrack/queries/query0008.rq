@@ -1,0 +1,25 @@
+SELECT DISTINCT ?_var1 (SAMPLE(?_var2) AS ?_var3) (SAMPLE(?_var4) AS ?_var5)
+
+ WHERE {
+	?_var1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class>. 
+	OPTIONAL {
+		?_var1 <http://purl.org/dc/elements/1.1/title> ?_var2
+	}. 
+	OPTIONAL {
+		?_var1 <http://www.w3.org/2000/01/rdf-schema#label> ?_var2
+	}. 
+	OPTIONAL {
+		{
+			SELECT DISTINCT ?_var1 (COUNT(DISTINCT ?_var6) AS ?_var4)
+			WHERE {
+				?_var6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.rdfabout.com/rdf/schema/politico/Politician>.
+				?_var6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?_var1. 
+				FILTER ((?_var1 in(<http://www.rdfabout.com/rdf/schema/politico/Politician>)))
+			}
+			GROUP BY ?_var1
+		}
+	}
+	FILTER ((?_var1 in(<http://www.rdfabout.com/rdf/schema/politico/Politician>)))
+}
+GROUP BY ?_var1
+ORDER BY DESC(?_var5)
