@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-
 /**
  * Test suite for UNION.
  * 
@@ -76,4 +75,71 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * <pre>
+     * select distinct ?s
+     * where { {
+     *   ?s a foaf:Person .
+     *   ?s rdfs:label ?label .
+     *   FILTER (?label = "Mike")
+     * } union { 
+     *   ?s a foaf:Person . 
+     *   ?s rdfs:label ?label .
+     *   FILTER (?label = "Jane")
+     * } }
+     * </pre>
+     * 
+     * Note: This is a port of
+     * {@link TestBigdataEvaluationStrategyImpl#test_union()}.
+     * 
+     * @throws Exception
+     */
+    public void test_union_02() throws Exception {
+
+        new TestHelper("union_02").runTest();
+        
+    }
+    
+    /**
+     * <pre>
+     * select distinct ?s
+     * where { {
+     *   ?s a foaf:Person .
+     *   ?s rdfs:label ?label .
+     *   FILTER (?label = "Mike")
+     * } union { 
+     *   ?s a foaf:Person . 
+     *   ?s rdfs:label ?label .
+     * } }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_union_03() throws Exception {
+
+        new TestHelper("union_03").runTest();
+        
+    }
+
+    /**
+     * <pre>
+     * select distinct ?s
+     * where { {
+     *   ?s a foaf:Person .
+     *   ?s rdfs:label ?label .
+     * } union { 
+     *   ?s a foaf:Person . 
+     *   ?s rdfs:label ?label .
+     *   FILTER (?label = "Jane")
+     * } }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_union_04() throws Exception {
+
+        new TestHelper("union_04").runTest();
+        
+    }    
+    
 }
