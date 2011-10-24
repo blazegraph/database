@@ -109,21 +109,6 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        // Main WHERE clause
-        {
-
-            @SuppressWarnings("unchecked")
-			final GraphPatternGroup<IGroupMemberNode> whereClause = 
-            	(GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
-
-            if (whereClause != null) {
-
-                optimize(context, queryRoot, new IJoinNode[] { }, whereClause);
-                
-            }
-
-        }
-
         // Named subqueries
         if (queryRoot.getNamedSubqueries() != null) {
 
@@ -146,6 +131,21 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
                 }
 
+            }
+
+        }
+
+        // Main WHERE clause
+        {
+
+            @SuppressWarnings("unchecked")
+			final GraphPatternGroup<IGroupMemberNode> whereClause = 
+            	(GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
+
+            if (whereClause != null) {
+
+                optimize(context, queryRoot, new IJoinNode[] { }, whereClause);
+                
             }
 
         }
@@ -553,6 +553,14 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             final Set<IVariable<?>> runFirstVars = new HashSet<IVariable<?>>();
             
             int startIndex = 0;
+            
+            /*
+             * DEAD CODE.  See ASTSearchOptimizer, which lifts the full text
+             * search into a ServiceNode.  This is captured by the ancestry
+             * code just below.
+             */
+            if (false) {
+            	
             for (int i = 0; i < arity; i++) {
                 final StatementPatternNode pred = spNodes.get(i);
 //            	final IAccessPathExpander expander = pred.getAccessPathExpander();
@@ -570,6 +578,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     order[startIndex++] = i;
                     used[i] = true;
                 }
+            }
+            
             }
             
             /*
