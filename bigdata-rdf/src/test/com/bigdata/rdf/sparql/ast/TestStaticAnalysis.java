@@ -394,7 +394,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 new LinkedHashSet<IVariable<?>>(), true/* recursive */));
 
         // Test "incoming" bindings for the where clause.
-        assertEquals(EMPTY_SET, sa.getIncomingBindings(whereClause,
+        assertEquals(EMPTY_SET, sa.getDefinitelyIncomingBindings(whereClause,
                 new LinkedHashSet<IVariable<?>>()));
 
     }
@@ -452,7 +452,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             final Set<IVariable<?>> expected = asSet(new String[] { "v" });
 
             // Test "incoming" bindings for the where clause.
-            assertEquals(EMPTY_SET, sa.getIncomingBindings(whereClause,
+            assertEquals(EMPTY_SET, sa.getDefinitelyIncomingBindings(whereClause,
                     new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings for the where clause.
@@ -472,7 +472,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     .getWhereClause().get(1);
 
             // Test "incoming" bindings.
-            assertEquals(asSet(new String[] { "v" }), sa.getIncomingBindings(
+            assertEquals(asSet(new String[] { "v" }), sa.getDefinitelyIncomingBindings(
                     filterClause, new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
@@ -608,7 +608,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     .getWhereClause();
 
             // Test "incoming" bindings.
-            assertEquals(EMPTY_SET, sa.getIncomingBindings(group,
+            assertEquals(EMPTY_SET, sa.getDefinitelyIncomingBindings(group,
                     new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
@@ -646,7 +646,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "v" }),
-                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
+                    sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
@@ -680,10 +680,12 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             final JoinGroupNode group = (JoinGroupNode) queryRoot
                     .getWhereClause().get(1).get(1);
 
+            sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>());
+            
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "v", "w" }),
-                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
+                    sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
@@ -807,7 +809,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     EMPTY_SET,
-                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
+                    sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
@@ -844,7 +846,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "X" }),
-                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
+                    sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(
@@ -881,7 +883,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
             // Test "incoming" bindings.
             assertEquals(
                     asSet(new String[] { "X", "Y" }),
-                    sa.getIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
+                    sa.getDefinitelyIncomingBindings(group,new LinkedHashSet<IVariable<?>>()));
 
             // Test "must" bound bindings.
             assertEquals(

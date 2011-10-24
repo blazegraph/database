@@ -367,8 +367,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          * that problem. It is now driven out of an iterator visiting the
          * candidate optional join groups.
          */
-        final Set<IVariable<?>> topDownVars = sa.getIncomingBindings(
-                (IBindingProducerNode) p, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> topDownVars = sa.getDefinitelyIncomingBindings(
+                p, new LinkedHashSet<IVariable<?>>());
 
         /*
          * Obtain the set of variables used in JOINs -OR- FILTERs within this
