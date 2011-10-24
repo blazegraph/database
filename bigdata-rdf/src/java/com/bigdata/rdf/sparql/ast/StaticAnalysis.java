@@ -660,6 +660,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
 
+        if(node.isOptional())
+            return vars;
+        
         for (IGroupMemberNode child : node) {
 
             if(!(child instanceof IBindingProducerNode))
