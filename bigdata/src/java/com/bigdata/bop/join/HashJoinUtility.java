@@ -82,7 +82,7 @@ public class HashJoinUtility {
      * Note: If joinVars is an empty array, then the solutions will all hash to
      * ONE (1).
      */
-    static private final int ONE = 1;
+    static final int ONE = 1;
     
     /**
      * Return the hash code which will be used as the key given the ordered
