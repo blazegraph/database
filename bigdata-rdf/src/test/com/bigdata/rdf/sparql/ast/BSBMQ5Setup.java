@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -70,6 +71,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 class BSBMQ5Setup {
     
+    final AtomicInteger nextId = new AtomicInteger(0); 
+
     final BigdataURI rdfsLabel; 
     final BigdataURI productFeature;
     final BigdataURI productPropertyNumeric1;
@@ -195,6 +198,7 @@ class BSBMQ5Setup {
                 new ConstantNode(rdfsLabel.getIV()), new VarNode(
                         "productLabel"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
+        p0.setId(nextId.incrementAndGet());
 
         // productInstance bsbm:productFeature ?prodFeature .
         p1 = new StatementPatternNode(
@@ -202,38 +206,44 @@ class BSBMQ5Setup {
                         productFeature.getIV()),
                 new VarNode("prodFeature"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
-
+        p1.setId(nextId.incrementAndGet());
+        
         // ?product bsbm:productFeature ?prodFeature .
         p2 = new StatementPatternNode(new VarNode("product"),
                 new ConstantNode(productFeature.getIV()), new VarNode(
                         "prodFeature"), null/* c */, Scope.DEFAULT_CONTEXTS);
-
+        p2.setId(nextId.incrementAndGet());
+        
         // productInstance bsbm:productPropertyNumeric1 ?origProperty1 .
         p3 = new StatementPatternNode(
                 new ConstantNode(product53999.getIV()), new ConstantNode(
                         productPropertyNumeric1.getIV()), new VarNode(
                         "origProperty1"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
-
+        p3.setId(nextId.incrementAndGet());
+        
         // ?product bsbm:productPropertyNumeric1 ?simProperty1 .
         p4 = new StatementPatternNode(new VarNode("product"),
                 new ConstantNode(productPropertyNumeric1.getIV()),
                 new VarNode("simProperty1"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
-
+        p4.setId(nextId.incrementAndGet());
+        
         // productInstance bsbm:productPropertyNumeric2 ?origProperty2 .
         p5 = new StatementPatternNode(
                 new ConstantNode(product53999.getIV()), new ConstantNode(
                         productPropertyNumeric2.getIV()), new VarNode(
                         "origProperty2"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
-
+        p5.setId(nextId.incrementAndGet());
+        
         // ?product bsbm:productPropertyNumeric2 ?simProperty2 .
         p6 = new StatementPatternNode(new VarNode("product"),
                 new ConstantNode(productPropertyNumeric2.getIV()),
                 new VarNode("simProperty2"), null/* c */,
                 Scope.DEFAULT_CONTEXTS);
-
+        p6.setId(nextId.incrementAndGet());
+        
         whereClause.addChild(p0);
         whereClause.addChild(p1);
         whereClause.addChild(p2);
