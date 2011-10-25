@@ -302,25 +302,30 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         }
 
         /*
-         * Do the siblings of the node first.
+         * Do the siblings of the node first.  Unless it is a Union.  Siblings
+         * don't see each other's bindings in a Union.
          */
-        for (IGroupMemberNode child : parent) {
+        if (!(parent instanceof UnionNode)) {
         	
-        	/*
-        	 * We've found ourself. Stop collecting vars.
-        	 */
-        	if (child == node) {
-        		
-        		break;
-        		
-        	}
-        	
-        	if (child instanceof IBindingProducerNode) {
-        		
-            	getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
-            	
-        	}
-        	
+	        for (IGroupMemberNode child : parent) {
+	        	
+	        	/*
+	        	 * We've found ourself. Stop collecting vars.
+	        	 */
+	        	if (child == node) {
+	        		
+	        		break;
+	        		
+	        	}
+	        	
+	        	if (child instanceof IBindingProducerNode) {
+	        		
+	            	getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
+	            	
+	        	}
+	        	
+	        }
+	        
         }
         
         /*

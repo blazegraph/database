@@ -66,13 +66,6 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
 
         new TestHelper("test_union_01").runTest();
         
-        /*
-         * FIXME Mike, please modify the data files to have some expected
-         * results so it test the UNION execution as well (the data and results
-         * files are both currently empty).
-         */
-        fail("Modify the data files to have some expected results.");
-
     }
 
     /**
