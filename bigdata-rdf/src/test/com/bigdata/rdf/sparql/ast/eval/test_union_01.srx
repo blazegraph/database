@@ -5,6 +5,8 @@
      xmlns:xs="http://www.w3.org/2001/XMLSchema#"
      xmlns="http://www.w3.org/2005/sparql-results#" >
    <head>
+    <variable name="p"/>
+    <variable name="o"/>
    </head>
    <results>
      <result>
