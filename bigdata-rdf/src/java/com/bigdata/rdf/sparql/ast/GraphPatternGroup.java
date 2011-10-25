@@ -30,6 +30,8 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSubGroupJoinVarOptimizer;
 
 /**
  * Join group or union.
@@ -45,6 +47,20 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
      */
     private static final long serialVersionUID = 1L;
 
+    public interface Annotations extends GroupNodeBase.Annotations {
+
+        /**
+         * An {@link IVariable}[] of the join variables will be definitely bound
+         * when we begin to evaluate a sub-group. This information is used to
+         * build a hash index on the join variables and to hash join the
+         * sub-group's solutions back into the parent group's solutions.
+         * 
+         * @see ASTSubGroupJoinVarOptimizer
+         */
+        String JOIN_VARS = "joinVars";
+        
+    }
+    
     /**
      * Required deep copy constructor.
      */
@@ -76,4 +92,17 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
         super(optional);
     }
 
+    /**
+     * The join variables for the group.
+     * 
+     * @see Annotations#JOIN_VARS
+     */
+    public IVariable<?>[] getJoinVars() {
+        return (IVariable[]) getProperty(Annotations.JOIN_VARS);
+    }
+
+    public void setJoinVars(final IVariable<?>[] joinVars) {
+        setProperty(Annotations.JOIN_VARS, joinVars);
+    }
+    
 }

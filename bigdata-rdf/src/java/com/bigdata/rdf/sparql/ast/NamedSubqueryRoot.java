@@ -169,6 +169,12 @@ public class NamedSubqueryRoot extends SubqueryBase {
         return (String[]) getRequiredProperty(Annotations.DEPENDS_ON);
         
     }
+
+    public final void setDependsOn(final String[] dependsOn) {
+        
+        setProperty(Annotations.DEPENDS_ON, dependsOn);
+        
+    }
     
     @Override
     public String toString(int indent) {

@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ModifiableBOpBase;
 
 /**
@@ -226,7 +227,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             sb.append(" [context=" + ((JoinGroupNode) this).getContext() + "]");
             
         }
-
+        
         sb.append(" {");
 
         for (IQueryNode n : this) {
@@ -293,6 +294,34 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 //        }
 
         sb.append("\n").append(s).append("}");
+
+        if (this instanceof GraphPatternGroup) {
+
+            final IVariable<?>[] joinVars = ((GraphPatternGroup<?>) this)
+                    .getJoinVars();
+
+            if (joinVars != null) {
+
+                sb.append(" JOIN ON (");
+
+                boolean first = true;
+
+                for (IVariable<?> var : joinVars) {
+
+                    if (!first)
+                        sb.append(",");
+
+                    sb.append(var);
+
+                    first = false;
+
+                }
+
+                sb.append(")");
+
+            }
+            
+        }
 
         return sb.toString();
 

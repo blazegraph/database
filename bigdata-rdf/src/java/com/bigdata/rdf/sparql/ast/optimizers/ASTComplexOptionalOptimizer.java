@@ -27,16 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -48,7 +45,6 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -56,14 +52,17 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * Rewrite a join group using two or more complex OPTIONAL groups using a hash
- * join pattern.<p> 
- * Note: this optimization is not required if there is only one complex
- * optional in the join group.
+ * join pattern.
+ * <p>
+ * Note: this optimization is not required if there is only one complex optional
+ * in the join group. It is only when there are multiple complex optional groups
+ * that we need to lift those groups out as named subqueries (since they need to
+ * feed each other). If there is only one complex optional group, then we can
+ * run it as a sub-group instead.
  * <p>
  * NOte: This optimization presumes that simple optional groups were already
  * translated into optional {@link StatementPatternNode}s.
@@ -115,9 +114,16 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * include's hash index, we should elide the step which builds the extra hash
  * index.
  * 
+ * TODO This optimzer should not be strictly necessary at all. The same behavior
+ * should arise from running the complex optionals as sub-groups. Based on a few
+ * govtrack CI queries, it looks like we do better when the complex optional
+ * groups are lifted out as named subqueries. We need to go back and investigate
+ * whether or not this is true and why.
+ * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTComplexOptionalOptimizer.java 5365 2011-10-19 20:56:18Z
+ *          thompsonbry $
  */
 public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 

@@ -229,7 +229,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 }
                 
                 // No dependencies.
-                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON, new String[]{});
+                nsr.setDependsOn(new String[]{});
 
                 nsr.setJoinVars(joinVars);
 
@@ -391,7 +391,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 }
                 
                 // No dependencies.
-                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON, new String[]{});
+                nsr.setDependsOn(new String[]{});
 
                 nsr.setJoinVars(joinVars);
 
@@ -681,7 +681,7 @@ public class TestASTNamedSubqueryOptimizer extends
                         QueryType.SELECT, set1);
                 namedSubqueries.add(nsr);
                 nsr.setJoinVars(new VarNode[]{/*none*/});
-                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON,new String[]{});
+                nsr.setDependsOn(new String[]{});
 
                 final ProjectionNode projection = new ProjectionNode();
                 nsr.setProjection(projection);
@@ -714,7 +714,7 @@ public class TestASTNamedSubqueryOptimizer extends
                         QueryType.SELECT, set2);
                 namedSubqueries.add(nsr);
                 nsr.setJoinVars(new VarNode[]{/*none*/});
-                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON,new String[]{set1});
+                nsr.setDependsOn(new String[]{set1});
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 nsr.setWhereClause(whereClause);
@@ -756,7 +756,7 @@ public class TestASTNamedSubqueryOptimizer extends
                         QueryType.SELECT, set3);
                 namedSubqueries.add(nsr);
                 nsr.setJoinVars(new VarNode[]{new VarNode("var1")});
-                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON,new String[]{set1});
+                nsr.setDependsOn(new String[]{set1});
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 nsr.setWhereClause(whereClause);
@@ -833,5 +833,5 @@ public class TestASTNamedSubqueryOptimizer extends
                         new LinkedHashSet<IVariable<?>>()));
 
     }
-
+    
 }

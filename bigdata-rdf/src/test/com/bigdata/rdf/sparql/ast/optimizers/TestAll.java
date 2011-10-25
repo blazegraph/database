@@ -81,7 +81,10 @@ public class TestAll extends TestCase {
         // Unit tests for rewrites of GRAPH ... { ... } patterns.
         suite.addTestSuite(TestASTGraphGroupOptimizer.class);
 
-        // Unit tests for named subquery rewrites.
+        // Unit tests for assigning join variables for sub-groups.
+        suite.addTestSuite(TestASTSubGroupJoinVarOptimizer.class);
+
+        // Unit tests for assigning join variables for named subquery includes.
         suite.addTestSuite(TestASTNamedSubqueryOptimizer.class);
         
         // Unit tests for lifting of simple optionals into the parent group.
