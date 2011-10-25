@@ -28,22 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.LinkedHashSet;
-import java.util.Set;
 
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.MalformedQueryException;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -54,8 +51,10 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Test suite for the {@link ASTNamedSubqueryOptimizer}.
@@ -95,9 +94,19 @@ public class TestASTNamedSubqueryOptimizer extends
      * the analysis of the bindings which MUST be produced by the subquery and
      * those which MUST be bound on entry into the group in which the subquery
      * solution set is included within the main query.
-     * <p>
-     * The join should be on <code>?x</code> in this example.
+     * <pre>
+     * select ?x ?o
+     * with {
+     *  select ?x where { ?x rdf:type foaf:Person }
+     * } AS %namedSet1
+     * where {
+     *  ?x rdfs:label ?o
+     *  INCLUDE %namedSet1
+     * }
+     * </pre>
      * 
+     * The join should be on <code>?x</code> in this example.
+     * <p>
      * Note: Whether we use a join on <code>?x</code> or whether there are NO
      * join variables depends on the order imposed on the named subquery include
      * versus the statement pattern, which depends on the expected cardinality
@@ -105,62 +114,323 @@ public class TestASTNamedSubqueryOptimizer extends
      * only use <code>?x</code> as a join variable if the expected cardinality
      * of <code>?x rdfs:label ?o</code> is LT the expected cardinality of the
      * named solution set. In fact, for this case it probably won't be.
-     * 
-     * FIXME Write unit tests where the INCLUDE is embedded into a child group.
-     * In that location we know that some things are already bound by the parent
-     * group so we can be assured that we will use the available join variables.
-     * [This really depends on running the INCLUDE after the non-optional joins
-     * in the parent, which is itself just a heuristic. In fact, the entire
-     * notion of
-     * {@link StaticAnalysis#getIncomingBindings(IBindingProducerNode, Set)}
-     * depends on this heuristic!]
      */
-    public void test_static_analysis_join_vars() throws MalformedQueryException {
+    public void test_static_analysis_join_vars() {
 
-        final String queryStr = "" +
-                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"+
-                "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> \n"+
-                "PREFIX foaf: <http://xmlns.com/foaf/0.1/> \n"+
-                "select ?x ?o \n"+
-                " with {"+
-                "   select ?x where { ?x rdf:type foaf:Person }\n"+
-                " } AS %namedSet1 \n"+
-                "where { \n" +
-                "   ?x rdfs:label ?o \n" +
-                "   INCLUDE %namedSet1 \n"+
-                "}";
-
-        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
-                .parseQuery2(queryStr, baseURI);
-
-        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-        QueryRoot queryRoot = astContainer.getOriginalAST();
-        
-        // Run the optimizers to determine the join variables.
-        queryRoot = (QueryRoot) new DefaultOptimizerList().optimize(context,
-                queryRoot, null/* bindingSets */);
-
-        // The expected join variables.
-        final VarNode[] joinVars = new VarNode[] { new VarNode("x") };
-
-        final NamedSubqueryRoot nsr = (NamedSubqueryRoot) queryRoot
-                .getNamedSubqueries().get(0);
-
-        final NamedSubqueryInclude nsi = (NamedSubqueryInclude) queryRoot
-                .getWhereClause().get(1);
-
-        assertEquals(joinVars, nsr.getJoinVars());
-
-        assertEquals(joinVars, nsi.getJoinVars());
-        
         /*
-         * FIXME Rewrite to have just the AST as input, not a query. We do not
-         * have enough control over the query translation to ensure that the
-         * problem is setup correctly.
+         * Note: DO NOT share structures in this test!!!!
          */
-        fail("fix test setup to be more robust");
-        
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV rdfsLabel = makeIV(RDFS.LABEL);
+        @SuppressWarnings("rawtypes")
+        final IV person = makeIV(FOAFVocabularyDecl.Person);
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        final String namedSet1 = "namedSet1";
+        final VarNode[] joinVars = new VarNode[]{new VarNode("x")};
+        {
+            
+            // NamedSubqueryRoot
+            {
+
+                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet1);
+                given.getNamedSubqueriesNotNull().add(nsr);
+
+                {
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+                }
+
+                {
+                    final SubqueryRoot subqueryRoot = new SubqueryRoot(
+                            QueryType.SELECT);
+                    nsr.setWhereClause(new JoinGroupNode(subqueryRoot));
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    nsr.setWhereClause(whereClause);
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "x"), new ConstantNode(a),
+                            new ConstantNode(person), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+                }
+
+            }
+            
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("s"));
+                projection.addProjectionVar(new VarNode("o"));
+            
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new NamedSubqueryInclude(namedSet1));
+                
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            // NamedSubqueryRoot
+            {
+
+                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet1);
+                expected.getNamedSubqueriesNotNull().add(nsr);
+
+                {
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+                }
+
+                {
+                    final SubqueryRoot subqueryRoot = new SubqueryRoot(
+                            QueryType.SELECT);
+                    nsr.setWhereClause(new JoinGroupNode(subqueryRoot));
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    nsr.setWhereClause(whereClause);
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "x"), new ConstantNode(a),
+                            new ConstantNode(person), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+                }
+                
+                // No dependencies.
+                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON, new String[]{});
+
+                nsr.setJoinVars(joinVars);
+
+            }
+            
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("s"));
+                projection.addProjectionVar(new VarNode("o"));
+            
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet1);
+                whereClause.addChild(nsi);
+
+                nsi.setJoinVars(joinVars);
+
+            }
+
+        }
+
+        final IASTOptimizer rewriter = new ASTNamedSubqueryOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Variant of {@link #test_static_analysis_join_vars()} where the order of
+     * the {@link StatementPatternNode} and the {@link NamedSubqueryInclude} in
+     * the main WHERE clause is reversed such that there are no join variables
+     * for the INCLUDE.
+     */
+    public void test_static_analysis_no_join_vars() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV rdfsLabel = makeIV(RDFS.LABEL);
+        @SuppressWarnings("rawtypes")
+        final IV person = makeIV(FOAFVocabularyDecl.Person);
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        final String namedSet1 = "namedSet1";
+        final VarNode[] joinVars = new VarNode[]{};
+        {
+            
+            // NamedSubqueryRoot
+            {
+
+                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet1);
+                given.getNamedSubqueriesNotNull().add(nsr);
+
+                {
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+                }
+
+                {
+                    final SubqueryRoot subqueryRoot = new SubqueryRoot(
+                            QueryType.SELECT);
+                    nsr.setWhereClause(new JoinGroupNode(subqueryRoot));
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    nsr.setWhereClause(whereClause);
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "x"), new ConstantNode(a),
+                            new ConstantNode(person), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+                }
+
+            }
+            
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("s"));
+                projection.addProjectionVar(new VarNode("o"));
+            
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new NamedSubqueryInclude(namedSet1));
+                
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            // NamedSubqueryRoot
+            {
+
+                final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
+                        QueryType.SELECT, namedSet1);
+                expected.getNamedSubqueriesNotNull().add(nsr);
+
+                {
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+                }
+
+                {
+                    final SubqueryRoot subqueryRoot = new SubqueryRoot(
+                            QueryType.SELECT);
+                    nsr.setWhereClause(new JoinGroupNode(subqueryRoot));
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    nsr.setProjection(projection);
+
+                    projection.addProjectionVar(new VarNode("x"));
+
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+                    nsr.setWhereClause(whereClause);
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(
+                            "x"), new ConstantNode(a),
+                            new ConstantNode(person), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
+                }
+                
+                // No dependencies.
+                nsr.setProperty(NamedSubqueryRoot.Annotations.DEPENDS_ON, new String[]{});
+
+                nsr.setJoinVars(joinVars);
+
+            }
+            
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+                
+                projection.addProjectionVar(new VarNode("s"));
+                projection.addProjectionVar(new VarNode("o"));
+            
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet1);
+                whereClause.addChild(nsi);
+
+                nsi.setJoinVars(joinVars);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(rdfsLabel), new VarNode("o"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+
+        final IASTOptimizer rewriter = new ASTNamedSubqueryOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
     }
 
     /**
