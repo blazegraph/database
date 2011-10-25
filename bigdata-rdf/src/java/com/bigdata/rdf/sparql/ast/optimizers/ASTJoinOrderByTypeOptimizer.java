@@ -258,12 +258,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 	             */
 	            for (IGroupMemberNode child : joinGroup) {
 	                if (child instanceof NamedSubqueryInclude) {
-	                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
-	                    final VarNode[] joinVars = nsi.getJoinVars();
-	                    if (joinVars == null)
-	                        throw new AssertionError();
-	                    if (joinVars.length == 0)
-	                        ordered.add(nsi);
+                        ordered.add(child);
 	                }
 	            }
 
@@ -276,7 +271,13 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 	             */
 		    	for (IGroupMemberNode n : joinGroup.getStatementPatterns()) {
 		    		
-		    		ordered.add(n);
+		    		final StatementPatternNode sp = (StatementPatternNode) n;
+		    		
+		    		if (!sp.isOptional()) {
+		    		
+		    			ordered.add(n);
+		    			
+		    		}
 		    		
 		    	}
 		    	for (IGroupMemberNode n : sa.getJoinFilters(joinGroup)) {
@@ -292,21 +293,6 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 	            for (IGroupMemberNode child : joinGroup) {
 	                if (child instanceof SubqueryRoot) {
 	                    ordered.add(child);
-	                }
-	            }
-
-	            /*
-	             * Add named subquery joins for named subqueries for which at least
-	             * one join variable was identified by static analysis.
-	             */
-	            for (IGroupMemberNode child : joinGroup) {
-	                if (child instanceof NamedSubqueryInclude) {
-	                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
-	                    final VarNode[] joinVars = nsi.getJoinVars();
-	                    if (joinVars == null)
-	                        throw new AssertionError();
-	                    if (joinVars.length > 0)
-	                        ordered.add(nsi);
 	                }
 	            }
 
