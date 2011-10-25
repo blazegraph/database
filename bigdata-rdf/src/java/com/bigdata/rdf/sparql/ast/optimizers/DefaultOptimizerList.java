@@ -141,7 +141,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Flatten UNIONs where possible.
          * 
+         * <pre>
          * UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
+         * </pre>
+         * 
+         * Note: This must run before the {@link ASTEmptyGroupOptimizer} in
+         * order to eliminate certain UNION/group combinations.
          */
         add(new ASTFlattenUnionsOptimizer());
         
