@@ -483,9 +483,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
                 }
 
                 // Set the DEPENDS_ON annotation.
-                aNamedSubquery.setProperty(
-                        NamedSubqueryRoot.Annotations.DEPENDS_ON,
-                        includes.toArray(new String[0]));
+                aNamedSubquery.setDependsOn(includes.toArray(new String[0]));
                 
             }
             

@@ -76,8 +76,25 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     public JoinGroupNode(final boolean optional) {
 
         super(optional);
-		
-	}
+        
+    }
+
+    /**
+     * Construct a possibly optional group having the specified child as its
+     * initial member.
+     * 
+     * @param optional
+     *            <code>true</code> iff the group is optional.
+     * @param child
+     *            The initial child.
+     */
+    public JoinGroupNode(final boolean optional, IGroupMemberNode child) {
+
+        super(optional);
+        
+        addChild(child);
+        
+    }
 
     /**
      * Set the context for a GroupGraphPattern.

@@ -408,11 +408,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         
         /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate.
-         * 
-         * FIXME This similar too, but still different from, recognizing when we
-         * should be breaking out some of the joins into their own subqueries
-         * and then uniting those subqueries using a hash join (BSBM Q5, search
-         * in search).
          */
         add(new ASTSparql11SubqueryOptimizer());
 
@@ -422,6 +417,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * include with those join variables.
          */
         add(new ASTNamedSubqueryOptimizer());
+        
+        /**
+         * Identify and assign the join variables to sub-groups.
+         */
+        add(new ASTSubGroupJoinVarOptimizer());
         
         /**
          * TODO Add an AST optimizer which prunes out out unnecessary variables

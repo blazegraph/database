@@ -103,7 +103,19 @@ public class GroupByNode extends ValueExpressionListBaseNode<AssignmentNode> {
 
         sb.append("\n").append(indent(indent)).append("group by ");
 
+        boolean first = true;
+        
         for (IValueExpressionNode v : this) {
+            
+            if(first) {
+
+                first = false;
+                
+            } else {
+                
+                sb.append(" ");
+                
+            }
             
             sb.append(v);
             

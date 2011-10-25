@@ -2202,8 +2202,18 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     }
 
     /**
-     * This method handles UNION and OPTIONAL subgroups.
-     *  
+     * This method handles sub-groups, including UNION, required sub-groups, and
+     * OPTIONAL subgroups.
+     * <p>
+     * The basic pattern for efficient sub-group evaluation is to build a hash
+     * index before the sub-group, run the sub-group against the solutions in
+     * that hash index, and then hash join the sub-group solutions back into the
+     * solutions in the hash index. This last step reunites the sub-group
+     * solutions with the solutions in the parent group. The hash index and hash
+     * join steps use the same join variables. This pattern works best when one
+     * or more join variables can be identified for the hash index / hash join
+     * steps.
+     * 
      * @param left
      * @param subgroup
      * @param ctx
@@ -2257,17 +2267,28 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 		     */
             final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-            // Find the set of variables which will be definitely bound by the
-            // time the sub-group is evaluated.
-            final Set<IVariable<?>> incomingBound = ctx.sa.getDefinitelyIncomingBindings(
-                    (GraphPatternGroup<?>) subgroup,
-                    new LinkedHashSet<IVariable<?>>());
-//            final Set<IVariable<?>> incomingBound = ctx.sa.getIncomingBindings(
+//            // Find the set of variables which will be definitely bound by the
+//            // time the sub-group is evaluated.
+//            final Set<IVariable<?>> incomingBound = ctx.sa.getDefinitelyIncomingBindings(
 //                    (GraphPatternGroup<?>) subgroup,
 //                    new LinkedHashSet<IVariable<?>>());
 
-            @SuppressWarnings("rawtypes")
-            final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);
+//            @SuppressWarnings("rawtypes")
+//            final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);
+            final IVariable[] joinVars = subgroup.getJoinVars();
+            if (joinVars == null) {
+                /*
+                 * The AST optimizer which assigns the join variables did not
+                 * run.
+                 * 
+                 * Note: It is Ok if there are no join variables (an empty[]).
+                 * Sometimes there are no join variables and we wind up doing a
+                 * cross-product compare in the hash join. However, it is NOT Ok
+                 * if the join variables annotation was never set (a null).
+                 */
+                throw new RuntimeException("Join variables not specified: "
+                        + subgroup);
+            }
 	        
 		    // Pass all variable bindings along.
 	        @SuppressWarnings("rawtypes")
