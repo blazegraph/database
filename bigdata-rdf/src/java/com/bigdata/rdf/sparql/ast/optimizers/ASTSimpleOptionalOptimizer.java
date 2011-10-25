@@ -409,7 +409,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                 }
 
                 /*
-                 * FIXME This is disabled. I am having trouble getting the query
+                 * Note: This is disabled. I am having trouble getting the query
                  * plan to generate the correct materialization operations with
                  * the mock filter node and its mock requirements. Talk this
                  * over with MikeP or wait until I get further into how the
@@ -419,6 +419,10 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
                  * before the optional join. If so, then this might not be worth
                  * the effort as we could (potentially) be doing more work than
                  * if we just ran the optional in the child group.
+                 * 
+                 * Note: I have decided that this is not worth the candle. The
+                 * new optional sub-group hash join code path is much faster and
+                 * handles complex optionals just fine.
                  */
 
                 if (false && req instanceof ComputedMaterializationRequirement) {

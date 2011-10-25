@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -40,13 +39,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
@@ -296,9 +292,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * We've reached the root.
          */
         if (parent == null) {
-        	
-        	return vars;
-        	
+            
+            return vars;
+            
         }
 
         /*
@@ -306,26 +302,30 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * don't see each other's bindings in a Union.
          */
         if (!(parent instanceof UnionNode)) {
-        	
-	        for (IGroupMemberNode child : parent) {
-	        	
-	        	/*
-	        	 * We've found ourself. Stop collecting vars.
-	        	 */
-	        	if (child == node) {
-	        		
-	        		break;
-	        		
-	        	}
-	        	
-	        	if (child instanceof IBindingProducerNode) {
-	        		
-	            	getDefinitelyProducedBindings((IBindingProducerNode) child, vars, true);
-	            	
-	        	}
-	        	
-	        }
-	        
+            
+            for (IGroupMemberNode child : parent) {
+                
+                /*
+                 * We've found ourself. Stop collecting vars.
+                 */
+                if (child == node) {
+                    
+                    break;
+                    
+                }
+                
+                if (child instanceof IBindingProducerNode) {
+                    
+                    final boolean optional = child instanceof IJoinNode
+                            && ((IJoinNode) child).isOptional();
+                    if (!optional) {
+                        getDefinitelyProducedBindings(
+                                (IBindingProducerNode) child, vars, true/* recursive */);
+                    }
+                }
+                
+            }
+            
         }
         
         /*
@@ -597,12 +597,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
 
-//            if(sp.isSimpleOptional()) {
+            if(sp.isSimpleOptional()) {
 
                 // Only if the statement pattern node is an optional join.
                 vars.addAll(sp.getProducedBindings());
                 
-//            }
+            }
 
         } else if(node instanceof SubqueryRoot) {
 
@@ -664,9 +664,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     private Set<IVariable<?>> getDefinitelyProducedBindings(
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
-
-        if(node.isOptional())
-            return vars;
+        // Note: always report what is bound when we enter a group. The caller
+        // needs to avoid entering a group which is optional if they do not want
+        // it's bindings.
+//        if(node.isOptional())
+//            return vars;
         
         for (IGroupMemberNode child : node) {
 
@@ -758,106 +760,39 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
 
-        for (IGroupMemberNode child : node) {
+        // Add in anything definitely produced by this group (w/o recursion).
+        getDefinitelyProducedBindings(node, vars, false/* recursive */);
 
-            if(!(child instanceof IBindingProducerNode))
-                continue;
+        /*
+         * Note: Assignments which have an error cause the variable to be left
+         * unbound rather than failing the solution. Therefore assignment nodes
+         * are handled as "maybe" bound, not "must" bound.
+         */
 
-            if (child instanceof GraphPatternGroup<?>) {
+        for (AssignmentNode bind : node.getAssignments()) {
 
-                if (recursive) {
+            vars.add(bind.getVar());
 
-                    // Add anything bound by a child group.
+        }
 
-                    final GraphPatternGroup<?> group = (GraphPatternGroup<?>) child;
+        if (recursive) {
 
-//                    if (!group.isOptional()) {
+            /*
+             * Add in anything "maybe" produced by a child group.
+             */
 
-                        getMaybeProducedBindings(group, vars, recursive);
+            for (IGroupMemberNode child : node) {
 
-//                    }
+                if (child instanceof IBindingProducerNode) {
 
+                    vars.addAll(getMaybeProducedBindings(
+                            (IBindingProducerNode) child, vars, recursive));                
+                
                 }
                 
-            } else {
-            	
-                getMaybeProducedBindings((IBindingProducerNode) child, vars, recursive);
-                
             }
-            
+
         }
-//            
-//            if (child instanceof StatementPatternNode) {
-//
-//                final StatementPatternNode sp = (StatementPatternNode) child;
-//
-////                if (!sp.isSimpleOptional()) {
-//                    
-//                    /*
-//                     * Required JOIN (statement pattern).
-//                     */
-//
-//                    getMaybeProducedBindings(sp, vars, recursive);
-//
-////                }
-//
-//            } else if (child instanceof NamedSubqueryInclude
-//                    || child instanceof SubqueryRoot
-//                    || child instanceof ServiceNode) {
-//
-//                /*
-//                 * Required JOIN (Named solution set, SPARQL 1.1 subquery,
-//                 * EXISTS, or SERVICE).
-//                 * 
-//                 * Note: We have to descend recursively into these structures in
-//                 * order to determine anything.
-//                 */
-//
-//                vars.addAll(getMaybeProducedBindings(
-//                        (IBindingProducerNode) child,
-//                        new LinkedHashSet<IVariable<?>>(), true/* recursive */));
-//
-//            } else if (child instanceof GraphPatternGroup<?>) {
-//
-//                if (recursive) {
-//
-//                    // Add anything bound by a child group.
-//
-//                    final GraphPatternGroup<?> group = (GraphPatternGroup<?>) child;
-//
-////                    if (!group.isOptional()) {
-//
-//                        getMaybeProducedBindings(group, vars, recursive);
-//
-////                    }
-//
-//                }
-//                
-//            } else if (child instanceof AssignmentNode) {
-//
-//                /*
-//                 * Note: BIND() in a group is only a "maybe" because the spec says
-//                 * that an error when evaluating a BIND() in a group will not fail
-//                 * the solution.
-//                 * 
-//                 * @see http://www.w3.org/TR/sparql11-query/#assignment (
-//                 * "If the evaluation of the expression produces an error, the
-//                 * variable remains unbound for that solution.")
-//                 */
-//            	
-//                vars.add(((AssignmentNode) child).getVar());
-//
-//            } else if(child instanceof FilterNode) {
-//
-//                // NOP
-//                
-//            } else {
-//
-//                throw new AssertionError(child.toString());
-//
-//            }
-//
-//        }
 
         return vars;
 
