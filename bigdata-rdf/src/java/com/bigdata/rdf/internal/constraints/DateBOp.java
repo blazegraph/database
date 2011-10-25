@@ -139,7 +139,7 @@ public class DateBOp extends IVValueExpression<IV> implements INeedsMaterializat
             }
 
             BigdataLiteral bl = (BigdataLiteral) left.getValue();
-            if (XSD.DATETIME.equals(bl.getDatatype())) {
+            if (XSD.DATETIME.equals(bl.getDatatype())||XSD.DATE.equals(bl.getDatatype())||XSD.TIME.equals(bl.getDatatype())) {
                 XMLGregorianCalendar cal=bl.calendarValue();
                 switch (op()) {
                 case DAY:

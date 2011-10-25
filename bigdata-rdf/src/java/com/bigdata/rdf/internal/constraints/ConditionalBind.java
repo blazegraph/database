@@ -10,6 +10,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -18,7 +19,7 @@ import com.bigdata.rdf.internal.IV;
  * not compare as equals.
  * <p>
  * Note: This is intended for use within a {@link BindingConstraint}.  That
- * 
+ *
  * @author mroycsi
  */
 public class ConditionalBind<E extends IV> extends ImmutableBOp implements
@@ -50,9 +51,9 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
 
         this(new BOp[] { var, expr }, NV.asMap(new NV(Annotations.PROJECTION,
                 projection)));
-        
+
         this.projection = projection;
-        
+
     }
 
     /**
@@ -64,22 +65,22 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
     public ConditionalBind(BOp[] args, Map<String, Object> annotations) {
 
         super(args, annotations);
-        
+
         if (getProperty(Annotations.PROJECTION) == null)
             throw new IllegalArgumentException();
-    
+
     }
 
     boolean isProjection(){
-    
+
         if (projection == null) {
-        
+
             projection = (Boolean) getRequiredProperty(Annotations.PROJECTION);
-            
+
         }
 
         return projection;
-        
+
     }
 
     /**
@@ -115,7 +116,7 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
          */
 //        /*
 //         * Evaluate the value expression.
-//         * 
+//         *
 //         * Note: This also handles the special case of an aggregate appearing
 //         * within a function call context outside of a projection.
 //         */
@@ -132,27 +133,47 @@ public class ConditionalBind<E extends IV> extends ImmutableBOp implements
         final E val = expr.get(bindingSet); // evaluate the value expression.
 
         final E existing = var.get(bindingSet); // lookup current bound value.
+        try{
 
-        if (existing == null) {
+            if( val == null){
 
-            // bind the variable as a side-effect.
-            bindingSet.set(var, new Constant<E>(val));
+                throw new SparqlTypeErrorException.UnboundVarException();
 
-            // return the evaluated value
-            return val;
+            }
 
-        } else {
+	        if (existing == null) {
 
+	            // bind the variable as a side-effect.
+	            bindingSet.set(var, new Constant<E>(val));
+
+	            // return the evaluated value
+	            return val;
+
+	        } else {
+
+	            /*
+	             * Note: A BindingConstraint wrapping the ConditionalBind will see
+	             * the [null] and fail the solution. This avoids throwing the
+	             * SPARQLTypeErrorException, which has more overhead.
+	             */
+
+	            return (val.equals(existing)) ? val : null;
+
+	        }
+        }catch(SparqlTypeErrorException typeError){
             /*
-             * Note: A BindingConstraint wrapping the ConditionalBind will see
-             * the [null] and fail the solution. This avoids throwing the
-             * SPARQLTypeErrorException, which has more overhead.
+             * Note: If an assignment fails to evaluate, and there is already a  binding in
+             * the solution with the same variable name, the solution fails.
+             * If there is not already an assignment, rethrow the exception, so that the
+             * BindingConstraint can pass the solution, since the sparql spec says a
+             * failure in an assignment passes the solution.
              */
-            
-            return (val.equals(existing)) ? val : null;
-
+            if(existing!=null){
+                return null;
+            }else{
+                throw typeError;
+            }
         }
-
     }
 
 }
