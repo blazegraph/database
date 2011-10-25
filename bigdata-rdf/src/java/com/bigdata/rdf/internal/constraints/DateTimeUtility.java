@@ -57,7 +57,7 @@ public class DateTimeUtility {
                     throw new IllegalArgumentException("Cannot add process datatype literals:" + l1 + ":" + l2);
                 }
             } else if (op == MathOp.MINUS) {
-                if (c1 != null && d2 != null) {
+                if (c1 != null && c2 != null) {
                     long milliseconds = c1.toGregorianCalendar().getTimeInMillis() - c2.toGregorianCalendar().getTimeInMillis();
                     double days = ((double) milliseconds) / ((double) (1000 * 60 * 60 * 24));
                     return new XSDNumericIV(days);

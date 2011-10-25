@@ -74,6 +74,10 @@ public class Bind<E> extends ImmutableBOp implements IValueExpression<E>, IBind<
 		// evaluate the value expression.
 		final E val = expr.get(bindingSet);
 
+		if(val==null){
+		      return null;
+		}
+		
 		// bind the variable as a side-effect.
 		bindingSet.set(var, new Constant<E>(val));
 

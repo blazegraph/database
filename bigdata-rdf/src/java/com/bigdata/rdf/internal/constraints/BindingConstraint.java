@@ -27,6 +27,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.error.SparqlTypeErrorException;
 
 public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
     public BindingConstraint(final BOp[] args, final Map<String, Object> annotations) {
@@ -43,10 +44,13 @@ public class BindingConstraint extends com.bigdata.bop.constraint.Constraint {
 
     @Override
     public boolean accept(final IBindingSet bindingSet) {
-        
+        try{
         final Object result = ((ConditionalBind) get(0)).get(bindingSet);
         
         return result != null;
+        } catch (SparqlTypeErrorException stee) {
+            return true;
+        }
         
     }
 
