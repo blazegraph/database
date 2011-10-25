@@ -44,10 +44,18 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Flattens nested unions whenever possible.
+ * Flatten nested UNIONs whenever possible.
+ * 
+ * <pre>
+ * UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
+ * </pre>
+ * 
+ * Note: This must run before the {@link ASTEmptyGroupOptimizer} in order to
+ * eliminate certain UNION/group combinations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTFlattenUnionsOptimizer.java 5314 2011-10-12 12:51:13Z
+ *          thompsonbry $
  */
 public class ASTFlattenUnionsOptimizer implements IASTOptimizer {
 
