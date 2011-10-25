@@ -98,12 +98,13 @@ public class TestASTNamedSubqueryOptimizer extends
      * <p>
      * The join should be on <code>?x</code> in this example.
      * 
-     * FIXME Actually, whether we use a join on <code>?x</code> or whether there
-     * are NO join variables depends on the expected cardinality of the named
-     * solution set and <code>?x rdfs:label ?o</code>. We should only use
-     * <code>?x</code> as a join variable if the expected cardinality of
-     * <code>?x rdfs:label ?o</code> is LT the expected cardinality of the named
-     * solution set. In fact, for this case it probably won't be.
+     * Note: Whether we use a join on <code>?x</code> or whether there are NO
+     * join variables depends on the order imposed on the named subquery include
+     * versus the statement pattern, which depends on the expected cardinality
+     * of the named solution set and <code>?x rdfs:label ?o</code>. We should
+     * only use <code>?x</code> as a join variable if the expected cardinality
+     * of <code>?x rdfs:label ?o</code> is LT the expected cardinality of the
+     * named solution set. In fact, for this case it probably won't be.
      * 
      * FIXME Write unit tests where the INCLUDE is embedded into a child group.
      * In that location we know that some things are already bound by the parent
@@ -141,7 +142,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 queryRoot, null/* bindingSets */);
 
         // The expected join variables.
-        final IVariable[] joinVars = new IVariable[] { Var.var("x") };
+        final VarNode[] joinVars = new VarNode[] { new VarNode("x") };
 
         final NamedSubqueryRoot nsr = (NamedSubqueryRoot) queryRoot
                 .getNamedSubqueries().get(0);
@@ -149,14 +150,17 @@ public class TestASTNamedSubqueryOptimizer extends
         final NamedSubqueryInclude nsi = (NamedSubqueryInclude) queryRoot
                 .getWhereClause().get(1);
 
-        /*
-         * TODO This is failing for the reasons documented above. I've left this
-         * test case here as a place holder for the issue.
-         */
         assertEquals(joinVars, nsr.getJoinVars());
 
         assertEquals(joinVars, nsi.getJoinVars());
-
+        
+        /*
+         * FIXME Rewrite to have just the AST as input, not a query. We do not
+         * have enough control over the query translation to ensure that the
+         * problem is setup correctly.
+         */
+        fail("fix test setup to be more robust");
+        
     }
 
     /**
