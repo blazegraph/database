@@ -139,6 +139,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTSetValueExpressionsOptimizer());
         
         /**
+         * Flatten UNIONs where possible.
+         * 
+         * UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
+         */
+        add(new ASTFlattenUnionsOptimizer());
+        
+        /**
          * Eliminate semantically empty join group nodes which are the sole
          * child of another join groups.
          * <pre>
@@ -226,13 +233,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTExistsOptimizer());
 
-        /**
-         * Flatten UNIONs where possible.
-         * 
-         * UNION(A,B,C) := UNION(A,UNION(B,C)) -or- UNION(UNION(A,B),C))
-         */
-        add(new ASTFlattenUnionsOptimizer());
-        
         /**
          * Handles a variety of special constructions related to graph graph
          * groups.

@@ -1,12 +1,35 @@
 <?xml version="1.0"?>
 <sparql
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
      xmlns:xs="http://www.w3.org/2001/XMLSchema#"
      xmlns="http://www.w3.org/2005/sparql-results#" >
    <head>
    </head>
    <results>
      <result>
+        <binding name="p">
+            <uri>http://www.w3.org/2000/01/rdf-schema#label</uri>
+        </binding>
+        <binding name="o">
+            <literal>1080</literal>
+        </binding>
+     </result>
+     <result>
+        <binding name="p">
+            <uri>http://www.w3.org/2000/01/rdf-schema#label</uri>
+        </binding>
+        <binding name="o">
+            <literal>DB01254</literal>
+        </binding>
+     </result>
+     <result>
+        <binding name="p">
+            <uri>http://www.w3.org/2000/01/rdf-schema#label</uri>
+        </binding>
+        <binding name="o">
+            <literal>3062316</literal>
+        </binding>
      </result>
    </results>
 </sparql>
