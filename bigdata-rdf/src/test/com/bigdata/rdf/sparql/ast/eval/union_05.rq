@@ -1,0 +1,8 @@
+SELECT ?p ?o ?s
+WHERE { 
+    {
+        <http://example/foo> ?p ?o . 
+    } UNION { 
+        ?s ?p <http://example/foo> . 
+    }
+}

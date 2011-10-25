@@ -135,4 +135,22 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
         
     }    
     
+    /**
+     * <pre>
+     *  SELECT ?p ?o ?s
+     *  WHERE { 
+     *      {
+     *          <http://example/foo> ?p ?o . 
+     *      } UNION { 
+     *          ?s ?p <http://example/foo> . 
+     *      }
+     *  }
+     * </pre>
+     */
+    public void test_union_05() throws Exception {
+
+        new TestHelper("union_05").runTest();
+        
+    }
+
 }
