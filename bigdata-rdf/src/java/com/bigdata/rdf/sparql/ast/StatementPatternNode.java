@@ -410,7 +410,7 @@ public class StatementPatternNode extends
             }
         }
 
-        if (getQueryHints() != null) {
+        if (getQueryHints() != null && !getQueryHints().isEmpty()) {
             sb.append("\n");
             sb.append(indent(indent+1));
             sb.append(Annotations.QUERY_HINTS);
