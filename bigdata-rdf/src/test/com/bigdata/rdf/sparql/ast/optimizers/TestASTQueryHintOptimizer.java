@@ -35,9 +35,8 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -52,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -60,29 +60,31 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Test suite for the {@link ASTSubGroupJoinVarOptimizer}.
+ * Test suite for the {@link ASTQueryHintOptimizer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * TODO This only tests {@link QueryHintScope#BGP}.  Test all scopes.
  */
-public class TestASTSubGroupJoinVarOptimizer extends
+public class TestASTQueryHintOptimizer extends
         AbstractASTEvaluationTestCase {
 
     /**
      * 
      */
-    public TestASTSubGroupJoinVarOptimizer() {
+    public TestASTQueryHintOptimizer() {
     }
 
     /**
      * @param name
      */
-    public TestASTSubGroupJoinVarOptimizer(String name) {
+    public TestASTQueryHintOptimizer(String name) {
         super(name);
     }
 
     /**
-     * Unit test for assigning join variables to sub-groups.
+     * Unit test for binding query hints.
      * 
      * <pre>
      * PREFIX p1: <http://www.rdfabout.com/rdf/schema/usgovt/>
@@ -117,7 +119,7 @@ public class TestASTSubGroupJoinVarOptimizer extends
      * The complex optional group in this query should have <code>_var1</code>
      * specified as a join variable.
      */
-    public void test_govtrack_21() {
+    public void test_query_hints() {
 
         /*
          * Note: DO NOT share structures in this test!!!!
@@ -142,10 +144,16 @@ public class TestASTSubGroupJoinVarOptimizer extends
         final IV votedBy = makeIV(new URIImpl(
                 "http://www.rdfabout.com/rdf/schema/vote/votedBy"));
 
+        @SuppressWarnings("rawtypes")
+        final IV scopeBGP = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHintScope.BGP));
+        @SuppressWarnings("rawtypes")
+        final IV chunkCapacity = makeIV(new URIImpl(QueryHints.NAMESPACE+BufferAnnotations.CHUNK_CAPACITY));
+        @SuppressWarnings("rawtypes")
+        final IV chunkCapacityValue = makeIV(new LiteralImpl("200"));
+
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
         final String namedSet1 = "_set1";
-        final IVariable<?>[] joinVars = new IVariable[] { Var.var("_var3") };
         {
 
             // NamedSubqueryRoot
@@ -222,6 +230,12 @@ public class TestASTSubGroupJoinVarOptimizer extends
                             new VarNode("_var10"), new ConstantNode(rdfsLabel),
                             new VarNode("_var2"), null/* c */,
                             Scope.DEFAULT_CONTEXTS));
+                    
+                    complexOptGroup.addChild(new StatementPatternNode(
+                            new ConstantNode(scopeBGP), new ConstantNode(
+                                    chunkCapacity), new ConstantNode(
+                                    chunkCapacityValue), null/* c */,
+                            Scope.DEFAULT_CONTEXTS));
                 }
 
                 final GroupByNode groupByNode = new GroupByNode();
@@ -295,7 +309,6 @@ public class TestASTSubGroupJoinVarOptimizer extends
                             "_var3"), new ConstantNode(name), new VarNode(
                             "_var9"), null/* c */, Scope.DEFAULT_CONTEXTS));
             whereClause.addChild(simpleOptGroup);
-            simpleOptGroup.setJoinVars(joinVars);
 
             final JoinGroupNode complexOptGroup = new JoinGroupNode(true/* optional */);
             whereClause.addChild(complexOptGroup);
@@ -304,11 +317,13 @@ public class TestASTSubGroupJoinVarOptimizer extends
                         "_var10"), new ConstantNode(votedBy), new VarNode(
                         "_var3"), null/* c */, Scope.DEFAULT_CONTEXTS));
 
-                complexOptGroup.addChild(new StatementPatternNode(new VarNode(
-                        "_var10"), new ConstantNode(rdfsLabel), new VarNode(
-                        "_var2"), null/* c */, Scope.DEFAULT_CONTEXTS));
-                
-                complexOptGroup.setJoinVars(joinVars);
+                final StatementPatternNode sp = new StatementPatternNode(
+                        new VarNode("_var10"), new ConstantNode(rdfsLabel),
+                        new VarNode("_var2"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS);
+                complexOptGroup.addChild(sp);
+                sp.setQueryHint(BufferAnnotations.CHUNK_CAPACITY, "200");
+              
             }
 
             final GroupByNode groupByNode = new GroupByNode();
@@ -318,7 +333,7 @@ public class TestASTSubGroupJoinVarOptimizer extends
 
         }
 
-        final IASTOptimizer rewriter = new ASTSubGroupJoinVarOptimizer();
+        final IASTOptimizer rewriter = new ASTQueryHintOptimizer();
 
         final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
                 given), store);
@@ -327,7 +342,7 @@ public class TestASTSubGroupJoinVarOptimizer extends
                 given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
-
+        
     }
 
 }

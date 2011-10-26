@@ -1,0 +1,25 @@
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX hint: <http://www.bigdata.com/queryHints#>
+
+SELECT ?x ?o
+WHERE {
+
+  # query hint binds for the group.
+  hint:Group hint:com.bigdata.bop.PipelineOp.maxParallel 10 .
+
+  # query hint binds for the group and any subgroups.
+  hint:GroupAndSubGroups hint:com.bigdata.bop.PipelineOp.pipelineQueueCapacity 20 .
+
+  # query hint binds for the (sub)query but does not effect other (sub)queries.
+  hint:SubQuery hint:com.bigdata.relation.accesspath.IBuffer.chunkOfChunksCapacity 20 .
+
+  ?x rdfs:label ?o .
+
+  ?x rdf:type foaf:Person .
+
+  # query hint binds for the immediately proceeeding basic graph pattern.
+  hint:BGP hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 100 .
+
+}

@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -1944,12 +1945,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final AST2BOpContext ctx) {
 
         @SuppressWarnings("rawtypes")
-        final List<IPredicate> preds = new LinkedList<IPredicate>();
+        final List<Predicate<?>> preds = new LinkedList<Predicate<?>>();
+        final List<Properties> hints = new LinkedList<Properties>();
 
         for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
             if(!sp.isSimpleOptional()) {
                 // Only required statement patterns.
                 preds.add(toPredicate(sp, ctx));
+                hints.add(sp.getQueryHints());
             }
         }
 
@@ -2000,18 +2003,23 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * Iterate through the predicates and join them, along with their
              * join constraints.
              */
-            for (int i = 0; i < preds.size(); i++) {
-
-                // assign a bop id to the predicate
-                final Predicate<?> pred = (Predicate<?>) preds.get(i);
+    		int i = 0;
+            final Iterator<Predicate<?>> itr = preds.iterator();
+            final Iterator<Properties> itr2 = hints.iterator();
+    		while(itr.hasNext()) {
+    		    
+    		    final Predicate<?> pred = itr.next();
+    		    final Properties queryHints = itr2.next();
 
                 // need to make a modifiable collection
                 final Collection<IConstraint> c = new LinkedList<IConstraint>
                 	(Arrays.asList(assignedConstraints[i]));
 
                 left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,//
-                        c, ctx.idFactory, ctx.queryHints);
+                        c, ctx.idFactory, /*ctx.*/queryHints);
 
+                i++;
+                
             }
 
 	        return left;

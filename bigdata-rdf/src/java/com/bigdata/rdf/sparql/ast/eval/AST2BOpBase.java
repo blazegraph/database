@@ -84,6 +84,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -260,16 +261,8 @@ public class AST2BOpBase {
      *         operator is returned.
      * 
      * 
-     *         TODO It would be nice if this would only apply those query hints
-     *         to an operator which are known to be annotations understood by
-     *         that operator. This information is basically available from the
-     *         inner Annotation interface for a given operator class, but that
-     *         is not really all that accessible. [The way it is now, the query
-     *         hints get sprayed onto every operator and that will make the
-     *         query much fatter for NIO on a cluster.]
-     *         <p>
-     *         We can use (hintURI bd:hint hintValue) in statement patterns to
-     *         place hints more precisely within the AST.
+     *         TODO This is being phased out by the
+     *         {@link ASTQueryHintOptimizer}
      */
     public static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {

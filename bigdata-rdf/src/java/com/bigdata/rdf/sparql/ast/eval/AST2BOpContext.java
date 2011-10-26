@@ -17,6 +17,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
@@ -51,6 +52,9 @@ public class AST2BOpContext implements IdFactory {
 	
 	/**
 	 * The query hints from the original {@link #query}.
+	 * 
+	 * @see QueryHints
+	 * @see ASTQueryHintOptimizer
 	 */
     public final Properties queryHints;
     

@@ -91,6 +91,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+        // Test suite for embedded bigdata query hints.
+        suite.addTestSuite(TestQueryHints.class);
+        
         /*
          * Tests corresponding to various trouble tickets.
          */

@@ -214,6 +214,13 @@ public class DatasetNode extends QueryNodeBase {
             sb.append(s);
             sb.append("namedGraphFilter=" + namedGraphFilter);
         }
+//        if (getQueryHints() != null) {
+//            sb.append("\n");
+//            sb.append(s);
+//            sb.append(Annotations.QUERY_HINTS);
+//            sb.append("=");
+//            sb.append(getQueryHints().toString());
+//        }
         return sb.toString();
     }
 

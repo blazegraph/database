@@ -410,7 +410,15 @@ public class StatementPatternNode extends
             }
         }
 
-	    return sb.toString();
+        if (getQueryHints() != null) {
+            sb.append("\n");
+            sb.append(indent(indent+1));
+            sb.append(Annotations.QUERY_HINTS);
+            sb.append("=");
+            sb.append(getQueryHints().toString());
+        }
+
+        return sb.toString();
 		
 	}
 

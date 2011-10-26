@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
+import java.util.Properties;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.ModifiableBOpBase;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 
 /**
  * Base class for the AST.
@@ -46,6 +48,14 @@ public class ASTBase extends ModifiableBOpBase {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends ModifiableBOpBase.Annotations {
+
+        /**
+         * An optional {@link Properties} object specifying query hints which
+         * apply to <i>this</i> AST node.
+         * 
+         * @see ASTQueryHintOptimizer
+         */
+        String QUERY_HINTS = "queryHints";
         
     }
 
@@ -63,6 +73,47 @@ public class ASTBase extends ModifiableBOpBase {
         super(args, annotations);
     }
 
+    /**
+     * Return the query hints for this AST node.
+     * 
+     * @return The query hints -or- <code>null</code> if none have been
+     *         declared.
+     */
+    public Properties getQueryHints() {
+
+        return (Properties) getProperty(Annotations.QUERY_HINTS);
+
+    }
+
+    /**
+     * Set a query hint.
+     * 
+     * @param name
+     *            The property name for the query hint.
+     * @param value
+     *            The property value for the query hint.
+     */
+    public void setQueryHint(final String name, final String value) {
+
+        if(name == null)
+            throw new IllegalArgumentException();
+
+        if(value == null)
+            throw new IllegalArgumentException();
+        
+        Properties queryHints = getQueryHints();
+
+        if (queryHints == null) {
+
+            // Lazily allocate the map.
+            setProperty(Annotations.QUERY_HINTS, queryHints = new Properties());
+
+        }
+
+        queryHints.setProperty(name, value);
+
+    }
+    
     /**
      * Replace all occurrences of the old value with the new value in both the
      * arguments and annotations of this operator (recursive). A match is
