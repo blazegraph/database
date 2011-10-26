@@ -63,6 +63,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestASTBindingAssigner.class);
 
+        // Unit tests for binding query hints on the AST nodes.
+        suite.addTestSuite(TestASTQueryHintOptimizer.class);
+
         // Unit tests for "SELECT (DISTINCT|REDUCED) *" 
         suite.addTestSuite(TestASTWildcardProjectionOptimizer.class);
 

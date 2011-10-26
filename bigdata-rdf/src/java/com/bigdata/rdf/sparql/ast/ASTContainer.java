@@ -202,7 +202,7 @@ public class ASTContainer extends ASTBase {
         final QueryRoot originalAST = getOriginalAST();
         
         final QueryRoot optimizedAST = getOptimizedAST();
-        
+
         if (queryString != null) {
 
             sb.append("\n");
@@ -252,6 +252,15 @@ public class ASTContainer extends ASTBase {
             sb.append(optimizedAST);
 
         }
+
+//        if (getQueryHints() != null) {
+//
+//            sb.append("\n");
+//            sb.append(Annotations.QUERY_HINTS);
+//            sb.append("=");
+//            sb.append(getQueryHints().toString());
+//
+//        }
 
         return sb.toString();
 

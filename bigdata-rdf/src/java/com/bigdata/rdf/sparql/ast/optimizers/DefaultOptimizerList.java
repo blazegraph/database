@@ -137,6 +137,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * expressions.
          */
         add(new ASTSetValueExpressionsOptimizer());
+
+        /**
+         * Query hints are identified applied to AST nodes based on the
+         * specified scope and the location within the AST in which they are
+         * found. This mechanism can be more selective than declaring a query
+         * hint for the entire query using a PREFIX declaration.
+         */
+        add(new ASTQueryHintOptimizer());
         
         /**
          * Flatten UNIONs where possible.
