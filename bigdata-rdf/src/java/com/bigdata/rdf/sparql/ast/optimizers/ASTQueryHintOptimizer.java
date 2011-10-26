@@ -29,6 +29,8 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
@@ -186,11 +188,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
     private void applyGlobalQueryHints(final QueryRoot queryRoot,
             final Properties queryHints) {
 
+        if (queryHints == null || queryHints.isEmpty())
+            return;
+        
         validateQueryHints(queryHints);
         
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIteratorWithAnnotations(queryRoot);
 
+        // Note: working around a ConcurrentModificationException.
+        final List<ASTBase> list = new LinkedList<ASTBase>();
+        
         while (itr.hasNext()) {
 
             final BOp op = itr.next();
@@ -206,6 +214,12 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final ASTBase t = (ASTBase) op;
 
+            list.add(t);
+            
+        }
+        
+        for(ASTBase t : list) {
+            
             if (t.getProperty(ASTBase.Annotations.QUERY_HINTS) != null) {
                 /*
                  * There should not be any query hints applied yet.
