@@ -1944,7 +1944,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final JoinGroupNode joinGroup, final StaticAnalysis sa,
             final AST2BOpContext ctx) {
 
-        @SuppressWarnings("rawtypes")
         final List<Predicate<?>> preds = new LinkedList<Predicate<?>>();
         final List<Properties> hints = new LinkedList<Properties>();
 
@@ -2017,6 +2016,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
                 left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,//
                         c, ctx.idFactory, /*ctx.*/queryHints);
+
 
                 i++;
                 
