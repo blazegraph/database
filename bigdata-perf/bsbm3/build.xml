@@ -13,25 +13,14 @@
 		</fileset>
 	</path>
 
-	<target name="clean" description="cleans everything in [build.dir]">
-		<delete dir="${build.dir}" />
-	</target>
-
-	<target name="prepare">
-		<!-- create directories. -->
-		<mkdir dir="${build.dir}" />
-		<copy toDir="${build.dir}/bin">
-			<!-- copy logging and journal configuration file. -->
-			<fileset file="${bsbm.dir}/*.properties" />
-		</copy>
-	</target>
-
 	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
-	<target name="run-load" depends="prepare"
+	<target name="run-load"
 		    description="Load a data set.">
 		<!-- delete file if it exists so we load into a new journal. -->
 		<delete file="${bsbm.journalFile}" />
-		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
+		<java classname="com.bigdata.rdf.store.DataLoader"
+		      fork="true" failonerror="true"
+		      >
 			<arg line="-namespace ${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}
@@ -44,9 +33,11 @@
 		</java>
 	</target>
 
-	<target name="start-sparql-server" depends="prepare"
+	<target name="start-sparql-server"
 		    description="Start a small http server fronting for a bigdata database instance.">
-		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+		<java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer"
+		      fork="true" failonerror="true"
+		      >
 			<arg line="${bsbm.nanoServerPort} ${bsbm.namespace} ${bsbm.journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
 			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
