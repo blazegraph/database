@@ -2844,7 +2844,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
         }
 
-        if (sp.getProperty(Annotations.HASH_JOIN, Annotations.DEFAULT_HASH_JOIN)) {
+        final Properties queryHints = sp.getQueryHints();
+        
+        if (queryHints != null
+                && Boolean.parseBoolean(queryHints.getProperty(
+                        Annotations.HASH_JOIN, "false"))) {
 
             /*
              * Use a hash join for this predicate.
