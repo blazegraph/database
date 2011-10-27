@@ -52,7 +52,7 @@ import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Test suite for the {@link HashJoinUtility}.
+ * Test suite for the {@link HTreeHashJoinUtility}.
  * 
  * TODO Unit test to verify vectoring of left solutions having the same hash
  * code (and look at whether we can vector optional solutions
@@ -61,18 +61,18 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHashJoinUtility extends AbstractHashJoinUtilityTestCase {
+public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
     /**
      * 
      */
-    public TestHashJoinUtility() {
+    public TestHTreeHashJoinUtility() {
     }
 
     /**
      * @param name
      */
-    public TestHashJoinUtility(String name) {
+    public TestHTreeHashJoinUtility(String name) {
         super(name);
     }
     
@@ -181,7 +181,7 @@ public class TestHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         
             final BOpStats stats = new BOpStats();
             
-            HashJoinUtility.acceptSolutions(
+            HTreeHashJoinUtility.acceptSolutions(
                     new Chunkerator<IBindingSet>(right.iterator()), joinVars, stats,
                     rightSolutions, optional);
 
@@ -202,14 +202,14 @@ public class TestHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
         
         // Compute the "required" solutions.
-        HashJoinUtility
+        HTreeHashJoinUtility
                 .hashJoin(leftItr, outputBuffer, joinVars, selectVars,
                         constraints, rightSolutions, joinSet, optional, true/* leftIsPipeline */);
 
         if(optional) {
             
             // Output the optional solutions.
-            HashJoinUtility.outputOptionals(outputBuffer, rightSolutions, joinSet);
+            HTreeHashJoinUtility.outputOptionals(outputBuffer, rightSolutions, joinSet);
             
         }
 

@@ -44,13 +44,11 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.counters.CAT;
-import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
- * Utility class supporting hash join against a Java hash collection (as opposed
- * to the {@link HTree}).
+ * Utility class supporting hash join against a Java hash collection.
  * <p>
  * acceptSolutions: A solutions set is fully materialized in a hash table. The
  * {@link Key}s of the hash table are the as-bound join variable(s). The values
@@ -87,7 +85,7 @@ public class JVMHashJoinUtility {
      * @param stats
      *            The statistics to be updated as the solutions are buffered on
      *            the hash index.
-     * @param htree
+     * @param map
      *            The hash index.
      * @param optional
      *            <code>true</code> iff the join is optional. When
@@ -329,10 +327,10 @@ public class JVMHashJoinUtility {
 
         }
 
-        int hashCode = HashJoinUtility.ONE;
+        int hashCode = HTreeHashJoinUtility.ONE;
         try {
             
-            hashCode = HashJoinUtility.hashCode(joinVars, bset);
+            hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset);
             
         } catch (JoinVariableNotBoundException ex) {
             

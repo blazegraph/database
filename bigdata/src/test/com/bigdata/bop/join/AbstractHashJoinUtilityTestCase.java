@@ -46,7 +46,7 @@ import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.relation.accesspath.IBuffer;
 
 /**
- * Test suite for both {@link HashJoinUtility} and {@link JVMHashJoinUtility}.
+ * Test suite for both {@link HTreeHashJoinUtility} and {@link JVMHashJoinUtility}.
  * 
  * TODO Unit test of optional solutions
  * 
@@ -54,7 +54,7 @@ import com.bigdata.relation.accesspath.IBuffer;
  * solutions (so this means a test with optionals and also we need a test w/o
  * constraints).
  * 
- * TODO See {@link TestHTreeHashJoin} and some of the other join test suites for
+ * TODO See {@link TestHTreeHashJoinOp} and some of the other join test suites for
  * some of these variations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

@@ -46,9 +46,9 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.HashJoinUtility;
+import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.JoinAnnotations;
-import com.bigdata.bop.join.SolutionSetHashJoinOp;
+import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -65,7 +65,7 @@ import com.bigdata.striterator.ICloseableIterator;
  *          thompsonbry $
  * 
  * @deprecated This should probably be replaced by the more general purpose
- *             {@link SolutionSetHashJoinOp}, in which case the RELEASE annotation
+ *             {@link HTreeSolutionSetHashJoinOp}, in which case the RELEASE annotation
  *             must be set to <code>false</code> if there is more than one
  *             location in the query plan where the named solution set will be
  *             consumed.
@@ -317,7 +317,7 @@ public class NamedSubqueryIncludeOp extends PipelineOp {
             final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
                     context.getSource());
 
-            HashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
+            HTreeHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
                     selectVars, constraints, rightSolutions/* hashIndex */,
                     joinSet, optional, true/* leftIsPipeline */);
 

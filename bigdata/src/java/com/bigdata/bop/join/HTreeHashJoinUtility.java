@@ -73,10 +73,10 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class HashJoinUtility {
+public class HTreeHashJoinUtility {
 
     static private final transient Logger log = Logger
-            .getLogger(HashJoinUtility.class);
+            .getLogger(HTreeHashJoinUtility.class);
 
     /**
      * Note: If joinVars is an empty array, then the solutions will all hash to
@@ -180,7 +180,7 @@ public class HashJoinUtility {
                 int hashCode = ONE; // default (used iff join is optional).
                 try {
 
-                    hashCode = HashJoinUtility.hashCode(joinVars, bset);
+                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset);
 
                 } catch (JoinVariableNotBoundException ex) {
 
@@ -324,7 +324,7 @@ public class HashJoinUtility {
                     // Compute hash code from bindings on the join vars.
                     int hashCode;
                     try {
-                        hashCode = HashJoinUtility.hashCode(joinVars,
+                        hashCode = HTreeHashJoinUtility.hashCode(joinVars,
                                 leftSolutions[i]);
                         a[n++] = new BS(hashCode, leftSolutions[i]);
                     } catch (JoinVariableNotBoundException ex) {

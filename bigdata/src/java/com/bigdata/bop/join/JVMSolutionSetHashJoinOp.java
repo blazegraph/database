@@ -137,11 +137,11 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
          * TODO Alternatively, we could specify the #of different locations in
          * the query plan where the named solution set will be consumed.
          * 
-         * @see SolutionSetHashJoinOp.Annotations#RELEASE
+         * @see HTreeSolutionSetHashJoinOp.Annotations#RELEASE
          */
-        final String RELEASE = SolutionSetHashJoinOp.Annotations.RELEASE;
+        final String RELEASE = HTreeSolutionSetHashJoinOp.Annotations.RELEASE;
 
-        final boolean DEFAULT_RELEASE = SolutionSetHashJoinOp.Annotations.DEFAULT_RELEASE;
+        final boolean DEFAULT_RELEASE = HTreeSolutionSetHashJoinOp.Annotations.DEFAULT_RELEASE;
         
     }
 
@@ -187,7 +187,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
         
         }
 
-        // The RHS HTree annotation must be specified.
+        // The RHS annotation must be specified.
         getRequiredProperty(Annotations.NAMED_SET_REF);
         
         // Join variables must be specified.
@@ -340,8 +340,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                             .getRequiredProperty(Annotations.NAMED_SET_REF);
 
                     // Lookup the attributes for the query on which we will hang
-                    // the
-                    // solution set.
+                    // the solution set.
                     final IQueryAttributes attrs = context
                             .getQueryAttributes(namedSetRef.queryId);
 
@@ -373,7 +372,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                      * release() the hash tree then we need to know how many
                      * times the temporary solution set is being included and
                      * decrement a counter each time. When the counter reaches
-                     * zero, we can release the HTree.
+                     * zero, we can release the hash index.
                      */
                     release();
 

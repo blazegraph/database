@@ -56,7 +56,7 @@ import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator joins a solution set into the pipeline. The solution set must be be
- * constructed by a {@link NamedSubqueryOp} or a {@link HashIndexOp}. While this
+ * constructed by a {@link NamedSubqueryOp} or a {@link HTreeHashIndexOp}. While this
  * JOIN requires the RHS {@link HTree} to be fully materialized, evaluation of
  * the LHS source solutions is pipelined. Parallel evaluation of source chunks
  * is permitted, but the RHS {@link HTree} must have been checkpointed before
@@ -71,14 +71,16 @@ import com.bigdata.striterator.ICloseableIterator;
  * join will be output for each source chunk but the "optional" solutions will
  * not be reported until ALL source chunks have been processed.
  * 
+ * @see HTreeHashJoinUtility
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: NamedSubqueryIncludeOp.java 5178 2011-09-12 19:09:23Z
  *          thompsonbry $
  */
-public class SolutionSetHashJoinOp extends PipelineOp {
+public class HTreeSolutionSetHashJoinOp extends PipelineOp {
 
     static private final transient Logger log = Logger
-            .getLogger(SolutionSetHashJoinOp.class);
+            .getLogger(HTreeSolutionSetHashJoinOp.class);
 
     /**
      * 
@@ -140,7 +142,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
          * TODO Alternatively, we could specify the #of different locations in
          * the query plan where the named solution set will be consumed.
          */
-        final String RELEASE = SolutionSetHashJoinOp.class + ".release";
+        final String RELEASE = HTreeSolutionSetHashJoinOp.class + ".release";
 
         final boolean DEFAULT_RELEASE = true;
         
@@ -149,7 +151,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public SolutionSetHashJoinOp(SolutionSetHashJoinOp op) {
+    public HTreeSolutionSetHashJoinOp(HTreeSolutionSetHashJoinOp op) {
 
         super(op);
         
@@ -161,7 +163,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public SolutionSetHashJoinOp(final BOp[] args,
+    public HTreeSolutionSetHashJoinOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -203,7 +205,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
 
     }
 
-    public SolutionSetHashJoinOp(final BOp[] args, NV... annotations) {
+    public HTreeSolutionSetHashJoinOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -247,7 +249,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-        private final SolutionSetHashJoinOp op;
+        private final HTreeSolutionSetHashJoinOp op;
 
         private final IVariable<E>[] joinVars;
         
@@ -284,7 +286,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
 
         @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
-                final SolutionSetHashJoinOp op) {
+                final HTreeSolutionSetHashJoinOp op) {
 
             this.context = context;
 
@@ -440,7 +442,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
             final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
                     context.getSource());
 
-            HashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
+            HTreeHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
                     selectVars, constraints, rightSolutions/* hashIndex */,
                     joinSet, optional, true/* leftIsPipeline */);
 
@@ -451,7 +453,7 @@ public class SolutionSetHashJoinOp extends PipelineOp {
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                HashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
+                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
                         joinSet);
 
                 unsyncBuffer2.flush();

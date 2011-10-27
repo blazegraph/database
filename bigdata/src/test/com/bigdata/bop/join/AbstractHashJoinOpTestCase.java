@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,35 +22,30 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2010
+ * Created on Oct 27, 2011
  */
 
 package com.bigdata.bop.join;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
-import junit.framework.TestCase2;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
@@ -66,32 +61,31 @@ import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 
+import junit.framework.TestCase2;
+
 /**
- * Unit tests for the {@link HTreeHashJoinOp} operator.
- * <p>
- * Note: The logic to map binding sets over shards is tested independently.
+ * Common base class for hash join with access path unit tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHTreeHashJoin extends TestCase2 {
+abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public TestHTreeHashJoin() {
+    public AbstractHashJoinOpTestCase() {
     }
 
     /**
      * @param name
      */
-    public TestHTreeHashJoin(String name) {
+    public AbstractHashJoinOpTestCase(String name) {
         super(name);
     }
 
@@ -107,7 +101,7 @@ public class TestHTreeHashJoin extends TestCase2 {
         
     }
 
-    static private final String namespace = "ns";
+    static protected final String namespace = "ns";
     
     Journal jnl;
     
@@ -174,196 +168,24 @@ public class TestHTreeHashJoin extends TestCase2 {
 
     }
 
-    protected PipelineOp newJoin(final BOp[] args, final int joinId,
+    /**
+     * Return a new join operator instance for the test.
+     * 
+     * @param args
+     * @param joinId
+     * @param joinVars
+     * @param predOp
+     * @param annotations
+     * @return
+     */
+    abstract protected PipelineOp newJoin(final BOp[] args, final int joinId,
             final IVariable<E>[] joinVars,
             final Predicate<E> predOp,
-            final NV... annotations) {
-
-        final Map<String,Object> tmp = NV.asMap(
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER), //
-                new NV(Predicate.Annotations.BOP_ID, joinId),//
-                new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
-                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(PipelineOp.Annotations.MAX_MEMORY, Bytes.megabyte)//
-                );
-
-        if (annotations != null) {
-         
-            for (NV nv : annotations) {
-            
-                tmp.put(nv.getName(), nv.getValue());
-                
-            }
-            
-        }
-        
-        final PipelineOp joinOp = new HTreeHashJoinOp<E>(args, tmp);
-
-        return joinOp;
-        
-    }
-
-    /**
-     * Correct rejection tests for the constructor.
+            final NV... annotations);
+    
+    /*
+     * Tests
      */
-    public void test_correctRejection() {
-        
-        final BOp[] emptyArgs = new BOp[]{};
-        final int joinId = 1;
-        final int predId = 2;
-        @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
-
-        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("Mary"), Var.var("x") }, NV
-                .asMap(new NV[] {//
-                        new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
-                        new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Annotations.TIMESTAMP,
-                                ITx.READ_COMMITTED),//
-                }));
-        
-        // w/o variables.
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-//                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.CONTROLLER),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + IllegalStateException.class);
-        } catch (IllegalStateException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-        // bad evaluation context.
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.ANY),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-        // missing predicate.
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.SHARDED),//
-//                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + IllegalStateException.class);
-        } catch (IllegalStateException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-//        // shared state not specified.
-//        try {
-//            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-//                    new NV(BOp.Annotations.BOP_ID, joinId),//
-//                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-//                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-//                                    BOpEvaluationContext.SHARDED),//
-//                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-////                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-//                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-//                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-//                                    Bytes.megabyte),//
-//                    }));
-//            fail("Expecting: " + UnsupportedOperationException.class);
-//        } catch (UnsupportedOperationException ex) {
-//            if (log.isInfoEnabled())
-//                log.info("Ignoring expected exception: " + ex);
-//        }
-        
-        // maxParallel not set to ONE (1).
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.SHARDED),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 2),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-        // maxMemory not overridden.
-        try {
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.SHARDED),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-//                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-//                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-        // maxMemory != MAX_LONG and predicate is OPTIONAL
-        try {
-            @SuppressWarnings("unchecked")
-            final Predicate<E> pred2 = (Predicate<E>) pred.setProperty(
-                    IPredicate.Annotations.OPTIONAL, true);
-            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-                    new NV(BOp.Annotations.BOP_ID, joinId),//
-                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.SHARDED),//
-                            new NV(AccessPathJoinAnnotations.PREDICATE,pred2),//
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-                                    Bytes.megabyte),//
-                    }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-        
-    }
     
     /**
      * Unit test for a simple join. There are two source solutions. Each binds
@@ -384,9 +206,9 @@ public class TestHTreeHashJoin extends TestCase2 {
         @SuppressWarnings("unchecked")
         final IVariable<E>[] joinVars = new IVariable[] { x };
         
-		final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-				new Constant<String>("John"), x }, NV
-				.asMap(new NV[] {//
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                new Constant<String>("John"), x }, NV
+                .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
@@ -877,9 +699,7 @@ public class TestHTreeHashJoin extends TestCase2 {
                 new BOp[] { }, // args
                 joinId,
                 joinVars,
-                pred,
-                // Note: memory can not be constrained since predicate is optional.
-                new NV(PipelineOp.Annotations.MAX_MEMORY,Long.MAX_VALUE)
+                pred
                 );
 
         /**
@@ -1025,9 +845,7 @@ public class TestHTreeHashJoin extends TestCase2 {
                 new BOp[] { }, // args
                 joinId,
                 joinVars,
-                pred,
-                // Note: memory can not be constrained since predicate is optional.
-                new NV(PipelineOp.Annotations.MAX_MEMORY,Long.MAX_VALUE)
+                pred
                 );
 
         /**

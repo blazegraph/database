@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
@@ -52,7 +51,6 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
 import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.bop.join.JVMHashJoinUtility.SolutionHit;
-import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
@@ -81,9 +79,7 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * This operator is NOT thread-safe. It relies on the query engine to provide
  * synchronization. The operator MUST be run on the query controller.
  * 
- * @see HashIndexOp, which is a variant of this class for the {@link HTree}.
- * @see JVMSolutionSetHashJoinOp, which joins solutions back into the query
- *      plan.
+ * @see JVMSolutionSetHashJoinOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -97,7 +93,7 @@ public class JVMHashIndexOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HTreeAnnotations, HashJoinAnnotations,
+    public interface Annotations extends HashJoinAnnotations,
             HashMapAnnotations {
 
         /**
@@ -158,7 +154,7 @@ public class JVMHashIndexOp extends PipelineOp {
         if (getMaxParallel() != 1) {
             /*
              * Parallel evaluation is not allowed. This operator writes on an
-             * HTree and that object is not thread-safe for mutation.
+             * object that is not thread-safe for mutation.
              */
             throw new IllegalArgumentException(
                     PipelineOp.Annotations.MAX_PARALLEL + "="
@@ -433,7 +429,7 @@ public class JVMHashIndexOp extends PipelineOp {
         }
 
         /**
-         * Buffer intermediate resources on the {@link HTree}.
+         * Buffer intermediate resources.
          */
         private void acceptSolutions() {
 
