@@ -1515,11 +1515,13 @@ public class AST2BOpBase {
             }
             map.put(BOp.Annotations.EVALUATION_CONTEXT, evaluationContext);
 
+            map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
+
             if (useHTree) {
 
                 map.put(PipelineOp.Annotations.MAX_MEMORY, Long.MAX_VALUE);
                 
-                map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
+                map.put(PipelineOp.Annotations.LAST_PASS, true);
 
                 left = new HTreeHashJoinOp(leftOrEmpty(left), map);
                 
@@ -1527,8 +1529,6 @@ public class AST2BOpBase {
                 
                 map.put(PipelineOp.Annotations.PIPELINED, false);
                 
-                map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
-
                 left = new JVMHashJoinOp(leftOrEmpty(left), map);
                 
             }

@@ -34,7 +34,6 @@ import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint directives understood by a bigdata SPARQL end point.

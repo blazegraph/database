@@ -93,7 +93,10 @@ public class TestAll extends TestCase {
 
         // Test suite for embedded bigdata query hints.
         suite.addTestSuite(TestQueryHints.class);
-        
+
+        // Test suite with explicitly enabled hash joins.
+        suite.addTestSuite(TestHashJoin.class);
+
         /*
          * Tests corresponding to various trouble tickets.
          */

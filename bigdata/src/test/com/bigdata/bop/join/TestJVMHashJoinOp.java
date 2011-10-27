@@ -77,7 +77,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
                 new NV(Predicate.Annotations.BOP_ID, joinId),//
                 new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
                 new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-//                new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+//                new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.PIPELINED, false)//
                 );
