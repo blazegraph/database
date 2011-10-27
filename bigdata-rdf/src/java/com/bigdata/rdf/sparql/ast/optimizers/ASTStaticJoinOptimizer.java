@@ -63,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
  * This is an AST optimizer port of the old "static" optimizer - 
@@ -354,16 +355,25 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     		
     		if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
     			
-    			final IV s = getIV(sp.s());
-    			final IV p = getIV(sp.p());
-    			final IV o = getIV(sp.o());
-    			final IV c = getIV(sp.c());
+                final IV<?, ?> s = getIV(sp.s());
+                final IV<?, ?> p = getIV(sp.p());
+                final IV<?, ?> o = getIV(sp.o());
+                final IV<?, ?> c = getIV(sp.c());
     			
-    			final long cardinality = 
-    				ctx.db.getAccessPath(s, p, o, c).rangeCount(false);
-    			
+                final IAccessPath<?> ap = ctx.db.getAccessPath(s, p, o, c);
+                
+                final long cardinality = ap.rangeCount(false/* exact */);
+
+                // Annotate with the fast range count.
     			sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
     			
+                /*
+                 * Annotate with the index which would be used if we did not run
+                 * access path "as-bound". This is the index that will be used
+                 * if we wind up doing a hash join for this predicate.
+                 */
+                sp.setProperty(Annotations.ORIGINAL_INDEX, ap.getKeyOrder());
+
     		}
     		
     	}

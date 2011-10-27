@@ -13,6 +13,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
@@ -21,6 +22,7 @@ import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A node in the AST representing a statement pattern.
@@ -416,6 +418,26 @@ public class StatementPatternNode extends
             sb.append(Annotations.QUERY_HINTS);
             sb.append("=");
             sb.append(getQueryHints().toString());
+        }
+        
+        final Long rangeCount = (Long) getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+
+        final IKeyOrder<?> keyOrder = (IKeyOrder<?>) getProperty(AST2BOpBase.Annotations.ORIGINAL_INDEX);
+
+        if (rangeCount != null) {
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
+            sb.append("=");
+            sb.append(rangeCount.toString());
+        }
+
+        if (keyOrder != null) {
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append(AST2BOpBase.Annotations.ORIGINAL_INDEX);
+            sb.append("=");
+            sb.append(keyOrder.toString());
         }
 
         return sb.toString();
