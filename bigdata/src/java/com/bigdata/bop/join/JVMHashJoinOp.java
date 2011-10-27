@@ -41,7 +41,6 @@ import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
@@ -244,9 +243,9 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-        private final IQueryAttributes attrs;
-        
-        private final Object sourceSolutionsKey;
+//        private final IQueryAttributes attrs;
+//        
+//        private final Object sourceSolutionsKey;
 
         /**
          * The hash index.
@@ -286,24 +285,24 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
             {
 
-                /*
-                 * First, see if the map already exists.
-                 * 
-                 * Note: Since the operator is not thread-safe, we do not need
-                 * to use a putIfAbsent pattern here.
-                 */
-                attrs = context.getRunningQuery().getAttributes();
-
-                sourceSolutionsKey = op.getId() + ".sourceSolutions";
-
-                Map<Key, Bucket> rightSolutions = (Map<Key, Bucket>) attrs
-                        .get(sourceSolutionsKey);
-
-                if (rightSolutions == null) {
-
-                    /*
-                     * Create the map(s).
-                     */
+//                /*
+//                 * First, see if the map already exists.
+//                 * 
+//                 * Note: Since the operator is not thread-safe, we do not need
+//                 * to use a putIfAbsent pattern here.
+//                 */
+//                attrs = context.getRunningQuery().getAttributes();
+//
+//                sourceSolutionsKey = op.getId() + ".sourceSolutions";
+//
+//                Map<Key, Bucket> rightSolutions = (Map<Key, Bucket>) attrs
+//                        .get(sourceSolutionsKey);
+//
+//                if (rightSolutions == null) {
+//
+//                    /*
+//                     * Create the map(s).
+//                     */
                     
                     /*
                      * Materialize the binding sets and populate a hash map.
@@ -313,31 +312,31 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
                             op.getLoadFactor()//
                     );
 
-                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
-                        throw new AssertionError();
+//                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
+//                        throw new AssertionError();
                     
-                }
+//                }
 
-                // The map is shared state across invocations of this operator
-                // task.
-                this.rightSolutions = rightSolutions;
+//                // The map is shared state across invocations of this operator
+//                // task.
+//                this.rightSolutions = rightSolutions;
 
             }
 
         }
 
-        /**
-         * Discard the hash index.
-         */
-        private void release() {
-
-            if (rightSolutions != null) {
-
-                attrs.remove(sourceSolutionsKey);
-                
-            }
-
-        }
+//        /**
+//         * Discard the hash index.
+//         */
+//        private void release() {
+//
+//            if (rightSolutions != null) {
+//
+//                attrs.remove(sourceSolutionsKey);
+//                
+//            }
+//
+//        }
         
         public Void call() throws Exception {
 
@@ -345,22 +344,22 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
                 acceptSolutions();
 
-                if (context.isLastInvocation()) {
+//                if (context.isLastInvocation()) {
 
                     doHashJoin();
                     
-                }
+//                }
 
                 // Done.
                 return null;
                 
             } finally {
 
-                if (context.isLastInvocation()) {
-
-                    release();
-
-                }
+//                if (context.isLastInvocation()) {
+//
+//                    release();
+//
+//                }
                 
                 sink.close();
 

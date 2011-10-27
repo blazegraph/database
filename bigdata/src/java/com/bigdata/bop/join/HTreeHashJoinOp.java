@@ -181,6 +181,15 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 //                    + "=" + isSharedState());
 //        }
 
+        if (!isLastPassRequested()) {
+            /*
+             * Last pass evaluation must be requested. This operator relies on
+             * last pass evaluation semantics to produce its outputs.
+             */
+            throw new IllegalArgumentException(PipelineOp.Annotations.LAST_PASS
+                    + "=" + isLastPassRequested());
+        }
+
         // Must be positive.  May be max long for unbounded memory.
         if (getMaxMemory() <= 0L)
             throw new UnsupportedOperationException(Annotations.MAX_MEMORY

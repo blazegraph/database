@@ -79,7 +79,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                 new NV(Predicate.Annotations.BOP_ID, joinId),//
                 new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
                 new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-//                new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.MAX_MEMORY, Bytes.megabyte)//
                 );
@@ -134,7 +134,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.CONTROLLER),//
                             new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
@@ -153,7 +153,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.ANY),//
                             new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
@@ -172,7 +172,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.SHARDED),//
 //                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
@@ -182,25 +182,25 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
-        
-//        // shared state not specified.
-//        try {
-//            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
-//                    new NV(BOp.Annotations.BOP_ID, joinId),//
-//                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
-//                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-//                                    BOpEvaluationContext.SHARDED),//
-//                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-////                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-//                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-//                            new NV(PipelineOp.Annotations.MAX_MEMORY,
-//                                    Bytes.megabyte),//
-//                    }));
-//            fail("Expecting: " + UnsupportedOperationException.class);
-//        } catch (UnsupportedOperationException ex) {
-//            if (log.isInfoEnabled())
-//                log.info("Ignoring expected exception: " + ex);
-//        }
+
+        // last pass evaluation not requested.
+        try {
+            new HTreeHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+                    new NV(BOp.Annotations.BOP_ID, joinId),//
+                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
+                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.SHARDED),//
+                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, false),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.MAX_MEMORY,
+                                    Bytes.megabyte),//
+                    }));
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
         
         // maxParallel not set to ONE (1).
         try {
@@ -210,13 +210,13 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.SHARDED),//
                             new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 2),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
                     }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
@@ -229,7 +229,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.SHARDED),//
                             new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                            new NV(PipelineOp.Annotations.MAX_MEMORY,
 //                                    Bytes.megabyte),//
@@ -251,7 +251,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.SHARDED),//
                             new NV(AccessPathJoinAnnotations.PREDICATE,pred2),//
-//                            new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//

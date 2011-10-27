@@ -609,11 +609,15 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param name
      * @param value
      */
-    private void applyToQuery(QueryRoot queryRoot, String name, String value) {
+    private void applyToQuery(final QueryRoot queryRoot, final String name,
+            String value) {
 
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIteratorWithAnnotations(queryRoot);
 
+        // Note: working around a ConcurrentModificationException.
+        final List<ASTBase> list = new LinkedList<ASTBase>();
+        
         while (itr.hasNext()) {
 
             final BOp op = itr.next();
@@ -628,6 +632,12 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
              */
 
             final ASTBase t = (ASTBase) op;
+
+            list.add(t);
+            
+        }
+        
+        for(ASTBase t : list) {
 
             t.setQueryHint(name, value);
             
