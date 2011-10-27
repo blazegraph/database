@@ -21,5 +21,6 @@ WHERE {
 
   # query hint binds for the immediately proceeeding basic graph pattern.
   hint:BGP hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1000 .
+  hint:BGP hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
 
 }
