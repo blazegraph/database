@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -40,6 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.counters.render.XHTMLRenderer;
@@ -197,10 +199,12 @@ public class QueryLog {
          * Columns for each pipeline operator.
          */
         sb.append("\tevalOrder"); // [0..n-1]
-        sb.append("\tbopId");
-        sb.append("\tpredId");
         sb.append("\tevalContext");
         sb.append("\tcontroller");
+        sb.append("\tbopId");
+        sb.append("\tpredId");
+        sb.append("\tbopSummary"); // short form of the bop.
+        sb.append("\tpredSummary"); // short form of the pred.
         // metadata considered by the static optimizer.
         sb.append("\tstaticBestKeyOrder"); // original key order assigned by static optimizer.
         sb.append("\tnvars"); // #of variables in the predicate for a join.
@@ -298,35 +302,54 @@ public class QueryLog {
         }
         
         sb.append('\t');
+        sb.append(bop.getEvaluationContext());
+        sb.append('\t');
+        sb.append(bop.getProperty(BOp.Annotations.CONTROLLER,
+                BOp.Annotations.DEFAULT_CONTROLLER));
+        sb.append('\t');
         sb.append(Integer.toString(bopId));
 		sb.append('\t');
-		{
-			/*
-			 * Show the predicate identifier if this is a Join operator.
-			 * 
-			 * @todo handle other kinds of join operators when added using a
-			 * shared interface.
-			 */
-			final IPredicate<?> pred = (IPredicate<?>) bop
-					.getProperty(PipelineJoin.Annotations.PREDICATE);
-			if (pred != null) {
-				try {
-					final int predId = pred.getId();
-					sb.append(Integer.toString(predId));
-				} catch (IllegalStateException ex) {
-					/*
-					 * All predicates SHOULD have a bopId, but this catches the
-					 * error if one does not.
-					 */
-					sb.append(NA);
-				}
-			}
-		}
-		sb.append('\t');
-		sb.append(bop.getEvaluationContext());
-		sb.append('\t');
-		sb.append(bop.getProperty(BOp.Annotations.CONTROLLER,
-				BOp.Annotations.DEFAULT_CONTROLLER));
+        @SuppressWarnings("rawtypes")
+        final IPredicate pred = (IPredicate<?>) bop
+                .getProperty(PipelineJoin.Annotations.PREDICATE);
+        final Integer predId = pred == null ? null : (Integer) pred
+                .getProperty(BOp.Annotations.BOP_ID);
+        if (predId != null) {
+            sb.append(predId);
+        } else {
+            if (pred != null) {
+                // Expected but missing.
+                sb.append(NA);
+            }
+        }
+        sb.append('\t');
+        sb.append(bop.getClass().getSimpleName());
+        sb.append("[" + bopId + "]");
+        sb.append('\t');
+        if (pred != null) {
+            sb.append(pred.getClass().getSimpleName());
+            sb.append("[" + predId + "](");
+            final Iterator<BOp> itr = pred.argIterator();
+            boolean first = true;
+            while (itr.hasNext()) {
+                if (first) {
+                    first = false;
+                } else
+                    sb.append(", ");
+                final IVariableOrConstant<?> x = (IVariableOrConstant<?>) itr
+                        .next();
+                if (x.isVar()) {
+                    sb.append("?");
+                    sb.append(x.getName());
+                } else {
+                    sb.append(x.get());
+                    //sb.append(((IV)x.get()).getValue());
+                }
+            }
+            sb.append(")");
+        } else {
+            sb.append(NA);
+        }
 
 		/*
 		 * Static optimizer metadata.
@@ -336,10 +359,6 @@ public class QueryLog {
 		 * bindings (optionals may leave some unbound).
 		 */
 		{
-
-			@SuppressWarnings("unchecked")
-			final IPredicate pred = (IPredicate<?>) bop
-					.getProperty(PipelineJoin.Annotations.PREDICATE);
 			
 			if (pred != null) {
 			
@@ -503,10 +522,12 @@ public class QueryLog {
          * Columns for each pipeline operator.
          */
         w.write("<th>evalOrder</th>"); // [0..n-1]
-        w.write("<th>bopId</th>");
-        w.write("<th>predId</th>");
         w.write("<th>evalContext</th>");
         w.write("<th>controller</th>");
+        w.write("<th>bopId</th>");
+        w.write("<th>predId</th>");
+        w.write("<th>bopSummary</th>");
+        w.write("<th>predSummary</th>");
         // metadata considered by the static optimizer.
         w.write("<th>staticBestKeyOrder</th>"); // original key order assigned
                                                 // by static optimizer.
@@ -696,38 +717,60 @@ public class QueryLog {
         }
         
         w.write(TD);
-        w.write(Integer.toString(bopId));
-        w.write(TDx);
-        {
-            /*
-             * Show the predicate identifier if this is a Join operator.
-             * 
-             * @todo handle other kinds of join operators when added using a
-             * shared interface.
-             */
-            final IPredicate<?> pred = (IPredicate<?>) bop
-                    .getProperty(PipelineJoin.Annotations.PREDICATE);
-            w.write(TD);
-            if (pred != null) {
-				try {
-					final int predId = pred.getId();
-					w.write(Integer.toString(predId));
-				} catch (IllegalStateException ex) {
-					/*
-					 * All predicates SHOULD have a bopId, but this catches the
-					 * error if one does not.
-					 */
-					w.write(cdata(NA));
-				}
-            }
-            w.write(TDx);
-        }
-        w.write(TD);
         w.write(cdata(bop.getEvaluationContext().toString()));
         w.write(TDx);
         w.write(TD);
         w.write(cdata(bop.getProperty(BOp.Annotations.CONTROLLER,
                 BOp.Annotations.DEFAULT_CONTROLLER).toString()));
+        w.write(TDx);
+
+        w.write(TD);
+        w.write(Integer.toString(bopId));
+        w.write(TDx);
+        @SuppressWarnings("rawtypes")
+        final IPredicate pred = (IPredicate<?>) bop
+                .getProperty(PipelineJoin.Annotations.PREDICATE);
+        final Integer predId = pred == null ? null : (Integer) pred
+                .getProperty(BOp.Annotations.BOP_ID);
+        w.write(TD);
+        if (predId != null) {
+            w.write(cdata(predId.toString()));
+        } else {
+            if (pred != null) {
+                // Expected but missing.
+                w.write(cdata(NA));
+            }
+        }
+        w.write(TDx);
+        w.write(TD);
+        w.write(cdata(bop.getClass().getSimpleName()));
+        w.write(cdata("[" + bopId + "]"));
+        w.write(TDx);
+        w.write(TD);
+        if (pred != null) {
+            w.write(cdata(pred.getClass().getSimpleName()));
+            w.write(cdata("[" + predId + "]("));
+            final Iterator<BOp> itr = pred.argIterator();
+            boolean first = true;
+            while (itr.hasNext()) {
+                if (first) {
+                    first = false;
+                } else
+                    w.write(cdata(", "));
+                final IVariableOrConstant<?> x = (IVariableOrConstant<?>) itr
+                        .next();
+                if (x.isVar()) {
+                    w.write(cdata("?"));
+                    w.write(cdata(x.getName()));
+                } else {
+                    w.write(cdata(x.get().toString()));
+                    //sb.append(((IV)x.get()).getValue());
+                }
+            }
+            w.write(cdata(")"));
+        } else {
+            w.write(cdata(NA));
+        }
         w.write(TDx);
 
         /*
@@ -739,10 +782,6 @@ public class QueryLog {
          */
         {
 
-            @SuppressWarnings("unchecked")
-            final IPredicate pred = (IPredicate<?>) bop
-                    .getProperty(PipelineJoin.Annotations.PREDICATE);
-            
             if (pred != null) {
             
                 final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
