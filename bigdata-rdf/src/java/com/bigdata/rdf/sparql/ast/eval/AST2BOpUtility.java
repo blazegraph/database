@@ -2832,12 +2832,12 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         // Propagate the estimated cardinality to the Predicate.
         anns.add(new NV(Annotations.ESTIMATED_CARDINALITY,
-                sp.getRequiredProperty(Annotations.ESTIMATED_CARDINALITY)));
+                sp.getProperty(Annotations.ESTIMATED_CARDINALITY)));
 
         // Propagate the index which would be used if we do not run the
         // predicate "as-bound".
         anns.add(new NV(Annotations.ORIGINAL_INDEX,
-                sp.getRequiredProperty(Annotations.ORIGINAL_INDEX)));
+                sp.getProperty(Annotations.ORIGINAL_INDEX)));
 
         if (sp.isOptional()) {
             // Mark the join as optional.

@@ -546,7 +546,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         switch (scope) {
         case Query: {
-            applyToQuery(queryRoot,name,value);
+            applyToQuery(context,queryRoot,name,value);
             break;
         }
         case SubQuery: {
@@ -609,9 +609,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param name
      * @param value
      */
-    private void applyToQuery(final QueryRoot queryRoot, final String name,
-            String value) {
+    private void applyToQuery(final AST2BOpContext context,
+            final QueryRoot queryRoot, final String name, String value) {
 
+        if (context.queryHints == null) {
+            /*
+             * Also stuff the query hint on the global context for things which
+             * look there.
+             */
+            context.queryHints.setProperty(name, value);
+        }
+        
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIteratorWithAnnotations(queryRoot);
 
