@@ -1481,7 +1481,7 @@ public class AST2BOpBase {
 //            final long fastRangeCount = (Long) pred
 //                    .getRequiredProperty(Annotations.ESTIMATED_CARDINALITY);
             
-            final long estimatedInputCardinality = 0L;
+            final long estimatedInputCardinality = Long.MAX_VALUE; // FIXME From the RTO. 
             
             final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
 
