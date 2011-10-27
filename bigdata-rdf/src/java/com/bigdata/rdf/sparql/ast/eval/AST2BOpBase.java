@@ -61,6 +61,11 @@ import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.AccessPathJoinAnnotations;
+import com.bigdata.bop.join.HTreeHashJoinOp;
+import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.JVMHashJoinOp;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.filter.HTreeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
@@ -68,6 +73,7 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
@@ -232,6 +238,24 @@ public class AST2BOpBase {
          */
         String NKNOWN = Rule2BOpUtility.class.getName() + ".nknown";
 
+        /**
+         * Query hint to use a hash join against the access path for a given
+         * predicate. Hash joins should be enabled once it is recognized that
+         * the #of as-bound probes of the predicate will approach or exceed the
+         * range count of the predicate.
+         * <p>
+         * Note: {@link HashJoinAnnotations#JOIN_VARS} MUST also be specified
+         * for the predicate. The join variable(s) are variables which are (a)
+         * bound by the predicate and (b) are known bound in the source
+         * solutions. The query planner has the necessary context to figure this
+         * out based on the structure of the query plan and the join evaluation
+         * order.
+         */
+        String HASH_JOIN = AST2BOpBase.class.getPackage().getName()
+                + ".hashJoin";
+
+        boolean DEFAULT_HASH_JOIN = false;
+        
     }
 
     /**
@@ -259,7 +283,6 @@ public class AST2BOpBase {
      * @return A copy of that operator to which the query hints (if any) have
      *         been applied. If there are no query hints then the original
      *         operator is returned.
-     * 
      * 
      *         TODO This is being phased out by the
      *         {@link ASTQueryHintOptimizer}
@@ -292,6 +315,7 @@ public class AST2BOpBase {
     /**
      * @deprecated This is part of the {@link SOp2BOpUtility} integration.
      */
+    @SuppressWarnings("rawtypes")
     public static PipelineOp join(final AbstractTripleStore db,
             final QueryEngine queryEngine,
             final PipelineOp left, final Predicate pred,
@@ -543,6 +567,7 @@ public class AST2BOpBase {
                 // An anonymous variable whose name is based on the variable in
                 // the query whose Value we are trying to materialize from the
                 // IV.
+                @SuppressWarnings("unchecked")
                 final IVariable<BigdataValue> anonvar = Var.var("--"
                         + v.getName() + "-" + ctx.nextId());
                 
@@ -595,6 +620,8 @@ public class AST2BOpBase {
                         new PipelineJoin(leftOrEmpty(inlineMaterializeOp), //
                                 anns.toArray(new NV[anns.size()])),
                         ctx.queryHints);
+//                final PipelineOp lexJoinOp = newJoin(inlineMaterializeOp, anns,
+//                        ctx.queryHints);
 
                 if (log.isDebugEnabled()) {
                     log.debug("adding lex join op: " + lexJoinOp);
@@ -611,6 +638,7 @@ public class AST2BOpBase {
     }
 
     // TODO JAVADOC
+    @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
             final AbstractTripleStore db,//
             final QueryEngine queryEngine,//
@@ -765,8 +793,9 @@ public class AST2BOpBase {
 
                 anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-                left = applyQueryHints(new PipelineJoin(leftOrEmpty(left),
-                        anns.toArray(new NV[anns.size()])), queryHints);
+//                left = applyQueryHints(new PipelineJoin(leftOrEmpty(left),
+//                        anns.toArray(new NV[anns.size()])), queryHints);
+                left = newJoin(left, anns, queryHints);
 
             }
 
@@ -853,8 +882,9 @@ public class AST2BOpBase {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-        return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                .toArray(new NV[anns.size()])), queryHints);
+//        return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                .toArray(new NV[anns.size()])), queryHints);
+        return newJoin(left, anns, queryHints);
 
     }
 
@@ -905,8 +935,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -918,8 +949,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -947,8 +979,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -973,8 +1006,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -988,7 +1022,9 @@ public class AST2BOpBase {
          * @todo must pass estimateCost() to the underlying access path plus
          * layer on any cost for the optional expander.
          */
+        @SuppressWarnings("rawtypes")
         final IRelation r = context.getRelation(pred);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         final ScanCostReport scanCostReport = ((AccessPath) context
                 .getAccessPath(r, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
@@ -1025,8 +1061,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         } else {
 
@@ -1073,8 +1110,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(dataSetJoin),
-                    anns.toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(dataSetJoin),
+//                    anns.toArray(new NV[anns.size()])), queryHints);
+            return newJoin(dataSetJoin, anns, queryHints);
 
         }
 
@@ -1094,6 +1132,7 @@ public class AST2BOpBase {
      *       decision until we actually evaluate that access path. This is
      *       basically a special case of runtime query optimization.
      */
+    @SuppressWarnings("rawtypes")
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
@@ -1104,7 +1143,7 @@ public class AST2BOpBase {
 
         final boolean scaleOut = queryEngine.isScaleOut();
 
-        if(dataset != null && summary==null){
+        if (dataset != null && summary == null) {
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             // Filter for distinct SPOs.
             if (true) { // summary.nknown < 10 * Bytes.kilobyte32) {
@@ -1131,8 +1170,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
         }
 
         if (summary != null && summary.nknown == 0) {
@@ -1149,8 +1189,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -1178,8 +1219,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])), queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])), queryHints);
+            return newJoin(left, anns, queryHints);
 
         }
 
@@ -1265,6 +1307,7 @@ public class AST2BOpBase {
          * much data to have in memory anyway.
          */
         final IRelation r = context.getRelation(pred);
+        @SuppressWarnings("unchecked")
         final ScanCostReport scanCostReport = ((AccessPath) context
                 .getAccessPath(r, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
@@ -1328,8 +1371,9 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])),queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])),queryHints);
+            return newJoin(left, anns, queryHints);
 
         } else {
 
@@ -1380,10 +1424,102 @@ public class AST2BOpBase {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-                    .toArray(new NV[anns.size()])),queryHints);
+//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
+//                    .toArray(new NV[anns.size()])),queryHints);            
+            return newJoin(left, anns, queryHints);
+            
+        }
+
+    }
+
+    /**
+     * Create and return an appropriate type of join. The default is the
+     * pipeline join. A hash join can be selected using the appropriate query
+     * hint. The query hints which control this decision must be annotated on
+     * the {@link IPredicate} by the caller.
+     * 
+     * @param left
+     * @param anns
+     * @param queryHints
+     * @return
+     * 
+     * @see Annotations#HASH_JOIN
+     * @see HashJoinAnnotations#JOIN_VARS
+     * @see Annotations#ESTIMATED_CARDINALITY
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    static private PipelineOp newJoin(PipelineOp left, final List<NV> anns,
+            final Properties queryHints) {
+
+        final Map<String, Object> map = NV.asMap(anns.toArray(new NV[anns
+                .size()]));
+
+        // Look up the predicate for the access path.
+        final IPredicate<?> pred = (IPredicate<?>)map.get(AccessPathJoinAnnotations.PREDICATE);
+
+        // MAX_LONG unless we are doing cutoff join evaluation.
+        final long limit = pred.getProperty(JoinAnnotations.LIMIT,
+                JoinAnnotations.DEFAULT_LIMIT);
+
+        // True iff a hash join was requested for this predicate.
+        final boolean hashJoin = limit != Long.MAX_VALUE
+                && pred.getProperty(Annotations.HASH_JOIN,
+                        Annotations.DEFAULT_HASH_JOIN);
+        
+        if (hashJoin) {
+
+            /*
+             * TODO Choose HTree versus JVM hash join operator based on the the
+             * estimated input cardinality to the join.
+             * 
+             * TODO If we partition the hash join on a cluster then we should
+             * divide the estimated input cardinality by the #of partitions to
+             * get the estimated input cardinality per partition.
+             */
+            
+//            final long fastRangeCount = (Long) pred
+//                    .getRequiredProperty(Annotations.ESTIMATED_CARDINALITY);
+            
+            final long estimatedInputCardinality = 0L;
+            
+            final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
+
+            /*
+             * The join variable(s) are variables which are (a) bound by the
+             * predicate and (b) are known bound in the source solutions.
+             */
+            final IVariable<?>[] joinVars = (IVariable<?>[]) pred
+                    .getRequiredProperty(HashJoinAnnotations.JOIN_VARS);
+
+            map.put(HashJoinAnnotations.JOIN_VARS, joinVars);
+            
+            if (useHTree) {
+
+                map.put(PipelineOp.Annotations.MAX_MEMORY, Long.MAX_VALUE);
+                
+                map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
+
+                left = new HTreeHashJoinOp(leftOrEmpty(left), map);
+                
+            } else {
+                
+                map.put(PipelineOp.Annotations.PIPELINED, false);
+                
+                map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
+
+                left = new JVMHashJoinOp(leftOrEmpty(left), map);
+                
+            }
+
+        } else {
+
+            left = new PipelineJoin(leftOrEmpty(left), map);
 
         }
+
+        left = applyQueryHints(left, queryHints);
+
+        return left;
 
     }
 

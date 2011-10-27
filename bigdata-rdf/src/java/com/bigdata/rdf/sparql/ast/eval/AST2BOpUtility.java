@@ -45,6 +45,7 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
+import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
@@ -2067,7 +2068,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @return
      */
     private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
-            PipelineOp left, final Predicate<?> pred,
+            PipelineOp left, final Predicate<?> pred, final Properties queryHints,
             final Collection<FilterNode> filters, final AST2BOpContext ctx) {
 
         final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
@@ -2081,7 +2082,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         // just for now
         left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,
-                constraints, ctx.idFactory, ctx.queryHints);
+                constraints, ctx.idFactory, queryHints);
 
         return left;
 
@@ -2141,20 +2142,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                      * FILTER(s) MUST NOT have materialization requirements for
                      * variables which were not already bound before the
                      * optional JOIN on this statement pattern.
-                     * 
-                     * TODO Move logic to set OPTIONAL on the Predicate into
-                     * toPredicate. It can already see the isSimpleOptional
-                     * annotation on the StatementPatternNode.
                      */
 
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
-                            ctx).setProperty(IPredicate.Annotations.OPTIONAL,
-                            Boolean.TRUE);
+                            ctx);
 
                     final List<FilterNode> filters = sp.getFilters();
 
                     left = addOptionalJoinForSingletonOptionalSubquery(left,
-                            pred, filters, ctx);
+                            pred, sp.getQueryHints(), filters, ctx);
 
                 }
 
@@ -2190,12 +2186,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 final Collection<FilterNode> filters = subJoinGroup
                         .getFilters();
 
-                final Predicate<?> pred = (Predicate<?>) toPredicate(sp, ctx)
-                        .setProperty(IPredicate.Annotations.OPTIONAL,
-                                Boolean.TRUE);
+                final Predicate<?> pred = (Predicate<?>) toPredicate(sp, ctx);
 
                 left = addOptionalJoinForSingletonOptionalSubquery(left, pred,
-                        filters, ctx);
+                        sp.getQueryHints(), filters, ctx);
 
             } else {
 
@@ -2275,14 +2269,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 		     */
             final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-//            // Find the set of variables which will be definitely bound by the
-//            // time the sub-group is evaluated.
-//            final Set<IVariable<?>> incomingBound = ctx.sa.getDefinitelyIncomingBindings(
-//                    (GraphPatternGroup<?>) subgroup,
-//                    new LinkedHashSet<IVariable<?>>());
-
-//            @SuppressWarnings("rawtypes")
-//            final IVariable[] joinVars = incomingBound.toArray(new IVariable[0]);
+            @SuppressWarnings("rawtypes")
             final IVariable[] joinVars = subgroup.getJoinVars();
             if (joinVars == null) {
                 /*
@@ -2843,6 +2830,62 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         anns.add(new NV(IPredicate.Annotations.BOP_ID, ctx.idFactory
                 .incrementAndGet()));
 
+        // Propagate the estimated cardinality to the Predicate.
+        anns.add(new NV(Annotations.ESTIMATED_CARDINALITY,
+                sp.getRequiredProperty(Annotations.ESTIMATED_CARDINALITY)));
+
+        // Propagate the index which would be used if we do not run the
+        // predicate "as-bound".
+        anns.add(new NV(Annotations.ORIGINAL_INDEX,
+                sp.getRequiredProperty(Annotations.ORIGINAL_INDEX)));
+
+        if (sp.isOptional()) {
+            // Mark the join as optional.
+            anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
+        }
+
+        if (sp.getProperty(Annotations.HASH_JOIN, Annotations.DEFAULT_HASH_JOIN)) {
+
+            /*
+             * Use a hash join for this predicate.
+             * 
+             * Note: In order to run the predicate using a hash join we need to
+             * figure out what the JOIN_VARS[] will be for the predicate. The
+             * join variables must be (a) bound by the predicate when we run the
+             * access path; and (b) known incoming bound for the predicate when
+             * we run that join in the current evaluation order.
+             */
+
+            // Start with everything known bound on entry.
+            final Set<IVariable<?>> joinVars = ctx.sa
+                    .getDefinitelyIncomingBindings(sp,
+                            new LinkedHashSet<IVariable<?>>());
+
+            // Find all variables which this predicate will bind.
+            final Set<IVariable<?>> predVars = ctx.sa
+                    .getDefinitelyProducedBindings(sp,
+                            new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+            
+            // Retain only those variables which this predicate will bind.
+            joinVars.retainAll(predVars);
+            
+            if (!joinVars.isEmpty()) {
+
+                /*
+                 * A hash join can only be used when there is at least one
+                 * variable which is known to be bound and which will also be
+                 * bound by the predicate.
+                 */
+
+                anns.add(new NV(Annotations.HASH_JOIN, true));
+
+                anns.add(new NV(HashJoinAnnotations.JOIN_VARS, joinVars
+                        .toArray(new IVariable[joinVars.size()])));
+
+            }
+            
+        }
+        
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
