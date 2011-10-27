@@ -55,7 +55,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
- * Test suite for {@link HashIndexOp}.
+ * Test suite for {@link HTreeHashIndexOp}.
  * 
  * TODO Test variant with non-empty join vars.
  * 
@@ -64,18 +64,18 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHashIndexOp extends TestCase2 {
+public class TestHTreeHashIndexOp extends TestCase2 {
 
     /**
      * 
      */
-    public TestHashIndexOp() {
+    public TestHTreeHashIndexOp() {
     }
 
     /**
      * @param name
      */
-    public TestHashIndexOp(String name) {
+    public TestHTreeHashIndexOp(String name) {
         super(name);
     }
 
@@ -178,30 +178,30 @@ public class TestHashIndexOp extends TestCase2 {
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                 queryId, solutionSetName, joinVars);
 
-        new HashIndexOp(BOp.NOARGS,//
+        new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HashIndexOp.Annotations.SELECT, selected),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Must run on the query controller.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
 //                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                            BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -210,16 +210,16 @@ public class TestHashIndexOp extends TestCase2 {
 
         // Parallel evaluation is not permitted since operator writes on HTree.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
 //                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -229,16 +229,16 @@ public class TestHashIndexOp extends TestCase2 {
         // Last pass evaluation must be requested since operator defers outputs
         // until all inputs have been consumed.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -246,30 +246,30 @@ public class TestHashIndexOp extends TestCase2 {
         }
 
         // OPTIONAL semantics are supported.
-        new HashIndexOp(BOp.NOARGS,//
+        new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, true),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HashIndexOp.Annotations.SELECT, selected),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Join vars must be specified.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
 //                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalStateException ex) {
             if(log.isInfoEnabled())
@@ -277,42 +277,42 @@ public class TestHashIndexOp extends TestCase2 {
         }
 
         // Join vars may be an empty [].
-        new HashIndexOp(BOp.NOARGS,//
+        new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
-                new NV(HashIndexOp.Annotations.SELECT, selected),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
         
         // The selected variables annotation is optional.
-        new HashIndexOp(BOp.NOARGS,//
+        new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
-                new NV(HashIndexOp.Annotations.SELECT, null),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, null),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
         
         // The solution set name must be specified.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HashIndexOp.Annotations.SELECT, selected)//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected)//
 //                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalStateException ex) {
@@ -323,9 +323,9 @@ public class TestHashIndexOp extends TestCase2 {
     }
 
     /**
-     * A simple test of a {@link HashIndexOp} followed by a
-     * {@link SolutionSetHashJoinOp}. In practice we should never follow the
-     * {@link HashIndexOp} immediately with a {@link SolutionSetHashJoinOp} as
+     * A simple test of a {@link HTreeHashIndexOp} followed by a
+     * {@link HTreeSolutionSetHashJoinOp}. In practice we should never follow the
+     * {@link HTreeHashIndexOp} immediately with a {@link HTreeSolutionSetHashJoinOp} as
      * this is basically a complex NOP. However, this does provide a simple test
      * of the most basic mechanisms for those two operators.
      */
@@ -344,30 +344,30 @@ public class TestHashIndexOp extends TestCase2 {
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                 queryId, solutionSetName, joinVars);
 
-        final HashIndexOp op = new HashIndexOp(BOp.NOARGS,//
+        final HTreeHashIndexOp op = new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, false),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
-        final SolutionSetHashJoinOp op2 = new SolutionSetHashJoinOp(
+        final HTreeSolutionSetHashJoinOp op2 = new HTreeSolutionSetHashJoinOp(
                 new BOp[] { op },//
                 new NV(BOp.Annotations.BOP_ID, 2),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
-                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         final PipelineOp query = op2;
@@ -419,8 +419,8 @@ public class TestHashIndexOp extends TestCase2 {
      * <p>
      * Note: Since there are no intervening joins or filters, this produces the
      * same output as the unit test above. However, in this case the joinSet
-     * will have been created by the {@link HashIndexOp} and utilized by the
-     * {@link SolutionSetHashJoinOp}.
+     * will have been created by the {@link HTreeHashIndexOp} and utilized by the
+     * {@link HTreeSolutionSetHashJoinOp}.
      */
     public void test_hashIndexOp_02() throws Exception {
 
@@ -437,30 +437,30 @@ public class TestHashIndexOp extends TestCase2 {
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                 queryId, solutionSetName, joinVars);
 
-        final HashIndexOp op = new HashIndexOp(BOp.NOARGS,//
+        final HTreeHashIndexOp op = new HTreeHashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HashIndexOp.Annotations.OPTIONAL, true),//
-                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
-        final SolutionSetHashJoinOp op2 = new SolutionSetHashJoinOp(
+        final HTreeSolutionSetHashJoinOp op2 = new HTreeSolutionSetHashJoinOp(
                 new BOp[] { op },//
                 new NV(BOp.Annotations.BOP_ID, 2),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
-                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         final PipelineOp query = op2;

@@ -20,6 +20,6 @@ WHERE {
   ?x rdf:type foaf:Person .
 
   # query hint binds for the immediately proceeeding basic graph pattern.
-  hint:BGP hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 100 .
+  hint:BGP hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1000 .
 
 }

@@ -63,16 +63,16 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.rwstore.sector.MemStore;
 
 /**
- * A hash join based on the {@link HTree} and suitable for very large
- * intermediate result sets. Intermediate results are buffered on the
- * {@link HTree} on each evaluation pass. When the memory demand of the
- * {@link HTree} is not bounded, the hash join will run a single pass over the
- * {@link IAccessPath} for the target {@link IPredicate}. For some queries, this
- * can be more efficient than probing as-bound instances of the target
- * {@link IPredicate} using a nested indexed join, such as {@link PipelineOp}.
- * This can also be more efficient on a cluster where the key range scan of the
- * target {@link IPredicate} will be performed using predominately sequential
- * IO.
+ * A hash join against an {@link IAccessPath} based on the {@link HTree} and
+ * suitable for very large intermediate result sets. Source solutions are
+ * buffered on the {@link HTree} on each evaluation pass. When the memory demand
+ * of the {@link HTree} is not bounded, the hash join will run a single pass
+ * over the {@link IAccessPath} for the target {@link IPredicate}. For some
+ * queries, this can be more efficient than probing as-bound instances of the
+ * target {@link IPredicate} using a nested indexed join, such as
+ * {@link PipelineOp}. This can also be more efficient on a cluster where the
+ * key range scan of the target {@link IPredicate} will be performed using
+ * predominately sequential IO.
  * <p>
  * If the {@link PipelineOp.Annotations#MAX_MEMORY} annotation is specified then
  * an evaluation pass over the target {@link IAccessPath} will be triggered if,
@@ -113,6 +113,8 @@ import com.bigdata.rwstore.sector.MemStore;
  * join. Therefore {@link PipelineOp.Annotations#MAX_MEMORY} must be set to
  * {@link Long#MAX_VALUE} when the {@link IPredicate} is
  * {@link IPredicate.Annotations#OPTIONAL}.
+ * 
+ * @see HTreeHashJoinUtility
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -524,7 +526,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          */
         private void acceptSolutions() {
 
-            HashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+            HTreeHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
                     stats, rightSolutions, optional);
 
         }
@@ -554,7 +556,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            HashJoinUtility.hashJoin(
+            HTreeHashJoinUtility.hashJoin(
                     ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
                     unsyncBuffer, joinVars, selectVars, constraints,
                     rightSolutions, joinSet, optional, false/*leftIsPipeline*/);
@@ -566,7 +568,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                HashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
+                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
                         joinSet);
 
                 unsyncBuffer2.flush();

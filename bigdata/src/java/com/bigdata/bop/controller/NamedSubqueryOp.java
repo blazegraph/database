@@ -50,8 +50,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.HashJoinUtility;
-import com.bigdata.bop.join.SolutionSetHashJoinOp;
+import com.bigdata.bop.join.HTreeHashJoinUtility;
+import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
@@ -77,7 +77,7 @@ import com.bigdata.rwstore.sector.MemStore;
  * synchronization for the "run-once" contract of the subquery. The operator
  * MUST be run on the query controller.
  * 
- * @see SolutionSetHashJoinOp
+ * @see HTreeSolutionSetHashJoinOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -510,7 +510,7 @@ public class NamedSubqueryOp extends PipelineOp {
 						subquerySolutionItr = runningSubquery.iterator();
 
 						// Buffer the solutions on the hash index.
-                        final long ncopied = HashJoinUtility.acceptSolutions(
+                        final long ncopied = HTreeHashJoinUtility.acceptSolutions(
                                 subquerySolutionItr, joinVars, stats,
                                 solutions, false/* optional */);
 

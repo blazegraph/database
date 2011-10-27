@@ -68,8 +68,8 @@ import com.bigdata.rwstore.sector.MemStore;
  * solutions are output on the default sink. The set of variables to be copied
  * to the sink may be restricted by an annotation.
  * <p>
- * There are two basic use cases for the {@link HashIndexOp}, both of which rely
- * on a {@link SolutionSetHashJoinOp} to re-integrate the results buffered on
+ * There are two basic use cases for the {@link HTreeHashIndexOp}, both of which rely
+ * on a {@link HTreeSolutionSetHashJoinOp} to re-integrate the results buffered on
  * the {@link HTree}.
  * <p>
  * The first use case is when we will run an OPTIONAL group. In this case, an
@@ -87,11 +87,11 @@ import com.bigdata.rwstore.sector.MemStore;
  * This operator is NOT thread-safe. It relies on the query engine to provide
  * synchronization. The operator MUST be run on the query controller.
  * 
- * @see SolutionSetHashJoinOp
+ * @see HTreeSolutionSetHashJoinOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HashIndexOp extends PipelineOp {
+public class HTreeHashIndexOp extends PipelineOp {
 
 //    static private final transient Logger log = Logger
 //            .getLogger(HashIndexOp.class);
@@ -137,7 +137,7 @@ public class HashIndexOp extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public HashIndexOp(final HashIndexOp op) {
+    public HTreeHashIndexOp(final HTreeHashIndexOp op) {
         super(op);
     }
     
@@ -147,7 +147,7 @@ public class HashIndexOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public HashIndexOp(final BOp[] args,
+    public HTreeHashIndexOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -195,7 +195,7 @@ public class HashIndexOp extends PipelineOp {
 
     }
 
-    public HashIndexOp(final BOp[] args, NV... annotations) {
+    public HTreeHashIndexOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -296,7 +296,7 @@ public class HashIndexOp extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
 
-        private final HashIndexOp op;
+        private final HTreeHashIndexOp op;
         
         private final NamedSolutionSetStats stats;
         
@@ -339,7 +339,7 @@ public class HashIndexOp extends PipelineOp {
          */
         private final HTree solutions;
         
-        public ControllerTask(final HashIndexOp op,
+        public ControllerTask(final HTreeHashIndexOp op,
                 final BOpContext<IBindingSet> context) {
 
             if (op == null)
@@ -528,7 +528,7 @@ public class HashIndexOp extends PipelineOp {
          */
         private void acceptSolutions() {
 
-            HashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+            HTreeHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
                     stats, solutions, optional);
 
         }

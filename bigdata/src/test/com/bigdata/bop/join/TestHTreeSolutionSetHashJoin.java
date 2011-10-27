@@ -36,19 +36,19 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import junit.framework.TestCase2;
 
 /**
- * Test suite for {@link SolutionSetHashJoinOp}.
+ * Test suite for {@link HTreeSolutionSetHashJoinOp}.
  * 
- * @see TestHashIndexOp
+ * @see TestHTreeHashIndexOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSolutionSetHashJoin extends TestCase2 {
+public class TestHTreeSolutionSetHashJoin extends TestCase2 {
 
-    public TestSolutionSetHashJoin() {
+    public TestHTreeSolutionSetHashJoin() {
     }
 
-    public TestSolutionSetHashJoin(String name) {
+    public TestHTreeSolutionSetHashJoin(String name) {
         super(name);
     }
 
@@ -78,59 +78,59 @@ public class TestSolutionSetHashJoin extends TestCase2 {
         // optional is optional, but requires lastPass.
         
         // Normal join w/o lastPass and release allows maxParallel GT 1.
-        new SolutionSetHashJoinOp(BOp.NOARGS,//
+        new HTreeSolutionSetHashJoinOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 5),//
                 new NV(PipelineOp.Annotations.LAST_PASS, false),//
-                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, false),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
 //                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Normal join w/ lastPass and release; requires maxParallel EQ 1.
-        new SolutionSetHashJoinOp(BOp.NOARGS,//
+        new HTreeSolutionSetHashJoinOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.RELEASE, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
 //                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Optional join; requires maxParallel EQ 1, lastPass.
-        new SolutionSetHashJoinOp(BOp.NOARGS,//
+        new HTreeSolutionSetHashJoinOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, true),//
-                new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Must run on the query controller.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 5),//
                     new NV(PipelineOp.Annotations.LAST_PASS, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE, false),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
 //                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -139,17 +139,17 @@ public class TestSolutionSetHashJoin extends TestCase2 {
         
         // Last pass requires maxParallel := 1.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 5),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE, false),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
 //                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -158,17 +158,17 @@ public class TestSolutionSetHashJoin extends TestCase2 {
         
         // Optional requires lastPass, maxParallel=1.
         try {
-            new HashIndexOp(BOp.NOARGS,//
+            new HTreeHashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.RELEASE, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(SolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(SolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())

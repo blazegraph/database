@@ -60,22 +60,23 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("join operators");
 
-        // @todo test each kind of join operator against a standalone db.
+        // Test suite for pipeline join.
         suite.addTestSuite(TestPipelineJoin.class);
 
         // Test suite for the guts of the JVM hash join logic.
         suite.addTestSuite(TestJVMHashJoinUtility.class);
 
         // Test suite for the guts of the HTree hash join logic.
-        suite.addTestSuite(TestHashJoinUtility.class);
+        suite.addTestSuite(TestHTreeHashJoinUtility.class);
         
         // Test suite for a hash join with an access path.
-        suite.addTestSuite(TestHTreeHashJoin.class);
+        suite.addTestSuite(TestJVMHashJoinOp.class); // JVM
+        suite.addTestSuite(TestHTreeHashJoinOp.class); // HTree
         
         // Test suite for building a hash index from solutions and joining that
         // hash index back into the pipeline.
-        suite.addTestSuite(TestHashIndexOp.class);
-        suite.addTestSuite(TestSolutionSetHashJoin.class);
+        suite.addTestSuite(TestHTreeHashIndexOp.class);
+        suite.addTestSuite(TestHTreeSolutionSetHashJoin.class);
         
         return suite;
         
