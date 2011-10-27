@@ -1455,14 +1455,15 @@ public class AST2BOpBase {
                 .size()]));
 
         // Look up the predicate for the access path.
-        final IPredicate<?> pred = (IPredicate<?>)map.get(AccessPathJoinAnnotations.PREDICATE);
+        final IPredicate<?> pred = (IPredicate<?>) map
+                .get(AccessPathJoinAnnotations.PREDICATE);
 
         // MAX_LONG unless we are doing cutoff join evaluation.
         final long limit = pred.getProperty(JoinAnnotations.LIMIT,
                 JoinAnnotations.DEFAULT_LIMIT);
 
         // True iff a hash join was requested for this predicate.
-        final boolean hashJoin = limit != Long.MAX_VALUE
+        final boolean hashJoin = limit == JoinAnnotations.DEFAULT_LIMIT
                 && pred.getProperty(Annotations.HASH_JOIN,
                         Annotations.DEFAULT_HASH_JOIN);
         
@@ -1493,6 +1494,27 @@ public class AST2BOpBase {
 
             map.put(HashJoinAnnotations.JOIN_VARS, joinVars);
             
+            /*
+             * Choose the evaluation context.
+             * 
+             * Note: On a cluster this MUST be consistent with the decision made
+             * for handling named and default graphs, except that we are free to
+             * choose either SHARDED or HASHED for a hash join. Also, while the
+             * pipeline join can use ANY on a cluster, the hash joins MUST run
+             * on the controller or be either sharded or hash partitioned.
+             */
+            BOpEvaluationContext evaluationContext = (BOpEvaluationContext) map
+                    .get(BOp.Annotations.EVALUATION_CONTEXT);
+
+            if (evaluationContext == null) {
+                // TODO Should be SHARDED or HASHED on a cluster.
+                evaluationContext = BOpEvaluationContext.CONTROLLER;
+            } else if(evaluationContext == BOpEvaluationContext.ANY) {
+                // ANY is not permitted for a hash join.
+                evaluationContext = BOpEvaluationContext.CONTROLLER;
+            }
+            map.put(BOp.Annotations.EVALUATION_CONTEXT, evaluationContext);
+
             if (useHTree) {
 
                 map.put(PipelineOp.Annotations.MAX_MEMORY, Long.MAX_VALUE);
