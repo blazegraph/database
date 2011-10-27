@@ -99,13 +99,15 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * {@link BOpEvaluationContext#SHARDED} or {@link BOpEvaluationContext#HASHED}
  * operator and the {@link IPredicate} is annotated for local access paths. If
  * you need to use remote access paths, then the {@link PipelineJoin} should be
- * annotated as a {@link BOpEvaluationContext#ANY} operator.
+ * annotated as a {@link BOpEvaluationContext#ANY} operator since it will be
+ * issuing a remote read from each node on which it has source solutions to be
+ * joined.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Break the star join logic out into its own join operator and test
- *       suite (or just discard it).
+ * @todo Break the star join logic out into its own join operator and test suite
+ *       (or just discard it).
  */
 public class PipelineJoin<E> extends PipelineOp implements
 		IShardwisePipelineOp<E> {

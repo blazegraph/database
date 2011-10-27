@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
@@ -145,8 +144,13 @@ public class JVMHashIndexOp extends PipelineOp {
 
         super(args, annotations);
 
-        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
-            throw new IllegalArgumentException(
+        switch (getEvaluationContext()) {
+        case CONTROLLER:
+        case SHARDED:
+        case HASHED:
+            break;
+        default:
+            throw new UnsupportedOperationException(
                     BOp.Annotations.EVALUATION_CONTEXT + "="
                             + getEvaluationContext());
         }
