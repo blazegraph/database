@@ -13,9 +13,11 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -24,20 +26,21 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 /**
  * An in-memory merge sort for binding sets. The operator is pipelined. Each
  * time it runs, it evaluates the value expressions on which the ordering will
- * be imposed, binding the results on the incoming solution and buffers the
+ * be imposed, binding the results on the incoming solutions and buffers the
  * as-bound solution for eventual sorting. The sort is applied only once the
- * last chunk of source solutions has been observed. Computing the value
- * expressions first is not only an efficiency, but is also required in order to
- * detect type errors. When a type error is detected for a value expression the
- * corresponding input solution is dropped. Since the computed value expressions
- * must become bound on the solutions to be sorted, the caller is responsible
- * for wrapping any value expression more complex than a variable or a constant
- * with an {@link IBind} onto an anonymous variable. All such variables will be
- * dropped when the solutions are written out. Since this operator must be able
- * to compare all {@link IV}s in all {@link IBindingSet}s, it depends on the
- * materialization of non-inline {@link IV}s and the ability of the value
- * comparator to handle comparisons between materialized non-inline {@link IV}s
- * and inline {@link IV}s.
+ * last chunk of source solutions has been observed.
+ * <p>
+ * Computing the value expressions first is not only an efficiency, but is also
+ * required in order to detect type errors. When a type error is detected for a
+ * value expression the corresponding input solution is dropped. Since the
+ * computed value expressions must become bound on the solutions to be sorted,
+ * the caller is responsible for wrapping any value expression more complex than
+ * a variable or a constant with an {@link IBind} onto an anonymous variable.
+ * All such variables will be dropped when the solutions are written out. Since
+ * this operator must be able to compare all {@link IV}s in all
+ * {@link IBindingSet}s, it depends on the materialization of non-inline
+ * {@link IV}s and the ability of the value comparator to handle comparisons
+ * between materialized non-inline {@link IV}s and inline {@link IV}s.
  * 
  * TODO External memory ORDER BY operator.
  * <p>
@@ -53,7 +56,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * sort is executed. This could scale better than a pure JVM heap version, but
  * only to the extent that the keys are smaller than the total solutions. The
  * solutions would probably be written as serialized binding sets on the memory
- * manager such that each solution has its own int32 address.  That address can
+ * manager such that each solution has its own int32 address. That address can
  * then be paired with the as-bound key to be sorted on the JVM heap.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -93,12 +96,6 @@ public class MemorySortOp extends SortOp {
 							+ getEvaluationContext());
 		}
 
-        // shared state is used to share the hash table.
-        if (!isSharedState()) {
-            throw new UnsupportedOperationException(Annotations.SHARED_STATE
-                    + "=" + isSharedState());
-        }
-        
         if (!isLastPassRequested()) {
             throw new UnsupportedOperationException(Annotations.LAST_PASS
                     + "=" + isLastPassRequested());
@@ -124,42 +121,11 @@ public class MemorySortOp extends SortOp {
         }
         
 	}
-
-    @Override
-    public BOpStats newStats() {
-
-        return new MyStats();
-
-    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new SortTask(this, context));
         
-    }
-
-    private static class MyStats extends BOpStats {
-
-        private static final long serialVersionUID = 1L;
-        
-        private volatile transient LinkedList<IBindingSet> solutions;
-        
-        MyStats() {
-
-            this.solutions = new LinkedList<IBindingSet>();
-            
-        }
-        
-        // TODO Refactor the hash table onto IQueryAttributes and move this method.
-        void release() {
-
-            if (log.isInfoEnabled())
-                log.info("Releasing state");
-
-            solutions = null;
-            
-        }
-
     }
 
     /**
@@ -171,10 +137,29 @@ public class MemorySortOp extends SortOp {
         
         private final BOpContext<IBindingSet> context;
 
-        private final MyStats stats;
+        private final BOpStats stats;
 
         private final ISortOrder<?>[] sortOrder;
 
+        /**
+         * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
+         * we will hang the named solution set.
+         */
+        private final IQueryAttributes attrs;
+        
+        /**
+         * The solutions. A reference to this object is stored on the
+         * {@link IQueryAttributes}.
+         */
+        private transient LinkedList<IBindingSet> solutions;
+        
+        /**
+         * The name of the key under which the {@link #solutions} are stored in
+         * the {@link IQueryAttributes}.
+         */
+        private final String key;
+        
+        @SuppressWarnings("unchecked")
         SortTask(final MemorySortOp op,
                 final BOpContext<IBindingSet> context) {
         	
@@ -182,9 +167,35 @@ public class MemorySortOp extends SortOp {
             
             this.context = context;
             
-            this.stats = (MyStats) context.getStats();
+            this.stats = context.getStats();
 
             this.sortOrder = op.getSortOrder();
+        
+            this.attrs = context.getQueryAttributes();
+            
+            this.key = Integer.toString(op.getId());
+                    
+            solutions = (LinkedList<IBindingSet>) attrs.get(key);
+
+            if(solutions == null) {
+
+                solutions = new LinkedList<IBindingSet>();
+                
+                if (attrs.putIfAbsent(key, solutions) != null)
+                    throw new AssertionError();
+                
+            }
+            
+        }
+
+        void release() {
+
+            if (log.isInfoEnabled())
+                log.info("Releasing state");
+
+            attrs.remove(key);
+            
+            solutions = null;
             
         }
 
@@ -218,7 +229,7 @@ public class MemorySortOp extends SortOp {
                 if (lastInvocation) {
 
                     // Discard the operator's internal state.
-                    stats.release();
+                    release();
 
                 }
 
@@ -276,7 +287,7 @@ public class MemorySortOp extends SortOp {
                         }
 
                         // add to the set of solutions to be sorted.
-                        stats.solutions.add(bset);
+                        solutions.add(bset);
 
                     } // next source solution
 
@@ -293,8 +304,9 @@ public class MemorySortOp extends SortOp {
                 }
 
                 if (log.isInfoEnabled())
-                    log.info("Buffered " + stats.solutions + " so far");
-                
+                    log.info("Buffered " + solutions.size()
+                            + " solutions so far");
+
             } finally {
         
                 itr.close();
@@ -314,8 +326,7 @@ public class MemorySortOp extends SortOp {
             if (log.isInfoEnabled())
                 log.info("Sorting.");
 
-            final IBindingSet[] all = stats.solutions
-                    .toArray(new IBindingSet[0]);
+            final IBindingSet[] all = solutions.toArray(new IBindingSet[0]);
 
             @SuppressWarnings({ "rawtypes", "unchecked" })
             final Comparator<IBindingSet> c = new BindingSetComparator(

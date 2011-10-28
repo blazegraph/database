@@ -2737,8 +2737,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                                         BOpEvaluationContext.CONTROLLER),//
                                 new NV(MemorySortOp.Annotations.PIPELINED, true),//
                                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-                                new NV(MemorySortOp.Annotations.SHARED_STATE,
-                                        true),//
+//                                new NV(MemorySortOp.Annotations.SHARED_STATE,
+//                                        true),//
                                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
                         })), ctx.queryHints);
 
