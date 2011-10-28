@@ -45,10 +45,10 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
+import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
-import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
@@ -117,8 +117,6 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.ElementFilter;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.Rule;
 
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.IFilter;
@@ -311,8 +309,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             } else {
 
-                left = addProjectedAssigments(left,
-                        projection.getAssignmentProjections(), ctx);
+//                left = addProjectedAssigments(left,
+//                        projection.getAssignmentProjections(), ctx);
+                left = addAssignments(left,
+                        projection.getAssignmentProjections(), ctx, true/* projection */);
 
             }
 
@@ -780,15 +780,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             );
         }
         
-//        left = new NamedSubqueryIncludeOp(leftOrEmpty(left), //
-//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.CONTROLLER),//
-//                new NV(NamedSubqueryIncludeOp.Annotations.NAMED_SET_REF,
-//                        namedSolutionSetRef),//
-//                new NV(NamedSubqueryIncludeOp.Annotations.JOIN_VARS, joinVars)//
-//        );
-
         return left;
 
     }
@@ -886,20 +877,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                  */
                 final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-//                // Find the set of variables which will be definitely bound by the
-//                // time the sub-select is evaluated.
-//                final Set<IVariable<?>> incomingBound = ctx.sa
-//                        .getIncomingBindings(subqueryRoot,
-//                                new LinkedHashSet<IVariable<?>>());
-//                
-//                /*
-//                 * The join variables are those which are known bound on entry
-//                 * to the subquery and which are also projected by the subquery.
-//                 */
-//                final Set<IVariable<?>> joinVarSet = new LinkedHashSet<IVariable<?>>();
-//                joinVarSet.addAll(incomingBound);
-//                joinVarSet.retainAll(Arrays.asList(vars));
-                final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(subqueryRoot, new LinkedHashSet<IVariable<?>>());
+                final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
+                        subqueryRoot, new LinkedHashSet<IVariable<?>>());
 
                 @SuppressWarnings("rawtypes")
                 final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
@@ -992,6 +971,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             } else {
 
+                /*
+                 * This does "as-bound" subqueries with one solution in per
+                 * subquery.  It is very inefficient.
+                 */
+                
                 final boolean aggregate = isAggregate(subqueryRoot);
 
                 final PipelineOp subqueryPlan = convert(null/* left */,
@@ -1147,23 +1131,18 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     /**
      * Generate the query plan for a union.
+     * <p>
+     * Note: A UNION operation is converted into a plan using the {@link Tee}
+     * operator. This allows us to run the sub-plans "inlined" within the main
+     * pipeline. This pattern is significantly faster than old evaluation
+     * pattern which issued one sub-query per child of the UNION per source
+     * solution.
      * 
+     * @param left
      * @param unionNode
      * @param ctx
      * @return
-     * 
-     *         TODO Could recognize
-     * 
-     *         <pre>
-     * optional {
-     *   { a } union { b }
-     * }     *
-     * </pre>
-     * 
-     *         as an optional union, but we are not handling the optional
-     *         property for a union right now.
      */
-    @SuppressWarnings("unused")
     private static PipelineOp convertUnion(PipelineOp left,
             final UnionNode unionNode, final AST2BOpContext ctx) {
 
@@ -1193,17 +1172,17 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         final int downstreamId = ctx.nextId();
 
-            	/*
+        /*
          * Pre-generate the ids for the Tee operators.
-            	 */
+         */
         final int[] subqueryIds = new int[arity];
-            	
+
         for (int i = 0; i < arity; i++) {
-            		
-        	subqueryIds[i] = ctx.nextId();
-            		
-            	}
-            	
+
+            subqueryIds[i] = ctx.nextId();
+
+        }
+
         /*
          * Should kinda look like this:
          * 
@@ -1224,12 +1203,13 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * We need one less Tee than we have subqueries.
          */
-        for (int j = 0; j < (arity-1); j++) {
+        for (int j = 0; j < (arity - 1); j++) {
         	
             final LinkedList<NV> anns = new LinkedList<NV>();
+
             anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
             
-            if (j < (arity-2)) {
+            if (j < (arity - 2)) {
             
             	/* 
             	 * Not the last one - send the Tee to the next Tee and the next 
@@ -1256,17 +1236,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         	
         }
         
-//        final PipelineOp[] subqueries = new PipelineOp[arity];
-
         int i = 0;
         for (IGroupMemberNode child : unionNode) {
         			
             // convert the child
             if (child instanceof JoinGroupNode) {
         
-        /*
-                 * Need to make sure the first operator in the group has the right Id.
-         */
+                /*
+                 * Need to make sure the first operator in the group has the
+                 * right Id.
+                 */
         		left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
         				new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
         				}));
@@ -1274,14 +1253,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 final PipelineOp subquery = convertJoinGroup(left,
                         (JoinGroupNode) child, ctx, false/* needsEndOp */);
             	
-        	/*
-            	 * Route all "subqueries" to the same place. This works because 
-                 * the subqueries array is passed in as references to the topmost
-                 * (last) operator in the subquery pipeline, and this is the one 
-                 * whose SINK_REF we need to change.
-        	 */
-            	left = (PipelineOp) subquery
-            		.setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
+                /*
+                 * Route all "subqueries" to the same place. This works because
+                 * the subqueries array is passed in as references to the
+                 * topmost (last) operator in the subquery pipeline, and this is
+                 * the one whose SINK_REF we need to change.
+                 */
+                left = (PipelineOp) subquery.setProperty(
+                        PipelineOp.Annotations.SINK_REF, downstreamId);
                 
             } else {
 
@@ -1304,149 +1283,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 		 
         return left;
         
-//        return unionUsingTee(left, subqueries, ctx);
-
-//        // The bopId for the UNION or STEP.
-//        final int thisId = ctx.nextId();
-//
-//        final LinkedList<NV> anns = new LinkedList<NV>();
-//        anns.add(new NV(BOp.Annotations.BOP_ID, thisId));
-//        anns.add(new NV(Union.Annotations.SUBQUERIES, subqueries));
-//
-//        // if (union.getParent() == null) {
-//        anns.add(new NV(Union.Annotations.EVALUATION_CONTEXT,
-//                BOpEvaluationContext.CONTROLLER));
-//        anns.add(new NV(Union.Annotations.CONTROLLER, true));
-//        // }
-//
-//        final PipelineOp union = applyQueryHints(new Union(leftOrEmpty(left),
-//                NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-//
-//        return union;
-
-            }
-
-//    /**
-//     * Create a pipeline that simulates a union by subquery by using a series
-//     * of Tee operators and some creative routing of the SINK and ALT_SINK.
-//     * 
-//     * @param left
-//     * @param subqueries
-//     * 			The mini-pipelines to union together. These MUST be references
-//     * 			to the top-most (last) operator in the subquery.
-//     * @param ctx
-//     * @return
-//     */
-//    private static PipelineOp unionUsingTee(PipelineOp left,
-//            final PipelineOp[] subqueries, final AST2BOpContext ctx) {
-//        
-//        final int arity = subqueries.length;
-//        
-//        /*
-//         * We are going to route all the subqueries here when they're done,
-//         * by replacing the SINK_REF on the topmost operator in the subquery.
-//         */
-//        final int downstreamId = ctx.nextId();
-//
-//        /*
-//         * Pre-generate the ids for the Tee operators.
-//         */
-//        final int[] subqueryIds = new int[arity];
-//                
-//        for (int i = 0; i < arity; i++) {
-//                    
-//            subqueryIds[i] = ctx.nextId();
-//                    
-//        }
-//                
-//        /*
-//         * Should kinda look like this:
-//         * 
-//         *       copy := CopyOp( lastBOp4 )[bopId=5]
-//         *       subquery4 := firstBOp4( lastBOp3 )[bopId=41]->...->lastBOp4(...)[sinkRef=5]
-//         *       subquery3 := firstBOp3( lastBOp2 )[bopId=31]->...->lastBOp3(...)[sinkRef=5]
-//         *       subquery2 := firstBOp2( lastBOp1 )[bopId=21]->...->lastBOp2(...)[sinkRef=5]
-//         *       subquery1 := firstBOp1( tee3 )[bopId=11]->...->lastBOp1(...)[sinkRef=5]
-//         *       tee3   := TEE( tee2 )[bopId=03;sinkRef=31;altSinkRef=41]
-//         *       tee2   := TEE( tee1 )[bopId=02;sinkRef=03;altSinkRef=21]
-//         *       tee1   := TEE( left )[bopId=01;sinkRef=02;altSinkRef=11]
-//         *       left
-//         */
-//
-//        int thisTeeId = ctx.nextId();
-//        int nextTeeId = ctx.nextId();
-//        
-//        /*
-//         * We need one less Tee than we have subqueries.
-//         */
-//        for (int j = 0; j < (arity-1); j++) {
-//            
-//            final LinkedList<NV> anns = new LinkedList<NV>();
-//            anns.add(new NV(BOp.Annotations.BOP_ID, thisTeeId));
-//            
-//            if (j < (arity-2)) {
-//            
-//                /* 
-//                 * Not the last one - send the Tee to the next Tee and the next 
-//                 * subquery.
-//                 */
-//                anns.add(new NV(PipelineOp.Annotations.SINK_REF, nextTeeId));
-//                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j]));
-//                
-//                thisTeeId = nextTeeId;
-//                nextTeeId = ctx.nextId();
-//                
-//            } else {
-//                
-//                /*
-//                 * Last one - send the Tee to the last two subqueries.
-//                 */
-//                anns.add(new NV(PipelineOp.Annotations.SINK_REF, subqueryIds[j]));
-//                anns.add(new NV(PipelineOp.Annotations.ALT_SINK_REF, subqueryIds[j+1]));
-//                
-//            }
-//            
-//            left = applyQueryHints(new Tee(leftOrEmpty(left),
-//                    NV.asMap(anns.toArray(new NV[anns.size()]))), ctx.queryHints);
-//            
-//        }
-//        
-//        /*
-//         * Add the subqueries themselves to the pipeline.
-//         */
-//        for (int i = 0; i < arity; i++) {
-//        
-//            /*
-//             * Need to make sure the first operator in the group has the right Id.
-//             */
-//            left = new CopyOp(leftOrEmpty(left), NV.asMap(new NV[] {//
-//                    new NV(Predicate.Annotations.BOP_ID, subqueryIds[i++]),//
-//                    }));
-//            
-//            /*
-//             * Route all "subqueries" to the same place. This works because 
-//             * the subqueries array is passed in as references to the topmost
-//             * (last) operator in the subquery pipeline, and this is the one 
-//             * whose SINK_REF we need to change.
-//             */
-//            left = (PipelineOp) subqueries[i]
-//                .setProperty(PipelineOp.Annotations.SINK_REF, downstreamId);
-//                
-//        }
-//        
-//        /*
-//         * All the subqueries get routed here when they are done.
-//         */
-//         left = applyQueryHints(new CopyOp(leftOrEmpty(left), 
-//                 NV.asMap(new NV[] {//
-//                  new NV(Predicate.Annotations.BOP_ID, downstreamId),//
-//                  new NV(BOp.Annotations.EVALUATION_CONTEXT, 
-//                              BOpEvaluationContext.CONTROLLER)//
-//                  })), ctx.queryHints);
-//
-//        return left;
-//
-        // }
+    }
 
     /**
      * Join group consists of: statement patterns, constraints, and sub-groups
@@ -1492,8 +1329,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * 5. Pipeline the postConditionals. Add materialization steps as needed.
      * </pre>
-     * 
-     * TODO Think about how hash joins fit into this.
      */
     private static PipelineOp convertJoinGroup(PipelineOp left,
             final JoinGroupNode joinGroup, final AST2BOpContext ctx, 
@@ -1671,6 +1506,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * Add the subqueries (individual optional statement patterns, optional
          * join groups, and nested union).
          */
+        // FIXME just do: left = addSubgroup(left, subgroup, ctx);
         left = addSubqueries(left, joinGroup, ctx);
 
         /*
@@ -1743,34 +1579,23 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     }
 
     /**
-     * Project select expressions (non-aggregation case).
+     * Add an assignment to the query plan.
      * 
-     * FIXME https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
-     * variable bindings during query evaluation). This is basically the last
-     * place where we can prune out variables which are not being projected. We
-     * need to do that here, but also incrementally.
-     * <p>
-     * Note: Sesame allows externally given bindings to flow through the query
-     * even if they are projected by the query. This means that the "projection"
-     * can not remove all bindings except those which are projected. Either we
-     * need to also not prune exogenous bindings or we need to strip out
-     * bindings introduced by anonymous variables which are part of query
-     * rewrites. The former seems easier.
+     * @param left
+     * @param assignments
+     * @param ctx
+     * @param projection
+     * @return
      */
-    private static final PipelineOp addProjectedAssigments(PipelineOp left,
-            final List<AssignmentNode> assignments, final AST2BOpContext ctx) {
-
-        left = addAssignments(left, assignments, ctx, true/* projection */);
-
-        return left;
-
-    }
-
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static final PipelineOp addAssignments(PipelineOp left,
             final List<AssignmentNode> assignments, final AST2BOpContext ctx,
             final boolean projection) {
 
+        /*
+         * FIXME Lift out [done] into convertJoinGroup() and callers. See
+         * addConditionals() where we need to do the same thing.
+         */
         final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
         for (AssignmentNode assignmentNode : assignments) {
@@ -1836,6 +1661,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     private static final PipelineOp addConditionals(PipelineOp left,
             final Collection<FilterNode> filters, final AST2BOpContext ctx) {
 
+        /*
+         * FIXME Looks like addConditionals() should have [done] passed in so we
+         * do not redo the materialization pipeline if we already materialized
+         * something. In fact, [done] should be passed down until we reach a
+         * subquery (variable names have a different scope in a subquery).
+         * 
+         * TODO This method is used for pre- and post-filters. How is this done
+         * for the joins? Ah. We need to do the same thing in AST2BOpBase
+         * #join(....) at ~ 700.
+         */
         final Set<IVariable<IV>> done = new LinkedHashSet<IVariable<IV>>();
 
         for (FilterNode filter : filters) {
@@ -1898,6 +1733,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/233 (Replace
      *      DataSetJoin with an "inline" access path.)
+     * 
+     *      TODO This mechanism is not currently being used. If we decide to
+     *      keep it, we could use a {@link JVMSolutionSetHashJoinOp}. Just push
+     *      the data into the hash index and then just that operator to join it
+     *      into the pipeline. Then we could ditch the {@link DataSetJoin}.
      */
     @SuppressWarnings("rawtypes")
     private static final PipelineOp addKnownInConditionals(PipelineOp left,
@@ -1945,6 +1785,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final JoinGroupNode joinGroup, final StaticAnalysis sa,
             final AST2BOpContext ctx) {
 
+        /*
+         * FIXME The join-filter attachment needs to be computed in
+         * convertJoinGroup().
+         */
         final List<Predicate<?>> preds = new LinkedList<Predicate<?>>();
         final List<Properties> hints = new LinkedList<Properties>();
 
@@ -1974,82 +1818,53 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final Set<IVariable<?>> knownBound = sa.getDefinitelyIncomingBindings(
                 joinGroup, new LinkedHashSet<IVariable<?>>());
 
-    	if (true/*ctx.astStaticOptimizer*/) {
-    		
-    		/*
-    		 * If the AST static optimizer is enabled, the statement patterns
-    		 * will already be in the correct order by the time they get here.
-    		 * We simply need to add the joins and the join constraints.
-    		 */
-    		
-            final IConstraint[][] assignedConstraints;
-    		{
+		/*
+		 * If the AST static optimizer is enabled, the statement patterns
+		 * will already be in the correct order by the time they get here.
+		 * We simply need to add the joins and the join constraints.
+		 */
+		
+        final IConstraint[][] assignedConstraints;
+		{
 
-     			final int nknownBound = knownBound != null ? knownBound.size() : 0;
+ 			final int nknownBound = knownBound != null ? knownBound.size() : 0;
 
-    			// figure out which constraints are attached to which
-    			// predicates.
-    			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
-    					preds.toArray(new IPredicate[preds.size()]), 
-    					constraints.toArray(new IConstraint[constraints.size()]),
-    					nknownBound == 0 ? IVariable.EMPTY : knownBound
-    							.toArray(new IVariable<?>[nknownBound]),
-    					true// pathIsComplete
-    					);
-    			
-    		}
+			// figure out which constraints are attached to which predicates.
+			assignedConstraints = PartitionedJoinGroup.getJoinGraphConstraints(
+					preds.toArray(new IPredicate[preds.size()]), 
+					constraints.toArray(new IConstraint[constraints.size()]),
+					nknownBound == 0 ? IVariable.EMPTY : knownBound
+							.toArray(new IVariable<?>[nknownBound]),
+					true// pathIsComplete
+					);
+			
+		}
 
-    		/*
-             * Iterate through the predicates and join them, along with their
-             * join constraints.
-             */
-    		int i = 0;
-            final Iterator<Predicate<?>> itr = preds.iterator();
-            final Iterator<Properties> itr2 = hints.iterator();
-    		while(itr.hasNext()) {
-    		    
-    		    final Predicate<?> pred = itr.next();
-    		    final Properties queryHints = itr2.next();
+		/*
+         * Iterate through the predicates and join them, along with their
+         * join constraints.
+         */
+		int i = 0;
+        final Iterator<Predicate<?>> itr = preds.iterator();
+        final Iterator<Properties> itr2 = hints.iterator();
+		while(itr.hasNext()) {
+		    
+		    final Predicate<?> pred = itr.next();
+		    final Properties queryHints = itr2.next();
 
-                // need to make a modifiable collection
-                final Collection<IConstraint> c = new LinkedList<IConstraint>
-                	(Arrays.asList(assignedConstraints[i]));
+            // need to make a modifiable collection
+            final Collection<IConstraint> c = new LinkedList<IConstraint>
+            	(Arrays.asList(assignedConstraints[i]));
 
-                left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,//
-                        c, ctx.idFactory, /*ctx.*/queryHints);
+            left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,//
+                    c, ctx.idFactory, /*ctx.*/queryHints);
 
 
-                i++;
-                
-            }
+            i++;
+            
+        }
 
-	        return left;
-    		
-    	} else {
-    	
-    		/*
-    		 * Rule2BOpUtility handles static join order optimization using
-    		 * the old DefaultEvaluationPlan2.
-    		 */
-	        @SuppressWarnings("rawtypes")
-	        final IRule rule = new Rule("null", // name
-	                null, // head
-	                preds.toArray(new IPredicate[preds.size()]), // tails
-	                constraints.size() > 0 // constraints
-	                ? constraints.toArray(new IConstraint[constraints.size()])
-	                        : null);
-	
-	        /*
-	         * Note: Rule2BOpUtility is also handling materialization steps for
-	         * joins.
-	         */
-	
-	        left = Rule2BOpUtility.convert(rule, left, knownBound, ctx.idFactory,
-	                ctx.db, ctx.queryEngine, ctx.queryHints);
-	
-	        return left;
-	        
-    	}
+        return left;
 
     }
 
@@ -2117,7 +1932,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 continue;
             }
 
-			left = _addSubquery(left, subgroup, ctx);
+			left = addSubgroup(left, subgroup, ctx);
 
         }
 
@@ -2167,35 +1982,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 continue;
             }
 
-            if (subgroup instanceof JoinGroupNode
-                    && ((JoinGroupNode) subgroup).isSimpleOptional()) {
-
-                /*
-                 * Optimize a simple join group as an optional join rather than
-                 * a subquery.
-                 * 
-                 * FIXME Deprecated by ASTSimpleOptionalOptimizer. This code
-                 * block should go away.
-                 */
-
-                final JoinGroupNode subJoinGroup = (JoinGroupNode) subgroup;
-
-                final StatementPatternNode sp = subJoinGroup
-                        .getSimpleOptional();
-
-                final Collection<FilterNode> filters = subJoinGroup
-                        .getFilters();
-
-                final Predicate<?> pred = (Predicate<?>) toPredicate(sp, ctx);
-
-                left = addOptionalJoinForSingletonOptionalSubquery(left, pred,
-                        sp.getQueryHints(), filters, ctx);
-
-            } else {
-
-            	left = _addSubquery(left, subgroup, ctx);
-            	
-            }
+        	left = addSubgroup(left, subgroup, ctx);
 
         }
 
@@ -2221,7 +2008,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @param ctx
      * @return
      */
-	private static PipelineOp _addSubquery(//
+	private static PipelineOp addSubgroup(//
 			PipelineOp left,//
 			final GraphPatternGroup<IGroupMemberNode> subgroup,//
 			final AST2BOpContext ctx//
