@@ -328,15 +328,15 @@ public class StatementPatternNode extends
 
         @SuppressWarnings("unchecked")
         final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
-        
+
         if (filters == null) {
-        
+
             return Collections.emptyList();
-            
+
         }
 
         return Collections.unmodifiableList(filters);
-        
+
     }
 
     public void setFilters(final List<FilterNode> filters) {

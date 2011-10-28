@@ -151,6 +151,53 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	}
 
 	/**
+	 * Return the #of statement patterns.
+	 */
+    public int getStatementPatternCount() {
+
+        int n = 0;
+
+        for (IQueryNode node : this) {
+
+            if (node instanceof StatementPatternNode) {
+
+                n++;
+
+            }
+
+        }
+
+        return n;
+
+    }
+    
+    /**
+     * Return the #of required statement patterns (does not include those
+     * flagged as OPTIONAL).
+     */
+    public int getRequiredStatementPatternCount() {
+
+        int n = 0;
+
+        for (IQueryNode node : this) {
+
+            if (node instanceof StatementPatternNode) {
+
+                if(!((StatementPatternNode)node).isOptional()) {
+                
+                    n++;
+
+                }
+
+            }
+
+        }
+
+        return n;
+
+    }
+    
+	/**
 	 * Return only the {@link ServiceNode} child nodes in this group.
 	 */
 	public List<ServiceNode> getServiceNodes() {

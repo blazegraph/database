@@ -322,7 +322,8 @@ public class AST2BOpBase {
             final Collection<IConstraint> constraints,
             final AtomicInteger idFactory, final Properties queryHints) {
 
-        return join(db, queryEngine, left, pred, constraints,
+        return join(db, queryEngine, left, pred,
+                new LinkedHashSet<IVariable<?>>(), constraints,
                 new BOpContextBase(queryEngine), idFactory, queryHints);
 
     }
@@ -644,6 +645,7 @@ public class AST2BOpBase {
             final QueryEngine queryEngine,//
             PipelineOp left,//
             Predicate pred,//
+            final Set<IVariable<?>> doneSet,// variables known to be materialized.
             final Collection<IConstraint> constraints,//
             final BOpContextBase context, //
             final AtomicInteger idFactory,//
@@ -671,7 +673,7 @@ public class AST2BOpBase {
          */
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization =
             new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
-
+        
         if (constraints != null && !constraints.isEmpty()) {
 //          // decorate the predicate with any constraints.
 //          pred = (Predicate<?>) pred.setProperty(
@@ -811,8 +813,8 @@ public class AST2BOpBase {
 
         if (needsMaterialization.size() > 0) {
 
-            final Set<IVariable<IV>> alreadyMaterialized =
-                new LinkedHashSet<IVariable<IV>>();
+            final Set<IVariable<?>> alreadyMaterialized = doneSet;
+//                new LinkedHashSet<IVariable<IV>>();
 
             for (Map.Entry<IConstraint, Set<IVariable<IV>>> e :
                 needsMaterialization.entrySet()) {
