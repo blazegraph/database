@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Set;
@@ -436,6 +437,7 @@ public class Rule2BOpUtility extends AST2BOpBase {
 		/*
          *
          */
+		final Set<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>();
         for (int i = 0; i < preds.length; i++) {
 
             // assign a bop id to the predicate
@@ -446,6 +448,7 @@ public class Rule2BOpUtility extends AST2BOpBase {
             	(Arrays.asList(assignedConstraints[i]));
 
             left = join(db, queryEngine, left, pred,//
+                    doneSet,//
                     c, context, idFactory, queryHints);
 
         }

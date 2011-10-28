@@ -7,5 +7,5 @@ select ?x ?o
   } AS %namedSet1
 where {
   ?x rdfs:label ?o
-  INCLUDE %namedSet1 JOIN ON (?x)
+  INCLUDE %namedSet1 
 }

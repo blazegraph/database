@@ -779,6 +779,7 @@ public class SOp2BOpUtility {
 		int i = 0;
         for (Predicate<?> pred : preds) {
             left = Rule2BOpUtility.join(db, queryEngine, left, pred,//
+                    new LinkedHashSet<IVariable<?>>(),// doneSet
                     Arrays.asList(assignedConstraints[i++]), //
                     context, idFactory, queryHints);
 

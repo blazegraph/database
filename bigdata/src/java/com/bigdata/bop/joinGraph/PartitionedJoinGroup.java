@@ -25,6 +25,7 @@ import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis_CanJoin;
 
 /**
  * Class accepts a join group and partitions it into a join graph and a tail
@@ -54,6 +55,9 @@ import com.bigdata.bop.solutions.DistinctBindingSetOp;
  *       search access path that replaces the actual access path for the
  *       predicate, which is meaningless in an of itself because the P is
  *       magical.]
+ * 
+ * @deprecated by {@link StaticAnalysis_CanJoin} which is a port of this code to
+ *             the AST mode.
  */
 public class PartitionedJoinGroup {
 
