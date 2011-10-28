@@ -2761,7 +2761,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         new NV(SliceOp.Annotations.LIMIT, slice.getLimit()),
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
-                        new NV(SliceOp.Annotations.PIPELINED, false),//
+                        new NV(SliceOp.Annotations.PIPELINED, true),//
                         new NV(SliceOp.Annotations.MAX_PARALLEL, 1),//
                         new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 })), ctx.queryHints);

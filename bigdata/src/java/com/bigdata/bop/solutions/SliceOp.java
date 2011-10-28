@@ -39,7 +39,6 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.ChunkedRunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
@@ -63,16 +62,6 @@ import com.bigdata.service.IBigdataFederation;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Slice is not safe for subqueries - the entire query is cancelled when
- *       the slice is satisfied.
- *       <p>
- *       If we allow complex operator trees in which "subqueries" can also use a
- *       slice then either they need to run as their own query with their own
- *       {@link ChunkedRunningQuery} state or the API for cancelling a running query as
- *       used here needs to only cancel evaluation of the child operators.
- *       Otherwise we could cancel all operator evaluation for the query,
- *       including operators which are ancestors of the {@link SliceOp}.
  */
 public class SliceOp extends PipelineOp {
 
@@ -139,6 +128,15 @@ public class SliceOp extends PipelineOp {
             throw new UnsupportedOperationException(
                     Annotations.EVALUATION_CONTEXT + "="
                             + getEvaluationContext());
+        }
+        
+        if (!isPipelinedEvaluation()) {
+            /*
+             * Evaluation must be pipelined or the SLICE will wait for all
+             * solutions to be materialized before it runs.
+             */
+            throw new UnsupportedOperationException(Annotations.PIPELINED
+                    + "=" + isPipelinedEvaluation());
         }
 
 		if (!isSharedState())

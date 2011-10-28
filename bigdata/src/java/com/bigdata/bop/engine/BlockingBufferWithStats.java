@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 
 /**
@@ -50,21 +49,11 @@ public class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
 
     private final BOpStats stats;
     
-    private final long limit;
-
-    private long nvisited = 0L;
-    
     public BlockingBufferWithStats(final PipelineOp op, final BOpStats stats) {
 
         super(op.getChunkOfChunksCapacity(), op.getChunkCapacity(), op
                 .getChunkTimeout(), BufferAnnotations.chunkTimeoutUnit);
 
-        if (op instanceof SliceOp) {
-            limit = ((SliceOp) op).getLimit();
-        } else {
-            limit = Long.MAX_VALUE;
-        }
-        
         this.stats = stats;
 
     }
@@ -103,30 +92,6 @@ public class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
 
             stats.chunksOut.increment();
 
-            nvisited++;
-
-            if (nvisited >= limit) {
-
-                /*
-                 * Enforce the limit.
-                 * 
-                 * Note: We do not need to deal with the OFFSET as the SliceOp
-                 * will handle that. However, if we do not deal with the LIMIT
-                 * then the iterator draining the query buffer may continue to
-                 * materialize solutions long after there is no need for them.
-                 * 
-                 * This used to be handled by Sesame, but we are no longer
-                 * wrapping the query buffer's iterator with a Sesame iterator
-                 * which enforces a Slice.
-                 */
-                
-                close();
-                
-                if(log.isInfoEnabled())
-                    log.info("Closed output buffer.");
-
-            }
-        
         }
         
         return ret;
