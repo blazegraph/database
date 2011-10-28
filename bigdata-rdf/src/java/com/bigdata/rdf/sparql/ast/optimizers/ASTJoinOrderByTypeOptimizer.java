@@ -30,8 +30,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -46,7 +44,6 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
@@ -56,8 +53,8 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
  */
 public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
-    private static final Logger log = Logger
-            .getLogger(ASTJoinOrderByTypeOptimizer.class);
+//    private static final Logger log = Logger
+//            .getLogger(ASTJoinOrderByTypeOptimizer.class);
 
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
@@ -119,7 +116,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
     /**
      * Get the group member nodes into the right order:
-     * 
+     * <pre> 
      * 1. Pre-filters
      * 2. In-filters
      * 3. Service calls
@@ -131,9 +128,8 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
      * 9. Simple optionals & optional subgroups
      * 10. Assignments
      * 11. Post-conditionals
-     * 
+     * </pre> 
      * Most of this logic was lifted out of {@link AST2BOpUtility}.
-     * 
      */
     private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
     		final GraphPatternGroup<?> op) {
@@ -342,10 +338,6 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 	                     * FILTER(s) MUST NOT have materialization requirements for
 	                     * variables which were not already bound before the
 	                     * optional JOIN on this statement pattern.
-	                     * 
-	                     * TODO Move logic to set OPTIONAL on the Predicate into
-	                     * toPredicate. It can already see the isSimpleOptional
-	                     * annotation on the StatementPatternNode.
 	                     */
 
 	                	ordered.add(sp);
@@ -425,6 +417,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
                 final QueryBase subquery = (QueryBase) child;
 
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
