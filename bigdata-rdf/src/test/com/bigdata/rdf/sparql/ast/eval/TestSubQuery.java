@@ -76,15 +76,15 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     /**
      * <pre>
      * PREFIX : <http://example.org/>
-     * SELECT * 
+     * SELECT *
      * WHERE {
      *      ?s :p ?o .
-     *      { 
+     *      {
      *         SELECT ?s { ?s a :ty } ORDER BY ?s LIMIT 3
-     *      } 
+     *      }
      * }
      * </pre>
-     * 
+     *
      * mroycsi wrote: Based on sparql bottom up evaluation, the subquery will
      * return s1,s2,s3 as the solutions for ?s. Joined with the ?s :p ?o, you
      * should only get the statements where ?s is s1,s2,s3.
@@ -121,7 +121,7 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
      * the subquery first.
      * <p>
      * Note: This is handled by {@link ASTSparql11SubqueryOptimizer}.
-     * 
+     *
      * @see TestASTSparql11SubqueryOptimizer#test_subSelectWithLimitAndOrderBy()
      */
     public void test_sparql_subquery_limiting_resource_pattern() throws Exception {
@@ -132,7 +132,7 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * Simple Sub-Select unit test
-     * 
+     *
      * <pre>
      * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
      * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -154,13 +154,13 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * A unit test from the Sesame 2.5 TCK.
-     * 
+     *
      * <pre>
      * SELECT * { SELECT * { ?s ?p ?o } }
      * </pre>
      */
     public void test_sparql11_subquery_02() throws Exception {
-        
+
         new TestHelper(
                 "sparql11-subquery-02", // testURI,
                 "sparql11-subquery-02.rq",// queryFileURL
@@ -169,28 +169,28 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
 
     }
-    
+
     /**
      * A unit test from the Sesame 2.5 TCK.
-     * 
+     *
      * <pre>
      * SELECT (count(*) as ?count)
-     * WHERE { 
+     * WHERE {
      *     { SELECT ?s ?p ?o WHERE { ?s ?p ?o } }
      * }
      * </pre>
      */
     public void test_sparql11_count_subquery_01() throws Exception {
-        
+
         new TestHelper(
                 "sparql11-count-subquery-01", // testURI,
                 "sparql11-count-subquery-01.rq",// queryFileURL
                 "sparql11-count-subquery-01.ttl",// dataFileURL
                 "sparql11-count-subquery-01.srx"// resultFileURL
                 ).runTest();
-        
+
     }
-    
+
     /**
      * This is a version of {@link #test_sparql_subselect()} which uses the same
      * data and has the same results, but which uses a named subquery rather
@@ -209,6 +209,15 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     public void test_named_subquery_noJoinVars() throws Exception {
 
         new TestHelper("named-subquery-noJoinVars").runTest();
+
+    }
+
+    /**
+     * Test that only projected variables are included in subquery results
+     */
+    public void test_sparql11_subquery_scope() throws Exception {
+
+        new TestHelper("sparql11-subquery-scope").runTest();
 
     }
 
