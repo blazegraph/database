@@ -1,0 +1,10 @@
+PREFIX : <http://example.org/>
+SELECT ?s ?x
+WHERE {
+	 {
+	    SELECT ?s ?x { ?s :p ?x }
+	 }
+	 {
+	 	SELECT ?s ?fake1 ?fake2 { ?x :q ?s . LET (?fake1 := 1) . LET (?fake2 := 2) . }
+	 }
+}

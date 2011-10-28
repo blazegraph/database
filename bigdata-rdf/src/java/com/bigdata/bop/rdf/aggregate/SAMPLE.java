@@ -31,6 +31,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
+import com.bigdata.rdf.internal.constraints.IPassesMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 
 /**
@@ -40,7 +41,7 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
  *
  * @author thompsonbry
  */
-public class SAMPLE extends AggregateBase<IV> {
+public class SAMPLE extends AggregateBase<IV> implements IPassesMaterialization{
 
     /**
 	 *
