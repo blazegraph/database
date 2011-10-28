@@ -576,9 +576,11 @@ public class AbstractDataDrivenSPARQLTestCase extends
                     message.append(astContainer.toString());
                     message.append("\n===================================\n");
                     message.append(BOpUtility.toString(queryPlan));
+                    if(store.getStatementCount()<100) {
                     message.append("\n===================================\n");
                     message.append("database dump:\n");
                     message.append(store.dumpStore());
+                    }
 //                        RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
 //                        while (stmts.hasNext()) {
 //                            message.append(stmts.next());
