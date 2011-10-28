@@ -298,6 +298,17 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
+     * Return the {@link IQueryAttributes} associated with this query.
+     * 
+     * @return The {@link IQueryAttributes}.
+     */
+    public IQueryAttributes getQueryAttributes() {
+        
+        return getRunningQuery().getAttributes();
+        
+    }
+    
+    /**
      * Return the {@link IMemoryManager} associated with the specified query.
      * 
      * @param queryId

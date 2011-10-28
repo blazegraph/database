@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.util.UUID;
 import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
@@ -38,6 +39,7 @@ import com.bigdata.bop.Bind;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
@@ -128,7 +130,7 @@ public class TestMemorySortOp extends TestCase2 {
 				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+//                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
 		}));
 
@@ -174,8 +176,10 @@ public class TestMemorySortOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);
 
+        final UUID queryId = UUID.randomUUID();
+        final IQueryContext queryContext = new MockQueryContext(queryId);
 		final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
-		, null/* indexManager */
+		, null/* indexManager */,queryContext
 		);
 
 		final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
@@ -237,7 +241,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+//                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
 
@@ -283,8 +287,10 @@ public class TestMemorySortOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);
 
+        final UUID queryId = UUID.randomUUID();
+        final IQueryContext queryContext = new MockQueryContext(queryId);
         final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
-        , null/* indexManager */
+        , null/* indexManager */,queryContext
         );
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
@@ -350,7 +356,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
+//                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
 
@@ -396,8 +402,10 @@ public class TestMemorySortOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                 query, stats);
 
+        final UUID queryId = UUID.randomUUID();
+        final IQueryContext queryContext = new MockQueryContext(queryId);
         final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
-        , null/* indexManager */
+        , null/* indexManager */,queryContext
         );
         
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
