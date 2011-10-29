@@ -81,10 +81,10 @@ import com.bigdata.rwstore.sector.MemStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class NamedSubqueryOp extends PipelineOp {
+public class HTreeNamedSubqueryOp extends PipelineOp {
 
     static private final transient Logger log = Logger
-            .getLogger(NamedSubqueryOp.class);
+            .getLogger(HTreeNamedSubqueryOp.class);
 
     /**
      * 
@@ -110,7 +110,7 @@ public class NamedSubqueryOp extends PipelineOp {
     /**
      * Deep copy constructor.
      */
-    public NamedSubqueryOp(final NamedSubqueryOp op) {
+    public HTreeNamedSubqueryOp(final HTreeNamedSubqueryOp op) {
         super(op);
     }
     
@@ -120,7 +120,7 @@ public class NamedSubqueryOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public NamedSubqueryOp(final BOp[] args,
+    public HTreeNamedSubqueryOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -156,7 +156,7 @@ public class NamedSubqueryOp extends PipelineOp {
 
     }
 
-    public NamedSubqueryOp(final BOp[] args, NV... annotations) {
+    public HTreeNamedSubqueryOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -278,7 +278,7 @@ public class NamedSubqueryOp extends PipelineOp {
          */
         private final HTree solutions;
         
-        public ControllerTask(final NamedSubqueryOp op,
+        public ControllerTask(final HTreeNamedSubqueryOp op,
                 final BOpContext<IBindingSet> context) {
 
             if (op == null)

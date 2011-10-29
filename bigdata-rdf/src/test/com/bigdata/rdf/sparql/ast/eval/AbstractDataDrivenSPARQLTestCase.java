@@ -478,6 +478,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
             }
 
             // Note: code block shows the expected and actual results.
+            StringBuilder expectedAndActualResults = null;
             if (!resultsEqual && true) {
                 queryResultTable.beforeFirst();
                 expectedResultTable.beforeFirst();
@@ -501,7 +502,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 message.append("=============");
                 StringUtil.appendN('=', getName().length(), message);
                 message.append("========================\n");
-                log.error(message);
+                expectedAndActualResults = message;
+//                log.error(message);
             }
 
             if (!resultsEqual) {
@@ -566,9 +568,13 @@ public class AbstractDataDrivenSPARQLTestCase extends
                     }
                     message.append(" =======================\n");
 
-                    System.out.print(message.toString());
+                    log.error(message.toString());
                 }
 
+                if (expectedAndActualResults != null) {
+                    message.append(expectedAndActualResults);
+                }
+                
 //                    RepositoryConnection con = ((DatasetRepository)dataRep).getDelegate().getConnection();
 //                    System.err.println(con.getClass());
 //                    try {

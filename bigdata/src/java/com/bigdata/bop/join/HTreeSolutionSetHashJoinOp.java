@@ -43,7 +43,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.controller.NamedSubqueryOp;
+import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.SubqueryJoinAnnotations;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.htree.HTree;
@@ -56,7 +56,7 @@ import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Operator joins a solution set into the pipeline. The solution set must be be
- * constructed by a {@link NamedSubqueryOp} or a {@link HTreeHashIndexOp}. While this
+ * constructed by a {@link HTreeNamedSubqueryOp} or a {@link HTreeHashIndexOp}. While this
  * JOIN requires the RHS {@link HTree} to be fully materialized, evaluation of
  * the LHS source solutions is pipelined. Parallel evaluation of source chunks
  * is permitted, but the RHS {@link HTree} must have been checkpointed before
@@ -98,9 +98,9 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          * the {@link IQueryAttributes} on that {@link IRunningQuery}.
          * 
          * @see NamedSolutionSetRef
-         * @see NamedSubqueryOp.Annotations#NAMED_SET_REF
+         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
          */
-        final String NAMED_SET_REF = NamedSubqueryOp.Annotations.NAMED_SET_REF;
+        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
         /**
          * An optional {@link IVariable}[] identifying the variables to be

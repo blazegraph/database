@@ -7,7 +7,7 @@ SELECT ?g ?subj
   FROM NAMED :g1
   FROM NAMED :g2
   WITH {
-   SELECT ?subj
+   SELECT ?g ?subj
     WHERE {
       GRAPH ?g {
         ?lit bd:search "mike" .

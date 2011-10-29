@@ -53,15 +53,14 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * Optimizer attaches {@link FilterNode}s which will run as "join filters" to
  * {@link StatementPatternNode}s. The joins must already be in the order in
  * which they will be evaluated.
- *
- * TODO Can this also handle RangeBOp attachments? See the bottom of
- * AST2BOpUtility.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTAttachJoinFiltersOptimizer.java 5455 2011-10-29 19:43:53Z
+ *          thompsonbry $
  */
 public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
+    @SuppressWarnings("unchecked")
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
@@ -144,10 +143,6 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
      * <p>
      * Note: This handles re-attach by collecting previously attached FILTERS
      * from required joins.
-     * 
-     * FIXME We must be able to attach a FILTER to any {@link IJoinNode}. Those
-     * filters need to be run with (or after) that join. This includes INCLUDE,
-     * subgroup, and subquery joins NOT just statement pattern nodes.
      */
     private void attachJoinFilters2(final AST2BOpContext context,
             final StaticAnalysis sa, final JoinGroupNode group) {
@@ -199,28 +194,46 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             
         }
 
-        final int requiredJoinCount = requiredJoins.size();
-
-        final IJoinNode[] path = new IJoinNode[requiredJoinCount];
-
-        final Set<IVariable<?>> knownBound = sa.getDefinitelyIncomingBindings(
-                group, new LinkedHashSet<IVariable<?>>());
-
         /*
          * Figure out which filters are attached to which joins.
          */
+        {
 
-        final FilterNode[][] assignedConstraints = sa.getJoinGraphConstraints(
-                path, joinFilters.toArray(new FilterNode[joinFilters.size()]),
-                knownBound, true/* pathIsComplete */);
+            final int requiredJoinCount = requiredJoins.size();
+
+            final IJoinNode[] path = requiredJoins
+                    .toArray(new IJoinNode[requiredJoinCount]);
+
+            final Set<IVariable<?>> knownBound = sa
+                    .getDefinitelyIncomingBindings(group,
+                            new LinkedHashSet<IVariable<?>>());
+
+            final FilterNode[][] assignedConstraints = sa
+                    .getJoinGraphConstraints(path, joinFilters
+                            .toArray(new FilterNode[joinFilters.size()]),
+                            knownBound, true/* pathIsComplete */);
+
+            /*
+             * Attach the join filters.
+             */
+            for (int i = 0; i < requiredJoinCount; i++) {
+
+                final IJoinNode tmp = path[i];
+
+                tmp.setAttachedJoinFilters(Arrays
+                        .asList(assignedConstraints[i]));
+
+            }
+
+        }
+
         /*
-         * Attach the join filters.
+         * Remove all join filters from the group. They have all been attached
+         * to the joins.
          */
-        for (int i = 0; i < requiredJoinCount; i++) {
+        for (FilterNode joinFilter : joinFilters) {
 
-            final IJoinNode tmp = path[i];
-
-            tmp.setAttachedJoinFilters(Arrays.asList(assignedConstraints[i]));
+            group.removeArg(joinFilter);
 
         }
 

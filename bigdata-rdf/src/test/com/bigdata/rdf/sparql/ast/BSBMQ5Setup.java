@@ -69,40 +69,40 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * the constraints before the tail of the plan can in fact lead to a more
  * efficient join path.
  */
-class BSBMQ5Setup {
+public class BSBMQ5Setup {
     
     final AtomicInteger nextId = new AtomicInteger(0); 
 
-    final BigdataURI rdfsLabel; 
-    final BigdataURI productFeature;
-    final BigdataURI productPropertyNumeric1;
-    final BigdataURI productPropertyNumeric2;
-    final BigdataURI product53999;
-    final BigdataLiteral _120;
-    final BigdataLiteral _170;
+    public final BigdataURI rdfsLabel; 
+    public final BigdataURI productFeature;
+    public final BigdataURI productPropertyNumeric1;
+    public final BigdataURI productPropertyNumeric2;
+    public final BigdataURI product53999;
+    public final BigdataLiteral _120;
+    public final BigdataLiteral _170;
 
-    final QueryRoot queryRoot;
-    final ProjectionNode projection;
+    public final QueryRoot queryRoot;
+    public final ProjectionNode projection;
     
     /** ?product rdfs:label ?productLabel . */
-    final StatementPatternNode p0;
+    public final StatementPatternNode p0;
     /** productInstance bsbm:productFeature ?prodFeature . */
-    final StatementPatternNode p1;
+    public final StatementPatternNode p1;
     /** ?product bsbm:productFeature ?prodFeature . */
-    final StatementPatternNode p2;
+    public final StatementPatternNode p2;
     /** productInstance bsbm:productPropertyNumeric1 ?origProperty1 . */
-    final StatementPatternNode p3;
+    public final StatementPatternNode p3;
     /** ?product bsbm:productPropertyNumeric1 ?simProperty1 . */
-    final StatementPatternNode p4;
+    public final StatementPatternNode p4;
     /** productInstance bsbm:productPropertyNumeric2 ?origProperty2 . */
-    final StatementPatternNode p5;
+    public final StatementPatternNode p5;
     /** ?product bsbm:productPropertyNumeric2 ?simProperty2 . */
-    final StatementPatternNode p6;
+    public final StatementPatternNode p6;
 
     /**
      * FILTER (productInstance != ?product)
      */
-    final FilterNode c0;
+    public final FilterNode c0;
 
     /**
      * FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 >
@@ -112,7 +112,7 @@ class BSBMQ5Setup {
      * that each of these is represented as its own {@link FilterNode}, but
      * I have combined them for the purposes of these unit tests.
      */
-    final FilterNode c1;
+    public final FilterNode c1;
 
     /**
      * FILTER (?simProperty2 < (?origProperty2 + 170) && ?simProperty2 >
@@ -122,22 +122,22 @@ class BSBMQ5Setup {
      * that each of these is represented as its own {@link FilterNode}, but
      * I have combined them for the purposes of these unit tests.
      */
-    final FilterNode c2;
+    public final FilterNode c2;
 
     /** The constraints on the join graph. */
-    final FilterNode[] constraints;
+    public final FilterNode[] constraints;
 
     /** no constraints. */
-    final Set<FilterNode> NA = Collections.emptySet();
+    public final Set<FilterNode> NA = Collections.emptySet();
 
     /** {@link #c0} attaches when any of [p0,p2,p4,p6] runs for the 1st time. */
-    final Set<FilterNode> C0;
+    public final Set<FilterNode> C0;
 
     /** {@link #c1} attaches when 2nd of (p3,p4) runs (in any order). */
-    final Set<FilterNode> C1;
+    public final Set<FilterNode> C1;
 
     /** {@link #c2} attaches when 2nd of (p5,p6) runs (in any order). */
-    final Set<FilterNode> C2;
+    public final Set<FilterNode> C2;
 
     public BSBMQ5Setup(final AbstractTripleStore store) {
         

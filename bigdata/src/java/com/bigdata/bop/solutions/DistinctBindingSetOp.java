@@ -18,6 +18,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
@@ -86,6 +87,12 @@ public class DistinctBindingSetOp extends PipelineOp {
 		if (vars == null || vars.length == 0)
 			throw new IllegalArgumentException();
 
+    }
+
+    public DistinctBindingSetOp(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
+        
     }
 
     /**
