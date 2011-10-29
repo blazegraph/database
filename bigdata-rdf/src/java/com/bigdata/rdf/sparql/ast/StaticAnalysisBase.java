@@ -179,12 +179,12 @@ public class StaticAnalysisBase {
          * Recursion.
          */
         if(filters) {
-            if(op instanceof StatementPatternNode) {
+            if(op instanceof IJoinNode) {
                 /*
-                 * Optional statements patterns may have attached filters.
+                 * Join nodes may have attached filters.
                  */
-                final StatementPatternNode t = (StatementPatternNode) op;
-                final List<FilterNode> list = t.getFilters();
+                final IJoinNode t = (IJoinNode) op;
+                final List<FilterNode> list = t.getAttachedJoinFilters();
                 if (list != null) {
                     for (FilterNode f : list) {
                         getSpannedVariables(f, filters, varSet);

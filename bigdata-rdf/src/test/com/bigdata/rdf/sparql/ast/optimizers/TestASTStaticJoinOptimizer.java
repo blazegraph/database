@@ -1486,7 +1486,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
         if (optional) {
             
-            sp.setSimpleOptional(true);
+            sp.setOptional(true);
             
         }
         

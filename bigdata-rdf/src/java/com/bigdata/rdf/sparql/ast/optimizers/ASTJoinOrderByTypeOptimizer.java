@@ -326,7 +326,7 @@ public class ASTJoinOrderByTypeOptimizer implements IASTOptimizer {
 
 	                final StatementPatternNode sp = (StatementPatternNode) child;
 
-	                if (sp.isSimpleOptional()) {
+	                if (sp.isOptional()) {
 
 	                    /*
 	                     * ASTSimpleOptionalOptimizer will recognize and lift out

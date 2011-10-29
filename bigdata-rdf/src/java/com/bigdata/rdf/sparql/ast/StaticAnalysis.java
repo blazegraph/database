@@ -106,7 +106,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * 
  * <dt>{@link StatementPatternNode}</dt>
  * <dd>All variables are definitely bound UNLESS
- * {@link StatementPatternNode#isSimpleOptional()} is <code>true</code>.
+ * {@link StatementPatternNode#isOptional()} is <code>true</code>.
  * <p>
  * Note: we sometimes attach a simple optional join to the parent group for
  * efficiency, at which point it becomes an "optional" statement pattern. An
@@ -384,7 +384,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
             
-            if(!sp.isSimpleOptional()) {
+            if(!sp.isOptional()) {
 
                 // Only if the statement pattern node is a required join.
                 vars.addAll(sp.getProducedBindings());
@@ -597,7 +597,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
 
-            if(sp.isSimpleOptional()) {
+            if(sp.isOptional()) {
 
                 // Only if the statement pattern node is an optional join.
                 vars.addAll(sp.getProducedBindings());
@@ -679,7 +679,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 final StatementPatternNode sp = (StatementPatternNode) child;
 
-                if (!sp.isSimpleOptional()) {
+                if (!sp.isOptional()) {
                     
                     /*
                      * Required JOIN (statement pattern).
@@ -1158,7 +1158,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Start with all the filters in this group.
          */
-        final List<FilterNode> filters = group.getFilters();
+        final List<FilterNode> filters = group.getAllFiltersInGroup();
 
         /*
          * Get the variables known to be bound starting out.
@@ -1231,7 +1231,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Start with all the filters in this group.
          */
-        final List<FilterNode> filters = group.getFilters();
+        final List<FilterNode> filters = group.getAllFiltersInGroup();
 
         /*
          * Get the variables known to be bound starting out.

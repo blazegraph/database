@@ -564,7 +564,7 @@ public class TestASTNamedSubqueryOptimizer extends
                             new VarNode("var1"), new ConstantNode(name),
                             new VarNode("var6"), null/* c */,
                             Scope.DEFAULT_CONTEXTS);
-                    sp.setSimpleOptional(true);
+                    sp.setOptional(true);
                     whereClause.addChild(sp);
                 }
                 
@@ -702,7 +702,7 @@ public class TestASTNamedSubqueryOptimizer extends
                             new VarNode("var1"), new ConstantNode(name),
                             new VarNode("var6"), null/* c */,
                             Scope.DEFAULT_CONTEXTS);
-                    sp.setSimpleOptional(true);
+                    sp.setOptional(true);
                     whereClause.addChild(sp);
                 }
                 

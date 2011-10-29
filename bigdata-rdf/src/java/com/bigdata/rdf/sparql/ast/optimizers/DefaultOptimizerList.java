@@ -391,10 +391,30 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * required or optional join group.
          */
         add(new ASTStaticJoinOptimizer());
+
+        /**
+         * Optimizer attaches FilterNodes which will run as "join filters" to
+         * StatementPatternNodes.
+         * 
+         * FIXME Write tests, modify convertJoinGroup(), and enable this
+         * optimizer. Make sure that we are handling cases where a join filter
+         * winds up attached to a join other than a statement pattern node,
+         * e.g., to a SubqueryRoot, NamedSubqueryInclude, UnionNode, or
+         * ServiceNode.
+         */
+        // add(new ASTAttachJoinFiltersOptimizer());
         
         /**
          * Rewrite a join group having complex optionals using a hash join
-         * pattern.
+         * pattern as a named subquery.
+         * 
+         * Note: Complex optionals are handled using a hash join pattern even
+         * without this optimizer, but they are not lifted into named subqueries
+         * unless this optimizer runs.
+         * 
+         * TODO Validate that using this optimizer provides a performance
+         * advantage over complex optionals run as sub-groups using a hash join
+         * pattern, which is what happens if we do not run this optimizer.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
          */

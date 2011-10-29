@@ -52,7 +52,8 @@ public class StatementPatternNode extends
 
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends GroupMemberNodeBase.Annotations {
+    public interface Annotations extends GroupMemberNodeBase.Annotations,
+            IJoinNode.Annotations {
 
         /**
          * The {@link Scope} (required).
@@ -61,52 +62,6 @@ public class StatementPatternNode extends
          */
         String SCOPE = "scope";
         
-        /**
-         * Boolean flag indicates that a {@link StatementPatternNode} was lifted
-         * out of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
-         * 
-         * @see ASTSimpleOptionalOptimizer
-         */
-        String SIMPLE_OPTIONAL = "simpleOptional";
-    
-        boolean DEFAULT_SIMPLE_OPTIONAL = false;
-        
-        /**
-         * A {@link List} of {@link FilterNode}s for constraints which MUST run
-         * <em>with</em> the JOIN for this statement pattern (optional).
-         * 
-         * <h3>Simple Optionals</h3>
-         * 
-         * This is specified when a simple optional is identified and the
-         * filters are lifted with the optional statement pattern into the
-         * parent group. Under these circumstances the FILTER(s) MUST be
-         * attached to the JOIN in order to preserve the OPTIONAL semantics of
-         * the join (if the filters are run in the pipeline after the join then
-         * the join+constraints no longer has the same semantics as the optional
-         * group with that statement pattern and filters).
-         * <p>
-         * Note: The need to maintain the correct semantics for the simple
-         * optional group (statement pattern plus filter(s)) is also the reason
-         * why the lifted FILTER(s) MUST NOT require the materialization of any
-         * variables which would not have been bound before that JOIN. Since
-         * variables bound by the JOIN for the optional statement pattern will
-         * not be materialized, filters attached to that JOIN can not require
-         * materialization of variables bound by the JOIN (though they can
-         * depend on variables already bound by the required joins in the parent
-         * group).
-         * 
-         * @see ASTSimpleOptionalOptimizer
-         * 
-         *      FIXME This annotation was originally developed to support simple
-         *      optionals (and is currently only in the code path for simple
-         *      optionals), but might also be used to filter an access path. For
-         *      example, with IN(var,values). However, this annotation does not
-         *      distinguish between local and remote "element" filters and there
-         *      is some API tensions between visitation of "elements" versus
-         *      "bindingSets" for access paths.
-         */
-        String FILTERS = "filters";
-     
         /**
          * Boolean flag indicates that the distinct solutions for the statement
          * pattern are required ({@value #DEFAULT_DISTINCT}).
@@ -277,54 +232,43 @@ public class StatementPatternNode extends
     }
 
     /**
-     * Return <code>true</code> the {@link StatementPatternNode} was lifted out
-     * of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
+     * {@inheritDoc}
+     * <p>
+     * This returns <code>true</code> iff the {@link StatementPatternNode} was
+     * lifted out of an optional {@link JoinGroupNode} such that it has OPTIONAL
+     * semantics.
      * 
-     * @see Annotations#SIMPLE_OPTIONAL
+     * @see ASTSimpleOptionalOptimizer
      */
-    // TODO Replace with isOptional()
-    public boolean isSimpleOptional() {
-        
-        return isOptional();
-        
-    }
-    
-    /**
-     * Return <code>true</code> the {@link StatementPatternNode} was lifted out
-     * of an optional {@link JoinGroupNode} and has OPTIONAL semantics.
-     * 
-     * @see Annotations#SIMPLE_OPTIONAL
-     */
-    public boolean isOptional() {
-        
-        return getProperty(Annotations.SIMPLE_OPTIONAL,
-                Annotations.DEFAULT_SIMPLE_OPTIONAL);
+    final public boolean isOptional() {
 
-    }
-    
+        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+
+    }    
 
     /**
      * Mark this {@link StatementPatternNode} as one which was lifted out of a
      * "simple optional" group and which therefore has "optional" semantics (we
      * will do an optional join for it).
-     */
-    // TODO Rename as setOptional()
-    public void setSimpleOptional(final boolean simpleOptional) {
-        
-        setProperty(Annotations.SIMPLE_OPTIONAL,simpleOptional);
-        
-    }
-
-    /**
-     * Return the FILTER(s) associated with this statement pattern. Such filters
-     * will be run with the JOIN for this statement pattern. As such, they MUST
-     * NOT rely on materialization of variables which would not have been bound
-     * before that JOIN.
+     * <p>
+     * Note: The need to maintain the correct semantics for the simple optional
+     * group (statement pattern plus filter(s)) is also the reason why the
+     * lifted FILTER(s) MUST NOT require the materialization of any variables
+     * which would not have been bound before that JOIN. Since variables bound
+     * by the JOIN for the optional statement pattern will not be materialized,
+     * filters attached to that JOIN can not require materialization of
+     * variables bound by the JOIN (though they can depend on variables already
+     * bound by the required joins in the parent group).
      * 
-     * @see Annotations#FILTERS
      * @see ASTSimpleOptionalOptimizer
      */
-    public List<FilterNode> getFilters() {
+    final public void setOptional(final boolean optional) {
+
+        setProperty(Annotations.OPTIONAL, optional);
+
+    }
+
+    final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
         final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
@@ -339,12 +283,12 @@ public class StatementPatternNode extends
 
     }
 
-    public void setFilters(final List<FilterNode> filters) {
+    final public void setAttachedJoinFilters(final List<FilterNode> filters) {
 
         setProperty(Annotations.FILTERS, filters);
 
     }
-    
+
     /**
      * Return <code>true</code> if none of s, p, o, or c is a variable.
      */
@@ -405,7 +349,7 @@ public class StatementPatternNode extends
 
         sb.append("\n").append(indent(indent)).append(toShortString());
 
-        final List<FilterNode> filters = getFilters();
+        final List<FilterNode> filters = getAttachedJoinFilters();
         if(!filters.isEmpty()) {
             for (FilterNode filter : filters) {
                 sb.append(filter.toString(indent + 1));
@@ -414,7 +358,7 @@ public class StatementPatternNode extends
 
         if (getQueryHints() != null && !getQueryHints().isEmpty()) {
             sb.append("\n");
-            sb.append(indent(indent+1));
+            sb.append(indent(indent + 1));
             sb.append(Annotations.QUERY_HINTS);
             sb.append("=");
             sb.append(getQueryHints().toString());
@@ -466,11 +410,12 @@ public class StatementPatternNode extends
 
         sb.append(")");
         
-        if(isSimpleOptional()) {
-            sb.append(" [simpleOptional]");
+        if(isOptional()) {
+            sb.append(" [optional]");
         }
-        if (!getFilters().isEmpty()) {
-            sb.append(" [#filters=" + getFilters().size() + "]");
+
+        if (!getAttachedJoinFilters().isEmpty()) {
+            sb.append(" [#filters=" + getAttachedJoinFilters().size() + "]");
         }
 
         return sb.toString();
