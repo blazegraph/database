@@ -198,15 +198,15 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
-    /**
-     * This is a variant {@link #test_named_subquery()} in which the JOIN ON
-     * query hint is used to explicitly specify NO join variables.
-     */
-    public void test_named_subquery_noJoinVars() throws Exception {
-
-        new TestHelper("named-subquery-noJoinVars").runTest();
-
-    }
+//    /**
+//     * This is a variant {@link #test_named_subquery()} in which the JOIN ON
+//     * query hint is used to explicitly specify NO join variables.
+//     */
+//    public void test_named_subquery_noJoinVars() throws Exception {
+//
+//        new TestHelper("named-subquery-noJoinVars").runTest();
+//
+//    }
 
     /**
      * Test that only projected variables are included in subquery results
