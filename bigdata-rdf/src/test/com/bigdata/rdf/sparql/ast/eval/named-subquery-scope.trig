@@ -1,0 +1,6 @@
+@prefix : <http://example.org/> .
+
+:subquery-local-variables {
+    :s1 :p 1 .
+    :other :q :s1 .
+}

@@ -217,4 +217,12 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Test that only projected variables are included in named-subquery results
+     */
+    public void test_named_subquery_scope() throws Exception {
+
+        new TestHelper("named-subquery-scope").runTest();
+
+    }
 }
