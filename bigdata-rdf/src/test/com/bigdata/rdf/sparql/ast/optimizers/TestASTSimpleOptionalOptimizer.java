@@ -232,7 +232,7 @@ public class TestASTSimpleOptionalOptimizer extends
 
             expectedClause.addChild(liftedSp);
 
-            liftedSp.setSimpleOptional(true);
+            liftedSp.setOptional(true);
 
             // The filter stays in place (it is in the outer group).
             expectedClause.addChild(new FilterNode(new VarNode("w")));
@@ -321,7 +321,7 @@ public class TestASTSimpleOptionalOptimizer extends
 
             expectedClause.addChild(liftedSp);
 
-            liftedSp.setSimpleOptional(true);
+            liftedSp.setOptional(true);
             
             final List<FilterNode> filters = new LinkedList<FilterNode>();
             
@@ -337,7 +337,7 @@ public class TestASTSimpleOptionalOptimizer extends
             
             filters.add(filterNode);
             
-            liftedSp.setFilters(filters);
+            liftedSp.setAttachedJoinFilters(filters);
 
         }
         

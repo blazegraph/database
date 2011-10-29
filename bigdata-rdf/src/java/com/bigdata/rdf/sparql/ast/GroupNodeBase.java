@@ -1,6 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -18,11 +20,8 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends GroupMemberNodeBase.Annotations {
-    
-        String OPTIONAL = "optional";
-
-        boolean DEFAULT_OPTIONAL = false;
+    interface Annotations extends GroupMemberNodeBase.Annotations,
+            IJoinNode.Annotations {
 
     }
 
@@ -164,18 +163,39 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
 	}
 	
-	public boolean isOptional() {
+	final public boolean isOptional() {
 		
         return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
 		
 	}
 	
-	public void setOptional(final boolean optional) {
+	final public void setOptional(final boolean optional) {
 	    
 	    setProperty(Annotations.OPTIONAL, optional);
 	    
 	}
 	
+    final public List<FilterNode> getAttachedJoinFilters() {
+
+        @SuppressWarnings("unchecked")
+        final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
+
+        if (filters == null) {
+
+            return Collections.emptyList();
+
+        }
+
+        return Collections.unmodifiableList(filters);
+
+    }
+
+    final public void setAttachedJoinFilters(final List<FilterNode> filters) {
+
+        setProperty(Annotations.FILTERS, filters);
+
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -251,48 +271,6 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         }
 
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof StatementPatternNode)) {
-//                continue;
-//            }
-//            sb.append(n.toString(indent + 1)).append("\n");
-//        }
-//
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof FilterNode)) {
-//                continue;
-//            }
-//            sb.append(n.toString(indent + 1)).append("\n");
-//        }
-//
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof UnionNode)) {
-//                continue;
-//            }
-//            sb.append(((UnionNode) n).toString(indent + 1)).append("\n");
-//        }
-//
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof JoinGroupNode)) {
-//                continue;
-//            }
-//            sb.append(((JoinGroupNode) n).toString(indent + 1)).append("\n");
-//        }
-//
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof SubqueryRoot)) {
-//                continue;
-//            }
-//            sb.append(((SubqueryRoot) n).toString(indent + 1)).append("\n");
-//        }
-//
-//        for (IQueryNode n : this) {
-//            if (!(n instanceof AssignmentNode)) {
-//                continue;
-//            }
-//            sb.append(((AssignmentNode) n).toString(indent + 1)).append("\n");
-//        }
-
         sb.append("\n").append(s).append("}");
 
         if (this instanceof GraphPatternGroup) {
@@ -321,6 +299,13 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
             }
             
+        }
+
+        final List<FilterNode> filters = getAttachedJoinFilters();
+        if(!filters.isEmpty()) {
+            for (FilterNode filter : filters) {
+                sb.append(filter.toString(indent + 1));
+            }
         }
 
         return sb.toString();

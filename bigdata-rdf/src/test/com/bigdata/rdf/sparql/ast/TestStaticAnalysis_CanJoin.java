@@ -182,8 +182,8 @@ public class TestStaticAnalysis_CanJoin extends TestCase2 {
          */
         final StatementPatternNode p1 = new StatementPatternNode(p, q, x);
         final StatementPatternNode p2 = new StatementPatternNode(y, r, z);
-        p2.setSimpleOptional(true);
-        p2.setFilters(Collections.singletonList(new FilterNode(x)));
+        p2.setOptional(true);
+        p2.setAttachedJoinFilters(Collections.singletonList(new FilterNode(x)));
 
         final StaticAnalysis sa = new StaticAnalysis(new QueryRoot(QueryType.SELECT));
 

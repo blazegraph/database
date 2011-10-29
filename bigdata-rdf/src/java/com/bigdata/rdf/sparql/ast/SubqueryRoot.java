@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -33,7 +35,8 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
  */
 public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
-    public interface Annotations extends SubqueryBase.Annotations {
+    public interface Annotations extends SubqueryBase.Annotations,
+            IJoinNode.Annotations {
         
         /**
          * Annotation provides a query hint indicating whether or not the
@@ -87,23 +90,55 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
     }
 
-    public void setRunOnce(boolean runOnce) {
-        setProperty(Annotations.RUN_ONCE,runOnce);
+    /**
+     * Indicate whether this subquery should run once rather than as-bound.
+     * 
+     * @param runOnce
+     * 
+     * @see Annotations#RUN_ONCE
+     */
+    public void setRunOnce(final boolean runOnce) {
+
+        setProperty(Annotations.RUN_ONCE, runOnce);
+
     }
 
     public boolean isRunOnce() {
 
         return getProperty(Annotations.RUN_ONCE, Annotations.DEFAULT_RUN_ONCE);
-        
+
     }
-    
+
     /**
      * Returns <code>false</code>.
      */
     final public boolean isOptional() {
+
         return false;
+        
     }
 
+    final public List<FilterNode> getAttachedJoinFilters() {
+
+        @SuppressWarnings("unchecked")
+        final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
+
+        if (filters == null) {
+
+            return Collections.emptyList();
+
+        }
+
+        return Collections.unmodifiableList(filters);
+
+    }
+
+    final public void setAttachedJoinFilters(final List<FilterNode> filters) {
+
+        setProperty(Annotations.FILTERS, filters);
+
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -123,6 +158,13 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
         sb.append(indent(indent));
 
         sb.append("@" + Annotations.RUN_ONCE + "=" + runOnce);
+
+        final List<FilterNode> filters = getAttachedJoinFilters();
+        if(!filters.isEmpty()) {
+            for (FilterNode filter : filters) {
+                sb.append(filter.toString(indent + 1));
+            }
+        }
 
         return sb.toString();
 

@@ -319,13 +319,13 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
          * Set the flag so we know to do an OPTIONAL join for this statement
          * pattern.
          */
-        sp.setSimpleOptional(true);
+        sp.setOptional(true);
 
         /*
          * Attach any lifted filters.
          */
         if (!filters.isEmpty())
-            sp.setFilters(filters);
+            sp.setAttachedJoinFilters(filters);
 
         /*
          * Replace the group with the statement pattern node.

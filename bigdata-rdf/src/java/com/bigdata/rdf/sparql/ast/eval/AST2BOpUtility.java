@@ -232,7 +232,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     private static PipelineOp convert(PipelineOp left, final QueryBase query,
             final AST2BOpContext ctx) {
 
-        // The set of variables which are known to be materialized.
+        /*
+         * The set of variables which are known to be materialized.
+         * 
+         * FIXME Raise into the caller. In this method, compute a new doneSet
+         * instance. This is initialized from everything in the caller's doneSet
+         * and then we retainAll(projectedVars) for the (sub)query. In this way
+         * the subquery only see those variables in the done set which were in
+         * the doneSet of the parent and were projected into the (sub)query.
+         */
         final Set<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>();
         
         final GraphPatternGroup<?> root = query.getWhereClause();
@@ -533,7 +541,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 ctx.queryId, subqueryRoot.getName(), joinVars);
 
         if(ctx.nativeHashJoins) {
-        left = new NamedSubqueryOp(leftOrEmpty(left), //
+            left = new NamedSubqueryOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -835,7 +843,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
                 // true if we will release the HTree as soon as the join is done.
                 // Note: also requires lastPass.
-                final boolean release = lastPass && true;
+                final boolean release = lastPass;
 
                 if(ctx.nativeHashJoins) {
                     left = new HTreeSolutionSetHashJoinOp(
@@ -1283,7 +1291,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * 
          * FIXME This should be an optimizer. The join-filters should be
          * attached to the StatementPatternNode using the FILTERS annotation.
-         * That will get them out of the GROUP.
+         * That will get them out of the GROUP. [TODO Can this also handle
+         * RangeBOp attachments?  See the bottom of AST2BOpUtility.]
+         * 
+         * Once we attach the filters in an AST optimizer for required joins as
+         * well we can coalesce the code paths for adding a join for both
+         * optional statement patterns and required statement patterns. They
+         * will both be doing the same thing - attaching to the join any filters
+         * which are attached to the statement pattern node.
          */
         final int requiredStatementPatternCount = joinGroup
                 .getRequiredStatementPatternCount();
@@ -1293,7 +1308,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         if (requiredStatementPatternCount > 0) {
             int i = 0;
             for (StatementPatternNode sp : joinGroup.getStatementPatterns()) {
-                if (!sp.isSimpleOptional()) {
+                if (!sp.isOptional()) {
                     // Only required statement patterns.
                     preds[i++] = toPredicate(sp, ctx);
                     // hints.add(sp.getQueryHints());
@@ -1332,7 +1347,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             if (child instanceof StatementPatternNode) {
                 final StatementPatternNode sp = (StatementPatternNode) child;
-                if (sp.isSimpleOptional()) {
+                if (sp.isOptional()) {
                     /*
                      * ASTSimpleOptionalOptimizer will recognize and lift out
                      * simple optionals into the parent join group. A simple
@@ -1346,7 +1361,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                      */
                     final Predicate<?> pred = (Predicate<?>) toPredicate(sp,
                             ctx);
-                    final List<FilterNode> filters = sp.getFilters();
+                    final List<FilterNode> filters = sp.getAttachedJoinFilters();
                     left = addOptionalJoinForSingletonOptionalSubquery(left,
                             pred, sp.getQueryHints(), filters, ctx);
                     continue;
@@ -1656,6 +1671,12 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      *            node.
      * @param ctx
      * @return
+     * @deprecated Once we attach the filters in an AST optimizer for required
+     *             joins as well we can coalesce the code paths for adding a
+     *             join for both optional statement patterns and required
+     *             statement patterns. They will both be doing the same thing -
+     *             attaching to the join any filters which are attached to the
+     *             statement pattern node.
      */
     private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
             PipelineOp left, final Predicate<?> pred, final Properties queryHints,
@@ -2587,14 +2608,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             final URI functionURI = functionNode.getFunctionURI();
 
-            // TODO More efficient if the factory replaces a [null] reference
-            // for scalar values with Collections.emptyMap().  Modify the 
-            // parse tree => AST conversion to leave [scalarValues:=null] unless
-            // we need to set something explicitly.
             final Map<String, Object> scalarValues = functionNode.getScalarValues();
 
-            // TODO More efficient to pass in the FunctionNode than creating a
-            // new VEN[] each time.
             final ValueExpressionNode[] args = functionNode.args().toArray(
                     new ValueExpressionNode[functionNode.arity()]);
 

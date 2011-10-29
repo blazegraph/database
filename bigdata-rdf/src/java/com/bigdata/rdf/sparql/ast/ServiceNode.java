@@ -27,11 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -43,7 +46,8 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends GroupMemberNodeBase.Annotations {
+    interface Annotations extends GroupMemberNodeBase.Annotations,
+            IJoinNode.Annotations {
 
         /**
          * The service {@link URI}, which will be resolved against the
@@ -125,7 +129,30 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
      * Returns <code>false</code>.
      */
     final public boolean isOptional() {
+     
         return false;
+        
+    }
+
+    final public List<FilterNode> getAttachedJoinFilters() {
+
+        @SuppressWarnings("unchecked")
+        final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
+
+        if (filters == null) {
+
+            return Collections.emptyList();
+
+        }
+
+        return Collections.unmodifiableList(filters);
+
+    }
+
+    final public void setAttachedJoinFilters(final List<FilterNode> filters) {
+
+        setProperty(Annotations.FILTERS, filters);
+
     }
 
     @Override
@@ -151,6 +178,13 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
             
         }
         
+        final List<FilterNode> filters = getAttachedJoinFilters();
+        if(!filters.isEmpty()) {
+            for (FilterNode filter : filters) {
+                sb.append(filter.toString(indent + 1));
+            }
+        }
+
         return sb.toString();
 
     }

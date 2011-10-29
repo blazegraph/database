@@ -7,10 +7,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.controller.SubqueryOp;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.InBOp;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 
 /**
  * An optional or non-optional collection of query nodes that run together in
@@ -292,7 +289,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 	/**
 	 * Return only the filter child nodes in this group.
 	 */
-	public List<FilterNode> getFilters() {
+	public List<FilterNode> getAllFiltersInGroup() {
 		
 		final List<FilterNode> filters = new LinkedList<FilterNode>();
 		
@@ -365,98 +362,6 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
         return filters;
         
     }
-
-    /**
-     * A "simple optional" is an optional sub-group that contains only one
-     * statement pattern, no sub-groups of its own, and no filters that require
-     * materialized variables. We can lift these "simple optionals" into the
-     * parent group without incurring the costs of launching a
-     * {@link SubqueryOp}.
-     * 
-     * @deprecated by {@link ASTSimpleOptionalOptimizer}
-     */
-    @Deprecated
-	public boolean isSimpleOptional() {
-		
-		// first, the whole group must be optional
-		if (!isOptional()) {
-			return false;
-		}
-		
-		/*
-		 * Second, make sure we have only one statement pattern, no sub-queries,
-		 * and no filters that require materialization.
-		 */
-		StatementPatternNode sp = null;
-		
-		for (IQueryNode node : this) {
-			
-		    if (node instanceof StatementPatternNode) {
-			
-				// already got one
-				if (sp != null) {
-					return false;
-				}
-				
-				sp = (StatementPatternNode) node;
-				
-			} else if (node instanceof FilterNode) {
-				
-				final FilterNode filter = (FilterNode) node;
-				
-                final INeedsMaterialization req = filter
-                        .getMaterializationRequirement();
-
-                if (req.getRequirement() != INeedsMaterialization.Requirement.NEVER) {
-
-					return false;
-					
-				}
-            
-			} else {
-			
-			    /*
-			     * Anything else will queer the deal.
-			     */
-			    
-			    return false;
-			    
-			}
-			
-		}
-
-        // if we've made it this far, we are simple optional
-        return sp != null;
-
-	}
-
-    /**
-     * Get the single "simple optional" statement pattern.
-     * <p>
-     * See {@link #isSimpleOptional()}.
-     * 
-     * @deprecated by {@link ASTSimpleOptionalOptimizer}
-     */
-    @Deprecated
-	public StatementPatternNode getSimpleOptional() {
-		
-		if (!isSimpleOptional()) {
-			throw new RuntimeException("not a simple optional join group");
-		}
-		
-		for (IQueryNode node : this) {
-			
-			if (node instanceof StatementPatternNode) {
-				
-				return (StatementPatternNode) node;
-				
-			}
-			
-		}
-		
-		throw new RuntimeException("not a simple optional join group");
-		
-	}
 
 	/*
 	 * Note: I took this out and put a simpler version of toString(indent) into
