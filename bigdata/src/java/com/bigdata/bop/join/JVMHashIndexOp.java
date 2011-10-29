@@ -43,7 +43,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.controller.NamedSubqueryOp;
+import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.SubqueryJoinAnnotations;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -104,7 +104,7 @@ public class JVMHashIndexOp extends PipelineOp {
          * 
          * @see NamedSolutionSetRef
          */
-        final String NAMED_SET_REF = NamedSubqueryOp.Annotations.NAMED_SET_REF;
+        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
         /**
          * An optional {@link IVariable}[] identifying the variables to be

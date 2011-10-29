@@ -95,9 +95,9 @@ public class JVMNamedSubqueryOp extends PipelineOp {
          * solution set was attached.
          * 
          * @see NamedSolutionSetRef
-         * @see NamedSubqueryOp.Annotations#NAMED_SET_REF
+         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
          */
-        final String NAMED_SET_REF = NamedSubqueryOp.Annotations.NAMED_SET_REF;
+        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
         
     }
 
