@@ -519,36 +519,36 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         final NamedSubqueryInclude includeNode = new NamedSubqueryInclude(
                 node.getName());
 
-        final int nargs = node.jjtGetNumChildren();
-
-        if (nargs > 0 || node.isQueryHint()) {
-
-            /*
-             * Query hint for the join variables. This query hint may be used if
-             * static analysis of the context in which the INCLUDE appears fails
-             * to predict the correct join variables. (In the worst case it will
-             * fail to identify ANY join variables, which will cause the join to
-             * consider N x M solutions, rather than selectively probing a hash
-             * index to find just those solutions which could match.)
-             * 
-             * TODO We should recognize the syntax () as explicitly requesting
-             * a join without join variables.  This would have to be done as an
-             * action in [sparql.jjt].
-             */
-            
-            final VarNode[] joinvars = new VarNode[nargs];
-
-            for (int i = 0; i < nargs; i++) {
-
-                final Node argNode = node.jjtGetChild(i);
-
-                joinvars[i] = (VarNode) argNode.jjtAccept(this, null);
-
-            }
-
-            includeNode.setJoinVars(joinvars);
-
-        }
+//        final int nargs = node.jjtGetNumChildren();
+//
+//        if (nargs > 0 || node.isQueryHint()) {
+//
+//            /*
+//             * Query hint for the join variables. This query hint may be used if
+//             * static analysis of the context in which the INCLUDE appears fails
+//             * to predict the correct join variables. (In the worst case it will
+//             * fail to identify ANY join variables, which will cause the join to
+//             * consider N x M solutions, rather than selectively probing a hash
+//             * index to find just those solutions which could match.)
+//             * 
+//             * TODO We should recognize the syntax () as explicitly requesting
+//             * a join without join variables.  This would have to be done as an
+//             * action in [sparql.jjt].
+//             */
+//            
+//            final VarNode[] joinvars = new VarNode[nargs];
+//
+//            for (int i = 0; i < nargs; i++) {
+//
+//                final Node argNode = node.jjtGetChild(i);
+//
+//                joinvars[i] = (VarNode) argNode.jjtAccept(this, null);
+//
+//            }
+//
+//            includeNode.setJoinVars(joinvars);
+//
+//        }
 
         graphPattern.add(includeNode);
 

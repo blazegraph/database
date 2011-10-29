@@ -20,7 +20,7 @@ class ASTNamedSubqueryInclude extends SimpleNode {
   
     private String name;
 
-    private boolean queryHint;
+//    private boolean queryHint;
 
     /**
      * Set the name of the named solution set.
@@ -36,19 +36,19 @@ class ASTNamedSubqueryInclude extends SimpleNode {
         return name;
     }
 
-    /**
-     * Set flag indicating the join variable query hint.
-     */
-    public void setQueryHint(boolean queryHint) {
-        this.queryHint = queryHint;
-    }
-
-    /**
-     * Return query hint flag.
-     */
-    public boolean isQueryHint() {
-        return queryHint;
-    }
+//    /**
+//     * Set flag indicating the join variable query hint.
+//     */
+//    public void setQueryHint(boolean queryHint) {
+//        this.queryHint = queryHint;
+//    }
+//
+//    /**
+//     * Return query hint flag.
+//     */
+//    public boolean isQueryHint() {
+//        return queryHint;
+//    }
 
 }
 /* JavaCC - OriginalChecksum=3c3697c969e7c8627c4e939334b4599f (do not edit this line) */
