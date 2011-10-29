@@ -64,6 +64,7 @@ import com.bigdata.bop.solutions.IVComparator;
 import com.bigdata.bop.solutions.MemoryGroupByOp;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
+import com.bigdata.bop.solutions.ProjectionOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
@@ -746,7 +747,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             
             final ProjectionNode projection = subqueryRoot.getProjection();
 
-            final IVariable<?>[] vars = projection.getProjectionVars();
+            // The variables projected by the subquery.
+            final IVariable<?>[] projectedVars = projection.getProjectionVars();
 
             /*
              * Enable new sub-group evaluation code path. This is based on a
@@ -757,7 +759,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * solutions from the sub-select (which are flowing through the
              * pipeline).
              */
-            if(ctx.hashJoinPatternForSubSelect) { 
+            if(ctx.hashJoinPatternForSubSelect) {
 
                 /*
                  * Model a sub-group by building a hash index at the start of the
@@ -774,29 +776,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
                 @SuppressWarnings("rawtypes")
                 final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
-
-                // Only pass along the variables projected by the Subquery.
-                @SuppressWarnings("rawtypes")
-                final IVariable[] selectVarsProjectedBySubquery = vars;
-                
-                /*
-                 * FIXME We need to retain all variables which were visible in
-                 * the parent group plus anything which was projected out of the
-                 * subquery. Since there can be exogenous variables, the easiest
-                 * way to do this is to add a step which projects only those
-                 * variables which are projected out of the subquery and then to
-                 * not constrain the variables projected out of the hash join.
-                 */
-                final IVariable[] selectVarsInParent = null;
                 
                 final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                         ctx.queryId, solutionSetName, joinVars);
 
                 final boolean optional = false;// Sub-Select is not optional.
 
-                final PipelineOp op;
                 if(ctx.nativeHashJoins) {
-                    op = new HTreeHashIndexOp(leftOrEmpty(left),//
+                    left = new HTreeHashIndexOp(leftOrEmpty(left),//
                         new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
@@ -804,11 +791,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                         new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                         new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                        new NV(HTreeHashIndexOp.Annotations.SELECT, selectVarsProjectedBySubquery),//
+                        new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                         new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                 );
                 } else {
-                    op = new JVMHashIndexOp(leftOrEmpty(left),//
+                    left = new JVMHashIndexOp(leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                             new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                     BOpEvaluationContext.CONTROLLER),//
@@ -816,11 +803,33 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                             new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                             new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                            new NV(HTreeHashIndexOp.Annotations.SELECT, selectVarsProjectedBySubquery),//
+                            new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                             new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                     ); 
                 }
 
+                // Append the subquery plan.
+                left = convert(left, subqueryRoot, ctx);
+
+                /*
+                 * Append operator to drop variables which are not projected by
+                 * the subquery.
+                 * 
+                 * Note: We need to retain all variables which were visible in
+                 * the parent group plus anything which was projected out of the
+                 * subquery. Since there can be exogenous variables, the easiest
+                 * way to do this correctly is to drop variables from the
+                 * subquery plan which are not projected by the subquery. (This
+                 * is not done at the top-level query plan because it would
+                 * cause exogenous variables to be dropped.)
+                 */
+                left = new ProjectionOp(leftOrEmpty(left), //
+                        new NV(BOp.Annotations.BOP_ID,ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(ProjectionOp.Annotations.SELECT,projectedVars)//
+                        );
+                
                 // lastPass is required if the join is optional.
                 final boolean lastPass = optional; // iff optional.
 
@@ -828,33 +837,30 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 // Note: also requires lastPass.
                 final boolean release = lastPass && true;
 
-                final PipelineOp subqueryPlan = convert(op/* left */,
-                        subqueryRoot, ctx);
-
                 if(ctx.nativeHashJoins) {
                     left = new HTreeSolutionSetHashJoinOp(
-                        new BOp[] { subqueryPlan },//
+                        leftOrEmpty(left),//
                         new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                        new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVarsInParent),//
+                        new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                         );
                 } else {
                     left = new JVMSolutionSetHashJoinOp(
-                        new BOp[] { subqueryPlan },//
+                        leftOrEmpty(left),//
                         new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                        new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVarsInParent),//
+                        new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                         new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -877,7 +883,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                         new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                         new NV(SubqueryOp.Annotations.OPTIONAL, false),//
-                        new NV(SubqueryOp.Annotations.SELECT, vars),//
+                        new NV(SubqueryOp.Annotations.SELECT, projectedVars),//
                         new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
                 );
             

@@ -29,7 +29,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * <p>
  * Note: This implementation is a pipelined operator which inspects each chunk
  * of solutions as they arrive and those solutions which are distinct for each
- * chunk are passed on. If uses a {@link ConcurrentMap} and is thread-safe.
+ * chunk are passed on. It uses a {@link ConcurrentMap} and is thread-safe.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
