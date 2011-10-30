@@ -333,29 +333,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             }
 
             /*
-             * Append operator to drop variables which are not projected by the
-             * subquery.
-             * 
-             * Note: We need to retain all variables which were visible in the
-             * parent group plus anything which was projected out of the
-             * subquery. Since there can be exogenous variables, the easiest way
-             * to do this correctly is to drop variables from the subquery plan
-             * which are not projected by the subquery. (This is not done at the
-             * top-level query plan because it would cause exogenous variables
-             * to be dropped.)
-             */
-
-            // The variables projected by the subquery.
-            final IVariable<?>[] projectedVars = projection.getProjectionVars();
-
-            left = new ProjectionOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            );
-
-            /*
              * Note: The DISTINCT operators also enforce the projection.
              * 
              * Note: REDUCED allows, but does not require, either complete or
@@ -384,6 +361,33 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
+        if (projection != null) {
+         
+            /*
+             * Append operator to drop variables which are not projected by the
+             * subquery.
+             * 
+             * Note: We need to retain all variables which were visible in the
+             * parent group plus anything which was projected out of the
+             * subquery. Since there can be exogenous variables, the easiest way
+             * to do this correctly is to drop variables from the subquery plan
+             * which are not projected by the subquery. (This is not done at the
+             * top-level query plan because it would cause exogenous variables
+             * to be dropped.)
+             */
+
+            // The variables projected by the subquery.
+            final IVariable<?>[] projectedVars = projection.getProjectionVars();
+
+            left = new ProjectionOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
+            );
+
+        }
+        
         final SliceNode slice = query.getSlice();
 
         if (slice != null) {
