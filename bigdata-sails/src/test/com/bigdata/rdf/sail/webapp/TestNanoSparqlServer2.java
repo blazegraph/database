@@ -62,12 +62,14 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
+import org.semanticweb.yars.nx.parser.NxParser;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
@@ -1150,6 +1152,14 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         
     }
 
+//    // FIXME We need an NQuadsWriter to run this test.
+//    // Note: quads interchange
+//    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
+//
+//        doInsertWithBodyTest("POST", 23, requestPath, NQuadsParser.nquads);
+//        
+//    }
+
     // TODO Write test for UPDATE where we override the default context using
     // the context-uri.
     public void test_POST_INSERT_triples_with_BODY_and_defaultContext()
@@ -1212,6 +1222,69 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         
     }
 
+    /**
+     * Test for POST of an NQuads resource by a URL.
+     */
+    public void test_POST_INSERT_NQuads_by_URL()
+            throws Exception {
+
+        if(TestMode.quads != testMode)
+            return;
+
+        // Verify nothing in the KB.
+        {
+            final String queryStr = "ASK where {?s ?p ?o}";
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = queryStr;
+            opts.method = "GET";
+
+            opts.acceptHeader = BooleanQueryResultFormat.SPARQL
+                    .getDefaultMIMEType();
+            assertEquals(false, askResults(doSparqlQuery(opts, requestPath)));
+        }
+
+        // #of statements in that RDF file.
+        final long expectedStatementCount = 7;
+        
+        // Load the resource into the KB.
+        {
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.method = "POST";
+            opts.requestParams = new LinkedHashMap<String, String[]>();
+            opts.requestParams
+                    .put("uri",
+                            new String[] { "file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/quads.nq" });
+
+            final MutationResult result = getMutationResult(doSparqlQuery(opts,
+                    requestPath));
+
+            assertEquals(expectedStatementCount, result.mutationCount);
+
+        }
+
+        /*
+         * Verify KB has the loaded data.
+         */
+        {
+            final String queryStr = "SELECT * where {?s ?p ?o}";
+
+            final QueryOptions opts = new QueryOptions();
+            opts.serviceURL = m_serviceURL;
+            opts.queryStr = queryStr;
+            opts.method = "GET";
+
+            opts.acceptHeader = BooleanQueryResultFormat.SPARQL
+                    .getDefaultMIMEType();
+
+            assertEquals(expectedStatementCount, countResults(doSparqlQuery(
+                    opts, requestPath)));
+        }
+
+    }
+        
     /**
      * Test of insert and retrieval of a large literal.
      */
@@ -2268,7 +2341,7 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
     private Graph loadGraphFromResource(final String resource)
             throws RDFParseException, RDFHandlerException, IOException {
 
-        final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
+//        final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
 
         final Graph g = readGraphFromFile(new File(resource));
 
