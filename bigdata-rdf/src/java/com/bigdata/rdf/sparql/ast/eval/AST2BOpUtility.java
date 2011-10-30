@@ -480,7 +480,18 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             final String[] dependsOn = subqueryRoot.getDependsOn();
 
-            if (dependsOn.length == 0)
+            /*
+             * TODO Parallelism for the named subqueries with no dependenceies
+             * has been (at least temporarily) disabled. The problem with a
+             * UNION of these no-dependency named subqueries is that each of
+             * them sees an input solution which is empty (no bindings) and
+             * copies that to its output. Since the outputs are UNIONed, we are
+             * getting N empty solutions out when we run N named subqueries with
+             * no dependencies. This is demonstrated by TestSubQuery in the
+             * "named-subquery-scope" test case. While that test was written to
+             * test something else, it happens to trigger this bug as well.
+             */
+            if (dependsOn.length == 0 && false)
                 runFirst.add(subqueryRoot);
             else
                 remainder.add(subqueryRoot);
@@ -489,43 +500,40 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         final int nfirst = runFirst.size();
 
-        if (nfirst == 0) {
+        if (nfirst > 0) {
 
-            // Can't be true. At least one of the named subqueries must not
-            // depend on any of the others.
+            if (nfirst == 1) {
 
-            throw new AssertionError();
+                left = addNamedSubquery(left, runFirst.get(0), ctx);
 
-        } else if (nfirst == 1) {
+            } else {
 
-            left = addNamedSubquery(left, runFirst.get(0), ctx);
+                final PipelineOp[] steps = new PipelineOp[nfirst];
 
-        } else {
+                int i = 0;
 
-            final PipelineOp[] steps = new PipelineOp[nfirst];
+                for (NamedSubqueryRoot subqueryRoot : runFirst) {
 
-            int i = 0;
+                    steps[i++] = addNamedSubquery(null/* left */, subqueryRoot,
+                            ctx);
 
-            for (NamedSubqueryRoot subqueryRoot : runFirst) {
+                }
 
-                steps[i++] = addNamedSubquery(null/* left */, subqueryRoot,
-                        ctx);
+                // Do not run the subqueries with unlimited parallelism.
+                final int maxParallelSubqueries = Math.min(steps.length, 10);
+
+                // Run the steps in parallel.
+                left = new Union(leftOrEmpty(left), //
+                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                        new NV(Steps.Annotations.SUBQUERIES, steps),//
+                        new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
+                                maxParallelSubqueries)//
+                );
 
             }
-
-            // Do not run the subqueries with unlimited parallelism.
-            final int maxParallelSubqueries = Math.min(steps.length, 10);
-
-            // Run the steps in parallel.
-            left = new Union(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(Steps.Annotations.SUBQUERIES, steps),//
-                    new NV(Steps.Annotations.MAX_PARALLEL_SUBQUERIES,
-                            maxParallelSubqueries)//
-            );
-
+            
         }
 
         // Run the remaining steps in sequence.
