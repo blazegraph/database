@@ -71,7 +71,11 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class BSBMQ5Setup {
     
-    final AtomicInteger nextId = new AtomicInteger(0); 
+    /**
+     * Note: First id assigned is zero. This matches the naming of the
+     * statement pattern nodes.
+     */
+    final AtomicInteger nextId = new AtomicInteger(-1); 
 
     public final BigdataURI rdfsLabel; 
     public final BigdataURI productFeature;

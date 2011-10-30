@@ -220,8 +220,13 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
                 final IJoinNode tmp = path[i];
 
-                tmp.setAttachedJoinFilters(Arrays
-                        .asList(assignedConstraints[i]));
+                final FilterNode[] filters = assignedConstraints[i];
+
+                if (filters.length > 0) {
+
+                    tmp.setAttachedJoinFilters(Arrays.asList(filters));
+                    
+                }
 
             }
 
