@@ -343,6 +343,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              * could be created using chunk wise DISTINCT. Note that REDUCED may
              * not change the order in which the solutions appear (but we are
              * evaluating it before ORDER BY so that is Ok.)
+             * 
+             * TODO If there is an ORDER BY and a DISTINCT then the sort can be
+             * used to impose the distinct without the overhead of a hash index
+             * by filtering out the duplicate solutions after the sort.
              */
 
             if (projection.isDistinct() || projection.isReduced()) {

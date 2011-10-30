@@ -393,7 +393,12 @@ public class StatementPatternNode extends
         
 	    final StringBuilder sb = new StringBuilder();
 
-        sb.append("StatementPatternNode(");
+	    final Integer id = (Integer)getProperty(BOp.Annotations.BOP_ID);
+        sb.append("StatementPatternNode");
+        if (id != null) {
+            sb.append("[").append(id.toString()).append("]");
+        }
+        sb.append("(");
         sb.append(s()).append(", ");
         sb.append(p()).append(", ");
         sb.append(o());
