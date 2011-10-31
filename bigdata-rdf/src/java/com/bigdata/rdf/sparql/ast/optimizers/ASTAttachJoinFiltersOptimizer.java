@@ -52,7 +52,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 /**
  * Optimizer attaches {@link FilterNode}s which will run as "join filters" to
  * {@link StatementPatternNode}s. The joins must already be in the order in
- * which they will be evaluated.
+ * which they will be evaluated. Join filters which are already attached to
+ * required joins will be pick up and reattached as appropriate for the current
+ * join evaluation order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTAttachJoinFiltersOptimizer.java 5455 2011-10-29 19:43:53Z
@@ -167,9 +169,21 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             final IJoinNode aJoinNode = (IJoinNode) child;
             
             if (aJoinNode.isOptional()) {
+                /*
+                 * Note: We do not attach filters to OPTIONAL joins here.
+                 * 
+                 * Note: The ASTSimpleOptionalOptimizer is responsible for
+                 * filter attachment to optional statement pattern nodes. It
+                 * looks for optional JoinGroupNodes which it can rewrite into
+                 * an optional StatementPatternNode. The join filter (if any)
+                 * attached to that optional StatementPatternNode MUST NOT be
+                 * detached and reassigned even if the join order changes since
+                 * it is really part of an optional group which was rewritten
+                 * into an optional statement pattern.
+                 */
                 continue;
             }
-            
+
             requiredJoins.add(aJoinNode);
             
             final List<FilterNode> ownJoinFilters = aJoinNode
