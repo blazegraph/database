@@ -16,6 +16,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.striterator.AbstractChunkedResolverator;
@@ -35,6 +36,7 @@ public class BigdataBindingSetResolverator
     final private static Logger log = Logger
             .getLogger(BigdataBindingSetResolverator.class);
 
+    @SuppressWarnings("rawtypes")
     private final IVariable[] required;
 
     /**
@@ -99,6 +101,35 @@ public class BigdataBindingSetResolverator
      */
     protected IBindingSet[] resolveChunk(final IBindingSet[] chunk) {
 
+        return resolveChunk(required, state.getLexiconRelation(),
+                state.getSPOKeyArity(), chunk);
+
+    }
+
+    /**
+     * Resolve a chunk of {@link IBindingSet}s into a chunk of
+     * {@link IBindingSet}s in which term identifiers have been resolved to
+     * {@link BigdataValue}s.
+     * 
+     * @param required
+     *            The variable(s) to be materialized.
+     * @param lex
+     *            The lexicon reference.
+     * @param arity
+     *            The arity of the keys for the statement indices (3 for triples
+     *            or 4 for quads). This is just a hint used to provision the
+     *            internal hash map.
+     * @param chunk
+     *            The chunk of solutions whose variables will be materialized.
+     *            
+     * @return A new chunk of solutions in which those variables have been
+     *         materialized.
+     */
+    static public IBindingSet[] resolveChunk(final IVariable<?>[] required,
+            final LexiconRelation lex,
+            final int arity,// 3==triples or 4==quads ; just a hint.
+            final IBindingSet[] chunk) {
+    
         if (log.isInfoEnabled())
             log.info("Fetched chunk: size=" + chunk.length + ", chunk="
                     + Arrays.toString(chunk));
@@ -109,7 +140,7 @@ public class BigdataBindingSetResolverator
          */
         
         final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(chunk.length
-                * state.getSPOKeyArity());
+                * arity);
 
         for (IBindingSet solution : chunk) {
 
@@ -121,12 +152,14 @@ public class BigdataBindingSetResolverator
 
             if (required == null) {
             	
+                @SuppressWarnings("rawtypes")
                 final Iterator<Map.Entry<IVariable, IConstant>> itr = 
                 	bindingSet.iterator();
 
 	            while (itr.hasNext()) {
 	
-	                final Map.Entry<IVariable, IConstant> entry = itr.next();
+	                @SuppressWarnings("rawtypes")
+                    final Map.Entry<IVariable, IConstant> entry = itr.next();
 	                
 	                final IV<?,?> iv = (IV<?,?>) entry.getValue().get();
 	
@@ -175,8 +208,7 @@ public class BigdataBindingSetResolverator
                     + Arrays.toString(required));
 
         // batch resolve term identifiers to terms.
-        final Map<IV<?,?>, BigdataValue> terms = state.getLexiconRelation()
-                .getTerms(ids);
+        final Map<IV<?, ?>, BigdataValue> terms = lex.getTerms(ids);
 
         /*
          * Assemble a chunk of resolved elements.
@@ -187,7 +219,7 @@ public class BigdataBindingSetResolverator
             int i = 0;
             for (IBindingSet e : chunk) {
 
-                final IBindingSet f = getBindingSet(e, terms);
+                final IBindingSet f = getBindingSet(e, required, terms);
 
                 chunk2[i++] = f;
 
@@ -222,7 +254,8 @@ public class BigdataBindingSetResolverator
      *             if the {@link IBindingSet} was not materialized with the
      *             {@link IBindingSet}.
      */
-    private IBindingSet getBindingSet(final IBindingSet solution,
+    static private IBindingSet getBindingSet(final IBindingSet solution,
+            final IVariable<?>[] required,
             final Map<IV<?,?>, BigdataValue> terms) {
 
         if (solution == null)
@@ -231,12 +264,6 @@ public class BigdataBindingSetResolverator
         if (terms == null)
             throw new IllegalArgumentException();
 
-        if(solution == null) {
-            
-            throw new IllegalStateException("BindingSet was not materialized");
-            
-        }
-
         final IBindingSet bindingSet;
         if (required == null) {
         	bindingSet = solution;
@@ -244,11 +271,13 @@ public class BigdataBindingSetResolverator
         	bindingSet = solution.copy(required);
         }
         	
+        @SuppressWarnings("rawtypes")
         final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
                 .iterator();
 
         while (itr.hasNext()) {
 
+            @SuppressWarnings("rawtypes")
             final Map.Entry<IVariable, IConstant> entry = itr.next();
 
             final Object boundValue = entry.getValue().get();
