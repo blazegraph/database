@@ -36,8 +36,10 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.BigdataServiceCall;
@@ -93,6 +95,13 @@ public class ServiceCallJoin extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends PipelineOp.Annotations {
+
+        /**
+         * Optional constraints to be applied to each solution.
+         * 
+         * @see JoinAnnotations#CONSTRAINTS
+         */
+        String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
 
         /**
          * The service URI from the {@link ServiceRegistry}.
@@ -171,6 +180,8 @@ public class ServiceCallJoin extends PipelineOp {
 
         private final BOpContext<IBindingSet> context;
         
+        private final IConstraint[] constraints;
+        
         private final BigdataServiceCall serviceCall;
         
         public ChunkTask(final ServiceCallJoin op,
@@ -198,6 +209,8 @@ public class ServiceCallJoin extends PipelineOp {
 
             final long timestamp = ((Long) op
                     .getRequiredProperty(Annotations.TIMESTAMP)).longValue();
+
+            constraints = op.getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
             final AbstractTripleStore db = (AbstractTripleStore) context
                     .getResource(namespace, timestamp);
@@ -302,7 +315,7 @@ public class ServiceCallJoin extends PipelineOp {
                         
                         final IBindingSet out = BOpContext.bind(left, right,
                                 true/* leftIsPipeline */,
-                                null/* constraints */, null/*varsToKeep*/);
+                                constraints, null/*varsToKeep*/);
                         
                         if (out != null) {
                             

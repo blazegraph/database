@@ -395,14 +395,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Optimizer attaches FilterNodes which will run as "join filters" to
          * StatementPatternNodes.
-         * 
-         * FIXME Write tests, modify convertJoinGroup(), and enable this
-         * optimizer. Make sure that we are handling cases where a join filter
-         * winds up attached to a join other than a statement pattern node,
-         * e.g., to a SubqueryRoot, NamedSubqueryInclude, UnionNode, or
-         * ServiceNode.
          */
-        // add(new ASTAttachJoinFiltersOptimizer());
+        add(new ASTAttachJoinFiltersOptimizer());
         
         /**
          * Rewrite a join group having complex optionals using a hash join
