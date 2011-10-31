@@ -68,6 +68,8 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.lexicon.LexPredicate;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -574,6 +576,39 @@ public class AST2BOpFilters extends AST2BOpBase {
         }
 
         return joinConstraints.toArray(new IConstraint[joinConstraints.size()]);
+
+    }
+    
+    /**
+     * Convert the attached join filters into a list of {@link IConstraint}s.
+     * 
+     * @param joinNode
+     *            The {@link IJoinNode}.
+     * 
+     * @return The constraints -or- <code>null</code> if there are no attached
+     *         join filters for that {@link IJoinNode}.
+     */
+    static protected List<IConstraint> getJoinConstraints(final IJoinNode joinNode) {
+
+        final List<FilterNode> joinFilters = joinNode.getAttachedJoinFilters();
+
+        if (joinFilters == null || joinFilters.isEmpty()) {
+
+            return null;
+
+        }
+
+        final List<IConstraint> constraints = new LinkedList<IConstraint>();
+        
+        for (FilterNode filter : joinFilters) {
+        
+            constraints
+                    .add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
+                            filter.getValueExpression()));
+            
+        }
+        
+        return constraints;
 
     }
     
