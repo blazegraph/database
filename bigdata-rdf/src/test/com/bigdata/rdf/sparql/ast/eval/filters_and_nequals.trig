@@ -1,0 +1,12 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+: {
+:Person rdf:subClassOf :Entity .
+:Place rdfs:subClassOf :Entity .
+:Thing rdfs:subClassOF :Entity .
+:Person rdfs:label "Person" .
+:Place rdfs:label "Place" .
+:Thing rdfs:label "Thing" .
+}
