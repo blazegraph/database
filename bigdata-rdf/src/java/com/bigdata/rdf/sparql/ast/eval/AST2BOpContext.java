@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IdFactory;
-import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.htree.HTree;
@@ -88,22 +87,22 @@ public class AST2BOpContext implements IdFactory {
      */
     boolean nativeHashJoins = false;
     
-    /**
-     * When <code>true</code>, use a hash join pattern for sub-group evaluation.
-     * When <code>false</code>, use a {@link SubqueryOp}. This effects handling
-     * of OPTIONAL groups. It also effect handle of UNION iff UNION is modeled
-     * as sub-groups rather than using a TEE pattern.
-     */
-    boolean hashJoinPatternForSubGroup = true;
+//    /**
+//     * When <code>true</code>, use a hash join pattern for sub-group evaluation.
+//     * When <code>false</code>, use a {@link SubqueryOp}. This effects handling
+//     * of OPTIONAL groups. It also effect handle of UNION iff UNION is modeled
+//     * as sub-groups rather than using a TEE pattern.
+//     */
+//    boolean hashJoinPatternForSubGroup = true;
     
-    /**
-     * When <code>true</code>, use a hash join pattern for sub-select
-     * evaluation. When <code>false</code>, use a {@link SubqueryOp}.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
-     *      static optimizer into an AST rewrite)
-     */
-    boolean hashJoinPatternForSubSelect = true;
+//    /**
+//     * When <code>true</code>, use a hash join pattern for sub-select
+//     * evaluation. When <code>false</code>, use a {@link SubqueryOp}.
+//     * 
+//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
+//     *      static optimizer into an AST rewrite)
+//     */
+//    boolean hashJoinPatternForSubSelect = true;
     
     private int varIdFactory = 0;
 

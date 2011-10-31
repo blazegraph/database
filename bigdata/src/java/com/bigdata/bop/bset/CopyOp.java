@@ -37,6 +37,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
@@ -102,6 +103,12 @@ public class CopyOp extends PipelineOp {
      */
     public CopyOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
+    }
+
+    public CopyOp(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
+        
     }
 
     /**

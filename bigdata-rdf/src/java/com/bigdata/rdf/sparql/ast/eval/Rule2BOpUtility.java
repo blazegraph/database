@@ -86,10 +86,14 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Rule2BOpUtility extends AST2BOpBase {
+public class Rule2BOpUtility extends AST2BOpJoins {
 
     protected static final Logger log = Logger.getLogger(Rule2BOpUtility.class);
 
+    protected Rule2BOpUtility() {
+        
+    }
+    
 //    private static final transient IConstraint[][] NO_ASSIGNED_CONSTRAINTS = new IConstraint[0][];
 
     /**

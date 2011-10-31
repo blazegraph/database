@@ -74,6 +74,14 @@ public class NamedSubqueryRoot extends SubqueryBase {
          */
         String JOIN_VARS = "joinVars";
 
+        /**
+         * The set of variables which are known to have been materialized once
+         * this named subquery is evaluated. This is set when the
+         * {@link NamedSubqueryRoot} is evaluated and then referenced by the
+         * {@link NamedSubqueryInclude}.
+         */
+        String DONE_SET = "doneSet";
+
     }
     
     /**

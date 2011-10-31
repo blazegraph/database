@@ -35,6 +35,7 @@ import java.util.Set;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -55,6 +56,17 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * which they will be evaluated. Join filters which are already attached to
  * required joins will be pick up and reattached as appropriate for the current
  * join evaluation order.
+ * <p>
+ * Note: Even though a {@link FilterNode} is attached to a given join, the
+ * {@link FilterNode} may have materialization requirements which make it
+ * impossible to evaluate the constraint on the physical JOIN operator. In such
+ * cases, a materialization pattern will be used to ensure that the necessary
+ * variables have been materialized before the constraint runs. The
+ * materialization pipeline, of necessity, runs after the join and the
+ * constraint will be modeled as a {@link ConditionalRoutingOp}. However, this
+ * optimizer is NOT responsible for those decisions. It just attaches filters to
+ * join based on when their variables become bound, not when their variables are
+ * known to satisify the materialization requirements for the filter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: ASTAttachJoinFiltersOptimizer.java 5455 2011-10-29 19:43:53Z
@@ -115,7 +127,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
             if (child instanceof GraphPatternGroup<?>) {
             
                 attachJoinFilters(context, sa,
-                        (GraphPatternGroup<IGroupMemberNode>) group);
+                        (GraphPatternGroup<IGroupMemberNode>) child);
                 
             } else if (child instanceof SubqueryRoot) {
                 
