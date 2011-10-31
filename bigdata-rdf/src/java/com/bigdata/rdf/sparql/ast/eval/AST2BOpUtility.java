@@ -90,7 +90,6 @@ import com.bigdata.rdf.sparql.ast.GroupByNode;
 import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -126,7 +125,7 @@ import cutthecrap.utils.striterators.NOPFilter;
 
 /**
  * Query plan generator converts an AST into a query plan made up of
- * {@link PipelineOp}s
+ * {@link PipelineOp}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -1781,47 +1780,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
     
-//    /**
-//     * Adds an optional join (prepared by the caller) in place of an optional
-//     * group having a join as its sole group member.
-//     * 
-//     * @param left
-//     * @param pred
-//     *            The {@link Predicate} for some optional statement pattern
-//     *            node.
-//     * @param filters
-//     *            Any filters which MUST be run with that statement pattern
-//     *            node.
-//     * @param ctx
-//     * @return
-//     * @deprecated Once we attach the filters in an AST optimizer for required
-//     *             joins as well we can coalesce the code paths for adding a
-//     *             join for both optional statement patterns and required
-//     *             statement patterns. They will both be doing the same thing -
-//     *             attaching to the join any filters which are attached to the
-//     *             statement pattern node.
-//     */
-//    private static final PipelineOp addOptionalJoinForSingletonOptionalSubquery(
-//            PipelineOp left, final Predicate<?> pred, final Properties queryHints,
-//            final Collection<FilterNode> filters, final AST2BOpContext ctx) {
-//
-//        final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
-//
-//        for (FilterNode filter : filters) {
-//
-//            constraints.add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-//                    filter.getValueExpression()));
-//
-//        }
-//
-//        // just for now
-//        left = Rule2BOpUtility.join(ctx.db, ctx.queryEngine, left, pred,
-//                constraints, ctx.idFactory, queryHints);
-//
-//        return left;
-//
-//    }
-
     /**
      * This method handles sub-groups, including UNION, required sub-groups, and
      * OPTIONAL subgroups.
@@ -2377,62 +2335,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
 
-    /**
-     * Convert the attached join filters into a list of {@link IConstraint}s.
-     * 
-     * @param joinNode
-     *            The {@link IJoinNode}.
-     * 
-     * @return The constraints -or- <code>null</code> if there are no attached
-     *         join filters for that {@link IJoinNode}.
-     */
-    static private List<IConstraint> getJoinConstraints(final IJoinNode joinNode) {
-
-        final List<FilterNode> joinFilters = joinNode.getAttachedJoinFilters();
-
-        if (joinFilters == null || joinFilters.isEmpty()) {
-
-            return null;
-
-        }
-
-        final List<IConstraint> constraints = new LinkedList<IConstraint>();
-        
-        for (FilterNode filter : joinFilters) {
-        
-            constraints
-                    .add(new SPARQLConstraint<XSDBooleanIV<BigdataLiteral>>(
-                            filter.getValueExpression()));
-            
-        }
-        
-        return constraints;
-
-    }
-    
-    /**
-     * Convert the attached join filters into an {@link IConstraint}[].
-     * 
-     * @param joinNode
-     *            The {@link IJoinNode}.
-     * 
-     * @return The constraints -or- <code>null</code> if there are no attached
-     *         join filters for that {@link IJoinNode}.
-     */
-    static private IConstraint[] getJoinConstraintsAsArray(final IJoinNode joinNode) {
-    
-        final List<IConstraint> constraints = getJoinConstraints(joinNode);
-        
-        if(constraints == null) {
-         
-            return null;
-            
-        }
-        
-        return constraints.toArray(new IConstraint[constraints.size()]);
-        
-    }
-    
     /**
      * Method produces a {@link Predicate} which captures the semantics of the
      * {@link StatementPatternNode}.
