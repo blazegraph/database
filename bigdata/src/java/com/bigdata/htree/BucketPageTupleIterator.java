@@ -49,7 +49,8 @@ class BucketPageTupleIterator<E> implements
 		if (currentBucketPage == null)
 			throw new IllegalStateException();
 		final IRaba keys = currentBucketPage.getKeys();
-		for (; nextNonEmptySlot < keys.size(); nextNonEmptySlot++) {
+		final int size = keys.size();
+		for (; nextNonEmptySlot < size; nextNonEmptySlot++) {
 			if (keys.isNull(nextNonEmptySlot))
 				continue;
 			return true;

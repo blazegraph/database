@@ -31,6 +31,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
@@ -48,6 +49,7 @@ import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndexLocalCounter;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Leaf;
@@ -1142,7 +1144,10 @@ public class HTree extends AbstractHTree
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
 			// find the child directory page or bucket page.
-			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+			final AbstractPage child = current.getChildIfPresent(hashBits);
+			if (child == null)
+				return null;
+			
 			if (child.isLeaf()) {
 				/*
 				 * Found the bucket page, search it for a match.
@@ -1197,7 +1202,10 @@ public class HTree extends AbstractHTree
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
 			// find the child directory page or bucket page.
-			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+			final AbstractPage child = current.getChildIfPresent(hashBits);
+			if (child == null)
+				return emptyTupleIterator();
+			
 			if (child.isLeaf()) {
 				/*
 				 * Found the bucket page, search it for a match.
@@ -1220,7 +1228,26 @@ public class HTree extends AbstractHTree
 		}
 	}
 
-    public void insert(final Object obj) {
+    private ITupleIterator emptyTupleIterator() {
+		// TODO Auto-generated method stub
+		return new ITupleIterator() {
+
+			public ITuple next() {
+				throw new NoSuchElementException();
+			}
+
+			public boolean hasNext() {
+				return false;
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+			
+		};
+	}
+
+	public void insert(final Object obj) {
         insert(obj.hashCode(), SerializerUtil.serialize(obj));
     }
 
@@ -1266,8 +1293,7 @@ public class HTree extends AbstractHTree
 		while (true) {
 
 			// skip prefixLength bits and then extract globalDepth bits. 
-			if (prefixLength >= key.length * 8 && !current.isOverflowDirectory())
-				throw new AssertionError();
+			assert !(prefixLength >= key.length * 8 && !current.isOverflowDirectory());
 			
 		    final int hashBits = current.getLocalHashCode(key, prefixLength);
 
@@ -1302,7 +1328,7 @@ public class HTree extends AbstractHTree
 				/*
 				 * Found the bucket page, update it.
 				 */
-			    final BucketPage bucketPage = (BucketPage) child.copyOnWrite();
+			    final BucketPage bucketPage = (BucketPage) child.copyOnWrite(); // not sure if this is needed
 			    
 				// Attempt to insert the tuple into the bucket.
 				if (!bucketPage.insert(key, value)) {
@@ -1515,6 +1541,9 @@ public class HTree extends AbstractHTree
 		return removals;
 	}
 
+	/**
+	 *
+	 */
 	protected AbstractPage locatePageForKey(final byte[] key) {
 		if (key == null)
 			throw new IllegalArgumentException();

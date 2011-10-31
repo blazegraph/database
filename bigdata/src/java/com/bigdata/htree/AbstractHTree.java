@@ -507,8 +507,6 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 
             }
 
-//        }
-
     }
 
     /**
