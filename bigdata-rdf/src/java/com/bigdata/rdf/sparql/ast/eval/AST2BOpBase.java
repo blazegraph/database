@@ -89,6 +89,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
@@ -101,6 +103,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.EmptyAccessPathExpander;
+import com.bigdata.test.ExperimentDriver.Condition;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -141,7 +144,7 @@ public class AST2BOpBase {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
      */
-    static final boolean forceRemoteAPs = true;
+    protected static final boolean forceRemoteAPs = true;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
@@ -606,7 +609,7 @@ public class AST2BOpBase {
                 anns.add(new NV(BOp.Annotations.BOP_ID, lexJoinId));
                 anns.add(new NV(PipelineOp.Annotations.SINK_REF, endId));
                 
-                if (ctx.isCluster() && !Rule2BOpUtility.forceRemoteAPs) {
+                if (ctx.isCluster() && !AST2BOpBase.forceRemoteAPs) {
                     // use a partitioned join.
                     anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.SHARDED));
@@ -638,7 +641,52 @@ public class AST2BOpBase {
 
     }
 
-    // TODO JAVADOC
+    /**
+     * Add a join for a statement pattern. This handles triples-mode,
+     * named-graph and default graph join patterns whether on a single machine
+     * or on a cluster.
+     * <p>
+     * If there are join constraints, then their materialization requirements
+     * are considered. Constraints are attached directly to the join if they do
+     * not have materialization requirements, or if those materialization
+     * requirements either have been or *may* have been satisified (
+     * {@link Requirement#SOMETIMES}).
+     * <p>
+     * Constraints which can not be attached to the join, or which *might* not
+     * have their materialization requirements satisified by the time the join
+     * runs ({@link Requirement#SOMETIMES}) cause a materialization pattern to
+     * be appended to the pipeline. Once the materialization requirements have
+     * been satisified, the constraint is then imposed by a
+     * {@link ConditionalRoutingOp}.
+     * 
+     * @param db
+     * @param queryEngine
+     * @param left
+     * @param pred
+     *            The predicate describing the statement pattern.
+     * @param doneSet
+     *            The set of variables already known to be materialized.
+     * @param constraints
+     *            Constraints on that join (optional).
+     * @param context
+     * @param idFactory
+     * @param queryHints
+     *            Query hints associated with that statement pattern.
+     * @return
+     * 
+     *         FIXME Pull this out into a method. It is generic and can be used
+     *         for build a materialization pipeline after any kind of join and
+     *         applying join filters as soon as their data is materialized.
+     * 
+     *         -OR- Can I just handle this in ASTAttachJoinFiltersOptimizer (or
+     *         a follow on optimizer) by moving filter nodes which require
+     *         materialization to after the join, at which point the logic to
+     *         add the filter to the pipeline will take care of the
+     *         materialization steps automatically?
+     * 
+     *         TODO The RTO will need to assign the ids to joins so it can
+     *         correlate them with the {@link IJoinNode}s.
+     */
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
             final AbstractTripleStore db,//
@@ -658,14 +706,6 @@ public class AST2BOpBase {
 
         anns.add(new NV(BOp.Annotations.BOP_ID, joinId));
 
-//        anns.add(new NV(PipelineJoin.Annotations.SELECT,
-//                selectVars[order[i]]));
-
-        // No. The join just looks at the Predicate's optional annotation.
-//        if (pred.isOptional())
-//            anns.add(new NV(PipelineJoin.Annotations.OPTIONAL, pred
-//                    .isOptional()));
-
         /*
          * Some constraints need to be detached from the join so that we can
          * add a materialization step in between the join and the constraint
@@ -675,13 +715,10 @@ public class AST2BOpBase {
             new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
         
         if (constraints != null && !constraints.isEmpty()) {
-//          // decorate the predicate with any constraints.
-//          pred = (Predicate<?>) pred.setProperty(
-//                  IPredicate.Annotations.CONSTRAINTS, constraints
-//                          .toArray(new IConstraint[constraints.size()]));
 
             // create a mutable version
             final Collection<IConstraint> tmp = new LinkedList<IConstraint>();
+
             tmp.addAll(constraints);
 
             final Collection<IConstraint> tryBeforeMaterialization =
@@ -693,8 +730,10 @@ public class AST2BOpBase {
 
                 final IConstraint c = it.next();
 
-                // if this constraint needs materialized variables, remove it
-                // from the join and run it as a ConditionalRoutingOp later
+                /*
+                 * If this constraint needs materialized variables, remove it
+                 * from the join and run it as a ConditionalRoutingOp later.
+                 */
 
                 final Set<IVariable<IV>> terms =
                     new LinkedHashSet<IVariable<IV>>();
@@ -795,8 +834,6 @@ public class AST2BOpBase {
 
                 anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//                left = applyQueryHints(new PipelineJoin(leftOrEmpty(left),
-//                        anns.toArray(new NV[anns.size()])), queryHints);
                 left = newJoin(left, anns, queryHints);
 
             }
@@ -814,7 +851,6 @@ public class AST2BOpBase {
         if (needsMaterialization.size() > 0) {
 
             final Set<IVariable<?>> alreadyMaterialized = doneSet;
-//                new LinkedHashSet<IVariable<IV>>();
 
             for (Map.Entry<IConstraint, Set<IVariable<IV>>> e :
                 needsMaterialization.entrySet()) {
