@@ -178,9 +178,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	}
 
 	public boolean isLeaf() {
-		if (data == null)
-			throw new AssertionError("data == null");
-		
 		return data.isLeaf();
 	}
 
@@ -581,8 +578,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 * for this bucketPage since the serialization and dirty protocols
 		 * need not change at all. 
 		 */
-		final EvictionProtection protect = new EvictionProtection(this);
-		try {
+//		final EvictionProtection protect = new EvictionProtection(this);
+//		try {
 			/**
 			 * In any event:
 			 * 		create new bucket page and insert key/value
@@ -614,9 +611,9 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			newPage.insert(key, val);
 			
 			assert dirtyHierarchy();
-		} finally {
-			protect.release();
-		}
+//		} finally {
+//			protect.release();
+//		}
 
 		return true;
 	}
@@ -803,7 +800,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		 */
 		private boolean findNextSlot() {
 			final IRaba keys = getKeys();
-			for (; nextNonEmptySlot < keys.size(); nextNonEmptySlot++) {
+			final int size = keys.size();
+			for (; nextNonEmptySlot < size; nextNonEmptySlot++) {
 				if (keys.isNull(nextNonEmptySlot))
 					continue;
 				return true;
@@ -917,7 +915,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 */
 	private String PPVAL(final int index) {
 
-		if (getKeys().size() <= index)
+		if (index >= getKeys().size())
 			return "-";
 
 		if (index > getKeys().capacity()) {

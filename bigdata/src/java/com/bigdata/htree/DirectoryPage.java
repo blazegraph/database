@@ -92,11 +92,11 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	/**
 	 * Split the child {@link BucketPage}.
-	 * 
+	 * <p>
 	 * Rather than immediately creating 2 buckets, we want first to just
 	 * fill half the original slots (by testing the first key value) and
 	 * leaving the other half as null.
-	 * 
+	 * <p>
 	 * This will result in a lazy creation of the second BucketPage
 	 * if required.  Such that we could end up introducing several
 	 * new layers without the needless creation of empty BucketPages.
@@ -132,7 +132,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		final int newDepth = bucketPage.globalDepth + 1;
 		final boolean fillLowerSlots = bucketSlot < start + crefs;
 		
-		BucketPage newPage = createPage(newDepth);
+		final BucketPage newPage = createPage(newDepth);
 		
 		final Reference<AbstractPage> a = (Reference<AbstractPage>) (fillLowerSlots ? newPage.self : null);
 		for (int s = start; s < start + crefs; s++) {
@@ -179,8 +179,26 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 * based on the number of empty slots surrounding it.
 	 * 
 	 * If all slots are empty, then they will all be filled with references to the
-	 * new page
-	 * @param slot the target slot to be filled
+	 * new page.
+	 *
+	 * The regions tested follow the pattern below:
+	 * [A A A A A A A A]
+	 * [A A A A B B B B]
+	 * [A A B B C C D D]
+	 * [A B C D E F G H]
+	 *
+	 * Examples with 8 slots, test slot 'T'
+	 * [- - - - T - - -] // all empty
+	 * [S S S S S S S S] // set ALL 8
+	 * 
+	 * [F F - - T - - -] // other half not empty
+	 * [F F - - S S S S] // set 4 slots
+	 * 
+	 * [F F - T - - - -] // same half not empty
+	 * [F F S S - - - -] // set 2 slots
+	 * 
+	 * @param slot - the target slot to be filled
+	 * @param bucketPage - the page to replicate
 	 */
 	private void fillEmptySlots(final int slot, final BucketPage bucketPage) {
 		// create with initial max depth
@@ -401,7 +419,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         
         // Check for lazy BucketPage creation
         if (getChildAddr(index) == IRawStore.NULL) {
-        	DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+        	final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
 
         	return copy.setLazyChild(index);
         }
@@ -410,11 +428,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	}
     
     private BucketPage setLazyChild(final int index) {
-    	DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+    	final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+    	assert copy == this;
 
     	assert childRefs[index] == null;
     	
-    	BucketPage lazyChild = new BucketPage((HTree) htree, htree.addressBits);
+    	final BucketPage lazyChild = new BucketPage((HTree) htree, htree.addressBits);
     	lazyChild.parent = (Reference<DirectoryPage>) self;
     	((HTree) htree).nleaves++;
     	
@@ -1656,7 +1675,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 
-	private AbstractPage getChildIfPresent(int slot) {
+	AbstractPage getChildIfPresent(int slot) {
 		if (childRefs[slot] == null && data.getChildAddr(slot) == IRawStore.NULL) {
 			return null;
 		} else {
@@ -2362,8 +2381,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			return copy._addLevelForOverflow(current);
 		}
 		
-		EvictionProtection ep = new EvictionProtection(this);
-		try {		
+		// EvictionProtection ep = new EvictionProtection(this);
+		// try {		
 			final DirectoryPage newdir = new DirectoryPage((HTree) htree, null /*overflowKey*/, htree.addressBits);
 			
 			if (isReadOnly()) // TBD: Remove debug point
@@ -2394,9 +2413,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			// System.out.println("_addLevelForOverflow, level: " + newdir.getLevel());
 			
 			return newdir;
-		} finally {
-			ep.release();
-		}
+		// } finally {
+		//	ep.release();
+		// }
 	}
 	
 	private void _touchHierarchy() {

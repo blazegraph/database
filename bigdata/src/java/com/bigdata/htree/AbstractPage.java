@@ -749,20 +749,20 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
      * loaded from a checkpoint and not mutable) and the other version
      * otherwise. Remember, the mutable {@link HTree} is single threaded.
      */
-	class EvictionProtection {
+//	class EvictionProtection {
 
 //	    private final ArrayList<AbstractPage> protection = new ArrayList<AbstractPage>();
 		
-		EvictionProtection(final AbstractPage start) {
+//		EvictionProtection(final AbstractPage start) {
 //			AbstractPage dp = start;
 //			while (dp != null) {
 //				dp.referenceCount++;
 //				protection.add(dp);
 //				dp = dp.getParentDirectory();
 //			}			
-		}
+//		}
 		
-		void release() {
+//		void release() {
 //			for (AbstractPage dp : protection) {
 //				if (--dp.referenceCount == 0) {
 //					if (dp.isDirty() && !dp.isDeleted())
@@ -770,8 +770,8 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 //				}
 //					
 //			}
-		}
-	}
+//		}
+//	}
 
     /**
      * Return <code>true</code> iff self and all materialized children are
