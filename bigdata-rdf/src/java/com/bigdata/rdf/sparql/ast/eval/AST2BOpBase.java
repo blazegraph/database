@@ -90,7 +90,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
@@ -103,7 +102,6 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.EmptyAccessPathExpander;
-import com.bigdata.test.ExperimentDriver.Condition;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -568,9 +566,11 @@ public class AST2BOpBase {
 
                 final String ns = ctx.db.getLexiconRelation().getNamespace();
 
-                // An anonymous variable whose name is based on the variable in
-                // the query whose Value we are trying to materialize from the
-                // IV.
+                /*
+                 * An anonymous variable whose name is based on the variable in
+                 * the query whose Value we are trying to materialize from the
+                 * IV.
+                 */
                 @SuppressWarnings("unchecked")
                 final IVariable<BigdataValue> anonvar = Var.var("--"
                         + v.getName() + "-" + ctx.nextId());
@@ -826,6 +826,7 @@ public class AST2BOpBase {
                  */
 
                 final boolean scaleOut = queryEngine.isScaleOut();
+
                 if (scaleOut)
                     throw new UnsupportedOperationException();
 
@@ -848,7 +849,12 @@ public class AST2BOpBase {
 
         }
 
-        if (needsMaterialization.size() > 0) {
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        if (!needsMaterialization.isEmpty()) {
 
             final Set<IVariable<?>> alreadyMaterialized = doneSet;
 
@@ -868,19 +874,19 @@ public class AST2BOpBase {
                 final int condId = idFactory.incrementAndGet();
 
                 // we might have already materialized everything we need
-                if (terms.size() > 0) {
+                if (!terms.isEmpty()) {
 
+                    // Add materialization steps for remaining variables.
                     left = addMaterializationSteps(db, queryEngine, left,
                             condId, c, terms, idFactory, queryHints);
 
                 }
 
-                left = Rule2BOpUtility.applyQueryHints(
-                        new ConditionalRoutingOp(leftOrEmpty(left),
-                            NV.asMap(new NV[]{//
-                                new NV(BOp.Annotations.BOP_ID, condId),
-                                new NV(ConditionalRoutingOp.Annotations.CONDITION, c),
-                            })), queryHints);
+                left = Rule2BOpUtility.applyQueryHints(//
+                    new ConditionalRoutingOp(leftOrEmpty(left),//
+                        new NV(BOp.Annotations.BOP_ID, condId),//
+                        new NV(ConditionalRoutingOp.Annotations.CONDITION,c)//
+                    ), queryHints);
 
             }
 
