@@ -63,7 +63,7 @@ public class TestAll extends TestCase {
         
         // Basic query.
         suite.addTestSuite(TestBasicQuery.class);
-
+        
         // Test suite for named and default graph access patterns.
         suite.addTestSuite(TestNamedGraphs.class);
         
@@ -79,6 +79,9 @@ public class TestAll extends TestCase {
         // Test suite for aggregation queries.
         suite.addTestSuite(TestAggregationQuery.class);
 
+        // Test suite for FILTER evaluation.
+        suite.addTestSuite(TestFilters.class);
+        
         // Full text search
         suite.addTestSuite(TestSearch.class);
 
