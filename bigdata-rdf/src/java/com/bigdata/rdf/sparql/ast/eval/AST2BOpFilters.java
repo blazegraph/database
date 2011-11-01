@@ -169,7 +169,7 @@ public class AST2BOpFilters extends AST2BOpBase {
      * @see TryBeforeMaterializationConstraint
      */
     @SuppressWarnings("rawtypes")
-    public static PipelineOp addMaterializationSteps(PipelineOp left,
+    protected static PipelineOp addMaterializationSteps(PipelineOp left,
             final int rightId, final IValueExpression<IV> ve,
             final Collection<IVariable<IV>> vars, final AST2BOpContext ctx) {
 
@@ -238,6 +238,12 @@ public class AST2BOpFilters extends AST2BOpBase {
             final int rightId, final Collection<IVariable<IV>> vars,
             final AST2BOpContext ctx) {
 
+        /*
+         * FIXME If there is more than one variable to be materialized then use
+         * a pipeline operator which uses the chunked materialization pattern
+         * for solution sets.  See BigdataBindingSetResolverator.
+         */
+        
         final Iterator<IVariable<IV>> it = vars.iterator();
 
         int firstId = ctx.nextId();

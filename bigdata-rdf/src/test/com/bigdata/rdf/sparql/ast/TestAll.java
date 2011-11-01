@@ -78,9 +78,6 @@ public class TestAll extends TestCase {
         // Test suite for AST evaluation helpers.
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.TestAll.suite());
 
-        // Unit tests for query evaluation written to the AST layer.
-        suite.addTestSuite(TestASTTriplesModeEvaluation.class);
-
         // Unit tests for named solution set references.
         suite.addTestSuite(TestNamedSolutionSetRef.class);
         
