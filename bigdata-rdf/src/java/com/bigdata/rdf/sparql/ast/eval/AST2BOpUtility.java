@@ -206,13 +206,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * main query.
          */
 
-        // TODO Attach the query plan to the ASTContainer?
         queryPlan = (PipelineOp) queryPlan.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
+        // Attach the query plan to the ASTContainer.
+        astContainer.setQueryPlan(queryPlan);
+
         if (log.isInfoEnabled()) {
             log.info(astContainer);
-            log.info(BOpUtility.toString(queryPlan));
         }
 
         return queryPlan;

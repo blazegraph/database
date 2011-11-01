@@ -32,8 +32,8 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
+import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
@@ -58,7 +58,8 @@ import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
-import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -136,81 +137,125 @@ public class ASTEvalHelper {
      * 
      * @param store
      *            The {@link AbstractTripleStore} having the data.
-     * @param queryPlan
-     *            The query plan.
+     * @param astContainer
+     *            The {@link ASTContainer}.
      * @param bs
      *            The initial solution to kick things off.
-     * @param queryEngine
-     *            The query engine.
      *            
      * @return <code>true</code> if there are any solutions to the query.
      * 
      * @throws QueryEvaluationException
      */
+//    static public boolean evaluateBooleanQuery(
+//            final AbstractTripleStore database, final PipelineOp queryPlan,
+//            final BindingSet bs, final QueryEngine queryEngine)
+//            throws QueryEvaluationException {
+//
+//        CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
+//        try {
+//            itr = ASTEvalHelper
+//                    .evaluateQuery(database, queryPlan,
+//                            new QueryBindingSet(bs), queryEngine,
+//                            new IVariable[0]/* required */);
+//            return itr.hasNext();
+//        } finally {
+//            if (itr != null) {
+//                itr.close();
+//            }
+//        }
+//    }
+//
     static public boolean evaluateBooleanQuery(
-            final AbstractTripleStore database, final PipelineOp queryPlan,
-            final BindingSet bs, final QueryEngine queryEngine)
+            final AbstractTripleStore store,
+            final ASTContainer astContainer, final BindingSet bs)
             throws QueryEvaluationException {
 
-        IRunningQuery runningQuery = null;
-        IAsynchronousIterator<IBindingSet[]> source = null;
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        // Clear the optimized AST.
+        astContainer.clearOptimizedAST();
+
+        // Convert the query (generates an optimized AST as a side-effect).
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+        CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
         try {
-
-            source = wrapSource(database, bs);
-            
-            // Submit query for evaluation.
-            runningQuery = queryEngine.eval(queryPlan, source);
-
-            // See if any solutions were produced.
-            return runningQuery.iterator().hasNext();
-
-        } catch (Exception e) {
-
-            throw new QueryEvaluationException(e);
-            
+            itr = ASTEvalHelper
+                    .evaluateQuery(store, queryPlan,
+                            new QueryBindingSet(bs), context.queryEngine,
+                            new IVariable[0]/* required */);
+            return itr.hasNext();
         } finally {
-            
-            // Ensure source is closed.
-            if(source != null)
-                source.close();
-            
-            if (runningQuery != null) {
-            
-                runningQuery.cancel(true/* mayInterruptIfRunning */);
-                
-                checkFuture(runningQuery);
-
+            if (itr != null) {
+                itr.close();
             }
-
         }
-
     }
+    
+//    static public boolean evaluateBooleanQuery(
+//            final AbstractTripleStore database, final PipelineOp queryPlan,
+//            final BindingSet bs, final QueryEngine queryEngine)
+//            throws QueryEvaluationException {
+//        
+//        IRunningQuery runningQuery = null;
+//        IAsynchronousIterator<IBindingSet[]> source = null;
+//        try {
+//
+//            source = wrapSource(database, bs);
+//            
+//            // Submit query for evaluation.
+//            runningQuery = queryEngine.eval(queryPlan, source);
+//
+//            // See if any solutions were produced.
+//            return runningQuery.iterator().hasNext();
+//
+//        } catch (Exception e) {
+//
+//            throw new QueryEvaluationException(e);
+//            
+//        } finally {
+//            
+//            // Ensure source is closed.
+//            if(source != null)
+//                source.close();
+//            
+//            if (runningQuery != null) {
+//            
+//                runningQuery.cancel(true/* mayInterruptIfRunning */);
+//                
+//                checkFuture(runningQuery);
+//
+//            }
+//
+//        }
+//
+//    }
 
-    /**
-     * Test for abnormal completion of the {@link IRunningQuery}.
-     */
-    static private void checkFuture(final IRunningQuery runningQuery)
-            throws QueryEvaluationException {
-
-        try {
-            runningQuery.get();
-        } catch (InterruptedException e) {
-            /*
-             * Interrupted while waiting on the Future.
-             */
-            throw new RuntimeException(e);
-        } catch (Throwable e) {
-            /*
-             * Exception thrown by the runningQuery.
-             */
-            if (runningQuery.getCause() != null) {
-                // abnormal termination - wrap and rethrow.
-                throw new QueryEvaluationException(e);
-            }
-            // otherwise this is normal termination.
-        }
-
-    }
+//    /**
+//     * Test for abnormal completion of the {@link IRunningQuery}.
+//     */
+//    static private void checkFuture(final IRunningQuery runningQuery)
+//            throws QueryEvaluationException {
+//
+//        try {
+//            runningQuery.get();
+//        } catch (InterruptedException e) {
+//            /*
+//             * Interrupted while waiting on the Future.
+//             */
+//            throw new RuntimeException(e);
+//        } catch (Throwable e) {
+//            /*
+//             * Exception thrown by the runningQuery.
+//             */
+//            if (runningQuery.getCause() != null) {
+//                // abnormal termination - wrap and rethrow.
+//                throw new QueryEvaluationException(e);
+//            }
+//            // otherwise this is normal termination.
+//        }
+//
+//    }
     
     /**
      * Evaluate a SELECT query.
@@ -218,22 +263,45 @@ public class ASTEvalHelper {
      * @param store
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
-     *            The query plan.
+     *            The {@link ASTContainer}.
      * @param bs
      *            The initial solution to kick things off.
-     * @param queryEngine
-     *            The query engine.
-     * @param projected
-     *            The variables projected by the query.
      *            
      * @return An object from which the solutions may be drained.
      * 
      * @throws QueryEvaluationException
      */
+//    static public TupleQueryResult evaluateTupleQuery(
+//            final AbstractTripleStore store, final PipelineOp queryPlan,
+//            final QueryBindingSet bs, final QueryEngine queryEngine,
+//            final IVariable<?>[] projected) throws QueryEvaluationException {
+//
+//        final List<String> projectedSet = new LinkedList<String>();
+//
+//        for (IVariable<?> var : projected)
+//            projectedSet.add(var.getName());
+//
+//        return new TupleQueryResultImpl(projectedSet,
+//                ASTEvalHelper.evaluateQuery(store, queryPlan,
+//                        new QueryBindingSet(bs), queryEngine, projected));
+//
+//    }
+//    
     static public TupleQueryResult evaluateTupleQuery(
-            final AbstractTripleStore store, final PipelineOp queryPlan,
-            final QueryBindingSet bs, final QueryEngine queryEngine,
-            final IVariable<?>[] projected) throws QueryEvaluationException {
+            final AbstractTripleStore store, final ASTContainer astContainer,
+            final QueryBindingSet bs) throws QueryEvaluationException {
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        // Clear the optimized AST.
+        astContainer.clearOptimizedAST();
+
+        // Convert the query (generates an optimized AST as a side-effect).
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+        // Get the projection for the query.
+        final IVariable<?>[] projected = astContainer.getOptimizedAST()
+                .getProjection().getProjectionVars();
 
         final List<String> projectedSet = new LinkedList<String>();
 
@@ -241,8 +309,8 @@ public class ASTEvalHelper {
             projectedSet.add(var.getName());
 
         return new TupleQueryResultImpl(projectedSet,
-                ASTEvalHelper.evaluateQuery(store, queryPlan,
-                        new QueryBindingSet(bs), queryEngine, projected));
+                ASTEvalHelper.evaluateQuery(store, queryPlan, bs,
+                        context.queryEngine, projected));
 
     }
     
@@ -251,59 +319,82 @@ public class ASTEvalHelper {
      * 
      * @param store
      *            The {@link AbstractTripleStore} having the data.
-     * @param queryPlan
-     *            The query plan.
+     * @param astContainer
+     *            The {@link ASTContainer}.
      * @param bs
      *            The initial solution to kick things off.
-     * @param queryEngine
-     *            The query engine.
-     * @param projected
-     *            The variables projected by the query.
-     * @param prefixDecls
-     *            The namespace prefix declarations map. This is a {@link Map}
-     *            with {@link String} keys (prefix) and {@link String} values
-     *            (the uri associated with that prefix).
-     * @param construct
-     *            The construct template.
      * 
      * @throws QueryEvaluationException
      */
+//    public static GraphQueryResult evaluateGraphQuery(
+//            final AbstractTripleStore store, final PipelineOp queryPlan,
+//            final QueryBindingSet queryBindingSet,
+//            final QueryEngine queryEngine, final IVariable<?>[] projected,
+//            final Map<String, String> prefixDecls, final ConstructNode construct)
+//            throws QueryEvaluationException {
+//
+//        return new GraphQueryResultImpl(prefixDecls, new ASTConstructIterator(
+//                store, construct, ASTEvalHelper.evaluateQuery(store,
+//                        queryPlan, queryBindingSet, queryEngine, projected)));
+//
+//    }
+//
     public static GraphQueryResult evaluateGraphQuery(
-            final AbstractTripleStore store, final PipelineOp queryPlan,
-            final QueryBindingSet queryBindingSet,
-            final QueryEngine queryEngine, final IVariable<?>[] projected,
-            final Map<String, String> prefixDecls, final ConstructNode construct)
-            throws QueryEvaluationException {
+            final AbstractTripleStore store, final ASTContainer astContainer,
+            final QueryBindingSet bs) throws QueryEvaluationException {
 
-        return new GraphQueryResultImpl(prefixDecls, new ASTConstructIterator(
-                store, construct, ASTEvalHelper.evaluateQuery(store,
-                        queryPlan, queryBindingSet, queryEngine, projected)));
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        // Clear the optimized AST.
+        astContainer.clearOptimizedAST();
+        
+        // Convert the query (generates an optimized AST as a side-effect).
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+
+        // The optimized AST.
+        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+        
+        return new GraphQueryResultImpl(//
+                optimizedQuery.getPrefixDecls(), //
+                new ASTConstructIterator(store, //
+                        optimizedQuery.getConstruct(), //
+                        ASTEvalHelper.evaluateQuery(
+                                store,
+                                queryPlan,
+                                bs,//
+                                context.queryEngine, //
+                                optimizedQuery.getProjection()
+                                        .getProjectionVars()//
+                                )));
 
     }
     
     /**
-     * Evaluate a query plan.
+     * Evaluate a query plan (core method).
+     * 
+     * @param database
+     *            The {@link AbstractTripleStore} view against which the query
+     *            will be evaluated.
+     * @param queryPlan
+     *            The query plan.
+     * @param bs
+     *            The source binding set.
+     * @param queryEngine
+     *            The query engine on which the query will run.
+     * @param required
+     *            The variables which must be materialized. Only materialized
+     *            variables will be reported in the output solutions. This MAY
+     *            be <code>null</code> to materialize all variables in the
+     *            solutions. If MAY be empty to materialize NONE of the
+     *            variables in the solutions (in which case all solutions will
+     *            be empty).
      * 
      * @return An iteration which may be used to read Sesame {@link BindingSet}s
      *         containing the solutions for the query.
      * 
-     *         TODO What is [required] for? It is probably where we are finally
-     *         pruning off the variables which are not being projected. That
-     *         should be done in {@link AST2BOpUtility}. (Yes, it gets passed
-     *         through to {@link BigdataBindingSetResolverator}, but that will
-     *         also accept a <code>null</code> and then just materialize all
-     *         variables it finds, which is what it should be doing if we have
-     *         already pruned the variables to just the projected variables in
-     *         the query plan.)
-     *         <p>
-     *         There is a twist here. I believe that Sesame may allow the
-     *         variables given in the initial binding set to flow through even
-     *         if they were not projected.
-     *         <p>
-     *         see https://sourceforge.net/apps/trac/bigdata/ticket/368 (Prune
-     *         variable bindings during query evaluation).
+     * @throws QueryEvaluationException
      */
-    static public CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
+    static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final AbstractTripleStore database, final PipelineOp queryPlan,
             final QueryBindingSet bs, final QueryEngine queryEngine,
             final IVariable<?>[] required) throws QueryEvaluationException {
@@ -349,6 +440,14 @@ public class ASTEvalHelper {
 
     }
 
+    /**
+     * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}.
+     * 
+     * @param src
+     *            The {@link BindingSet}.
+     *            
+     * @return The {@link IBindingSet}.
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static IBindingSet toBindingSet(final BindingSet src) {
 
@@ -377,6 +476,52 @@ public class ASTEvalHelper {
         
     }
     
+    /**
+     * Wrap {@link IRunningQuery} with the logic to materialize {@link IV}s as
+     * RDF {@link Value}s.
+     * 
+     * @param runningQuery
+     *            The {@link IRunningQuery}.
+     * @param db
+     *            The view of the {@link AbstractTripleStore} against which the
+     *            query is running.
+     * @param required
+     *            The variables which must be materialized (optional).
+     *            
+     * @return A Sesame {@link CloseableIteration} which will drain
+     *         {@link BindingSet}s of materialized RDF {@link Value}s.
+     */
+    private static CloseableIteration<BindingSet, QueryEvaluationException> 
+        iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
+            final IVariable<?>[] required) {
+    
+        // Dechunkify the running query and monitor the Sesame iterator.
+        final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
+        
+        // Wrap in an IChunkedOrderedIterator
+        final IChunkedOrderedIterator<IBindingSet> it2 = 
+            new ChunkedWrappedIterator<IBindingSet>(it1);
+        
+        // Materialize IVs as RDF Values.
+        final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
+            // Convert bigdata binding sets to Sesame binding sets.
+            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                // Materialize IVs as RDF Values.
+                new BigdataBindingSetResolverator(db, it2, required).start(
+                        db.getExecutorService()));
+        
+        return it3;
+        
+    }
+
+    /**
+     * Dechunkify the running query and monitor the Sesame iterator.
+     * 
+     * @param runningQuery
+     *            The {@link IRunningQuery}.
+     *            
+     * @return An {@link ICloseableIterator} which has been dechunkified.
+     */
     private static ICloseableIterator<IBindingSet> iterator(
             final IRunningQuery runningQuery) {
 
@@ -396,26 +541,4 @@ public class ASTEvalHelper {
         
     }
     
-    private static CloseableIteration<BindingSet, QueryEvaluationException> 
-        iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
-            final IVariable<?>[] required) {
-    
-        final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
-        
-        // Wrap in an IChunkedOrderedIterator
-        final IChunkedOrderedIterator<IBindingSet> it2 = 
-            new ChunkedWrappedIterator<IBindingSet>(it1);
-        
-        // Materialize IVs as RDF Values.
-        final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
-            // Convert bigdata binding sets to Sesame binding sets.
-            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-                // Materialize IVs as RDF Values.
-                new BigdataBindingSetResolverator(db, it2, required).start(
-                        db.getExecutorService()));
-        
-        return it3;
-        
-    }
-
 }

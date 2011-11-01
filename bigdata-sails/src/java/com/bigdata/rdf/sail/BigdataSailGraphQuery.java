@@ -47,14 +47,11 @@ import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -318,7 +315,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
     
         if (astContainer != null) {
 
-            astContainer.clearOptimizedAST();
+//            astContainer.clearOptimizedAST();
             
             final QueryRoot originalQuery = astContainer.getOriginalAST();
             
@@ -328,24 +325,27 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
 
             originalQuery.setIncludeInferred(getIncludeInferred());
 
-            final AbstractTripleStore store = getTripleStore();
-
-            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
-
-            final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
-            
+//            final AbstractTripleStore store = getTripleStore();
+//
+//            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+//
+//            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+//
+//            final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+//            
+//            final GraphQueryResult queryResult = ASTEvalHelper
+//                    .evaluateGraphQuery(
+//                    store, //
+//                    queryPlan, //
+//                    new QueryBindingSet(getBindings()),//
+//                    context.queryEngine, //
+//                    optimizedQuery.getProjection().getProjectionVars(),
+//                    optimizedQuery.getPrefixDecls(), //
+//                    optimizedQuery.getConstruct()//
+//                    );
             final GraphQueryResult queryResult = ASTEvalHelper
-                    .evaluateGraphQuery(
-                    store, //
-                    queryPlan, //
-                    new QueryBindingSet(getBindings()),//
-                    context.queryEngine, //
-                    optimizedQuery.getProjection().getProjectionVars(),
-                    optimizedQuery.getPrefixDecls(), //
-                    optimizedQuery.getConstruct()//
-                    );
+                    .evaluateGraphQuery(getTripleStore(), astContainer,
+                            new QueryBindingSet(getBindings()));
 
             return queryResult;
             

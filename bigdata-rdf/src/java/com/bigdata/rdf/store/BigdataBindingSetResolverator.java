@@ -101,8 +101,7 @@ public class BigdataBindingSetResolverator
      */
     protected IBindingSet[] resolveChunk(final IBindingSet[] chunk) {
 
-        return resolveChunk(required, state.getLexiconRelation(),
-                state.getSPOKeyArity(), chunk);
+        return resolveChunk(required, state.getLexiconRelation(), chunk);
 
     }
 
@@ -112,23 +111,22 @@ public class BigdataBindingSetResolverator
      * {@link BigdataValue}s.
      * 
      * @param required
-     *            The variable(s) to be materialized.
+     *            The variable(s) to be materialized. When <code>null</code>,
+     *            everything will be materialized. If a zero length array is
+     *            given, then NOTHING will be materialized and the outputs
+     *            solutions will be empty.
      * @param lex
      *            The lexicon reference.
-     * @param arity
-     *            The arity of the keys for the statement indices (3 for triples
-     *            or 4 for quads). This is just a hint used to provision the
-     *            internal hash map.
      * @param chunk
      *            The chunk of solutions whose variables will be materialized.
-     *            
+     * 
      * @return A new chunk of solutions in which those variables have been
      *         materialized.
      */
     static public IBindingSet[] resolveChunk(final IVariable<?>[] required,
-            final LexiconRelation lex,
-            final int arity,// 3==triples or 4==quads ; just a hint.
-            final IBindingSet[] chunk) {
+            final LexiconRelation lex,//
+            final IBindingSet[] chunk//
+            ) {
     
         if (log.isInfoEnabled())
             log.info("Fetched chunk: size=" + chunk.length + ", chunk="
@@ -139,8 +137,14 @@ public class BigdataBindingSetResolverator
          * chunk.
          */
         
-        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(chunk.length
-                * arity);
+        /*
+         * Estimate the capacity of the hash map based on the #of variables to
+         * materialize per solution and the #of solutions.
+         */
+        final int initialCapacity = required == null ? chunk.length
+                : ((required.length == 0) ? 1 : chunk.length * required.length);
+
+        final Collection<IV<?, ?>> ids = new HashSet<IV<?, ?>>(initialCapacity);
 
         for (IBindingSet solution : chunk) {
 
