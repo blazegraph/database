@@ -63,7 +63,10 @@ public class TestAll extends TestCase {
         
         // Basic query.
         suite.addTestSuite(TestBasicQuery.class);
-        
+
+        // Port of unit tests original written at the AST layer.
+        suite.addTestSuite(TestAST.class);
+
         // Test suite for named and default graph access patterns.
         suite.addTestSuite(TestNamedGraphs.class);
         

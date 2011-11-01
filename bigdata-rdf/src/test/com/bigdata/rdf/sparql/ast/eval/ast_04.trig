@@ -1,0 +1,14 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+: {
+:x rdf:type :C .
+:x :predicate1 "1"^^xsd:int .
+:x :predicate1 "2"^^xsd:int .
+:x :predicate1 "three"^^xsd:string .
+
+:z rdf:type :C .
+:z :predicate1 "2"^^xsd:int .
+:z :predicate1 "three"^^xsd:string .
+}
