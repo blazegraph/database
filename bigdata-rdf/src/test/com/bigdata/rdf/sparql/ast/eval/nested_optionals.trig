@@ -10,6 +10,6 @@
 :Jane rdf:type :Object .
 :Bryan rdf:type :Object .
 :Mike rdfs:label "mike label" .
-:Mike rdfs:label "mike comment" .
+:Mike rdfs:comment "mike comment" .
 :Jane rdfs:label "jane label" .
 }
