@@ -198,9 +198,14 @@ public class MutableBucketData implements ILeafData {
 
 //        final int nkeys = keys.size();
         
+        /**
+         * Only initialize values for number of key/values stored
+         */
+        final int dataslots = keys.nkeys;
+        
         if (versionTimestamps != null) {
 
-            for (int i = 0; i < branchingFactor; i++) {
+            for (int i = 0; i < dataslots; i++) {
 
                 versionTimestamps[i] = src.getVersionTimestamp(i);
                 
@@ -220,7 +225,7 @@ public class MutableBucketData implements ILeafData {
         
         if (deleteMarkers != null) {
 
-            for (int i = 0; i < branchingFactor; i++) {
+            for (int i = 0; i < dataslots; i++) {
 
                 deleteMarkers[i] = src.getDeleteMarker(i);
                 
@@ -230,7 +235,7 @@ public class MutableBucketData implements ILeafData {
 
         if (rawRecords != null) {
 
-            for (int i = 0; i < branchingFactor; i++) {
+            for (int i = 0; i < dataslots; i++) {
 
                 rawRecords[i] = src.getRawRecord(i) != IRawStore.NULL;
                 
