@@ -1,0 +1,16 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+: {
+  :mike rdf:type :person .
+  :mike :likes   :rdf .
+  :mike rdfs:label "Mike" .
+  
+  :rdf rdf:type :thing .
+  :rdf rdfs:label "RDF" .
+  
+  # Something which is not related.
+  :DC rdf:type :thing .
+  
+}

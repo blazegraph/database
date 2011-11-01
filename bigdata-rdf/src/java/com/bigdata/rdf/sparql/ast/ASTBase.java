@@ -86,6 +86,43 @@ public class ASTBase extends ModifiableBOpBase {
     }
 
     /**
+     * Return the value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     *            
+     * @return The value of the query hint and <code>null</code> if the query
+     *         hint is not defined.
+     */
+    public String getQueryHint(final String name) {
+
+        return getQueryHint(name, null/*defaultValue*/);
+
+    }
+    
+    /**
+     * Return the value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     * @param defaultValue
+     *            The default value to use if the query hint is not defined.
+     * 
+     * @return The value of the query hint and <i>defaultValue</i> if the query
+     *         hint is not defined.
+     */
+    public String getQueryHint(final String name, final String defaultValue) {
+
+        final Properties queryHints = (Properties) getProperty(Annotations.QUERY_HINTS);
+
+        if (queryHints == null)
+            return defaultValue;
+
+        return queryHints.getProperty(name, defaultValue);
+
+    }
+
+    /**
      * Set a query hint.
      * 
      * @param name

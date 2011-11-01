@@ -275,6 +275,10 @@ public class NanoSparqlClient {
 
                 /*
                  * Set an appropriate Accept header for the query.
+                 * 
+                 * FIXME Do this with BigdataSparqlParser2, perhaps using a
+                 * simple empty kb instance to back up the parser.  Then we
+                 * can drop BigdataSPARQLParser entirely.
                  */
                 final ParsedQuery parsedQuery = new BigdataSPARQLParser()
                         .parseQuery(opts.queryStr, opts.baseURI);

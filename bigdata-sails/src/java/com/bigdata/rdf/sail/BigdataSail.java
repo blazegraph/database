@@ -85,25 +85,15 @@ import org.openrdf.model.impl.NamespaceImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.QueryRoot;
-import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UpdateExpr;
-import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
-import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
-import org.openrdf.query.algebra.evaluation.impl.ConstantOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.FilterOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.QueryJoinOptimizer;
-import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
-import org.openrdf.query.algebra.evaluation.util.QueryOptimizerList;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.AbstractJournal;
@@ -121,18 +111,19 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
@@ -145,12 +136,9 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -283,41 +271,6 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DEFAULT_BUFFER_CAPACITY = "10000";
         
         /**
-         * This boolean may be used to specify whether or not to use "native"
-         * joins, bypassing the Sesame join mechanism (default
-         * {@value #DEFAULT_NATIVE_JOINS}). Native joins translate high-level
-         * query from an {@link TupleExpr} into an {@link IRule} and then
-         * execute the {@link IRule}. The generated {@link IRule}s operate
-         * directly with the {@link SPORelation} and {@link SPO} objects using
-         * internal 64-bit term identifiers rather than RDF {@link Value}s.
-         * When query results are externalized, efficient batch resolution is
-         * used to translate from those 64-bit term identifiers to
-         * {@link BigdataValue}s.
-         * 
-         * @see #DEFAULT_NATIVE_JOINS
-         */
-        public static final String NATIVE_JOINS = BigdataSail.class
-                .getPackage().getName()
-                + ".nativeJoins";
-        
-        public static final String DEFAULT_NATIVE_JOINS = "true";
-        
-        /**
-         * When true, SAIL will delegate all query evaluation to bigdata.
-         * Bigdata will parse the SPARQL query into its own AST
-         * {@link QueryRoot} and then evaluate that. The Sesame
-         * {@link TupleExpr} operator model will not be used. This option
-         * provides access new bigdata query operators, including those which
-         * can exploit the JVM process heap, those which can pipeline
-         * aggregations, and those which can be parallelized on a cluster.
-         */
-        public static final String NATIVE_SPARQL = BigdataSail.class
-                .getPackage().getName()
-                + ".nativeSparql";
-        
-        public static final String DEFAULT_NATIVE_SPARQL = "true";
-        
-        /**
          * Option (default <code>true</code>) may be used to explicitly disable
          * query-time expansion for entailments NOT computed during closure. In
          * particular, this may be used to disable the query time expansion of
@@ -372,15 +325,6 @@ public class BigdataSail extends SailBase implements Sail {
         public static final String DEFAULT_ISOLATABLE_INDICES = "false";
 
         /**
-         * Experimental new star joins feature.  Not yet performant.
-         */
-        public static final String STAR_JOINS = BigdataSail.class
-                .getPackage().getName()
-                + ".starJoins";
-        
-        public static final String DEFAULT_STAR_JOINS = "false";
-        
-        /**
          * Option specifies the namespace of the designed KB instance (default
          * {@value #DEFAULT_NAMESPACE}).
          */
@@ -388,34 +332,7 @@ public class BigdataSail extends SailBase implements Sail {
                 .getName()+ ".namespace";
 
         public static final String DEFAULT_NAMESPACE = "kb";
-        
-        /**
-         * Option to use the new query plan generator (default
-         * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
-         * 
-         * @deprecated
-         */
-        public static final String NEW_EVAL_STRATEGY = BigdataSail.class.getPackage()
-                .getName()+ ".newEvalStrategy";
-
-        @Deprecated
-        public static final String DEFAULT_NEW_EVAL_STRATEGY = "true";
-        
-        /**
-         * Option as to whether or not to allow Sesame evaluation of queries
-         * that cannot be run natively (if false, these queries will throw
-         * exceptions.  If true, these queries will run heinously slow but they
-         * will run. (default
-         * {@value #DEFAULT_NEW_EVAL_STRATEGY}).
-         * 
-         * @deprecated
-         */
-        public static final String ALLOW_SESAME_QUERY_EVALUATION = BigdataSail.class.getPackage()
-                .getName()+ ".allowSesameQueryEvaluation";
-
-        @Deprecated
-        public static final String DEFAULT_ALLOW_SESAME_QUERY_EVALUATION = "false";
-        
+                
     }
 
     /**
@@ -488,15 +405,6 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * Return <code>true</code> iff star joins are enabled.
-     */
-    public boolean isStarJoins() {
-    	
-    	return starJoins;
-    	
-    }
-    
-    /**
      * The configured capacity for the statement buffer(s).
      * 
      * @see Options#BUFFER_CAPACITY
@@ -516,23 +424,6 @@ public class BigdataSail extends SailBase implements Sail {
      * @see AbstractTripleStore.Options#QUADS
      */
     final private boolean quads;
-    
-    /**
-     * When true, SAIL will delegate joins to bigdata internal joins.
-     * 
-     * @see Options#NATIVE_JOINS
-     */
-    final private boolean nativeJoins;
-    
-    /**
-     * When true, SAIL will delegate all query evaluation to bigdata. Bigdata
-     * will parse the SPARQL query into its own AST {@link QueryRoot} and then
-     * evaluate that. The Sesame {@link TupleExpr} operator model will not be
-     * used.
-     * 
-     * @see Options#NATIVE_SPARQL
-     */
-    final private boolean nativeSparql;
     
     /**
      * When true, SAIL will compute entailments at query time that were excluded
@@ -564,21 +455,6 @@ public class BigdataSail extends SailBase implements Sail {
      * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
-    
-    /**
-     * When true, enable star joins.
-     * 
-     * @See {@link Options#STAR_JOINS}
-     */
-    final private boolean starJoins;
-    
-    /**
-     * When true, allow queries that cannot be executed natively to be
-     * executed by Sesame.
-     * 
-     * @See {@link Options#ALLOW_SESAME_QUERY_EVALUATION}
-     */
-    final private boolean allowSesameQueryEvaluation;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -934,9 +810,7 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
     }
-    
-
-    
+        
     /**
      * Core ctor.  You must use this variant for a scale-out triple store.
      * <p>
@@ -1001,33 +875,6 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
-        // nativeJoins
-        {
-            
-//            nativeJoins = false;
-//            System.err.println("native joins are disabled.");
-            nativeJoins = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.NATIVE_JOINS,
-                    BigdataSail.Options.DEFAULT_NATIVE_JOINS));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.NATIVE_JOINS + "=" + nativeJoins);
-
-        }
-
-        // nativeSparql
-        {
-            
-            nativeSparql = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.NATIVE_SPARQL,
-                    BigdataSail.Options.DEFAULT_NATIVE_SPARQL));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.NATIVE_SPARQL + "="
-                        + nativeSparql);
-
-        }
-
         // queryTimeExpander
         if (scaleOut) {
             
@@ -1086,32 +933,6 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
                         + isolatable);
-            
-        }
-
-        // star joins
-        { 
-            
-            starJoins = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.STAR_JOINS,
-                    BigdataSail.Options.DEFAULT_STAR_JOINS));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.STAR_JOINS + "="
-                        + starJoins);
-            
-        }
-
-        // Sesame query evaluation
-        { 
-            
-            allowSesameQueryEvaluation = Boolean.parseBoolean(properties.getProperty(
-                    BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION,
-                    BigdataSail.Options.DEFAULT_ALLOW_SESAME_QUERY_EVALUATION));
-
-            if (log.isInfoEnabled())
-                log.info(BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION + "="
-                        + allowSesameQueryEvaluation);
             
         }
 
@@ -1828,18 +1649,6 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
-        /**
-         * When <code>true</code>, bigdata provides native SPARQL evaluation and
-         * the Sesame {@link TupleExpr} operator model will not be used.
-         * 
-         * @see Options#NATIVE_SPARQL
-         */
-        public final boolean isNativeSparql() {
-            
-            return nativeSparql;
-            
-        }
-        
         /**
          * When true, SAIL will compute entailments at query time that were excluded
          * from forward closure.
@@ -3294,13 +3103,15 @@ public class BigdataSail extends SailBase implements Sail {
          */
 
         /**
-         * This overload is here to complete the SailConnection interface, but
-         * is never used.  The BigdataSailRepositoryConnection will always use
-         * the other overloaded version (the one with queryHints).
-         * <p>
-         * See {@link #evaluate(TupleExpr, Dataset, BindingSet, boolean, Properties)}.
+         * Bigdata now uses an internal query model which differs significantly
+         * from the Sesame query model. Support is no longer provided for
+         * {@link TupleExpr} evaluation. SPARQL queries must be prepared and
+         * evaluated using a {@link BigdataSailRepositoryConnection}.
          * 
-         * @deprecated by {@link Options#NATIVE_SPARQL}
+         * @throws SailException
+         *             <em>always</em>.
+         * 
+         * @see #evaluate(QueryRoot, Dataset, BindingSet, boolean)
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 final TupleExpr tupleExpr, //
@@ -3308,341 +3119,72 @@ public class BigdataSail extends SailBase implements Sail {
                 final BindingSet bindings,//
                 final boolean includeInferred//
         ) throws SailException {
-         
-            return evaluate2(tupleExpr, dataset, bindings,
-                    null/* bindingSets */, includeInferred, new Properties());
+
+            throw new SailException(
+                    "Support is not longer provided for TupleExpr evaluation");
             
         }
-        
+
+        /**
+         * Evaluate a bigdata query model.
+         * 
+         * @param queryRoot
+         *            The query model.
+         * @param dataset
+         *            The data set (optional).
+         * @param bindings
+         *            The initial bindings.
+         * @param includeInferred
+         *            <code>true</code> iff inferences will be considered when
+         *            reading on access paths.
+         * 
+         * @return The {@link CloseableIteration} from which the solutions may
+         *         be drained.
+         *         
+         * @throws SailException
+         */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
-                final TupleExpr tupleExpr, //
+                final QueryRoot queryRoot, //
                 final Dataset dataset,//
                 final BindingSet bindings,//
-                final boolean includeInferred,//
-                final Properties queryHints
+                final boolean includeInferred//
         ) throws SailException {
-         
-            return evaluate2(tupleExpr, dataset, bindings,
-                    null/* bindingSets */, includeInferred, queryHints);
+
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
             
-        }
-        
-        /**
-         * Return the optimized operator tree.  Useful for debugging.
-         * 
-         * @deprecated by {@link Options#NATIVE_SPARQL}
-         */
-        /*public*/ synchronized TupleExpr optimize(
-                TupleExpr tupleExpr,//
-                Dataset dataset,//
-                BindingSet bindings,//
-                final boolean includeInferred,//
-                final Properties queryHints//
-                ) throws SailException {
+            final QueryRoot originalQuery = astContainer.getOriginalAST();
 
-            if (log.isInfoEnabled())
-                log.info("Optimizing query: " + tupleExpr + ", dataSet="
-                        + dataset + ", includeInferred=" + includeInferred);
-
-            flushStatementBuffers(true/* assertions */, true/* retractions */);
-
-            // Clone the tuple expression to allow for more aggressive optimizations
-            tupleExpr = tupleExpr.clone();
-
-            if (!(tupleExpr instanceof QueryRoot)) {
-                // Add a dummy root node to the tuple expressions to allow the
-                // optimizers to modify the actual root node
-                tupleExpr = new QueryRoot(tupleExpr);
-            }
+            originalQuery.setIncludeInferred(includeInferred);
 
             /*
-             * Convert the terms in the query with BigdataValues. Both the
-             * native joins and the BigdataEvaluationStatistics rely on
-             * this.
+             * Batch resolve RDF Values to IVs and then set on the query model.
              */
-            final Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
-            dataset = (Dataset) newVals[0];
-            bindings = (BindingSet) newVals[1];
-            
-            final BigdataTripleSource tripleSource = 
-            	new BigdataTripleSource(this, includeInferred);
-
-            final BigdataEvaluationStrategy strategy = new BigdataEvaluationStrategyImpl3(
-                    tripleSource, dataset, null/* bindingSets */, nativeJoins,
-                    allowSesameQueryEvaluation);
-
-            final QueryOptimizerList optimizerList = new QueryOptimizerList();
-            optimizerList.add(new BindingAssigner());
-            optimizerList.add(new ConstantOptimizer(strategy));
-            optimizerList.add(new CompareOptimizer());
-            optimizerList.add(new ConjunctiveConstraintSplitter());
-            optimizerList.add(new SameTermFilterOptimizer());
-            // only need to optimize the join order this way if we are not
-            // using native joins
-            if (nativeJoins == false) {
-                optimizerList.add(new QueryJoinOptimizer(
-                        new BigdataEvaluationStatistics(this)));
-            }
-            optimizerList.add(new FilterOptimizer());
-
-            optimizerList.optimize(tupleExpr, dataset, bindings);
-
-            if (log.isInfoEnabled())
-                log.info("Optimized query: " + tupleExpr);
-
-            replaceValues(dataset, tupleExpr, bindings);
-//        	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
-//            dataset = (Dataset) newVals2[0];
-//            bindings = (BindingSet) newVals2[1];
-            
-            return tupleExpr;
-
-        }
-
-        /**
-         * Use this method to pump in a stream of bigdata IBindingSets.
-         * 
-         * @param bindings
-         *            The initial binding set which will be feed into the native
-         *            query evaluation.
-         * 
-         * @param bindingSets
-         *            An optional source for zero or more binding sets which
-         *            will be fed into the start of the native query evaluation.
-         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
-         * 
-         * @param includeInferred
-         *            The <i>includeInferred</i> argument is applied in two
-         *            ways. First, inferences are stripped out of the
-         *            {@link AccessPath}. Second, query time expansion of
-         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
-         *            <p>
-         *            Note: Query time expansion can be disabled independently
-         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
-         *            per-query basis.
-         * 
-         * @param queryHints
-         *            A set of properties that are parsed from a SPARQL query.
-         *            See {@link QueryHints#PREFIX} for more information.
-         * 
-         * @throws SailException
-         *             if <i>bindingSets</i> is non-<code>null</code> and
-         *             <i>bindingSet</i> is non-empty.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
-         * 
-         * @deprecated by {@link Options#NATIVE_SPARQL}
-         */
-        public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
-                TupleExpr tupleExpr,//
-                Dataset dataset,//
-                BindingSet bindings,//
-                final IAsynchronousIterator<IBindingSet[]> bindingSets,
-                final boolean includeInferred,//
-                final Properties queryHints//
-                ) throws SailException {
-
-        	return evaluate2(tupleExpr, dataset, bindings, bindingSets, includeInferred, queryHints);
-        	
-        }
-        
-        /**
-         * Use this method to pump in a stream of Sesame BindingSets.
-         * 
-         * @param bindings
-         *            The initial binding set which will be feed into the native
-         *            query evaluation.
-         * 
-         * @param bindingSets
-         *            An optional source for zero or more binding sets which
-         *            will be fed into the start of the native query evaluation.
-         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
-         * 
-         * @param includeInferred
-         *            The <i>includeInferred</i> argument is applied in two
-         *            ways. First, inferences are stripped out of the
-         *            {@link AccessPath}. Second, query time expansion of
-         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
-         *            <p>
-         *            Note: Query time expansion can be disabled independently
-         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
-         *            per-query basis.
-         * 
-         * @param queryHints
-         *            A set of properties that are parsed from a SPARQL query.
-         *            See {@link QueryHints#PREFIX} for more information.
-         * 
-         * @throws SailException
-         *             if <i>bindingSets</i> is non-<code>null</code> and
-         *             <i>bindingSet</i> is non-empty.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
-         */
-        public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
-                TupleExpr tupleExpr,//
-                Dataset dataset,//
-                BindingSet bindings,//
-                final CloseableIteration<BindingSet, QueryEvaluationException> bindingSets,
-                final boolean includeInferred,//
-                final Properties queryHints//
-                ) throws SailException {
-        	
-        	return evaluate2(tupleExpr, dataset, bindings, bindingSets, includeInferred, queryHints);
-        	
-        }
-
-        /**
-         * 
-         * @param bindings
-         *            The initial binding set which will be feed into the native
-         *            query evaluation.
-         * 
-         * @param bindingSets
-         *            An optional source for zero or more binding sets which
-         *            will be fed into the start of the native query evaluation.
-         *            When non-<code>null</code> <i>bindings</i> MUST be empty.
-         * 
-         * @param includeInferred
-         *            The <i>includeInferred</i> argument is applied in two
-         *            ways. First, inferences are stripped out of the
-         *            {@link AccessPath}. Second, query time expansion of
-         *            <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
-         *            <p>
-         *            Note: Query time expansion can be disabled independently
-         *            using {@link Options#QUERY_TIME_EXPANDER}, but not on a
-         *            per-query basis.
-         * 
-         * @param queryHints
-         *            A set of properties that are parsed from a SPARQL query.
-         *            See {@link QueryHints#PREFIX} for more information.
-         * 
-         * @throws SailException
-         *             if <i>bindingSets</i> is non-<code>null</code> and
-         *             <i>bindingSet</i> is non-empty.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/267
-         */
-        private synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate2(
-                TupleExpr tupleExpr,//
-                Dataset dataset,//
-                BindingSet bindings,//
-                final Object bindingSets,
-                final boolean includeInferred,//
-                final Properties queryHints//
-                ) throws SailException {
-
-            if (tupleExpr == null)
-                throw new SailException();
-            
-            if (bindings == null) // required by optimize() and probably others.
-                throw new SailException();
-            
-            if (bindings != null && bindingSets != null && bindings.size() > 0)
-                throw new SailException(
-                        "The bindings and bindingSets options are mutually exclusive.");
-
-            if (log.isInfoEnabled())
-                log.info("Evaluating query: " + tupleExpr + ", dataSet="
-                        + dataset + ", includeInferred=" + includeInferred);
-
-            flushStatementBuffers(true/* assertions */, true/* retractions */);
-
-            // Clone the tuple expression to allow for more aggressive optimizations
-            tupleExpr = tupleExpr.clone();
-
-            if (!(tupleExpr instanceof QueryRoot)) {
-                // Add a dummy root node to the tuple expressions to allow the
-                // optimizers to modify the actual root node
-                tupleExpr = new QueryRoot(tupleExpr);
-            }
 
             try {
 
-                /*
-                 * Convert the terms in the query with BigdataValues. Both the
-                 * native joins and the BigdataEvaluationStatistics rely on
-                 * this.
-                 */
-            	final Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
-                dataset = (Dataset) newVals[0];
-                bindings = (BindingSet) newVals[1];
+                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
 
-                final BigdataTripleSource tripleSource = 
-                	new BigdataTripleSource(this, includeInferred);
+                astContainer.getOriginalAST().setDataset(
+                        new DatasetNode((Dataset) tmp[0]));
 
-                final BigdataEvaluationStrategy strategy = 
-                	new BigdataEvaluationStrategyImpl3(
-                			tripleSource, //
-                			dataset, //
-                            bindingSets,// 
-                			nativeJoins,// 
-                			allowSesameQueryEvaluation//
-                			);
+            } catch (SailException e) {
 
-                final QueryOptimizerList optimizerList = new QueryOptimizerList();
-                optimizerList.add(new BindingAssigner());
-                optimizerList.add(new ConstantOptimizer(strategy));
-                optimizerList.add(new CompareOptimizer());
-                optimizerList.add(new ConjunctiveConstraintSplitter());
-                optimizerList.add(new SameTermFilterOptimizer());
-                // only need to optimize the join order this way if we are not
-                // using native joins
-                if (nativeJoins == false) {
-                    optimizerList.add(new QueryJoinOptimizer(
-                            new BigdataEvaluationStatistics(this)));
-                }
-                optimizerList.add(new FilterOptimizer());
-
-                optimizerList.optimize(tupleExpr, dataset, bindings);
-
-                if (log.isInfoEnabled())
-                    log.info("Optimized query: " + tupleExpr);
-
-            	final Object[] newVals2 = replaceValues(dataset, tupleExpr, bindings);
-//                dataset = (Dataset) newVals2[0];
-                bindings = (BindingSet) newVals2[1];
-                
-                // Note: evaluation begins with an empty binding set NOT the
-                // caller's bindingSet.
-                final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy
-                        .evaluate(tupleExpr,
-                                bindings,
-                                queryHints);
-
-                return itr;
-
-            } catch (QueryEvaluationException e) {
-
-                throw new SailException(e);
+                throw new RuntimeException(e);
 
             }
-
-        }
-
-        /**
-         * Batch resolve and replace all {@link Value} objects stored in
-         * variables or in the {@link Dataset} with {@link BigdataValue}
-         * objects, which have access to the 64-bit internal term identifier
-         * associated with each value in the database.
-         * <p>
-         * Note: The native rule execution must examine the resulting
-         * {@link BigdataValue}s. If any value does not exist in the lexicon
-         * then its term identifier will be ZERO (0L). {@link StatementPattern}s
-         * with term identifiers of ZERO (0L) WILL NOT match anything in the
-         * data and MUST NOT be executed since a ZERO (0L) will be interpreted
-         * as a variable!
-         * 
-         * @return yucky hack, need to return a new dataset and a new binding
-         *         set. dataset is [0], binding set is [1]
-         *         
-         * @deprecated by {@link Options#NATIVE_SPARQL}
-         */
-        protected Object[] replaceValues(final Dataset dataset,
-                final TupleExpr tupleExpr, final BindingSet bindings)
-                throws SailException {
-
-            return new BigdataValueReplacer(database).replaceValues(dataset,
-                    tupleExpr, bindings);
+            
+            try {
+                
+                return ASTEvalHelper.evaluateTupleQuery(getTripleStore(),
+                        astContainer, new QueryBindingSet(bindings));
+            
+            } catch (QueryEvaluationException e) {
+                
+                
+                throw new SailException(e);
+                
+            }
             
         }
         

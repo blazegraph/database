@@ -67,7 +67,6 @@ import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
-import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;

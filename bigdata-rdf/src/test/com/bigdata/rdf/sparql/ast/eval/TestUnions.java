@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+
+
 /**
  * Test suite for UNION.
  * 
@@ -149,6 +151,36 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
     public void test_union_05() throws Exception {
 
         new TestHelper("union_05").runTest();
+        
+    }
+
+    /*
+     * ported from com.bigdata.rdf.sail.TestNestedUnions
+     */
+    
+    // Note: was testSimplestNestedUnion().
+    public void test_union_06() throws Exception {
+        
+        new TestHelper("union_06").runTest();
+        
+    }
+
+    // Note: was testNestedUnionWithOptionals().
+    public void test_union_07() throws Exception {
+        
+        new TestHelper("union_07").runTest();
+        
+    }
+
+    // Note: was testForumBug() which used union.ttl for its data.
+    public void test_union_08() throws Exception {
+        
+        new TestHelper(
+                "union_08", // testURI,
+                "union_08.rq",// queryFileURL
+                "union_08.ttl",// dataFileURL
+                "union_08.srx"// resultFileURL
+                ).runTest();
         
     }
 

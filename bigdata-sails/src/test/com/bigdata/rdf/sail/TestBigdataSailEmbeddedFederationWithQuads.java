@@ -100,25 +100,13 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
         // test suite for optionals handling (left joins).
         suite.addTestSuite(TestOptionals.class);
 
-        suite.addTestSuite(TestNestedOptionals.class);
-        
-        suite.addTestSuite(TestNestedUnions.class);
-        
         // test of the search magic predicate
         suite.addTestSuite(TestSearchQuery.class);
         
-        // high-level query tests.
-        suite.addTestSuite(TestQuery.class);
-
         // test of high-level query on a graph with statements about statements.
         suite.addTestSuite(TestProvenanceQuery.class);
 
-        // unit tests for custom evaluation of high-level query
-        suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
-
         suite.addTestSuite(TestUnions.class);
-        
-        suite.addTestSuite(TestDescribe.class);
         
 		suite.addTestSuite(com.bigdata.rdf.sail.DavidsTestBOps.class);
 

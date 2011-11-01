@@ -28,9 +28,7 @@ package com.bigdata.rdf.sail;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -41,24 +39,11 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.Projection;
-import org.openrdf.query.algebra.QueryRoot;
-import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.sop.SOp;
-import com.bigdata.rdf.sail.sop.SOp2BOpUtility;
-import com.bigdata.rdf.sail.sop.SOpTree;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroup;
-import com.bigdata.rdf.sail.sop.SOpTree.SOpGroups;
-import com.bigdata.rdf.sail.sop.SOpTreeBuilder;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -154,26 +139,6 @@ public class TestSesameFilters extends ProxyBigdataSailTestCase {
 	                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
 	            tupleQuery.setIncludeInferred(false /* includeInferred */);
 	           
-	            if (log.isInfoEnabled()) {
-	            	
-		            final BigdataSailTupleQuery bdTupleQuery =
-		            	(BigdataSailTupleQuery) tupleQuery;
-		            final QueryRoot root = (QueryRoot) bdTupleQuery.getTupleExpr();
-		            final Projection p = (Projection) root.getArg();
-		            final TupleExpr tupleExpr = p.getArg();
-		            final SOpTreeBuilder stb = new SOpTreeBuilder();
-		            final SOpTree tree = stb.collectSOps(tupleExpr);
-	           
-	                log.info(tree);
-	            	log.info(query);
-
-	            	final TupleQueryResult result = tupleQuery.evaluate();
-	                while (result.hasNext()) {
-	                    log.info(result.next());
-	                }
-	                
-	            }
-	            
 	            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
 	            answer.add(createBindingSet(
 	            		new BindingImpl("s", mike),

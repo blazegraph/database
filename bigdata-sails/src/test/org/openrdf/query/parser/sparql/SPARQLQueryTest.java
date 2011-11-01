@@ -39,7 +39,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.QueryResultUtil;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.dawg.DAWGTestResultSetUtil;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MutableTupleQueryResult;
@@ -350,23 +349,19 @@ public abstract class SPARQLQueryTest extends TestCase {
             RepositoryConnection con = ((DatasetRepository)dataRep).getDelegate().getConnection();
 //            System.err.println(con.getClass());
             try {
-                String queryString = readQueryString();
-                Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
+                final String queryString = readQueryString();
+                final Query query = con.prepareQuery(QueryLanguage.SPARQL,
+                        queryString, queryFileURL);
                 if (dataset != null) {
                     query.setDataset(dataset);
                 }
-                message.append(queryString.trim());
-                message.append("\n===================================\n");
-                final TupleExpr tupleExpr = ((BigdataSailQuery) query).getTupleExpr();
-                if(tupleExpr != null) {
-                    message.append(tupleExpr);
-                } else {
-                    message.append(((BigdataSailQuery) query).getASTContainer());
-                }
+//                message.append(queryString.trim());
+//                message.append("\n===================================\n");
+                message.append(((BigdataSailQuery) query).getASTContainer());
                 
                 message.append("\n===================================\n");
                 message.append("database dump:\n");
-                RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
+                final RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
                 while (stmts.hasNext()) {
                     message.append(stmts.next());
                     message.append("\n");

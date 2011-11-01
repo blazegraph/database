@@ -97,8 +97,8 @@ public class TestTicket355 extends QuadsTestCase {
 		props.setProperty(BigdataSail.Options.INLINE_DATE_TIMES, "true");
 		props.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
 		props.setProperty(BigdataSail.Options.EXACT_SIZE, "true");
-		props.setProperty(BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION,
-				"false");
+//		props.setProperty(BigdataSail.Options.ALLOW_SESAME_QUERY_EVALUATION,
+//				"false");
 		props.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
 
 		return props;

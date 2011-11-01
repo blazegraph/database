@@ -2832,5 +2832,97 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 //          }
 //      }
 //  }
-  
+//  
+//    public void testSimpleRange() throws Exception {
+//        
+////      final Sail sail = new MemoryStore();
+////      sail.initialize();
+////      final Repository repo = new SailRepository(sail);
+//
+//      final BigdataSail sail = getSail();
+//      try {
+//      sail.initialize();
+//      final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//      
+//      final RepositoryConnection cxn = repo.getConnection();
+//      
+//      try {
+//          cxn.setAutoCommit(false);
+//  
+//          final ValueFactory vf = sail.getValueFactory();
+//
+//          /*
+//           * Create some terms.
+//           */
+//          final URI mike = vf.createURI(BD.NAMESPACE + "mike");
+//          final URI bryan = vf.createURI(BD.NAMESPACE + "bryan");
+//          final URI person = vf.createURI(BD.NAMESPACE + "person");
+//          final URI age = vf.createURI(BD.NAMESPACE + "age");
+//          final Literal _1 = vf.createLiteral(1);
+//          final Literal _2 = vf.createLiteral(2);
+//          final Literal _3 = vf.createLiteral(3);
+//          final Literal _4 = vf.createLiteral(4);
+//          final Literal _5 = vf.createLiteral(5);
+//          
+//          /*
+//           * Create some statements.
+//           */
+//          cxn.add(mike, age, _2);
+//          cxn.add(mike, RDF.TYPE, person);
+//          cxn.add(bryan, age, _4);
+//          cxn.add(bryan, RDF.TYPE, person);
+//          
+//          /*
+//           * Note: The either flush() or commit() is required to flush the
+//           * statement buffers to the database before executing any operations
+//           * that go around the sail.
+//           */
+//          cxn.commit();
+//          
+//          {
+//              
+//              String query =
+//                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
+//                  "prefix bd: <"+BD.NAMESPACE+"> " +
+//                  "prefix rdf: <"+RDF.NAMESPACE+"> " +
+//                  "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+//                  
+//                  "select * " +
+//                  "where { " +
+////                    "bd:productA bd:property1 ?origProperty1 . " +
+////                    "?product bd:property1 ?simProperty1 . " +
+////                    "FILTER (?simProperty1 < (?origProperty1 + 120) && ?simProperty1 > (?origProperty1 - 120)) " +
+//                  "  ?x bd:age ?age . " +
+//                  "  ?x rdf:type bd:person . " +
+//                  "  filter(?age > 1 && ?age < 3) " +
+//                  "}"; 
+//  
+//              final SailTupleQuery tupleQuery = (SailTupleQuery)
+//                  cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//              tupleQuery.setIncludeInferred(false /* includeInferred */);
+//              
+////            final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+////            answer.add(createBindingSet(
+////                    new BindingImpl("a", paul),
+////                    new BindingImpl("b", mary)
+////                    ));
+////            answer.add(createBindingSet(
+////                    new BindingImpl("a", brad),
+////                    new BindingImpl("b", john)
+////                    ));
+////
+////            final TupleQueryResult result = tupleQuery.evaluate();
+////              compare(result, answer);
+//
+//          }
+//          
+//      } finally {
+//          cxn.close();
+//      }
+//      } finally {
+//          sail.__tearDownUnitTest();//shutDown();
+//      }
+//
+//  }
+
 }

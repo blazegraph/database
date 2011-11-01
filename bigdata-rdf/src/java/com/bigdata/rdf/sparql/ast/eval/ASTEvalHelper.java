@@ -57,7 +57,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
-import com.bigdata.rdf.sail.sop.UnsupportedOperatorException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -414,19 +413,6 @@ public class ASTEvalHelper {
              */
             return iterator(runningQuery, database, required);
 
-        } catch (UnsupportedOperatorException t) {
-            if (runningQuery != null) {
-                // ensure query is halted.
-                runningQuery.cancel(true/* mayInterruptIfRunning */);
-            }
-            // ensure source is closed on error path.
-            if(source != null) 
-                source.close();
-            /*
-             * Note: Do not wrap as a different exception type. The caller is
-             * looking for this.
-             */
-            throw new UnsupportedOperatorException(t);
         } catch (Throwable t) {
             if (runningQuery != null) {
                 // ensure query is halted.

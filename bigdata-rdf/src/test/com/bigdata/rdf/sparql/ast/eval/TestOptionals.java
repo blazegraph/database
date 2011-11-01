@@ -26,8 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.eval;
 
-
-
 /**
  * Test suite for OPTIONAL groups. Unlike the TCK, this test suite is focused on
  * the semantics of well-formed OPTIONAL groups.
@@ -47,8 +45,6 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Unit test for a simple optional (one where the statement pattern can
      * be lifted into the parent group).
-     * 
-     * TODO Variant with FILTER which CAN be lifted.
      */
     public void test_simple_optional_01() throws Exception {
 
@@ -160,55 +156,64 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
         
     }
 
-//    public void test_nested_optionals() throws Exception {
-//
-//        // define the vocabulary
-//        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
-//        final URI jane = new URIImpl(BD.NAMESPACE + "Jane");
-//        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
-//        final URI person = new URIImpl(BD.NAMESPACE + "Person");
-//        final URI object = new URIImpl(BD.NAMESPACE + "Object");
-//        final Literal mikeLabel = new LiteralImpl("mike label");
-//        final Literal mikeComment = new LiteralImpl("mike comment");
-//        final Literal janeLabel = new LiteralImpl("jane label");
-//        
-//        // define the graph
-//        Graph graph = new GraphImpl();
-//        graph.add(mike, RDF.TYPE, person);
-//        graph.add(jane, RDF.TYPE, person);
-//        graph.add(bryan, RDF.TYPE, person);
-//        graph.add(mike, RDF.TYPE, object);
-//        graph.add(jane, RDF.TYPE, object);
-//        graph.add(bryan, RDF.TYPE, object);
-//        graph.add(mike, RDFS.LABEL, mikeLabel);
-//        graph.add(mike, RDFS.COMMENT, mikeComment);
-//        graph.add(jane, RDFS.LABEL, janeLabel);
-//        
-//        // define the query
-//        String query = 
-//            "select ?s ?label ?comment " +
-//            "where { " +
-//            "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
-//            "  ?s <"+RDF.TYPE+"> <"+object+"> . " +
-//            "  OPTIONAL { ?s <"+RDFS.LABEL+"> ?label . } " + 
-//            "  OPTIONAL { ?s <"+RDFS.COMMENT+"> ?comment . } " + 
-//            "}";
-//        
-//        // define the correct answer
-//        Collection<BindingSet> answer = new LinkedList<BindingSet>();
-//        answer.add(createBindingSet(
-//                new BindingImpl("s", mike),
-//                new BindingImpl("label", mikeLabel),
-//                new BindingImpl("comment", mikeComment)));
-//        answer.add(createBindingSet(
-//                new BindingImpl("s", jane),
-//                new BindingImpl("label", janeLabel)));
-//        answer.add(createBindingSet(
-//                new BindingImpl("s", bryan)));
-//        
-//        // run the test
-//        runQuery(graph, query, answer);
-//        
-//    }
+    /*
+     * Tests ported from com.bigdata.rdf.sail.TestOptionals.
+     */
+    
+    /**
+     * <pre>
+     * select *
+     * where {
+     *   ?a :knows ?b .
+     *   OPTIONAL {
+     *     ?b :knows ?c .
+     *     ?c :knows ?d .
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_optionals_simplest() throws Exception {
+
+        new TestHelper("optionals_simplest").runTest();
+
+    }
+
+    /**
+     * <pre>
+     * select *
+     * where {
+     *   ?a :knows ?b .
+     *   OPTIONAL {
+     *     ?b :knows ?c .
+     *     ?c :knows ?d .
+     *     filter(?d != :leon)
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_optionals_simplestWithFilter() throws Exception {
+
+        new TestHelper("optionals_simplestWithFilter").runTest();
+
+    }
+
+    /**
+     * <pre>
+     * select *
+     * where {
+     *   ?a :knows ?b .
+     *   OPTIONAL {
+     *     ?b :knows ?c .
+     *     ?c :knows ?d .
+     *     filter(?d != :paul)
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_optionals_simplestWithConditional() throws Exception {
+
+        new TestHelper("optionals_simplestWithConditional").runTest();
+
+    }
     
 }

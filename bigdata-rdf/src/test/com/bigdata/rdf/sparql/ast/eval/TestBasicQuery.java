@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+
 /**
  * Data driven test suite.
  * 
@@ -141,6 +142,30 @@ public class TestBasicQuery extends AbstractDataDrivenSPARQLTestCase {
                 "describe-3.rq",// queryFileURL
                 "describe-3.trig",// dataFileURL
                 "describe-3-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    // Note: Was TestDescribe#testSingleDescribe()
+    public void test_describe_4() throws Exception {
+
+        new TestHelper(
+                "describe-4", // testURI,
+                "describe-4.rq",// queryFileURL
+                "describe-4.trig",// dataFileURL
+                "describe-4-result.trig"// resultFileURL
+                ).runTest();
+        
+    }
+
+    // Note: Was TestDescribe#testMultiDescribe()
+    public void test_describe_5() throws Exception {
+
+        new TestHelper(
+                "describe-5", // testURI,
+                "describe-5.rq",// queryFileURL
+                "describe-5.trig",// dataFileURL
+                "describe-5-result.trig"// resultFileURL
                 ).runTest();
         
     }
