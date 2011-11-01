@@ -718,6 +718,11 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
                 // (for now) a re-organisation
                 // ((HTree)htree).nentries++;
                 // insert Ok.
+                
+                if (srcPage.hasRawRecords() && srcPage.getRawRecord(srcSlot) != IRawStore.NULL) {
+                	((MutableBucketData) data).rawRecords[i] = true;
+                }
+                
                 return true;
             }
 
