@@ -73,6 +73,9 @@ public class TestAll extends TestCase {
         // Test suite for UNIONs.
         suite.addTestSuite(TestUnions.class);
 
+        // Test suite for different combinations of joins.
+        suite.addTestSuite(TestComboJoins.class);
+
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
 
