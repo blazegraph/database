@@ -1,0 +1,15 @@
+prefix : <http://www.bigdata.com/rdf#> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?neType ?majorType ?minorType
+WHERE {
+  {
+    ?neType <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://example/class/NamedEntity> .
+    FILTER(?neType != <http://example/class/NamedEntity>) 
+  } UNION {
+    ?lookup <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example/class/Lookup> . 
+    ?lookup <http://example/prop/lookup/majorType> ?majorType . 
+    OPTIONAL { ?lookup <http://example/prop/lookup/minorType> ?minorType } 
+  }
+}

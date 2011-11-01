@@ -192,11 +192,11 @@ public class BigdataSailHelper {
          */
         properties.setProperty(Options.AXIOMS_CLASS,NoAxioms.class.getName());
         
-        /*
-         * Enable rewrites of high-level queries into native rules (native JOIN
-         * execution).
-         */
-        properties.setProperty(BigdataSail.Options.NATIVE_JOINS, "true");
+//        /*
+//         * Enable rewrites of high-level queries into native rules (native JOIN
+//         * execution).
+//         */
+//        properties.setProperty(BigdataSail.Options.NATIVE_JOINS, "true");
 
         /*
          * Maximum #of subqueries to evaluate concurrently for the 1st join

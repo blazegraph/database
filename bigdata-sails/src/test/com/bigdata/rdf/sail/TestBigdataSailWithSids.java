@@ -69,22 +69,15 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
 
         // test of the search magic predicate
         suite.addTestSuite(TestSearchQuery.class);
-        
-        // high-level query tests.
-        suite.addTestSuite(TestQuery.class);
 
         // test of high-level query on a graph with statements about statements.
         suite.addTestSuite(TestProvenanceQuery.class);
 
-        suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
-        
         suite.addTestSuite(TestReadWriteTransactions.class);
         
         suite.addTestSuite(TestOrderBy.class);
         
         suite.addTestSuite(TestUnions.class);
-        
-        suite.addTestSuite(TestDescribe.class);
         
         suite.addTestSuite(TestInlineValues.class);
        

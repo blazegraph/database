@@ -1,0 +1,14 @@
+prefix : <http://www.bigdata.com/> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+select *
+where {
+  {
+    ?a :knows :fred .
+  } UNION {
+    ?a :knows :leon .
+  }
+  OPTIONAL { ?a rdf:type ?type }
+  OPTIONAL { ?a rdfs:label ?label }
+}

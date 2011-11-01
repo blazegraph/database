@@ -26,11 +26,7 @@ import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.impl.AbstractQuery;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.query.parser.ParsedBooleanQuery;
-import org.openrdf.query.parser.ParsedGraphQuery;
 import org.openrdf.query.parser.ParsedQuery;
-import org.openrdf.query.parser.ParsedTupleQuery;
-import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.BooleanQueryResultWriter;
 import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
@@ -64,10 +60,7 @@ import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
-import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sail.sparql.BigdataParsedQuery;
-import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -98,11 +91,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String EXPLAIN = "explain";
     
 	private final SparqlEndpointConfig m_config;
-	
-    /**
-     * Note: will use {@link Bigdata2ASTSPARQLParser} if null.
-     */
-	private final QueryParser m_queryParser;
 
     /**
      * A thread pool for running accepted queries against the
@@ -149,20 +137,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			throw new IllegalArgumentException();
 
 		m_config = config;
-
-		// used to parse queries.
-//		m_queryParser = new SPARQLParserFactory().getParser();
-		if(config.nativeSparql) {
-		    /*
-		     * Bigdata handles all query evaluation.
-		     */
-		    m_queryParser = null;
-		} else {
-		    /*
-		     * Hybrid of Sesame TupleExpr model and bigdata evaluation.
-		     */
-		    m_queryParser = new BigdataSPARQLParser();
-		}
 
         if (config.queryThreadPoolSize == 0) {
 
@@ -287,12 +261,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         protected final String baseURI;
 
+//        /**
+//         * The {@link ParsedQuery}. This will be an {@link IBigdataParsedQuery}
+//         * in order to provide access to the {@link QueryHints} and the
+//         * {@link QueryType}.
+//         */
+//        protected final ParsedQuery parsedQuery;
         /**
-         * The {@link ParsedQuery}. This will be an {@link IBigdataParsedQuery}
-         * in order to provide access to the {@link QueryHints} and the
-         * {@link QueryType}.
+         * The {@link ASTContainer} provides access to the original SPARQL
+         * query, the query model, the query plan, etc.
          */
-        protected final ParsedQuery parsedQuery;
+        protected final ASTContainer astContainer;
         
         /**
          * A symbolic constant indicating the type of query.
@@ -389,7 +368,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final long timestamp, //
                 final String queryStr,//
                 final String baseURI,
-                final ParsedQuery parsedQuery,//
+                final ASTContainer astContainer,//
                 final QueryType queryType,//
                 final String mimeType,//
                 final Charset charset,//
@@ -404,7 +383,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 throw new IllegalArgumentException();
             if (baseURI == null)
                 throw new IllegalArgumentException();
-            if (parsedQuery == null)
+            if (astContainer == null)
                 throw new IllegalArgumentException();
             if (queryType == null)
                 throw new IllegalArgumentException();
@@ -423,7 +402,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.timestamp = timestamp;
             this.queryStr = queryStr;
             this.baseURI = baseURI;
-            this.parsedQuery = parsedQuery;
+            this.astContainer = astContainer;
             this.queryType = queryType;
             this.mimeType = mimeType;
             this.charset = charset;
@@ -515,59 +494,28 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * 
          * @param cxn
          *            The connection.
-         *            
+         * 
          * @return The query.
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
-            final ASTContainer astContainer = parsedQuery instanceof BigdataParsedQuery ? ((BigdataParsedQuery) parsedQuery)
-                    .getASTContainer() : null;
+//            final ASTContainer astContainer = ((BigdataParsedQuery) parsedQuery)
+//                    .getASTContainer();
 
-            if ( astContainer != null) {
+//            final QueryType queryType = ((BigdataParsedQuery) parsedQuery)
+//                    .getQueryType();
 
-                final QueryType queryType = ((BigdataParsedQuery) parsedQuery)
-                        .getQueryType();
-                
-                switch (queryType) {
-                case SELECT:
-                    return new BigdataSailTupleQuery(astContainer, cxn);
-                case DESCRIBE:
-                case CONSTRUCT:
-                    return new BigdataSailGraphQuery(astContainer, cxn);
-                case ASK: {
-                    return new BigdataSailBooleanQuery(astContainer, cxn);
-                }
-                default:
-                    throw new RuntimeException("Unknown query type: "
-                            + queryType);
-                }
-                
+            switch (queryType) {
+            case SELECT:
+                return new BigdataSailTupleQuery(astContainer, cxn);
+            case DESCRIBE:
+            case CONSTRUCT:
+                return new BigdataSailGraphQuery(astContainer, cxn);
+            case ASK: {
+                return new BigdataSailBooleanQuery(astContainer, cxn);
             }
-            
-            final Properties queryHints = ((IBigdataParsedQuery) parsedQuery)
-                    .getQueryHints();
-
-            if (parsedQuery instanceof ParsedTupleQuery) {
-
-                return new BigdataSailTupleQuery(
-                        (ParsedTupleQuery) parsedQuery, cxn, queryHints);
-
-            } else if (parsedQuery instanceof ParsedGraphQuery) {
-
-                return new BigdataSailGraphQuery(
-                        (ParsedGraphQuery) parsedQuery, cxn, queryHints,
-                        QueryType.DESCRIBE == queryType);
-
-            } else if (parsedQuery instanceof ParsedBooleanQuery) {
-
-                return new BigdataSailBooleanQuery(
-                        (ParsedBooleanQuery) parsedQuery, cxn, queryHints);
-
-            } else {
-
-                throw new RuntimeException("Unexpected query type: "
-                        + parsedQuery.getClass());
-
+            default:
+                throw new RuntimeException("Unknown query type: " + queryType);
             }
 
         }
@@ -587,13 +535,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 */
 		protected UUID setQueryId(final BigdataSailQuery query) {
 			assert queryId2 == null; // precondition.
-			// Figure out the effective UUID under which the query will run.
-			final String queryIdStr = query.getQueryHints().getProperty(
-					QueryHints.QUERYID);
-			if (queryIdStr == null) {
-				queryId2 = UUID.randomUUID();
-				query.getQueryHints().setProperty(QueryHints.QUERYID,
-						queryId2.toString());
+            // Figure out the effective UUID under which the query will run.
+            final String queryIdStr = query.getASTContainer().getQueryHint(
+                    QueryHints.QUERYID);
+            if (queryIdStr == null) {
+                queryId2 = UUID.randomUUID();
+                query.getASTContainer().setQueryHint(QueryHints.QUERYID,
+                        queryId2.toString());
 			} else {
 				queryId2 = UUID.fromString(queryIdStr);
 			}
@@ -682,11 +630,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public AskQueryTask(final String namespace, final long timestamp,
                 final String queryStr, final String baseURI,
-                final ParsedQuery parsedQuery, final QueryType queryType,
+                final ASTContainer astContainer, final QueryType queryType,
                 final BooleanQueryResultFormat format,
                 final HttpServletRequest req, final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+            super(namespace, timestamp, queryStr, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -720,12 +668,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public TupleQueryTask(final String namespace, final long timestamp,
                 final String queryStr, final String baseURI,
-                final ParsedQuery parsedQuery, final QueryType queryType,
+                final ASTContainer astContainer, final QueryType queryType,
                 final TupleQueryResultFormat format,
                 final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+            super(namespace, timestamp, queryStr, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -757,11 +705,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         public GraphQueryTask(final String namespace, final long timestamp,
                 final String queryStr, final String baseURI,
-                final ParsedQuery parsedQuery, final QueryType queryType,
+                final ASTContainer astContainer, final QueryType queryType,
                 final RDFFormat format, final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, parsedQuery,
+            super(namespace, timestamp, queryStr, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -858,20 +806,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
-        final ParsedQuery parsedQuery;
-        if (m_queryParser == null) {
-            parsedQuery = new Bigdata2ASTSPARQLParser(getTripleStore(namespace,
-                    timestamp)).parseQuery(queryStr, baseURI);
-        } else {
-            parsedQuery = m_queryParser.parseQuery(queryStr, baseURI);
-        }
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                getTripleStore(namespace, timestamp)).parseQuery2(queryStr,
+                baseURI);
 
         if (log.isDebugEnabled())
-            log.debug(parsedQuery.toString());
+            log.debug(astContainer.toString());
 
-        final QueryType queryType = ((IBigdataParsedQuery) parsedQuery)
+        final QueryType queryType = astContainer.getOriginalAST()
                 .getQueryType();
-
+        
 		/*
 		 * When true, provide an "explanation" for the query (query plan, query
 		 * evaluation statistics) rather than the results of the query.
@@ -901,7 +845,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     .forMIMEType(acceptStr, BooleanQueryResultFormat.SPARQL);
 
             return new AskQueryTask(namespace, timestamp, queryStr, baseURI,
-                    parsedQuery, queryType, format, req, os);
+                    astContainer, queryType, format, req, os);
 
         }
         case DESCRIBE:
@@ -911,7 +855,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     RDFFormat.RDFXML);
 
             return new GraphQueryTask(namespace, timestamp, queryStr, baseURI,
-                    parsedQuery, queryType, format, req, os);
+                    astContainer, queryType, format, req, os);
 
         }
         case SELECT: {
@@ -920,7 +864,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     .forMIMEType(acceptStr, TupleQueryResultFormat.SPARQL);
 
             return new TupleQueryTask(namespace, timestamp, queryStr, baseURI,
-                    parsedQuery, queryType, format, req, os);
+                    astContainer, queryType, format, req, os);
 
         }
         } // switch(queryType)
@@ -1150,9 +1094,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     + tripleStore.getSPORelation().getPrimaryIndex()
                             .getIndexMetadata()
                             .getWriteRetentionQueueCapacity() + "\n");
-
-            sb.append(BigdataSail.Options.STAR_JOINS + "="
-                    + conn.getRepository().getSail().isStarJoins() + "\n");
 
             sb.append("-- All properties.--\n");
             

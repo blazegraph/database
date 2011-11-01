@@ -84,12 +84,6 @@ public class TestAll extends TestCase {
         // test suite for the SPARQL parse tree => bigdata AST translation.
         suite.addTest(com.bigdata.rdf.sail.sparql.TestAll.suite());
         
-        // test suite for extracting query hints from a SPARQL query.
-        suite.addTestSuite(TestQueryHints.class);
-     
-        // test suite for utility to extract the type of a SPARQL query.
-        suite.addTestSuite(TestQueryType.class);
-
         // bootstrap tests for the BigdataSail
         suite.addTestSuite(TestBootstrapBigdataSail.class);
 

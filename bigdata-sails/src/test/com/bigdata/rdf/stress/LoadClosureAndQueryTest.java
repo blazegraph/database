@@ -2212,13 +2212,13 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          */
         properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
 
-        /*
-         * Enable rewrites of high-level queries into native rules (native JOIN
-         * execution). (Can be changed without re-loading the data to compare
-         * the performance of the Sesame query evaluation against using the
-         * native rules to perform query evaluation.)
-         */
-        properties.setProperty(BigdataSail.Options.NATIVE_JOINS, "true");
+//        /*
+//         * Enable rewrites of high-level queries into native rules (native JOIN
+//         * execution). (Can be changed without re-loading the data to compare
+//         * the performance of the Sesame query evaluation against using the
+//         * native rules to perform query evaluation.)
+//         */
+//        properties.setProperty(BigdataSail.Options.NATIVE_JOINS, "true");
 
         /*
          * Option to restrict ourselves to RDFS only inference. This condition

@@ -23,13 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.util.Properties;
-
-import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.TupleExpr;
-
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -41,26 +35,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public interface BigdataSailQuery {
     
-    /**
-     * Returns a copy of the Sesame operator tree that will or would be
-     * evaluated by this query (debugging purposes only).
-     * 
-     * @deprecated We no longer support {@link TupleExpr}.
-     */
-    TupleExpr getTupleExpr() throws QueryEvaluationException;
-    
-	/**
-	 * Return query hints associated with this query. Query hints are embedded
-	 * in query strings as namespaces. 
-	 * 
-	 * @return The query hints and never <code>null</code>.
-	 * 
-	 * @see QueryHints
-	 * 
-	 * @deprecated by {@link #getASTContainer()} 
-	 */
-    Properties getQueryHints();
-
     /**
      * Return the AST model.
      */

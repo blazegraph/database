@@ -37,7 +37,6 @@ import com.bigdata.rdf.sail.tck.Bigdata2ASTSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSPARQLSyntaxTest;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
@@ -87,27 +86,15 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         // test suite for optionals handling (left joins).
         suite.addTestSuite(TestOptionals.class);
 
-        suite.addTestSuite(TestNestedOptionals.class);
-        
-        suite.addTestSuite(TestNestedUnions.class);
-
         // test of the search magic predicate
         suite.addTestSuite(TestSearchQuery.class);
-        
-        // high-level query tests.
-        suite.addTestSuite(TestQuery.class);
 
         // test of high-level query on a graph with statements about statements.
         suite.addTestSuite(TestProvenanceQuery.class);
 
-        // unit tests for custom evaluation of high-level query
-        suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
-
         suite.addTestSuite(TestOrderBy.class);
         
         suite.addTestSuite(TestUnions.class);
-        
-        suite.addTestSuite(TestDescribe.class);
         
         suite.addTestSuite(TestMultiGraphs.class);
         
@@ -124,10 +111,10 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket275.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket276.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket348.class);
-        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket352.class);
+//        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket352.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket353.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestTicket355.class);
-        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket361.class);
+//        suite.addTestSuite(com.bigdata.rdf.sail.TestTicket361.class);
 
         suite.addTestSuite(com.bigdata.rdf.sail.DavidsTestBOps.class);
 
