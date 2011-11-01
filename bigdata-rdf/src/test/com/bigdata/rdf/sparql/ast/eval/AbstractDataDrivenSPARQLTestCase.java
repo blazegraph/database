@@ -74,9 +74,6 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.rio.helpers.StatementCollector;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
@@ -134,9 +131,9 @@ public class AbstractDataDrivenSPARQLTestCase extends
         private final String queryStr;
 
         private final ASTContainer astContainer;
-        private final AST2BOpContext context;
+//        private final AST2BOpContext context;
        
-        private final PipelineOp queryPlan;
+//        private final PipelineOp queryPlan;
 
         /**
          * 
@@ -245,14 +242,14 @@ public class AbstractDataDrivenSPARQLTestCase extends
             astContainer = new Bigdata2ASTSPARQLParser(store).parseQuery2(
                     queryStr, baseURI);
 
-            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
-                    astContainer, store));
-
-            if (log.isInfoEnabled())
-                log.info(astContainer);
-
-            if (log.isInfoEnabled())
-                log.info("\n"+BOpUtility.toString(queryPlan));
+//            queryPlan = AST2BOpUtility.convert(context = new AST2BOpContext(
+//                    astContainer, store));
+//
+//            if (log.isInfoEnabled())
+//                log.info(astContainer);
+//
+//            if (log.isInfoEnabled())
+//                log.info("\n"+BOpUtility.toString(queryPlan));
 
         }
 
@@ -270,20 +267,24 @@ public class AbstractDataDrivenSPARQLTestCase extends
          */
         public void runTest() throws Exception {
 
-            final QueryRoot queryRoot = astContainer.getOptimizedAST();
+            final QueryRoot queryRoot = astContainer.getOriginalAST();
             
             switch (queryRoot.getQueryType()) {
             case SELECT: {
 
                 final TupleQueryResult expectedResult = readExpectedTupleQueryResult();
 
-                final IVariable<?>[] projected = queryRoot.getProjection()
-                        .getProjectionVars();
+//                final IVariable<?>[] projected = queryRoot.getProjection()
+//                        .getProjectionVars();
 
                 final TupleQueryResult queryResult = ASTEvalHelper
-                        .evaluateTupleQuery(store, queryPlan,
-                                new QueryBindingSet(), context.queryEngine,
-                                projected);
+                        .evaluateTupleQuery(store, astContainer,
+                                new QueryBindingSet());
+
+//                final TupleQueryResult queryResult = ASTEvalHelper
+//                        .evaluateTupleQuery(store, queryPlan,
+//                                new QueryBindingSet(), context.queryEngine,
+//                                projected);
 
                 compareTupleQueryResults(queryResult, expectedResult);
 
@@ -295,14 +296,17 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 final Set<Statement> expectedResult = readExpectedGraphQueryResult();
 
                 final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
-                        store, //
-                        queryPlan, //
-                        new QueryBindingSet(),//
-                        context.queryEngine, //
-                        queryRoot.getProjection().getProjectionVars(),
-                        queryRoot.getPrefixDecls(), //
-                        queryRoot.getConstruct()//
-                        );
+                        store, astContainer, new QueryBindingSet());
+                
+//                final GraphQueryResult gqr = ASTEvalHelper.evaluateGraphQuery(
+//                        store, //
+//                        queryPlan, //
+//                        new QueryBindingSet(),//
+//                        context.queryEngine, //
+//                        queryRoot.getProjection().getProjectionVars(),
+//                        queryRoot.getPrefixDecls(), //
+//                        queryRoot.getConstruct()//
+//                        );
 
                 final Set<Statement> queryResult = Iterations.asSet(gqr);
 
@@ -312,10 +316,13 @@ public class AbstractDataDrivenSPARQLTestCase extends
                 
             }
             case ASK: {
-                
+
                 final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
-                        store, queryPlan, new QueryBindingSet(),
-                        context.queryEngine);
+                        store, astContainer, new QueryBindingSet());
+
+//                final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
+//                        store, queryPlan, new QueryBindingSet(),
+//                        context.queryEngine);
                 
                 final boolean expectedResult = readExpectedBooleanQueryResult();
                 
@@ -580,8 +587,6 @@ public class AbstractDataDrivenSPARQLTestCase extends
 //                    try {
                     message.append("\n===================================\n");
                     message.append(astContainer.toString());
-                    message.append("\n===================================\n");
-                    message.append(BOpUtility.toString(queryPlan));
                     if(store.getStatementCount()<100) {
                     message.append("\n===================================\n");
                     message.append("database dump:\n");

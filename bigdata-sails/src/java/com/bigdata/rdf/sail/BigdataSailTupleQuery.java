@@ -18,15 +18,11 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -146,30 +142,17 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
         if (astContainer != null) {
             
-            astContainer.clearOptimizedAST();
-            
             final QueryRoot originalQuery = astContainer.getOriginalAST();
             
             if (getMaxQueryTime() > 0)
                 originalQuery.setTimeout(TimeUnit.SECONDS
                         .toMillis(getMaxQueryTime()));
-            
+
             originalQuery.setIncludeInferred(getIncludeInferred());
-            
-            final AbstractTripleStore store = getTripleStore();
-
-            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
-
-            final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
-            
-            final IVariable<?>[] projected = optimizedQuery.getProjection()
-                    .getProjectionVars();
 
             final TupleQueryResult queryResult = ASTEvalHelper
-                    .evaluateTupleQuery(store, queryPlan, new QueryBindingSet(
-                            getBindings()), context.queryEngine, projected);
+                    .evaluateTupleQuery(getTripleStore(), astContainer,
+                            new QueryBindingSet(getBindings()));
 
             return queryResult;
             

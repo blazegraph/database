@@ -53,6 +53,9 @@ import com.bigdata.rdf.store.BD;
 
 /**
  * Unit tests for high-level query.
+ * <p>
+ * Note: ALL unit tests in this class have been ported to the AST data driven
+ * test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

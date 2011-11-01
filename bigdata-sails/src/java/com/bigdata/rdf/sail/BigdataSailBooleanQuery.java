@@ -138,7 +138,7 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
         if (astContainer != null) {
             
-            astContainer.clearOptimizedAST();
+//            astContainer.clearOptimizedAST();
 
             final QueryRoot originalQuery = astContainer.getOriginalAST();
             
@@ -148,19 +148,23 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery
 
             originalQuery.setIncludeInferred(getIncludeInferred());
 
-            final AbstractTripleStore store = getTripleStore();
-
-            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
-
-            // Generate the query plan.
-            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
-
-            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(//
-                    store, //
-                    queryPlan,//
-                    new QueryBindingSet(getBindings()),//
-                    context.queryEngine//
-                    );
+//            final AbstractTripleStore store = getTripleStore();
+//
+//            final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+//
+//            // Generate the query plan.
+//            final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+//
+//            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(//
+//                    store, //
+//                    queryPlan,//
+//                    new QueryBindingSet(getBindings()),//
+//                    context.queryEngine//
+//                    );
+            
+            final boolean queryResult = ASTEvalHelper.evaluateBooleanQuery(
+                    getTripleStore(), astContainer, new QueryBindingSet(
+                            getBindings()));
             
             return queryResult;
             

@@ -32,6 +32,8 @@ import java.util.Map;
 import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
@@ -76,6 +78,11 @@ public class ASTContainer extends ASTBase {
          * The AST as rewritten by the {@link IASTOptimizer}s.
          */
         String OPTIMIZED_AST = "optimizedAST";
+        
+        /**
+         * The physical query plan (pipeline bops).
+         */
+        String QUERY_PLAN = "queryPlan";
         
     }
 
@@ -191,6 +198,24 @@ public class ASTContainer extends ASTBase {
         
     }
     
+    /**
+     * Return the physical query plan (pipeline bops).
+     */
+    public PipelineOp getQueryPlan() {
+
+        return (PipelineOp) getProperty(Annotations.QUERY_PLAN);
+
+    }
+
+    /**
+     * Set the physical query plan (pipeline bops).
+     */
+    public void setQueryPlan(final PipelineOp queryPlan) {
+        
+        setProperty(Annotations.QUERY_PLAN, queryPlan);
+
+    }
+    
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
@@ -202,6 +227,8 @@ public class ASTContainer extends ASTBase {
         final QueryRoot originalAST = getOriginalAST();
         
         final QueryRoot optimizedAST = getOptimizedAST();
+
+        final PipelineOp queryPlan = getQueryPlan();
 
         if (queryString != null) {
 
@@ -250,6 +277,15 @@ public class ASTContainer extends ASTBase {
             sb.append("\n");
             sb.append(Annotations.OPTIMIZED_AST);
             sb.append(optimizedAST);
+
+        }
+
+        if (queryPlan != null) {
+
+            sb.append("\n");
+            sb.append(Annotations.QUERY_PLAN);
+            sb.append("\n");
+            sb.append(BOpUtility.toString(queryPlan));
 
         }
 
