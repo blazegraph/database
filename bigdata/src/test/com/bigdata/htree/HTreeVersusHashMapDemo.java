@@ -29,7 +29,6 @@ package com.bigdata.htree;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Random;
@@ -45,6 +44,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
@@ -110,7 +110,8 @@ public class HTreeVersusHashMapDemo {
                 // new FrontCodedRabaCoder(),// TODO FrontCodedRaba
                 new SimpleRabaCoder(),// keys
                 new SimpleRabaCoder() // vals
-        );
+//                EmptyRabaValueCoder.INSTANCE // if no values.
+                );
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
@@ -135,7 +136,7 @@ public class HTreeVersusHashMapDemo {
 
     }
 
-    static final int REPORT_INTERVAL = 10000; // report interval.
+    static final int REPORT_INTERVAL = 100000; // report interval.
 
     /**
      * Interface for reporting on progress.
@@ -197,7 +198,7 @@ public class HTreeVersusHashMapDemo {
         private final int nkeys;
         private final int vectorSize;
         private final IGenerator gen;
-        private final Set<Integer> c;
+        private final Map<Object,Object> c;
         private final IReport report;
 
         /**
@@ -212,9 +213,9 @@ public class HTreeVersusHashMapDemo {
          * @param c
          *            The Java collection.
          */
-        JavaCollectionDemo(IReport report, final int nkeys, final int vectorSize,
+        JavaCollectionDemo(final IReport report, final int nkeys, final int vectorSize,
                 final IGenerator gen,
-                final Set<Integer> c) {
+                final Map<Object,Object> c) {
 
             this.report = report;
             this.nkeys = nkeys;
@@ -228,6 +229,8 @@ public class HTreeVersusHashMapDemo {
 
             final long start = System.currentTimeMillis();
 
+            final IKeyBuilder keyBuilder = new KeyBuilder();
+            
             final int[] keys = new int[vectorSize];
             int alen;
 
@@ -251,14 +254,16 @@ public class HTreeVersusHashMapDemo {
                 for (int j = 0; j < alen; j++) {
 
                     final Integer key = keys[j];
+//                    final byte[] key = keyBuilder.reset().append(keys[j])
+//                            .getKey();
 
-                    if (!c.contains(key)) {
-                        /*
-                         * Do not store duplicate entries since we will compare
-                         * the performance to a Set.
-                         */
-                        c.add(key);
-                    }
+//                    if (!c.containsKey(key)) {
+//                        /*
+//                         * Do not store duplicate entries since we will compare
+//                         * the performance to a Set.
+//                         */
+                        c.put(key,key);
+//                    }
 
                     final long nops = i + j;
 
@@ -278,9 +283,10 @@ public class HTreeVersusHashMapDemo {
 
             if (log.isInfoEnabled()) {
 
-                log.info("\nHtree: Entries: " + c.size() + "; Load took "
+                log.info("\nEntries: " + c.size() + "; Load took "
                         + (load - start) + "ms, Generator="
-                        + gen.getClass().getSimpleName());
+                        + gen.getClass().getSimpleName() + ", class="
+                        + this.getClass().getSimpleName());
 
             }
 
@@ -314,7 +320,7 @@ public class HTreeVersusHashMapDemo {
          * @param writeRetentionQueueCapacity
          *            The capacity of the write retention queue.
          */
-        HTreeDemo(IReport report, final int nkeys, final int vectorSize,
+        HTreeDemo(final IReport report, final int nkeys, final int vectorSize,
                 final IGenerator gen,
                 final int addressBits,
                 final int writeRetentionQueueCapacity) {
@@ -342,7 +348,7 @@ public class HTreeVersusHashMapDemo {
 
                 final IKeyBuilder keyBuilder = new KeyBuilder();
 
-                final byte[] val = null; // no value stored under the key.
+//                final byte[] val = null; // no value stored under the key.
                 
                 final int[] keys = new int[vectorSize];
                 int alen;
@@ -371,13 +377,13 @@ public class HTreeVersusHashMapDemo {
                         final byte[] key = keyBuilder.reset().append(rnd)
                                 .getKey();
 
-                        if (!htree.contains(key)) {
-                            /*
-                             * Do not store duplicate entries since we will
-                             * compare the performance to a Set.
-                             */
-                            htree.insert(key, val);
-                        }
+//                        if (!htree.contains(key)) {
+//                            /*
+//                             * Do not store duplicate entries since we will
+//                             * compare the performance to a Set.
+//                             */
+                            htree.insert(key, key);
+//                        }
 
                         final long nops = i + j;
 
@@ -401,11 +407,13 @@ public class HTreeVersusHashMapDemo {
                 
                 if (log.isInfoEnabled()) {
 
-                    log.info("\nHtree: Entries: "+htree.nentries+", Leaves: " + htree.nleaves + ", Evicted: "
+                    log.info("\nEntries: "+htree.nentries+", Leaves: " + htree.nleaves + ", Evicted: "
                             + counters.leavesWritten + ", Nodes: "
                             + htree.nnodes + ", Evicted: "
                             + counters.nodesWritten + "; Load took "
-                            + (load - start) + "ms, Generator="+gen.getClass().getSimpleName());
+                            + (load - start) + "ms, Generator="
+                            + gen.getClass().getSimpleName() + ", class="
+                            + this.getClass().getSimpleName());
 
                 }
 
@@ -489,20 +497,20 @@ public class HTreeVersusHashMapDemo {
 //      final int rnd = Integer.reverse(i+j); // sequential
 
         final int nkeys = 2 * Bytes.megabyte32;
-        final int vectorSize = 10000;
-        final IGenerator gen = true ? new SequentialGenerator() : new PseudoRandomGenerator(nkeys);
+        final int vectorSize = 1;//0000;
+        final IGenerator gen = true? new SequentialGenerator() : new PseudoRandomGenerator(nkeys);
 //        final IGenerator gen = new SequentialGenerator();
 //        final IGenerator gen = new PseudoRandomGenerator(nkeys);
 //        final IGenerator gen = new RandomGenerator(-91L/*seed*/,nkeys);
-        final int addressBits = 10; // pages with 2^10 slots.
-        final int writeRetentionQueueCapacity = 5000;
+        final int addressBits = 8; // pages with 2^10 slots.
+        final int writeRetentionQueueCapacity = 50;
 
         if (false) {
             new HTreeDemo(new ReportListener(), nkeys, vectorSize, gen,
                     addressBits, writeRetentionQueueCapacity).run();
         } else {
             new JavaCollectionDemo(new ReportListener(), nkeys, vectorSize,
-                    gen, new HashSet<Integer>(nkeys)).run();
+                    gen, new HashMap<Object,Object>(nkeys)).run();
         }
 
     }

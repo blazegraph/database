@@ -37,7 +37,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
@@ -85,7 +84,7 @@ import com.bigdata.relation.rule.EmptyAccessPathExpander;
  */
 public class AST2BOpJoins extends AST2BOpFilters {
 
-    private static final Logger log = Logger.getLogger(AST2BOpFilters.class);
+//    private static final Logger log = Logger.getLogger(AST2BOpFilters.class);
 
     /**
      * 
@@ -887,6 +886,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             final long estimatedInputCardinality = Long.MAX_VALUE; // FIXME From the RTO. 
             
+            // FIXME From query hint / AST2BaseContext default.
             final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
 
             /*

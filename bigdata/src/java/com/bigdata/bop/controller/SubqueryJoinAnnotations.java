@@ -35,17 +35,7 @@ import com.bigdata.bop.join.JoinAnnotations;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface SubqueryJoinAnnotations extends JoinAnnotations, SubqueryAnnotations {
-
-    /**
-     * When <code>true</code> the subquery has optional semantics (if the
-     * subquery fails, the original binding set will be passed along to the
-     * downstream sink anyway) (default {@value #DEFAULT_OPTIONAL}).
-     * <p>
-     * Note: Constraints on the subquery ARE NOT applied on the optional path.
-     */
-    String OPTIONAL = SubqueryOp.class.getName() + ".optional";
-
-    boolean DEFAULT_OPTIONAL = false;
+public interface SubqueryJoinAnnotations extends JoinAnnotations,
+        SubqueryAnnotations {
 
 }

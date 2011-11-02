@@ -39,7 +39,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
@@ -142,7 +142,7 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
          */
         final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                new FrontCodedRabaCoder(),// keys : TODO Optimize for int32!
+                DefaultFrontCodedRabaCoder.INSTANCE,// keys : TODO Optimize for int32!
                 new SimpleRabaCoder() // vals
         );
 
@@ -209,7 +209,8 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         if(optional) {
             
             // Output the optional solutions.
-            HTreeHashJoinUtility.outputOptionals(outputBuffer, rightSolutions, joinSet);
+            HTreeHashJoinUtility.outputOptionals(outputBuffer, rightSolutions,
+                    joinSet, selectVars);
             
         }
 

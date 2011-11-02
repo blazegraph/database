@@ -183,7 +183,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         ctx.sa = new StaticAnalysis(optimizedQuery);
 
         // The executable query plan.
-        PipelineOp queryPlan = convertQueryBaseScopedVars(null/* left */,
+        PipelineOp queryPlan = convertQueryBaseWithScopedVars(null/* left */,
                 optimizedQuery, new LinkedHashSet<IVariable<?>>()/* doneSet */,
                 ctx);
 
@@ -270,7 +270,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         tmp.retainAll(projectedVarList);
 
         // DO SUBQUERY PLAN HERE.
-        left = convertQueryBaseScopedVars(left, query, tmp/* doneSet */, ctx);
+        left = convertQueryBaseWithScopedVars(left, query, tmp/* doneSet */,
+                ctx);
 
         // Retain only those variables projected by the subquery.
         tmp.retainAll(projectedVarList);
@@ -281,7 +282,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         return left;
 
     }
-    
+
     /**
      * Core method to convert a {@link QueryBase}.
      * <p>
@@ -294,7 +295,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @param ctx
      * @return
      */
-    private static PipelineOp convertQueryBaseScopedVars(PipelineOp left,
+    private static PipelineOp convertQueryBaseWithScopedVars(PipelineOp left,
             final QueryBase query, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
         
@@ -476,15 +477,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         }
 
         /*
-         * TODO Do we need to add operators for materialization of any remaining
-         * variables which are being projected out of the query? Note that we do
-         * not want to force materialization for subqueries. They should stay as
-         * IVs. (I think that materialization is still handled by the bulk IV
-         * resolution iterators).
+         * Note: we do NOT want to force materialization for variables projected
+         * by subqueries since those variables might not need to be materialized
+         * in the parent query. Projected variables SHOULD stay as IV as long as
+         * possible.
          */
 
         if (log.isInfoEnabled())
-            log.info("\nsubquery: " + query + "\nplan=" + left);
+            log.info("\nsubquery: " + query + "\nplan="
+                    + BOpUtility.toString(left));
 
         return left;
 

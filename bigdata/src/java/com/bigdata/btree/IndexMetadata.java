@@ -1677,6 +1677,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 	 * be stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}. Values
 	 * larger than this will be automatically converted into raw record
 	 * references.
+	 * 
+	 * @see Options#MAX_REC_LEN
+	 * @see Options#DEFAULT_MAX_REC_LEN
 	 */
 	public final int getMaxRecLen() {return maxRecLen;}
 

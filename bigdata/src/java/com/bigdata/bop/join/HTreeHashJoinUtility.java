@@ -29,20 +29,42 @@ package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.HTreeHashIndexOp.Annotations;
+import com.bigdata.btree.Checkpoint;
+import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -132,6 +154,319 @@ public class HTreeHashJoinUtility {
     }
 
     /**
+     * A class which encapsulates the different bits which are used by an
+     * {@link HTree} hash join. An instance of this class should be saved on the
+     * {@link IQueryAttributes} when the operation of the hash join will span
+     * more than one evaluation pass for an operator or when the hash index is
+     * built up by one operator and consumed by another.
+     */
+    public static class HTreeHashJoinState {
+        
+        /**
+         * The schema provides the order in which the {@link IV}[] for solutions
+         * stored in the hash index are encoded in the {@link HTree}. {@link IV}
+         * s which are not bound are modeled by a {@link TermId#NullIV}.
+         * <p>
+         * Note: In order to be able to encode/decode the schema based on the
+         * lazy identification of the variables which appear in solutions the
+         * {@link HTree} must store variable length {@link IV}[]s since new
+         * variables may be discovered at any point.
+         */
+        public final LinkedHashSet<IVariable<?>> schema;
+        
+        /**
+         * <code>true</code> iff the join is OPTIONAL.
+         * 
+         * @see JoinAnnotations#
+         * 
+         */
+        public final boolean optional;
+        
+        /**
+         * The join variables.
+         * 
+         * @see HashJoinAnnotations#JOIN_VARS
+         */
+        public final IVariable<?>[] joinVars;
+
+        /**
+         * The join constraints (optional).
+         */
+        public final IConstraint[] constraints;
+
+        /**
+         * The backing {@link IRawStore}.
+         */
+        private final IRawStore store;
+        public IRawStore getStore() {
+            return store;
+        }
+        
+        /**
+         * The hash index. The keys are int32 hash codes built from the join
+         * variables. The values are an {@link IV}[], similar to the encoding in
+         * the statement indices. The mapping from the index positions in the
+         * {@link IV}s to the variables is specified by the {@link #schema}.
+         */
+        private final AtomicReference<HTree> rightSolutions = new AtomicReference<HTree>();
+        public HTree getRightSolutions() { // TODO Does not need to be visible once hash join utility method signature is changed.
+            return rightSolutions.get();
+        }
+        
+        /**
+         * The set of distinct source solutions which joined. This set is
+         * maintained iff the join is optional and is <code>null</code>
+         * otherwise.
+         */
+        private final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
+        public HTree getJoinSet() { // TODO Does not need to be visible once hash join utility method signature is changed.
+            return joinSet.get();
+        }
+        
+        /**
+         * The {@link IV}:{@link BigdataValue} mapping. This captures any cached
+         * BigdataValue references encountered on {@link IV}s. This map does not
+         * store duplicate entries for the same {@link IV}.
+         */
+        private final AtomicReference<HTree> ivCache = new AtomicReference<HTree>();
+
+        /**
+         * <code>true</code> until the state is discarded by {@link #release()}.
+         */
+        private final AtomicBoolean open = new AtomicBoolean(true);
+        
+        /**
+         * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
+         * {@link #joinSet}.
+         */
+        static private IndexMetadata getIndexMetadata(final PipelineOp op) {
+
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+            metadata.setAddressBits(op.getProperty(Annotations.ADDRESS_BITS,
+                    Annotations.DEFAULT_ADDRESS_BITS));
+
+            metadata.setRawRecords(op.getProperty(Annotations.RAW_RECORDS,
+                    Annotations.DEFAULT_RAW_RECORDS));
+
+            metadata.setMaxRecLen(op.getProperty(Annotations.MAX_RECLEN,
+                    Annotations.DEFAULT_MAX_RECLEN));
+
+            metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
+
+            @SuppressWarnings("rawtypes")
+            final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+                    new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+                    DefaultFrontCodedRabaCoder.INSTANCE,// keys : TODO Optimize for int32!
+                    new SimpleRabaCoder() // vals : FIXME IV[] coder (stmt indices).
+            );
+
+            metadata.setTupleSerializer(tupleSer);
+            
+            return metadata;
+
+        }
+        
+        /**
+         * Setup the {@link IndexMetadata} for {@link #ivCache}.
+         */
+        static private IndexMetadata getIVCacheIndexMetadata(final PipelineOp op) {
+
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
+            metadata.setAddressBits(op.getProperty(Annotations.ADDRESS_BITS,
+                    Annotations.DEFAULT_ADDRESS_BITS));
+
+            /*
+             * Override. We want all BigdataValue objects to be raw records
+             * so they do not interact with the fan out and net page size
+             * for the HTree buckets.
+             */
+            metadata.setRawRecords(true);
+            metadata.setMaxRecLen(0);
+
+            metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
+
+            @SuppressWarnings("rawtypes")
+            final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+                    new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+                    DefaultFrontCodedRabaCoder.INSTANCE,// TODO Optimize for IV key.
+                    new SimpleRabaCoder() // vals : FIXME Fast BigdataValue coder (ID2TERM)
+            );
+
+            metadata.setTupleSerializer(tupleSer);
+            
+            return metadata;
+
+        }
+        
+        /**
+         * 
+         * @param mmgr
+         *            The IMemoryManager which will back the named solution set.
+         * @param op
+         *            The operator which will construct the hash index. The
+         *            {@link HTreeAnnotations} may be specified for this
+         *            operator and will control the initialization of the
+         *            various {@link HTree} instances.
+         * @param optional
+         *            <code>true</code> iff the join is optional.
+         * 
+         * @see HTreeAnnotations
+         */
+        public HTreeHashJoinState(final IMemoryManager mmgr,
+                final PipelineOp op, final boolean optional) {
+
+            if (mmgr == null)
+                throw new IllegalArgumentException();
+
+            if (op == null)
+                throw new IllegalArgumentException();
+            
+            // The ordered list of variables used to encode/decode the IV[]s.
+            this.schema = new LinkedHashSet<IVariable<?>>();
+
+            // Iff the join has OPTIONAL semantics.
+            this.optional = optional;
+            
+            // The join variables (required).
+            joinVars = (IVariable<?>[]) op
+                    .getRequiredProperty(Annotations.JOIN_VARS);
+            
+            // The join constraints (optional).
+            constraints = (IConstraint[]) op.getProperty(
+                    Annotations.CONSTRAINTS, null/* defaultValue */);
+
+            /*
+             * This wraps an efficient raw store interface around a child memory
+             * manager created from the IMemoryManager which will back the named
+             * solution set.
+             */
+            store = new MemStore(mmgr.createAllocationContext());
+
+            // Will support incremental eviction and persistence.
+            rightSolutions.set(HTree.create(store, getIndexMetadata(op)));
+
+            if (optional) {
+
+                // The join set is used to handle optionals.
+                joinSet.set(HTree.create(store, getIndexMetadata(op)));
+
+            }
+
+            /*
+             * Setup the IV => BigdataValue mapping. This captures any cached
+             * BigdataValue references encountered on IVs. This map does not
+             * store duplicate entries for the same IV.
+             */
+            this.ivCache.set(HTree.create(store, getIVCacheIndexMetadata(op)));
+
+        }
+
+        /**
+         * Checkpoint the {@link HTree} instance(s) used to buffer the source
+         * solutions ({@link #rightSolutions} and {@link #ivCache}) and then
+         * re-load the them in a read-only mode from their checkpoint(s). This
+         * exposes a view of the {@link HTree} which is safe for concurrent
+         * readers.
+         */
+        public void saveSolutionSet() {
+
+            if (!open.get())
+                throw new IllegalStateException();
+
+            checkpoint(rightSolutions);
+            checkpoint(ivCache);
+            
+            /*
+             * Note: DO NOT checkpoint the joinSet here. That index is not even
+             * written upon until we begin to evaluate the joins, which happens
+             * after we checkpoint the source solutions.
+             */
+
+        }
+
+        /**
+         * Checkpoint the join set (used to buffer the optional solutions).
+         * <p>
+         * Note: Since we always output the solutions which did not join from a
+         * single thread as part of last pass evaluation there is no need to
+         * checkpoint the {@link #joinSet}.
+         */
+        public void checkpointJoinSet() {
+
+            if (!open.get())
+                throw new IllegalStateException();
+
+            checkpoint(joinSet);
+
+        }
+        
+        private void checkpoint(final AtomicReference<HTree> ref) {
+            
+            final HTree tmp = ref.get();
+
+            if (tmp != null) {
+                
+                // Checkpoint the HTree.
+                final Checkpoint checkpoint = tmp.writeCheckpoint2();
+
+                // Get a read-only view of the HTree.
+                if (!ref.compareAndSet(tmp/* expect */,
+                        HTree.load(store, checkpoint.getCheckpointAddr(),
+                                true/* readOnly */))) {
+
+                    throw new IllegalStateException();
+
+                }
+
+            }
+            
+        }
+
+        /**
+         * Discard the {@link HTree} data.
+         */
+        public void release() {
+
+            if (open.compareAndSet(true/* expect */, false/* update */)) {
+                // Already closed.
+                return;
+            }
+
+            schema.clear();
+
+            HTree tmp = rightSolutions.getAndSet(null/* newValue */);
+
+            if (tmp != null) {
+
+                tmp.close();
+
+            }
+
+            tmp = joinSet.getAndSet(null/* newValue */);
+            
+            if (tmp != null) {
+
+                tmp.close();
+
+            }
+
+            tmp = ivCache.getAndSet(null/* newValue */);
+            
+            if (tmp != null) {
+
+                tmp.close();
+
+            }
+
+            store.close();
+
+        }
+
+    }
+
+    /**
      * Buffer solutions on an {@link HTree}.
      * 
      * @param itr
@@ -158,7 +493,9 @@ public class HTreeHashJoinUtility {
      *         FIXME Does anything actually rely on the
      *         {@link JoinVariableNotBoundException}? It would seem that this
      *         exception could only be thrown if the joinvars[] was incorrectly
-     *         formulated as it should only include "known bound" variables.
+     *         formulated as it should only include "known bound" variables. (I
+     *         think that this is related to incorrectly passing along empty 
+     *         solutions for named subquery hash joins.)
      */
     public static long acceptSolutions(
             final ICloseableIterator<IBindingSet[]> itr,
@@ -197,6 +534,9 @@ public class HTreeHashJoinUtility {
                     
                 }
 
+//                if (log.isTraceEnabled())
+//                    log.trace("hashCode=" + hashCode + ": " + bset);
+                
                 // Insert binding set under hash code for that key.
                 htree.insert(hashCode, SerializerUtil.serialize(bset));
                 
@@ -263,8 +603,8 @@ public class HTreeHashJoinUtility {
      *            the optional constraints will actually join, but the join will
      *            do much more work to find those solutions.
      * @param selectVars
-     *            The variables to be retained (optional, all a retained if no
-     *            specified).
+     *            The variables to be retained (optional, all variables are
+     *            retained if not specified).
      * @param constraints
      *            Constraints on the solutions (optional, may be
      *            <code>null</code>).
@@ -358,8 +698,8 @@ public class HTreeHashJoinUtility {
                             break;
                         }
                     }
-                    // #of left solutions having the same hash code.
-                    final int bucketSize = toIndex - fromIndex;
+//                    // #of left solutions having the same hash code.
+//                    final int bucketSize = toIndex - fromIndex;
 
                     /*
                      * Note: all source solutions in [fromIndex:toIndex) have
@@ -400,6 +740,11 @@ public class HTreeHashJoinUtility {
                                                 selectVars);
 
                                 if (outSolution == null) {
+
+//                                    if (log.isTraceEnabled())
+//                                        log.trace("Does not join: left="
+//                                                + leftSolution + ", right="
+//                                                + rightSolution);
 
                                     // Join failed.
                                     continue;
@@ -519,11 +864,15 @@ public class HTreeHashJoinUtility {
      * @param joinSet
      *            The set of distinct right solutions which joined. This set is
      *            maintained iff the join is optional.
+     * @param selectVars
+     *            The variables to be retained (optional, all variables are
+     *            retained if not specified).
      */
     static public void outputOptionals(
             final IBuffer<IBindingSet> outputBuffer,
             final HTree rightSolutions, //
-            final HTree joinSet//
+            final HTree joinSet,//
+            final IVariable<?>[] selectVars//
             ) {
 
         // Visit all source solutions.
@@ -535,7 +884,7 @@ public class HTreeHashJoinUtility {
             
             final ITuple<IBindingSet> t = sitr.next();
             
-            final IBindingSet rightSolution = t.getObject();
+            IBindingSet rightSolution = t.getObject();
 
             // The hash code is based on the entire solution for the
             // joinSet.
@@ -549,9 +898,17 @@ public class HTreeHashJoinUtility {
             if (!jitr.hasNext()) {
 
                 /*
-                 * Since the source solution is not in the join set,
-                 * output it as an optional solution.
+                 * Since the source solution is not in the join set, output it
+                 * as an optional solution.
                  */
+
+                if (selectVars != null && selectVars.length > 0) {
+                
+                    // Only output the projected variables.
+                    rightSolution = rightSolution.copy(selectVars);
+                    
+                }
+
                 outputBuffer.add(rightSolution);
 
             }
@@ -559,5 +916,5 @@ public class HTreeHashJoinUtility {
         }
 
     } // handleOptionals.
-    
+
 }
