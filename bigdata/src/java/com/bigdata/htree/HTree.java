@@ -1555,7 +1555,6 @@ public class HTree extends AbstractHTree
 		
 		DirectoryPage current = getRoot(); // start at the root.
 		int prefixLength = 0;// prefix length of the root is always zero.
-		int buddyOffset = 0; // buddyOffset of the root is always zero.
 		while (true) {
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
@@ -1568,13 +1567,9 @@ public class HTree extends AbstractHTree
 			}
 			/*
 			 * Recursive descent into a child directory page. We have to update
-			 * the prefixLength and compute the offset of the buddy hash table
-			 * within the child before descending into the child.
+			 * the prefixLength before descending into the child.
 			 */
 			prefixLength = prefixLength + current.globalDepth;
-			buddyOffset = HTreeUtil
-					.getBuddyOffset(hashBits, current.globalDepth,
-							child.globalDepth/* localDepthOfChild */);
 			current = (DirectoryPage) child;
 		}
 	}
