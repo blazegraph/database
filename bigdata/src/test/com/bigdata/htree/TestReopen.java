@@ -286,7 +286,9 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 	public void test_multipleReopen3() {
 		for (int i = 0; i < 50; i++) {
-			System.out.println("Running test: " + i);
+			if (log.isDebugEnabled()) {
+				log.debug("Running test: " + i);
+			}
 			test_reopen03();
 		}
 	}
