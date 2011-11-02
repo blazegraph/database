@@ -1079,8 +1079,12 @@ public class HTree extends AbstractHTree
 		while (true) {
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
-			// find the child directory page or bucket page.
-			final AbstractPage child = current.getChild(hashBits, buddyOffset);
+			// find the child directory page or bucket page but do not lazily
+			// create new Directory if not present
+			final AbstractPage child = current.getChildIfPresent(hashBits);
+			if (child == null)
+				return false;
+			
 			if (child.isLeaf()) {
 				/*
 				 * Found the bucket page, update it.
@@ -1143,7 +1147,8 @@ public class HTree extends AbstractHTree
 		while (true) {
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
-			// find the child directory page or bucket page.
+			// find the child directory page or bucket page and ensure a new
+			// child is not created on lookup
 			final AbstractPage child = current.getChildIfPresent(hashBits);
 			if (child == null)
 				return null;
@@ -1189,8 +1194,6 @@ public class HTree extends AbstractHTree
 	 *            The key.
 	 * 
 	 * @return The iterator and never <code>null</code>.
-	 * 
-	 * TODO Unit tests for lookupAll(byte[] key)
 	 */
 	public ITupleIterator lookupAll(final byte[] key) {
 		if (key == null)
@@ -1202,6 +1205,7 @@ public class HTree extends AbstractHTree
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
 			// find the child directory page or bucket page.
+			// Ensure we do not create a child for lookup 
 			final AbstractPage child = current.getChildIfPresent(hashBits);
 			if (child == null)
 				return emptyTupleIterator();
@@ -1229,7 +1233,6 @@ public class HTree extends AbstractHTree
 	}
 
     private ITupleIterator emptyTupleIterator() {
-		// TODO Auto-generated method stub
 		return new ITupleIterator() {
 
 			public ITuple next() {
@@ -1335,9 +1338,6 @@ public class HTree extends AbstractHTree
 			    
 				// Attempt to insert the tuple into the bucket.
 				if (!bucketPage.insert(key, value)) {
-					if (bucketPage.data == null) {
-						throw new AssertionError("bucketPage.data == null");
-					}
 					if (current.globalDepth == child.globalDepth) {
 
                         /*
@@ -1354,7 +1354,6 @@ public class HTree extends AbstractHTree
                         } else {
 
                         	current.getParentDirectory().split(buddyOffset, current/* oldChild */);
-                            nnodes++; // One more directory page in the hash tree. 
                            
                         }
 
@@ -1528,7 +1527,7 @@ public class HTree extends AbstractHTree
 		
 		final AbstractPage page = locatePageForKey(key);
 		
-		final byte[] ret =  page.removeFirst(key);
+		final byte[] ret =  page == null ? null : page.removeFirst(key);
 		
 		if (ret != null) nentries--;
 		
@@ -1548,7 +1547,7 @@ public class HTree extends AbstractHTree
 	}
 
 	/**
-	 *
+	 * 
 	 */
 	protected AbstractPage locatePageForKey(final byte[] key) {
 		if (key == null)
@@ -1560,9 +1559,11 @@ public class HTree extends AbstractHTree
 		while (true) {
 			// skip prefixLength bits and then extract globalDepth bits. 
 			final int hashBits = current.getLocalHashCode(key, prefixLength);
-			// find the child directory page or bucket page.
-			final AbstractPage child = current.getChild(hashBits, buddyOffset);
-			if (child.isLeaf() || ((DirectoryPage) child).isOverflowDirectory()) {
+			// find the child directory page or bucket page, ensuring that
+			// new Directory is not created if not present
+			final AbstractPage child = current.getChildIfPresent(hashBits);
+			
+			if (child == null || child.isLeaf() || ((DirectoryPage) child).isOverflowDirectory()) {
 				return child;
 			}
 			/*
