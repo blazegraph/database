@@ -172,18 +172,9 @@ public class AbstractHTreeTestCase extends TestCase2 {
 
 //		final ITupleSerializer<?,?> tupleSer = DefaultTupleSerializer.newInstance();
 
-		/*
-		 * TODO This sets up a tuple serializer for a presumed case of 4 byte
-		 * keys (the buffer will be resized if necessary) and explicitly chooses
-		 * the SimpleRabaCoder as a workaround since the keys IRaba for the
-		 * HTree does not report true for isKeys(). Once we work through an
-		 * optimized bucket page design we can revisit this as the
-		 * FrontCodedRabaCoder should be a good choice, but it currently
-		 * requires isKeys() to return true.
-		 */
 		final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
 				new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-				new FrontCodedRabaCoder(8),// Note: reports true for isKeys()!
+				new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
 				// new SimpleRabaCoder(),// keys
 				new SimpleRabaCoder() // vals
 				);

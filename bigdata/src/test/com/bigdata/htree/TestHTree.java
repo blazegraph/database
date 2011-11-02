@@ -200,7 +200,6 @@ public class TestHTree extends AbstractHTreeTestCase {
             htree.insert(k2, v2);
 			if (log.isInfoEnabled())
 				log.info(htree.PP());
-			System.out.println(htree.PP());
             assertEquals("nnodes", 1, htree.getNodeCount());
             assertEquals("nleaves", 1, htree.getLeafCount());
             assertEquals("nentries", 2, htree.getEntryCount());
