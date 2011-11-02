@@ -26,9 +26,14 @@ package com.bigdata.htree;
 import java.util.Random;
 import java.util.UUID;
 
+import junit.framework.AssertionFailedError;
+
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.util.PseudoRandom;
 
 /**
  * Unit tests for the close/checkpoint/reopen protocol designed to manage the
@@ -171,27 +176,21 @@ public class TestReopen extends AbstractHTreeTestCase {
 	}
 
 	/**
-	 * Stress test comparison with ground truth btree when {@link HTree#close()}
+	 * Stress test comparison with ground truth htree when {@link HTree#close()}
 	 * is randomly invoked during mutation operations.
 	 */
 	public void test_reopen03() {
 
 		final Random r = new Random();
+		final PseudoRandom psr = new PseudoRandom(100, 13);
+		final PseudoRandom psr2 = new PseudoRandom(255, 13);
 
-		final IRawStore store = new SimpleMemoryRawStore();
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
+                Integer.MAX_VALUE);
 
 		try {
 
 			final UUID indexUUID = UUID.randomUUID();
-
-			/*
-			 * The btree under test.
-			 * 
-			 * Note: the fixture factory is NOT used since this node evictions
-			 * will be forced when this tree is closed (node evictions are not
-			 * permitted by the default fixture factory).
-			 */
-			final HTree btree = getHTree(store, 2/*addressBits*/);
 
 			/*
 			 * The btree used to maintain ground truth.
@@ -200,51 +199,82 @@ public class TestReopen extends AbstractHTreeTestCase {
 			 * will eventually overflow the hard reference queue and begin
 			 * evicting nodes and leaves onto the store.
 			 */
+			final HTree htree ;
 			final HTree groundTruth;
 			{
 
-				final IndexMetadata md = new IndexMetadata(indexUUID);
+				final IndexMetadata gmd = new IndexMetadata(indexUUID);
 
-				md.setAddressBits(2);
+				gmd.setWriteRetentionQueueCapacity(30);
+				gmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
 
-				groundTruth = HTree.create(store, md);
+		        gmd.setAddressBits(2);
+
+				groundTruth = HTree.create(store, gmd);
+				
+				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+
+				hmd.setWriteRetentionQueueCapacity(30);
+				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
+
+				hmd.setAddressBits(2);
+				htree = HTree.create(store, hmd);
 
 			}
 
-			final int limit = 10000;
-			final int keylen = r.nextInt(1 + 12);
-
+			final int limit = 100; // 20000
+			final int keylen = 8; // r.nextInt(1 + 12);
+			
 			for (int i = 0; i < limit; i++) {
 
-				final int n = r.nextInt(100);
+				final int n = psr.next(); // r.nextInt(100);
 
 				if (n < 5) {
 					/* periodically force a checkpoint + close of the btree. */
-					if (btree.isOpen()) {
+					boolean htreeClosed = false;
+					boolean groundTruthClosed = false;
+					if (htree.isOpen()) {
 						// System.err.println("checkpoint+close");
-						btree.writeCheckpoint();
-						btree.close();
-						// assertSameBTree(groundTruth, btree);
+						htree.writeCheckpoint();
+						htree.close();
+						htreeClosed = true;
+					} else if (groundTruth.isOpen()){
+						//groundTruth.writeCheckpoint();
+						//groundTruth.close();
+						groundTruthClosed = true;
+					}
+					
+					try {
+						// assertSameHTree(groundTruth, htree);
+					} catch (AssertionFailedError ae) {
+						System.out.println("HTree Closed: " + htreeClosed + ", groundTruthClosed: " + groundTruthClosed);
+						throw ae;
 					}
 				} else if (n < 20) {
 					// remove an entry.
 					final byte[] key = new byte[keylen];
+					// psr2.nextBytes(key, i);
 					r.nextBytes(key);
-					btree.remove(key);
+					htree.remove(key);
 					groundTruth.remove(key);
-					// assertSameBTree(groundTruth, btree);
+					// assertSameHTree(groundTruth, htree);
 				} else {
 					// add an entry.
 					final byte[] key = new byte[keylen];
+					// psr2.nextBytes(key, i);
 					r.nextBytes(key);
-					btree.insert(key, key);
+					htree.insert(key, key);
 					groundTruth.insert(key, key);
-					// assertSameBTree(groundTruth, btree);
+					// assertSameHTree(groundTruth, htree);
 				}
 
 			}
 
-			assertSameHTree(groundTruth, btree);
+			try {
+				assertSameHTree(groundTruth, htree);
+			} catch (AssertionFailedError ae) {
+				throw ae;
+			}
 
 		} finally {
 
@@ -254,4 +284,10 @@ public class TestReopen extends AbstractHTreeTestCase {
         
     }
 
+	public void test_multipleReopen3() {
+		for (int i = 0; i < 50; i++) {
+			System.out.println("Running test: " + i);
+			test_reopen03();
+		}
+	}
 }
