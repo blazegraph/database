@@ -340,8 +340,8 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 2000;
-    private static final int s_retentionQueueCapacity = 30;
+    private static final int s_limit = 10000;
+    private static final int s_retentionQueueCapacity = 20;
 
     /**
      * Note: If the retention queue is less than the maximum depth of the HTree
