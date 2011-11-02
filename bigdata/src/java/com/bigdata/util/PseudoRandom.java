@@ -118,4 +118,16 @@ public class PseudoRandom {
         return next();
 
 	}
+
+	public void nextBytes(byte[] key, final int prev) {
+		m_next = prev;
+		
+		nextBytes(key);
+	}
+
+	public void nextBytes(byte[] key) {
+		for (int i = 0; i < key.length; i++) {
+			key[i] = (byte) next();
+		}
+	}
 }
