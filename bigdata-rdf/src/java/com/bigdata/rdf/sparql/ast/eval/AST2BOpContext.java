@@ -74,8 +74,14 @@ public class AST2BOpContext implements IdFactory {
     
     /**
      * When <code>true</code>, will use the version of DISTINCT which operators
-     * on the native heap (assuming that the query is not of such obvious low
-     * cardinality that the JVM heap version will do better).
+     * on the native heap.
+     * 
+     * TODO Intelligently choose JVM versus HTree for this option based on the
+     * estimated cardinality of the query.
+     * 
+     * TODO Query hint to control this.
+     * 
+     * TODO The same choice exists for default graph access paths.
      */
     boolean nativeDistinct = true;
 
@@ -84,6 +90,11 @@ public class AST2BOpContext implements IdFactory {
      * Otherwise use hash joins based on the Java collection classes. The
      * {@link HTree} is more scalable but has higher overhead for small
      * cardinality hash joins.
+     * 
+     * TODO Intelligently choose JVM versus HTree for this option based on the
+     * estimated cardinality of the hash join.
+     * 
+     * TODO Query hint to control this on an overall and per join basis.
      */
     boolean nativeHashJoins = false;
     

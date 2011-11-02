@@ -29,7 +29,6 @@ package com.bigdata.bop.join;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
@@ -39,28 +38,20 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.htree.HTree;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
-import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * A hash join against an {@link IAccessPath} based on the {@link HTree} and
@@ -251,45 +242,45 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         
     }
     
-    /**
-     * 
-     * @see Annotations#CONSTRAINTS
-     */
-    public IConstraint[] constraints() {
+//    /**
+//     * 
+//     * @see Annotations#CONSTRAINTS
+//     */
+//    public IConstraint[] constraints() {
+//
+//        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
+//
+//    }    
 
-        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
-
-    }    
-
-    /**
-     * @see Annotations#ADDRESS_BITS
-     */
-    public int getAddressBits() {
-
-        return getProperty(Annotations.ADDRESS_BITS,
-                Annotations.DEFAULT_ADDRESS_BITS);
-
-    }
-
-    /**
-     * @see Annotations#RAW_RECORDS
-     */
-    public boolean getRawRecords() {
-
-        return getProperty(Annotations.RAW_RECORDS,
-                Annotations.DEFAULT_RAW_RECORDS);
-
-    }
-    
-    /**
-     * @see Annotations#MAX_RECLEN
-     */
-    public int getMaxRecLen() {
-
-        return getProperty(Annotations.MAX_RECLEN,
-                Annotations.DEFAULT_MAX_RECLEN);
-
-    }
+//    /**
+//     * @see Annotations#ADDRESS_BITS
+//     */
+//    public int getAddressBits() {
+//
+//        return getProperty(Annotations.ADDRESS_BITS,
+//                Annotations.DEFAULT_ADDRESS_BITS);
+//
+//    }
+//
+//    /**
+//     * @see Annotations#RAW_RECORDS
+//     */
+//    public boolean getRawRecords() {
+//
+//        return getProperty(Annotations.RAW_RECORDS,
+//                Annotations.DEFAULT_RAW_RECORDS);
+//
+//    }
+//    
+//    /**
+//     * @see Annotations#MAX_RECLEN
+//     */
+//    public int getMaxRecLen() {
+//
+//        return getProperty(Annotations.MAX_RECLEN,
+//                Annotations.DEFAULT_MAX_RECLEN);
+//
+//    }
 
     public BaseJoinStats newStats() {
 
@@ -317,36 +308,23 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         
         private final IPredicate<E> pred;
         
-        private final IVariable<E>[] joinVars;
+//        private final IVariable<E>[] joinVars;
         
-        private final IConstraint[] constraints;
+//        private final IConstraint[] constraints;
 
         private final IVariable<?>[] selectVars;
         
-        private final boolean optional;
+//        private final boolean optional;
         
         private final BaseJoinStats stats;
 
+        private final HTreeHashJoinState state;
+        
         private final IBlockingBuffer<IBindingSet[]> sink;
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-        /**
-         * A map whose keys are the bindings on the specified variables. The
-         * values in the map are <code>null</code>s.
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         */
-        private final HTree rightSolutions;
-
-        /**
-         * The set of distinct source solutions which joined. This set is
-         * maintained iff the join is optional.
-         */
-        private final HTree joinSet;
-
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final HTreeHashJoinOp<E> op) {
 
@@ -361,12 +339,12 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             this.selectVars = (IVariable<?>[]) op
                     .getProperty(Annotations.SELECT);
 
-            this.joinVars = (IVariable<E>[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
-            
-            this.constraints = op.constraints();
-
-            this.optional = op.isOptional();
+//            this.joinVars = (IVariable<E>[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            
+//            this.constraints = op.constraints();
+//
+//            this.optional = op.isOptional();
 
             this.sink = context.getSink();
 
@@ -385,115 +363,26 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                 final IQueryAttributes attrs = context.getRunningQuery()
                         .getAttributes();
 
-                final Object sourceSolutionsKey = op.getId()
-                        + ".sourceSolutions";
+                final Object joinStateKey = op.getId() + ".joinState";
 
-                final Object joinSetKey = op.getId() + ".joinSet";
+                HTreeHashJoinState state = (HTreeHashJoinState) attrs
+                        .get(joinStateKey);
 
-                HTree rightSolutions = (HTree) attrs.get(sourceSolutionsKey);
+                if (state == null) {
 
-                HTree joinSet = (HTree) attrs.get(joinSetKey);
+                    state = new HTreeHashJoinState(context.getRunningQuery()
+                            .getMemoryManager(), op, op.isOptional());
 
-                if (rightSolutions == null) {
+                    attrs.put(joinStateKey, state);
 
-                    /*
-                     * Create the map(s).
-                     */
-                    
-                    final IndexMetadata metadata = new IndexMetadata(
-                            UUID.randomUUID());
-
-                    metadata.setAddressBits(op.getAddressBits());
-
-                    metadata.setRawRecords(op.getRawRecords());
-
-                    metadata.setMaxRecLen(op.getMaxRecLen());
-
-                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
-                                                          // keys.
-
-                    /*
-                     * TODO This sets up a tuple serializer for a presumed case
-                     * of 4 byte keys (the buffer will be resized if necessary)
-                     * and explicitly chooses the SimpleRabaCoder as a
-                     * workaround since the keys IRaba for the HTree does not
-                     * report true for isKeys(). Once we work through an
-                     * optimized bucket page design we can revisit this as the
-                     * FrontCodedRabaCoder should be a good choice, but it
-                     * currently requires isKeys() to return true.
-                     */
-                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-                            new SimpleRabaCoder() // vals
-                    );
-
-                    metadata.setTupleSerializer(tupleSer);
-
-                    /*
-                     * This wraps an efficient raw store interface around a
-                     * child memory manager created from the IMemoryManager
-                     * which is backing the query.
-                     */
-                    final IRawStore store = new MemStore(context
-                            .getRunningQuery().getMemoryManager()
-                            .createAllocationContext());
-
-                    // Will support incremental eviction and persistence.
-                    rightSolutions = HTree.create(store, metadata);
-
-                    // Used to handle optionals.
-                    joinSet = op.isOptional() ? HTree.create(store,
-                            metadata.clone()) : null;
-
-                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
-                        throw new AssertionError();
-
-                    if (joinSet != null) {
-                        if (attrs.putIfAbsent(joinSetKey, joinSet) != null)
-                            throw new AssertionError();
-                    }
-                    
                 }
 
-                // The map is shared state across invocations of this operator
-                // task.
-                this.rightSolutions = rightSolutions;
-
-                // defined iff the join is optional.
-                this.joinSet = joinSet;
+                this.state = state;
 
             }
 
         }
 
-        /**
-         * Discard the {@link HTree} data.
-         */
-        private void release() {
-
-            if (joinSet != null) {
-
-                joinSet.close();
-
-//                joinSet = null;
-                
-            }
-
-            if (rightSolutions != null) {
-
-                final IRawStore store = rightSolutions.getStore();
-
-                rightSolutions.close();
-                
-//                sourceSolutions = null;
-                
-                store.close();
-
-            }
-
-        }
-        
         public Void call() throws Exception {
 
             try {
@@ -502,7 +391,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 final long maxMemory = op.getMaxMemory();
 
-                final long usedMemory = rightSolutions.getStore().size();
+                final long usedMemory = state.getStore().size();
                 
                 if (context.isLastInvocation() || usedMemory >= maxMemory) {
 
@@ -517,7 +406,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 if (context.isLastInvocation()) {
 
-                    release();
+                    state.release();
 
                 }
                 
@@ -535,8 +424,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          */
         private void acceptSolutions() {
 
-            HTreeHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
-                    stats, rightSolutions, optional);
+            HTreeHashJoinUtility
+                    .acceptSolutions(context.getSource(), state.joinVars,
+                            stats, state.getRightSolutions(), state.optional);
 
         }
 
@@ -545,15 +435,15 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          */
         private void doHashJoin() {
 
-            if (rightSolutions.getEntryCount() == 0)
+            if (state.getRightSolutions().getEntryCount() == 0)
                 return;
             
             final IAccessPath<?> accessPath = context.getAccessPath(relation,
                     pred);
 
             if (log.isDebugEnabled()) {
-                log.debug("rightSolutions=" + rightSolutions.getEntryCount());
-                log.debug("joinVars=" + Arrays.toString(joinVars));
+                log.debug("rightSolutions=" + state.getRightSolutions().getEntryCount());
+                log.debug("joinVars=" + Arrays.toString(state.joinVars));
                 log.debug("accessPath=" + accessPath);
             }
 
@@ -566,19 +456,21 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                     op.getChunkCapacity(), sink);
 
             HTreeHashJoinUtility.hashJoin(
-                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
-                    unsyncBuffer, joinVars, selectVars, constraints,
-                    rightSolutions, joinSet, optional, false/*leftIsPipeline*/);
+                    ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
+                    unsyncBuffer, state.joinVars, selectVars,
+                    state.constraints, state.getRightSolutions(), state.getJoinSet(),
+                    state.optional, false/* leftIsPipeline */);
 
-            if (optional) {
+            if (state.optional) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions,
-                        joinSet);
+                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2,
+                        state.getRightSolutions(), state.getJoinSet(),
+                        selectVars);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)

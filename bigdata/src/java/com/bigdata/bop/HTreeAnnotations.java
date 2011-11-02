@@ -62,7 +62,7 @@ public interface HTreeAnnotations {
 	 */
 	String RAW_RECORDS = HTreeAnnotations.class.getName() + ".rawRecords";
 
-	boolean DEFAULT_RAW_RECORDS = true;
+	boolean DEFAULT_RAW_RECORDS = false;
 
 	/**
 	 * When {@link #RAW_RECORDS} are used, this will be the maximum byte length
@@ -74,6 +74,6 @@ public interface HTreeAnnotations {
 	 */
 	String MAX_RECLEN = HTreeAnnotations.class.getName() + ".maxRecLen";
 
-	int DEFAULT_MAX_RECLEN = 0;
+	int DEFAULT_MAX_RECLEN = 128;
 	
 }

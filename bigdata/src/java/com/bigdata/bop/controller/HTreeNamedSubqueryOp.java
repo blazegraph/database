@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.controller;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,21 +48,13 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
+import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
-import com.bigdata.btree.Checkpoint;
-import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.rwstore.sector.MemStore;
 
 /**
  * Evaluation of a subquery, producing a named result set. This operator passes
@@ -96,10 +87,10 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
-         * subquery solution set is stored (a {@link HTree} reference). The
-         * attribute name includes the query UUID. The query UUID must be
-         * extracted and used to lookup the {@link IRunningQuery} to which the
-         * solution set was attached.
+         * subquery solution set is stored (a {@link HTreeHashJoinState}
+         * reference). The attribute name includes the query UUID. The query
+         * UUID must be extracted and used to lookup the {@link IRunningQuery}
+         * to which the solution set was attached.
          * 
          * @see NamedSolutionSetRef
          */
@@ -162,35 +153,35 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         
     }
 
-    /**
-     * @see Annotations#ADDRESS_BITS
-     */
-    public int getAddressBits() {
-
-        return getProperty(Annotations.ADDRESS_BITS,
-                Annotations.DEFAULT_ADDRESS_BITS);
-
-    }
-
-    /**
-     * @see Annotations#RAW_RECORDS
-     */
-    public boolean getRawRecords() {
-
-        return getProperty(Annotations.RAW_RECORDS,
-                Annotations.DEFAULT_RAW_RECORDS);
-
-    }
-    
-    /**
-     * @see Annotations#MAX_RECLEN
-     */
-    public int getMaxRecLen() {
-
-        return getProperty(Annotations.MAX_RECLEN,
-                Annotations.DEFAULT_MAX_RECLEN);
-
-    }
+//    /**
+//     * @see Annotations#ADDRESS_BITS
+//     */
+//    public int getAddressBits() {
+//
+//        return getProperty(Annotations.ADDRESS_BITS,
+//                Annotations.DEFAULT_ADDRESS_BITS);
+//
+//    }
+//
+//    /**
+//     * @see Annotations#RAW_RECORDS
+//     */
+//    public boolean getRawRecords() {
+//
+//        return getProperty(Annotations.RAW_RECORDS,
+//                Annotations.DEFAULT_RAW_RECORDS);
+//
+//    }
+//    
+//    /**
+//     * @see Annotations#MAX_RECLEN
+//     */
+//    public int getMaxRecLen() {
+//
+//        return getProperty(Annotations.MAX_RECLEN,
+//                Annotations.DEFAULT_MAX_RECLEN);
+//
+//    }
 
     @Override
     public BOpStats newStats() {
@@ -259,11 +250,11 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
          */
         final IQueryAttributes attrs;
         
-        /**
-         * The join variables.
-         */
-        @SuppressWarnings("rawtypes")
-        private final IVariable[] joinVars;
+//        /**
+//         * The join variables.
+//         */
+//        @SuppressWarnings("rawtypes")
+//        private final IVariable[] joinVars;
         
         /**
          * <code>true</code> iff this is the first time the task is being
@@ -271,12 +262,14 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
          * result set on {@link #solutions}.
          */
         private final boolean first;
+//        
+//        /**
+//         * The generated solution set (hash index using the specified join
+//         * variables).
+//         */
+//        private final HTree solutions;
         
-        /**
-         * The generated solution set (hash index using the specified join
-         * variables).
-         */
-        private final HTree solutions;
+        private final HTreeHashJoinState state;
         
         public ControllerTask(final HTreeNamedSubqueryOp op,
                 final BOpContext<IBindingSet> context) {
@@ -297,8 +290,8 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            this.joinVars = (IVariable[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            this.joinVars = (IVariable[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -313,63 +306,65 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                 // solution set.
                 attrs = context.getQueryAttributes(namedSetRef.queryId);
 
-                HTree solutions = (HTree) attrs.get(namedSetRef);
+                HTreeHashJoinState state = (HTreeHashJoinState) attrs.get(namedSetRef);
 
-                if (solutions == null) {
+                if (state == null) {
 
                     /*
-                     * Create the map(s).
+                     * Note: This operator does not support optional semantics.
                      */
-                    
-                    final IndexMetadata metadata = new IndexMetadata(
-                            UUID.randomUUID());
+                    state = new HTreeHashJoinState(
+                            context.getMemoryManager(namedSetRef.queryId), op,
+                            false/* optional */);
 
-                    metadata.setAddressBits(op.getAddressBits());
+//                    /*
+//                     * Create the map(s).
+//                     */
+//                    
+//                    final IndexMetadata metadata = new IndexMetadata(
+//                            UUID.randomUUID());
+//
+//                    metadata.setAddressBits(op.getAddressBits());
+//
+//                    metadata.setRawRecords(op.getRawRecords());
+//
+//                    metadata.setMaxRecLen(op.getMaxRecLen());
+//
+//                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
+//                                                          // keys.
+//
+//                    /*
+//                     * TODO This sets up a tuple serializer for a presumed case
+//                     * of 4 byte keys (the buffer will be resized if necessary)
+//                     * and explicitly chooses the SimpleRabaCoder as a
+//                     * workaround since the keys IRaba for the HTree does not
+//                     * report true for isKeys(). Once we work through an
+//                     * optimized bucket page design we can revisit this as the
+//                     * FrontCodedRabaCoder should be a good choice, but it
+//                     * currently requires isKeys() to return true.
+//                     */
+//                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
+//                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
+//                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
+//                            new SimpleRabaCoder() // vals
+//                    );
+//
+//                    metadata.setTupleSerializer(tupleSer);
+//
+//                    /*
+//                     * This wraps an efficient raw store interface around a
+//                     * child memory manager created from the IMemoryManager
+//                     * which will back the named solution set.
+//                     */
+//                    final IRawStore store = new MemStore(context
+//                            .getMemoryManager(namedSetRef.queryId)
+//                            .createAllocationContext());
+//
+//                    // Will support incremental eviction and persistence.
+//                    solutions = HTree.create(store, metadata);
 
-                    metadata.setRawRecords(op.getRawRecords());
-
-                    metadata.setMaxRecLen(op.getMaxRecLen());
-
-                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
-                                                          // keys.
-
-                    /*
-                     * TODO This sets up a tuple serializer for a presumed case
-                     * of 4 byte keys (the buffer will be resized if necessary)
-                     * and explicitly chooses the SimpleRabaCoder as a
-                     * workaround since the keys IRaba for the HTree does not
-                     * report true for isKeys(). Once we work through an
-                     * optimized bucket page design we can revisit this as the
-                     * FrontCodedRabaCoder should be a good choice, but it
-                     * currently requires isKeys() to return true.
-                     */
-                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-                            new SimpleRabaCoder() // vals
-                    );
-
-                    metadata.setTupleSerializer(tupleSer);
-
-                    /*
-                     * This wraps an efficient raw store interface around a
-                     * child memory manager created from the IMemoryManager
-                     * which will back the named solution set.
-                     */
-                    final IRawStore store = new MemStore(context
-                            .getMemoryManager(namedSetRef.queryId)
-                            .createAllocationContext());
-
-                    // Will support incremental eviction and persistence.
-                    solutions = HTree.create(store, metadata);
-
-                    /*
-                     * Note: This is done once the subquery has been run so we
-                     * can checkpoint the HTree first and put the read-only
-                     * reference on the attribute.
-                     */ 
-//                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
-//                        throw new AssertionError();
+                    if (attrs.putIfAbsent(namedSetRef, state) != null)
+                        throw new AssertionError();
 
                     this.first = true;
                     
@@ -379,7 +374,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                     
                 }
 
-                this.solutions = solutions;
+                this.state = state;
 
             }
             
@@ -435,29 +430,29 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             
         }
 
-        /**
-         * Checkpoint the {@link HTree} containing the results of the subquery,
-         * re-load the {@link HTree} in a read-only mode from that checkpoint
-         * and then set the reference to the read-only view of the {@link HTree}
-         * on the {@link IQueryAttributes}. This exposes a view of the
-         * {@link HTree} which is safe for concurrent readers.
-         */
-        private void saveSolutionSet() {
-            
-            // Checkpoint the HTree.
-            final Checkpoint checkpoint = solutions.writeCheckpoint2();
-            
-            // Get a read-only view of the HTree.
-            final HTree readOnly = HTree.load(solutions.getStore(),
-                    checkpoint.getCheckpointAddr(), true/* readOnly */);
-
-//            final IQueryAttributes attrs = context.getRunningQuery()
-//                    .getAttributes();
-
-            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
-                throw new AssertionError();
-
-        }
+//        /**
+//         * Checkpoint the {@link HTree} containing the results of the subquery,
+//         * re-load the {@link HTree} in a read-only mode from that checkpoint
+//         * and then set the reference to the read-only view of the {@link HTree}
+//         * on the {@link IQueryAttributes}. This exposes a view of the
+//         * {@link HTree} which is safe for concurrent readers.
+//         */
+//        private void saveSolutionSet() {
+//            
+//            // Checkpoint the HTree.
+//            final Checkpoint checkpoint = solutions.writeCheckpoint2();
+//            
+//            // Get a read-only view of the HTree.
+//            final HTree readOnly = HTree.load(solutions.getStore(),
+//                    checkpoint.getCheckpointAddr(), true/* readOnly */);
+//
+////            final IQueryAttributes attrs = context.getRunningQuery()
+////                    .getAttributes();
+//
+//            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
+//                throw new AssertionError();
+//
+//        }
         
         /**
          * Run a subquery.
@@ -511,8 +506,8 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
 						// Buffer the solutions on the hash index.
                         final long ncopied = HTreeHashJoinUtility.acceptSolutions(
-                                subquerySolutionItr, joinVars, stats,
-                                solutions, false/* optional */);
+                                subquerySolutionItr, state.joinVars, stats,
+                                state.getRightSolutions(), state.optional);
 
 						// Wait for the subquery to halt / test for errors.
 						runningSubquery.get();
@@ -520,8 +515,8 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                         // Report the #of solutions in the named solution set.
                         stats.solutionSetSize.addAndGet(ncopied);
 
-                        // Publish the solution set on the query context.
-                        saveSolutionSet();
+                        // Checkpoint the solution set.
+                        state.saveSolutionSet();
 
                         if (log.isInfoEnabled())
                             log.info("Solution set " + namedSetRef + " has "
