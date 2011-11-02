@@ -310,18 +310,9 @@ public class TestHTreeWithMemStore extends TestCase {
     private HTree getHTree(final IRawStore store, final int addressBits,
             final boolean rawRecords, final int writeRetentionQueueCapacity) {
 
-        /*
-         * TODO This sets up a tuple serializer for a presumed case of 4 byte
-         * keys (the buffer will be resized if necessary) and explicitly chooses
-         * the SimpleRabaCoder as a workaround since the keys IRaba for the
-         * HTree does not report true for isKeys(). Once we work through an
-         * optimized bucket page design we can revisit this as the
-         * FrontCodedRabaCoder should be a good choice, but it currently
-         * requires isKeys() to return true.
-         */
         final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                new FrontCodedRabaCoder(4),// Note: reports true for isKeys()!
+                new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
                 // new SimpleRabaCoder(),// keys
                 new SimpleRabaCoder() // vals
                 );
@@ -349,7 +340,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 200;
+    private static final int s_limit = 2000;
     private static final int s_retentionQueueCapacity = 30;
 
     /**
@@ -413,10 +404,6 @@ public class TestHTreeWithMemStore extends TestCase {
 
                 }
                 
-//                System.out.println(htree.PP());
-//                Iterator values = htree.values();
-//                while (values.hasNext()) values.next();
-
                 final long elapsedLookupFirstTime = System.currentTimeMillis()
                         - beginLookupFirst;
 
