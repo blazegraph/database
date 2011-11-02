@@ -48,6 +48,7 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -174,7 +175,7 @@ public class AbstractHTreeTestCase extends TestCase2 {
 
 		final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
 				new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-				new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
+				DefaultFrontCodedRabaCoder.INSTANCE,// Note: reports true for isKeys()!
 				// new SimpleRabaCoder(),// keys
 				new SimpleRabaCoder() // vals
 				);

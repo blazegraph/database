@@ -46,6 +46,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -312,7 +313,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
         final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
+                DefaultFrontCodedRabaCoder.INSTANCE,// Note: reports true for isKeys()!
                 // new SimpleRabaCoder(),// keys
                 new SimpleRabaCoder() // vals
                 );
