@@ -349,7 +349,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
     }
     
-    private static final int s_limit = 10000;
+    private static final int s_limit = 200;
     private static final int s_retentionQueueCapacity = 30;
 
     /**
@@ -383,6 +383,8 @@ public class TestHTreeWithMemStore extends TestCase {
                 for (int i = 0; i < s_limit; i++) {
                     keys[i] = keyBuilder.reset().append(new Integer(i).hashCode()).getKey();
                 }
+                final byte[] badkey = keyBuilder.reset().append(new Integer(s_limit * 32).hashCode()).getKey();
+
                 final long begin = System.currentTimeMillis();
                 for (int i = 0; i < s_limit; i++) {
                     final byte[] key = keys[i];
@@ -436,6 +438,10 @@ public class TestHTreeWithMemStore extends TestCase {
                             + htree.getNodeCount() + ", nleaves="
                             + htree.getLeafCount());
                 }
+                
+                // Attempts to access absent keys should not lazily create bucketPage
+                assertTrue(htree.lookupFirst(badkey) == null); 
+                assertFalse(htree.lookupAll(badkey).hasNext()); // should not lazily create bucketPage if value not present!
 
             } catch (Throwable t) {
 

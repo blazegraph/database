@@ -34,15 +34,19 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NoEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Bytes;
@@ -179,8 +183,8 @@ public class AbstractHTreeTestCase extends TestCase2 {
 		 */
 		final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
 				new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-				//new FrontCodedRabaCoder(),// Note: reports true for isKeys()!
-				new SimpleRabaCoder(),// keys
+				new FrontCodedRabaCoder(8),// Note: reports true for isKeys()!
+				// new SimpleRabaCoder(),// keys
 				new SimpleRabaCoder() // vals
 				);
 
@@ -265,8 +269,30 @@ public class AbstractHTreeTestCase extends TestCase2 {
 	static protected void assertSameHTree(final AbstractHTree expected,
 			final AbstractHTree actual) {
 	
-		fail("Write test helper method");
+		assertTrue(((HTree) expected).nentries == ((HTree) actual).nentries);
+		assertTrue(((HTree) expected).nleaves == ((HTree) actual).nleaves);
+		assertTrue(((HTree) expected).nnodes == ((HTree) actual).nnodes);
+		
+		assertSameIterator(
+				expected.getRoot().getTuples(), 
+				actual.getRoot().getTuples());
 	
+	}
+
+	private static void assertSameIterator(ITupleIterator expected,
+			ITupleIterator actual) {
+		int index = 0;
+		while (expected.hasNext()) {
+			assertTrue(actual.hasNext());
+			index++;
+			
+			ITuple etup = expected.next();
+			ITuple atup = actual.next();
+			assertTrue(BytesUtil.bytesEqual(etup.getKey(), atup.getKey()));
+			assertTrue(BytesUtil.bytesEqual(etup.getValue(), atup.getValue()));
+		}
+
+		assertFalse(actual.hasNext());
 	}
 
 	public static void assertSameOrderIterator(byte[][] keys,

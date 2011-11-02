@@ -139,16 +139,11 @@ public class TestDirtyIterators extends AbstractHTreeTestCase {
 			 * 
 			 * <pre>
 			 * #nodes=3, #leaves=3, #entries=5
-			 * D#88 [2] (D#62,B#80,B#20,B#20)
-			 * D#62 [2]     (D#65,B#94,B#92,B#92)
-			 * D#65 [2]         (B#99,B#35,B#65,B#65)
+			 * D#88 [2] (D#62,-,-,-)
+			 * D#62 [2]     (D#65,-,-,-)
+			 * D#65 [2]         (B#99,B#35,-,-)
 			 * B#99 [2]             ([1](00000001),[2](00000010),[3](00000011),-)
 			 * B#35 [2]             ([4](00000100),[5](00000101),-,-)
-			 * B#65 [1]             (-,-,-,-)
-			 * B#94 [2]         (-,-,-,-)
-			 * B#92 [1]         (-,-,-,-)
-			 * B#80 [2]     (-,-,-,-)
-			 * B#20 [1]     (-,-,-,-)
 			 * </pre>
 			 */
 			{
@@ -157,10 +152,10 @@ public class TestDirtyIterators extends AbstractHTreeTestCase {
 				
 				if (log.isInfoEnabled())
 					log.info("After another insert: " + htree.PP());
-
+				
 				assertEquals("nnodes", 3, htree.getNodeCount());
-				assertEquals("nleaves", 7, htree.getLeafCount());
-				assertEquals("nleaves", 5, htree.getEntryCount());
+				assertEquals("nleaves", 2, htree.getLeafCount());
+				assertEquals("nentries", 5, htree.getEntryCount());
 				
 				final DirectoryPage a = (DirectoryPage) htree.root.getChild(0);
 				final BucketPage b = (BucketPage) htree.root.getChild(1);
@@ -244,8 +239,8 @@ public class TestDirtyIterators extends AbstractHTreeTestCase {
 					log.info("After initial inserts: " + htree.PP());
 
 				assertEquals("nnodes", 3, htree.getNodeCount());
-				assertEquals("nleaves", 7, htree.getLeafCount());
-				assertEquals("nleaves", 5, htree.getEntryCount());
+				assertEquals("nleaves", 2, htree.getLeafCount());
+				assertEquals("nentries", 5, htree.getEntryCount());
 
 				final DirectoryPage root = (DirectoryPage) htree.root;
 				final DirectoryPage a = (DirectoryPage) htree.root.getChild(0);
