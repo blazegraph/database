@@ -322,6 +322,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 */
 	AbstractPage getChild(final int index) {
 		
+		/**
+		 * FIXME: Need to check whether we are using unnecessary synchronization
+		 */
 		AbstractPage ret = checkLazyChild(index);
 		
 		if (ret != null) {
@@ -1676,41 +1679,18 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	}
 
 	/**
-	 * Tests the slot
-	 * @param slot
-	 * @return an existing AbstractPage if present
+	 * Tests the slot for content
+	 * 
+	 * @param slot - the slot to check
+	 * @return an existing AbstractPage if present and null otherwise
 	 */
-	AbstractPage getChildIfPresent(int slot) {
+	AbstractPage getChildIfPresent(final int slot) {
 		if (childRefs[slot] == null && data.getChildAddr(slot) == IRawStore.NULL) {
 			return null;
 		} else {
 			return getChild(slot);
 		}
 	}
-
-//	@Override
-//	void insertRawTuple(final byte[] key, final byte[] val, final int buddy) {
-//
-//		assert buddy == 0;
-//
-//		final int pl = getPrefixLength();
-//		final int hbits = getLocalHashCode(key, pl);
-//		final AbstractPage cp = getChild(hbits); // removed eager copyOnWrite()
-//
-//		cp.insertRawTuple(key, val, getChildBuddy(hbits));
-//	}
-
-//	/*
-//	 * Checks child buddies, looking for previous references and incrementing
-//	 */
-//	private int getChildBuddy(int hbits) {
-//		int cbuddy = 0;
-//		final AbstractPage cp = getChild(hbits);
-//		while (hbits > 0 && cp == getChild(--hbits))
-//			cbuddy++;
-//
-//		return cbuddy;
-//	}
 
     /**
      * Invoked by {@link #copyOnWrite()} to clear the persistent address for a
