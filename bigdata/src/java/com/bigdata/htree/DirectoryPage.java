@@ -2038,6 +2038,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
                 newDepth//
                 );
 
+        ((HTree) htree).nnodes++; // One more directory page in the hash tree. 
+        
         assert newChild.isDirty();
         
         // Set the parent reference on the new bucket.

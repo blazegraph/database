@@ -387,7 +387,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			return null;
 		
 		if (hasRawRecords()) {
-			long addr = getRawRecord(index);
+			final long addr = getRawRecord(index);
 			
 			if (addr != IRawStore.NULL)
 				return getBytes(readRawRecord(addr));
@@ -396,7 +396,11 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		return getValues().get(index);
 	}
 	
-	final byte[] getBytes(ByteBuffer buf) {
+	/**
+	 * @param buf
+	 * @return a byte array representing the data view of the ByteBuffer
+	 */
+	final byte[] getBytes(final ByteBuffer buf) {
 
 		if (buf.hasArray() && buf.arrayOffset() == 0 && buf.position() == 0
 				&& buf.limit() == buf.capacity()) {
@@ -416,13 +420,13 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		final byte[] a;
 		{
 
-			buf = buf.asReadOnlyBuffer();
+			final ByteBuffer buf2 = buf.asReadOnlyBuffer();
 
-			final int len = buf.remaining();
+			final int len = buf2.remaining();
 
 			a = new byte[len];
 
-			buf.get(a);
+			buf2.get(a);
 
 		}
 
@@ -1407,7 +1411,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	/**
 	 * Must check for rawRecords and remove the references.
 	 */
-	public byte[] removeFirst(final byte[] key) {
+	final public byte[] removeFirst(final byte[] key) {
 		if (isReadOnly()) {
 			BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
 			
