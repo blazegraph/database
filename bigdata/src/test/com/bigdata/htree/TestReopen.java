@@ -253,16 +253,16 @@ public class TestReopen extends AbstractHTreeTestCase {
 				} else if (n < 20) {
 					// remove an entry.
 					final byte[] key = new byte[keylen];
-					// psr2.nextBytes(key, i);
-					r.nextBytes(key);
+					psr2.nextBytes(key, i);
+					//r.nextBytes(key);
 					htree.remove(key);
 					groundTruth.remove(key);
 					// assertSameHTree(groundTruth, htree);
 				} else {
 					// add an entry.
 					final byte[] key = new byte[keylen];
-					// psr2.nextBytes(key, i);
-					r.nextBytes(key);
+					psr2.nextBytes(key, i);
+					// r.nextBytes(key);
 					htree.insert(key, key);
 					groundTruth.insert(key, key);
 					// assertSameHTree(groundTruth, htree);
@@ -286,8 +286,8 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 	public void test_multipleReopen3() {
 		for (int i = 0; i < 50; i++) {
-			if (log.isDebugEnabled()) {
-				log.debug("Running test: " + i);
+			if (true || log.isDebugEnabled()) {
+				System.out.println("Running test: " + i);
 			}
 			test_reopen03();
 		}
