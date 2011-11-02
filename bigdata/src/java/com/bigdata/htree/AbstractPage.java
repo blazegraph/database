@@ -784,12 +784,10 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
     /** @deprecated Move to a test helper based on a striterator pattern. */
     abstract int activeDirectoryPages();
 
-    public int removeAll(final byte[] key) {
-    	throw new UnsupportedOperationException();
-    }
+    /** @overide */
+    abstract public int removeAll(final byte[] key);
 
-    public byte[] removeFirst(final byte[] key) {
-    	throw new UnsupportedOperationException();
-    }
+    /** @overide */
+    abstract public byte[] removeFirst(final byte[] key);
 
 }

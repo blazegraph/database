@@ -1327,8 +1327,11 @@ public class HTree extends AbstractHTree
 
 				/*
 				 * Found the bucket page, update it.
+				 * 
+				 * We must copyOnWrite now since the insert will otherwise call it
+				 * and potentially invalidate the bucketPage reference.
 				 */
-			    final BucketPage bucketPage = (BucketPage) child.copyOnWrite(); // not sure if this is needed
+			    final BucketPage bucketPage = (BucketPage) child.copyOnWrite();
 			    
 				// Attempt to insert the tuple into the bucket.
 				if (!bucketPage.insert(key, value)) {
