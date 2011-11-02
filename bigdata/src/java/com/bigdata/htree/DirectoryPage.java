@@ -1675,6 +1675,11 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 
+	/**
+	 * Tests the slot
+	 * @param slot
+	 * @return an existing AbstractPage if present
+	 */
 	AbstractPage getChildIfPresent(int slot) {
 		if (childRefs[slot] == null && data.getChildAddr(slot) == IRawStore.NULL) {
 			return null;
@@ -1984,6 +1989,14 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	    
 	}
 	
+	/**
+	 * This method is never called at present since DirectoryPages are
+	 * always created at maximum depth.  Whether there is any advantage
+	 * in supporting pages of lesser depths is yet to be determined.
+	 * 
+	 * @param buddyOffset
+	 * @param oldChild
+	 */
     public void split(final int buddyOffset, final DirectoryPage oldChild) {
 
         if (true) {
@@ -2546,7 +2559,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	    _fillChildSlots(hashBits, start, refs, 0);
 	}
 
-   public int removeAll(final byte[] key) {
+   final public int removeAll(final byte[] key) {
 	   if (!isOverflowDirectory())
     	throw new UnsupportedOperationException("Only valid if page is an overflow directory");
 	   
@@ -2578,7 +2591,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		return ret;
     }
 
-    public byte[] removeFirst(final byte[] key) {
+    final public byte[] removeFirst(final byte[] key) {
  	   if (!isOverflowDirectory())
  	    	throw new UnsupportedOperationException("Only valid if page is an overflow directory");
  	   
