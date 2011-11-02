@@ -710,19 +710,29 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
                 keys.nkeys++;
                 keys.keys[i] = key;
                 vals.nvalues++;
+                
                 // Note: DOES NOT Materialize a raw record!!!!
                 vals.values[i] = srcPage.getValues().get(srcSlot);
-                // TODO deleteMarker:=false
-                // TODO versionTimestamp:=...
-                // do not increment on raw insert, since this is only ever
-                // (for now) a re-organisation
-                // ((HTree)htree).nentries++;
-                // insert Ok.
                 
+                // deleteMarkers
+                if (srcPage.hasDeleteMarkers()) {
+                	((MutableBucketData) data).deleteMarkers[i] = srcPage.getDeleteMarker(srcSlot);
+                }
+                
+                // version timestamp
+                if (srcPage.hasVersionTimestamps()) {
+                	((MutableBucketData) data).versionTimestamps[i] = srcPage.getVersionTimestamp(srcSlot);
+                }
+                
+                // copy raw record info
                 if (srcPage.hasRawRecords() && srcPage.getRawRecord(srcSlot) != IRawStore.NULL) {
                 	((MutableBucketData) data).rawRecords[i] = true;
                 }
                 
+                // do not increment on raw insert, since this is only ever
+                // (for now) a re-organisation
+
+                // insert Ok.
                 return true;
             }
 
