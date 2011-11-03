@@ -202,14 +202,14 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
                 // everything after the date (from 11 chars in)
                 s = s.substring(10);
             } else if (dt.equals(XSD.GDAY)) {
-                // gDay Defines a part of a date - the day (DD)
-                s = s.substring(8, 10);
+                // gDay Defines a part of a date - the day (---DD)
+                s = "---" + s.substring(8, 10);
             } else if (dt.equals(XSD.GMONTH)) {
-                // gMonth Defines a part of a date - the month (MM)
-                s = s.substring(5, 7);
+                // gMonth Defines a part of a date - the month (--MM)
+                s = "--" + s.substring(5, 7);
             } else if (dt.equals(XSD.GMONTHDAY)) {
-                // gMonthDay Defines a part of a date - the month and day (MM-DD)
-                s = s.substring(5, 10);
+                // gMonthDay Defines a part of a date - the month and day (--MM-DD)
+                s = "--" + s.substring(5, 10);
             } else if (dt.equals(XSD.GYEAR)) {
                 // gYear Defines a part of a date - the year (YYYY)
                 s = s.substring(0, 4);
