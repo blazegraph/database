@@ -42,13 +42,11 @@ public class NoEvictionListener implements
         IEvictionListener {
 
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
-
-        assert ref instanceof Leaf;
         
-        if( ref.isDirty()) {
+        if ( ref.isDirty() && !ref.isDeleted()) {
 
             throw new UnsupportedOperationException(
-	                    "Leaf eviction is disabled for this unit test: leaf=" + ref);
+	                    "Eviction is disabled: ref=" + ref);
             
         }
 
