@@ -51,6 +51,7 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
@@ -134,6 +135,28 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                     buri.setIV(xsdStringIV);
                 } else if (XSD.DATETIME.equals(uri)) {
                     buri.setIV(xsdDateTimeIV);
+                } else if (XSD.DATE.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.TIME.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.GDAY.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.GMONTH.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.GMONTHDAY.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.GYEAR.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.GYEARMONTH.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.POSITIVE_INTEGER.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.NEGATIVE_INTEGER.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.NON_POSITIVE_INTEGER.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
+                } else if (XSD.NON_NEGATIVE_INTEGER.equals(uri)) {
+                    buri.setIV(newTermId(VTE.URI));
                 } else
                     throw new UnsupportedOperationException();
                 return buri;
@@ -790,6 +813,31 @@ public class TestEncodeDecodeMixedIVs extends AbstractEncodeDecodeKeysTestCase {
                                     .newXMLGregorianCalendar("2001-10-26T21:32:52.12679")),
                             vf.createLiteral(df
                                     .newXMLGregorianCalendar("1901-10-26T21:32:52")), };
+
+                    for (int i = 0; i < dt.length; i++) {
+
+                        ivs.add(ext.createIV(dt[i]));
+
+                    }
+
+                }
+
+                // derived numerics extension
+                {
+
+                    final DatatypeFactory df = DatatypeFactory.newInstance();
+
+                    final DerivedNumericsExtension<BigdataValue> ext = 
+                        new DerivedNumericsExtension<BigdataValue>(resolver);
+                    
+                    final BigdataLiteral[] dt = {
+                		vf.createLiteral("1", XSD.POSITIVE_INTEGER),
+                		vf.createLiteral("-1", XSD.NEGATIVE_INTEGER),
+                		vf.createLiteral("-1", XSD.NON_POSITIVE_INTEGER),
+                		vf.createLiteral("1", XSD.NON_NEGATIVE_INTEGER),
+                		vf.createLiteral("0", XSD.NON_POSITIVE_INTEGER),
+                		vf.createLiteral("0", XSD.NON_NEGATIVE_INTEGER),
+                    		};
 
                     for (int i = 0; i < dt.length; i++) {
 

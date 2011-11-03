@@ -47,6 +47,7 @@ import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
@@ -621,6 +622,58 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
 
     }
     
+    /**
+     * Unit test for round-trip of derived numeric values.
+     */
+    public void test_encodeDecodeDerivedNumerics() throws Exception {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        final DatatypeFactory df = DatatypeFactory.newInstance();
+
+        final DerivedNumericsExtension<BigdataValue> ext = 
+            new DerivedNumericsExtension<BigdataValue>(new IDatatypeURIResolver() {
+	            public BigdataURI resolve(URI uri) {
+	                final BigdataURI buri = vf.createURI(uri.stringValue());
+	                buri.setIV(newTermId(VTE.URI));
+	                return buri;
+	            }
+	        });
+        
+        final BigdataLiteral[] dt = {
+    		vf.createLiteral("1", XSD.POSITIVE_INTEGER),
+    		vf.createLiteral("-1", XSD.NEGATIVE_INTEGER),
+    		vf.createLiteral("-1", XSD.NON_POSITIVE_INTEGER),
+    		vf.createLiteral("1", XSD.NON_NEGATIVE_INTEGER),
+    		vf.createLiteral("0", XSD.NON_POSITIVE_INTEGER),
+    		vf.createLiteral("0", XSD.NON_NEGATIVE_INTEGER),
+        		};
+        
+        final IV<?, ?>[] e = new IV[dt.length];
+        
+        for (int i = 0; i < dt.length; i++) {
+
+            e[i] = ext.createIV(dt[i]);
+            
+        }
+        
+        final IV<?, ?>[] a = doEncodeDecodeTest(e);
+
+        if (log.isInfoEnabled()) {
+        	for (int i = 0; i < e.length; i++) {
+                log.info("original: " + dt[i]);
+                log.info("asValue : " + ext.asValue((LiteralExtensionIV<?>) e[i], vf));
+                log.info("decoded : " + ext.asValue((LiteralExtensionIV<?>) a[i], vf));
+                log.info("");
+	        }
+//        	log.info(svf.createLiteral(
+//                df.newXMLGregorianCalendar("2001-10-26T21:32:52.12679")));
+        }
+        
+        doComparatorTest(e);
+        
+    }
+
     /**
      * Unit test for {@link SidIV}.
      */
