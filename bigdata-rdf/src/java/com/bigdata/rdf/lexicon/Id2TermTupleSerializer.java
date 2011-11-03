@@ -38,6 +38,8 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -113,12 +115,21 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
     public Id2TermTupleSerializer(final String namespace,
             final BigdataValueFactory valueFactory) {
         
-        super(//
+        this(namespace,valueFactory,
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
                 getDefaultLeafKeysCoder(),//
 //                getDefaultValuesCoder()
                 SimpleRabaCoder.INSTANCE
         );
+
+    }
+
+    public Id2TermTupleSerializer(final String namespace,
+            final BigdataValueFactory valueFactory,
+            final IKeyBuilderFactory keyBuilderFactory,
+            final IRabaCoder leafKeysCoder, final IRabaCoder leafValsCoder) {
+
+        super(keyBuilderFactory, leafKeysCoder, leafValsCoder);
 
         if (namespace == null)
             throw new IllegalArgumentException();

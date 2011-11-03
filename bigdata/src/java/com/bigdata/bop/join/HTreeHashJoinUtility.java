@@ -64,6 +64,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.ByteArrayBuffer;
@@ -263,9 +264,14 @@ public class HTreeHashJoinUtility {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
-        metadata.setAddressBits(op.getProperty(
-                HTreeAnnotations.ADDRESS_BITS,
-                HTreeAnnotations.DEFAULT_ADDRESS_BITS));
+        final int addressBits = op.getProperty(HTreeAnnotations.ADDRESS_BITS,
+                HTreeAnnotations.DEFAULT_ADDRESS_BITS);
+
+        final int branchingFactor = 2 ^ addressBits;
+        
+        final int ratio = 32;
+        
+        metadata.setAddressBits(addressBits);
 
         metadata.setRawRecords(op.getProperty(//
                 HTreeAnnotations.RAW_RECORDS,
@@ -282,7 +288,7 @@ public class HTreeHashJoinUtility {
         @SuppressWarnings("rawtypes")
         final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                DefaultFrontCodedRabaCoder.INSTANCE,// keys : TODO Optimize for int32!
+                new FrontCodedRabaCoder(ratio),// keys : TODO Optimize for int32!
                 new SimpleRabaCoder() // vals : FIXME IV[] coder (stmt indices).
         );
 
@@ -301,7 +307,11 @@ public class HTreeHashJoinUtility {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
-        metadata.setBranchingFactor(256);// TODO Config.
+        final int branchingFactor = 256;// TODO Config.
+        
+        final int ratio = 32;
+        
+        metadata.setBranchingFactor(branchingFactor);
 
         metadata.setWriteRetentionQueueCapacity(4000);// FIXME CONFIG
 
@@ -312,7 +322,8 @@ public class HTreeHashJoinUtility {
                 .getInstance(namespace);
 
         metadata.setTupleSerializer(new Id2TermTupleSerializer(namespace,
-                valueFactory));
+                valueFactory, new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
+                new FrontCodedRabaCoder(ratio), SimpleRabaCoder.INSTANCE));
 
         // a bloom filter should help avoid lookups when IVs do not have cached
         // values.
