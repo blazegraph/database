@@ -28,6 +28,7 @@ import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
@@ -205,8 +206,8 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 				final IndexMetadata gmd = new IndexMetadata(indexUUID);
 
-				gmd.setWriteRetentionQueueCapacity(30);
-				gmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
+				gmd.setWriteRetentionQueueCapacity(100);
+				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
 
 		        gmd.setAddressBits(2);
 
@@ -222,7 +223,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 
 			}
 
-			final int limit = 100; // 20000
+			final int limit = 20000; // 20000
 			final int keylen = 8; // r.nextInt(1 + 12);
 			
 			for (int i = 0; i < limit; i++) {
@@ -234,7 +235,6 @@ public class TestReopen extends AbstractHTreeTestCase {
 					boolean htreeClosed = false;
 					boolean groundTruthClosed = false;
 					if (htree.isOpen()) {
-						// System.err.println("checkpoint+close");
 						htree.writeCheckpoint();
 						htree.close();
 						htreeClosed = true;
@@ -257,7 +257,6 @@ public class TestReopen extends AbstractHTreeTestCase {
 					//r.nextBytes(key);
 					htree.remove(key);
 					groundTruth.remove(key);
-					// assertSameHTree(groundTruth, htree);
 				} else {
 					// add an entry.
 					final byte[] key = new byte[keylen];
@@ -265,7 +264,6 @@ public class TestReopen extends AbstractHTreeTestCase {
 					// r.nextBytes(key);
 					htree.insert(key, key);
 					groundTruth.insert(key, key);
-					// assertSameHTree(groundTruth, htree);
 				}
 
 			}
@@ -283,13 +281,4 @@ public class TestReopen extends AbstractHTreeTestCase {
 		}
         
     }
-
-	public void test_multipleReopen3() {
-		for (int i = 0; i < 50; i++) {
-			if (true || log.isDebugEnabled()) {
-				System.out.println("Running test: " + i);
-			}
-			test_reopen03();
-		}
-	}
 }

@@ -223,7 +223,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		
 		// test for full range null
 		for (int i = from; i < to; i++) {
-			if (childRefs[i] != null) {
+			if (childRefs[i] != null || getChildAddr(i) != IRawStore.NULL) {
 				// recurse and return
 				final int childlen = (to-from) >> 1; // half
 				if (slot < (from + childlen)) {
@@ -2489,8 +2489,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 				if (isReadOnly())
 					assert !isReadOnly();
 				
-				if (childRefs[offset+s] != null) // TBD: remove debug point
-					assert childRefs[offset+s] == null;
+				assert childRefs[offset+s] == null;
 				
 				childRefs[offset+s] = (Reference<AbstractPage>) bp.self;
 			}
