@@ -52,6 +52,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -162,10 +163,6 @@ public class AST2BOpFilters extends AST2BOpBase {
      * is {@link CompareBOp}, which can sometimes work on internal values and
      * sometimes can't.
      * 
-     * TODO Consider the efficiency of the steps which are being taken. Should
-     * we test for the most common cases first, or for those with the least
-     * latency to "fix"?
-     * 
      * @see TryBeforeMaterializationConstraint
      */
     @SuppressWarnings("rawtypes")
@@ -238,12 +235,31 @@ public class AST2BOpFilters extends AST2BOpBase {
             final int rightId, final Collection<IVariable<IV>> vars,
             final AST2BOpContext ctx) {
 
-        /*
-         * FIXME If there is more than one variable to be materialized then use
-         * a pipeline operator which uses the chunked materialization pattern
-         * for solution sets.  See BigdataBindingSetResolverator.
-         */
-        
+        final int nvars = vars.size();
+
+        if (nvars == 0)
+            return left;
+
+        final long timestamp = getTimestamp(ctx);
+
+        final String ns = ctx.db.getLexiconRelation().getNamespace();
+
+        if (nvars > 1) {
+            /*
+             * Use a pipeline operator which uses the chunked materialization
+             * pattern for solution sets. This is similar to the pattern which
+             * is used when the IVs in the final solutions are materialized as
+             * RDF Values.
+             * 
+             * TODO We could also use this operator to materialize the solutions
+             * at the end of the top-level query plan rather than wrapping the
+             * iterator.
+             */
+            return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
+                    vars.toArray(new IVariable[0]), ns, timestamp).setProperty(
+                    BOp.Annotations.BOP_ID, ctx.nextId());
+        }
+
         final Iterator<IVariable<IV>> it = vars.iterator();
 
         int firstId = ctx.nextId();
@@ -316,21 +332,6 @@ public class AST2BOpFilters extends AST2BOpBase {
 
             final Predicate lexPred;
             {
-
-                long timestamp = ctx.db.getTimestamp();
-
-                if (TimestampUtility.isReadWriteTx(timestamp)) {
-                    /*
-                     * Note: Use the timestamp of the triple store view unless
-                     * this is a read/write transaction, in which case we need
-                     * to use the last commit point in order to see any writes
-                     * which it may have performed (lexicon writes are always
-                     * unisolated).
-                     */
-                    timestamp = ITx.UNISOLATED;
-                }
-
-                final String ns = ctx.db.getLexiconRelation().getNamespace();
 
                 /*
                  * An anonymous variable whose name is based on the variable in
@@ -407,6 +408,27 @@ public class AST2BOpFilters extends AST2BOpBase {
 
     }
 
+    /**
+     * Return the timestamp which will be used to read on the lexicon.
+     * <p>
+     * Note: This uses the timestamp of the triple store view unless this is a
+     * read/write transaction, in which case we need to use the last commit
+     * point in order to see any writes which it may have performed (lexicon
+     * writes are always unisolated).
+     */
+    static private long getTimestamp(final AST2BOpContext ctx) {
+       
+        long timestamp = ctx.db.getTimestamp();
+
+        if (TimestampUtility.isReadWriteTx(timestamp)) {
+
+            timestamp = ITx.UNISOLATED;
+            
+        }
+        
+        return timestamp;
+
+    }
     
     /**
      * Wrapper for handling the {@link AST2BOpContext} / {@link BOpContextBase}
