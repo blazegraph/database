@@ -86,7 +86,7 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                 new NV(PipelineOp.Annotations.LAST_PASS, false),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
 //                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
@@ -100,7 +100,7 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
 //                new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
@@ -112,8 +112,8 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, true),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, true),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
@@ -126,11 +126,11 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 5),//
                     new NV(PipelineOp.Annotations.LAST_PASS, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
-//                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-//                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+//                    new NV(HTreeHashIndexOp.Annotations.RELEASE, false),//
+//                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -145,11 +145,11 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 5),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
-//                    new NV(SolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-//                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+//                    new NV(HTreeHashIndexOp.Annotations.RELEASE, false),//
+//                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -164,11 +164,11 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, false),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-//                    new NV(SolutionSetHashJoinOp.Annotations.SELECT, selected),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+//                    new NV(HTreeHashIndexOp.Annotations.RELEASE, false),//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())

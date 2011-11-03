@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.btree.Checkpoint.IndexTypeEnum;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.isolation.IConflictResolver;
@@ -3173,8 +3174,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
-     * Create an initial {@link Checkpoint} for a new {@link BTree} described by
-     * this metadata record.
+     * Create an initial {@link Checkpoint} for a new persistence capable data
+     * structure described by this metadata record.
      * <p>
      * The caller is responsible for writing the {@link Checkpoint} record onto
      * the store.
@@ -3187,6 +3188,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * </pre>
      * 
      * @return The {@link Checkpoint}.
+     * 
+     *         FIXME This fails to communicate the {@link IndexTypeEnum} when
+     *         the index is first created. Either that should be indicated by a
+     *         setIndexTypeEnum() method or it should be pass in here as an
+     *         argument and from here into the Checkpoint constructor (which is
+     *         discovered via reflection).
      */
     @SuppressWarnings("unchecked")
     final public Checkpoint firstCheckpoint() {

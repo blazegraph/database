@@ -33,6 +33,9 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.LiteralImpl;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -43,6 +46,12 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IBuffer;
 
 /**
@@ -67,6 +76,145 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     
     public AbstractHashJoinUtilityTestCase(String name) {
         super(name);
+    }
+
+    /**
+     * Setup for a problem used by many of the join test suites.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static public class JoinSetup {
+
+        public final String namespace;
+
+        public final IV<?, ?> brad, john, fred, mary, paul, leon;
+
+        public JoinSetup(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+            
+            this.namespace = namespace;
+
+            brad = makeIV(new LiteralImpl("Brad"));
+            
+            john = makeIV(new LiteralImpl("John"));
+
+            fred = makeIV(new LiteralImpl("Fred"));
+
+            mary = makeIV(new LiteralImpl("Mary"));
+
+            paul = makeIV(new LiteralImpl("Paul"));
+
+            leon = makeIV(new LiteralImpl("Leon"));
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getLeft1() {
+
+            final IVariable<?> x = Var.var("x");
+            final IVariable<?> y = Var.var("y");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(x, new Constant<IV>(brad));
+            tmp.set(y, new Constant<IV>(fred));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(x, new Constant<IV>(mary));
+            left.add(tmp);
+
+            return left;
+        }
+
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getRight1() {
+
+            final IVariable<?> a = Var.var("a");
+            final IVariable<?> x = Var.var("x");
+//            final IVariable<?> y = Var.var("y");
+
+            // The right solutions (the hash index).
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(paul));
+            tmp.set(x, new Constant<IV>(mary));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(paul));
+            tmp.set(x, new Constant<IV>(brad));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(john));
+            tmp.set(x, new Constant<IV>(mary));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(john));
+            tmp.set(x, new Constant<IV>(brad));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(mary));
+            tmp.set(x, new Constant<IV>(brad));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(brad));
+            tmp.set(x, new Constant<IV>(fred));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(a, new Constant<IV>(brad));
+            tmp.set(x, new Constant<IV>(leon));
+            right.add(tmp);
+
+            // new E("Paul", "Mary"),// [0]
+            // new E("Paul", "Brad"),// [1]
+            //
+            // new E("John", "Mary"),// [2]
+            // new E("John", "Brad"),// [3]
+            //
+            // new E("Mary", "Brad"),// [4]
+            //
+            // new E("Brad", "Fred"),// [5]
+            // new E("Brad", "Leon"),// [6]
+
+            return right;
+
+        }
+
     }
 
     /**
@@ -149,94 +297,14 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
     }
     
-    private List<IBindingSet> getLeft1() {
-
-        final IVariable<?> x = Var.var("x");
-        final IVariable<?> y = Var.var("y");
-
-        // The left solutions (the pipeline).
-        final List<IBindingSet> left = new LinkedList<IBindingSet>();
-
-        IBindingSet tmp;
-
-        tmp = new ListBindingSet();
-        tmp.set(x, new Constant<String>("Brad"));
-        tmp.set(y, new Constant<String>("Fred"));
-        left.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(x, new Constant<String>("Mary"));
-        left.add(tmp);
-
-        return left;
-    }
-
-    private List<IBindingSet> getRight1() {
-
-        final IVariable<?> a = Var.var("a");
-        final IVariable<?> x = Var.var("x");
-//        final IVariable<?> y = Var.var("y");
-
-        // The right solutions (the hash index).
-        final List<IBindingSet> right = new LinkedList<IBindingSet>();
-
-        IBindingSet tmp;
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("Paul"));
-        tmp.set(x, new Constant<String>("Mary"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("Paul"));
-        tmp.set(x, new Constant<String>("Brad"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("John"));
-        tmp.set(x, new Constant<String>("Mary"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("John"));
-        tmp.set(x, new Constant<String>("Brad"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("Mary"));
-        tmp.set(x, new Constant<String>("Brad"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("Brad"));
-        tmp.set(x, new Constant<String>("Fred"));
-        right.add(tmp);
-
-        tmp = new ListBindingSet();
-        tmp.set(a, new Constant<String>("Brad"));
-        tmp.set(x, new Constant<String>("Leon"));
-        right.add(tmp);
-
-        // new E("Paul", "Mary"),// [0]
-        // new E("Paul", "Brad"),// [1]
-        //
-        // new E("John", "Mary"),// [2]
-        // new E("John", "Brad"),// [3]
-        //
-        // new E("Mary", "Brad"),// [4]
-        //
-        // new E("Brad", "Fred"),// [5]
-        // new E("Brad", "Leon"),// [6]
-
-        return right;
-
-    }
-
     /**
      * Non-optional join.
      */
+    @SuppressWarnings("rawtypes")
     public void test_hashJoin03() {
 
+        final JoinSetup setup = new JoinSetup(getName());
+        
         final boolean optional = false;
 
         final IVariable<?> a = Var.var("a");
@@ -251,24 +319,24 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         // the join constraints.
         final IConstraint[] constraints = new IConstraint[] { Constraint
-                .wrap(new EQConstant(a, new Constant<String>("John"))) };
+                .wrap(new EQConstant(a, new Constant<IV>(setup.john))) };
 
         // The left solutions (the pipeline).
-        final List<IBindingSet> left = getLeft1();
+        final List<IBindingSet> left = setup.getLeft1();
 
         // The right solutions (the hash index).
-        final List<IBindingSet> right = getRight1();
+        final List<IBindingSet> right = setup.getRight1();
 
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };
@@ -281,8 +349,11 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     /**
      * Variant with no join variables.
      */
+    @SuppressWarnings("rawtypes")
     public void test_hashJoin04() {
 
+        final JoinSetup setup = new JoinSetup(getName());
+        
         final boolean optional = false;
 
         final IVariable<?> a = Var.var("a");
@@ -297,24 +368,24 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         // the join constraints.
         final IConstraint[] constraints = new IConstraint[] { Constraint
-                .wrap(new EQConstant(a, new Constant<String>("John"))) };
+                .wrap(new EQConstant(a, new Constant<IV>(setup.john))) };
 
         // The left solutions (the pipeline).
-        final List<IBindingSet> left = getLeft1();
+        final List<IBindingSet> left = setup.getLeft1();
 
         // The right solutions (the hash index).
-        final List<IBindingSet> right = getRight1();
+        final List<IBindingSet> right = setup.getRight1();
 
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };
@@ -327,7 +398,10 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     /**
      * Variant without select variables.
      */
+    @SuppressWarnings("rawtypes")
     public void test_hashJoin05() {
+
+        final JoinSetup setup = new JoinSetup(getName());
 
         final boolean optional = false;
 
@@ -343,26 +417,26 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         // the join constraints.
         final IConstraint[] constraints = new IConstraint[] { Constraint
-                .wrap(new EQConstant(a, new Constant<String>("John"))) };
+                .wrap(new EQConstant(a, new Constant<IV>(setup.john))) };
 
         // The left solutions (the pipeline).
-        final List<IBindingSet> left = getLeft1();
+        final List<IBindingSet> left = setup.getLeft1();
 
         // The right solutions (the hash index).
-        final List<IBindingSet> right = getRight1();
+        final List<IBindingSet> right = setup.getRight1();
 
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { a, x },//
-                        new IConstant[] { new Constant<String>("John"),
-                                          new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { a, x, y },//
-                        new IConstant[] { new Constant<String>("John"),
-                                          new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };

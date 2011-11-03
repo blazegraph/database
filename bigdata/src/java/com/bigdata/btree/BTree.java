@@ -41,9 +41,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.RWStrategy;
-import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -858,19 +856,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
     }
 
     /**
-     * Checkpoint operation {@link #flush()}es dirty nodes, the optional
-     * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
-     * and then writes a new {@link Checkpoint} record on the backing store,
-     * saves a reference to the current {@link Checkpoint} and returns the
-     * address of that {@link Checkpoint} record.
-     * <p>
-     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
-     * is at the store level and uses {@link Checkpoint}s to ensure that the
-     * state of the {@link BTree} is current on the backing store.
-     * 
-     * @return The {@link Checkpoint} record for the {@link BTree} was written
-     *         onto the store. The {@link BTree} can be reloaded from this
-     *         {@link Checkpoint} record.
+     * {@inheritDoc}
      * 
      * @see #load(IRawStore, long)
      */
@@ -1719,6 +1705,9 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
 					+ store.toString(addrCheckpoint), t);
 		}
 
+//        if (checkpoint.getIndexType() != IndexTypeEnum.BTree)
+//            throw new RuntimeException("Not a BTree checkpoint: " + checkpoint);
+		
 		/*
 		 * Read metadata record from store.
 		 */

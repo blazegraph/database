@@ -36,7 +36,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
@@ -44,7 +43,6 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -122,7 +120,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends AccessPathJoinAnnotations,
-            HTreeAnnotations, HashJoinAnnotations {
+            HTreeHashJoinAnnotations {
         
     }
     
@@ -308,23 +306,14 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         
         private final IPredicate<E> pred;
         
-//        private final IVariable<E>[] joinVars;
-        
-//        private final IConstraint[] constraints;
-
-        private final IVariable<?>[] selectVars;
-        
-//        private final boolean optional;
-        
         private final BaseJoinStats stats;
 
-        private final HTreeHashJoinState state;
+        private final HTreeHashJoinUtility state;
         
         private final IBlockingBuffer<IBindingSet[]> sink;
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-//        @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final HTreeHashJoinOp<E> op) {
 
@@ -335,16 +324,6 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             this.pred = op.getPredicate();
 
             this.relation = context.getRelation(pred);
-
-            this.selectVars = (IVariable<?>[]) op
-                    .getProperty(Annotations.SELECT);
-
-//            this.joinVars = (IVariable<E>[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
-//            
-//            this.constraints = op.constraints();
-//
-//            this.optional = op.isOptional();
 
             this.sink = context.getSink();
 
@@ -365,12 +344,12 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
                 final Object joinStateKey = op.getId() + ".joinState";
 
-                HTreeHashJoinState state = (HTreeHashJoinState) attrs
+                HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
                         .get(joinStateKey);
 
                 if (state == null) {
 
-                    state = new HTreeHashJoinState(context.getRunningQuery()
+                    state = new HTreeHashJoinUtility(context.getRunningQuery()
                             .getMemoryManager(), op, op.isOptional());
 
                     attrs.put(joinStateKey, state);
@@ -387,7 +366,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
             try {
 
-                acceptSolutions();
+                state.acceptSolutions(context.getSource(), stats);
 
                 final long maxMemory = op.getMaxMemory();
 
@@ -420,17 +399,6 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
         }
 
         /**
-         * Buffer intermediate resources on the {@link HTree}.
-         */
-        private void acceptSolutions() {
-
-            HTreeHashJoinUtility
-                    .acceptSolutions(context.getSource(), state.joinVars,
-                            stats, state.getRightSolutions(), state.optional);
-
-        }
-
-        /**
          * Do a hash join of the buffered solutions with the access path.
          */
         private void doHashJoin() {
@@ -455,11 +423,9 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            HTreeHashJoinUtility.hashJoin(
+            state.hashJoin(
                     ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
-                    unsyncBuffer, state.joinVars, selectVars,
-                    state.constraints, state.getRightSolutions(), state.getJoinSet(),
-                    state.optional, false/* leftIsPipeline */);
+                    unsyncBuffer, false/* leftIsPipeline */);
 
             if (state.optional) {
 
@@ -468,9 +434,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2,
-                        state.getRightSolutions(), state.getJoinSet(),
-                        selectVars);
+                state.outputOptionals(unsyncBuffer2);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)

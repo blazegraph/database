@@ -38,7 +38,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
@@ -48,11 +47,9 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
-import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
-import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -82,8 +79,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryAnnotations, HTreeAnnotations,
-            HashJoinAnnotations {
+    public interface Annotations extends SubqueryAnnotations, HTreeHashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
@@ -250,26 +246,14 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
          */
         final IQueryAttributes attrs;
         
-//        /**
-//         * The join variables.
-//         */
-//        @SuppressWarnings("rawtypes")
-//        private final IVariable[] joinVars;
-        
         /**
          * <code>true</code> iff this is the first time the task is being
          * invoked, in which case we will evaluate the subquery and save its
          * result set on {@link #solutions}.
          */
         private final boolean first;
-//        
-//        /**
-//         * The generated solution set (hash index using the specified join
-//         * variables).
-//         */
-//        private final HTree solutions;
-        
-        private final HTreeHashJoinState state;
+
+        private final HTreeHashJoinUtility state;
         
         public ControllerTask(final HTreeNamedSubqueryOp op,
                 final BOpContext<IBindingSet> context) {
@@ -306,62 +290,17 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                 // solution set.
                 attrs = context.getQueryAttributes(namedSetRef.queryId);
 
-                HTreeHashJoinState state = (HTreeHashJoinState) attrs.get(namedSetRef);
+                HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
+                        .get(namedSetRef);
 
                 if (state == null) {
 
                     /*
                      * Note: This operator does not support optional semantics.
                      */
-                    state = new HTreeHashJoinState(
+                    state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
                             false/* optional */);
-
-//                    /*
-//                     * Create the map(s).
-//                     */
-//                    
-//                    final IndexMetadata metadata = new IndexMetadata(
-//                            UUID.randomUUID());
-//
-//                    metadata.setAddressBits(op.getAddressBits());
-//
-//                    metadata.setRawRecords(op.getRawRecords());
-//
-//                    metadata.setMaxRecLen(op.getMaxRecLen());
-//
-//                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
-//                                                          // keys.
-//
-//                    /*
-//                     * TODO This sets up a tuple serializer for a presumed case
-//                     * of 4 byte keys (the buffer will be resized if necessary)
-//                     * and explicitly chooses the SimpleRabaCoder as a
-//                     * workaround since the keys IRaba for the HTree does not
-//                     * report true for isKeys(). Once we work through an
-//                     * optimized bucket page design we can revisit this as the
-//                     * FrontCodedRabaCoder should be a good choice, but it
-//                     * currently requires isKeys() to return true.
-//                     */
-//                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-//                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-//                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-//                            new SimpleRabaCoder() // vals
-//                    );
-//
-//                    metadata.setTupleSerializer(tupleSer);
-//
-//                    /*
-//                     * This wraps an efficient raw store interface around a
-//                     * child memory manager created from the IMemoryManager
-//                     * which will back the named solution set.
-//                     */
-//                    final IRawStore store = new MemStore(context
-//                            .getMemoryManager(namedSetRef.queryId)
-//                            .createAllocationContext());
-//
-//                    // Will support incremental eviction and persistence.
-//                    solutions = HTree.create(store, metadata);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
@@ -504,10 +443,9 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
 
-						// Buffer the solutions on the hash index.
-                        final long ncopied = HTreeHashJoinUtility.acceptSolutions(
-                                subquerySolutionItr, state.joinVars, stats,
-                                state.getRightSolutions(), state.optional);
+                        // Buffer the solutions on the hash index.
+                        final long ncopied = state.acceptSolutions(
+                                subquerySolutionItr, stats);
 
 						// Wait for the subquery to halt / test for errors.
 						runningSubquery.get();

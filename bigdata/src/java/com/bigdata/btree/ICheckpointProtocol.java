@@ -80,6 +80,23 @@ public interface ICheckpointProtocol extends ICommitter {
     public long writeCheckpoint();
     
     /**
+     * Checkpoint operation must {@link #flush()} dirty nodes, dirty persistent
+     * data structures, etc, write a new {@link Checkpoint} record on the
+     * backing store, save a reference to the current {@link Checkpoint}, and
+     * return the address of that {@link Checkpoint} record.
+     * <p>
+     * Note: A checkpoint by itself is NOT an atomic commit. The commit protocol
+     * is at the store level and uses {@link Checkpoint}s to ensure that the
+     * state of the persistence capable data structure is current on the backing
+     * store.
+     * 
+     * @return The {@link Checkpoint} record for the persistent data structure
+     *         which was written onto the store. The persistent data structure
+     *         can be reloaded from this {@link Checkpoint} record.
+     */
+    public Checkpoint writeCheckpoint2();
+    
+    /**
      * Return the {@link IDirtyListener}.
      */
     public IDirtyListener getDirtyListener();

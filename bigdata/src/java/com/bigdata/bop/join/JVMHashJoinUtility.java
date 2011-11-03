@@ -75,6 +75,59 @@ public class JVMHashJoinUtility {
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
     
     /**
+     * Note: If joinVars is an empty array, then the solutions will all hash to
+     * ONE (1).
+     */
+    private static final int ONE = 1;
+    
+    /**
+     * Return the hash code which will be used as the key given the ordered
+     * as-bound values for the join variables.
+     * 
+     * @param joinVars
+     *            The join variables.
+     * @param bset
+     *            The bindings whose as-bound hash code for the join variables
+     *            will be computed.
+     * 
+     * @return The hash code.
+     * 
+     * @throws JoinVariableNotBoundException
+     *             if there is no binding for a join variable.
+     */
+    private static int hashCode(final IVariable<?>[] joinVars,
+            final IBindingSet bset) throws JoinVariableNotBoundException {
+
+        int h = ONE;
+
+        for (IVariable<?> v : joinVars) {
+
+            final IConstant<?> c = bset.get(v);
+
+            if (c == null) {
+
+                // Reject any solution which does not have a binding for a join
+                // variable.
+
+                throw new JoinVariableNotBoundException(v.getName());
+                
+            }
+
+//            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
+//
+//            h = 31 * h + ch;
+            h ^= c.hashCode();
+            
+        }
+        
+//        System.err.println("hashCode=" + h + ", joinVars="
+//                + Arrays.toString(joinVars) + " : " + bset);
+
+        return h;
+
+    }
+
+    /**
      * Buffer solutions on a JVM hash collection.
      * 
      * @param itr
@@ -327,10 +380,10 @@ public class JVMHashJoinUtility {
 
         }
 
-        int hashCode = HTreeHashJoinUtility.ONE;
+        int hashCode = ONE;
         try {
             
-            hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset);
+            hashCode = hashCode(joinVars, bset);
             
         } catch (JoinVariableNotBoundException ex) {
             

@@ -55,6 +55,7 @@ import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
+import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinOp;
@@ -926,6 +927,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
                 map.put(PipelineOp.Annotations.MAX_MEMORY, Long.MAX_VALUE);
                 
                 map.put(PipelineOp.Annotations.LAST_PASS, true);
+
+                map.put(HTreeHashJoinAnnotations.RELATION_NAME,
+                        pred.getRequiredProperty(Predicate.Annotations.RELATION_NAME));
 
                 left = new HTreeHashJoinOp(leftOrEmpty(left), map);
                 
