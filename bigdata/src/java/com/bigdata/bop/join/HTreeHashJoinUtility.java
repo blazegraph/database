@@ -63,7 +63,6 @@ import com.bigdata.btree.Tuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
@@ -887,6 +886,13 @@ public class HTreeHashJoinUtility {
 
         try {
 
+            if (log.isDebugEnabled()) {
+                final HTree htree = this.rightSolutions.get();
+                log.debug("rightSolutions: #nnodes=" + htree.getNodeCount()
+                        + ",#leaves=" + htree.getLeafCount() + ",#entries="
+                        + htree.getEntryCount());
+            }
+            
             // TODO parameter from operator annotations.
             final int chunkSize = ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
@@ -1148,6 +1154,18 @@ public class HTreeHashJoinUtility {
      */
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
+        if (log.isInfoEnabled()) {
+            final HTree htree = this.rightSolutions.get();
+            log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
+                    + ",#leaves=" + htree.getLeafCount() + ",#entries="
+                    + htree.getEntryCount());
+            
+            final HTree joinSet = this.joinSet.get();
+            log.info("joinSet: #nnodes=" + joinSet.getNodeCount() + ",#leaves="
+                    + joinSet.getLeafCount() + ",#entries="
+                    + joinSet.getEntryCount());
+        }
+
         // Visit all source solutions.
         @SuppressWarnings("unchecked")
         final ITupleIterator<IBindingSet> sitr = rightSolutions.get()
@@ -1199,6 +1217,13 @@ public class HTreeHashJoinUtility {
      */
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
+        if (log.isInfoEnabled()) {
+            final HTree htree = rightSolutions.get();
+            log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
+                    + ",#leaves=" + htree.getLeafCount() + ",#entries="
+                    + htree.getEntryCount());
+        }
+        
         // source.
         @SuppressWarnings("unchecked")
         final ITupleIterator<IBindingSet> solutionsIterator = rightSolutions

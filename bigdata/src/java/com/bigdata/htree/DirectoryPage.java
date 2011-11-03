@@ -1809,18 +1809,26 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
     	
     }
 
+    /**
+     * Move to test suite.
+     */
+    @Deprecated
 	int activeBucketPages() {
 		int ret = 0;
-		Iterator<AbstractPage> children = childIterator();
+		final Iterator<AbstractPage> children = childIterator();
 		while (children.hasNext()) {
 			ret += children.next().activeBucketPages();
 		}
 		return ret;
 	}
 
+    /**
+     * Move to test suite.
+     */
+    @Deprecated
 	int activeDirectoryPages() {
 		int ret = 1;
-		Iterator<AbstractPage> children = childIterator();
+		final Iterator<AbstractPage> children = childIterator();
 		while (children.hasNext()) {
 			ret += children.next().activeDirectoryPages();
 		}
