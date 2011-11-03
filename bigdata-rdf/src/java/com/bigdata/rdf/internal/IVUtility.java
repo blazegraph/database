@@ -739,11 +739,30 @@ public class IVUtility {
      */
     public static IV[] decodeAll(final byte[] key) {
 
+        return decodeAll(key, 0/* fromOffset */, key.length/* toOffset */);
+
+    }
+
+    /**
+     * Decodes all {@link IV}s from a slice of a byte[].
+     * 
+     * @param key
+     *            The byte[].
+     * @param fromOffset
+     *            The offset of the first encoded {@link IV} in the byte[].
+     * @param toOffset
+     *            The offset of the first byte which will not be decoded.
+     * 
+     * @return The set of {@link IV}s.
+     */
+    public static IV[] decodeAll(final byte[] key, final int fromOffset,
+            final int toOffset) {
+
         final List<IV> ivs = new LinkedList<IV>();
         
-        int offset = 0;
+        int offset = fromOffset;
         
-        while (offset < key.length) {
+        while (offset < toOffset) {
 
             final IV iv = decodeFromOffset(key, offset);
             

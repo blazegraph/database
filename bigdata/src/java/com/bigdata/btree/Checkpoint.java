@@ -238,6 +238,15 @@ public class Checkpoint implements Externalizable {
         return counter;
         
     }
+    
+    /**
+     * The type of index for this checkpoint record.
+     */
+    public IndexTypeEnum getIndexType() {
+        
+        return indexType;
+        
+    }
 
     /**
      * A human readable representation of the state of the {@link Checkpoint}

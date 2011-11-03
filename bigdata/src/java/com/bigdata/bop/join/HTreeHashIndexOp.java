@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
@@ -45,7 +44,6 @@ import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.htree.HTree;
@@ -91,8 +89,8 @@ public class HTreeHashIndexOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HTreeAnnotations, HashJoinAnnotations,
-            JoinAnnotations {
+    public interface Annotations extends HTreeHashJoinAnnotations,
+            HashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
@@ -288,31 +286,13 @@ public class HTreeHashIndexOp extends PipelineOp {
         @SuppressWarnings("rawtypes")
         private final IVariable[] selected; 
         
-//        /**
-//         * The join variables.
-//         */
-//        @SuppressWarnings("rawtypes")
-//        private final IVariable[] joinVars;
-        
         /**
          * <code>true</code> iff this is the first time the task is being
          * invoked, in which case we allocate the {@link #solutions} map.
          */
         private final boolean first;
         
-//        /**
-//         * <code>true</code> iff the solutions will be reintegrated by an
-//         * OPTIONAL join. 
-//         */
-//        private final boolean optional;
-//        
-//        /**
-//         * The generated solution set (hash index using the specified join
-//         * variables).
-//         */
-//        private final HTree solutions;
-        
-        private final HTreeHashJoinState state;
+        private final HTreeHashJoinUtility state;
         
         public ControllerTask(final HTreeHashIndexOp op,
                 final BOpContext<IBindingSet> context) {
@@ -331,13 +311,8 @@ public class HTreeHashIndexOp extends PipelineOp {
 
             this.selected = (IVariable[]) op.getProperty(Annotations.SELECT);
             
-//            this.optional = op.isOptional();
-
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
-
-//            this.joinVars = (IVariable[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -352,13 +327,14 @@ public class HTreeHashIndexOp extends PipelineOp {
                 // solution set.
                 attrs = context.getQueryAttributes(namedSetRef.queryId);
 
-                HTreeHashJoinState state = (HTreeHashJoinState) attrs
+                HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
                         .get(namedSetRef);
 
                 if (state == null) {
                     
-                    state = new HTreeHashJoinState(context
-                            .getMemoryManager(namedSetRef.queryId), op, op.isOptional());
+                    state = new HTreeHashJoinUtility(
+                            context.getMemoryManager(namedSetRef.queryId), op,
+                            op.isOptional());
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
@@ -372,92 +348,6 @@ public class HTreeHashIndexOp extends PipelineOp {
                 }
                 
                 this.state = state;
-//
-//                /*
-//                     * Create the map(s).
-//                     */
-//                    
-//                    final IndexMetadata metadata = new IndexMetadata(
-//                            UUID.randomUUID());
-//
-//                    metadata.setAddressBits(op.getAddressBits());
-//
-//                    metadata.setRawRecords(op.getRawRecords());
-//
-//                    metadata.setMaxRecLen(op.getMaxRecLen());
-//
-//                    metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code
-//                                                          // keys.
-//
-//                    /*
-//                     * TODO This sets up a tuple serializer for a presumed case
-//                     * of 4 byte keys (the buffer will be resized if necessary)
-//                     * and explicitly chooses the SimpleRabaCoder as a
-//                     * workaround since the keys IRaba for the HTree does not
-//                     * report true for isKeys(). Once we work through an
-//                     * optimized bucket page design we can revisit this as the
-//                     * FrontCodedRabaCoder should be a good choice, but it
-//                     * currently requires isKeys() to return true.
-//                     */
-//                    final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-//                            new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-//                            new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-//                            new SimpleRabaCoder() // vals
-//                    );
-//
-//                    metadata.setTupleSerializer(tupleSer);
-//
-//                    /*
-//                     * This wraps an efficient raw store interface around a
-//                     * child memory manager created from the IMemoryManager
-//                     * which will back the named solution set.
-//                     */
-//                    final IRawStore store = new MemStore(context
-//                            .getMemoryManager(namedSetRef.queryId)
-//                            .createAllocationContext());
-//
-//                    // Will support incremental eviction and persistence.
-//                    solutions = HTree.create(store, metadata);
-//
-//                    /*
-//                     * Note: This is done once the subquery has been run so we
-//                     * can checkpoint the HTree first and put the read-only
-//                     * reference on the attribute.
-//                     */ 
-////                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
-////                        throw new AssertionError();
-//
-//                    this.first = true;
-//                 
-//                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
-//                        throw new AssertionError();
-//
-//                    if (optional) {
-//
-//                        /*
-//                         * The join set is used to handle optionals. It is saved
-//                         * under a named solution set reference based on the
-//                         * original named solution set reference, but with a
-//                         * slightly different named set name.
-//                         */
-//                        final NamedSolutionSetRef joinSetRef = new NamedSolutionSetRef(
-//                                namedSetRef.queryId, namedSetRef.namedSet
-//                                        + ".joinSet", joinVars);
-//
-//                        HTree joinSet = HTree.create(store, metadata.clone());
-//
-//                        if (attrs.putIfAbsent(joinSetRef, joinSet) != null)
-//                            throw new AssertionError();
-//                        
-//                    }
-//                    
-//                } else {
-//                    
-//                    this.first = false;
-//                    
-//                }
-//
-//                this.solutions = solutions;
 
             }
             
@@ -471,7 +361,7 @@ public class HTreeHashIndexOp extends PipelineOp {
             try {
 
                 // Buffer all source solutions.
-                acceptSolutions();
+                state.acceptSolutions(context.getSource(), stats);
 
                 if(context.isLastInvocation()) {
 
@@ -516,17 +406,6 @@ public class HTreeHashIndexOp extends PipelineOp {
         }
 
         /**
-         * Buffer intermediate resources on the {@link HTree}.
-         */
-        private void acceptSolutions() {
-
-            HTreeHashJoinUtility.acceptSolutions(context.getSource(),
-                    state.joinVars, stats, state.getRightSolutions(),
-                    state.optional);
-
-        }
-
-        /**
          * Output the buffered solutions.
          */
         private void outputSolutions() {
@@ -537,28 +416,8 @@ public class HTreeHashIndexOp extends PipelineOp {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            // source.
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<IBindingSet> solutionsIterator = state
-                    .getRightSolutions().rangeIterator();
-
-            while(solutionsIterator.hasNext()) {
-
-                final ITuple<IBindingSet> tuple = solutionsIterator.next();
-
-                IBindingSet bset = tuple.getObject();
-
-                if (selected != null) {
-
-                    // Drop variables which are not projected.
-                    bset = bset.copy(selected);
-
-                }
-
-                unsyncBuffer.add(bset);
-
-            }
-
+            state.outputSolutions(unsyncBuffer);
+            
             unsyncBuffer.flush();
 
             sink.flush();

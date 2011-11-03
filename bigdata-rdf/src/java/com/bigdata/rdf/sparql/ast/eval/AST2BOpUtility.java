@@ -832,10 +832,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
                             namedSolutionSetRef),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
-                            joinVars),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
-                                    joinConstraints),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
+//                            joinVars),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
+//                                    joinConstraints),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE,
                                 release)//
             );
@@ -846,13 +846,13 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
+                    new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
                             namedSolutionSetRef),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
+                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS,
                             joinVars),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
                             joinConstraints),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE,
+                    new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE,
                             release)//
             );
             
@@ -1014,10 +1014,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -1922,10 +1922,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//

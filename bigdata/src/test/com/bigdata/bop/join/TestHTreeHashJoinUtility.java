@@ -28,24 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.HTreeAnnotations;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
-import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -78,20 +72,8 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
     
     private MemoryManager mmgr;
 
-    private HTree rightSolutions, joinSet;
-
     @Override
     protected void tearDown() throws Exception {
-
-        if (rightSolutions != null) {
-            rightSolutions.close();
-            rightSolutions = null;
-        }
-
-        if (joinSet != null) {
-            joinSet.close();
-            joinSet = null;
-        }
 
         if (mmgr != null) {
             mmgr.clear();
@@ -115,45 +97,6 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         
         mmgr = new MemoryManager(DirectBufferPool.INSTANCE);
 
-        final IRawStore store = new MemStore(mmgr.createAllocationContext());
-
-        /*
-         * Create the map(s).
-         */
-
-        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-
-        metadata.setAddressBits(HTreeAnnotations.DEFAULT_ADDRESS_BITS);
-
-        metadata.setRawRecords(HTreeAnnotations.DEFAULT_RAW_RECORDS);
-
-        metadata.setMaxRecLen(HTreeAnnotations.DEFAULT_MAX_RECLEN);
-
-        metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
-
-        /*
-         * TODO This sets up a tuple serializer for a presumed case of 4 byte
-         * keys (the buffer will be resized if necessary) and explicitly chooses
-         * the SimpleRabaCoder as a workaround since the keys IRaba for the
-         * HTree does not report true for isKeys(). Once we work through an
-         * optimized bucket page design we can revisit this as the
-         * FrontCodedRabaCoder should be a good choice, but it currently
-         * requires isKeys() to return true.
-         */
-        final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
-                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                DefaultFrontCodedRabaCoder.INSTANCE,// keys : TODO Optimize for int32!
-                new SimpleRabaCoder() // vals
-        );
-
-        metadata.setTupleSerializer(tupleSer);
-
-        // Will support incremental eviction and persistence.
-        rightSolutions = HTree.create(store, metadata);
-
-        // Used to handle optionals (should be ignored otherwise).
-        joinSet = HTree.create(store, metadata.clone());
-
     }
 
     /**
@@ -176,46 +119,86 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
             final IBindingSet[] expected//
             ) {
 
-        // Load the right solutions into the HTree.
-        {
-        
-            final BOpStats stats = new BOpStats();
-            
-            HTreeHashJoinUtility.acceptSolutions(
-                    new Chunkerator<IBindingSet>(right.iterator()), joinVars, stats,
-                    rightSolutions, optional);
+        // Setup a mock PipelineOp for the test.
+        final PipelineOp op = new PipelineOp(BOp.NOARGS, NV.asMap(//
+                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                        new String[] { getName() }),//
+                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                new NV(JoinAnnotations.SELECT, selectVars),//
+                new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                )) {
 
-            assertEquals(right.size(), rightSolutions.getEntryCount());
-            
-            assertEquals(right.size(),stats.unitsIn.get());
-            
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final HTreeHashJoinUtility state = new HTreeHashJoinUtility(mmgr, op,
+                optional);
+
+        try {
+
+            // Load the right solutions into the HTree.
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                state.acceptSolutions(
+                        new Chunkerator<IBindingSet>(right.iterator()), stats);
+
+                assertEquals(right.size(), state.getRightSolutions()
+                        .getEntryCount());
+
+                assertEquals(right.size(), stats.unitsIn.get());
+
+            }
+
+            /*
+             * Run the hash join.
+             */
+
+            final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
+                    left.iterator());
+
+            // Buffer used to collect the solutions.
+            final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+
+            // Compute the "required" solutions.
+            state.hashJoin(leftItr, outputBuffer, true/* leftIsPipeline */);
+
+            if (optional) {
+
+                // Output the optional solutions.
+                state.outputOptionals(outputBuffer);
+
+            }
+
+            // Verify the expected solutions.
+            assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
+
+        } finally {
+
+            state.release();
+
         }
 
-        /*
-         * Run the hash join.
-         */
+    }
 
-        final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
-                left.iterator());
-
-        // Buffer used to collect the solutions.
-        final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+    /**
+     * FIXME Write a unit test which verifies that the ivCache is used and that
+     * the cached {@link BigdataValue}s are correctly restored when the
+     * rightSolutions had cached values and the leftSolutions did not have a
+     * value cached for the same IVs. For example, this could be done with a
+     * cached value on an IV which is not a join variable and which is only
+     * present in the rightSolutions. 
+     */
+    public void test_cache() {
         
-        // Compute the "required" solutions.
-        HTreeHashJoinUtility
-                .hashJoin(leftItr, outputBuffer, joinVars, selectVars,
-                        constraints, rightSolutions, joinSet, optional, true/* leftIsPipeline */);
-
-        if(optional) {
-            
-            // Output the optional solutions.
-            HTreeHashJoinUtility.outputOptionals(outputBuffer, rightSolutions,
-                    joinSet, selectVars);
-            
-        }
-
-        // Verify the expected solutions.
-        assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
+        fail("write test");
         
     }
     

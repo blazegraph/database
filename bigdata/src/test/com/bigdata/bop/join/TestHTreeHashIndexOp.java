@@ -41,18 +41,16 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.ap.E;
-import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.AbstractHashJoinUtilityTestCase.JoinSetup;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.striterator.ChunkedArrayIterator;
 
 /**
  * Test suite for {@link HTreeHashIndexOp}.
@@ -99,39 +97,9 @@ public class TestHTreeHashIndexOp extends TestCase2 {
 
         jnl = new Journal(getProperties());
 
-        loadData(jnl);
-
         queryEngine = new QueryEngine(jnl);
 
         queryEngine.init();
-
-    }
-
-    /**
-     * Create and populate relation in the {@link #namespace}.
-     */
-    private void loadData(final Journal store) {
-
-        final String namespace = "ns";
-
-        // create the relation.
-        final R rel = new R(store, namespace, ITx.UNISOLATED, new Properties());
-        rel.create();
-
-        // data to insert (in key order for convenience).
-        final E[] a = {//
-                new E("John", "Mary"),// [0]
-                new E("Leon", "Paul"),// [1]
-                new E("Mary", "Paul"),// [2]
-                new E("Paul", "Leon"),// [3]
-        };
-
-        // insert data (the records are not pre-sorted).
-        rel
-                .insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
-
-        // Do commit since not scale-out.
-        store.commit();
 
     }
 
@@ -329,16 +297,17 @@ public class TestHTreeHashIndexOp extends TestCase2 {
      * this is basically a complex NOP. However, this does provide a simple test
      * of the most basic mechanisms for those two operators.
      */
+    @SuppressWarnings("rawtypes")
     public void test_hashIndexOp_01() throws Exception {
 
+        final JoinSetup setup = new JoinSetup(getName());
+        
         final UUID queryId = UUID.randomUUID();
         
         final String solutionSetName = "set1";
         
-        @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[]{};
         
-        @SuppressWarnings("rawtypes")
         final IVariable[] selectVars = null;
         
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
@@ -350,6 +319,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{setup.namespace}),//
                 new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
@@ -362,9 +332,9 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -379,15 +349,15 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         final IBindingSet[] bindingSets1 = new IBindingSet[1];
         {
             final IBindingSet tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Leon"));
+            tmp.set(x, new Constant<IV>(setup.leon));
             bindingSets1[0] = tmp;
         }
         
         final IBindingSet[] bindingSets2 = new IBindingSet[1];
         {
             final IBindingSet tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
-            tmp.set(y, new Constant<String>("John"));
+            tmp.set(x, new Constant<IV>(setup.mary));
+            tmp.set(y, new Constant<IV>(setup.john));
             bindingSets2[0] = tmp;
         }
         
@@ -395,12 +365,12 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
         new ListBindingSet(//
             new IVariable[] { x },//
-            new IConstant[] { new Constant<String>("Leon") }//
+            new IConstant[] { new Constant<IV>(setup.leon) }//
             ), //
         new ListBindingSet(//
             new IVariable[] { x, y },//
-            new IConstant[] { new Constant<String>("Mary"), 
-                new Constant<String>("John") }//
+            new IConstant[] { new Constant<IV>(setup.mary), 
+                new Constant<IV>(setup.john) }//
         ),//
         };
 
@@ -422,16 +392,17 @@ public class TestHTreeHashIndexOp extends TestCase2 {
      * will have been created by the {@link HTreeHashIndexOp} and utilized by the
      * {@link HTreeSolutionSetHashJoinOp}.
      */
+    @SuppressWarnings("rawtypes")
     public void test_hashIndexOp_02() throws Exception {
 
+        final JoinSetup setup = new JoinSetup(getName());
+        
         final UUID queryId = UUID.randomUUID();
         
         final String solutionSetName = "set1";
         
-        @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = new IVariable[]{};
         
-        @SuppressWarnings("rawtypes")
         final IVariable[] selectVars = null;
         
         final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
@@ -444,6 +415,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(HTreeHashIndexOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{setup.namespace}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -455,9 +427,9 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, op.isOptional()),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -472,15 +444,15 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         final IBindingSet[] bindingSets1 = new IBindingSet[1];
         {
             final IBindingSet tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Leon"));
+            tmp.set(x, new Constant<IV>(setup.leon));
             bindingSets1[0] = tmp;
         }
         
         final IBindingSet[] bindingSets2 = new IBindingSet[1];
         {
             final IBindingSet tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
-            tmp.set(y, new Constant<String>("John"));
+            tmp.set(x, new Constant<IV>(setup.mary));
+            tmp.set(y, new Constant<IV>(setup.john));
             bindingSets2[0] = tmp;
         }
         
@@ -488,12 +460,12 @@ public class TestHTreeHashIndexOp extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
         new ListBindingSet(//
             new IVariable[] { x },//
-            new IConstant[] { new Constant<String>("Leon") }//
+            new IConstant[] { new Constant<IV>(setup.leon) }//
             ), //
         new ListBindingSet(//
             new IVariable[] { x, y },//
-            new IConstant[] { new Constant<String>("Mary"), 
-                new Constant<String>("John") }//
+            new IConstant[] { new Constant<IV>(setup.mary), 
+                new Constant<IV>(setup.john) }//
         ),//
         };
 

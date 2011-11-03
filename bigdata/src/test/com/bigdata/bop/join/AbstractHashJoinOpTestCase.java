@@ -121,6 +121,10 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         // create the relation.
         final R rel = new R(store, namespace, ITx.UNISOLATED, new Properties());
         rel.create();
+        
+//        // create the relation.
+//        final AbstractTripleStore tripleStore = new LocalTripleStore(store, namespace, ITx.UNISOLATED, new Properties());
+//        tripleStore.create();
 
         // data to insert (in key order for convenience).
         final E[] a = {//

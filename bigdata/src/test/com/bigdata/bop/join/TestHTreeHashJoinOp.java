@@ -78,6 +78,8 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                         BOpEvaluationContext.CONTROLLER), //
                 new NV(Predicate.Annotations.BOP_ID, joinId),//
                 new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                       predOp.getRequiredProperty(Predicate.Annotations.RELATION_NAME)),//
                 new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//

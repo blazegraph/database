@@ -38,13 +38,11 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.join.HTreeHashJoinUtility.HTreeHashJoinState;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -85,8 +83,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends PipelineOp.Annotations,
-            HashJoinAnnotations, JoinAnnotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * The {@link NamedSolutionSetRef} used to locate the {@link HTree}
@@ -99,34 +96,6 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
          */
         final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
-
-//        /**
-//         * An optional {@link IVariable}[] identifying the variables to be
-//         * retained in the {@link IBindingSet}s written out by the operator. All
-//         * variables are retained unless this annotation is specified. This is
-//         * normally set to the <em>projection</em> of the subquery, in which
-//         * case the lexical scope of the variables will be properly managed for
-//         * the subquery INCLUDE join.
-//         * 
-//         * @see JoinAnnotations#SELECT
-//         */
-//        final String SELECT = JoinAnnotations.SELECT;
-//
-//        /**
-//         * An {@link IConstraint}[] to be applied to solutions when they are
-//         * joined (optional).
-//         */
-//        final String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
-//        
-//        /**
-//         * Boolean annotation is <code>true</code> iff the join has OPTIONAL
-//         * semantics.
-//         * 
-//         * @see JoinAnnotations#OPTIONAL
-//         */
-//        final String OPTIONAL = JoinAnnotations.OPTIONAL;
-//
-//        final boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
         
         /**
          * When <code>true</code> the hash index identified by
@@ -140,7 +109,10 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          * until all such operators are done.
          * 
          * TODO Alternatively, we could specify the #of different locations in
-         * the query plan where the named solution set will be consumed.
+         * the query plan where the named solution set will be consumed. This
+         * could be part of the {@link HTreeHashJoinUtility} state, in which
+         * case it would only be set as an annotation on the operator which
+         * generates the hash index.
          */
         final String RELEASE = HTreeSolutionSetHashJoinOp.class + ".release";
 
@@ -177,32 +149,9 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                     + " requires " + Annotations.LAST_PASS);
         }
         
-        if (isOptional() && !isLastPassRequested()) {
-
-            /*
-             * An optional join requires that we observe all solutions before we
-             * report "optional" solutions so we can identify those which do not
-             * join.
-             */
-
-            throw new UnsupportedOperationException(Annotations.OPTIONAL
-                    + " requires " + Annotations.LAST_PASS);
-        
-        }
-
         // The RHS HTree annotation must be specified.
         getRequiredProperty(Annotations.NAMED_SET_REF);
         
-        // Join variables must be specified.
-        final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
-
-        for (IVariable<?> var : joinVars) {
-
-            if (var == null)
-                throw new IllegalArgumentException(Annotations.JOIN_VARS);
-
-        }
-
     }
 
     public HTreeSolutionSetHashJoinOp(final BOp[] args, NV... annotations) {
@@ -211,15 +160,6 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
         
     }
 
-    /**
-     * @see Annotations#OPTIONAL
-     */
-    public boolean isOptional() {
-        
-        return getProperty(Annotations.OPTIONAL,Annotations.DEFAULT_OPTIONAL);
-        
-    }
-    
     /**
      * @see Annotations#RELEASE
      */
@@ -251,17 +191,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
 
         private final HTreeSolutionSetHashJoinOp op;
 
-//        private final IVariable<E>[] joinVars;
-//        
-//        private final IConstraint[] constraints;
-
-        private final IVariable<?>[] selectVars;
-
-//        private final boolean optional;
-        
         private final boolean release;
-        
-//        private final String namedSet;
         
         private final BaseJoinStats stats;
 
@@ -269,41 +199,14 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-//        /**
-//         * A map whose keys are the bindings on the specified variables. The
-//         * values in the map are <code>null</code>s.
-//         * <p>
-//         * Note: The map is shared state and can not be discarded or cleared
-//         * until the last invocation!!!
-//         */
-//        private final HTree rightSolutions;
-//
-//        /**
-//         * The set of distinct source solutions which joined. This set is
-//         * maintained iff the join is optional.
-//         */
-//        private final HTree joinSet;
-        
-        private final HTreeHashJoinState state;
+        private final HTreeHashJoinUtility state;
 
-        @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final HTreeSolutionSetHashJoinOp op) {
 
             this.context = context;
 
             this.stats = (BaseJoinStats) context.getStats();
-
-            this.selectVars = (IVariable<?>[]) op
-                    .getProperty(Annotations.SELECT);
-
-//            this.joinVars = (IVariable<E>[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
-//            
-//            this.constraints = (IConstraint[]) op
-//                    .getProperty(Annotations.CONSTRAINTS);
-//
-//            this.optional = op.isOptional();
 
             this.release = op.getProperty(Annotations.RELEASE,
                     Annotations.DEFAULT_RELEASE);
@@ -323,10 +226,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
             final IQueryAttributes attrs = context
                     .getQueryAttributes(namedSetRef.queryId);
 
-            state = (HTreeHashJoinState) attrs.get(namedSetRef);
-            
-//            // The HTree holding the solutions.
-//            rightSolutions = (HTree) attrs.get(namedSetRef);
+            state = (HTreeHashJoinUtility) attrs.get(namedSetRef);
 
             if (state == null) {
                 
@@ -336,59 +236,22 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                 
             }
 
-//            if (optional) {
-//                
-//                final NamedSolutionSetRef joinSetRef = new NamedSolutionSetRef(
-//                        namedSetRef.queryId, namedSetRef.namedSet + ".joinSet",
-//                        joinVars);
-//
-//                final HTree joinSet = (HTree) attrs.get(joinSetRef);
-//
-//                if (joinSet == null) {
-//                    
-//                    // The join set was not found!
-//                    
-//                    throw new RuntimeException("Not found: " + joinSetRef);
-//                    
-//                }
-//                
-//                this.joinSet = joinSet;
-//            
-//            } else {
-//                
-//                this.joinSet = null;
-//                
-//            }
+            if (state.optional && !op.isLastPassRequested()) {
+
+                /*
+                 * An optional join requires that we observe all solutions
+                 * before we report "optional" solutions so we can identify
+                 * those which do not join.
+                 */
+
+                throw new UnsupportedOperationException(
+                        JoinAnnotations.OPTIONAL + " requires "
+                                + Annotations.LAST_PASS);
+            
+            }
 
         }
 
-//        /**
-//         * Discard the {@link HTree} data.
-//         */
-//        private void release() {
-//
-//            if (joinSet != null) {
-//
-//                joinSet.close();
-//
-////                joinSet = null;
-//                
-//            }
-//
-//            if (rightSolutions != null) {
-//
-//                final IRawStore store = rightSolutions.getStore();
-//
-//                rightSolutions.close();
-//                
-////                sourceSolutions = null;
-//                
-//                store.close();
-//
-//            }
-//
-//        }
-        
         public Void call() throws Exception {
 
             try {
@@ -446,9 +309,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
             final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
                     context.getSource());
 
-            HTreeHashJoinUtility.hashJoin(leftItr, unsyncBuffer, state.joinVars,
-                    selectVars, state.constraints, state.getRightSolutions()/* hashIndex */,
-                    state.getJoinSet(), state.optional, true/* leftIsPipeline */);
+            state.hashJoin(leftItr, unsyncBuffer, true/* leftIsPipeline */);
 
             if (state.optional && context.isLastInvocation()) {
 
@@ -457,8 +318,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                HTreeHashJoinUtility.outputOptionals(unsyncBuffer2,
-                        state.getRightSolutions(), state.getJoinSet(), selectVars);
+                state.outputOptionals(unsyncBuffer2);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)
