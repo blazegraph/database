@@ -987,6 +987,8 @@ public class HTreeHashJoinUtility {
 
                                 }
 
+                                resolveCachedValues(outSolution);
+
                                 if (log.isDebugEnabled())
                                     log.debug("Output solution: hashCode="
                                             + hashCode + ", sameHashCodeCount="
