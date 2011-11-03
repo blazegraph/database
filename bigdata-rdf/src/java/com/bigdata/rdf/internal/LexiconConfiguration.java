@@ -260,14 +260,25 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         for (IExtension<BigdataValue> extension : xFactory.getExtensions()) {
 
-            final BigdataURI datatype = extension.getDatatype();
+//            final BigdataURI datatype = extension.getDatatype();
+        	for (BigdataURI datatype : extension.getDatatypes()) {
 
-            if (datatype == null)
-                continue;
-
-            iv2ext.put(datatype.getIV(), extension);
-
-            datatype2ext.put(datatype.stringValue(), extension);
+	            if (datatype == null)
+	                continue;
+	            
+	            if (log.isDebugEnabled()) {
+	            	log.debug("adding extension for: " + datatype);
+	            }
+	            
+	            if (iv2ext.containsKey(datatype.getIV())) {
+	            	log.warn("multiple IExtension implementations for: " + datatype);
+	            }
+	
+	            iv2ext.put(datatype.getIV(), extension);
+	
+	            datatype2ext.put(datatype.stringValue(), extension);
+	            
+        	}
 
         }
 

@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -56,9 +59,11 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
         
     }
         
-    public BigdataURI getDatatype() {
+    public Set<BigdataURI> getDatatypes() {
         
-        return color;
+        final Set<BigdataURI> datatypes = new LinkedHashSet<BigdataURI>();
+        datatypes.add(color);
+        return datatypes;
         
     }
     
@@ -93,7 +98,7 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
         
         final AbstractLiteralIV delegate = new XSDNumericIV(c.getByte());
 
-        return new LiteralExtensionIV(delegate, getDatatype().getIV());
+        return new LiteralExtensionIV(delegate, color.getIV());
         
     }
     

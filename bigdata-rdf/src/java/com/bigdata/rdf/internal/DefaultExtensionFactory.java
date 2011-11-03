@@ -32,9 +32,12 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     
     public void init(final LexiconRelation lex) {
 
-    	if (lex.isInlineDateTimes())
+    	if (lex.isInlineDateTimes()) {
+    		
     		extensions.add(new DateTimeExtension<BigdataLiteral>(
     				lex, lex.getInlineDateTimesTimeZone()));
+    		
+    	}
 
         if (lex.getMaxInlineStringLength() > 0) {
 			/*

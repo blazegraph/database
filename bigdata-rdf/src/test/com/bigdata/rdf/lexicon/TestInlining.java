@@ -30,6 +30,7 @@ package com.bigdata.rdf.lexicon;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -49,8 +50,8 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
@@ -555,7 +556,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         
         try {
 
-            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+            final Collection<BigdataValue> terms = new LinkedHashSet<BigdataValue>();
 
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
@@ -565,6 +566,48 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
             terms.add(f.createLiteral("2007-12-25T00:00:00", f
                     .createURI(XSD.DATETIME.toString())));
+
+            terms.add(f.createLiteral("2008-03-22", f
+                    .createURI(XSD.DATE.toString())));
+
+            terms.add(f.createLiteral("2007-12-25", f
+                    .createURI(XSD.DATE.toString())));
+
+            terms.add(f.createLiteral("00:00:00", f
+                    .createURI(XSD.TIME.toString())));
+
+            terms.add(f.createLiteral("13:15:42", f
+                    .createURI(XSD.TIME.toString())));
+
+            terms.add(f.createLiteral("---22", f
+                    .createURI(XSD.GDAY.toString())));
+
+            terms.add(f.createLiteral("---25", f
+                    .createURI(XSD.GDAY.toString())));
+
+            terms.add(f.createLiteral("--03", f
+                    .createURI(XSD.GMONTH.toString())));
+
+            terms.add(f.createLiteral("--12", f
+                    .createURI(XSD.GMONTH.toString())));
+
+            terms.add(f.createLiteral("--03-22", f
+                    .createURI(XSD.GMONTHDAY.toString())));
+
+            terms.add(f.createLiteral("--12-25", f
+                    .createURI(XSD.GMONTHDAY.toString())));
+
+            terms.add(f.createLiteral("2008", f
+                    .createURI(XSD.GYEAR.toString())));
+
+            terms.add(f.createLiteral("1976", f
+                    .createURI(XSD.GYEAR.toString())));
+
+            terms.add(f.createLiteral("2008-03", f
+                    .createURI(XSD.GYEARMONTH.toString())));
+
+            terms.add(f.createLiteral("1976-12", f
+                    .createURI(XSD.GYEARMONTH.toString())));
 
             final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
 

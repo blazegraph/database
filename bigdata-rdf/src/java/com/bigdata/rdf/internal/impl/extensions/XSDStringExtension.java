@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.extensions;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -62,9 +65,11 @@ public class XSDStringExtension<V extends BigdataValue> implements IExtension<V>
         
     }
         
-    public BigdataURI getDatatype() {
+    public Set<BigdataURI> getDatatypes() {
         
-        return xsdStringURI;
+        final Set<BigdataURI> datatypes = new LinkedHashSet<BigdataURI>();
+        datatypes.add(xsdStringURI);
+        return datatypes;
         
     }
     
@@ -94,7 +99,7 @@ public class XSDStringExtension<V extends BigdataValue> implements IExtension<V>
                 null // no datatype
         );
 
-        return new LiteralExtensionIV<BigdataLiteral>(delegate, getDatatype().getIV());
+        return new LiteralExtensionIV<BigdataLiteral>(delegate, xsdStringURI.getIV());
 
     }
     
