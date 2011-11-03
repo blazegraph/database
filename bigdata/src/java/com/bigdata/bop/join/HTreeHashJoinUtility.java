@@ -971,7 +971,8 @@ public class HTreeHashJoinUtility {
                                 if (outSolution == null) {
 
                                     if (log.isTraceEnabled())
-                                        log.trace("Does not join: left="
+                                        log.trace("Does not join: hashCode="
+                                                + hashCode + ", left="
                                                 + leftSolution + ", right="
                                                 + rightSolution);
 
