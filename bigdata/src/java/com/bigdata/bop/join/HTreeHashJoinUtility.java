@@ -941,8 +941,12 @@ public class HTreeHashJoinUtility {
                         final ITupleIterator<IBindingSet> titr = rightSolutions
                                 .lookupAll(hashCode);
 
+                        long sameHashCodeCount = 0;
+                        
                         while (titr.hasNext()) {
 
+                            sameHashCodeCount++;
+                            
                             final ITuple<IBindingSet> t = titr.next();
 
                             /*
@@ -972,7 +976,9 @@ public class HTreeHashJoinUtility {
 
                                     if (log.isTraceEnabled())
                                         log.trace("Does not join: hashCode="
-                                                + hashCode + ", left="
+                                                + hashCode
+                                                + "sameHashCodeCount="
+                                                + sameHashCodeCount + ", left="
                                                 + leftSolution + ", right="
                                                 + rightSolution);
 
@@ -982,7 +988,10 @@ public class HTreeHashJoinUtility {
                                 }
 
                                 if (log.isDebugEnabled())
-                                    log.debug("Output solution: " + outSolution);
+                                    log.debug("Output solution: hashCode="
+                                            + hashCode + ", sameHashCodeCount="
+                                            + sameHashCodeCount + ", solution="
+                                            + outSolution);
 
                                 // Accept this binding set.
                                 outputBuffer.add(outSolution);
