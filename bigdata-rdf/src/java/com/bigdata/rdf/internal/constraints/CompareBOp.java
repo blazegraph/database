@@ -108,6 +108,11 @@ public class CompareBOp extends XSDBooleanIVValueExpression
             final IV<BigdataValue, ?> right,
             final CompareOp op) {
 
+        if (log.isDebugEnabled()) {
+            log.debug(left);
+            log.debug(right);
+        }
+
 //    	final BigdataValue val1 = left.getValue();
 //    	final BigdataValue val2 = right.getValue();
 //    	
@@ -189,7 +194,14 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     		
     		if (leftDatatype.equals(rightDatatype)) {
     		
-    			return _accept(left.compareTo(right), op);
+        		final boolean accept = 
+        			_accept(left.compareTo(right), op);
+        		
+	    		if (log.isDebugEnabled()) {
+	    			log.debug(accept);
+	    		}
+	    		
+	    		return accept;
     			
     		}
     		
@@ -313,7 +325,6 @@ public class CompareBOp extends XSDBooleanIVValueExpression
     	if (log.isDebugEnabled()) {
     		log.debug("left: " + left);
     		log.debug("right: " + right);
-    		
     		log.debug("left value: " + (left.hasValue() ? left.getValue() : null));
     		log.debug("right value: " + (right.hasValue() ? right.getValue() : null));
     	}

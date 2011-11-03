@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.Set;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
@@ -54,8 +56,8 @@ public interface IExtension<V extends BigdataValue> {
      * @return
      *          the datatype
      */
-    BigdataURI getDatatype();
-
+    Set<BigdataURI> getDatatypes();
+    
     /**
      * Create an {@link LiteralExtensionIV} from an RDF value.
      * 
