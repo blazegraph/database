@@ -117,17 +117,21 @@ public class TestIVComparator extends TestCase2 {
                 throw new RuntimeException(e);
             }
             
-            final DateTimeExtension<BigdataValue> ext = new DateTimeExtension<BigdataValue>(
-                    new IDatatypeURIResolver() {
-                        public BigdataURI resolve(final URI uri) {
-                            final BigdataURI buri = f.createURI(uri.stringValue());
-                            buri.setIV(new TermId<BigdataLiteral>(VTE.URI,termId++));
-                            return buri;
-                        }
-                    }, TimeZone.getTimeZone("GMT"));
+            final IDatatypeURIResolver resolver = new IDatatypeURIResolver() {
+                public BigdataURI resolve(final URI uri) {
+                    final BigdataURI buri = f.createURI(uri.stringValue());
+                    buri.setIV(new TermId<BigdataLiteral>(VTE.URI,termId++));
+                    return buri;
+                }
+            };
+            
+            final DateTimeExtension<BigdataValue> dtExt = new DateTimeExtension<BigdataValue>(
+        			resolver, TimeZone.getTimeZone("GMT"));
 
-            ext.createIV(f.createLiteral(df
+            dtExt.createIV(f.createLiteral(df
                     .newXMLGregorianCalendar("2001-10-26T21:32:52.126Z")));
+            dtExt.createIV(f.createLiteral("2001-10-26", XSD.DATE));
+            dtExt.createIV(f.createLiteral("21:32:52.126Z", XSD.TIME));
 
             noninline_plain_lit1.setValue(f.createLiteral("bigdata"));
             noninline_plain_lit2.setValue(f.createLiteral("systap"));

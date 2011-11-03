@@ -37,7 +37,6 @@ import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.log.Log;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -162,7 +161,7 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
      * Use the long value of the {@link XSDLongIV} delegate (which represents
      * milliseconds since the epoch) to create a an XMLGregorianCalendar
      * object (GMT timezone).  Use the XMLGregorianCalendar to create a datatype
-     * literal value with the xsd:dateTime datatype.
+     * literal value with the appropriate datatype.
      */
     public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
         

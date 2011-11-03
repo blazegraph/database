@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -16,6 +17,9 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * the statement indices.</dd>
  * <dt>{@link XSDStringExtension}</dt>
  * <dd>Inlining <code>xsd:string</code> literals into the statement indices.</dd>
+ * <dt>{@link DerivedNumericsExtension}</dt>
+ * <dd>Inlining literals which represent derived numeric values into
+ * the statement indices.</dd>
  * </dl>
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
@@ -32,6 +36,11 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     
     public void init(final LexiconRelation lex) {
 
+    	/*
+    	 * Always going to inline the derived numeric types.
+    	 */
+    	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(lex));
+    	
     	if (lex.isInlineDateTimes()) {
     		
     		extensions.add(new DateTimeExtension<BigdataLiteral>(
