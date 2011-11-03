@@ -1841,14 +1841,26 @@ public class HTree extends AbstractHTree
 
     }
     
+    /**
+     * Move to test suite.
+     */
+    @Deprecated
     public final int activeBucketPages() {
     	return root.activeBucketPages();
     }
-    
+
+    /**
+     * Move to test suite.
+     */
+    @Deprecated
     public final int activeDirectoryPages() {
     	return root.activeDirectoryPages();
     }
     
+    /**
+     * Move to test suite.
+     */
+    @Deprecated
     public String getPageInfo() {
     	return "Created Pages for " 
 		+ addressBits + " addressBits"

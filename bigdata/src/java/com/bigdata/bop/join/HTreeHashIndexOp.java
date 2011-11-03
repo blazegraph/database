@@ -183,37 +183,7 @@ public class HTreeHashIndexOp extends PipelineOp {
         return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
         
     }
-    
-//    /**
-//     * @see Annotations#ADDRESS_BITS
-//     */
-//    public int getAddressBits() {
-//
-//        return getProperty(Annotations.ADDRESS_BITS,
-//                Annotations.DEFAULT_ADDRESS_BITS);
-//
-//    }
-//
-//    /**
-//     * @see Annotations#RAW_RECORDS
-//     */
-//    public boolean getRawRecords() {
-//
-//        return getProperty(Annotations.RAW_RECORDS,
-//                Annotations.DEFAULT_RAW_RECORDS);
-//
-//    }
-//    
-//    /**
-//     * @see Annotations#MAX_RECLEN
-//     */
-//    public int getMaxRecLen() {
-//
-//        return getProperty(Annotations.MAX_RECLEN,
-//                Annotations.DEFAULT_MAX_RECLEN);
-//
-//    }
-
+   
     @Override
     public BOpStats newStats() {
 
