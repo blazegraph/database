@@ -34,7 +34,6 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -46,9 +45,8 @@ import com.bigdata.btree.NoEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
-import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -271,17 +269,29 @@ public class AbstractHTreeTestCase extends TestCase2 {
 	
 	}
 
-	private static void assertSameIterator(ITupleIterator expected,
-			ITupleIterator actual) {
-		int index = 0;
-		while (expected.hasNext()) {
-			assertTrue(actual.hasNext());
-			index++;
+	protected static void assertSameIterator(final ITupleIterator<?> expected,
+			final ITupleIterator<?> actual) {
+		
+	    @SuppressWarnings("unused")
+        int index = 0;
+		
+	    while (expected.hasNext()) {
+		
+	        assertTrue(actual.hasNext());
 			
-			ITuple etup = expected.next();
-			ITuple atup = actual.next();
-			assertTrue(BytesUtil.bytesEqual(etup.getKey(), atup.getKey()));
-			assertTrue(BytesUtil.bytesEqual(etup.getValue(), atup.getValue()));
+	        index++;
+			
+            final ITuple<?> etup = expected.next();
+            final ITuple<?> atup = actual.next();
+
+            assertEquals("flags", etup.flags(), atup.flags());
+            
+            assertTrue("keys",
+                    BytesUtil.bytesEqual(etup.getKey(), atup.getKey()));
+            
+            assertTrue("vals",
+                    BytesUtil.bytesEqual(etup.getValue(), atup.getValue()));
+        
 		}
 
 		assertFalse(actual.hasNext());
