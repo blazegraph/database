@@ -15,6 +15,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
@@ -26,6 +27,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * Efficiently resolve term identifiers in Bigdata {@link IBindingSet}s to RDF
  * {@link BigdataValue}s.
  * 
+ * @see ChunkedMaterializationOp
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: BigdataSolutionResolverator.java 3448 2010-08-18 20:55:58Z thompsonbry $
  */
@@ -33,7 +36,7 @@ public class BigdataBindingSetResolverator
         extends
         AbstractChunkedResolverator<IBindingSet, IBindingSet, AbstractTripleStore> {
 
-    final private static Logger log = Logger
+    private final static Logger log = Logger
             .getLogger(BigdataBindingSetResolverator.class);
 
     @SuppressWarnings("rawtypes")
@@ -101,7 +104,7 @@ public class BigdataBindingSetResolverator
      */
     protected IBindingSet[] resolveChunk(final IBindingSet[] chunk) {
 
-        return resolveChunk(required, state.getLexiconRelation(), chunk);
+        return resolveChunk(/*required, */state.getLexiconRelation(), chunk);
 
     }
 
@@ -123,7 +126,7 @@ public class BigdataBindingSetResolverator
      * @return A new chunk of solutions in which those variables have been
      *         materialized.
      */
-    static public IBindingSet[] resolveChunk(final IVariable<?>[] required,
+    private IBindingSet[] resolveChunk(//final IVariable<?>[] required,
             final LexiconRelation lex,//
             final IBindingSet[] chunk//
             ) {
@@ -208,7 +211,7 @@ public class BigdataBindingSetResolverator
 //        System.err.println("resolving: " + Arrays.toString(ids.toArray()));
 
         if (log.isInfoEnabled())
-            log.info("Resolving " + ids.size() + " term identifiers, required="
+            log.info("Resolving " + ids.size() + " IVs, required="
                     + Arrays.toString(required));
 
         // batch resolve term identifiers to terms.
@@ -298,8 +301,8 @@ public class BigdataBindingSetResolverator
 
             if (value == null) {
 
-                throw new RuntimeException("Could not resolve termId="
-                        + iv);
+                throw new RuntimeException("Could not resolve: iv=" + iv);
+                
             }
 
             /*
@@ -316,5 +319,5 @@ public class BigdataBindingSetResolverator
         return bindingSet;
 
     }
-    
+
 }
