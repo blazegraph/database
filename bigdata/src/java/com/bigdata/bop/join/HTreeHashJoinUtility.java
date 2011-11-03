@@ -275,6 +275,8 @@ public class HTreeHashJoinUtility {
                 HTreeAnnotations.MAX_RECLEN,
                 HTreeAnnotations.DEFAULT_MAX_RECLEN));
 
+        metadata.setWriteRetentionQueueCapacity(4000);// FIXME CONFIG
+
         metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
 
         @SuppressWarnings("rawtypes")
@@ -300,6 +302,8 @@ public class HTreeHashJoinUtility {
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
         metadata.setBranchingFactor(256);// TODO Config.
+
+        metadata.setWriteRetentionQueueCapacity(4000);// FIXME CONFIG
 
         final String namespace = ((String[]) op
                 .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0];
