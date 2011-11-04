@@ -150,8 +150,7 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
                 state.acceptSolutions(
                         new Chunkerator<IBindingSet>(right.iterator()), stats);
 
-                assertEquals(right.size(), state.getRightSolutions()
-                        .getEntryCount());
+                assertEquals(right.size(), state.getRightSolutionCount());
 
                 assertEquals(right.size(), stats.unitsIn.get());
 
