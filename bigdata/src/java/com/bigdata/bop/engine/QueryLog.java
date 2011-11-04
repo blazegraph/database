@@ -367,9 +367,10 @@ public class QueryLog {
 				final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
 						.getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
 				
-				// Explicit override of the key order (if given).
-				final IKeyOrder<?> overrideKeyOrder = pred.getKeyOrder();
-				
+                // Explicit override of the key order (if given).
+                final Object overrideKeyOrder = pred
+                        .getProperty(IPredicate.Annotations.KEY_ORDER);
+
 				final Long rangeCount = (Long) pred
 						.getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
 				
@@ -379,7 +380,7 @@ public class QueryLog {
                 
 				sb.append('\t'); // keyorder override.
 				if (overrideKeyOrder != null)
-					sb.append(overrideKeyOrder);
+					sb.append(overrideKeyOrder.toString());
 				
 				sb.append('\t'); // nvars
 				if (keyOrder != null)
@@ -800,7 +801,8 @@ public class QueryLog {
                         .getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
                 
                 // Explicit override of the key order (if given).
-                final IKeyOrder<?> overrideKeyOrder = pred.getKeyOrder();
+                final Object overrideKeyOrder = pred
+                        .getProperty(IPredicate.Annotations.KEY_ORDER);
 
                 final Long rangeCount = (Long) pred
                         .getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
