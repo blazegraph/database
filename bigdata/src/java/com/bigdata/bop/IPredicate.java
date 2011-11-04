@@ -115,7 +115,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          *      the index for testing fully bound access paths based on index
          *      locality)
          */
-        String KEY_ORDER = AccessPathJoinAnnotations.class.getName() + ".keyOrder";
+        String KEY_ORDER = IPredicate.class.getName() + ".keyOrder";
 
         /**
          * <code>true</code> iff the predicate has SPARQL optional semantics
