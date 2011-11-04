@@ -48,6 +48,6 @@ public interface AccessPathJoinAnnotations extends JoinAnnotations {
      * which have the data for the shards on which the {@link IAccessPath} must
      * read.
      */
-    String PREDICATE = PipelineJoin.class.getName() + ".predicate";
+    String PREDICATE = AccessPathJoinAnnotations.class.getName() + ".predicate";
 
 }

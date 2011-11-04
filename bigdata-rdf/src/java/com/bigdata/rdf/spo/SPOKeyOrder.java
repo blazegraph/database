@@ -775,6 +775,16 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
 
+        /*
+         * Look for a key order override.
+         */
+        final SPOKeyOrder keyOrder = (SPOKeyOrder) predicate.getKeyOrder();
+
+        if (keyOrder != null) {
+            // Overridden.
+            return keyOrder;
+        }
+        
     	final RangeBOp range = (RangeBOp) 
     		predicate.getProperty(SPOPredicate.Annotations.RANGE);
     	

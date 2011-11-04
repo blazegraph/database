@@ -519,20 +519,24 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
 
         }
-    
-		/**
-		 * Determines the {@link UUID} which will be associated with the
-		 * {@link IRunningQuery}. If {@link QueryHints#QUERYID} has already been
-		 * used by the application to specify the {@link UUID} then that
-		 * {@link UUID} is noted. Otherwise, a random {@link UUID} is generated
-		 * and assigned to the query by binding it on the query hints.
-		 * 
-		 * @param query
-		 *            The query.
-		 * 
-		 * @return The {@link UUID} which will be associated with the
-		 *         {@link IRunningQuery}.
-		 */
+
+        /**
+         * Determines the {@link UUID} which will be associated with the
+         * {@link IRunningQuery}. If {@link QueryHints#QUERYID} has already been
+         * used by the application to specify the {@link UUID} then that
+         * {@link UUID} is noted. Otherwise, a random {@link UUID} is generated
+         * and assigned to the query by binding it on the query hints.
+         * <p>
+         * Note: The ability to provide metadata from the {@link ASTContainer}
+         * in the {@link StatusServlet} or the "EXPLAIN" page depends on the
+         * ability to cross walk the queryIds as established by this method.
+         * 
+         * @param query
+         *            The query.
+         * 
+         * @return The {@link UUID} which will be associated with the
+         *         {@link IRunningQuery}.
+         */
 		protected UUID setQueryId(final BigdataSailQuery query) {
 			assert queryId2 == null; // precondition.
             // Figure out the effective UUID under which the query will run.

@@ -872,7 +872,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                         Annotations.DEFAULT_HASH_JOIN);
         
         if (hashJoin) {
-
+            
             /*
              * TODO Choose HTree versus JVM hash join operator based on the the
              * estimated input cardinality to the join.

@@ -34,6 +34,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
+import com.bigdata.bop.join.AccessPathJoinAnnotations;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -42,6 +43,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
@@ -86,15 +88,34 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          */
         String RELATION_NAME = IPredicate.class.getName() + ".relationName";
 
-//        /**
-//         * The {@link IKeyOrder} which will be used to read on the relation.
-//         * <p>
-//         * Note: This is generally assigned by the query optimizer. The query
-//         * optimizer considers the possible indices for each {@link IPredicate}
-//         * in a query and the possible join orders and then specifies the order
-//         * of the joins and the index to use for each join.
-//         */
-//        String KEY_ORDER = "keyOrder";
+        /**
+         * Optional property <em>overrides</em> the {@link IKeyOrder} to use for
+         * the access path. Sometimes changing which index is used for a join
+         * can change the locality of the join and improve join performance.
+         * <p>
+         * This property mostly makes sense for the quads mode of the database
+         * where there is typically more than one {@link SPOKeyOrder} which
+         * begins with the same key component. E.g., {@link SPOKeyOrder#POCS}
+         * versus {@link SPOKeyOrder#PCSO}.
+         * <p>
+         * An {@link IKeyOrder} override can also make sense when reading on a
+         * fully bound access path if there is an alternative key order which
+         * might provide better temporal locality. For example, by reading on
+         * the same {@link IKeyOrder} as the previous join.
+         * <p>
+         * <strong>WARNING:</strong> DO NOT override the {@link IKeyOrder}
+         * unless you are also taking control of (or taking into account) the
+         * join order -or- if a hash join will be used against the predicate.
+         * Failure to heed this advice can result in an extremely bad access
+         * path as the join ordering may cause the variables which are actually
+         * bound when the predicate is evaluated to be quite different from what
+         * you might otherwise expect.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/150 (chosing
+         *      the index for testing fully bound access paths based on index
+         *      locality)
+         */
+        String KEY_ORDER = AccessPathJoinAnnotations.class.getName() + ".keyOrder";
 
         /**
          * <code>true</code> iff the predicate has SPARQL optional semantics
@@ -472,17 +493,17 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      */
     public IFilter getAccessPathFilter();
     
-//    /**
-//     * Return the {@link IKeyOrder} assigned to this {@link IPredicate} by the
-//     * query optimizer.
-//     * 
-//     * @return The assigned {@link IKeyOrder} or <code>null</code> if the query
-//     *         optimizer has not assigned the {@link IKeyOrder} yet.
-//     * 
-//     * @see Annotations#KEY_ORDER
-//     */
-//    public IKeyOrder<E> getKeyOrder();
-//    
+    /**
+     * Return the {@link IKeyOrder} override for this {@link IPredicate} by the
+     * query optimizer.
+     * 
+     * @return The assigned {@link IKeyOrder} or <code>null</code> if the
+     *         {@link IKeyOrder} was not overriden.
+     * 
+     * @see Annotations#KEY_ORDER
+     */
+    public IKeyOrder<E> getKeyOrder();
+    
 //    /**
 //     * Set the {@link IKeyOrder} annotation on the {@link IPredicate}, returning
 //     * a new {@link IPredicate} in which the annotation takes on the given
