@@ -33,7 +33,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
@@ -122,7 +121,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public class ASTQueryHintOptimizer implements IASTOptimizer {
 
-    private static final Logger log = Logger.getLogger(ASTQueryHintOptimizer.class);
+//    private static final Logger log = Logger.getLogger(ASTQueryHintOptimizer.class);
     
     @SuppressWarnings("unchecked")
     @Override
@@ -335,12 +334,14 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
          */
         if (nfound > 0) {
             
-            for (int i = 0; i < group.arity(); ) {
+            for (int i = 0; i < group.arity() && group.arity()>0; ) {
 
                 final IGroupMemberNode child = (IGroupMemberNode) group.get(i);
 
-                if (!(child instanceof StatementPatternNode))
+                if (!(child instanceof StatementPatternNode)) {
+                    i++;
                     continue;
+                }
 
                 final StatementPatternNode sp = (StatementPatternNode) child;
 
