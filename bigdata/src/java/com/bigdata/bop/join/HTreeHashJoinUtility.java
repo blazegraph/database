@@ -192,8 +192,14 @@ public class HTreeHashJoinUtility {
      * {@link HTree} must store variable length {@link IV}[]s since new
      * variables may be discovered at any point.
      */
-    public final LinkedHashSet<IVariable<?>> schema;
-    
+    private final LinkedHashSet<IVariable<?>> schema;
+
+    /**
+     * The set of variables for which materialized {@link IV}s have been
+     * observed.
+     */
+    private final LinkedHashSet<IVariable<?>> ivCacheSchema;
+
     /**
      * <code>true</code> iff the join is OPTIONAL.
      * 
@@ -224,8 +230,14 @@ public class HTreeHashJoinUtility {
      * The backing {@link IRawStore}.
      */
     private final IRawStore store;
+    
+    /**
+     * The backing {@link IRawStore}.
+     */
     public IRawStore getStore() {
+    
         return store;
+        
     }
     
     /**
@@ -235,8 +247,32 @@ public class HTreeHashJoinUtility {
      * {@link IV}s to the variables is specified by the {@link #schema}.
      */
     private final AtomicReference<HTree> rightSolutions = new AtomicReference<HTree>();
-    public HTree getRightSolutions() { // TODO Does not need to be visible once hash join utility method signature is changed.
+
+    /**
+     * The hash index.
+     */
+    protected HTree getRightSolutions() {
+        
         return rightSolutions.get();
+        
+    }
+    
+    /**
+     * Return <code>true</code> iff there are no solutions in the hash index.
+     */
+    public boolean isEmpty() {
+        
+        return getRightSolutions().getEntryCount() == 0;
+        
+    }
+    
+    /**
+     * Return the #of solutions in the hash index.
+     */
+    public long getRightSolutionCount() {
+        
+        return getRightSolutions().getEntryCount();
+        
     }
     
     /**
@@ -245,7 +281,13 @@ public class HTreeHashJoinUtility {
      * otherwise.
      */
     private final AtomicReference<HTree> joinSet = new AtomicReference<HTree>();
-    public HTree getJoinSet() { // TODO Does not need to be visible once hash join utility method signature is changed.
+    
+    /**
+     * The set of distinct source solutions which joined. This set is
+     * maintained iff the join is optional and is <code>null</code>
+     * otherwise.
+     */
+    protected HTree getJoinSet() {
         return joinSet.get();
     }
     
@@ -257,7 +299,7 @@ public class HTreeHashJoinUtility {
      * Note: This is precisely the same mapping we use for the ID2TERM
      * index.
      * 
-     * TODO Either we need a blobCache as well or we need to rematerialize
+     * FIXME Either we need a blobCache as well or we need to rematerialize
      * blobs in the rightSolutions after a hash join.
      */
     private final AtomicReference<BTree> ivCache = new AtomicReference<BTree>();
@@ -300,7 +342,7 @@ public class HTreeHashJoinUtility {
         final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
                 new FrontCodedRabaCoder(ratio),// keys : TODO Optimize for int32!
-                new SimpleRabaCoder() // vals : FIXME IV[] coder (stmt indices).
+                new SimpleRabaCoder() // vals
         );
 
         metadata.setTupleSerializer(tupleSer);
@@ -391,6 +433,9 @@ public class HTreeHashJoinUtility {
         // Initialize the schema with the join variables.
         this.schema = new LinkedHashSet<IVariable<?>>();
         this.schema.addAll(Arrays.asList(joinVars));
+
+        // The set of variables for which materialized values are observed.
+        this.ivCacheSchema = new LinkedHashSet<IVariable<?>>();
 
         // The join constraints (optional).
         this.constraints = (IConstraint[]) op
@@ -588,7 +633,7 @@ public class HTreeHashJoinUtility {
 
         long n = 0L;
         
-        final HTree htree = rightSolutions.get();
+        final HTree htree = getRightSolutions();
 
         final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
         
@@ -687,7 +732,7 @@ public class HTreeHashJoinUtility {
                 final BigdataValue value = e.getValue();
 
                 ivCache.insert(key, tupSer.serializeVal(value));
-
+                
             }
 
         }
@@ -711,7 +756,7 @@ public class HTreeHashJoinUtility {
      *            The solution to be encoded.
      * @return The encoded solution.
      */
-    private static byte[] encodeSolution(final IKeyBuilder keyBuilder,
+    private byte[] encodeSolution(final IKeyBuilder keyBuilder,
             final LinkedHashSet<IVariable<?>> schema,
             final Map<IV<?, ?>, BigdataValue> cache, final IBindingSet bset) {
 
@@ -727,6 +772,7 @@ public class HTreeHashJoinUtility {
                 final IV<?, ?> iv = c.get();
                 IVUtility.encode(keyBuilder, iv);
                 if (iv.hasValue()) {
+                    ivCacheSchema.add(v);
                     cache.put(iv, iv.getValue());
                 }
             }
@@ -930,7 +976,7 @@ public class HTreeHashJoinUtility {
         try {
 
             if (log.isInfoEnabled()) {
-                final HTree htree = this.rightSolutions.get();
+                final HTree htree = this.getRightSolutions();
                 log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
                         + ",#leaves=" + htree.getLeafCount() + ",#entries="
                         + htree.getEntryCount());
@@ -943,7 +989,7 @@ public class HTreeHashJoinUtility {
              */
             final int chunkSize = 10000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
-            final HTree rightSolutions = this.rightSolutions.get();
+            final HTree rightSolutions = this.getRightSolutions();
             
             final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
                     leftItr, chunkSize, IBindingSet.class);
@@ -1164,7 +1210,7 @@ public class HTreeHashJoinUtility {
      */
     void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
 
-        final HTree joinSet = this.joinSet.get();
+        final HTree joinSet = this.getJoinSet();
 
         joinSet.insert(joinSetHashCode, val);
 
@@ -1215,12 +1261,12 @@ public class HTreeHashJoinUtility {
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
         if (log.isInfoEnabled()) {
-            final HTree htree = this.rightSolutions.get();
+            final HTree htree = this.getRightSolutions();
             log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
                     + ",#leaves=" + htree.getLeafCount() + ",#entries="
                     + htree.getEntryCount());
             
-            final HTree joinSet = this.joinSet.get();
+            final HTree joinSet = this.getJoinSet();
             log.info("joinSet: #nnodes=" + joinSet.getNodeCount() + ",#leaves="
                     + joinSet.getLeafCount() + ",#entries="
                     + joinSet.getEntryCount());
@@ -1228,7 +1274,7 @@ public class HTreeHashJoinUtility {
 
         // Visit all source solutions.
         @SuppressWarnings("unchecked")
-        final ITupleIterator<IBindingSet> sitr = rightSolutions.get()
+        final ITupleIterator<IBindingSet> sitr = getRightSolutions()
                 .rangeIterator();
         
         while(sitr.hasNext()) {
@@ -1242,7 +1288,7 @@ public class HTreeHashJoinUtility {
             
             // Probe the join set for this source solution.
             @SuppressWarnings("unchecked")
-            final ITupleIterator<IBindingSet> jitr = joinSet.get()
+            final ITupleIterator<IBindingSet> jitr = getJoinSet()
                     .lookupAll(hashCode);
 
             if (!jitr.hasNext()) {
@@ -1278,7 +1324,7 @@ public class HTreeHashJoinUtility {
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
         if (log.isInfoEnabled()) {
-            final HTree htree = rightSolutions.get();
+            final HTree htree = getRightSolutions();
             log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
                     + ",#leaves=" + htree.getLeafCount() + ",#entries="
                     + htree.getEntryCount());
@@ -1315,27 +1361,28 @@ public class HTreeHashJoinUtility {
      * {@link BigdataValue}s to those values.
      * 
      * @param bset
+     *            A solution having {@link IV}s which need to be reunited with
+     *            their cached {@link BigdataValue}s.
      * 
-     *            TODO This could be expensive. We could use an {@link HTree}
-     *            for this as easily, however we might have similar lookup
-     *            costs. The only way to real reduce those costs with a scalable
-     *            data structure is to vector the lookups, which means vectoring
-     *            inside of the routines to output the solutions or the optional
-     *            solutions. An estimate of the cost imposed by the resolution
-     *            of the cached IVs could be provided by using a JVM collection
-     *            for the ivCache.
+     *            TODO If we vectored this operation it would substantially
+     *            reduce its costs.
      */
     @SuppressWarnings("rawtypes")
     private void resolveCachedValues(final IBindingSet bset) {
 
         final BTree ivCache = this.ivCache.get();
 
+        if (ivCache.getEntryCount() == 0L) {
+            // Nothing materialized.
+            return;
+        }
+        
         final Id2TermTupleSerializer tupSer = (Id2TermTupleSerializer) ivCache
                 .getIndexMetadata().getTupleSerializer();
         
         final IKeyBuilder keyBuilder = tupSer.getKeyBuilder();
 
-        final Tuple t = new Tuple(ivCache, IRangeQuery.KEYS|IRangeQuery.VALS);
+        final Tuple t = new Tuple(ivCache, IRangeQuery.KEYS | IRangeQuery.VALS);
 
         final Iterator<Map.Entry<IVariable, IConstant>> itr = bset.iterator();
 
@@ -1343,6 +1390,13 @@ public class HTreeHashJoinUtility {
 
             final Map.Entry<IVariable, IConstant> e = itr.next();
 
+            final IVariable<?> v = e.getKey();
+            
+            if (!ivCacheSchema.contains(v)) {
+                // Nothing observed for that variable.
+                continue;
+            }
+            
             final IV iv = (IV) e.getValue().get();
 
             if (iv.hasValue()) {

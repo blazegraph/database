@@ -363,16 +363,14 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
          */
         private void doHashJoin() {
 
-            if (state.getRightSolutions().getEntryCount() == 0)
+            if (state.isEmpty())
                 return;
             
             final IAccessPath<?> accessPath = context.getAccessPath(relation,
                     pred);
 
-            if (log.isDebugEnabled()) {
-                log.debug("rightSolutions=" + state.getRightSolutions().getEntryCount());
-                log.debug("joinVars=" + Arrays.toString(state.joinVars));
-                log.debug("accessPath=" + accessPath);
+            if (log.isInfoEnabled()) {
+                log.info("accessPath=" + accessPath);
             }
 
             stats.accessPathCount.increment();

@@ -27,12 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -75,8 +72,8 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class HTreeSolutionSetHashJoinOp extends PipelineOp {
 
-    static private final transient Logger log = Logger
-            .getLogger(HTreeSolutionSetHashJoinOp.class);
+//    static private final transient Logger log = Logger
+//            .getLogger(HTreeSolutionSetHashJoinOp.class);
 
     /**
      * 
@@ -291,17 +288,12 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          */
         private void doHashJoin() {
 
-            if (state.getRightSolutions().getEntryCount() == 0)
+            if (state.isEmpty())
                 return;
             
-            if (log.isDebugEnabled()) {
-                log.debug("rightSolutions=" + state.getRightSolutions().getEntryCount());
-                log.debug("joinVars=" + Arrays.toString(state.joinVars));
-            }
-
             stats.accessPathCount.increment();
 
-            stats.accessPathRangeCount.add(state.getRightSolutions().getEntryCount());
+            stats.accessPathRangeCount.add(state.getRightSolutionCount());
 
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
