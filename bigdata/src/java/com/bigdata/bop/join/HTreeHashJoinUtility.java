@@ -81,7 +81,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
-import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -937,8 +936,12 @@ public class HTreeHashJoinUtility {
                         + htree.getEntryCount());
             }
             
-            // TODO parameter from operator annotations.
-            final int chunkSize = ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
+            /*
+             * This basically controls the vectoring of the hash join.
+             * 
+             * TODO parameter from operator annotations.
+             */
+            final int chunkSize = 10000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
             final HTree rightSolutions = this.rightSolutions.get();
             
@@ -956,6 +959,13 @@ public class HTreeHashJoinUtility {
 
                 while (fromIndex < n) {
 
+                    /*
+                     * Figure out how many left solutions in the current chunk
+                     * have the same hash code. We will use the same iterator
+                     * over the right solutions for that hash code against the
+                     * HTree.
+                     */
+                    
                     // The next hash code to be processed.
                     final int hashCode = a[fromIndex].hashCode;
 
@@ -983,6 +993,8 @@ public class HTreeHashJoinUtility {
                             : null;
                     // #of solutions which join for that collision bucket.
                     int njoined = 0;
+                    // #of solutions which did not join for that collision bucket.
+                    int nrejected = 0;
                     {
 
                         // visit all source solutions having the same hash code
@@ -1023,12 +1035,16 @@ public class HTreeHashJoinUtility {
 
                                 if (outSolution == null) {
 
+                                    nrejected++;
+                                    
                                     if (log.isTraceEnabled())
                                         log.trace("Does not join: hashCode="
                                                 + hashCode
-                                                + "sameHashCodeCount="
+                                                + ", sameHashCodeCount="
                                                 + sameHashCodeCount
                                                 + ", #left=" + bucketSize
+                                                + ", #joined=" + njoined
+                                                + ", #rejected=" + nrejected
                                                 + ", left=" + leftSolution
                                                 + ", right=" + rightSolution);
 
@@ -1046,7 +1062,8 @@ public class HTreeHashJoinUtility {
                                             + ", sameHashCodeCount="
                                             + sameHashCodeCount + ", #left="
                                             + bucketSize + ", #joined="
-                                            + njoined + ", solution="
+                                            + njoined + ", #rejected="
+                                            + nrejected + ", solution="
                                             + outSolution);
 
                                 // Accept this binding set.
