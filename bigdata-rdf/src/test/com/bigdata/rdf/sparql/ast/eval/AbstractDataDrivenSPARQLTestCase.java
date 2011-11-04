@@ -265,7 +265,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
          *             if the resources can not be found, if the query does not
          *             produce the expected results, etc.
          */
-        public void runTest() throws Exception {
+        public ASTContainer runTest() throws Exception {
 
             final QueryRoot queryRoot = astContainer.getOriginalAST();
             
@@ -336,6 +336,8 @@ public class AbstractDataDrivenSPARQLTestCase extends
                         + queryRoot.getQueryType());
             }
 
+            return astContainer;
+            
         }
 
         public TupleQueryResult readExpectedTupleQueryResult() throws Exception {
