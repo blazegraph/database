@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -161,7 +162,16 @@ public class HTreeHashJoinUtility {
 //            h = 31 * h + ch;
 //            
 //            h ^= c.hashCode();
-            h = 31 * h + c.hashCode();
+            
+            // Works Ok.
+//            h = 31 * h + c.hashCode();
+            
+            // Martyn's version.  Also works Ok.
+            final int hc = c.hashCode();
+            h += ~(hc<<15);
+            h ^=  (hc>>10);
+            h +=  (hc<<3);
+            h ^=  (hc>>6);
 
         }
         
@@ -832,6 +842,37 @@ public class HTreeHashJoinUtility {
     }
     
     /**
+     * Glue class for hash code and encoded binding set used when we need to
+     * vector the join set for an optional join.
+     */
+    private static class BS2 implements Comparable<BS2> {
+
+        final private int hashCode;
+
+        final private byte[] value;
+
+        BS2(final int hashCode, final byte[] value) {
+            this.hashCode = hashCode;
+            this.value = value;
+        }
+
+        @Override
+        public int compareTo(final BS2 o) {
+            if (this.hashCode < o.hashCode)
+                return -1;
+            if (this.hashCode > o.hashCode)
+                return 1;
+            return 0;
+        }
+        
+        public String toString() {
+            return getClass().getName() + "{hashCode=" + hashCode + ",value="
+                    + BytesUtil.toString(value) + "}";
+        }
+        
+    }
+    
+    /**
      * Do a hash join between a stream of source solutions (left) and a hash
      * index (right). For each left solution, the hash index (right) is probed
      * for possible matches (solutions whose as-bound values for the join
@@ -935,8 +976,13 @@ public class HTreeHashJoinUtility {
 
                     /*
                      * Note: all source solutions in [fromIndex:toIndex) have
-                     * the same hash code.
+                     * the same hash code. They will be vectored together.
                      */
+                    // All solutions which join for that collision bucket
+                    final LinkedList<BS2> joined = optional ? new LinkedList<BS2>()
+                            : null;
+                    // #of solutions which join for that collision bucket.
+                    int njoined = 0;
                     {
 
                         // visit all source solutions having the same hash code
@@ -981,21 +1027,26 @@ public class HTreeHashJoinUtility {
                                         log.trace("Does not join: hashCode="
                                                 + hashCode
                                                 + "sameHashCodeCount="
-                                                + sameHashCodeCount + ", left="
-                                                + leftSolution + ", right="
-                                                + rightSolution);
+                                                + sameHashCodeCount
+                                                + ", #left=" + bucketSize
+                                                + ", left=" + leftSolution
+                                                + ", right=" + rightSolution);
 
                                     // Join failed.
                                     continue;
 
                                 }
 
+                                njoined++;
+
                                 resolveCachedValues(outSolution);
 
                                 if (log.isDebugEnabled())
-                                    log.debug("Output solution: hashCode="
-                                            + hashCode + ", sameHashCodeCount="
-                                            + sameHashCodeCount + ", solution="
+                                    log.debug("JOIN: hashCode=" + hashCode
+                                            + ", sameHashCodeCount="
+                                            + sameHashCodeCount + ", #left="
+                                            + bucketSize + ", #joined="
+                                            + njoined + ", solution="
                                             + outSolution);
 
                                 // Accept this binding set.
@@ -1003,15 +1054,26 @@ public class HTreeHashJoinUtility {
 
                                 if (optional) {
 
-                                    // TODO Vector these inserts.
-                                    saveInJoinSet(rightSolution.hashCode(),
-                                            t.getValue());
-
+                                    joined.add(new BS2(
+                                            rightSolution.hashCode(), t
+                                                    .getValue()));
                                 }
 
-                            }
+                            } // next left in the same bucket.
 
                         } // next rightSolution with the same hash code.
+
+                        if (optional) {
+                            /*
+                             * Vector the inserts into the [joinSet].
+                             */
+                            final BS2[] a2 = joined.toArray(new BS2[njoined]);
+                            Arrays.sort(a2, 0, njoined);
+                            for (int i = 0; i < njoined; i++) {
+                                final BS2 tmp = a2[i];
+                                saveInJoinSet(tmp.hashCode, tmp.value);
+                            }
+                        }
 
                     } // end block of leftSolutions having the same hash code.
 
