@@ -37,6 +37,7 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.TransientResourceMetadata;
+import com.bigdata.rwstore.RWStore;
 
 /**
  * An {@link IRawStore} backed by an {@link IMemoryManager}.
@@ -274,9 +275,22 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 
 	}
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to return the #of bytes in the allocation slots rather than
+     * the user bytes. This is because the {@link MemoryManager}, like the
+     * {@link RWStore}, does not know the #of bytes of user data in each
+     * allocation slot. Therefore it is not able to keep accurrate track of the
+     * user bytes as allocation slots are cycled.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/212 (Records must
+     *      store the as-written length for HA failover reads to be successful.)
+     */
+	@Override
 	public long size() {
 
-		return m_store.getUserBytes();
+		return m_store.getSlotBytes();
 
 	}
 
