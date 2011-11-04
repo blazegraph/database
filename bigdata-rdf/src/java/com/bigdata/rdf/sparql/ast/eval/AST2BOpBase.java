@@ -43,7 +43,6 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -89,6 +88,12 @@ public class AST2BOpBase {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
      */
     protected static final boolean forceRemoteAPs = true;
+
+    /**
+     * When <code>true</code>, may use the version of DISTINCT which operates on
+     * the native heap.
+     */
+    protected static boolean nativeDefaultGraph = true;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
