@@ -240,7 +240,7 @@ public class Striterator implements IStriterator, ITailOp, ICloseableIterator {
 	 * this "super" method.
 	 */
 	public void close() {
-		if (realSource instanceof ICloseableIterator)
+		if (isOpen && realSource instanceof ICloseableIterator)
 			((ICloseableIterator) realSource).close();
 		
 		isOpen = false;
