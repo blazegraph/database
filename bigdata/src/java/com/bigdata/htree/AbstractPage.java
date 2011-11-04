@@ -493,7 +493,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 			boolean recursive, boolean materialize);
 
 	/** Pretty print the tree from this level on down. */
-	abstract void PP(StringBuilder sb);
+	abstract void PP(StringBuilder sb, boolean showBinary);
 
 	/**
 	 * Return a very short id used by {@link #PP()}. The prefix "B" or "D"

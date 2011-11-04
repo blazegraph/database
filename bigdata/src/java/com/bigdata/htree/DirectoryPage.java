@@ -11,6 +11,7 @@ import java.util.concurrent.FutureTask;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
@@ -1630,7 +1631,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	}
 
 	@Override
-	public void PP(final StringBuilder sb) {
+	public void PP(final StringBuilder sb, final boolean showBinary) {
 
 		sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()));
 
@@ -1672,7 +1673,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 			final AbstractPage child = itr.next();
 
-			child.PP(sb);
+			child.PP(sb, showBinary);
 
 		}
 
@@ -1796,9 +1797,13 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
                 // Stash reference to the new child.
                 // childRefs[i] = btree.newRef(newChild);
-                childRefs[i] = (Reference) newChild.self;
-
-                newChild.parent = (Reference) this.self;
+                if (newChild != null) {
+	                childRefs[i] = (Reference) newChild.self;
+	
+	                newChild.parent = (Reference) this.self;
+                } else {
+                	childRefs[i] = null;
+                }
 
                 npointers++;
             }
@@ -2582,9 +2587,33 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
  	   if (!isOverflowDirectory())
  	    	throw new UnsupportedOperationException("Only valid if page is an overflow directory");
  	   
-		final BucketPage last = (BucketPage) lastChild();
-		
-		return last.removeFirst(key);
+ 	   /**
+ 	    * We should check the overflowKey to see if we need to ask the last
+ 	    * BucketPage to remove the key.
+ 	    * 
+ 	    * If so, then we need to ensure the BucketPage is not empty after removal
+ 	    * and, if so, to remove the reference and mark as deleted.
+ 	    */
+ 	   if (BytesUtil.compareBytes(key, getOverflowKey()) == 0) {
+ 		   
+			final AbstractPage last = lastChild();
+			
+			if (last.isLeaf()) {
+				final BucketPage lastbp = (BucketPage) last.copyOnWrite();
+				final byte[] ret = lastbp.removeFirst(key);
+				
+				if (lastbp.getValues().isEmpty()) {
+					lastbp.getParentDirectory().replaceChildRef(lastbp.self, null);
+					lastbp.delete();
+				}
+				
+				return ret;
+			} else {
+				return last.removeFirst(key);
+			}
+ 	   } else {
+ 		   return null;
+ 	   }
     }
 
 }
