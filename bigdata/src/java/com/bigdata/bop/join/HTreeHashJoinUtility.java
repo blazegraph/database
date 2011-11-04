@@ -163,14 +163,14 @@ public class HTreeHashJoinUtility {
 //            h ^= c.hashCode();
             
             // Works Ok.
-//            h = 31 * h + c.hashCode();
+            h = 31 * h + c.hashCode();
             
-            // Martyn's version.  Also works Ok.
-            final int hc = c.hashCode();
-            h += ~(hc<<15);
-            h ^=  (hc>>10);
-            h +=  (hc<<3);
-            h ^=  (hc>>6);
+//            // Martyn's version.  Also works Ok.
+//            final int hc = c.hashCode();
+//            h += ~(hc<<15);
+//            h ^=  (hc>>10);
+//            h +=  (hc<<3);
+//            h ^=  (hc>>6);
 
         }
         
