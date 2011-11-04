@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
@@ -49,6 +50,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.cost.ScanCostReport;
@@ -85,7 +87,7 @@ import com.bigdata.relation.rule.EmptyAccessPathExpander;
  */
 public class AST2BOpJoins extends AST2BOpFilters {
 
-//    private static final Logger log = Logger.getLogger(AST2BOpFilters.class);
+    private static final Logger log = Logger.getLogger(AST2BOpFilters.class);
 
     /**
      * 
@@ -548,29 +550,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
         final boolean scaleOut = queryEngine.isScaleOut();
 
         if (dataset != null && summary == null) {
+
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
+            
             // Filter for distinct SPOs.
-            if (true) { // summary.nknown < 10 * Bytes.kilobyte32) {
-                /*
-                 * JVM Based DISTINCT filter.
-                 */
-                pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
-            } else {
-                /*
-                 * FIXME The HTree variant of the distinct filter is more
-                 * scalable but it does not have access to the memory manager
-                 * for the IRunningQuery and hence will allocate its own memory
-                 * manager, which means that it will use at a minimum of 1M of
-                 * native memory. We need to look at the integration of the
-                 * filters with the IRunningQuery to fix this.
-                 * 
-                 * TODO The HTree benefits very much from vectoring. However, in
-                 * order to vector the filter we need to be operating on IV
-                 * chunks. Maybe we can resolve this issue and the issue of
-                 * access to the memory manager at the same time?
-                 */
-                pred = pred.addAccessPathFilter(HTreeDistinctFilter.newInstance());
-            }
+            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
@@ -757,7 +741,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
             // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             if (scaleOut) {
                 /*
@@ -810,7 +794,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
             // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             if (scaleOut) {
                 /*
@@ -836,6 +820,55 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
     }
 
+    /**
+     * Return the distinct filter used for a default graph join.
+     * 
+     * @param summary
+     * @return
+     * 
+     *         TODO The HTree variant of the distinct filter is more scalable
+     *         but it does not have access to the memory manager for the
+     *         IRunningQuery and hence will allocate its own memory manager,
+     *         which means that it will use at a minimum of 1M of native memory.
+     *         We need to look at the integration of the filters with the
+     *         IRunningQuery to fix this.
+     * 
+     *         TODO The HTree benefits very much from vectoring. However, in
+     *         order to vector the filter we need to be operating on IV chunks.
+     *         Maybe we can resolve this issue and the issue of access to the
+     *         memory manager at the same time?
+     */
+    static private BOpFilterBase newDistinctFilter(final Predicate<?> pred,
+            final DataSetSummary summary) {
+
+        boolean nativeDistinct = AST2BOpBase.nativeDefaultGraph;
+        if (nativeDistinct) {
+            if (summary == null) {
+                final Long rangeCount = (Long) pred
+                        .getProperty(Annotations.ESTIMATED_CARDINALITY);
+                if(rangeCount!=null) {
+                    if (rangeCount.longValue() < nativeDefaultGraphThreshold) {
+                        nativeDistinct = false;
+                    }
+                } else {
+                    log.warn("No rangeCount? : "+pred);
+                }
+            } else {
+                if (summary.nknown < nativeDefaultGraphThreshold) {
+                    nativeDistinct = false;
+                }
+            }
+        }
+        if (nativeDistinct) {
+            return HTreeDistinctFilter.newInstance();
+        } else {
+            /*
+             * JVM Based DISTINCT filter.
+             */
+            return DistinctFilter.newInstance();
+        }
+    }
+    
     /**
      * Create and return an appropriate type of join. The default is the
      * pipeline join. A hash join can be selected using the appropriate query

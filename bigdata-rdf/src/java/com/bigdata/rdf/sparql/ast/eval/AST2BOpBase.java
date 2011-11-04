@@ -40,6 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
@@ -95,6 +96,12 @@ public class AST2BOpBase {
      */
     protected static boolean nativeDefaultGraph = true;
 
+    /**
+     * The threshold at which we will use a native hash set rather than a
+     * default hash set for a default graph access path.
+     */
+    protected static final long nativeDefaultGraphThreshold = 100 * Bytes.kilobyte32;
+    
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
      * filter to subquery for each graph in the data set.
