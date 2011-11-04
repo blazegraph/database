@@ -52,6 +52,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
@@ -158,8 +159,10 @@ public class HTreeHashJoinUtility {
 //            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
 //
 //            h = 31 * h + ch;
-            h ^= c.hashCode();
-            
+//            
+//            h ^= c.hashCode();
+            h = 31 * h + c.hashCode();
+
         }
         
         if (log.isTraceEnabled())
@@ -1077,73 +1080,39 @@ public class HTreeHashJoinUtility {
     /**
      * Add to 2nd hash tree of all solutions which join.
      * <p>
-     * Note: the hash key is based on the entire solution for this htree.
-     * 
-     * TODO This code does allows duplicate solutions into the joinSet. There is
-     * code below which does not permit this. We might need to refactor that
-     * code into a utility method (together with how we obtain the appropriate
-     * hash code) and use it to filter out duplicates for the joinSet and/or the
-     * rightSolutions.
-     * 
-     * FIXME Use the same encoding here that we do for IVs in
-     * {@link #rightSolutions} compute the hash code based on ALL IVs, not just
-     * those in the {@link #joinVars}. (It would help if
-     * {@link #hashCode(IVariable[], IBindingSet)} accepted a <code>null</code>
-     * for the join variables for this use case (no, just do an alternative
-     * version which is simpler).
+     * Note: the hash key is based on the entire solution (not just the join
+     * variables). The values are the full encoded {@link IBindingSet}.
      */
-    void saveInJoinSet(final int hashCode, final byte[] val) {
+    void saveInJoinSet(final int joinSetHashCode, final byte[] val) {
 
-        joinSet.get().insert(hashCode, val);
+        final HTree joinSet = this.joinSet.get();
 
-//            final int joinSetHashCode = rightSolution.hashCode();
-//            
-//            // visit all joinSet solutions having the same hash code
-//            @SuppressWarnings("unchecked")
-//            final ITupleIterator<IBindingSet> xitr = joinSet
-//                    .lookupAll(joinSetHashCode);
-    //
-//            boolean found = false;
-//            while (!found && xitr.hasNext() ) {
-    //
-//                final ITuple<IBindingSet> xt = xitr.next();
-    //
-//                /*
-//                 * Note: The map entries must be the full source
-//                 * binding set, not just the join variables, even
-//                 * though the key and equality in the key is defined
-//                 * in terms of just the join variables.
-//                 * 
-//                 * Note: Solutions which have the same hash code but
-//                 * whose bindings are inconsistent will be rejected
-//                 * by bind() below.
-//                 */
-//                final IBindingSet aSolution = xt.getObject();
-//                
-//                if (rightSolution.equals(aSolution)) {
-    //
-//                    if (log.isDebugEnabled())
-//                        log.debug("Solution already in joinSet: "
-//                                + rightSolution);
-//                    
-//                    found = true;
-//                    
-//                    break;
-//                    
-//                }
-    //
-//            }
-    //
-//            if (!found) {
-//             
-//                joinSet.insert(rightSolution);
-//                
-//                if (log.isDebugEnabled())
-//                    log.debug("Solution added to joinSet: "
-//                            + rightSolution);
-//                
-//            }
-       }
+        joinSet.insert(joinSetHashCode, val);
+
+        // visit all joinSet solutions having the same hash code
+        @SuppressWarnings("unchecked")
+        final ITupleIterator<IBindingSet> xitr = joinSet
+                .lookupAll(joinSetHashCode);
+
+        while (xitr.hasNext()) {
+
+            final ITuple<IBindingSet> xt = xitr.next();
+
+            final ByteArrayBuffer b = xt.getValueBuffer();
+
+            if (0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+                    val.length/* alen */, val/* a */, 0/* boff */,
+                    b.limit()/* blen */, b.array())) {
+
+                return;
+
+            }
+
+        }
+
+        joinSet.insert(joinSetHashCode, val);
+
+    }
     
     /**
      * Identify and output the optional solutions. Optionals are identified
