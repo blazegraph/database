@@ -614,8 +614,8 @@ public class HTreeHashJoinUtility {
                         
                         // Drop solution;
 
-                        if (log.isDebugEnabled())
-                            log.debug(ex);
+                        if (log.isTraceEnabled())
+                            log.trace(ex);
 
                         continue;
 
@@ -929,9 +929,9 @@ public class HTreeHashJoinUtility {
 
         try {
 
-            if (log.isDebugEnabled()) {
+            if (log.isInfoEnabled()) {
                 final HTree htree = this.rightSolutions.get();
-                log.debug("rightSolutions: #nnodes=" + htree.getNodeCount()
+                log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
                         + ",#leaves=" + htree.getLeafCount() + ",#entries="
                         + htree.getEntryCount());
             }
@@ -1135,8 +1135,8 @@ public class HTreeHashJoinUtility {
                 a[n++] = new BS(hashCode, leftSolutions[i]);
             } catch (JoinVariableNotBoundException ex) {
                 // Drop solution
-                if (log.isDebugEnabled())
-                    log.debug(ex);
+                if (log.isTraceEnabled())
+                    log.trace(ex);
                 continue;
             }
         }
