@@ -494,11 +494,17 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	    
 	}
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * This implementation returns the amount of utilized storage.
-	 */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to return the #of bytes in the file rather than the user
+     * bytes. This is because the {@link RWStore} does not know the #of bytes of
+     * user data in each allocation slot. Therefore it is not able to keep
+     * accurrate track of the user bytes as allocation slots are cycled.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/212 (Records must
+     *      store the as-written length for HA failover reads to be successful.)
+     */
 	public long size() {
 
 	    return m_store.getFileStorage();
