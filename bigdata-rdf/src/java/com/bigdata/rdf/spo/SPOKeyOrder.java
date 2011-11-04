@@ -236,6 +236,26 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 //        }
         
     }
+
+    /**
+     * Covert a name of an {@link SPOKeyOrder} into an {@link SPOKeyOrder}.
+     * 
+     * @param name
+     *            The name.
+     * 
+     * @return The {@link SPOKeyOrder}.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is not a known {@link SPOKeyOrder}.
+     */
+    public static SPOKeyOrder fromString(final String name) {
+        for (int i = 0; i < names.length; i++) {
+            if (names[i].equals(name)) {
+                return valueOf(i);
+            }
+        }
+        throw new IllegalArgumentException("name=" + name);
+    }
     
     /**
      * The base name for the index.

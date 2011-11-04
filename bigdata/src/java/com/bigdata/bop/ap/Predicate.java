@@ -42,6 +42,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IAccessPathExpander;
@@ -375,7 +376,15 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     @SuppressWarnings("unchecked")
     public IKeyOrder<E> getKeyOrder() {
 
-        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
+        final Object o = getProperty(Annotations.KEY_ORDER);
+
+        if (o == null)
+            return null;
+        
+        if (o instanceof IKeyOrder<?>)
+            return (IKeyOrder<E>) o;
+
+        return (IKeyOrder<E>) SPOKeyOrder.fromString((String) o);
 
     }
 
