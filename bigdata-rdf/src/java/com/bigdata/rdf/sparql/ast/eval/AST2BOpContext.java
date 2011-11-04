@@ -96,7 +96,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * TODO Query hint to control this on an overall and per join basis.
      */
-    boolean nativeHashJoins = true;
+    boolean nativeHashJoins = false;
     
 //    /**
 //     * When <code>true</code>, use a hash join pattern for sub-group evaluation.

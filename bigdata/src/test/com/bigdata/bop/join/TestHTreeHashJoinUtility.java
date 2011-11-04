@@ -48,12 +48,15 @@ import com.bigdata.striterator.ICloseableIterator;
 /**
  * Test suite for the {@link HTreeHashJoinUtility}.
  * 
- * TODO Unit test to verify vectoring of left solutions having the same hash
- * code (and look at whether we can vector optional solutions
- * as well).
+ * TODO Write a unit test which verifies that the ivCache is used and that the
+ * cached {@link BigdataValue}s are correctly restored when the rightSolutions
+ * had cached values and the leftSolutions did not have a value cached for the
+ * same IVs. For example, this could be done with a cached value on an IV which
+ * is not a join variable and which is only present in the rightSolutions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestHTreeHashJoinUtility.java 5527 2011-11-04 17:41:14Z
+ *          thompsonbry $
  */
 public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
@@ -187,18 +190,4 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
     }
 
-    /**
-     * FIXME Write a unit test which verifies that the ivCache is used and that
-     * the cached {@link BigdataValue}s are correctly restored when the
-     * rightSolutions had cached values and the leftSolutions did not have a
-     * value cached for the same IVs. For example, this could be done with a
-     * cached value on an IV which is not a join variable and which is only
-     * present in the rightSolutions. 
-     */
-    public void test_cache() {
-        
-        fail("write test");
-        
-    }
-    
 }

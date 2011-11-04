@@ -655,6 +655,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(HTreeNamedSubqueryOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF,
@@ -986,6 +987,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                     new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -1016,7 +1018,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// FIXME
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
@@ -1886,6 +1888,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//

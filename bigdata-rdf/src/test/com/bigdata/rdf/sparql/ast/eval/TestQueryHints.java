@@ -64,4 +64,5 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper("query-hints-1").runTest();
         
     }
+    
 }
