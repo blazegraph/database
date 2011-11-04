@@ -83,7 +83,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * TODO The same choice exists for default graph access paths.
      */
-    boolean nativeDistinct = true;
+    boolean nativeDistinct = false;
 
     /**
      * When <code>true</code>, use hash joins based on the {@link HTree}.
