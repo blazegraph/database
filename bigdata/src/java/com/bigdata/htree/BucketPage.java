@@ -439,30 +439,15 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		if (key == null)
 			throw new IllegalArgumentException();
 
-		// #of slots on the page.
-		final int slotsOnPage = slotsOnPage();
-
 		/*
 		 * Locate the first unassigned tuple in the buddy bucket.
 		 * 
-		 * TODO Faster comparison with a coded key in the raba by either (a)
-		 * asking the raba to do the equals() test; or (b) copying the key from
-		 * the raba into a buffer which we reuse for each test. This is another
-		 * way in which the hash table keys raba differs from the btree keys
-		 * raba.
 		 */
 		final IRaba keys = getKeys();
-
-		final int nkeys = keys.size();
-		for (int i = 0; i < nkeys; i++) {
-			if (!keys.isNull(i)) {
-				if (BytesUtil.bytesEqual(key, keys.get(i))) {
-					return i;
-				}
-			}
-		}
 		
-		return -1;
+		final int si = keys.search(key);
+		
+		return si < 0 ? -1 : si;
 	}
 
 	/**
@@ -550,6 +535,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			int insIndex = keys.search(key);
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
+			} else {
+				System.err.println("Insert collision");
 			}
 			
 			((MutableBucketData) data).insert(insIndex, key, ival, ival != val);
@@ -885,7 +872,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	}
 
 	@Override
-	public void PP(final StringBuilder sb) {
+	public void PP(final StringBuilder sb, final boolean showBinary) {
 
 		sb.append(PPID() + " [" + globalDepth + "] " + indent(getLevel()));
 
@@ -910,8 +897,10 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 					sb.append(",");
 
 				final int slot = i * slotsPerBuddy + j;
-
-				sb.append(PPVAL(slot));
+				if (slot > 0 && slot % 16 == 0)
+					sb.append("\n----------" + indent(getLevel()));
+				
+				sb.append(PPVAL(slot, showBinary));
 
 			}
 
@@ -932,7 +921,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * @return The pretty print representation of the value associated with the
 	 *         tuple at that slot.
 	 */
-	private String PPVAL(final int index) {
+	private String PPVAL(final int index, final boolean showBinary) {
 
 		if (index >= getKeys().size())
 			return "-";
@@ -943,8 +932,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		
 		final byte[] key = getKeys().get(index);
 
-		final String keyStr = BytesUtil.toString(key) + "("
-				+ BytesUtil.toBitString(key) + ")";
+		final String keyStr = showBinary ? BytesUtil.toString(key) + "("
+				+ BytesUtil.toBitString(key) + ")" : BytesUtil.toString(key);
 
 		final String valStr;
 
