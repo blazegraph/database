@@ -16,12 +16,15 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
 
@@ -155,19 +158,10 @@ public class HTreeDistinctFilter extends BOpFilterBase {
 
             metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
 
-            /*
-             * TODO This sets up a tuple serializer for a presumed case of 4
-             * byte keys (the buffer will be resized if necessary) and
-             * explicitly chooses the SimpleRabaCoder as a workaround since the
-             * keys IRaba for the HTree does not report true for isKeys(). Once
-             * we work through an optimized bucket page design we can revisit
-             * this as the FrontCodedRabaCoder should be a good choice, but it
-             * currently requires isKeys() to return true.
-             */
             final ITupleSerializer<?, ?> tupleSer = new DefaultTupleSerializer(
                     new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                    new SimpleRabaCoder(),// keys : TODO Optimize for int32!
-                    new SimpleRabaCoder() // vals
+                    DefaultFrontCodedRabaCoder.INSTANCE,// keys
+                    EmptyRabaValueCoder.INSTANCE // vals
             );
 
             metadata.setTupleSerializer(tupleSer);
@@ -187,39 +181,29 @@ public class HTreeDistinctFilter extends BOpFilterBase {
 
         }
 
-        @SuppressWarnings("rawtypes")
         @Override
         public boolean isValid(final Object obj) {
 
-            final IV iv = (IV) obj;
+            final SPO spo = (SPO) obj;
 
-            final byte[] key = keyBuilder.reset().append(iv.hashCode())
-                    .getKey();
-
-            final byte[] val = iv.encode(keyBuilder.reset()).getKey();
+            keyBuilder.reset();
+            IVUtility.encode(keyBuilder, spo.s());
+            IVUtility.encode(keyBuilder, spo.p());
+            IVUtility.encode(keyBuilder, spo.o());
+            final byte[] key = keyBuilder.getKey();
 
             final ITupleIterator<?> itr = members.lookupAll(key);
 
-            while (itr.hasNext()) {
-            
-                final ITuple t = itr.next();
-                
-                final IV actual = IVUtility.decodeFromOffset(t.getValueBuffer()
-                        .array(), 0);
-                
-                if (iv.equals(actual)) {
-                    
-                    // Already in the map.
-                    return false;
-                    
-                }
-                
+            if (itr.hasNext()) {
+
+                // Already in the map.
+                return false;
+
             }
 
             // Add to the map.
-            
-            members.insert(key, val);
-            
+            members.insert(key, null/* val */);
+
             return true;
             
         }
