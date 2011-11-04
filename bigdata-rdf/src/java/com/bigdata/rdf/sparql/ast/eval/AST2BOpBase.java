@@ -43,6 +43,7 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -201,7 +202,7 @@ public class AST2BOpBase {
                 + ".hashJoin";
 
         boolean DEFAULT_HASH_JOIN = false;
-        
+
     }
 
     /**

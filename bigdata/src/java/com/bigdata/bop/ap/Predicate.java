@@ -372,13 +372,13 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
-//    @SuppressWarnings("unchecked")
-//    public IKeyOrder<E> getKeyOrder() {
-//
-//        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
-//
-//    }
-//
+    @SuppressWarnings("unchecked")
+    public IKeyOrder<E> getKeyOrder() {
+
+        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
+
+    }
+
 //    public Predicate<E> setKeyOrder(final IKeyOrder<E> keyOrder) {
 //
 //        final Predicate<E> tmp = this.clone();

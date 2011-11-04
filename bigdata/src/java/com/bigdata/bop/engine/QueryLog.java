@@ -207,6 +207,7 @@ public class QueryLog {
         sb.append("\tpredSummary"); // short form of the pred.
         // metadata considered by the static optimizer.
         sb.append("\tstaticBestKeyOrder"); // original key order assigned by static optimizer.
+        sb.append("\toverrideKeyOrder"); // key order iff explicitly overridden.
         sb.append("\tnvars"); // #of variables in the predicate for a join.
         sb.append("\tfastRangeCount"); // fast range count used by the static optimizer.
         // dynamics (aggregated for totals as well).
@@ -362,15 +363,23 @@ public class QueryLog {
 			
 			if (pred != null) {
 			
+			    // Static optimizer key order (if run).
 				final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
 						.getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
+				
+				// Explicit override of the key order (if given).
+				final IKeyOrder<?> overrideKeyOrder = pred.getKeyOrder();
 				
 				final Long rangeCount = (Long) pred
 						.getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
 				
-				sb.append('\t'); // keyorder
-				if (keyOrder != null)
-					sb.append(keyOrder);
+                sb.append('\t'); // keyorder
+                if (keyOrder != null)
+                    sb.append(keyOrder);
+                
+				sb.append('\t'); // keyorder override.
+				if (overrideKeyOrder != null)
+					sb.append(overrideKeyOrder);
 				
 				sb.append('\t'); // nvars
 				if (keyOrder != null)
@@ -381,7 +390,8 @@ public class QueryLog {
 					sb.append(rangeCount);
 				
 			} else {
-				sb.append('\t'); // keyorder
+				sb.append('\t'); // keyorder (static optimizer)
+				sb.append('\t'); // keyorder (override)
 				sb.append('\t'); // nvars
 				sb.append('\t'); // rangeCount
 			}
@@ -531,6 +541,7 @@ public class QueryLog {
         // metadata considered by the static optimizer.
         w.write("<th>staticBestKeyOrder</th>"); // original key order assigned
                                                 // by static optimizer.
+        w.write("<th>overriddenKeyOrder</th>"); // explicit key order override.
         w.write("<th>nvars</th>"); // #of variables in the predicate for a join.
         w.write("<th>fastRangeCount</th>"); // fast range count used by the
                                             // static optimizer.
@@ -784,9 +795,13 @@ public class QueryLog {
 
             if (pred != null) {
             
+                // Static optimizer key order (if run).
                 final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
                         .getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
                 
+                // Explicit override of the key order (if given).
+                final IKeyOrder<?> overrideKeyOrder = pred.getKeyOrder();
+
                 final Long rangeCount = (Long) pred
                         .getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
 
@@ -794,6 +809,12 @@ public class QueryLog {
                 w.write(TD);
                 if (keyOrder != null)
                     w.write(keyOrder.toString());
+                w.write(TDx);
+
+                // keyorder
+                w.write(TD);
+                if (overrideKeyOrder != null)
+                    w.write(overrideKeyOrder.toString());
                 w.write(TDx);
 
                 // nvars
@@ -809,7 +830,10 @@ public class QueryLog {
                 w.write(TDx);
 
             } else {
-                // keyorder
+                // keyorder (static)
+                w.write(TD);
+                w.write(TDx);
+                // keyorder (override)
                 w.write(TD);
                 w.write(TDx);
                 // nvars
