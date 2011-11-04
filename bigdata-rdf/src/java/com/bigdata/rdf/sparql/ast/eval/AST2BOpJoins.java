@@ -217,9 +217,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
             } else {
 
                 /*
-                 * This is basically the old way of handling quads query
-                 * using expanders which were attached by toPredicate() in
+                 * This is basically the old way of handling quads query using
+                 * expanders which were attached by toPredicate() in
                  * BigdataEvaluationStrategyImpl.
+                 * 
+                 * FIXME Remove this code path and the expander patterns from
+                 * the code base.
                  */
 
                 final boolean scaleOut = queryEngine.isScaleOut();
@@ -232,7 +235,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
                 anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-                left = newJoin(left, anns, queryHints);
+                left = newJoin(left, anns, queryHints,
+                        false/* defaultGraphFilter */, null/* summary */);
 
             }
 
@@ -288,9 +292,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//        return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                .toArray(new NV[anns.size()])), queryHints);
-        return newJoin(left, anns, queryHints);
+        return newJoin(left, anns, queryHints, false/* defaultGraphFilter */,
+                null/* summary */);
 
     }
 
@@ -341,24 +344,21 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, null/* summary */);
 
         }
 
         if (pred.get(3/* c */).isConstant()) {
 
             /*
-             * C is already bound.  The unmodified access path is used.
+             * C is already bound. The unmodified access path is used.
              */
 
-            anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+            anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
-
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, null/* summary */);
         }
 
         /*
@@ -385,9 +385,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         }
 
@@ -412,9 +411,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         }
 
@@ -467,9 +465,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         } else {
 
@@ -516,9 +513,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(dataSetJoin),
-//                    anns.toArray(new NV[anns.size()])), queryHints);
-            return newJoin(dataSetJoin, anns, queryHints);
+            return newJoin(dataSetJoin, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         }
 
@@ -553,14 +549,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             
-            // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
-
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints, true/* defaultGraphFilter */,
+                    summary);
         }
 
         if (summary != null && summary.nknown == 0) {
@@ -577,9 +569,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         }
 
@@ -607,9 +598,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])), queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    false/* defaultGraphFilter */, summary);
 
         }
 
@@ -740,8 +730,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
             // Filter to strip off the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
-            // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
+//            // Filter for distinct SPOs.
+//            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             if (scaleOut) {
                 /*
@@ -759,9 +749,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])),queryHints);
-            return newJoin(left, anns, queryHints);
+            return newJoin(left, anns, queryHints,
+                    true/* defaultGraphFilter */, summary);
 
         } else {
 
@@ -793,8 +782,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
             // Filter to strip off the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
-            // Filter for distinct SPOs.
-            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
+//            // Filter for distinct SPOs.
+//            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             if (scaleOut) {
                 /*
@@ -811,19 +800,30 @@ public class AST2BOpJoins extends AST2BOpFilters {
             }
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
-
-//            return applyQueryHints(new PipelineJoin(leftOrEmpty(left), anns
-//                    .toArray(new NV[anns.size()])),queryHints);            
-            return newJoin(left, anns, queryHints);
+           
+            return newJoin(left, anns, queryHints,
+                    true/* defaultGraphFilter */, summary);
             
         }
 
     }
 
     /**
-     * Return the distinct filter used for a default graph join.
+     * Return the distinct filter used for a default graph join (distinct SPOs).
+     * <p>
+     * Note: The native memory based DISTINCT filter MUST NOT be used for
+     * pipelined joins. Pipelined joins run "as-bound" and the per-as-bound
+     * cardinality is typically very small (1s to 1000s). However, a hash join
+     * can hit a very large cardinality for the default graph distinct filter
+     * since it sees all SPOs at once.
      * 
+     * @param pred
+     *            The predicate.
      * @param summary
+     *            The {@link DataSetSummary} (when available).
+     * @param hashJoin
+     *            <code>true</code> iff a hash join was chosen for this
+     *            predicate.
      * @return
      * 
      *         TODO The HTree variant of the distinct filter is more scalable
@@ -839,32 +839,49 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *         memory manager at the same time?
      */
     static private BOpFilterBase newDistinctFilter(final Predicate<?> pred,
-            final DataSetSummary summary) {
-
-        boolean nativeDistinct = AST2BOpBase.nativeDefaultGraph;
+            final DataSetSummary summary, final boolean hashJoin) {
+        
+        // Never use native distinct for as-bound "pipeline" joins.
+        boolean nativeDistinct = hashJoin && AST2BOpBase.nativeDefaultGraph;
+        
         if (nativeDistinct) {
-            if (summary == null) {
-                final Long rangeCount = (Long) pred
-                        .getProperty(Annotations.ESTIMATED_CARDINALITY);
-                if(rangeCount!=null) {
-                    if (rangeCount.longValue() < nativeDefaultGraphThreshold) {
-                        nativeDistinct = false;
-                    }
-                } else {
-                    log.warn("No rangeCount? : "+pred);
-                }
-            } else {
-                if (summary.nknown < nativeDefaultGraphThreshold) {
+            /*
+             * Examine the cardinality of the predicate to determine whether or
+             * not we should use a DISTINCT SPO filter backed by a persistence
+             * capable data structure against native memory.
+             */
+            final Long rangeCount = (Long) pred
+                    .getProperty(Annotations.ESTIMATED_CARDINALITY);
+            if (rangeCount != null) {
+                if (rangeCount.longValue() < nativeDefaultGraphThreshold) {
+                    // Small range count.
                     nativeDistinct = false;
                 }
+            } else {
+                log.warn("No rangeCount? : " + pred);
+            }
+        }
+        /*
+         * Note: I think that the predicate cardinality is probably much more
+         * important than the #of different contexts in the default graph. You
+         * can have two contexts and 2B cardinality on the range count and wind
+         * up with a DISTINCT 2B SPOs. Therefore I have disabled the following
+         * code path.
+         */
+        if (false && nativeDistinct && summary != null) {
+            /*
+             * Examine the cardinality of the defaultGraph *contexts*.
+             */
+            if (summary.nknown < nativeDefaultGraphThreshold) {
+                // Only a few graphs in the defaultGraph.
+                nativeDistinct = false;
             }
         }
         if (nativeDistinct) {
+            // Native memory based DISTINCT filter.
             return HTreeDistinctFilter.newInstance();
         } else {
-            /*
-             * JVM Based DISTINCT filter.
-             */
+            // JVM Based DISTINCT filter.
             return DistinctFilter.newInstance();
         }
     }
@@ -878,6 +895,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * @param left
      * @param anns
      * @param queryHints
+     * @param defaultGraphFilter
+     *            <code>true</code> iff a DISTINCT filter must be imposed on the
+     *            SPOs. This is never done for a named graph query. It is
+     *            normally done for default graph queries, but there are some
+     *            edge cases where the SPOs are provably distinct and we do not
+     *            need to bother.
+     * @param summary
+     *            The {@link DataSetSummary} (when available).
      * @return
      * 
      * @see Annotations#HASH_JOIN
@@ -886,13 +911,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     static private PipelineOp newJoin(PipelineOp left, final List<NV> anns,
-            final Properties queryHints) {
+            final Properties queryHints, final boolean defaultGraphFilter,
+            final DataSetSummary summary) {
 
         final Map<String, Object> map = NV.asMap(anns.toArray(new NV[anns
                 .size()]));
 
         // Look up the predicate for the access path.
-        final IPredicate<?> pred = (IPredicate<?>) map
+        Predicate<?> pred = (Predicate<?>) map
                 .get(AccessPathJoinAnnotations.PREDICATE);
 
         // MAX_LONG unless we are doing cutoff join evaluation.
@@ -903,6 +929,17 @@ public class AST2BOpJoins extends AST2BOpFilters {
         final boolean hashJoin = limit == JoinAnnotations.DEFAULT_LIMIT
                 && pred.getProperty(Annotations.HASH_JOIN,
                         Annotations.DEFAULT_HASH_JOIN);
+        
+        if (defaultGraphFilter) {
+
+            /*
+             * Filter for distinct SPOs.
+             */
+
+            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary,
+                    hashJoin));
+            
+        }
         
         if (hashJoin) {
             
