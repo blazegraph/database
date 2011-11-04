@@ -74,8 +74,15 @@ class BuddyBucketTupleIterator<E> implements
      * entry is identified that passes the various criteria.
      */
     public boolean hasNext() {
+    	
+    	if (index == -1) {
+    		return false;
+    	}
 
 		final IRaba keys = bucket.getKeys();
+		
+		assert keys.size() == lastSlot;
+		assert keys.size() <= keys.capacity();
 
 		for( ; index < lastSlot; index++) {
          
@@ -90,12 +97,12 @@ class BuddyBucketTupleIterator<E> implements
 //	                
 //	            }
 
-			if (!keys.isNull(index)) {
-				if (BytesUtil.bytesEqual(key, keys.get(index))) {
-					// entry @ index is next to visit.
-					return true;
+				if (!keys.isNull(index)) {
+					if (BytesUtil.bytesEqual(key, keys.get(index))) {
+						// entry @ index is next to visit.
+						return true;
+					}
 				}
-			}
 			
 			// if key doesn't match terminate early since the keys are sorted
 			index = lastSlot;
