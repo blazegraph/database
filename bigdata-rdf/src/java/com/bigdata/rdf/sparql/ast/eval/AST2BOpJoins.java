@@ -918,6 +918,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
                 // ANY is not permitted for a hash join.
                 evaluationContext = BOpEvaluationContext.CONTROLLER;
             }
+            if (evaluationContext == BOpEvaluationContext.CONTROLLER) {
+                // This is not necessary, but it makes the hash join stats
+                // immediately visible.
+                map.put(PipelineOp.Annotations.SHARED_STATE, true);
+            }
             map.put(BOp.Annotations.EVALUATION_CONTEXT, evaluationContext);
 
             map.put(PipelineOp.Annotations.MAX_PARALLEL, 1);
