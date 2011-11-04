@@ -535,8 +535,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			int insIndex = keys.search(key);
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
-			} else {
-				System.err.println("Insert collision");
+//			} else {
+//				System.err.println("Insert collision");
 			}
 			
 			((MutableBucketData) data).insert(insIndex, key, ival, ival != val);
