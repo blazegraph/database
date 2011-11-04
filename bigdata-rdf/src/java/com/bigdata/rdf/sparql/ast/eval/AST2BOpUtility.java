@@ -2020,7 +2020,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final IVariable<?>[] vars = projection.getProjectionVars();
 
         final PipelineOp op;
-        if (ctx.nativeDistinct) {
+        if (!ctx.nativeDistinct) {
             /*
              * DISTINCT on the JVM heap.
              */
