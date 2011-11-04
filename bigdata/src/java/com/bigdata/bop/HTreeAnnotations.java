@@ -50,7 +50,7 @@ public interface HTreeAnnotations {
 	 */
 	String ADDRESS_BITS = HTreeAnnotations.class.getName() + ".addressBits";
 
-	int DEFAULT_ADDRESS_BITS = 10;
+	int DEFAULT_ADDRESS_BITS = 8;//10;
 
 	/**
 	 * When <code>true</code> raw record references will be written on the
