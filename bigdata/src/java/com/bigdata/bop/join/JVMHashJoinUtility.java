@@ -116,7 +116,8 @@ public class JVMHashJoinUtility {
 //            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
 //
 //            h = 31 * h + ch;
-            h ^= c.hashCode();
+//            h ^= c.hashCode();
+            h = 31 * h + c.hashCode();
             
         }
         
