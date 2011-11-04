@@ -60,8 +60,8 @@ class BuddyBucketTupleIterator<E> implements
 		 */
 		lastSlot = bucket.getKeys().size();//slotsOnPage;
 
-		// The first slot to test.
-		index = 0;
+		// Lookup first slot to test.
+		index = bucket.lookupIndex(key);
 
 		tuple = new Tuple<E>(bucket.htree, IRangeQuery.DEFAULT);
 		
@@ -96,6 +96,9 @@ class BuddyBucketTupleIterator<E> implements
 					return true;
 				}
 			}
+			
+			// if key doesn't match terminate early since the keys are sorted
+			index = lastSlot;
 
 		} // next index.
 
