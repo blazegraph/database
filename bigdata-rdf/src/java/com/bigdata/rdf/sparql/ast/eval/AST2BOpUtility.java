@@ -2406,9 +2406,13 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         anns.add(new NV(Annotations.ORIGINAL_INDEX,
                 sp.getProperty(Annotations.ORIGINAL_INDEX)));
 
-        // Propagate the optional query hint override for the index to use.
-        anns.add(new NV(IPredicate.Annotations.KEY_ORDER,
-                sp.getProperty(IPredicate.Annotations.KEY_ORDER)));
+        {
+            // Propagate the optional query hint override for the index to use.
+            final Object tmp = sp.getQueryHint(IPredicate.Annotations.KEY_ORDER);
+            if (tmp != null) {
+                anns.add(new NV(IPredicate.Annotations.KEY_ORDER, tmp));
+            }
+        }
 
         if (sp.isOptional()) {
             // Mark the join as optional.
