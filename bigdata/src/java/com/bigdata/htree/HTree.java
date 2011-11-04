@@ -1577,13 +1577,17 @@ public class HTree extends AbstractHTree
 	 * Pretty print the {@link HTree}.
 	 */
 	String PP() {
+		return PP(true);
+	}
+	
+	String PP(final boolean showBinary) {
 		
 		final StringBuilder sb = new StringBuilder();
 		
 		sb.append("#nodes=" + nnodes + ", #leaves=" + nleaves + ", #entries="
 				+ nentries + "\n");
 
-		root.PP(sb);
+		root.PP(sb, showBinary);
 		
 		return sb.toString();
 	
