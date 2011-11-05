@@ -83,7 +83,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * threshold, the entries will be flushed through to the backing index
          * in order to vector updates against that index.
          */
-        int DEFAULT_INITIAL_CAPACITY = 100000;
+        int DEFAULT_INITIAL_CAPACITY = 10000;
 
         /**
          * The default maximum length of an inlined {@link IV} before it is
@@ -201,7 +201,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
                 // IFF BTree
                 metadata.setBranchingFactor(NativeDistinctFilter.this.getProperty(
                         BTreeAnnotations.BRANCHING_FACTOR,
-                        BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
+                        256));// TODO Overriden here. BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
 
                 // IFF HTree
                 metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
