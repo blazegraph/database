@@ -939,6 +939,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
             pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary,
                     hashJoin));
             
+            // Update the annotation map with the predicate now that we have
+            // attached the appropriate distinct filter.
+            map.put(AccessPathJoinAnnotations.PREDICATE, pred);
+            
         }
         
         if (hashJoin) {
