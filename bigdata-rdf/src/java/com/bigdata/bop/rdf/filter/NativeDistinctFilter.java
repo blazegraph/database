@@ -199,7 +199,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
                 metadata = new IndexMetadata(UUID.randomUUID());
 
                 // IFF BTree
-                metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
+                metadata.setBranchingFactor(NativeDistinctFilter.this.getProperty(
                         BTreeAnnotations.BRANCHING_FACTOR,
                         BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
 
@@ -217,9 +217,10 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
                 metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
 
-                metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
-                        Annotations.WRITE_RETENTION_QUEUE_CAPACITY,
-                        Annotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
+                metadata.setWriteRetentionQueueCapacity(NativeDistinctFilter.this
+                        .getProperty(
+                                Annotations.WRITE_RETENTION_QUEUE_CAPACITY,
+                                Annotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
 
                 final int ratio = 32; // TODO Config/tune.
 
