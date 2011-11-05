@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -460,7 +459,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 * 
          * @param The connection.
          */
-        AbstractQuery setupQuery(final BigdataSailRepositoryConnection cxn) {
+        final AbstractQuery setupQuery(final BigdataSailRepositoryConnection cxn) {
 
             // Note the begin time for the query.
             final long begin =  System.nanoTime();

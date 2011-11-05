@@ -201,7 +201,7 @@ public class AST2BOpContext implements IdFactory {
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
 
-        this.queryHints = astContainer.getOriginalAST().getQueryHints();
+        this.queryHints = astContainer./*getOriginalAST().*/getQueryHints();
 
         /*
          * Figure out the query UUID that will be used. This will be bound onto
