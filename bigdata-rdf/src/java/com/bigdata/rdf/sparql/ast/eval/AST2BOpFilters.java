@@ -244,7 +244,7 @@ public class AST2BOpFilters extends AST2BOpBase {
 
         final String ns = ctx.db.getLexiconRelation().getNamespace();
 
-        if (nvars > 1) {
+        if (nvars >= 1) {
             /*
              * Use a pipeline operator which uses the chunked materialization
              * pattern for solution sets. This is similar to the pattern which
@@ -254,6 +254,10 @@ public class AST2BOpFilters extends AST2BOpBase {
              * TODO We could also use this operator to materialize the solutions
              * at the end of the top-level query plan rather than wrapping the
              * iterator.
+             * 
+             * TODO We should drop the more complicated materialization pipeline
+             * logic unless a performance advantage can be demonstrated either
+             * on a Journal or a cluster.
              */
             return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
                     vars.toArray(new IVariable[0]), ns, timestamp).setProperty(

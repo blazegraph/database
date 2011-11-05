@@ -248,18 +248,6 @@ public class HTreeHashIndexOp extends PipelineOp {
          */
         private final IQueryAttributes attrs;
 
-        /**
-         * The {@link IVariable}[]s to be projected.
-         */
-        @SuppressWarnings("rawtypes")
-        private final IVariable[] selected; 
-        
-        /**
-         * <code>true</code> iff this is the first time the task is being
-         * invoked, in which case we allocate the {@link #solutions} map.
-         */
-        private final boolean first;
-        
         private final HTreeHashJoinUtility state;
         
         public ControllerTask(final HTreeHashIndexOp op,
@@ -277,8 +265,6 @@ public class HTreeHashIndexOp extends PipelineOp {
             
             this.stats = ((NamedSolutionSetStats) context.getStats());
 
-            this.selected = (IVariable[]) op.getProperty(Annotations.SELECT);
-            
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
             
@@ -306,13 +292,7 @@ public class HTreeHashIndexOp extends PipelineOp {
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
-
-                    first = true;
-                    
-                } else {
-                 
-                    first = false;
-                    
+                                        
                 }
                 
                 this.state = state;

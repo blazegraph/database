@@ -972,6 +972,24 @@ public class HTreeHashJoinUtility {
             final IBuffer<IBindingSet> outputBuffer,//
             final boolean leftIsPipeline//
             ) {
+        hashJoin2(leftItr, outputBuffer, leftIsPipeline, constraints);
+    }
+
+    /**
+     * Variable allows the caller to impose different constraints or additional
+     * constraints.
+     * 
+     * @param leftItr
+     * @param outputBuffer
+     * @param leftIsPipeline
+     * @param constraints
+     */
+    public void hashJoin2(//
+            final ICloseableIterator<IBindingSet> leftItr,//
+            final IBuffer<IBindingSet> outputBuffer,//
+            final boolean leftIsPipeline,//
+            final IConstraint[] constraints//
+            ) {
 
         try {
 
@@ -1212,27 +1230,34 @@ public class HTreeHashJoinUtility {
 
         final HTree joinSet = this.getJoinSet();
 
-        joinSet.insert(joinSetHashCode, val);
+        if (true) {
+            
+            /*
+             * Do not insert if there is already an entry for that solution in
+             * the join set.
+             */
+            
+            // visit all joinSet solutions having the same hash code
+            @SuppressWarnings("unchecked")
+            final ITupleIterator<IBindingSet> xitr = joinSet
+                    .lookupAll(joinSetHashCode);
 
-        // visit all joinSet solutions having the same hash code
-        @SuppressWarnings("unchecked")
-        final ITupleIterator<IBindingSet> xitr = joinSet
-                .lookupAll(joinSetHashCode);
+            while (xitr.hasNext()) {
 
-        while (xitr.hasNext()) {
+                final ITuple<IBindingSet> xt = xitr.next();
 
-            final ITuple<IBindingSet> xt = xitr.next();
+                final ByteArrayBuffer b = xt.getValueBuffer();
 
-            final ByteArrayBuffer b = xt.getValueBuffer();
+                if (0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+                        val.length/* alen */, val/* a */, 0/* boff */,
+                        b.limit()/* blen */, b.array())) {
 
-            if (0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
-                    val.length/* alen */, val/* a */, 0/* boff */,
-                    b.limit()/* blen */, b.array())) {
+                    return;
 
-                return;
+                }
 
             }
-
+            
         }
 
         joinSet.insert(joinSetHashCode, val);
@@ -1291,8 +1316,30 @@ public class HTreeHashJoinUtility {
             final ITupleIterator<IBindingSet> jitr = getJoinSet()
                     .lookupAll(hashCode);
 
-            if (!jitr.hasNext()) {
+            boolean found = false;
+            while(jitr.hasNext()) {
 
+                // Note: Compare full solutions, not just the hash code!
+                
+                final ITuple<IBindingSet> xt = jitr.next();
+
+                final ByteArrayBuffer tb = t.getValueBuffer();
+
+                final ByteArrayBuffer xb = xt.getValueBuffer();
+
+                if (0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+                        tb.limit()/* alen */, tb.array()/* a */, 0/* boff */,
+                        xb.limit()/* blen */, xb.array())) {
+
+                    found = true;
+                    break;
+
+                }
+
+            }
+
+            if (!found) {
+                
                 /*
                  * Since the source solution is not in the join set, output it
                  * as an optional solution.
@@ -1365,7 +1412,13 @@ public class HTreeHashJoinUtility {
      *            their cached {@link BigdataValue}s.
      * 
      *            TODO If we vectored this operation it would substantially
-     *            reduce its costs.
+     *            reduce its costs. We would have to collect up a bunch of
+     *            solutions which needed resolution, then collect up the IVs
+     *            which do not have cached values for variables which might have
+     *            values in the ivCache. We would then sort the IVs and do a
+     *            vectored resolution against the ivCache. Finally, the
+     *            solutions could be output in a chunk with their resolved
+     *            Values.
      */
     @SuppressWarnings("rawtypes")
     private void resolveCachedValues(final IBindingSet bset) {

@@ -531,4 +531,67 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * DAWG test ("find pairs that don't value-compare").
+     * 
+     * <pre>
+     * PREFIX     :    <http://example/>
+     * PREFIX  xsd:    <http://www.w3.org/2001/XMLSchema#>
+     * 
+     * SELECT ?x ?v1 ?y ?v2
+     * {
+     *     ?x :p ?v1 .
+     *     ?y :p ?v2 .
+     *     OPTIONAL { ?y :p ?v3 . FILTER( ?v1 != ?v3 || ?v1 = ?v3 )}
+     *     FILTER (!bound(?v3))
+     * }
+     * </pre>
+     * 
+     * <pre>
+     * mf:notable mf:IllFormedLiteral ;
+     * mf:requires mf:KnownTypesDefault2Neq ;
+     * mf:requires mf:LangTagAwareness ;
+     * </pre>
+     * 
+     * FIXME Missing 2 solutions.
+     */
+    public void test_open_eq_12() throws Exception {
+
+        new TestHelper(
+                "open-eq-12", // testURI,
+                "open-eq-12.rq",// queryFileURL
+                "open-eq-12.ttl",// dataFileURL
+                "open-eq-12.srx"// resultFileURL
+                ).runTest();
+
+    }
+
+    /**
+     * DAWG test (FILTER inside an OPTIONAL does not block an entire solution).
+     * <pre>
+     * PREFIX  dc: <http://purl.org/dc/elements/1.1/>
+     * PREFIX  x: <http://example.org/ns#>
+     * SELECT  ?title ?price
+     * WHERE
+     *     { ?book dc:title ?title . 
+     *       OPTIONAL
+     *         { ?book x:price ?price . 
+     *           FILTER (?price < 15) .
+     *         } .
+     *     }
+     * </pre>
+     * 
+     * FIXME Note: Missing [title="TITLE 2"].
+     */
+    public void test_OPTIONAL_FILTER() throws Exception {
+        
+        new TestHelper(
+                "OPTIONAL-FILTER", // testURI,
+                "OPTIONAL_FILTER.rq",// queryFileURL
+                "OPTIONAL_FILTER.ttl",// dataFileURL
+                "OPTIONAL_FILTER-result.ttl"// resultFileURL
+                ).runTest();
+        
+    }
+    
 }

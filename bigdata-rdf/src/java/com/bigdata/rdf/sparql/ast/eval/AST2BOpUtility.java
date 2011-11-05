@@ -835,8 +835,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             namedSolutionSetRef),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
 //                            joinVars),//
-//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
-//                                    joinConstraints),//
+                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
+                                    joinConstraints),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE,
                                 release)//
             );
@@ -989,7 +989,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                    new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
             } else {
@@ -1001,11 +1002,27 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                         new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                         new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                        new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+//                        new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
                         new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                 ); 
             }
 
+            /*
+             * Only the variables which are projected by the subquery may flow
+             * into the subquery. Adding a projection operator before the
+             * subquery plan ensures that variables which are not visible are
+             * dropped out of the solutions flowing through the subquery.
+             * However, those variables are already present in the hash index so
+             * they can be reunited with the solutions for the subquery in the
+             * solution set hash join at the end of the subquery plan.
+             */
+            left = new ProjectionOp(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
+            );
+            
             // Append the subquery plan.
             left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
             
@@ -1018,7 +1035,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// FIXME
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
@@ -1928,7 +1945,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
-//                new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//

@@ -27,11 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Iterator;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -54,14 +59,14 @@ class SolutionsLog {
 
     private static boolean first = true;
     
-    static private void prefix(final UUID queryId, final int bopId,
+    static private void prefix(final UUID queryId, final BOp bop, final int bopId,
             final int partitionId, final int chunkSize) {
 
         if (first) {
 
             // If first time, then write out the header.
             
-            solutionsLog.info("QueryUUID\tbopId\tpartitionId\tchunkSize\n");
+            solutionsLog.info("QueryUUID\tbop\tbopId\tpartitionId\tchunkSize\n");
             
             first = false;
             
@@ -70,6 +75,10 @@ class SolutionsLog {
         sb.setLength(0);
 
         sb.append(queryId);
+        sb.append('\t');
+        sb.append(bop.getClass().getSimpleName());
+//        sb.append('\t');
+//        sb.append(getPredSummary(bop));
         sb.append('\t');
         sb.append(bopId);
         sb.append('\t');
@@ -80,6 +89,45 @@ class SolutionsLog {
 
     }
 
+    /**
+     * If the bop is a join then return a summary of the predicate.
+     * 
+     * @param bop
+     *            The bop.
+     *            
+     * @return The predicate summary iff the bop is a join.
+     */
+    static private String getPredSummary(final BOp bop) {
+        final IPredicate<?> pred = (IPredicate<?>) bop
+                .getProperty(PipelineJoin.Annotations.PREDICATE);
+        if (pred == null)
+            return "";
+        final StringBuilder sb = new StringBuilder();
+        final Integer predId = pred == null ? null : (Integer) pred
+                .getProperty(BOp.Annotations.BOP_ID);
+        sb.append(pred.getClass().getSimpleName());
+        sb.append("[" + predId + "](");
+        final Iterator<BOp> itr = pred.argIterator();
+        boolean first = true;
+        while (itr.hasNext()) {
+            if (first) {
+                first = false;
+            } else
+                sb.append(", ");
+            final IVariableOrConstant<?> x = (IVariableOrConstant<?>) itr
+                    .next();
+            if (x.isVar()) {
+                sb.append("?");
+                sb.append(x.getName());
+            } else {
+                sb.append(x.get());
+                // sb.append(((IV)x.get()).getValue());
+            }
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+    
 //    /**
 //     * 
 //     * TODO This can not be used because the {@link LocalChunkMessage} wraps an
@@ -134,10 +182,10 @@ class SolutionsLog {
 //
 //    }
 
-    synchronized static void log(final UUID queryId, final int bopId,
-            final int partitionId, final IBindingSet[] a) {
+    synchronized static void log(final UUID queryId, final BOp bop,
+            final int bopId, final int partitionId, final IBindingSet[] a) {
 
-        prefix(queryId, bopId, partitionId, a.length);
+        prefix(queryId, bop, bopId, partitionId, a.length);
 
         final int headerLen = sb.length();
 
