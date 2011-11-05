@@ -47,6 +47,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -155,12 +156,6 @@ public class HTreeHashJoinUtility {
                 throw new JoinVariableNotBoundException(v.getName());
                 
             }
-
-//            final int ch = (int) c.hashCode() ^ (c.hashCode() >>> 32);
-//
-//            h = 31 * h + ch;
-//            
-//            h ^= c.hashCode();
             
             // Works Ok.
             h = 31 * h + c.hashCode();
@@ -322,7 +317,7 @@ public class HTreeHashJoinUtility {
 
         final int branchingFactor = 2 ^ addressBits;
         
-        final int ratio = 32;
+        final int ratio = 32; // TODO Config/tune.
         
         metadata.setAddressBits(addressBits);
 
@@ -334,7 +329,9 @@ public class HTreeHashJoinUtility {
                 HTreeAnnotations.MAX_RECLEN,
                 HTreeAnnotations.DEFAULT_MAX_RECLEN));
 
-        metadata.setWriteRetentionQueueCapacity(4000);// FIXME CONFIG
+        metadata.setWriteRetentionQueueCapacity(op.getProperty(
+                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
+                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
 
         metadata.setKeyLen(Bytes.SIZEOF_INT); // int32 hash code keys.
 
@@ -360,13 +357,15 @@ public class HTreeHashJoinUtility {
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
-        final int branchingFactor = 256;// TODO Config.
+        final int branchingFactor = 256;// TODO Config/tune.
         
-        final int ratio = 32;
+        final int ratio = 32; // TODO Config/tune.
         
         metadata.setBranchingFactor(branchingFactor);
 
-        metadata.setWriteRetentionQueueCapacity(4000);// FIXME CONFIG
+        metadata.setWriteRetentionQueueCapacity(op.getProperty(
+                IndexAnnotations.WRITE_RETENTION_QUEUE_CAPACITY,
+                IndexAnnotations.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY));
 
         final String namespace = ((String[]) op
                 .getRequiredProperty(Predicate.Annotations.RELATION_NAME))[0];

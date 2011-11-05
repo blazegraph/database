@@ -94,7 +94,7 @@ public class AST2BOpBase {
      * When <code>true</code>, may use the version of DISTINCT which operates on
      * the native heap.
      */
-    protected static boolean nativeDefaultGraph = false;
+    protected static boolean nativeDefaultGraph = true;
 
     /**
      * The threshold at which we will use a native hash set rather than a

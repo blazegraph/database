@@ -123,7 +123,6 @@ public class BloomFilterFactory implements Serializable {
      * scale-out (just about right sized for scale-out, depending on the split
      * handler).
      * <p>
-     * <p>
      * The space requirements of a {@link BloomFilter} are approximately one
      * byte per index entry for a reasonable false positive rate (aka error
      * rate). Use {@link BloomFilterFactory#DEFAULT} for reasonable defaults.

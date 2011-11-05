@@ -33,6 +33,8 @@ import org.openrdf.query.Dataset;
 /**
  * Test suite for named and default graph stuff.
  * 
+ * TODO Port everything from {@link com.bigdata.rdf.sail.TestNamedGraphs}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

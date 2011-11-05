@@ -14,7 +14,6 @@ import java.util.UUID;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
@@ -278,10 +277,11 @@ public class StatusServlet extends BigdataRDFServlet {
 							HTMLUtility.escapeForXHTML(queryTask.sailQuery
 									.toString()));
 
-					current.node("h2", "BOP Plan").node(
-							"pre",
-							HTMLUtility.escapeForXHTML(BOpUtility
-									.toString(query.getQuery())));
+                    // redundant with the ASTCOntainer.
+//					current.node("h2", "BOP Plan").node(
+//							"pre",
+//							HTMLUtility.escapeForXHTML(BOpUtility
+//									.toString(query.getQuery())));
 					
 				} else {
 				
