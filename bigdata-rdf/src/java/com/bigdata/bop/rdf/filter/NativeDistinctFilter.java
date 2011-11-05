@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BTreeAnnotations;
+import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -16,7 +17,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -83,7 +83,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * threshold, the entries will be flushed through to the backing index
          * in order to vector updates against that index.
          */
-        int DEFAULT_INITIAL_CAPACITY = 10000;
+        int DEFAULT_INITIAL_CAPACITY = 100000;
 
         /**
          * The default maximum length of an inlined {@link IV} before it is
@@ -158,7 +158,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * Note: Maybe either a {@link BTree} or an {@link HTree}. The code has
          * paths for both.
          */
-        private volatile BTree index;
+        private volatile HTree index;
         private volatile MemStore store;
         
         @Override
@@ -198,20 +198,22 @@ public class NativeDistinctFilter extends BOpFilterBase {
                 
                 metadata = new IndexMetadata(UUID.randomUUID());
 
+                // IFF BTree
                 metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
-                        Annotations.BRANCHING_FACTOR,
-                        Annotations.DEFAULT_BRANCHING_FACTOR));
+                        BTreeAnnotations.BRANCHING_FACTOR,
+                        BTreeAnnotations.DEFAULT_BRANCHING_FACTOR));
 
-//                metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
-//                        Annotations.ADDRESS_BITS,
-//                        Annotations.DEFAULT_ADDRESS_BITS));
+                // IFF HTree
+                metadata.setAddressBits(NativeDistinctFilter.this.getProperty(
+                        HTreeAnnotations.ADDRESS_BITS,
+                        HTreeAnnotations.DEFAULT_ADDRESS_BITS));
 
                 metadata.setRawRecords(NativeDistinctFilter.this.getProperty(
                         Annotations.RAW_RECORDS,
                         Annotations.DEFAULT_RAW_RECORDS));
 
-                metadata.setMaxRecLen(NativeDistinctFilter.this.getProperty(
-                        Annotations.MAX_RECLEN, Annotations.DEFAULT_MAX_RECLEN));
+                // No values.
+                metadata.setMaxRecLen(0);
 
                 metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
 
@@ -284,7 +286,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
              * Create the index. It will support incremental eviction and
              * persistence.
              */
-            index = BTree.create(store, metadata);
+            index = HTree.create(store, metadata);
             
         }
         
@@ -378,14 +380,20 @@ public class NativeDistinctFilter extends BOpFilterBase {
          */
         private boolean add(final HTree members,final byte[] key) {
             
-            final ITupleIterator<?> itr = members.lookupAll(key);
-
-            if (itr.hasNext()) {
-
-                // Already in the map.
+            if(members.contains(key)) {
+                
                 return false;
-
+                
             }
+            
+//            final ITupleIterator<?> itr = members.lookupAll(key);
+//
+//            if (itr.hasNext()) {
+//
+//                // Already in the map.
+//                return false;
+//
+//            }
 
             // Add to the map.
             members.insert(key, null/* val */);
