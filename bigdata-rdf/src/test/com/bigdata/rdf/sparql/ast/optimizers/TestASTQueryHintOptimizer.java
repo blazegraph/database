@@ -64,6 +64,8 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 /**
  * Test suite for the {@link ASTQueryHintOptimizer}.
  * 
+ * TODO Unit test to verify that the caller's queryId is set on the query.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
