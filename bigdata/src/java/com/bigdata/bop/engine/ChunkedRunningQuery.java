@@ -1087,7 +1087,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                  * other operator evaluation pass attempts to write on the query
                  * buffer.
                  */
-                sink = new NoCloseBuffer<IBindingSet[]>(getQueryId(), bopId,
+                sink = new NoCloseBuffer<IBindingSet[]>(getQueryId(), bop, bopId,
                         partitionId, getQueryBuffer());
             } else {
 //                final BOp targetOp = getBOpIndex().get(sinkId);
@@ -1240,10 +1240,11 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
     private class NoCloseBuffer<E> extends DelegateBuffer<E> {
 
         private final UUID queryId;
+        private final BOp bop;
         private final int bopId;
         final int partitionId;
         
-        public NoCloseBuffer(final UUID queryId, final int bopId,
+        public NoCloseBuffer(final UUID queryId, final BOp bop, final int bopId,
                 final int partitionId, final IBlockingBuffer<E> delegate) {
         
 //        public NoCloseBuffer(final IBlockingBuffer<E> delegate) {
@@ -1251,6 +1252,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             super(delegate);
             
             this.queryId = queryId;
+            this.bop = bop;
             this.bopId = bopId;
             this.partitionId = partitionId;
 
@@ -1260,7 +1262,7 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             super.add(e);
             if (SolutionsLog.solutionsLog.isInfoEnabled()) {
                 SolutionsLog
-                        .log(queryId, bopId, partitionId, (IBindingSet[]) e);
+                        .log(queryId, bop, bopId, partitionId, (IBindingSet[]) e);
             }
         }
 
@@ -1373,8 +1375,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                 throw new BufferClosedException();
 
             if (SolutionsLog.solutionsLog.isInfoEnabled()) {
-                SolutionsLog
-                        .log(q.getQueryId(), bopId, partitionId, (IBindingSet[]) e);
+                SolutionsLog.log(q.getQueryId(), q.getBOp(bopId), bopId,
+                        partitionId, (IBindingSet[]) e);
             }
 
 //            for (IBindingSet bset : e) {
