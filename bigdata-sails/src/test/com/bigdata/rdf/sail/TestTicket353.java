@@ -112,7 +112,7 @@ public class TestTicket353 extends QuadsTestCase {
 		// try with Bigdata:
 		final BigdataSail sail = getSail();
 		try {
-			executeQuery(new SailRepository(sail));
+			executeQuery(new BigdataSailRepository(sail));
 		} finally {
 			sail.__tearDownUnitTest();
 		}
@@ -126,9 +126,11 @@ public class TestTicket353 extends QuadsTestCase {
 		try {
 			repo.initialize();
 			final RepositoryConnection conn = repo.getConnection();
+			conn.setAutoCommit(false);
 			try {
 				final ValueFactory vf = conn.getValueFactory();
 				conn.add(vf.createURI("os:subject"), vf.createURI("os:prop"), vf.createLiteral("value"));
+				conn.commit();
 
 				String query = 
 					"SELECT ?b { {} union { ?a ?b ?c } }"

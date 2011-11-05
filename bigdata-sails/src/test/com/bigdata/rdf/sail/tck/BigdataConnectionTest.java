@@ -38,6 +38,14 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.GraphQuery;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
@@ -46,8 +54,8 @@ import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
@@ -280,5 +288,351 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 //        assertFalse(testCon.isOpen());
 //        assertTrue(testCon2.isOpen());
 //    }
+    
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+    @Override
+	public void testSimpleTupleQuery()
+		throws Exception
+	{
+		testCon.add(alice, name, nameAlice, context2);
+		testCon.add(alice, mbox, mboxAlice, context2);
+		testCon.add(context2, publisher, nameAlice);
+	
+		testCon.add(bob, name, nameBob, context1);
+		testCon.add(bob, mbox, mboxBob, context1);
+		testCon.add(context1, publisher, nameBob);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" SELECT name, mbox");
+//		queryBuilder.append(" FROM {} foaf:name {name};");
+//		queryBuilder.append("         foaf:mbox {mbox}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" SELECT ?name ?mbox");
+		queryBuilder.append(" WHERE {");
+		queryBuilder.append(" ?x foaf:name ?name .");
+		queryBuilder.append(" ?x foaf:mbox ?mbox .");
+		queryBuilder.append(" }");
+		
+		
+	
+		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				BindingSet solution = result.next();
+				assertTrue(solution.hasBinding("name"));
+				assertTrue(solution.hasBinding("mbox"));
+	
+				Value nameResult = solution.getValue("name");
+				Value mboxResult = solution.getValue("mbox");
+	
+				assertTrue((nameAlice.equals(nameResult) || nameBob.equals(nameResult)));
+				assertTrue((mboxAlice.equals(mboxResult) || mboxBob.equals(mboxResult)));
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+
+    /**
+     * This is a test of simply preparing a SeRQL query into a TupleExpr, no
+     * data, no evaluation.  Since we don't support SeRQL anymore, it does
+     * not seem worthwhile to port this one.
+     */
+    @Override
+	public void testPrepareSeRQLQuery()
+		throws Exception
+	{
+	}
+    
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testSimpleTupleQueryUnicode()
+		throws Exception
+	{
+		testCon.add(alexander, name, super.Александър);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" SELECT person");
+//		queryBuilder.append(" FROM {person} foaf:name {").append(super.Александър.getLabel()).append("}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" SELECT ?person");
+		queryBuilder.append(" where { ?person foaf:name \"").append(super.Александър.getLabel()).append("\" . }");
+	
+		
+		
+		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				BindingSet solution = result.next();
+				assertTrue(solution.hasBinding("person"));
+				assertEquals(alexander, solution.getValue("person"));
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+	
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testPreparedTupleQuery()
+		throws Exception
+	{
+		testCon.add(alice, name, nameAlice, context2);
+		testCon.add(alice, mbox, mboxAlice, context2);
+		testCon.add(context2, publisher, nameAlice);
+	
+		testCon.add(bob, name, nameBob, context1);
+		testCon.add(bob, mbox, mboxBob, context1);
+		testCon.add(context1, publisher, nameBob);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" SELECT name, mbox");
+//		queryBuilder.append(" FROM {} foaf:name {name};");
+//		queryBuilder.append("         foaf:mbox {mbox}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" SELECT ?name ?mbox");
+		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+
+		
+		
+		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+		query.setBinding("name", nameBob);
+	
+		TupleQueryResult result = query.evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				BindingSet solution = result.next();
+				assertTrue(solution.hasBinding("name"));
+				assertTrue(solution.hasBinding("mbox"));
+	
+				Value nameResult = solution.getValue("name");
+				Value mboxResult = solution.getValue("mbox");
+	
+				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
+				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+	
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testPreparedTupleQuery2()
+		throws Exception
+	{
+		testCon.add(alice, name, nameAlice, context2);
+		testCon.add(alice, mbox, mboxAlice, context2);
+		testCon.add(context2, publisher, nameAlice);
+	
+		testCon.add(bob, name, nameBob, context1);
+		testCon.add(bob, mbox, mboxBob, context1);
+		testCon.add(context1, publisher, nameBob);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" SELECT name, mbox");
+//		queryBuilder.append(" FROM {p} foaf:name {name};");
+//		queryBuilder.append("         foaf:mbox {mbox}");
+//		queryBuilder.append(" WHERE p = VAR");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" SELECT ?name ?mbox");
+		queryBuilder.append(" WHERE { ?VAR foaf:name ?name .");
+		queryBuilder.append("         ?VAR foaf:mbox ?mbox . }");
+
+		
+		
+		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+		query.setBinding("VAR", bob);
+	
+		TupleQueryResult result = query.evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				BindingSet solution = result.next();
+				assertTrue(solution.hasBinding("name"));
+				assertTrue(solution.hasBinding("mbox"));
+	
+				Value nameResult = solution.getValue("name");
+				Value mboxResult = solution.getValue("mbox");
+	
+				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
+				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+	
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testPreparedTupleQueryUnicode()
+		throws Exception
+	{
+		testCon.add(alexander, name, super.Александър);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" SELECT person");
+//		queryBuilder.append(" FROM {person} foaf:name {name}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" SELECT ?person");
+		queryBuilder.append(" WHERE { ?person foaf:name ?name . }");
+
+		
+		
+		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+		query.setBinding("name", super.Александър);
+	
+		TupleQueryResult result = query.evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				BindingSet solution = result.next();
+				assertTrue(solution.hasBinding("person"));
+				assertEquals(alexander, solution.getValue("person"));
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+	
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testSimpleGraphQuery()
+		throws Exception
+	{
+		testCon.add(alice, name, nameAlice, context2);
+		testCon.add(alice, mbox, mboxAlice, context2);
+		testCon.add(context2, publisher, nameAlice);
+	
+		testCon.add(bob, name, nameBob, context1);
+		testCon.add(bob, mbox, mboxBob, context1);
+		testCon.add(context1, publisher, nameBob);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" CONSTRUCT *");
+//		queryBuilder.append(" FROM {} foaf:name {name};");
+//		queryBuilder.append("         foaf:mbox {mbox}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
+		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
+		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+
+		
+		
+		GraphQueryResult result = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				Statement st = result.next();
+				if (name.equals(st.getPredicate())) {
+					assertTrue(nameAlice.equals(st.getObject()) || nameBob.equals(st.getObject()));
+				}
+				else {
+					assertTrue(mbox.equals(st.getPredicate()));
+					assertTrue(mboxAlice.equals(st.getObject()) || mboxBob.equals(st.getObject()));
+				}
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+	
+    /**
+     * Modified to test SPARQL instead of Serql.
+     */
+	public void testPreparedGraphQuery()
+		throws Exception
+	{
+		testCon.add(alice, name, nameAlice, context2);
+		testCon.add(alice, mbox, mboxAlice, context2);
+		testCon.add(context2, publisher, nameAlice);
+	
+		testCon.add(bob, name, nameBob, context1);
+		testCon.add(bob, mbox, mboxBob, context1);
+		testCon.add(context1, publisher, nameBob);
+	
+		StringBuilder queryBuilder = new StringBuilder();
+//		queryBuilder.append(" CONSTRUCT *");
+//		queryBuilder.append(" FROM {} foaf:name {name};");
+//		queryBuilder.append("         foaf:mbox {mbox}");
+//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
+		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
+		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+
+		
+		
+		GraphQuery query = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+		query.setBinding("name", nameBob);
+	
+		GraphQueryResult result = query.evaluate();
+	
+		try {
+			assertTrue(result != null);
+			assertTrue(result.hasNext());
+	
+			while (result.hasNext()) {
+				Statement st = result.next();
+				assertTrue(name.equals(st.getPredicate()) || mbox.equals(st.getPredicate()));
+				if (name.equals(st.getPredicate())) {
+					assertTrue("unexpected value for name: " + st.getObject(), nameBob.equals(st.getObject()));
+				}
+				else {
+					assertTrue(mbox.equals(st.getPredicate()));
+					assertTrue("unexpected value for mbox: " + st.getObject(), mboxBob.equals(st.getObject()));
+				}
+	
+			}
+		}
+		finally {
+			result.close();
+		}
+	}
+
+    
 
 }

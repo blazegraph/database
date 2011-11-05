@@ -26,8 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import info.aduna.iteration.CloseableIteration;
-
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -42,15 +40,13 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.Join;
-import org.openrdf.query.algebra.Projection;
-import org.openrdf.query.algebra.ProjectionElem;
-import org.openrdf.query.algebra.ProjectionElemList;
-import org.openrdf.query.algebra.StatementPattern;
-import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.Var;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
@@ -80,8 +76,7 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
         
     }
 
-    public void test_query() throws SailException, IOException,
-            RDFHandlerException, QueryEvaluationException {
+    public void test_query() throws Exception {
 
         final BigdataSail sail = getSail();
         
@@ -180,20 +175,22 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
              * context and the context is always a blank node.
              */
 
-            final TupleExpr tupleExpr = 
-                new Projection(
-                new Join(//
-                    new StatementPattern(//
-                            new Var("X", y),//
-                            new Var("1", RDF.TYPE),//
-                            new Var("2", B),//
-                            new Var("SID")),// unbound.
-                    new StatementPattern(//
-                            new Var("SID"),//
-                            new Var("3", dcCreator),//
-                            new Var("Y"))),
-                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
+//            final TupleExpr tupleExpr = 
+//                new Projection(
+//                new Join(//
+//                    new StatementPattern(//
+//                            new Var("X", y),//
+//                            new Var("1", RDF.TYPE),//
+//                            new Var("2", B),//
+//                            new Var("SID")),// unbound.
+//                    new StatementPattern(//
+//                            new Var("SID"),//
+//                            new Var("3", dcCreator),//
+//                            new Var("Y"))),
+//                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
 
+            final String q = "select ?Y where { ?SID <"+dcCreator+"> ?Y . graph ?SID { <"+y+"> <"+RDF.TYPE+"> <"+B+"> . } }";
+            
             /*
              * Create a data set consisting of the contexts to be queried.
              * 
@@ -204,9 +201,13 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
             final BindingSet bindingSet = new QueryBindingSet();
 
-            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
-                    .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
+//            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
+//                    .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
 
+            final TupleQuery tq = new BigdataSailRepository(sail).getReadOnlyConnection().prepareTupleQuery(QueryLanguage.SPARQL, q);
+            
+            final TupleQueryResult itr = tq.evaluate();
+            
             if (log.isInfoEnabled())
                 log.info("Verifying query.");
 

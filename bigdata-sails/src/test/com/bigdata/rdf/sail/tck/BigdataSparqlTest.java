@@ -98,6 +98,8 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#no-distinct-9",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-9",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-2",
+          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-3",
+          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-4",
     });
 
 	/**
@@ -185,6 +187,12 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     static final Collection<String> testURIs = Arrays.asList(new String[] {
     		// 8, 9, 14-19, 23-30
 
+    		// derived numeric types
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-08",
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-09",
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-14",
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-19",
+    		
     		// Throwing NotSerializableException - something is dragging in the SPOAccessPath
     		// @see http://sourceforge.net/apps/trac/bigdata/ticket/379
 //          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/triple-match/manifest#dawg-triple-pattern-003",

@@ -77,7 +77,7 @@ public class TestTicket275 extends QuadsTestCase {
 
 		final BigdataSail sail = getSail();
 		try {
-			executeQuery(new SailRepository(sail));
+			executeQuery(new BigdataSailRepository(sail));
 		} finally {
 			sail.__tearDownUnitTest();
 		}
@@ -89,9 +89,11 @@ public class TestTicket275 extends QuadsTestCase {
 		try {
 			repo.initialize();
 			final RepositoryConnection conn = repo.getConnection();
+			conn.setAutoCommit(false);
 			try {
 				conn.add(getClass().getResourceAsStream("TestTicket275.ttl"), "",
 						RDFFormat.TURTLE);
+				conn.commit();
 
 				final String query = "SELECT ?lookup WHERE { ?lookup <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <os:class/Lookup> . ?lookup <os:prop/lookup/majorType> ?majorType . OPTIONAL{?lookup <os:prop/lookup/minorType> ?minorType}. FILTER(STR(?majorType) = ?argMajorType). FILTER(!bound(?minorType))}";
 				final TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,

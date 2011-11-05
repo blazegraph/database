@@ -449,8 +449,7 @@ public class StaticAnalysis_CanJoin extends StaticAnalysisBase {
 
                         if (log.isDebugEnabled()) {
                             log.debug("Constraint attached at index " + i
-                                    + " of " + path.length + ", bopId="
-                                    + ((BOp)p).getId() + ", constraint=" + c);
+                                    + " of " + path.length + ", constraint=" + c);
                         }
 
                         constraints.add(c);
