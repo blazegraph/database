@@ -63,7 +63,7 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.rdf.filter.HTreeDistinctFilter;
+import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rawstore.Bytes;
@@ -879,7 +879,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
         }
         if (nativeDistinct) {
             // Native memory based DISTINCT filter.
-            return HTreeDistinctFilter.newInstance();
+            return NativeDistinctFilter.newInstance();
         } else {
             // JVM Based DISTINCT filter.
             return DistinctFilter.newInstance();

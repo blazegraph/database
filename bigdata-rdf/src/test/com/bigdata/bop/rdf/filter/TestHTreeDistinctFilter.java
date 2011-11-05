@@ -47,7 +47,7 @@ import com.bigdata.rdf.vocab.RDFSVocabulary;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
- * Unit tests for {@link HTreeDistinctFilter}.
+ * Unit tests for {@link NativeDistinctFilter}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -123,7 +123,7 @@ public class TestHTreeDistinctFilter extends TestCase2 {
         };
 
         // Iterator should visit the disinct IVs.
-        final Iterator<IV> actual = HTreeDistinctFilter.newInstance().filter(
+        final Iterator<IV> actual = NativeDistinctFilter.newInstance().filter(
                 list.iterator(), null/* context */);
         
         assertSameIteratorAnyOrder(expected, actual);

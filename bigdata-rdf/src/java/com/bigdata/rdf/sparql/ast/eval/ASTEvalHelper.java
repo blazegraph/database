@@ -145,25 +145,6 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-//    static public boolean evaluateBooleanQuery(
-//            final AbstractTripleStore database, final PipelineOp queryPlan,
-//            final BindingSet bs, final QueryEngine queryEngine)
-//            throws QueryEvaluationException {
-//
-//        CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
-//        try {
-//            itr = ASTEvalHelper
-//                    .evaluateQuery(database, queryPlan,
-//                            new QueryBindingSet(bs), queryEngine,
-//                            new IVariable[0]/* required */);
-//            return itr.hasNext();
-//        } finally {
-//            if (itr != null) {
-//                itr.close();
-//            }
-//        }
-//    }
-//
     static public boolean evaluateBooleanQuery(
             final AbstractTripleStore store,
             final ASTContainer astContainer, final BindingSet bs)
@@ -190,72 +171,7 @@ public class ASTEvalHelper {
             }
         }
     }
-    
-//    static public boolean evaluateBooleanQuery(
-//            final AbstractTripleStore database, final PipelineOp queryPlan,
-//            final BindingSet bs, final QueryEngine queryEngine)
-//            throws QueryEvaluationException {
-//        
-//        IRunningQuery runningQuery = null;
-//        IAsynchronousIterator<IBindingSet[]> source = null;
-//        try {
-//
-//            source = wrapSource(database, bs);
-//            
-//            // Submit query for evaluation.
-//            runningQuery = queryEngine.eval(queryPlan, source);
-//
-//            // See if any solutions were produced.
-//            return runningQuery.iterator().hasNext();
-//
-//        } catch (Exception e) {
-//
-//            throw new QueryEvaluationException(e);
-//            
-//        } finally {
-//            
-//            // Ensure source is closed.
-//            if(source != null)
-//                source.close();
-//            
-//            if (runningQuery != null) {
-//            
-//                runningQuery.cancel(true/* mayInterruptIfRunning */);
-//                
-//                checkFuture(runningQuery);
-//
-//            }
-//
-//        }
-//
-//    }
-
-//    /**
-//     * Test for abnormal completion of the {@link IRunningQuery}.
-//     */
-//    static private void checkFuture(final IRunningQuery runningQuery)
-//            throws QueryEvaluationException {
-//
-//        try {
-//            runningQuery.get();
-//        } catch (InterruptedException e) {
-//            /*
-//             * Interrupted while waiting on the Future.
-//             */
-//            throw new RuntimeException(e);
-//        } catch (Throwable e) {
-//            /*
-//             * Exception thrown by the runningQuery.
-//             */
-//            if (runningQuery.getCause() != null) {
-//                // abnormal termination - wrap and rethrow.
-//                throw new QueryEvaluationException(e);
-//            }
-//            // otherwise this is normal termination.
-//        }
-//
-//    }
-    
+        
     /**
      * Evaluate a SELECT query.
      * 
@@ -270,22 +186,6 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-//    static public TupleQueryResult evaluateTupleQuery(
-//            final AbstractTripleStore store, final PipelineOp queryPlan,
-//            final QueryBindingSet bs, final QueryEngine queryEngine,
-//            final IVariable<?>[] projected) throws QueryEvaluationException {
-//
-//        final List<String> projectedSet = new LinkedList<String>();
-//
-//        for (IVariable<?> var : projected)
-//            projectedSet.add(var.getName());
-//
-//        return new TupleQueryResultImpl(projectedSet,
-//                ASTEvalHelper.evaluateQuery(store, queryPlan,
-//                        new QueryBindingSet(bs), queryEngine, projected));
-//
-//    }
-//    
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet bs) throws QueryEvaluationException {
@@ -325,19 +225,6 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-//    public static GraphQueryResult evaluateGraphQuery(
-//            final AbstractTripleStore store, final PipelineOp queryPlan,
-//            final QueryBindingSet queryBindingSet,
-//            final QueryEngine queryEngine, final IVariable<?>[] projected,
-//            final Map<String, String> prefixDecls, final ConstructNode construct)
-//            throws QueryEvaluationException {
-//
-//        return new GraphQueryResultImpl(prefixDecls, new ASTConstructIterator(
-//                store, construct, ASTEvalHelper.evaluateQuery(store,
-//                        queryPlan, queryBindingSet, queryEngine, projected)));
-//
-//    }
-//
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet bs) throws QueryEvaluationException {

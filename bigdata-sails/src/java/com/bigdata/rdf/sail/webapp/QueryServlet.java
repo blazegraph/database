@@ -18,7 +18,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
@@ -378,10 +377,11 @@ public class QueryServlet extends BigdataRDFServlet {
 						"Query Evaluation Statistics").node("p");
 				if (q != null) {
 
-					current.node("h2", "BOP Plan").node(
-							"pre",
-							HTMLUtility.escapeForXHTML(BOpUtility
-									.toString(q.getQuery())));
+				    // redundant with the ASTCOntainer.
+//					current.node("h2", "BOP Plan").node(
+//							"pre",
+//							HTMLUtility.escapeForXHTML(BOpUtility
+//									.toString(q.getQuery())));
 
 					/*
 					 * Format query statistics as a table.

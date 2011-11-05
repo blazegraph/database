@@ -66,8 +66,8 @@ public class TestAll extends TestCase {
         // test resolver operator.
         suite.addTestSuite(TestResolver.class);
 
-        // test distinct operator.
-        suite.addTestSuite(TestDistinctFilter.class);
+        // TODO test distinct operators (native and JVM).
+//        suite.addTestSuite(TestDistinctFilter.class);
 
         suite.addTestSuite(TestSameVariableConstraint.class);
         
