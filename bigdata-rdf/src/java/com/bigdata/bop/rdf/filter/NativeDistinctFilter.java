@@ -50,6 +50,11 @@ import cutthecrap.utils.striterators.Filterator;
  * Note: You can change the code over the HTree/BTree by modifying only a few
  * lines.
  * 
+ * TODO Reads against the index will eventually degrade since we can not use
+ * ordered reads because the iterator filter pattern itself is not vectored. We
+ * might be able to fix this with a chunked filter pattern. Otherwise fixing
+ * this will require a more significant refactor.
+ * 
  * TODO It would be nicer if we left the MRU 10k in the map and evicted the LRU
  * 10k each time the map reached 20k. This can not be done with the
  * {@link LinkedHashMap} as its API is not sufficient for this purpose. However,
