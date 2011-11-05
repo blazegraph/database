@@ -158,7 +158,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * Note: Maybe either a {@link BTree} or an {@link HTree}. The code has
          * paths for both.
          */
-        private volatile HTree index;
+        private volatile BTree index;
         private volatile MemStore store;
         
         @Override
@@ -287,7 +287,7 @@ public class NativeDistinctFilter extends BOpFilterBase {
              * Create the index. It will support incremental eviction and
              * persistence.
              */
-            index = HTree.create(store, metadata);
+            index = BTree.create(store, metadata);
             
         }
         
