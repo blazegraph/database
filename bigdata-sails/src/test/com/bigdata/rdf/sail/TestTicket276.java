@@ -121,7 +121,7 @@ public class TestTicket276 extends QuadsTestCase {
 		final BigdataSail sail = getSail();
 		try {
 	        // fails with UnsupportedOperationException
-			executeQuery(new SailRepository(sail));
+			executeQuery(new BigdataSailRepository(sail));
 		} finally {
 			sail.__tearDownUnitTest();
 		}
@@ -135,9 +135,11 @@ public class TestTicket276 extends QuadsTestCase {
 		try {
 			repo.initialize();
 			final RepositoryConnection conn = repo.getConnection();
+			conn.setAutoCommit(false);
 			try {
 	            final ValueFactory vf = conn.getValueFactory();
 				addData(conn);
+				conn.commit();
 
 				final String query = "SELECT ?x { ?x ?a ?t . ?x ?lookup ?l }";
 				final TupleQuery q = conn.prepareTupleQuery(QueryLanguage.SPARQL,

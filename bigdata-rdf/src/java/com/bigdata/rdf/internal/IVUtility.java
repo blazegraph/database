@@ -56,10 +56,10 @@ import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
-import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
@@ -320,8 +320,8 @@ public class IVUtility {
             throw new IllegalArgumentException(
                     "left term is not numeric: left=" + iv1 + ", right=" + iv2);
 
-        final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
-        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
+        final Literal num1 = (Literal) iv1; 
+        final Literal num2 = (Literal) iv2; 
         
         // Determine most specific datatype that the arguments have in common,
         // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
