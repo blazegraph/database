@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.UUID;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -102,24 +101,24 @@ public interface QueryHints {
      */
     String DEFAULT_TAG = "";
     
-    
-	/**
-	 * If true, this query hint will let the evaluation strategy know it should
-	 * try to use the {@link SubqueryHashJoinOp} to perform a hash join between
-	 * subqueries.  Subqueries are identified in several ways: either an optional
-	 * join group, or a set of tails within one join group that create a cross
-	 * product if run normally (i.e. multiple free text searches).
-	 *  
-	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.hashJoin=true&gt;
-	 * </pre>
-	 */
-    String HASH_JOIN = QueryHints.class.getName() + ".hashJoin";
-
-    /**
-     * @see #HASH_JOIN
-     */
-    String DEFAULT_HASH_JOIN = "false";
+    // See AST2BOpBase.Annotations.HASH_JOINS
+//	/**
+//	 * If true, this query hint will let the evaluation strategy know it should
+//	 * try to use the {@link SubqueryHashJoinOp} to perform a hash join between
+//	 * subqueries.  Subqueries are identified in several ways: either an optional
+//	 * join group, or a set of tails within one join group that create a cross
+//	 * product if run normally (i.e. multiple free text searches).
+//	 *  
+//	 * <pre>
+//	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.hashJoin=true&gt;
+//	 * </pre>
+//	 */
+//    String HASH_JOIN = QueryHints.class.getName() + ".hashJoin";
+//
+//    /**
+//     * @see #HASH_JOIN
+//     */
+//    String DEFAULT_HASH_JOIN = "false";
 
     /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).

@@ -334,7 +334,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
          */
         if (nfound > 0) {
             
-            for (int i = 0; i < group.arity() && group.arity()>0; ) {
+            for (int i = 0; i < group.arity(); ) {
 
                 final IGroupMemberNode child = (IGroupMemberNode) group.get(i);
 
@@ -613,7 +613,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
     private void applyToQuery(final AST2BOpContext context,
             final QueryRoot queryRoot, final String name, String value) {
 
-        if (context.queryHints == null) {
+        if (context.queryHints != null) {
             /*
              * Also stuff the query hint on the global context for things which
              * look there.
