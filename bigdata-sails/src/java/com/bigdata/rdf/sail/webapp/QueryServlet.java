@@ -327,11 +327,11 @@ public class QueryServlet extends BigdataRDFServlet {
 			}
 			current = current.node("body");
 
-			// TODO Redundant if using native SPARQL evaluation.
-			current.node("h2", "SPARQL").node("p",
-					HTMLUtility.escapeForXHTML(queryTask.queryStr));
+//			// TODO Redundant if using native SPARQL evaluation.
+//			current.node("h2", "SPARQL").node("p",
+//					HTMLUtility.escapeForXHTML(queryTask.queryStr));
 
-			current.node("h2", "Parsed Query").node("pre",
+			current.node("h2", "Query").node("pre",
 					HTMLUtility.escapeForXHTML(queryTask.sailQuery.toString()));
 			
 			/*
