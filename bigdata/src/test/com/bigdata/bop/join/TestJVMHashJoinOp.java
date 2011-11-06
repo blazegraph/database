@@ -38,10 +38,10 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
 
 /**
  * Test suite for {@link JVMHashJoinOp}.
@@ -49,6 +49,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+@SuppressWarnings("rawtypes")
 public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
 
     /**
@@ -67,8 +68,8 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
 
     @Override
     protected PipelineOp newJoin(final BOp[] args, final int joinId,
-            final IVariable<E>[] joinVars,
-            final Predicate<E> predOp,
+            final IVariable<IV>[] joinVars,
+            final Predicate<IV> predOp,
             final NV... annotations) {
         
         final Map<String,Object> tmp = NV.asMap(
@@ -92,7 +93,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
             
         }
         
-        final PipelineOp joinOp = new JVMHashJoinOp<E>(args, tmp);
+        final PipelineOp joinOp = new JVMHashJoinOp<IV>(args, tmp);
 
         return joinOp;
 
@@ -107,13 +108,13 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         final int joinId = 1;
         final int predId = 2;
         @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
+        final IVariable<IV> x = Var.var("x");
 
-        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+        final Predicate<IV> pred = new Predicate<IV>(new IVariableOrConstant[] {
                 new Constant<String>("Mary"), Var.var("x") }, NV
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
+                                new String[] { setup.spoNamespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
@@ -121,7 +122,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // w/o variables.
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
 //                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
@@ -138,7 +139,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // bad evaluation context.
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
                             new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
@@ -155,7 +156,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // missing predicate.
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
                             new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
@@ -172,7 +173,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // maxParallel not set to ONE (1).
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
                             new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
@@ -189,7 +190,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // maxMemory is specified.
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
                             new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
@@ -208,7 +209,7 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
         
         // must be at once evaluation (pipelined:=true here).
         try {
-            new JVMHashJoinOp<E>(emptyArgs, NV.asMap(new NV[] {//
+            new JVMHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
                     new NV(BOp.Annotations.BOP_ID, joinId),//
                             new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
                             new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
