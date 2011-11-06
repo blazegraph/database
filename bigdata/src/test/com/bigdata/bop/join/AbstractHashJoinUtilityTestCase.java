@@ -80,9 +80,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
     /**
      * Setup for a problem used by many of the join test suites.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static public class JoinSetup {
 

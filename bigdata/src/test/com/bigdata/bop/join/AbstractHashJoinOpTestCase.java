@@ -34,21 +34,21 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
-import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
@@ -61,19 +61,27 @@ import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.striterator.ChunkedArrayIterator;
-
-import junit.framework.TestCase2;
 
 /**
  * Common base class for hash join with access path unit tests.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: AbstractHashJoinOpTestCase.java 5499 2011-11-03 19:49:10Z
+ *          thompsonbry $
  */
+@SuppressWarnings("rawtypes")
 abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
 
     /**
@@ -89,70 +97,239 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         super(name);
     }
 
-    @Override
-    public Properties getProperties() {
+//    @Override
+//    public Properties getProperties() {
+//
+//        final Properties p = new Properties(super.getProperties());
+//
+//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
+//                .toString());
+//
+//        return p;
+//        
+//    }
 
-        final Properties p = new Properties(super.getProperties());
+    /**
+     * Setup for a problem used by many of the join test suites.
+     */
+    static public class JoinSetup {
 
-        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-                .toString());
+        protected final String spoNamespace;
 
-        return p;
+        protected final IV<?, ?> knows, brad, john, fred, mary, paul, leon, luke;
+        
+        private Journal jnl;
+        
+        public JoinSetup(final String kbNamespace) {
+
+            if (kbNamespace == null)
+                throw new IllegalArgumentException();
+            
+            final Properties properties = new Properties();
+
+            properties.setProperty(Journal.Options.BUFFER_MODE,
+                    BufferMode.Transient.toString());
+            
+            // TODO COuld just be IRawStore
+            jnl = new Journal(properties);
+
+            // create the kb.
+            final AbstractTripleStore kb = new LocalTripleStore(jnl,
+                    kbNamespace, ITx.UNISOLATED, properties);
+
+            kb.create();
+
+            this.spoNamespace = kb.getSPORelation().getNamespace();
+
+            // Setup the vocabulary.
+            {
+                final BigdataValueFactory vf = kb.getValueFactory();
+                final String uriString = "http://bigdata.com/";
+                final BigdataURI _knows = vf.asValue(FOAFVocabularyDecl.knows);
+                final BigdataURI _brad = vf.createURI(uriString+"brad");
+                final BigdataURI _john = vf.createURI(uriString+"john");
+                final BigdataURI _fred = vf.createURI(uriString+"fred");
+                final BigdataURI _mary = vf.createURI(uriString+"mary");
+                final BigdataURI _paul = vf.createURI(uriString+"paul");
+                final BigdataURI _leon = vf.createURI(uriString+"leon");
+                final BigdataURI _luke = vf.createURI(uriString+"luke");
+
+                final BigdataValue[] a = new BigdataValue[] {
+                      _knows,//
+                      _brad,
+                      _john,
+                      _fred,
+                      _mary,
+                      _paul,
+                      _leon,
+                      _luke
+                };
+
+                kb.getLexiconRelation()
+                        .addTerms(a, a.length, false/* readOnly */);
+
+                knows = _knows.getIV();
+                brad = _brad.getIV();
+                john = _john.getIV();
+                fred = _fred.getIV();
+                mary = _mary.getIV();
+                paul = _paul.getIV();
+                leon = _leon.getIV();
+                luke = _luke.getIV();
+
+            }
+
+            // data to insert (in key order for convenience).
+            final SPO[] a = {//
+                    new SPO(paul, knows, mary, StatementEnum.Explicit),// [0]
+                    new SPO(paul, knows, brad, StatementEnum.Explicit),// [1]
+                    
+                    new SPO(john, knows, mary, StatementEnum.Explicit),// [2]
+                    new SPO(john, knows, brad, StatementEnum.Explicit),// [3]
+                    
+                    new SPO(mary, knows, brad, StatementEnum.Explicit),// [4]
+                    
+                    new SPO(brad, knows, fred, StatementEnum.Explicit),// [5]
+                    new SPO(brad, knows, leon, StatementEnum.Explicit),// [6]
+            };
+
+            // insert data (the records are not pre-sorted).
+            kb.addStatements(a, a.length);
+
+            // Do commit since not scale-out.
+            jnl.commit();
+
+        }
+
+//        /**
+//         * Return a (Mock) IV for a Value.
+//         * 
+//         * @param v
+//         *            The value.
+//         * 
+//         * @return The Mock IV.
+//         */
+//        @SuppressWarnings({ "unchecked", "rawtypes" })
+//        private IV makeIV(final Value v) {
+//            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+//                    .getInstance(namespace);
+//            final BigdataValue bv = valueFactory.asValue(v);
+//            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+//            iv.setValue(bv);
+//            return iv;
+//        }
+//
+//        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+//
+//        @SuppressWarnings("rawtypes")
+//        List<IBindingSet> getLeft1() {
+//
+//            final IVariable<?> x = Var.var("x");
+//            final IVariable<?> y = Var.var("y");
+//
+//            // The left solutions (the pipeline).
+//            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+//
+//            IBindingSet tmp;
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(x, new Constant<IV>(brad));
+//            tmp.set(y, new Constant<IV>(fred));
+//            left.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(x, new Constant<IV>(mary));
+//            left.add(tmp);
+//
+//            return left;
+//        }
+//
+//        @SuppressWarnings("rawtypes")
+//        List<IBindingSet> getRight1() {
+//
+//            final IVariable<?> a = Var.var("a");
+//            final IVariable<?> x = Var.var("x");
+////            final IVariable<?> y = Var.var("y");
+//
+//            // The right solutions (the hash index).
+//            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+//
+//            IBindingSet tmp;
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(paul));
+//            tmp.set(x, new Constant<IV>(mary));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(paul));
+//            tmp.set(x, new Constant<IV>(brad));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(john));
+//            tmp.set(x, new Constant<IV>(mary));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(john));
+//            tmp.set(x, new Constant<IV>(brad));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(mary));
+//            tmp.set(x, new Constant<IV>(brad));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(brad));
+//            tmp.set(x, new Constant<IV>(fred));
+//            right.add(tmp);
+//
+//            tmp = new ListBindingSet();
+//            tmp.set(a, new Constant<IV>(brad));
+//            tmp.set(x, new Constant<IV>(leon));
+//            right.add(tmp);
+//
+//            // new E("Paul", "Mary"),// [0]
+//            // new E("Paul", "Brad"),// [1]
+//            //
+//            // new E("John", "Mary"),// [2]
+//            // new E("John", "Brad"),// [3]
+//            //
+//            // new E("Mary", "Brad"),// [4]
+//            //
+//            // new E("Brad", "Fred"),// [5]
+//            // new E("Brad", "Leon"),// [6]
+//
+//            return right;
+//
+//        }
+
+        protected void destroy() {
+
+            if (jnl != null) {
+                jnl.destroy();
+                jnl = null;
+            }
+
+        }
         
     }
 
-    static protected final String namespace = "ns";
-    
-    Journal jnl;
+    protected JoinSetup setup = null;
     
     public void setUp() throws Exception {
         
-        jnl = new Journal(getProperties());
-
-        loadData(jnl);
-
+        setup = new JoinSetup(getName());
+        
     }
     
-    /**
-     * Create and populate relation in the {@link #namespace}.
-     */
-    private void loadData(final Journal store) {
-
-        // create the relation.
-        final R rel = new R(store, namespace, ITx.UNISOLATED, new Properties());
-        rel.create();
-        
-//        // create the relation.
-//        final AbstractTripleStore tripleStore = new LocalTripleStore(store, namespace, ITx.UNISOLATED, new Properties());
-//        tripleStore.create();
-
-        // data to insert (in key order for convenience).
-        final E[] a = {//
-                new E("Paul", "Mary"),// [0]
-                new E("Paul", "Brad"),// [1]
-                
-                new E("John", "Mary"),// [2]
-                new E("John", "Brad"),// [3]
-                
-                new E("Mary", "Brad"),// [4]
-                
-                new E("Brad", "Fred"),// [5]
-                new E("Brad", "Leon"),// [6]
-        };
-
-        // insert data (the records are not pre-sorted).
-        rel.insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
-
-        // Do commit since not scale-out.
-        store.commit();
-
-    }
-
     public void tearDown() throws Exception {
 
-        if (jnl != null) {
-            jnl.destroy();
-            jnl = null;
+        if (setup != null) {
+            setup.destroy();
+            setup = null;
         }
 
     }
@@ -183,8 +360,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
      * @return
      */
     abstract protected PipelineOp newJoin(final BOp[] args, final int joinId,
-            final IVariable<E>[] joinVars,
-            final Predicate<E> predOp,
+            final IVariable<IV>[] joinVars,
+            final Predicate<IV> predOp,
             final NV... annotations);
     
     /*
@@ -204,17 +381,17 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
+        final IVariable<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E> y = Var.var("y");
+        final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[] { x };
+        final IVariable<IV>[] joinVars = new IVariable[] { x };
         
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("John"), x }, NV
-                .asMap(new NV[] {//
+        final Predicate<IV> predOp = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.john),
+                        new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
+                                new String[] { setup.spoNamespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -225,12 +402,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };
@@ -246,12 +423,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             IBindingSet tmp;
 
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Brad"));
-            tmp.set(y, new Constant<String>("Fred"));
+            tmp.set(x, new Constant<IV>(setup.brad));
+            tmp.set(y, new Constant<IV>(setup.fred));
             list.add(tmp);
             
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
+            tmp.set(x, new Constant<IV>(setup.mary));
             list.add(tmp);
             
             initialBindingSets = list.toArray(new IBindingSet[0]);
@@ -271,7 +448,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, null/* sink2 */);
 
@@ -287,7 +464,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
@@ -327,17 +504,17 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
+        final IVariable<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E> y = Var.var("y");
+        final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[] { /* x */};
+        final IVariable<IV>[] joinVars = new IVariable[] { /* x */};
         
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("John"), x }, NV
-                .asMap(new NV[] {//
+        final Predicate<IV> predOp = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.john),
+                        new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
+                                new String[] { setup.spoNamespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -348,12 +525,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };
@@ -369,12 +546,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             IBindingSet tmp;
 
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Brad"));
-            tmp.set(y, new Constant<String>("Fred"));
+            tmp.set(x, new Constant<IV>(setup.brad));
+            tmp.set(y, new Constant<IV>(setup.fred));
             list.add(tmp);
             
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
+            tmp.set(x, new Constant<IV>(setup.mary));
             list.add(tmp);
             
             initialBindingSets = list.toArray(new IBindingSet[0]);
@@ -394,7 +571,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, null/* sink2 */);
 
@@ -410,7 +587,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
@@ -440,17 +617,17 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
+        final IVariable<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E> y = Var.var("y");
+        final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[] { x };
+        final IVariable<IV>[] joinVars = new IVariable[] { x };
         
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("John"), x }, NV
-                .asMap(new NV[] {//
+        final Predicate<IV> predOp = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.john),
+                        new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
+                                new String[] { setup.spoNamespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -458,7 +635,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp, 
                 new NV(SubqueryHashJoinOp.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
-                                .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
+                                .wrap(new EQConstant(x, new Constant<IV>(setup.brad))),//
                         }));
 
         // the expected solutions.
@@ -469,8 +646,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
 //                ),//
                 new ListBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Brad"),
-                                          new Constant<String>("Fred"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred),
                                 }//
                 ),//
         };
@@ -486,12 +663,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             IBindingSet tmp;
 
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Brad"));
-            tmp.set(y, new Constant<String>("Fred"));
+            tmp.set(x, new Constant<IV>(setup.brad));
+            tmp.set(y, new Constant<IV>(setup.fred));
             list.add(tmp);
             
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
+            tmp.set(x, new Constant<IV>(setup.mary));
             list.add(tmp);
             
             initialBindingSets = list.toArray(new IBindingSet[0]);
@@ -511,7 +688,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, null/* sink2 */);
 
@@ -527,7 +704,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
@@ -557,17 +734,17 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         @SuppressWarnings("unchecked")
-        final IVariable<E> x = Var.var("x");
+        final IVariable<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E> y = Var.var("y");
+        final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[] { x };
+        final IVariable<IV>[] joinVars = new IVariable[] { x };
         
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("John"), x }, NV
-                .asMap(new NV[] {//
+        final Predicate<IV> predOp = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.john),
+                        new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
+                                new String[] { setup.spoNamespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -582,11 +759,11 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x/*, y*/ },//
-                        new IConstant[] { new Constant<String>("Brad"),
+                        new IConstant[] { new Constant<IV>(setup.brad),
 //                                          new Constant<String>("Fred"),
                                 }//
                 ),//
@@ -603,12 +780,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             IBindingSet tmp;
 
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Brad"));
-            tmp.set(y, new Constant<String>("Fred"));
+            tmp.set(x, new Constant<IV>(setup.brad));
+            tmp.set(y, new Constant<IV>(setup.fred));
             list.add(tmp);
             
             tmp = new ListBindingSet();
-            tmp.set(x, new Constant<String>("Mary"));
+            tmp.set(x, new Constant<IV>(setup.mary));
             list.add(tmp);
             
             initialBindingSets = list.toArray(new IBindingSet[0]);
@@ -628,7 +805,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, null/* sink2 */);
 
@@ -644,7 +821,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
@@ -681,21 +858,23 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int predId = 3;
 
         @SuppressWarnings("unchecked")
-        final Var<E> x = Var.var("x");
+        final Var<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[]{x};
+        final IVariable<IV>[] joinVars = new IVariable[]{x};
 
         // AP("Paul" ?x)
-        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("Paul"), x }, NV.asMap(new NV[] {//
+        final Predicate<IV> pred = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.paul),
+                        new Constant<IV>(setup.knows), x },
+                NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.RELATION_NAME,
-                        new String[] { namespace }),//
+                        new String[] { setup.spoNamespace }),//
                 new NV(Predicate.Annotations.BOP_ID, predId),//
                 new NV(Predicate.Annotations.OPTIONAL, Boolean.TRUE),//
                 // constraint x != Luke
                 new NV(PipelineJoin.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint.wrap(new NEConstant(x,
-                                new Constant<String>("Luke"))) }),
+                                new Constant<IV>(setup.luke))) }),
                 new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
         }));
         
@@ -728,14 +907,14 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBindingSet bset2 = new ListBindingSet();
             {
              
-                bset2.set(x, new Constant<String>("Luke"));
+                bset2.set(x, new Constant<IV>(setup.luke));
                 
             }
             
             final IBindingSet bset3 = new ListBindingSet();
             {
              
-                bset3.set(x, new Constant<String>("Mary"));
+                bset3.set(x, new Constant<IV>(setup.mary));
                 
             }
             
@@ -754,12 +933,12 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 // bset2: optional solution.
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Luke") }//
+                        new IConstant[] { new Constant<IV>(setup.luke) }//
                 ),//
                   // bset3: joins.
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
         };
 
@@ -773,7 +952,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, null/* sink2 */);
 
@@ -789,7 +968,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
@@ -828,20 +1007,22 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final int predId = 3;
 
         @SuppressWarnings("unchecked")
-        final Var<E> x = Var.var("x");
+        final Var<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
-        final IVariable<E>[] joinVars = new IVariable[]{x};
+        final IVariable<IV>[] joinVars = new IVariable[]{x};
         
-        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("Paul"), x }, NV.asMap(new NV[] {//
+        final Predicate<IV> pred = new Predicate<IV>(
+                new IVariableOrConstant[] { new Constant<IV>(setup.paul),
+                        new Constant<IV>(setup.knows), x },
+                NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.RELATION_NAME,
-                        new String[] { namespace }),//
+                        new String[] { setup.spoNamespace }),//
                 new NV(Predicate.Annotations.BOP_ID, predId),//
                 new NV(Predicate.Annotations.OPTIONAL, Boolean.TRUE),//
                 // constraint x != Luke
                 new NV(PipelineJoin.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint.wrap(new NEConstant(x,
-                                new Constant<String>("Luke"))) }),
+                                new Constant<IV>(setup.luke))) }),
                 new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
         }));
         
@@ -887,14 +1068,14 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final IBindingSet bset2 = new ListBindingSet();
             {
              
-                bset2.set(x, new Constant<String>("Luke"));
+                bset2.set(x, new Constant<IV>(setup.luke));
                 
             }
             
             final IBindingSet bset3 = new ListBindingSet();
             {
              
-                bset3.set(x, new Constant<String>("Mary"));
+                bset3.set(x, new Constant<IV>(setup.mary));
                 
             }
             
@@ -918,7 +1099,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                   // bset3: joins.
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ),//
         };
 
@@ -932,7 +1113,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 // bset2: optional solution.
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Luke") }//
+                        new IConstant[] { new Constant<IV>(setup.luke) }//
                 ),//
         };
 
@@ -949,7 +1130,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                     query, stats);
 
             final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                    new MockRunningQuery(null/* fed */, jnl/* indexManager */,
+                    new MockRunningQuery(null/* fed */, setup.jnl/* indexManager */,
                             queryContext), -1/* partitionId */, stats, source,
                     sink, sink2);
 
@@ -965,7 +1146,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             final FutureTask<Void> ft = query.eval(context);
 
             // execute task.
-            jnl.getExecutorService().execute(ft);
+            setup.jnl.getExecutorService().execute(ft);
 
             AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
                     sink.iterator(), ft);
