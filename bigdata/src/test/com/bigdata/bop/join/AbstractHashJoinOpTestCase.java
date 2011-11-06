@@ -130,7 +130,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             properties.setProperty(Journal.Options.BUFFER_MODE,
                     BufferMode.Transient.toString());
             
-            // TODO COuld just be IRawStore
             jnl = new Journal(properties);
 
             // create the kb.
