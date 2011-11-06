@@ -142,8 +142,23 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     /**
      * Top-level entry point converts an AST query model into an executable
      * query plan.
+     * <p>
+     * <strong>NOTE:</strong> This is the entry for {@link ASTEvalHelper}. Do
+     * NOT use this entry point directly. It will evolve when we integrate the
+     * RTO and/or the BindingsClause of the SPARQL 1.1 Federation extension.
+     * Applications should use the public entry points on {@link ASTEvalHelper}
+     * rather that this entry point.
+     * 
+     * @param ctx
+     *            The evaluation context.
+     * @param bset
+     *            The exogenous inputs to the query (variable bindings from
+     *            outside of the query evaluation).
+     * 
+     * @return The query plan which may be used to evaluate the query.
      */
-    public static PipelineOp convert(final AST2BOpContext ctx) {
+    static PipelineOp convert(final AST2BOpContext ctx,
+            final IBindingSet bset) {
 
         /*
          * FIXME Pass in zero or more binding sets to use when optimizing the
@@ -164,7 +179,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * the evaluation of the join. We could also do column projections,
          * which would give us something like the hash-set based IN constraint.
          */
-        final IBindingSet[] bindingSets = null;
+        final IBindingSet[] bindingSets = new IBindingSet[] { bset };
 
         // The AST query model.
         final ASTContainer astContainer = ctx.astContainer;

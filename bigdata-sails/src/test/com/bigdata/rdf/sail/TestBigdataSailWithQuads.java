@@ -36,7 +36,6 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.Bigdata2ASTSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataComplexSparqlQueryTest;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlFullRWTxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
@@ -135,11 +134,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
                 /*
                  * SPARQL parser compliance test
-                 * 
-                 * TODO Drop the Sesame parser version when we are doing
-                 * integrating the bigdata AST.
                  */
-                tckSuite.addTest(BigdataSPARQLSyntaxTest.suite()); // sesame parser
+//                tckSuite.addTest(BigdataSPARQLSyntaxTest.suite()); // sesame parser
                 tckSuite.addTest(Bigdata2ASTSPARQLSyntaxTest.suite()); // bigdata parser
 
                 /*

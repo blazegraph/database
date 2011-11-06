@@ -116,7 +116,6 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -3156,23 +3155,25 @@ public class BigdataSail extends SailBase implements Sail {
 
             originalQuery.setIncludeInferred(includeInferred);
 
-            /*
-             * Batch resolve RDF Values to IVs and then set on the query model.
-             */
-
-            try {
-
-                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
-                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
-
-                astContainer.getOriginalAST().setDataset(
-                        new DatasetNode((Dataset) tmp[0]));
-
-            } catch (SailException e) {
-
-                throw new RuntimeException(e);
-
-            }
+// Note: This is done by ASTEvalHelper.
+//            
+//            /*
+//             * Batch resolve RDF Values to IVs and then set on the query model.
+//             */
+//
+//            try {
+//
+//                final Object[] tmp = new BigdataValueReplacer(getTripleStore())
+//                        .replaceValues(dataset, null/* tupleExpr */, null/* bindings */);
+//
+//                astContainer.getOriginalAST().setDataset(
+//                        new DatasetNode((Dataset) tmp[0]));
+//
+//            } catch (SailException e) {
+//
+//                throw new RuntimeException(e);
+//
+//            }
             
             try {
                 
