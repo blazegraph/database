@@ -97,7 +97,7 @@ public class ASTEvalHelper {
      * @throws SailException 
      */
     static private IAsynchronousIterator<IBindingSet[]> wrapSource(
-            final AbstractTripleStore store, final BindingSet bs)
+            final AbstractTripleStore store, final IBindingSet bs)
             throws SailException {
 
         final IAsynchronousIterator<IBindingSet[]> source;
@@ -109,12 +109,8 @@ public class ASTEvalHelper {
              * using the supplied bindings.
              */
 
-            // batch resolve Values to IVs.
-            final Object[] tmp = new BigdataValueReplacer(store)
-                    .replaceValues(null/* dataset */, null/* tupleExpr */, bs);
-
             // wrap the resolved binding set.
-            source = newBindingSetIterator(toBindingSet((BindingSet) tmp[1]));
+            source = newBindingSetIterator(bs);
 
         } else {
             
@@ -129,6 +125,46 @@ public class ASTEvalHelper {
 
         return source;
         
+    }
+    
+    /**
+     * Batch resolve {@link Value}s to {@link IV}s.
+     * 
+     * @param store
+     *            The KB instance.
+     * @param bs
+     *            The binding set (may be empty or <code>null</code>).
+     * 
+     * @return A binding set having resolved {@link IV}s.
+     * 
+     * @throws QueryEvaluationException
+     */
+    static private BindingSet batchResolveIVs(final AbstractTripleStore store,
+            final BindingSet bs) throws QueryEvaluationException {
+
+        if (bs == null) {
+            // Use an empty binding set.
+            return new QueryBindingSet();
+        }
+
+        if (bs.size() == 0) {
+            // Fast path if empty.
+            return bs;
+        }
+
+        try {
+            
+            final Object[] tmp = new BigdataValueReplacer(store).replaceValues(
+                    null/* dataset */, null/* tupleExpr */, bs);
+
+            return (BindingSet) tmp[1];
+            
+        } catch (SailException ex) {
+            
+            throw new QueryEvaluationException(ex);
+            
+        }
+
     }
     
     /**
@@ -155,15 +191,16 @@ public class ASTEvalHelper {
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
 
+        // Batch resolve Values to IVs and convert to bigdata binding set.
+        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
+
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
 
         CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
         try {
-            itr = ASTEvalHelper
-                    .evaluateQuery(store, queryPlan,
-                            new QueryBindingSet(bs), context.queryEngine,
-                            new IVariable[0]/* required */);
+            itr = ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
+                    context.queryEngine, new IVariable[0]/* required */);
             return itr.hasNext();
         } finally {
             if (itr != null) {
@@ -195,8 +232,11 @@ public class ASTEvalHelper {
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
 
+        // Batch resolve Values to IVs and convert to bigdata binding set.
+        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
+
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
 
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -208,7 +248,7 @@ public class ASTEvalHelper {
             projectedSet.add(var.getName());
 
         return new TupleQueryResultImpl(projectedSet,
-                ASTEvalHelper.evaluateQuery(store, queryPlan, bs,
+                ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
                         context.queryEngine, projected));
 
     }
@@ -234,8 +274,11 @@ public class ASTEvalHelper {
         // Clear the optimized AST.
         astContainer.clearOptimizedAST();
         
+        // Batch resolve Values to IVs and convert to bigdata binding set.
+        final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
+        
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context);
+        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -247,7 +290,7 @@ public class ASTEvalHelper {
                         ASTEvalHelper.evaluateQuery(
                                 store,
                                 queryPlan,
-                                bs,//
+                                bset,//
                                 context.queryEngine, //
                                 optimizedQuery.getProjection()
                                         .getProjectionVars()//
@@ -282,7 +325,7 @@ public class ASTEvalHelper {
      */
     static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final AbstractTripleStore database, final PipelineOp queryPlan,
-            final QueryBindingSet bs, final QueryEngine queryEngine,
+            final IBindingSet bs, final QueryEngine queryEngine,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
         IRunningQuery runningQuery = null;
