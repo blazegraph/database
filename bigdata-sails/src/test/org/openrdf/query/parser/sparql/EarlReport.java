@@ -32,7 +32,7 @@ import org.openrdf.rio.RDFWriterRegistry;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLSyntaxTest;
+import com.bigdata.rdf.sail.tck.Bigdata2ASTSPARQLSyntaxTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 
 /**
@@ -96,7 +96,7 @@ public class EarlReport {
 		testResult.addListener(listener);
 
 		BigdataSparqlTest.suite().run(testResult); // BBT : Override.
-		BigdataSPARQLSyntaxTest.suite().run(testResult); // BBT : Override
+		Bigdata2ASTSPARQLSyntaxTest.suite().run(testResult); // BBT : Override
 
 		con.setAutoCommit(false); // BBT: Override
 
