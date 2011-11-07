@@ -327,7 +327,7 @@ public class HTreeHashJoinUtility {
      * 
      * TODO parameter from operator annotations.
      */
-    private final int chunkSize = 10000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
+    private final int chunkSize = 1000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
     /**
      * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
