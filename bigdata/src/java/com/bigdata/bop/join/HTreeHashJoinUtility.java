@@ -82,6 +82,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.striterator.Chunkerator;
+import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -672,7 +673,7 @@ public class HTreeHashJoinUtility {
         if (stats == null)
             throw new IllegalArgumentException();
 
-        long n = 0L;
+        long naccepted = 0L;
         
         final HTree htree = getRightSolutions();
 
@@ -680,68 +681,91 @@ public class HTreeHashJoinUtility {
         
         final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
         
-        while (itr.hasNext()) {
+        /*
+         * Rechunk in order to have a nice fat vector size for ordered inserts.
+         */
+        final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
+                new Dechunkerator<IBindingSet>(itr), chunkSize,
+                IBindingSet.class);
 
-            final IBindingSet[] a = itr.next();
+        final AtomicInteger vectorSize = new AtomicInteger();
+        while (it.hasNext()) {
+
+            final BS[] a = vector(it.next(), joinVars, null/* selectVars */,
+                    false/* ignoreUnboundVariables */, vectorSize);
+
+            final int n = vectorSize.get();
+            
+//        while (itr.hasNext()) {
+//
+//            final IBindingSet[] a = itr.next();
 
             stats.chunksIn.increment();
             stats.unitsIn.add(a.length);
 
-            for (IBindingSet bset : a) {
+//            for (IBindingSet bset : a) {
+//
+//                int hashCode = ONE; // default (used iff join is optional).
+//                try {
+//
+//                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
+//                            ignoreUnboundVariables);
+//
+//                } catch (JoinVariableNotBoundException ex) {
+//
+//                    if (!optional) {
+//                        
+//                        // Drop solution;
+//
+//                        if (log.isTraceEnabled())
+//                            log.trace(ex);
+//
+//                        continue;
+//
+//                    }
+//                    
+//                }
+            
+            for (int i = 0; i < n; i++) {
 
-                int hashCode = ONE; // default (used iff join is optional).
-                try {
-
-                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
-                            ignoreUnboundVariables);
-
-                } catch (JoinVariableNotBoundException ex) {
-
-                    if (!optional) {
-                        
-                        // Drop solution;
-
-                        if (log.isTraceEnabled())
-                            log.trace(ex);
-
-                        continue;
-
-                    }
-                    
-                }
+                final BS tmp = a[i];
 
                 // Update the schema.
-                updateSchema(bset);
+                updateSchema(tmp.bset);
 
-                // TODO Vector the inserts.
-                
                 // Encode the key.
-                final byte[] key = keyBuilder.reset().append(hashCode).getKey();
-                
+                final byte[] key = keyBuilder.reset().append(tmp.hashCode)
+                        .getKey();
+
                 // Encode the solution.
                 final byte[] val = encodeSolution(keyBuilder, schema, cache,
-                        bset);
-                
+                        tmp.bset);
+
                 // Insert binding set under hash code for that key.
-                htree.insert(key,val);
-                
+                htree.insert(key, val);
+
             }
 
-            n += a.length;
+            naccepted += a.length;
 
             updateIVCache(cache, ivCache.get());
 
         }
         
-        return n;
+        return naccepted;
 
     }
 
     /**
      * Filter solutions, writing only the DISTINCT solutions onto the sink.
-     * @param itr The source solutions.
-     * @param stats The stats to be updated.
-     * @param sink The sink.
+     * 
+     * @param itr
+     *            The source solutions.
+     * @param stats
+     *            The stats to be updated.
+     * @param sink
+     *            The sink.
+     *            
      * @return The #of source solutions which pass the filter.
      */
     public long filterSolutions(final ICloseableIterator<IBindingSet[]> itr,
@@ -753,51 +777,69 @@ public class HTreeHashJoinUtility {
         if (stats == null)
             throw new IllegalArgumentException();
 
-        long n = 0L;
+        long naccepted = 0L;
         
         final HTree htree = getRightSolutions();
 
 //        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
         
         final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
-        
-        while (itr.hasNext()) {
 
-            final IBindingSet[] a = itr.next();
+        /*
+         * Rechunk in order to have a nice fat vector size for ordered inserts.
+         */
+        final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
+                new Dechunkerator<IBindingSet>(itr), chunkSize,
+                IBindingSet.class);
+
+        final AtomicInteger vectorSize = new AtomicInteger();
+        while (it.hasNext()) {
+
+            final BS[] a = vector(it.next(), joinVars, selectVars,
+                    true/* ignoreUnboundVariables */, vectorSize);
+  
+            final int n = vectorSize.get();
+
+//        while (itr.hasNext()) {
+//
+//            final IBindingSet[] a = itr.next();
 
             stats.chunksIn.increment();
             stats.unitsIn.add(a.length);
 
-            for (IBindingSet bset : a) {
+//            for (IBindingSet bset : a) {
+//                
+//                // Note: Must *only* consider the projected variables.
+//                bset = bset.copy(selectVars);
+//
+//                int hashCode = ONE; // default (used iff join is optional).
+//                try {
+//
+//                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
+//                            ignoreUnboundVariables);
+//
+//                } catch (JoinVariableNotBoundException ex) {
+//
+//                    // Exception is not thrown when used as a filter.
+//                    throw new AssertionError();
+//                    
+//                }
 
-                // Only consider the projected variables.
-                bset = bset.copy(selectVars);
+            for (int i = 0; i < n; i++) {
+
+                final BS tmp = a[i];
                 
-                int hashCode = ONE; // default (used iff join is optional).
-                try {
-
-                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
-                            ignoreUnboundVariables);
-
-                } catch (JoinVariableNotBoundException ex) {
-
-                    // Exception is not thrown when used as a filter.
-                    throw new AssertionError();
-                    
-                }
-
-                // TODO Vector the inserts.
-
                 // Update the schema.
-                updateSchema(bset);
+                updateSchema(tmp.bset);
 
                 // Encode the key.
-                final byte[] key = keyBuilder.reset().append(hashCode).getKey();
-                
+                final byte[] key = keyBuilder.reset().append(tmp.hashCode)
+                        .getKey();
+
                 // Encode the solution.
                 final byte[] val = encodeSolution(keyBuilder, schema,
-                        null/* cache */, bset);
-                
+                        null/* cache */, tmp.bset);
+
                 /*
                  * Search the hash index for a match.
                  */
@@ -830,19 +872,19 @@ public class HTreeHashJoinUtility {
                     htree.insert(key, val);
 
                     // Write onto the sink.
-                    sink.add(bset);
+                    sink.add(tmp.bset);
 
+                    naccepted++;
+                    
                 }
                 
             }
-
-            n += a.length;
 
 //            updateIVCache(cache, ivCache.get());
 
         }
         
-        return n;
+        return naccepted;
 
     }
     
@@ -1171,7 +1213,9 @@ public class HTreeHashJoinUtility {
             final AtomicInteger vectorSize = new AtomicInteger();
             while (it.hasNext()) {
 
-                final BS[] a = vector(it.next(), vectorSize);
+                final BS[] a = vector(it.next(), joinVars,
+                        null/* selectVars */,
+                        false/* ignoreUnboundVariables */, vectorSize);
                 
                 final int n = vectorSize.get();
 
@@ -1334,12 +1378,25 @@ public class HTreeHashJoinUtility {
      * 
      * @param leftSolutions
      *            The solutions.
+     * @param joinVars
+     *            The variables on which the hash code will be computed.
+     * @param selectVars
+     *            When non-<code>null</code>, all other variables are dropped.
+     *            (This is used when we are modeling a DISTINCT solutions filter
+     *            since we need to drop anything which is not part of the
+     *            DISTINCT variables list.)
+     * @param ignoreUnboundVariables
+     *            When <code>true</code>, an unbound variable will not cause a
+     *            {@link JoinVariableNotBoundException} to be thrown.
      * @param vectorSize
      *            The vector size (set by side-effect).
-     *            
+     * 
      * @return The vectored chunk of solutions ordered by hash code.
      */
     private BS[] vector(final IBindingSet[] leftSolutions,
+            final IVariable<?>[] joinVars,
+            final IVariable<?>[] selectVars,
+            final boolean ignoreUnboundVariables,
             final AtomicInteger vectorSize) {
 
         final BS[] a = new BS[leftSolutions.length];
@@ -1348,12 +1405,21 @@ public class HTreeHashJoinUtility {
 
         for (int i = 0; i < a.length; i++) {
 
+            /*
+             * Note: If this is a DISINCT FILTER, then we need to drop the
+             * variables which are not being considered immediately. Those
+             * variables MUST NOT participate in the computed hash code.
+             */
+
+            final IBindingSet bset = selectVars == null ? leftSolutions[i]
+                    : leftSolutions[i].copy(selectVars);
+
             // Compute hash code from bindings on the join vars.
             int hashCode;
             try {
                 hashCode = HTreeHashJoinUtility.hashCode(joinVars,
-                        leftSolutions[i], ignoreUnboundVariables);
-                a[n++] = new BS(hashCode, leftSolutions[i]);
+                        bset, ignoreUnboundVariables);
+                a[n++] = new BS(hashCode, bset);
             } catch (JoinVariableNotBoundException ex) {
                 // Drop solution
                 if (log.isTraceEnabled())
