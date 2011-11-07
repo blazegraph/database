@@ -84,7 +84,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * @see AST2BOpBase#nativeDefaultGraph
      */
-    boolean nativeDistinct = false;
+    boolean nativeDistinct = true;
 
     /**
      * When <code>true</code>, use hash joins based on the {@link HTree}.
@@ -97,7 +97,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * TODO Query hint to control this on an overall and per join basis.
      */
-    boolean nativeHashJoins = false;
+    boolean nativeHashJoins = true;
     
     /**
      * When <code>true</code>, the projection of the query will be materialized
