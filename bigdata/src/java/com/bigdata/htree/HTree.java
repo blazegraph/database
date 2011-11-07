@@ -56,6 +56,7 @@ import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
 import com.bigdata.btree.ReadOnlyCounter;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -1022,13 +1023,27 @@ public class HTree extends AbstractHTree
     
     /**
      * Convert an int32 hash code key into an <code>unsigned byte[4]</code>.
+     * <p>
+     * Note: This encoding MUST be consistent with
+     * {@link IKeyBuilder#append(int)}.
      */
     private byte[] i2k(final int key) {
+        // lexiographic ordering as unsigned int.
+        int v = key;
+        if (v < 0) {
+
+            v = v - 0x80000000;
+
+        } else {
+            
+            v = 0x80000000 + v;
+            
+        }
 		final byte[] buf = new byte[4];
-		buf[0] = (byte) (key >>> 24);
-		buf[1] = (byte) (key >>> 16);
-		buf[2] = (byte) (key >>> 8);
-		buf[3] = (byte) (key >>> 0);
+		buf[0] = (byte) (v >>> 24);
+		buf[1] = (byte) (v >>> 16);
+		buf[2] = (byte) (v >>> 8);
+		buf[3] = (byte) (v >>> 0);
 		return buf;
     }
 
