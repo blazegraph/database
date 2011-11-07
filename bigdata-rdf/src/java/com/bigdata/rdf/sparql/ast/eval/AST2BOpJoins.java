@@ -961,7 +961,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             final long estimatedInputCardinality = Long.MAX_VALUE; // FIXME From the RTO. 
             
-            // FIXME From query hint / AST2BaseContext default.
+            // FIXME From query hint / *AST2BaseContext* default.
             final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
 
             /*

@@ -66,7 +66,12 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * This operator does not use internal parallelism, but it is thread-safe and
  * multiple instances of this operator may be run in parallel by the query
  * engine for parallel evaluation of different binding set chunks flowing
- * through the pipeline.
+ * through the pipeline. However, there are much more efficient query plan
+ * patterns for most use cases. E.g., (a) creating a hash index with all source
+ * solutions, (b) flooding a sub-section of the query plan with the source
+ * solutions from the hash index; and (c) hash joining the solutions from the
+ * sub-section of the query plan back against the hash index to reunite the
+ * solutions from the subquery with those in the parent context.
  * 
  * <h3>Usage Notes</h3>
  * 
@@ -81,7 +86,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * by the subquery but which appear in the subquery as well, then such variables
  * in the subquery are effectively distinct from those having the same name
  * which appear in the parent query. In order to have correct bottom-up
- * evaluation semantics under these conditions.  This is handled by "projecting"
+ * evaluation semantics under these conditions. This is handled by "projecting"
  * only those variables into the subquery which it will project out.
  * 
  * @todo Rename as SubqueryPipelineJoinOp.

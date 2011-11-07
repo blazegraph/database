@@ -31,8 +31,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
@@ -46,7 +44,7 @@ import com.bigdata.bop.IVariable;
  */
 public class StaticAnalysisBase {
 
-    private static final Logger log = Logger.getLogger(StaticAnalysisBase.class);
+//    private static final Logger log = Logger.getLogger(StaticAnalysisBase.class);
     
     protected final QueryRoot queryRoot;
     
@@ -222,11 +220,13 @@ public class StaticAnalysisBase {
             throw new AssertionError();
         }
 
-        for (IVariable<?> var : proj.getProjectionVars()) {
-
-            varSet.add(var);
-
-        }
+        proj.getProjectionVars(varSet);
+        
+//        for (IVariable<?> var : proj.getProjectionVars()) {
+//
+//            varSet.add(var);
+//
+//        }
         
     }
 

@@ -288,7 +288,7 @@ public class HTreeHashIndexOp extends PipelineOp {
                     
                     state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
-                            op.isOptional());
+                            op.isOptional(), false/* filter */);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

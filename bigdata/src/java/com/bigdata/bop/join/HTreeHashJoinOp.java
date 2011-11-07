@@ -309,7 +309,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                 if (state == null) {
 
                     state = new HTreeHashJoinUtility(context.getRunningQuery()
-                            .getMemoryManager(), op, op.isOptional());
+                            .getMemoryManager(), op, op.isOptional(), false/* filter */);
 
                     attrs.put(joinStateKey, state);
 

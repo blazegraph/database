@@ -240,7 +240,7 @@ public class AST2BOpFilters extends AST2BOpBase {
         if (nvars == 0)
             return left;
 
-        final long timestamp = getTimestamp(ctx);
+        final long timestamp = getLexiconReadTimestamp(ctx);
 
         final String ns = ctx.db.getLexiconRelation().getNamespace();
 
@@ -251,17 +251,13 @@ public class AST2BOpFilters extends AST2BOpBase {
              * is used when the IVs in the final solutions are materialized as
              * RDF Values.
              * 
-             * TODO We could also use this operator to materialize the solutions
-             * at the end of the top-level query plan rather than wrapping the
-             * iterator.
-             * 
              * TODO We should drop the more complicated materialization pipeline
              * logic unless a performance advantage can be demonstrated either
              * on a Journal or a cluster.
              */
             return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
-                    vars.toArray(new IVariable[0]), ns, timestamp).setProperty(
-                    BOp.Annotations.BOP_ID, ctx.nextId());
+                    vars.toArray(new IVariable[nvars]), ns, timestamp)
+                    .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
         }
 
         final Iterator<IVariable<IV>> it = vars.iterator();
@@ -420,7 +416,7 @@ public class AST2BOpFilters extends AST2BOpBase {
      * point in order to see any writes which it may have performed (lexicon
      * writes are always unisolated).
      */
-    static private long getTimestamp(final AST2BOpContext ctx) {
+    static protected long getLexiconReadTimestamp(final AST2BOpContext ctx) {
        
         long timestamp = ctx.db.getTimestamp();
 

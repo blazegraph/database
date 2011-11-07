@@ -197,10 +197,20 @@ public class ASTEvalHelper {
         // Convert the query (generates an optimized AST as a side-effect).
         final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
 
+        // The optimized AST.
+        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+
+        // Note: We do not need to materialize anything for ASK.
+        final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
+                && !optimizedQuery.hasSlice();
+
         CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
         try {
             itr = ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
-                    context.queryEngine, new IVariable[0]/* required */);
+                    context.queryEngine
+                    , materializeProjectionInQuery//
+                    , new IVariable[0]// required
+                    );
             return itr.hasNext();
         } finally {
             if (itr != null) {
@@ -247,9 +257,18 @@ public class ASTEvalHelper {
         for (IVariable<?> var : projected)
             projectedSet.add(var.getName());
 
+        // The optimized AST.
+        final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
+
+        final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
+                && !optimizedQuery.hasSlice();
+
         return new TupleQueryResultImpl(projectedSet,
                 ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
-                        context.queryEngine, projected));
+                        context.queryEngine
+                        ,materializeProjectionInQuery//
+                        , projected//
+                        ));
 
     }
     
@@ -283,6 +302,9 @@ public class ASTEvalHelper {
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
         
+        final boolean materializeProjectionInQuery = context.materializeProjectionInQuery
+                && !optimizedQuery.hasSlice();
+
         return new GraphQueryResultImpl(//
                 optimizedQuery.getPrefixDecls(), //
                 new ASTConstructIterator(store, //
@@ -291,8 +313,9 @@ public class ASTEvalHelper {
                                 store,
                                 queryPlan,
                                 bset,//
-                                context.queryEngine, //
-                                optimizedQuery.getProjection()
+                                context.queryEngine //
+                                ,materializeProjectionInQuery//
+                                ,optimizedQuery.getProjection()
                                         .getProjectionVars()//
                                 )));
 
@@ -310,6 +333,10 @@ public class ASTEvalHelper {
      *            The source binding set.
      * @param queryEngine
      *            The query engine on which the query will run.
+     * @param materializeProjectionInQuery
+     *            When <code>true</code>, the projection was materialized within
+     *            query plan. When <code>false</code>, this method will take
+     *            responsibility for that materialization step.
      * @param required
      *            The variables which must be materialized. Only materialized
      *            variables will be reported in the output solutions. This MAY
@@ -326,10 +353,11 @@ public class ASTEvalHelper {
     static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final AbstractTripleStore database, final PipelineOp queryPlan,
             final IBindingSet bs, final QueryEngine queryEngine,
+            final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
         IRunningQuery runningQuery = null;
-        IAsynchronousIterator<IBindingSet[]> source = null; 
+        IAsynchronousIterator<IBindingSet[]> source = null;
         try {
             
             source = wrapSource(database, bs);
@@ -341,7 +369,8 @@ public class ASTEvalHelper {
              * Wrap up the native bigdata query solution iterator as Sesame
              * compatible iteration with materialized RDF Values.
              */
-            return iterator(runningQuery, database, required);
+            return iterator(runningQuery, database,
+                    materializeProjectionInQuery, required);
 
         } catch (Throwable t) {
             if (runningQuery != null) {
@@ -401,31 +430,64 @@ public class ASTEvalHelper {
      * @param db
      *            The view of the {@link AbstractTripleStore} against which the
      *            query is running.
+     * @param materializeProjectionInQuery
+     *            When <code>true</code>, the projection was materialized within
+     *            query plan. When <code>false</code>, this method will take
+     *            responsibility for that materialization step.
      * @param required
      *            The variables which must be materialized (optional).
-     *            
+     * 
      * @return A Sesame {@link CloseableIteration} which will drain
      *         {@link BindingSet}s of materialized RDF {@link Value}s.
      */
-    private static CloseableIteration<BindingSet, QueryEvaluationException> 
-        iterator(final IRunningQuery runningQuery, final AbstractTripleStore db,
+    private static CloseableIteration<BindingSet, QueryEvaluationException> iterator(
+            final IRunningQuery runningQuery, final AbstractTripleStore db,
+            final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) {
     
+        /*
+         * FIXME We should not dechunk just to rechunk here.  This is not very
+         * efficient.
+         */
+        
         // Dechunkify the running query and monitor the Sesame iterator.
         final ICloseableIterator<IBindingSet> it1 = iterator(runningQuery);
         
         // Wrap in an IChunkedOrderedIterator
         final IChunkedOrderedIterator<IBindingSet> it2 = 
             new ChunkedWrappedIterator<IBindingSet>(it1);
+
+        final CloseableIteration<BindingSet, QueryEvaluationException> it3; 
+        if(materializeProjectionInQuery) {
         
-        // Materialize IVs as RDF Values.
-        final CloseableIteration<BindingSet, QueryEvaluationException> it3 =
+            /*
+             * The projection of the query is being materialized by the query
+             * plan. All we have to do here is convert bigdata IBindingSets
+             * consisting of IVs having cached BigdataValues to Sesame
+             * BindingSets.
+             */
+            
+            // Convert IVs in IBindingSets to Sesame BindingSets with Values.
+            it3 = new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                    it2);
+        
+        } else {
+        
+            /*
+             * The projection of the query was not materialized by the query
+             * plan. We need to layer in a chunked iterator which handles that
+             * materialization step and then do the conversion into Sesame
+             * BindingSet objects.
+             */
+            
             // Convert bigdata binding sets to Sesame binding sets.
-            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-                // Materialize IVs as RDF Values.
-                new BigdataBindingSetResolverator(db, it2, required).start(
-                        db.getExecutorService()));
-        
+            it3 = new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+                    // Materialize IVs as RDF Values.
+                    new BigdataBindingSetResolverator(db, it2, required)
+                            .start(db.getExecutorService()));
+
+        }
+     
         return it3;
         
     }

@@ -71,6 +71,7 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * Unit tests for {@link SubqueryHashJoinOp}.
  * 
  * @author thompsonbry
+ * @deprecated by a different pattern for handling subquery evaluation.
  */
 public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
 

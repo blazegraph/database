@@ -49,6 +49,8 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 /**
  * Unit tests for {@link NativeDistinctFilter}.
  * 
+ * FIXME This test suite is incorrect. The iterator filters SPOs, not IVs.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
