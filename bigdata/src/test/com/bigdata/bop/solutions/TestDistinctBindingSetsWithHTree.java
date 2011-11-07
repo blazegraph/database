@@ -33,6 +33,9 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.LiteralImpl;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
@@ -52,6 +55,12 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -83,6 +92,104 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
     public TestDistinctBindingSetsWithHTree(String name) {
         super(name);
     }
+    
+    /**
+     * Setup for a problem used by many of the join test suites.
+     */
+    static protected class Setup {
+
+        protected final String namespace;
+
+        protected final IV<?, ?> brad, john, fred, jane, mary, paul, leon;
+
+        protected final List<IBindingSet> data;
+
+        public Setup(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+            
+            this.namespace = namespace;
+
+            brad = makeIV(new LiteralImpl("Brad"));
+            
+            john = makeIV(new LiteralImpl("John"));
+
+            fred = makeIV(new LiteralImpl("Fred"));
+
+            jane = makeIV(new LiteralImpl("Jane "));
+
+            mary = makeIV(new LiteralImpl("Mary"));
+
+            paul = makeIV(new LiteralImpl("Paul"));
+
+            leon = makeIV(new LiteralImpl("Leon"));
+            
+            final Var<?> x = Var.var("x");
+            final Var<?> y = Var.var("y");
+
+            data = new LinkedList<IBindingSet>();
+            IBindingSet bset = null;
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(john));
+                bset.set(y, new Constant<IV>(mary));
+                data.add(bset);
+            }
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(mary));
+                bset.set(y, new Constant<IV>(paul));
+                data.add(bset);
+            }
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(mary));
+                bset.set(y, new Constant<IV>(jane));
+                data.add(bset);
+            }
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(paul));
+                bset.set(y, new Constant<IV>(leon));
+                data.add(bset);
+            }
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(paul));
+                bset.set(y, new Constant<IV>(john));
+                data.add(bset);
+            }
+            {
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<IV>(leon));
+                bset.set(y, new Constant<IV>(paul));
+                data.add(bset);
+            }
+
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+    }
 
 //    @Override
 //    public Properties getProperties() {
@@ -98,65 +205,16 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
 
 //    Journal jnl = null;
 
-    List<IBindingSet> data = null;
-
+    protected Setup setup;
+    
     public void setUp() throws Exception {
 
 //        jnl = new Journal(getProperties());
-
-        setUpData();
-
-    }
-
-    /**
-     * Setup the data.
-     */
-    private void setUpData() {
-
-        final Var<?> x = Var.var("x");
-        final Var<?> y = Var.var("y");
-
-        data = new LinkedList<IBindingSet>();
-            IBindingSet bset = null;
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("John"));
-                bset.set(y, new Constant<String>("Mary"));
-                data.add(bset);
-            }
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Paul"));
-                data.add(bset);
-            }
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Mary"));
-                bset.set(y, new Constant<String>("Jane"));
-                data.add(bset);
-            }
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("Leon"));
-                data.add(bset);
-            }
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Paul"));
-                bset.set(y, new Constant<String>("John"));
-                data.add(bset);
-            }
-            {
-                bset = new HashBindingSet();
-                bset.set(x, new Constant<String>("Leon"));
-                bset.set(y, new Constant<String>("Paul"));
-                data.add(bset);
-            }
+        
+        setup = new Setup(getName());
 
     }
-
+    
     public void tearDown() throws Exception {
 
 //        if (jnl != null) {
@@ -165,7 +223,7 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
 //        }
 //        
         // clear reference.
-        data = null;
+        setup = null;
 
     }
     
@@ -312,17 +370,17 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
         new ListBindingSet(//
                 new IVariable[] { x },//
-                new IConstant[] { new Constant<String>("John") }//
+                new IConstant[] { new Constant<IV>(setup.john) }//
                 ),//
                 new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
+                        new IConstant[] { new Constant<IV>(setup.mary) }//
                 ), new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Paul") }//
+                        new IConstant[] { new Constant<IV>(setup.paul) }//
                 ), new ListBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Leon") }//
+                        new IConstant[] { new Constant<IV>(setup.leon) }//
                 ), };
 
         final MockQueryContext queryContext = new MockQueryContext(queryId);
@@ -331,7 +389,7 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
             final BOpStats stats = query.newStats();
 
             final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                    new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+                    new IBindingSet[][] { setup.data.toArray(new IBindingSet[0]) });
 
             final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
                     query, stats);

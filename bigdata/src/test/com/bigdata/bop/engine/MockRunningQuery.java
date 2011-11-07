@@ -147,8 +147,7 @@ public class MockRunningQuery implements IRunningQuery {
 	}
 
 	public UUID getQueryId() {
-		// TODO Auto-generated method stub
-		return null;
+		return queryContext.getQueryId();
 	}
 
     public IAsynchronousIterator<IBindingSet[]> iterator() {
