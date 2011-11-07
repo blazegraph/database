@@ -2,7 +2,7 @@
 
 #SELECT ( COUNT(?_var3) as ?count ) # 18s, 2M results.
 #SELECT ?_var3 # 138802ms, 2M results (added time is materialization costs)
-SELECT DISTINCT ?_var3 # 1069665ms, 11849 (added time is DISTINCT SOLUTIONS cost).
+SELECT DISTINCT ?_var3 # 67351ms (1k chunks), 11849 (added time is DISTINCT SOLUTIONS cost).
 WHERE {
   GRAPH ?g {
     ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k
