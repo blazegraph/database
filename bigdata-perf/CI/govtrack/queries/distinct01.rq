@@ -2,6 +2,8 @@
 
 SELECT DISTINCT ?_var3
 WHERE{
-  ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k
-  ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M
+  GRAPH ?g {
+    ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k
+    ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M
+  }
 }
