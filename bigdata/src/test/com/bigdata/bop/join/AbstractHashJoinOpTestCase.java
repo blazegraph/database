@@ -53,7 +53,6 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
-import com.bigdata.bop.controller.SubqueryHashJoinOp;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
@@ -632,7 +631,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 }));
 
         final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp, 
-                new NV(SubqueryHashJoinOp.Annotations.CONSTRAINTS,
+                new NV(JoinAnnotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
                                 .wrap(new EQConstant(x, new Constant<IV>(setup.brad))),//
                         }));
@@ -750,7 +749,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
 
         final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars,
                 predOp,//
-                new NV(SubqueryHashJoinOp.Annotations.SELECT,
+                new NV(JoinAnnotations.SELECT,
                         new IVariable[] { x })//
         );
 
