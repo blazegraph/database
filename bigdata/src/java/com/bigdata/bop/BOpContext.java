@@ -259,11 +259,15 @@ public class BOpContext<E> extends BOpContextBase {
      */
     public IRunningQuery getRunningQuery(final UUID queryId) {
 
-        // Lookup the query by its UUID. 
+        // Lookup the query by its UUID.
         final IRunningQuery runningQuery;
         try {
-            runningQuery = getRunningQuery().getQueryEngine()
-                    .getRunningQuery(queryId);
+            if (queryId.equals(this.runningQuery.getQueryId())) {
+                runningQuery = this.runningQuery;
+            } else {
+                runningQuery = getRunningQuery().getQueryEngine()
+                        .getRunningQuery(queryId);
+            }
 
         } catch (RuntimeException ex) {
             throw new RuntimeException("Query halted? : " + ex, ex);
