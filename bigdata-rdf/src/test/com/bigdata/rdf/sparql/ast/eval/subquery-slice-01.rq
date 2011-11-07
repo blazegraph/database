@@ -1,0 +1,8 @@
+PREFIX : <http://example.org/>
+SELECT (COUNT(*) as ?count) 
+WHERE {
+	 ?s :p ?o .
+	 { 
+	 	SELECT ?s { ?s a :ty } LIMIT 3
+	 } 
+}

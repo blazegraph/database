@@ -137,6 +137,15 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * Unit test of a SPARQL 1.1 subquery with a SLICE on the subquery.
+     */
+    public void test_sparql_subquery_slice_01() throws Exception {
+
+        new TestHelper("subquery-slice-01").runTest();
+
+    }
+
+    /**
      * Simple Sub-Select unit test
      *
      * <pre>
@@ -201,6 +210,17 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
      * This is a version of {@link #test_sparql_subselect()} which uses the same
      * data and has the same results, but which uses a named subquery rather
      * than a SPARQL 1.1 subselect.
+     * 
+     * <pre>
+     * select ?x ?o
+     *   with {
+     *     select ?x where { ?x rdf:type foaf:Person }
+     *   } AS %namedSet1
+     * where {
+     *   ?x rdfs:label ?o
+     *   INCLUDE %namedSet1 
+     * }
+     * </pre>
      */
     public void test_named_subquery() throws Exception {
 
@@ -219,7 +239,20 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 //    }
 
     /**
-     * Test that only projected variables are included in subquery results
+     * Test that only projected variables are included in subquery results.
+     * 
+     * <pre>
+     * PREFIX : <http://example.org/>
+     * SELECT ?s ?x
+     * WHERE {
+     *      {
+     *         SELECT ?s ?x { ?s :p ?x }
+     *      }
+     *      {
+     *         SELECT ?s ?fake1 ?fake2 { ?x :q ?s . LET (?fake1 := 1) . LET (?fake2 := 2) . }
+     *      }
+     * }
+     * </pre>
      */
     public void test_sparql11_subquery_scope() throws Exception {
 
@@ -228,11 +261,28 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Test that only projected variables are included in named-subquery results
+     * Test that only projected variables are included in named-subquery
+     * results.
+     * 
+     * <pre>
+     * PREFIX : <http://example.org/>
+     * SELECT ?s ?x
+     * WITH{
+     *     SELECT ?s ?x { ?s :p ?x }
+     * }as %set1
+     * WITH{
+     *     SELECT ?s ?fake1 ?fake2 { ?x :q ?s . LET (?fake1 := 1) . LET (?fake2 := 2) . }
+     * }as %set2
+     * WHERE {
+     *      INCLUDE %set1
+     *      INCLUDE %set2
+     * }
+     * </pre>
      */
     public void test_named_subquery_scope() throws Exception {
 
         new TestHelper("named-subquery-scope").runTest();
 
     }
+
 }

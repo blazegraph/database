@@ -192,8 +192,29 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
                 continue;
                 
             }
-            
-            if (subqueryRoot.getSlice() != null
+
+            if (subqueryRoot.hasSlice()) {
+
+                /*
+                 * Lift out SPARQL 1.1 subqueries which use LIMIT and/or OFFSET.
+                 * 
+                 * The SliceOp in the subquery will cause the IRunningQuery in
+                 * which it appears to be interrupted. Therefore, when a SLICE
+                 * is required for a subquery we need to lift it out to run it
+                 * as a named subquery.
+                 * 
+                 * TODO There may well be other cases that we have to handle
+                 * with as-bound evaluation of a Subquery with a LIMIT/OFFSET.
+                 * If so, then the subquery will have to be run using the
+                 * SubqueryOp.
+                 */
+
+                liftSparql11Subquery(context, sa, subqueryRoot);
+
+                continue;
+
+            }
+            if (subqueryRoot.hasSlice() 
                     && subqueryRoot.getOrderBy() != null) {
 
                 /*

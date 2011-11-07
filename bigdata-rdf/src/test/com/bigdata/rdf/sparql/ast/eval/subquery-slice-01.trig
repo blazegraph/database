@@ -1,0 +1,10 @@
+@prefix : <http://example.org/> .
+
+: {
+	:s1 a :ty ; :p :o1 .
+	:s2 a :ty ; :p :o2 .
+	:s3 a :ty ; :p :o3 .
+	:s4 a :ty ; :p :o4 .
+	:s5 a :ty ; :p :o5 .
+	:s6 a :ty ; :p :o6 .
+}
