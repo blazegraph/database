@@ -54,7 +54,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
- * Test suite for low-level operations on the TERMS index.
+ * Test suite for low-level operations on the BLOBS index.
  * 
  * @author thompsonbry
  */

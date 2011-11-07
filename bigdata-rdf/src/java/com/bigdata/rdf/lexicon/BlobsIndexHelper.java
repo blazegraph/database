@@ -362,14 +362,19 @@ public class BlobsIndexHelper {
                 // Can not match a NullIV.
                 continue;
 			}
-			
-            // raw bytes TODO More efficient if we can compare without
-            // materializing the tuple's value, or compare reusing a temporary
-            // buffer either from the caller or for the iterator.
-            final byte[] tmp2 = tuple.getValue();
 
-			// Note: Compares the compressed values ;-)
-			if(BytesUtil.bytesEqual(val, tmp2)) {
+            final ByteArrayBuffer tb = tuple.getValueBuffer();
+
+//          final byte[] tmp2 = tuple.getValue();
+//
+//        // Note: Compares the compressed values ;-)
+//        if(BytesUtil.bytesEqual(val, tmp2)) {
+
+            // compare without materializing the tuple's value
+            if (0 == BytesUtil.compareBytesWithLenAndOffset(
+                    0/* aoff */, val.length/* alen */, val,//
+                    0/* boff */, tb.limit()/* blen */, tb.array()/* b */
+            )) {
 
 				// Already in the index.
                 final short asFoundCounter = KeyBuilder.decodeShort(tuple
