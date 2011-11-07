@@ -325,7 +325,10 @@ public class HTreeHashJoinUtility {
     /**
      * This basically controls the vectoring of the hash join.
      * 
-     * TODO parameter from operator annotations.
+     * TODO parameter from operator annotations. Note that 10k tends to put too
+     * much heap pressure on the system if the source chunks happen to be
+     * smallish. 1000k or 100 is probably the right value until we improve
+     * vectoring of the query engine.
      */
     private final int chunkSize = 1000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
 
@@ -1415,17 +1418,27 @@ public class HTreeHashJoinUtility {
                     : leftSolutions[i].copy(selectVars);
 
             // Compute hash code from bindings on the join vars.
-            int hashCode;
+            int hashCode = ONE;
             try {
+
                 hashCode = HTreeHashJoinUtility.hashCode(joinVars,
                         bset, ignoreUnboundVariables);
-                a[n++] = new BS(hashCode, bset);
+                
             } catch (JoinVariableNotBoundException ex) {
-                // Drop solution
-                if (log.isTraceEnabled())
-                    log.trace(ex);
-                continue;
+
+                if (!optional) {// Drop solution
+                
+                    if (log.isTraceEnabled())
+                        log.trace(ex);
+                    
+                    continue;
+                    
+                }
+                
             }
+            
+            a[n++] = new BS(hashCode, bset);
+            
         }
 
         /*

@@ -119,6 +119,18 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * (lift it into the parent). (This sort of thing is not directly expressible in
  * the SPARQL syntax but it might arise through other AST transforms.)
  * 
+ * TODO Optimizer to lift optionals outside of an ORDER BY when the OPTIONALs
+ * are not used by the ORDER BY. This let's us avoid optional joins until we
+ * know what is in the result set.
+ * 
+ * TODO ORDER BY with LIMIT could be optimized as a pipelined + last pass
+ * operator which maintained a sorted array of LIMIT+OFFSET items. Any items
+ * which order after the LIMIT+OFFSET item in the list are discarded. This will
+ * keep down both the memory overhead of the ORDER BY operator and the #of
+ * comparisons to be made. (We still need a SLICE to handle the OFFSET unless
+ * the ORDER BY operator takes care of that during its last pass by only writing
+ * the items from OFFSET through LIMIT-1.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
  *          thompsonbry$
