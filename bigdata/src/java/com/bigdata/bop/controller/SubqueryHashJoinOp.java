@@ -68,6 +68,8 @@ import com.bigdata.striterator.Dechunkerator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinOp.java 5033 2011-08-16 19:02:04Z thompsonbry $
+ * 
+ * @deprecated by a different pattern for handling subquery evaluation.
  */
 public class SubqueryHashJoinOp extends PipelineOp {
 

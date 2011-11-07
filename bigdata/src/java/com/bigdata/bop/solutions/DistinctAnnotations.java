@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.solutions;
 
+import com.bigdata.bop.join.HashJoinAnnotations;
+
 /**
  * Annotations for DISTINCT operators.
  * 
@@ -38,6 +40,6 @@ public interface DistinctAnnotations {
 	 * Binding sets with distinct values for the specified variables will be
 	 * passed on.
 	 */
-	String VARIABLES = DistinctAnnotations.class.getName() + ".variables";
+	String VARIABLES = HashJoinAnnotations.JOIN_VARS;
 
 }

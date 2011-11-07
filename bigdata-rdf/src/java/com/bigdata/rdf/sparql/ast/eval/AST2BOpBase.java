@@ -92,7 +92,9 @@ public class AST2BOpBase {
 
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
-     * the native heap.
+     * the native heap (this is only used when we are doing a hash join against
+     * a default graph access path and the predicate for that access path has a
+     * large cardinality).
      */
     protected static boolean nativeDefaultGraph = true;
 
@@ -243,8 +245,8 @@ public class AST2BOpBase {
      *         been applied. If there are no query hints then the original
      *         operator is returned.
      * 
-     *         TODO This is being phased out by the
-     *         {@link ASTQueryHintOptimizer}
+     * @deprecated by {@link ASTQueryHintOptimizer} and explict declarations of
+     *             query hints and the scope in which they should be applied.
      */
     public static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {

@@ -99,6 +99,21 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Unit test for an optional which is too complex to be handled as a simple
      * optional (it involves more than one statement pattern).
+     * 
+     * <pre>
+     * select ?x ?o ?y ?z
+     * where {
+     *   ?x rdf:type foaf:Person
+     *   OPTIONAL {
+     *   ?x rdfs:label ?o
+     *   }
+     *   OPTIONAL {
+     *   ?x foaf:knows ?y .
+     *   ?y foaf:knows ?z .
+     *   FILTER ( ?z != ?x )
+     *   }
+     * }
+     * </pre>
      */
     public void test_complex_optional_01() throws Exception {
         

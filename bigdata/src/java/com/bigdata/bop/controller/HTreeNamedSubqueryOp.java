@@ -300,7 +300,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                      */
                     state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
-                            false/* optional */);
+                            false/* optional */, false/* filter */);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

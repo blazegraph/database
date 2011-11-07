@@ -27,15 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.internal.IV;
 
 /**
  * AST node modeling projected value expressions.
@@ -169,20 +170,40 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
     }
 
     /**
-     * Return the ordered subset of the value expressions which project a bare
-     * variable.
+     * Return the projected variables.
      */
     public IVariable[] getProjectionVars() {
 
-        final List<IVariable<IV>> vars = new LinkedList<IVariable<IV>>();
+        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
+
+        getProjectionVars(vars);
+//        for (AssignmentNode n : this) {
+//
+//            vars.add(n.getVar());
+//
+//        }
+
+        return (IVariable[]) vars.toArray(new IVariable[vars.size()]);
+
+    }
+    
+    /**
+     * Return the projected variables.
+     * 
+     * @param vars
+     *            A set into which the projected variables will be added.
+     * 
+     * @return The caller's set.
+     */
+    public Set<IVariable<?>> getProjectionVars(final Set<IVariable<?>> vars) {
 
         for (AssignmentNode n : this) {
 
             vars.add(n.getVar());
 
         }
-
-        return (IVariable[]) vars.toArray(new IVariable[vars.size()]);
+        
+        return vars;
 
     }
 

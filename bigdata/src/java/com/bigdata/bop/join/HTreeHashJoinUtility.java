@@ -65,7 +65,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.HTree;
@@ -133,6 +132,8 @@ public class HTreeHashJoinUtility {
      * @param bset
      *            The bindings whose as-bound hash code for the join variables
      *            will be computed.
+     * @param ignoreUnboundVariables
+     *            If a variable without a binding should be silently ignored.
      * 
      * @return The hash code.
      * 
@@ -140,7 +141,8 @@ public class HTreeHashJoinUtility {
      *             if there is no binding for a join variable.
      */
     private static int hashCode(final IVariable<?>[] joinVars,
-            final IBindingSet bset) throws JoinVariableNotBoundException {
+            final IBindingSet bset, final boolean ignoreUnboundVariables)
+            throws JoinVariableNotBoundException {
 
         int h = ONE;
 
@@ -150,9 +152,11 @@ public class HTreeHashJoinUtility {
 
             if (c == null) {
 
+                if(ignoreUnboundVariables)
+                    continue;
+                
                 // Reject any solution which does not have a binding for a join
                 // variable.
-
                 throw new JoinVariableNotBoundException(v.getName());
                 
             }
@@ -204,12 +208,23 @@ public class HTreeHashJoinUtility {
     public final boolean optional;
     
     /**
+     * <code>true</code> iff this is a DISTINCT filter.
+     */
+    private final boolean filter;
+    
+    /**
      * The join variables.
      * 
      * @see HashJoinAnnotations#JOIN_VARS
      */
     public final IVariable<?>[] joinVars;
 
+    /**
+     * When <code>true</code>, unbound join variables will not cause an
+     * exception to be thrown when their hash code is computed.
+     */
+    private final boolean ignoreUnboundVariables;
+    
     /**
      * The variables to be retained (optional, all variables are retained if
      * not specified).
@@ -283,7 +298,9 @@ public class HTreeHashJoinUtility {
      * otherwise.
      */
     protected HTree getJoinSet() {
+
         return joinSet.get();
+        
     }
     
     /**
@@ -304,6 +321,13 @@ public class HTreeHashJoinUtility {
      */
     private final AtomicBoolean open = new AtomicBoolean(true);
     
+    /**
+     * This basically controls the vectoring of the hash join.
+     * 
+     * TODO parameter from operator annotations.
+     */
+    private final int chunkSize = 10000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
+
     /**
      * Setup the {@link IndexMetadata} for {@link #rightSolutions} or
      * {@link #joinSet}.
@@ -404,16 +428,20 @@ public class HTreeHashJoinUtility {
      *            The IMemoryManager which will back the named solution set.
      * @param op
      *            The operator whose annotation will inform construction the
-     *            hash index. The {@link HTreeAnnotations} may be specified
-     *            for this operator and will control the initialization of
-     *            the various {@link HTree} instances.
+     *            hash index. The {@link HTreeAnnotations} may be specified for
+     *            this operator and will control the initialization of the
+     *            various {@link HTree} instances.
      * @param optional
      *            <code>true</code> iff the join is optional.
+     * @param filter
+     *            <code>true</code> iff the hash index is being used as a
+     *            DISTINCT filter. Various annotations pertaining to JOIN
+     *            processing are ignored when used as a DISTINCT filter.
      * 
-     * @see HTreeAnnotations
+     * @see HTreeHashJoinAnnotations
      */
     public HTreeHashJoinUtility(final IMemoryManager mmgr,
-            final PipelineOp op, final boolean optional) {
+            final PipelineOp op, final boolean optional, final boolean filter) {
 
         if (mmgr == null)
             throw new IllegalArgumentException();
@@ -425,16 +453,17 @@ public class HTreeHashJoinUtility {
         this.joinVars = (IVariable<?>[]) op
                 .getRequiredProperty(HashJoinAnnotations.JOIN_VARS);
 
-        // The projected variables (optional).
-        this.selectVars = (IVariable<?>[]) op
+        // The projected variables (optional and equal to the join variables iff
+        // this is a DISTINCT filter).
+        this.selectVars = filter ? joinVars : (IVariable<?>[]) op
                 .getProperty(JoinAnnotations.SELECT);
-        
+
         // Initialize the schema with the join variables.
         this.schema = new LinkedHashSet<IVariable<?>>();
         this.schema.addAll(Arrays.asList(joinVars));
 
         // The set of variables for which materialized values are observed.
-        this.ivCacheSchema = new LinkedHashSet<IVariable<?>>();
+        this.ivCacheSchema = filter ? null : new LinkedHashSet<IVariable<?>>();
 
         // The join constraints (optional).
         this.constraints = (IConstraint[]) op
@@ -442,6 +471,12 @@ public class HTreeHashJoinUtility {
 
         // Iff the join has OPTIONAL semantics.
         this.optional = optional;
+        
+        // Iff this is a DISTINCT filter.
+        this.filter = filter;
+        
+        // ignore unbound variables when used as a DISTINCT filter.
+        this.ignoreUnboundVariables = filter;
         
         /*
          * This wraps an efficient raw store interface around a child memory
@@ -465,7 +500,8 @@ public class HTreeHashJoinUtility {
          * BigdataValue references encountered on IVs. This map does not
          * store duplicate entries for the same IV.
          */
-        this.ivCache.set(BTree.create(store, getIVCacheIndexMetadata(op)));
+        if (!filter)
+            this.ivCache.set(BTree.create(store, getIVCacheIndexMetadata(op)));
 
     }
 
@@ -567,6 +603,12 @@ public class HTreeHashJoinUtility {
 
         schema.clear();
 
+        if (ivCacheSchema != null) {
+
+            ivCacheSchema.clear();
+            
+        }
+        
         HTree tmp = rightSolutions.getAndSet(null/* newValue */);
 
         if (tmp != null) {
@@ -634,9 +676,9 @@ public class HTreeHashJoinUtility {
         
         final HTree htree = getRightSolutions();
 
-        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
+        final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
         
-        final IKeyBuilder keyBuilder = new KeyBuilder(16);
+        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
         
         while (itr.hasNext()) {
 
@@ -650,7 +692,8 @@ public class HTreeHashJoinUtility {
                 int hashCode = ONE; // default (used iff join is optional).
                 try {
 
-                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset);
+                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
+                            ignoreUnboundVariables);
 
                 } catch (JoinVariableNotBoundException ex) {
 
@@ -670,9 +713,17 @@ public class HTreeHashJoinUtility {
                 // Update the schema.
                 updateSchema(bset);
 
+                // TODO Vector the inserts.
+                
+                // Encode the key.
+                final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+                
+                // Encode the solution.
+                final byte[] val = encodeSolution(keyBuilder, schema, cache,
+                        bset);
+                
                 // Insert binding set under hash code for that key.
-                htree.insert(hashCode,
-                        encodeSolution(keyBuilder, schema, cache, bset));
+                htree.insert(key,val);
                 
             }
 
@@ -686,6 +737,115 @@ public class HTreeHashJoinUtility {
 
     }
 
+    /**
+     * Filter solutions, writing only the DISTINCT solutions onto the sink.
+     * @param itr The source solutions.
+     * @param stats The stats to be updated.
+     * @param sink The sink.
+     * @return The #of source solutions which pass the filter.
+     */
+    public long filterSolutions(final ICloseableIterator<IBindingSet[]> itr,
+            final BOpStats stats, final IBuffer<IBindingSet> sink) {
+
+        if (itr == null)
+            throw new IllegalArgumentException();
+        
+        if (stats == null)
+            throw new IllegalArgumentException();
+
+        long n = 0L;
+        
+        final HTree htree = getRightSolutions();
+
+//        final Map<IV<?, ?>, BigdataValue> cache = new HashMap<IV<?, ?>, BigdataValue>();
+        
+        final IKeyBuilder keyBuilder = htree.getIndexMetadata().getKeyBuilder();
+        
+        while (itr.hasNext()) {
+
+            final IBindingSet[] a = itr.next();
+
+            stats.chunksIn.increment();
+            stats.unitsIn.add(a.length);
+
+            for (IBindingSet bset : a) {
+
+                // Only consider the projected variables.
+                bset = bset.copy(selectVars);
+                
+                int hashCode = ONE; // default (used iff join is optional).
+                try {
+
+                    hashCode = HTreeHashJoinUtility.hashCode(joinVars, bset,
+                            ignoreUnboundVariables);
+
+                } catch (JoinVariableNotBoundException ex) {
+
+                    // Exception is not thrown when used as a filter.
+                    throw new AssertionError();
+                    
+                }
+
+                // TODO Vector the inserts.
+
+                // Update the schema.
+                updateSchema(bset);
+
+                // Encode the key.
+                final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+                
+                // Encode the solution.
+                final byte[] val = encodeSolution(keyBuilder, schema,
+                        null/* cache */, bset);
+                
+                /*
+                 * Search the hash index for a match.
+                 */
+                boolean found = false;
+                
+                final ITupleIterator<?> titr = htree.lookupAll(key);
+
+                while(titr.hasNext()) {
+                
+                    final ITuple<?> t = titr.next();
+                    
+                    final ByteArrayBuffer tb = t.getValueBuffer();
+
+                    if (0 == BytesUtil.compareBytesWithLenAndOffset(
+                            0/* aoff */, val.length/* alen */, val,//
+                            0/* boff */, tb.limit()/* blen */, tb.array()/* b */
+                    )) {
+
+                        found = true;
+
+                        break;
+                        
+                    }
+                    
+                }
+
+                if (!found) {
+                
+                    // Add to the hash index.
+                    htree.insert(key, val);
+
+                    // Write onto the sink.
+                    sink.add(bset);
+
+                }
+                
+            }
+
+            n += a.length;
+
+//            updateIVCache(cache, ivCache.get());
+
+        }
+        
+        return n;
+
+    }
+    
     /**
      * Build up the schema. This includes all observed variables, not just those
      * declared in {@link #joinVars}
@@ -750,7 +910,8 @@ public class HTreeHashJoinUtility {
      *            {@link TermId#NullIV}.
      * @param cache
      *            Any cached {@link BigdataValue}s on the {@link IV}s are
-     *            inserted into this map.
+     *            inserted into this map (optional since the cache is not 
+     *            used when we are filtering DISTINCT solutions).
      * @param bset
      *            The solution to be encoded.
      * @return The encoded solution.
@@ -770,7 +931,7 @@ public class HTreeHashJoinUtility {
             } else {
                 final IV<?, ?> iv = c.get();
                 IVUtility.encode(keyBuilder, iv);
-                if (iv.hasValue()) {
+                if (iv.hasValue() && !filter) {
                     ivCacheSchema.add(v);
                     cache.put(iv, iv.getValue());
                 }
@@ -886,8 +1047,8 @@ public class HTreeHashJoinUtility {
     }
     
     /**
-     * Glue class for hash code and encoded binding set used when we need to
-     * vector the join set for an optional join.
+     * Glue class for hash code and encoded binding set used when we already
+     * have the binding set encoded.
      */
     private static class BS2 implements Comparable<BS2> {
 
@@ -999,15 +1160,11 @@ public class HTreeHashJoinUtility {
                         + htree.getEntryCount());
             }
             
-            /*
-             * This basically controls the vectoring of the hash join.
-             * 
-             * TODO parameter from operator annotations.
-             */
-            final int chunkSize = 10000;//ChunkedWrappedIterator.DEFAULT_CHUNK_SIZE;
-
             final HTree rightSolutions = this.getRightSolutions();
-            
+
+            final IKeyBuilder keyBuilder = rightSolutions.getIndexMetadata()
+                    .getKeyBuilder();
+
             final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
                     leftItr, chunkSize, IBindingSet.class);
 
@@ -1060,10 +1217,11 @@ public class HTreeHashJoinUtility {
                     int nrejected = 0;
                     {
 
+                        final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+                        
                         // visit all source solutions having the same hash code
-                        @SuppressWarnings("unchecked")
-                        final ITupleIterator<IBindingSet> titr = rightSolutions
-                                .lookupAll(hashCode);
+                        final ITupleIterator<?> titr = rightSolutions
+                                .lookupAll(key);
 
                         long sameHashCodeCount = 0;
                         
@@ -1071,7 +1229,7 @@ public class HTreeHashJoinUtility {
 
                             sameHashCodeCount++;
                             
-                            final ITuple<IBindingSet> t = titr.next();
+                            final ITuple<?> t = titr.next();
 
                             /*
                              * Note: The map entries must be the full source
@@ -1194,7 +1352,7 @@ public class HTreeHashJoinUtility {
             int hashCode;
             try {
                 hashCode = HTreeHashJoinUtility.hashCode(joinVars,
-                        leftSolutions[i]);
+                        leftSolutions[i], ignoreUnboundVariables);
                 a[n++] = new BS(hashCode, leftSolutions[i]);
             } catch (JoinVariableNotBoundException ex) {
                 // Drop solution
@@ -1235,15 +1393,19 @@ public class HTreeHashJoinUtility {
              * Do not insert if there is already an entry for that solution in
              * the join set.
              */
-            
+
+            final IKeyBuilder keyBuilder = joinSet.getIndexMetadata()
+                    .getKeyBuilder();
+
+            final byte[] key = keyBuilder.reset().append(joinSetHashCode)
+                    .getKey();
+
             // visit all joinSet solutions having the same hash code
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<IBindingSet> xitr = joinSet
-                    .lookupAll(joinSetHashCode);
+            final ITupleIterator<?> xitr = joinSet.lookupAll(key);
 
             while (xitr.hasNext()) {
 
-                final ITuple<IBindingSet> xt = xitr.next();
+                final ITuple<?> xt = xitr.next();
 
                 final ByteArrayBuffer b = xt.getValueBuffer();
 
@@ -1296,31 +1458,34 @@ public class HTreeHashJoinUtility {
                     + joinSet.getEntryCount());
         }
 
+        final HTree joinSet = getJoinSet();
+        
+        final IKeyBuilder keyBuilder = joinSet.getIndexMetadata()
+                .getKeyBuilder();
+
         // Visit all source solutions.
-        @SuppressWarnings("unchecked")
-        final ITupleIterator<IBindingSet> sitr = getRightSolutions()
-                .rangeIterator();
+        final ITupleIterator<?> sitr = getRightSolutions().rangeIterator();
         
         while(sitr.hasNext()) {
             
-            final ITuple<IBindingSet> t = sitr.next();
+            final ITuple<?> t = sitr.next();
             
             IBindingSet rightSolution = decodeSolution(t);
 
             // The hash code is based on the entire solution for the joinSet.
             final int hashCode = rightSolution.hashCode();
             
+            final byte[] key = keyBuilder.reset().append(hashCode).getKey();
+            
             // Probe the join set for this source solution.
-            @SuppressWarnings("unchecked")
-            final ITupleIterator<IBindingSet> jitr = getJoinSet()
-                    .lookupAll(hashCode);
+            final ITupleIterator<?> jitr = joinSet.lookupAll(key);
 
             boolean found = false;
-            while(jitr.hasNext()) {
+            while (jitr.hasNext()) {
 
                 // Note: Compare full solutions, not just the hash code!
-                
-                final ITuple<IBindingSet> xt = jitr.next();
+
+                final ITuple<?> xt = jitr.next();
 
                 final ByteArrayBuffer tb = t.getValueBuffer();
 
@@ -1331,6 +1496,7 @@ public class HTreeHashJoinUtility {
                         xb.limit()/* blen */, xb.array())) {
 
                     found = true;
+
                     break;
 
                 }

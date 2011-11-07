@@ -47,6 +47,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
@@ -56,12 +57,17 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Unit tests for {@link DistinctBindingSetOp}.
+ * Unit tests for {@link DistinctBindingSetsWithHTreeOp}.
+ * 
+ * FIXME This test suite need to be refactored since this operator is now RDF
+ * specific.
+ * 
+ * FIXME Write a unit test in which some variables are unbound; verify that only
+ * the variables which are being made DISTINCT are projected.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestDistinctBindingSets.java 4259 2011-02-28 16:24:53Z thompsonbry $
- * 
- * @todo write a unit test in which some variables are unbound.
+ * @version $Id: TestDistinctBindingSets.java 4259 2011-02-28 16:24:53Z
+ *          thompsonbry $
  */
 public class TestDistinctBindingSetsWithHTree extends TestCase2 {
 
@@ -169,16 +175,20 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
 
         final int distinctId = 1;
 
+        final UUID queryId = UUID.randomUUID();
+        
+        final IVariable<?>[] vars = new IVariable[] { x };
+
         // w/o variables.
         try {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                            new NamedSolutionSetRef(queryId, getName(), vars)),//
 //                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,
-                            true),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL,
                             1),//
                 }));
@@ -193,11 +203,11 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                            new NamedSolutionSetRef(queryId, getName(), vars)),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.ANY),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,
-                            true),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL,
                             1),//
                 }));
@@ -212,6 +222,8 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                            new NamedSolutionSetRef(queryId, getName(), vars)),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.SHARDED),//
@@ -226,21 +238,21 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         		log.info("Ignoring expected exception: "+ex);
         }
 
-        // w/o shared state.
+        // w/o named solution set reference.
         try {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+//                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+//                            new NamedSolutionSetRef(queryId, getName(), vars)),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-//                    new NV(PipelineOp.Annotations.SHARED_STATE,
-//                            true),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL,
                             1),//
                 }));
-        fail("Expecting: "+UnsupportedOperationException.class);
-        } catch(UnsupportedOperationException ex) {
+        fail("Expecting: "+IllegalStateException.class);
+        } catch(IllegalStateException ex) {
         	if(log.isInfoEnabled())
         		log.info("Ignoring expected exception: "+ex);
         }
@@ -250,11 +262,11 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
         new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                            new NamedSolutionSetRef(queryId, getName(), vars)),//
                     new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,
-                            true),//
 //                    new NV(PipelineOp.Annotations.MAX_PARALLEL,
 //                            1),//
                 }));
@@ -275,15 +287,21 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
     public void test_distinctBindingSets() throws InterruptedException,
             ExecutionException {
 
+        final UUID queryId = UUID.randomUUID();
+
         final Var<?> x = Var.var("x");
 //        final Var<?> y = Var.var("y");
+        
+        final IVariable<?>[] vars = new IVariable[]{x};
         
         final int distinctId = 1;
         
         final DistinctBindingSetsWithHTreeOp query = new DistinctBindingSetsWithHTreeOp(new BOp[]{},
                 NV.asMap(new NV[]{//
                     new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,distinctId),//
-                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,vars),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                            new NamedSolutionSetRef(queryId, getName(), vars)),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
 					new NV(PipelineOp.Annotations.SHARED_STATE, true),//
@@ -307,7 +325,6 @@ public class TestDistinctBindingSetsWithHTree extends TestCase2 {
                         new IConstant[] { new Constant<String>("Leon") }//
                 ), };
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             

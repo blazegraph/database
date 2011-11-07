@@ -311,6 +311,29 @@ abstract public class QueryBase extends QueryNodeBase implements
         
     }
 
+
+    /**
+     * Return <code>true</code> iff there is a {@link SliceNode} and either the
+     * LIMIT and/or OFFSET has been specified with a non-default value.
+     */
+    public boolean hasSlice() {
+
+        final SliceNode slice = getSlice();
+
+        if (slice == null)
+            return false;
+
+        if (slice.getLimit() != SliceNode.Annotations.DEFAULT_LIMIT)
+            return true;
+
+        if (slice.getOffset() != SliceNode.Annotations.DEFAULT_OFFSET)
+            return true;
+
+        // The SLICE does not specify either LIMIT or OFFSET.
+        return false;
+
+    }
+
     /**
      * Return the order by clause -or- <code>null</code> if there is no order
      * by.

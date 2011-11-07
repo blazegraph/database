@@ -141,7 +141,7 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         };
 
         final HTreeHashJoinUtility state = new HTreeHashJoinUtility(mmgr, op,
-                optional);
+                optional, false/*filter*/);
 
         try {
 

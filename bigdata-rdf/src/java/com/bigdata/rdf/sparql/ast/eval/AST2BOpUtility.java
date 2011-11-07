@@ -50,6 +50,7 @@ import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
@@ -161,18 +162,12 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final IBindingSet bset) {
 
         /*
-         * FIXME Pass in zero or more binding sets to use when optimizing the
-         * query. This is mainly for rewriting variables as constants (when
-         * there is one source binding set) or for adding IN filters (where
-         * there are several and we can constrain a variable to the known values
-         * which it can take on). This could be passed through using the [ctx]
-         * or directly.
-         * 
-         * Do we still want the ability to pass in an IBindingSet[] to query
-         * evaluation or we are planning to handle this entirely via a "java"
-         * service interface. If so, then we need the ability to run the
-         * optimizer once we have evaluated that service request in order to do
-         * things like set an IN filter based on the returned solution set.
+         * TODO Do we still want the ability to pass in an IBindingSet[] to
+         * query evaluation for the BindingsClauser or we are planning to handle
+         * this entirely via a "java" service interface. If so, then we need the
+         * ability to run the optimizer once we have evaluated that service
+         * request in order to do things like set an IN filter based on the
+         * returned solution set.
          * 
          * If we model this with an "inline access path", then that is really
          * very close to the Htree / hash join. The IN constraint could just be
@@ -197,22 +192,28 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         // Final static analysis object for the optimized query.
         ctx.sa = new StaticAnalysis(optimizedQuery);
 
-        // The executable query plan.
-        PipelineOp queryPlan = convertQueryBaseWithScopedVars(null/* left */,
-                optimizedQuery, new LinkedHashSet<IVariable<?>>()/* doneSet */,
-                ctx);
+        // The set of known materialized variables.
+        final LinkedHashSet<IVariable<?>> doneSet = new LinkedHashSet<IVariable<?>>();
 
-        if (queryPlan == null) {
+        // true IFF the query plan should handle materialize the projection.
+        final boolean materializeProjection = ctx.materializeProjectionInQuery
+                && !optimizedQuery.hasSlice();
+
+        // The executable query plan.
+        PipelineOp left = convertQueryBaseWithScopedVars(null/* left */,
+                optimizedQuery, doneSet, materializeProjection, ctx);
+
+        if (left == null) {
 
             /*
              * An empty query plan. Just copy anything from the input to the
              * output.
              */
 
-            queryPlan = addStartOp(ctx);
+            left = addStartOp(ctx);
 
         }
-
+        
         /*
          * Set the queryId on the top-level of the query plan.
          * 
@@ -221,17 +222,17 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * main query.
          */
 
-        queryPlan = (PipelineOp) queryPlan.setProperty(
+        left = (PipelineOp) left.setProperty(
                 QueryEngine.Annotations.QUERY_ID, ctx.queryId);
 
         // Attach the query plan to the ASTContainer.
-        astContainer.setQueryPlan(queryPlan);
+        astContainer.setQueryPlan(left);
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);
         }
 
-        return queryPlan;
+        return left;
 
     }
 
@@ -286,7 +287,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         // DO SUBQUERY PLAN HERE.
         left = convertQueryBaseWithScopedVars(left, query, tmp/* doneSet */,
-                ctx);
+                false /* materializeProjection */, ctx);
 
         // Retain only those variables projected by the subquery.
         tmp.retainAll(projectedVarList);
@@ -306,13 +307,20 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * @param left
      * @param query
+     *            The query.
      * @param doneSet
+     *            The set of variables which are already known to be
+     *            materialized.
+     * @param materializeProjection
+     *            When <code>true</code>, the projection of the
+     *            {@link QueryBase} solutions will be materialized.
      * @param ctx
-     * @return
+     * 
+     * @return The query plan.
      */
     private static PipelineOp convertQueryBaseWithScopedVars(PipelineOp left,
             final QueryBase query, final Set<IVariable<?>> doneSet,
-            final AST2BOpContext ctx) {
+            final boolean materializeProjection, final AST2BOpContext ctx) {
         
         final GraphPatternGroup<?> root = query.getWhereClause();
 
@@ -462,14 +470,55 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
             );
+            
+            if(materializeProjection) {
+                
+                /*
+                 * Note: Materialization done from within the query plan needs
+                 * to occur before the SLICE operator since the SLICE will
+                 * interrupt the query evaluation when it is satisfied, which
+                 * means that downstream operators will be canceled. Therefore a
+                 * materialization operator can not appear after a SLICE.
+                 * However, doing materialization within the query plan is not
+                 * efficient when the query uses a SLICE since we will
+                 * materialize too many solutions. This is true whether the
+                 * OFFSET and/or the LIMIT was specified. Therefore, as an
+                 * optimization, the caller should take responsible for
+                 * materialization when the top-level query uses a SLICE.
+                 */
+                
+                final Set<IVariable<?>> tmp = projection
+                        .getProjectionVars(new LinkedHashSet<IVariable<?>>());
+                
+                // do not materialize anything which was already materialized.
+                tmp.removeAll(doneSet);
+                
+                if (!tmp.isEmpty()) {
+
+                    final long timestamp = getLexiconReadTimestamp(ctx);
+
+                    final String ns = ctx.db.getLexiconRelation()
+                            .getNamespace();
+
+                    final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
+                            .size()]);
+                    
+                    left = (PipelineOp) new ChunkedMaterializationOp(
+                            leftOrEmpty(left), vars, ns, timestamp)
+                            .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
+
+                    // Add to the set of known materialized variables.
+                    doneSet.addAll(tmp);
+                    
+                }
+                
+            }
 
         }
         
-        final SliceNode slice = query.getSlice();
+        if(query.hasSlice()) {
 
-        if (slice != null) {
-
-            left = addSlice(left, slice, ctx);
+            left = addSlice(left, query.getSlice(), ctx);
 
         }
 
@@ -2068,6 +2117,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             /*
              * DISTINCT on the native heap.
              */
+            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                    ctx.queryId, "--distinct-"+ctx.nextId(), vars);
             op = new DistinctBindingSetsWithHTreeOp(leftOrEmpty(left),//
                     new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,
                            bopId),//
@@ -2075,7 +2126,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                            vars),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                           namedSolutionSet),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// for live stat updates.
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1)//
             );
         }

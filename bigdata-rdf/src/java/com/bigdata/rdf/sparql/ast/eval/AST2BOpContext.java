@@ -8,6 +8,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -81,7 +82,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * TODO Query hint to control this.
      * 
-     * TODO The same choice exists for default graph access paths.
+     * @see AST2BOpBase#nativeDefaultGraph
      */
     boolean nativeDistinct = false;
 
@@ -97,6 +98,40 @@ public class AST2BOpContext implements IdFactory {
      * TODO Query hint to control this on an overall and per join basis.
      */
     boolean nativeHashJoins = false;
+    
+    /**
+     * When <code>true</code>, the projection of the query will be materialized
+     * by an {@link ChunkedMaterializationOp} within the query plan unless a
+     * LIMIT and/or OFFSET was specified. When <code>false</code>, the
+     * projection is always materialized outside of the query plan.
+     * <p>
+     * Note: It is only safe and efficient to materialize the projection from
+     * within the query plan when the query does not specify an OFFSET / LIMIT.
+     * Materialization done from within the query plan needs to occur before the
+     * SLICE operator since the SLICE will interrupt the query evaluation when
+     * it is satisfied, which means that downstream operators will be canceled.
+     * Therefore a materialization operator can not appear after a SLICE.
+     * However, doing materialization within the query plan is not efficient
+     * when the query uses a SLICE since we will materialize too many solutions.
+     * This is true whether the OFFSET and/or the LIMIT was specified.
+     * <p>
+     * Note: It is advantegous to handle the materialization step inside of the
+     * query plan since that provides transparency into the materialization
+     * costs. When we handle materialization outside of the query plan, those
+     * materialization costs are not reflected in the query plan statistics.
+     * 
+     * FIXME This can not be enabled until we fix a bug where variables in
+     * optional groups (or simple optional statement patterns) are added to the
+     * doneSet when we attempt to materialize them for a filter. The bug is
+     * demonstrated by TestOptionals#test_complex_optional_01() as well as by
+     * some of the TCK optional tests (TestTCK). (This bug is normally masked if
+     * we do materialization outside of the query plan, but a query could be
+     * constructed which would demonstrate the problem even then since the
+     * variable appears within the query plan generator as if it is
+     * "known materialized" when it is only in fact materialized within the
+     * scope of the optional group.)
+     */
+    boolean materializeProjectionInQuery = false;
     
 //    /**
 //     * When <code>true</code>, use a hash join pattern for sub-group evaluation.
