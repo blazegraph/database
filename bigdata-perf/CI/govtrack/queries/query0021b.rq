@@ -1,10 +1,15 @@
-# Original query as given:
-#     [java] resultCount=20601, elapsed=241017ms, source=queries/query0021.rq
+# A variant of query0021 with optimizer disabled and running the [name] optional
+# last. This variant uses pipeline joins.
+#
+#     [java] resultCount=20601, elapsed=173571ms, source=queries/query0021.rq
+#     [java] resultCount=20601, elapsed=159698ms, source=queries/query0021.rq
+#     [java] resultCount=20601, elapsed=159410ms, source=queries/query0021.rq
 
 PREFIX p1: <http://www.rdfabout.com/rdf/schema/usgovt/>
 PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX hint: <http://www.bigdata.com/queryHints#>
 
 SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
 WITH {
@@ -16,13 +21,15 @@ WITH {
 	}
 } AS %_set1
 		WHERE {
+           hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+			
 			INCLUDE %_set1 .
-			OPTIONAL {
-				?_var3 p1:name ?_var9
-			}. 
 			OPTIONAL {
 				?_var10 p2:votedBy ?_var3. 
 				?_var10 rdfs:label ?_var2.
 			}
+			OPTIONAL {
+				?_var3 p1:name ?_var9
+			}. 
 		}
 		GROUP BY ?_var2 ?_var3
