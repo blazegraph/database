@@ -147,38 +147,34 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
             /** Metadata to identify the named solution set. */
             final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
-            
-            {
 
-                /*
-                 * First, see if the map already exists.
-                 * 
-                 * Note: Since the operator is not thread-safe, we do not need
-                 * to use a putIfAbsent pattern here.
-                 */
-                
-                // Lookup the attributes for the query on which we will hang the
-                // solution set.
-                final IQueryAttributes attrs = context
-                        .getQueryAttributes(namedSetRef.queryId);
+            /*
+             * First, see if the map already exists.
+             * 
+             * Note: Since the operator is not thread-safe, we do not need to
+             * use a putIfAbsent pattern here.
+             */
 
-                HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
-                        .get(namedSetRef);
+            // Lookup the attributes for the query on which we will hang the
+            // solution set.
+            final IQueryAttributes attrs = context
+                    .getQueryAttributes(namedSetRef.queryId);
 
-                if (state == null) {
-                    
-                    state = new HTreeHashJoinUtility(
-                            context.getMemoryManager(namedSetRef.queryId), op,
-                            false/*optional*/, true/* filter */);
+            HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
+                    .get(namedSetRef);
 
-                    if (attrs.putIfAbsent(namedSetRef, state) != null)
-                        throw new AssertionError();
-                                        
-                }
-                
-                this.state = state;
+            if (state == null) {
+
+                state = new HTreeHashJoinUtility(
+                        context.getMemoryManager(namedSetRef.queryId), op,
+                        false/* optional */, true/* filter */);
+
+                if (attrs.putIfAbsent(namedSetRef, state) != null)
+                    throw new AssertionError();
 
             }
+
+            this.state = state;
             
         }
         

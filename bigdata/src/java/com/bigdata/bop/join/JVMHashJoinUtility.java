@@ -51,39 +51,11 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Utility class supporting hash join against a Java hash collection.
- * <p>
- * acceptSolutions: A solutions set is fully materialized in a hash table. The
- * {@link Key}s of the hash table are the as-bound join variable(s). The values
- * in the hash table are {@link Bucket}s, each of which is the list of solutions
- * having a specific value for the as-bound join variables.
- * <p>
- * handleJoin: For each source solution materialized, the hash table is probed
- * using the as-bound join variables for that source solution. If there is a hit
- * in the hash table, then operator then outputs the cross product of the source
- * solution with the solutions list in the {@link Bucket} found under that
- * {@link Key} in the hash table, applying any optional CONSTRAINTS. A join hit
- * counter is carried for each solution in the hash index. The join hit counter
- * is used to support optional joins.
- * <p>
- * outputOptionals: Once the source solutions have been exhausted, all solutions
- * in the hash index having a join hit counter of ZERO (0) are output as
- * "optional" solutions.
- * 
- * TODO Javadoc. Just describe what is different about this implementation.
- * 
- * TODO The inner classes should all be private once we finish this refactor to
- * the {@link IHashJoinUtility}.
- * 
- * TODO Refactor and *test* the JVM versions of all the hash index operations.
- * Check the defaults in {@link AST2BOpContext} and {@link AST2BOpBase} to make
- * sure that we are testing the right stuff.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -148,335 +120,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         return h;
 
     }
-
-    /**
-     * Buffer solutions on a JVM hash collection.
-     * 
-     * @param itr
-     *            The source from which the solutions will be drained.
-     * @param joinVars
-     *            The join variables (required). There must be at least one join
-     *            variable.
-     * @param stats
-     *            The statistics to be updated as the solutions are buffered on
-     *            the hash index.
-     * @param map
-     *            The hash index.
-     * @param optional
-     *            <code>true</code> iff the join is optional. When
-     *            <code>true</code>, solutions which do not have a binding for
-     *            one or more of the join variables will be inserted into the
-     *            hash index anyway using <code>hashCode:=1</code>. This allows
-     *            the solutions to be discovered when we scan the hash index and
-     *            the set of solutions which did join to identify the optional
-     *            solutions.
-     * 
-     * @return The #of solutions that were buffered.
-     */
-    public static long acceptSolutions(//
-            final ICloseableIterator<IBindingSet[]> itr,//
-            final IVariable<?>[] joinVars,//
-            final BOpStats stats,//
-            final Map<Key, Bucket> map,//
-            final boolean optional) {
-        
-        final IBindingSet[] all = BOpUtility.toArray(itr, stats);
-
-        if (log.isDebugEnabled())
-            log.debug("Materialized: " + all.length
-                    + " source solutions.");
-
-        for (IBindingSet bset : all) {
-
-            final Key key = makeKey(joinVars, bset, optional);
-
-            if (key == null) {
-                // Drop solution.
-                continue;
-            }
-            
-            Bucket b = map.get(key);
-            
-            if(b == null) {
-                
-                map.put(key, b = new Bucket(bset));
-                
-            } else {
-                
-                b.add(bset);
-                
-            }
-
-        }
-
-        if (log.isDebugEnabled())
-            log.debug("There are : " + map.size()
-                    + " distinct combinations of the join vars: "
-                    + Arrays.toString(joinVars));
-
-        final long naccepted = all.length;
-        
-        return naccepted;
-        
-    }
-
-    public static long filterSolutions(//
-            final ICloseableIterator<IBindingSet[]> itr,//
-            final IVariable<?>[] joinVars,//
-            final BOpStats stats,//
-            final IBuffer<IBindingSet> sink,//
-            final Map<Key, Bucket> map) {
-        
-        final IBindingSet[] all = BOpUtility.toArray(itr, stats);
-
-        if (log.isDebugEnabled())
-            log.debug("Materialized: " + all.length
-                    + " source solutions.");
-
-        for (IBindingSet bset : all) {
-
-            /*
-             * Note: For a DISTINCT SOLUTIONS filter, we only consider the
-             * variables that are being projected. Further, all variables are
-             * used when computing the hash code. Therefore "joinVars" ==
-             * "selectedVars" for a DISTINCT SOLUTIONS filter.
-             */
-            bset.copy(joinVars); // only consider the selected variables.
-
-            /*
-             * Note: Solutions are NOT dropped if a variable is not bound in a
-             * given solution. The variable is simply not used when computing
-             * the hash code. Specifying optional:=true here causes makeKey() to
-             * have this behavior.
-             */
-            final Key key = makeKey(joinVars, bset, true/* optional */);
-
-            assert key != null;
-
-            Bucket b = map.get(key);
-            
-            if(b == null) {
-                
-                map.put(key, b = new Bucket(bset));
-                
-            } else {
-                
-                if(b.addDistinct(bset)) {
-                    
-                    // Write on the output sink.
-                    sink.add(bset);
-                    
-                }
-                
-            }
-
-        }
-
-        if (log.isDebugEnabled())
-            log.debug("There are : " + map.size()
-                    + " distinct combinations of the join vars: "
-                    + Arrays.toString(joinVars));
-
-        final long naccepted = all.length;
-        
-        return naccepted;
-        
-    }
-
-    /**
-     * Do a hash join between a stream of source solutions (left) and a hash
-     * index (right). For each left solution, the hash index (right) is probed
-     * for possible matches (solutions whose as-bound values for the join
-     * variables produce the same hash code). Possible matches are tested for
-     * consistency and the constraints (if any) are applied. Solutions which
-     * join are written on the caller's buffer.
-     * 
-     * @param leftItr
-     *            A stream of solutions to be joined against the hash index
-     *            (left).
-     * @param outputBuffer
-     *            Where to write the solutions which join.
-     * @param joinVars
-     *            The join variables (required). Solutions which do not have
-     *            bindings for the join variables will NOT join. If an empty
-     *            array is specified then all solutions will have a hash code of
-     *            ONE (1) and the join will degrade to a full N x M comparison.
-     *            Only solutions which are consistent with one another and with
-     *            the optional constraints will actually join, but the join will
-     *            do much more work to find those solutions.
-     * @param selectVars
-     *            The variables to be retained (optional, all a retained if no
-     *            specified).
-     * @param constraints
-     *            Constraints on the solutions (optional, may be
-     *            <code>null</code>).
-     * @param rightSolutions
-     *            A hash index already built over some multiset of solutions
-     *            (right).
-     * @param optional
-     *            <code>true</code> iff the optional solutions must also be
-     *            output.
-     * @param leftIsPipeline
-     *            <code>true</code> iff <i>left</i> is a solution from upstream
-     *            in the query pipeline. Otherwise, <i>right</i> is the upstream
-     *            solution.
-     */
-    static public void hashJoin(//
-            final ICloseableIterator<IBindingSet> leftItr,//
-            final IBuffer<IBindingSet> outputBuffer,//
-            final IVariable<?>[] joinVars,//
-            final IVariable<?>[] selectVars,//
-            final IConstraint[] constraints,//
-            final Map<Key,Bucket> rightSolutions,//
-            final boolean optional,//
-            final boolean leftIsPipeline//
-    ) {
-
-        try {
-
-            while (leftItr.hasNext()) {
-
-                final IBindingSet left = leftItr.next();
-
-                if (log.isDebugEnabled())
-                    log.debug("Considering " + left);
-
-                final Key key = JVMHashJoinUtility.makeKey(joinVars, left,
-                        optional);
-
-                if (key == null) {
-                    // Drop solution.
-                    continue;
-                }
-
-                // Probe the hash map.
-                final Bucket b = rightSolutions.get(key);
-
-                if (b == null)
-                    continue;
-
-                for (SolutionHit right : b) {
-
-                    if (log.isDebugEnabled())
-                        log.debug("Join with " + right);
-
-                    // See if the solutions join. 
-                    final IBindingSet outSolution = //
-                    BOpContext.bind(//
-                            right.solution,// 
-                            left,// 
-                            leftIsPipeline,//
-                            constraints,//
-                            selectVars//
-                            );
-
-                    if (outSolution == null) {
-                        // Join failed.
-                        continue;
-                    }
-
-                    if (log.isDebugEnabled())
-                        log.debug("Output solution: " + outSolution);
-
-                    right.nhits.increment();
-
-                    // Accept this binding set.
-                    outputBuffer.add(outSolution);
-
-                }
-
-            }
-
-        } finally {
-
-            leftItr.close();
-
-        }
-
-    } // handleJoin
-    
-    /**
-     * Identify and output the optional solutions. Optionals are identified
-     * using a counter associated with each right solution. The counter will be
-     * non-zero IFF the right solution joined with at least one left solution.
-     * The total set of right solutions is scanned once. Any right solution
-     * having a join hit counter of ZERO (0) is output.
-     * 
-     * @param outputBuffer
-     *            Where to write the optional solutions.
-     * @param rightSolutions
-     *            The hash index (right).
-     */
-    static public void outputOptionals(
-            final IBuffer<IBindingSet> outputBuffer,
-            final Map<Key, Bucket> rightSolutions // 
-    ) {
-
-        if (log.isInfoEnabled()) {
-            log.info("rightSolutions: #buckets=" + rightSolutions.size());
-        }
-
-        /*
-         * Note: when NO subquery solutions joined for a given source binding
-         * set AND the subquery is OPTIONAL then we output the _original_
-         * binding set to the sink join task(s) and DO NOT apply the
-         * CONSTRAINT(s).
-         */
-
-        for(Bucket b : rightSolutions.values()) {
-            
-            for(SolutionHit hit : b) {
-
-                if (hit.nhits.get() > 0)
-                    continue;
-
-                final IBindingSet bs = hit.solution;
-
-                if (log.isDebugEnabled())
-                    log.debug("Optional solution: " + bs);
-
-                outputBuffer.add(bs);
-
-            }
-            
-        }
-
-    } // outputOptionals
-
-    public static void outputSolutions(final IBuffer<IBindingSet> out,
-            final IVariable<?>[] selected,
-            final Map<Key, Bucket> rightSolutions) {
-
-        if (log.isInfoEnabled()) {
-            log.info("rightSolutions: #buckets=" + rightSolutions.size());
-        }
-
-        // source.
-        final Iterator<Bucket> bucketIterator = rightSolutions.values()
-                .iterator();
-
-        while (bucketIterator.hasNext()) {
-
-            final Bucket bucket = bucketIterator.next();
-
-            for (SolutionHit solutionHit : bucket) {
-
-                IBindingSet bset = solutionHit.solution;
-
-                if (selected != null) {
-
-                    // Drop variables which are not projected.
-                    bset = bset.copy(selected);
-
-                }
-
-                out.add(bset);
-
-            }
-
-        }
-
-    }
     
     /**
      * Return an array of constants corresponding to the as-bound values of the
@@ -527,11 +170,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 return null;
 
             }
-//            throw new RuntimeException(ex + " : joinvars="
-//                    + Arrays.toString(joinVars) + ", bset=" + bset, ex);
-        }
-        // final int hashCode = java.util.Arrays.hashCode(vals);
 
+        }
+        
         return new Key(hashCode, vals);
 
     }
@@ -541,7 +182,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * table to compare the keys as equal and also provides a efficiencies in
      * the hash code and equals() methods.
      */
-    public static class Key {
+    private static class Key {
         
         private final int hash;
 
@@ -580,7 +221,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * An input solution and a hit counter.
      */
-    public static class SolutionHit {
+    private static class SolutionHit {
 
         /**
          * The input solution.
@@ -616,7 +257,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * Each solution is paired with a hit counter so we can support OPTIONAL
      * semantics for the join.
      */
-    public static class Bucket implements Iterable<SolutionHit>{
+    private static class Bucket implements Iterable<SolutionHit>{
 
         /**
          * A set of solutions (and their hit counters) which have the same
@@ -803,7 +444,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          * do this with the DISTINCT SOLUTIONS filter we would have to make the
          * mutation operations on a Bucket atomic. E.g., using the synchronized
          * keyword. This would give us what amounts to per-hash code striped
-         * locks.
+         * locks. Note: the JVMDistinctBindingSetsOp does not use this class
+         * right now because it enjoys better concurrency than the
+         * JVMHashJoinUtility.
          */
         rightSolutionsRef.set(new LinkedHashMap<Key, Bucket>(//
                 op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
@@ -875,8 +518,43 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
-        final long naccepted = acceptSolutions(itr, joinVars, stats,
-                rightSolutionsRef.get(), optional);
+        final Map<Key,Bucket> map = getRightSolutions();
+        
+        final IBindingSet[] all = BOpUtility.toArray(itr, stats);
+
+        if (log.isDebugEnabled())
+            log.debug("Materialized: " + all.length
+                    + " source solutions.");
+
+        for (IBindingSet bset : all) {
+
+            final Key key = makeKey(joinVars, bset, optional);
+
+            if (key == null) {
+                // Drop solution.
+                continue;
+            }
+            
+            Bucket b = map.get(key);
+            
+            if(b == null) {
+                
+                map.put(key, b = new Bucket(bset));
+                
+            } else {
+                
+                b.add(bset);
+                
+            }
+
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("There are : " + map.size()
+                    + " distinct combinations of the join vars: "
+                    + Arrays.toString(joinVars));
+
+        final long naccepted = all.length;
         
         rightSolutionCount.add(naccepted);
         
@@ -888,9 +566,60 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     public long filterSolutions(ICloseableIterator<IBindingSet[]> itr,
             BOpStats stats, IBuffer<IBindingSet> sink) {
 
-        final long naccepted = filterSolutions(itr, joinVars, stats, sink,
-                getRightSolutions());
+        final Map<Key, Bucket> map = getRightSolutions();
+        
+        final IBindingSet[] all = BOpUtility.toArray(itr, stats);
 
+        if (log.isDebugEnabled())
+            log.debug("Materialized: " + all.length
+                    + " source solutions.");
+
+        for (IBindingSet bset : all) {
+
+            /*
+             * Note: For a DISTINCT SOLUTIONS filter, we only consider the
+             * variables that are being projected. Further, all variables are
+             * used when computing the hash code. Therefore "joinVars" ==
+             * "selectedVars" for a DISTINCT SOLUTIONS filter.
+             */
+            bset.copy(joinVars); // only consider the selected variables.
+
+            /*
+             * Note: Solutions are NOT dropped if a variable is not bound in a
+             * given solution. The variable is simply not used when computing
+             * the hash code. Specifying optional:=true here causes makeKey() to
+             * have this behavior.
+             */
+            final Key key = makeKey(joinVars, bset, true/* optional */);
+
+            assert key != null;
+
+            Bucket b = map.get(key);
+            
+            if(b == null) {
+                
+                map.put(key, b = new Bucket(bset));
+                
+            } else {
+                
+                if(b.addDistinct(bset)) {
+                    
+                    // Write on the output sink.
+                    sink.add(bset);
+                    
+                }
+                
+            }
+
+        }
+
+        if (log.isDebugEnabled())
+            log.debug("There are : " + map.size()
+                    + " distinct combinations of the join vars: "
+                    + Arrays.toString(joinVars));
+
+        final long naccepted = all.length;
+        
         rightSolutionCount.add(naccepted);
 
         return naccepted;
@@ -905,20 +634,125 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * For each source solution materialized, the hash table is probed using the
+     * as-bound join variables for that source solution. If there is a hit in
+     * the hash table, then operator then outputs the cross product of the
+     * source solution with the solutions list in the {@link Bucket} found under
+     * that {@link Key} in the hash table, applying any optional CONSTRAINTS. A
+     * join hit counter is carried for each solution in the hash index. The join
+     * hit counter is used to support optional joins.
+     */
     @Override
-    public void hashJoin2(ICloseableIterator<IBindingSet> leftItr,
-            IBuffer<IBindingSet> outputBuffer, boolean leftIsPipeline,
-            IConstraint[] constraints) {
+    public void hashJoin2(final ICloseableIterator<IBindingSet> leftItr,
+            final IBuffer<IBindingSet> outputBuffer,
+            final boolean leftIsPipeline, final IConstraint[] constraints) {
 
-        hashJoin(leftItr, outputBuffer, joinVars, selectVars, constraints,
-                getRightSolutions(), optional, leftIsPipeline);
-        
+        final Map<Key,Bucket> rightSolutions = getRightSolutions();
+          
+        if (log.isInfoEnabled()) {
+            log.info("rightSolutions: #buckets=" + rightSolutions.size()
+                    + ",#solutions=" + getRightSolutionCount());
+        }
+
+        try {
+
+            while (leftItr.hasNext()) {
+
+                final IBindingSet left = leftItr.next();
+
+                if (log.isDebugEnabled())
+                    log.debug("Considering " + left);
+
+                final Key key = JVMHashJoinUtility.makeKey(joinVars, left,
+                        optional);
+
+                if (key == null) {
+                    // Drop solution.
+                    continue;
+                }
+
+                // Probe the hash map.
+                final Bucket b = rightSolutions.get(key);
+
+                if (b == null)
+                    continue;
+
+                for (SolutionHit right : b) {
+
+                    if (log.isDebugEnabled())
+                        log.debug("Join with " + right);
+
+                    // See if the solutions join. 
+                    final IBindingSet outSolution = //
+                    BOpContext.bind(//
+                            right.solution,// 
+                            left,// 
+                            leftIsPipeline,//
+                            constraints,//
+                            selectVars//
+                            );
+
+                    if (outSolution == null) {
+                        // Join failed.
+                        continue;
+                    }
+
+                    if (log.isDebugEnabled())
+                        log.debug("Output solution: " + outSolution);
+
+                    right.nhits.increment();
+
+                    // Accept this binding set.
+                    outputBuffer.add(outSolution);
+
+                }
+
+            }
+
+        } finally {
+
+            leftItr.close();
+
+        }
+
     }
 
     @Override
-    public void outputOptionals(IBuffer<IBindingSet> outputBuffer) {
+    public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
         
-        outputOptionals(outputBuffer, getRightSolutions());
+        final Map<Key,Bucket> rightSolutions = getRightSolutions();
+        
+        if (log.isInfoEnabled()) {
+            log.info("rightSolutions: #buckets=" + rightSolutions.size());
+        }
+
+        /*
+         * Note: when NO subquery solutions joined for a given source binding
+         * set AND the subquery is OPTIONAL then we output the _original_
+         * binding set to the sink join task(s) and DO NOT apply the
+         * CONSTRAINT(s).
+         */
+
+        for(Bucket b : rightSolutions.values()) {
+            
+            for(SolutionHit hit : b) {
+
+                if (hit.nhits.get() > 0)
+                    continue;
+
+                final IBindingSet bs = hit.solution;
+
+                if (log.isDebugEnabled())
+                    log.debug("Optional solution: " + bs);
+
+                outputBuffer.add(bs);
+
+            }
+            
+        }
         
     }
 
@@ -929,8 +763,35 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         final IVariable<?>[] selected = getSelectVars();
 
-        outputSolutions(out, selected, rightSolutions);
-        
+        if (log.isInfoEnabled()) {
+            log.info("rightSolutions: #buckets=" + rightSolutions.size());
+        }
+
+        // source.
+        final Iterator<Bucket> bucketIterator = rightSolutions.values()
+                .iterator();
+
+        while (bucketIterator.hasNext()) {
+
+            final Bucket bucket = bucketIterator.next();
+
+            for (SolutionHit solutionHit : bucket) {
+
+                IBindingSet bset = solutionHit.solution;
+
+                if (selected != null) {
+
+                    // Drop variables which are not projected.
+                    bset = bset.copy(selected);
+
+                }
+
+                out.add(bset);
+
+            }
+
+        }       
+
     }
 
 }

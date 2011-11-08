@@ -155,49 +155,7 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
         return (IPredicate<E>) getRequiredProperty(Annotations.PREDICATE);
 
     }
-    
-//    /**
-//     * Return <code>true</code> iff the predicate associated with the join is
-//     * optional.
-//     * 
-//     * @see IPredicate.Annotations#OPTIONAL
-//     */
-//    private boolean isOptional() {
-//        
-//        return getPredicate().isOptional();
-//        
-//    }
-//    
-//    /**
-//     * 
-//     * @see Annotations#CONSTRAINTS
-//     */
-//    public IConstraint[] constraints() {
-//
-//        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
-//
-//    }    
-//
-//    /**
-//     * @see HashMapAnnotations#INITIAL_CAPACITY
-//     */
-//    public int getInitialCapacity() {
-//
-//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-//
-//    }
-//
-//    /**
-//     * @see HashMapAnnotations#LOAD_FACTOR
-//     */
-//    public float getLoadFactor() {
-//
-//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-//
-//    }
-    
+        
     public BaseJoinStats newStats() {
 
         return new BaseJoinStats();
@@ -224,31 +182,11 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
         
         private final IPredicate<E> pred;
         
-//        private final IVariable<E>[] joinVars;
-//        
-//        private final IConstraint[] constraints;
-//
-//        private final IVariable<?>[] selectVars;
-//        
-//        private final boolean optional;
-        
         private final BaseJoinStats stats;
 
         private final IBlockingBuffer<IBindingSet[]> sink;
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
-
-//        private final IQueryAttributes attrs;
-//        
-//        private final Object sourceSolutionsKey;
-
-//        /**
-//         * The hash index.
-//         * <p>
-//         * Note: The map is shared state and can not be discarded or cleared
-//         * until the last invocation!!!
-//         */
-//        private final Map<Key,Bucket> rightSolutions;
 
         private final JVMHashJoinUtility state;
         
@@ -263,16 +201,6 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
             this.relation = context.getRelation(pred);
 
-//            this.selectVars = (IVariable<?>[]) op
-//                    .getProperty(Annotations.SELECT);
-//
-//            this.joinVars = (IVariable<E>[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
-//            
-//            this.constraints = op.constraints();
-//
-//            this.optional = op.isOptional();
-
             this.sink = context.getSink();
 
             this.sink2 = context.getSink2();
@@ -281,60 +209,7 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
             
             this.state = new JVMHashJoinUtility(op, pred.isOptional(), false/* filter */);
 
-//            {
-//
-////                /*
-////                 * First, see if the map already exists.
-////                 * 
-////                 * Note: Since the operator is not thread-safe, we do not need
-////                 * to use a putIfAbsent pattern here.
-////                 */
-////                attrs = context.getRunningQuery().getAttributes();
-////
-////                sourceSolutionsKey = op.getId() + ".sourceSolutions";
-////
-////                Map<Key, Bucket> rightSolutions = (Map<Key, Bucket>) attrs
-////                        .get(sourceSolutionsKey);
-////
-////                if (rightSolutions == null) {
-////
-////                    /*
-////                     * Create the map(s).
-////                     */
-//                    
-//                    /*
-//                     * Materialize the binding sets and populate a hash map.
-//                     */
-//                    rightSolutions = new LinkedHashMap<Key, Bucket>(//
-//                            op.getInitialCapacity(),//
-//                            op.getLoadFactor()//
-//                    );
-//
-////                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
-////                        throw new AssertionError();
-//                    
-////                }
-//
-////                // The map is shared state across invocations of this operator
-////                // task.
-////                this.rightSolutions = rightSolutions;
-//
-//            }
-
         }
-
-//        /**
-//         * Discard the hash index.
-//         */
-//        private void release() {
-//
-//            if (rightSolutions != null) {
-//
-//                attrs.remove(sourceSolutionsKey);
-//                
-//            }
-//
-//        }
         
         public Void call() throws Exception {
 

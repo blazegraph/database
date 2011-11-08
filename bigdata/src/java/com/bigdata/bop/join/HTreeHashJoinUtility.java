@@ -1234,14 +1234,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         try {
 
-            if (log.isInfoEnabled()) {
-                final HTree htree = this.getRightSolutions();
-                log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
-                        + ",#leaves=" + htree.getLeafCount() + ",#entries="
-                        + htree.getEntryCount());
-            }
-            
             final HTree rightSolutions = this.getRightSolutions();
+
+            if (log.isInfoEnabled()) {
+                log.info("rightSolutions: #nnodes="
+                        + rightSolutions.getNodeCount() + ",#leaves="
+                        + rightSolutions.getLeafCount() + ",#entries="
+                        + rightSolutions.getEntryCount());
+            }
             
             final IKeyBuilder keyBuilder = rightSolutions.getIndexMetadata()
                     .getKeyBuilder();

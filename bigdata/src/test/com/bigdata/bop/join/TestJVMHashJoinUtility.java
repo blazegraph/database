@@ -27,16 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.ICloseableIterator;
@@ -45,7 +46,8 @@ import com.bigdata.striterator.ICloseableIterator;
  * Test suite for the {@link JVMHashJoinUtility}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestJVMHashJoinUtility.java 5343 2011-10-17 15:29:02Z
+ *          thompsonbry $
  */
 public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
@@ -62,27 +64,27 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         super(name);
     }
     
-    private Map<Key,Bucket> rightSolutions;
-
-    @Override
-    protected void tearDown() throws Exception {
-
-        if (rightSolutions != null) {
-            rightSolutions = null;
-        }
-
-        super.tearDown();
-
-    }
-
-    @Override
-    protected void setUp() throws Exception {
-
-        super.setUp();
-    
-        rightSolutions = new LinkedHashMap<Key, Bucket>();
-
-    }
+//    private Map<Key,Bucket> rightSolutions;
+//
+//    @Override
+//    protected void tearDown() throws Exception {
+//
+//        if (rightSolutions != null) {
+//            rightSolutions = null;
+//        }
+//
+//        super.tearDown();
+//
+//    }
+//
+//    @Override
+//    protected void setUp() throws Exception {
+//
+//        super.setUp();
+//    
+//        rightSolutions = new LinkedHashMap<Key, Bucket>();
+//
+//    }
 
     /**
      * Test helper.
@@ -104,14 +106,37 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
             final IBindingSet[] expected//
             ) {
 
+        // Setup a mock PipelineOp for the test.
+        final PipelineOp op = new PipelineOp(BOp.NOARGS, NV.asMap(//
+//                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+//                        new String[] { getName() }),//
+                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                new NV(JoinAnnotations.SELECT, selectVars),//
+                new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                )) {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
+                optional, false/*filter*/);
+        
         // Load the right solutions into the HTree.
         {
         
             final BOpStats stats = new BOpStats();
             
-            JVMHashJoinUtility.acceptSolutions(
-                    new Chunkerator<IBindingSet>(right.iterator()), joinVars, stats,
-                    rightSolutions, optional);
+            state.acceptSolutions(new Chunkerator<IBindingSet>(right.iterator()), stats);
+            
+//            JVMHashJoinUtility.acceptSolutions(
+//                    new Chunkerator<IBindingSet>(right.iterator()), joinVars, stats,
+//                    rightSolutions, optional);
 
 //            assertEquals(right.size(), rightSolutions.size();getEntryCount());
 
@@ -130,14 +155,17 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
         
         // Compute the "required" solutions.
-        JVMHashJoinUtility
-                .hashJoin(leftItr, outputBuffer, joinVars, selectVars,
-                        constraints, rightSolutions, optional, true/* leftIsPipeline */);
+        state.hashJoin(leftItr, outputBuffer, true/*leftIsPipeline*/);
+        
+//        JVMHashJoinUtility
+//                .hashJoin(leftItr, outputBuffer, joinVars, selectVars,
+//                        constraints, rightSolutions, optional, true/* leftIsPipeline */);
 
         if(optional) {
             
             // Output the optional solutions.
-            JVMHashJoinUtility.outputOptionals(outputBuffer, rightSolutions);
+            state.outputOptionals(outputBuffer);
+//            JVMHashJoinUtility.outputOptionals(outputBuffer, rightSolutions);
             
         }
 

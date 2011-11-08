@@ -271,24 +271,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
             this.constraints = BOpUtility.concat(
                     (IConstraint[]) op.getProperty(Annotations.CONSTRAINTS),
                     state.getConstraints());
-//            {
-//                final IConstraint[] tmp = (IConstraint[]) op
-//                        .getProperty(Annotations.CONSTRAINTS);
-//                final List<IConstraint> list = new LinkedList<IConstraint>();
-//                if (tmp != null) {
-//                    for (IConstraint c : tmp) {
-//                        list.add(c);
-//                    }
-//                }
-//                if (state.getConstraints() != null) {
-//                    for (IConstraint c : state.getConstraints()) {
-//                        list.add(c);
-//                    }
-//                }
-//                this.constraints = list.isEmpty() ? null : list
-//                        .toArray(new IConstraint[list.size()]);
-//            }
-            
+
         }
 
         public Void call() throws Exception {
