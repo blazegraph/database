@@ -1,3 +1,4 @@
+# Converged run time of ~6000-4000ms.
 SELECT DISTINCT ?_var1 (SAMPLE(?_var2) AS ?_var3) (SAMPLE(?_var4) AS ?_var5)
 
  WHERE {

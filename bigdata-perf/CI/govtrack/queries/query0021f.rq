@@ -1,0 +1,42 @@
+# A variant of query0021e where the simple optional is run last.  The join order
+# optimizer is explicitly disabled and the statement patterns in the extracted
+# named subquery have been reordered to get them into the same order that would
+# be used if the join optimizer were applied.  (The join optimizer is disabled
+# so we can control when the simple optional is run.)
+#
+# elapsed=98409ms
+
+PREFIX p1: <http://www.rdfabout.com/rdf/schema/usgovt/>
+PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX hint: <http://www.bigdata.com/queryHints#>
+
+SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
+WITH {
+ SELECT DISTINCT ?_var3
+ WHERE {
+  ?_var3 rdf:type <http://www.rdfabout.com/rdf/schema/politico/Politician>.
+  ?_var3 <http://www.rdfabout.com/rdf/schema/politico/hasRole> ?_var6.
+  ?_var6 <http://www.rdfabout.com/rdf/schema/politico/party> "Democrat".
+ }
+} AS %_set1
+WITH {
+    SELECT DISTINCT ?_var3 ?_var2
+    WHERE {
+            ?_var10 rdfs:label ?_var2. # Note: rdfs:label runs first.
+            ?_var10 p2:votedBy ?_var3.
+    }
+} AS %_set2
+
+  WHERE {
+   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+   INCLUDE %_set1 .
+            OPTIONAL {
+                INCLUDE %_set2
+            }
+            OPTIONAL {
+                ?_var3 p1:name ?_var9
+            }.
+  }
+  GROUP BY ?_var2 ?_var3

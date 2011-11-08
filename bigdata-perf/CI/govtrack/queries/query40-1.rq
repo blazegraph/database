@@ -1,3 +1,4 @@
+# Converged run time of ~800ms.
 SELECT 
 	?_var1 
 	(GROUP_CONCAT(DISTINCT ?_var2 ; separator=";")  AS ?_var3) 
