@@ -27,27 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
-import com.bigdata.bop.controller.SubqueryJoinAnnotations;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -74,8 +68,8 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class JVMSolutionSetHashJoinOp extends PipelineOp {
 
-    static private final transient Logger log = Logger
-            .getLogger(JVMSolutionSetHashJoinOp.class);
+//    static private final transient Logger log = Logger
+//            .getLogger(JVMSolutionSetHashJoinOp.class);
 
     /**
      * 
@@ -97,17 +91,17 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
          */
         final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
-        /**
-         * An optional {@link IVariable}[] identifying the variables to be
-         * retained in the {@link IBindingSet}s written out by the operator. All
-         * variables are retained unless this annotation is specified. This is
-         * normally set to the <em>projection</em> of the subquery, in which
-         * case the lexical scope of the variables is will be properly managed
-         * for the subquery INCLUDE join.
-         * 
-         * @see JoinAnnotations#SELECT
-         */
-        final String SELECT = JoinAnnotations.SELECT;
+//        /**
+//         * An optional {@link IVariable}[] identifying the variables to be
+//         * retained in the {@link IBindingSet}s written out by the operator. All
+//         * variables are retained unless this annotation is specified. This is
+//         * normally set to the <em>projection</em> of the subquery, in which
+//         * case the lexical scope of the variables is will be properly managed
+//         * for the subquery INCLUDE join.
+//         * 
+//         * @see JoinAnnotations#SELECT
+//         */
+//        final String SELECT = JoinAnnotations.SELECT;
 
         /**
          * An {@link IConstraint}[] to be applied to solutions when they are
@@ -115,13 +109,13 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
          */
         final String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
         
-        /**
-         * Boolean annotation is <code>true</code> iff the join has OPTIONAL
-         * semantics.
-         */
-        final String OPTIONAL = SubqueryJoinAnnotations.OPTIONAL;
-
-        final boolean DEFAULT_OPTIONAL = SubqueryJoinAnnotations.DEFAULT_OPTIONAL;
+//        /**
+//         * Boolean annotation is <code>true</code> iff the join has OPTIONAL
+//         * semantics.
+//         */
+//        final String OPTIONAL = SubqueryJoinAnnotations.OPTIONAL;
+//
+//        final boolean DEFAULT_OPTIONAL = SubqueryJoinAnnotations.DEFAULT_OPTIONAL;
         
         /**
          * When <code>true</code> the hash index identified by
@@ -174,31 +168,31 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                     + " requires " + Annotations.LAST_PASS);
         }
         
-        if (isOptional() && !isLastPassRequested()) {
-
-            /*
-             * An optional join requires that we observe all solutions before we
-             * report "optional" solutions so we can identify those which do not
-             * join.
-             */
-
-            throw new UnsupportedOperationException(Annotations.OPTIONAL
-                    + " requires " + Annotations.LAST_PASS);
-        
-        }
+//        if (isOptional() && !isLastPassRequested()) {
+//
+//            /*
+//             * An optional join requires that we observe all solutions before we
+//             * report "optional" solutions so we can identify those which do not
+//             * join.
+//             */
+//
+//            throw new UnsupportedOperationException("Optional join requires "
+//                    + Annotations.LAST_PASS);
+//
+//        }
 
         // The RHS annotation must be specified.
         getRequiredProperty(Annotations.NAMED_SET_REF);
         
-        // Join variables must be specified.
-        final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
-
-        for (IVariable<?> var : joinVars) {
-
-            if (var == null)
-                throw new IllegalArgumentException(Annotations.JOIN_VARS);
-
-        }
+//        // Join variables must be specified.
+//        final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
+//
+//        for (IVariable<?> var : joinVars) {
+//
+//            if (var == null)
+//                throw new IllegalArgumentException(Annotations.JOIN_VARS);
+//
+//        }
 
     }
 
@@ -208,14 +202,14 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
         
     }
 
-    /**
-     * @see Annotations#OPTIONAL
-     */
-    public boolean isOptional() {
-        
-        return getProperty(Annotations.OPTIONAL,Annotations.DEFAULT_OPTIONAL);
-        
-    }
+//    /**
+//     * @see Annotations#OPTIONAL
+//     */
+//    public boolean isOptional() {
+//        
+//        return getProperty(Annotations.OPTIONAL,Annotations.DEFAULT_OPTIONAL);
+//        
+//    }
     
     /**
      * @see Annotations#RELEASE
@@ -248,13 +242,15 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
 
         private final JVMSolutionSetHashJoinOp op;
 
-        private final IVariable<E>[] joinVars;
+        private final JVMHashJoinUtility state;
+        
+//        private final IVariable<E>[] joinVars;
         
         private final IConstraint[] constraints;
 
-        private final IVariable<?>[] selectVars;
-
-        private final boolean optional;
+//        private final IVariable<?>[] selectVars;
+//
+//        private final boolean optional;
         
         private final boolean release;
         
@@ -266,15 +262,14 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-        /**
-         * The hash index.
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         */
-        private final Map<Key,Bucket> rightSolutions;
+//        /**
+//         * The hash index.
+//         * <p>
+//         * Note: The map is shared state and can not be discarded or cleared
+//         * until the last invocation!!!
+//         */
+//        private final Map<Key,Bucket> rightSolutions;
 
-        @SuppressWarnings("unchecked")
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final JVMSolutionSetHashJoinOp op) {
 
@@ -282,16 +277,16 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
 
             this.stats = (BaseJoinStats) context.getStats();
 
-            this.selectVars = (IVariable<?>[]) op
-                    .getProperty(Annotations.SELECT);
-
-            this.joinVars = (IVariable<E>[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
-            
-            this.constraints = (IConstraint[]) op
-                    .getProperty(Annotations.CONSTRAINTS);
-
-            this.optional = op.isOptional();
+//            this.selectVars = (IVariable<?>[]) op
+//                    .getProperty(Annotations.SELECT);
+//
+//            this.joinVars = (IVariable<E>[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            
+//            this.constraints = (IConstraint[]) op
+//                    .getProperty(Annotations.CONSTRAINTS);
+//
+//            this.optional = op.isOptional();
 
             this.release = op.getProperty(Annotations.RELEASE,
                     Annotations.DEFAULT_RELEASE);
@@ -311,10 +306,9 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
             final IQueryAttributes attrs = context
                     .getQueryAttributes(namedSetRef.queryId);
 
-            // The hash index holding the solutions.
-            rightSolutions = (Map<Key, Bucket>) attrs.get(namedSetRef);
+            state = (JVMHashJoinUtility) attrs.get(namedSetRef);
 
-            if (rightSolutions == null) {
+            if (state == null) {
                 
                 // The solution set was not found!
                 
@@ -322,36 +316,64 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                 
             }
 
-        }
+            if (state.isOptional() && !op.isLastPassRequested()) {
 
-        /**
-         * Discard the data.
-         */
-        private void release() {
+                /*
+                 * An optional join requires that we observe all solutions
+                 * before we report "optional" solutions so we can identify
+                 * those which do not join.
+                 */
 
-            if (rightSolutions != null) {
-
-                // FIXME Clear the query attribute.
-                if(false) {
-
-                    // The name of the attribute used to discover the solution
-                    // set.
-                    final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
-                            .getRequiredProperty(Annotations.NAMED_SET_REF);
-
-                    // Lookup the attributes for the query on which we will hang
-                    // the solution set.
-                    final IQueryAttributes attrs = context
-                            .getQueryAttributes(namedSetRef.queryId);
-
-                    // The hash index holding the solutions.
-                    attrs.put(namedSetRef, null);
-
-                }
-
+                throw new UnsupportedOperationException(
+                        JoinAnnotations.OPTIONAL + " requires "
+                                + Annotations.LAST_PASS);
+            
             }
 
+            /*
+             * Combine the original constraints (if any) with those attached to
+             * this operator (if any).
+             * 
+             * Note: The solution set hash join is used to join in a hash index
+             * generated by some other part of the query plan. Since it is also
+             * used for named subqueries, which can be included in more than one
+             * location, it is necessary that we can override/expand on the join
+             * constraints for this operator.
+             */
+            this.constraints = BOpUtility.concat(
+                    (IConstraint[]) op.getProperty(Annotations.CONSTRAINTS),
+                    state.getConstraints());
+            
         }
+
+//        /**
+//         * Discard the data.
+//         */
+//        private void release() {
+//
+//            if (rightSolutions != null) {
+//
+//                // FIXME Clear the query attribute.
+//                if(false) {
+//
+//                    // The name of the attribute used to discover the solution
+//                    // set.
+//                    final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+//                            .getRequiredProperty(Annotations.NAMED_SET_REF);
+//
+//                    // Lookup the attributes for the query on which we will hang
+//                    // the solution set.
+//                    final IQueryAttributes attrs = context
+//                            .getQueryAttributes(namedSetRef.queryId);
+//
+//                    // The hash index holding the solutions.
+//                    attrs.put(namedSetRef, null);
+//
+//                }
+//
+//            }
+//
+//        }
         
         public Void call() throws Exception {
 
@@ -374,7 +396,8 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                      * decrement a counter each time. When the counter reaches
                      * zero, we can release the hash index.
                      */
-                    release();
+                    
+                    state.release();
 
                 }
                 
@@ -392,22 +415,12 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
          */
         private void doHashJoin() {
 
-            if (rightSolutions.isEmpty())
+            if (state.isEmpty())
                 return;
-
-            /*
-             * This is the #of collision buckets in the hash index.
-             */
-            final int rightBuckets = rightSolutions.size();
-            
-            if (log.isDebugEnabled()) {
-                log.debug("rightBuckets=" + rightBuckets);
-                log.debug("joinVars=" + Arrays.toString(joinVars));
-            }
 
             stats.accessPathCount.increment();
 
-            stats.accessPathRangeCount.add(rightBuckets);
+            stats.accessPathRangeCount.add(state.getRightSolutionCount());
 
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
@@ -415,18 +428,23 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
             final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
                     context.getSource());
 
-            JVMHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
-                    selectVars, constraints, rightSolutions/* hashIndex */,
-                    /*joinSet,*/ optional, true/* leftIsPipeline */);
+            state.hashJoin2(leftItr, unsyncBuffer, true/* leftIsPipeline */,
+                    constraints);
+            
+//            JVMHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
+//                    selectVars, constraints, rightSolutions/* hashIndex */,
+//                    /*joinSet,*/ optional, true/* leftIsPipeline */);
 
-            if (optional && context.isLastInvocation()) {
+            if (state.isOptional() && context.isLastInvocation()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
+                state.outputOptionals(unsyncBuffer2);
+                
+//                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)

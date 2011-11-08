@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -36,20 +34,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
-import com.bigdata.bop.controller.SubqueryJoinAnnotations;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
-import com.bigdata.bop.join.JVMHashJoinUtility.SolutionHit;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
@@ -92,8 +85,7 @@ public class JVMHashIndexOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HashJoinAnnotations,
-            HashMapAnnotations {
+    public interface Annotations extends JVMHashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
@@ -106,23 +98,23 @@ public class JVMHashIndexOp extends PipelineOp {
          */
         final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
-        /**
-         * An optional {@link IVariable}[] identifying the variables to be
-         * projected in the {@link IBindingSet}s written out by the operator.
-         * All variables are retained unless this annotation is specified. This
-         * is normally set to the <em>projection</em> of the subquery.
-         * 
-         * @see JoinAnnotations#SELECT
-         */
-        final String SELECT = JoinAnnotations.SELECT;
-        
-        /**
-         * Boolean annotation is <code>true</code> iff the solutions will be
-         * re-integrated into the query plan using an OPTIONAL join.
-         */
-        final String OPTIONAL = SubqueryJoinAnnotations.OPTIONAL;
-
-        final boolean DEFAULT_OPTIONAL = SubqueryJoinAnnotations.DEFAULT_OPTIONAL;
+//        /**
+//         * An optional {@link IVariable}[] identifying the variables to be
+//         * projected in the {@link IBindingSet}s written out by the operator.
+//         * All variables are retained unless this annotation is specified. This
+//         * is normally set to the <em>projection</em> of the subquery.
+//         * 
+//         * @see JoinAnnotations#SELECT
+//         */
+//        final String SELECT = JoinAnnotations.SELECT;
+//        
+//        /**
+//         * Boolean annotation is <code>true</code> iff the solutions will be
+//         * re-integrated into the query plan using an OPTIONAL join.
+//         */
+//        final String OPTIONAL = SubqueryJoinAnnotations.OPTIONAL;
+//
+//        final boolean DEFAULT_OPTIONAL = SubqueryJoinAnnotations.DEFAULT_OPTIONAL;
         
     }
 
@@ -198,37 +190,37 @@ public class JVMHashIndexOp extends PipelineOp {
         
     }
 
-    /**
-     * Return <code>true</code> iff the solutions on the hash index will be
-     * re-integrated using an OPTIONAL join.
-     * 
-     * @see Annotations#OPTIONAL
-     */
-    public boolean isOptional() {
-       
-        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
-        
-    }
-   
-    /**
-     * @see HashMapAnnotations#INITIAL_CAPACITY
-     */
-    public int getInitialCapacity() {
-
-        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-
-    }
-
-    /**
-     * @see HashMapAnnotations#LOAD_FACTOR
-     */
-    public float getLoadFactor() {
-
-        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-
-    }
+//    /**
+//     * Return <code>true</code> iff the solutions on the hash index will be
+//     * re-integrated using an OPTIONAL join.
+//     * 
+//     * @see Annotations#OPTIONAL
+//     */
+//    public boolean isOptional() {
+//       
+//        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+//        
+//    }
+//   
+//    /**
+//     * @see HashMapAnnotations#INITIAL_CAPACITY
+//     */
+//    public int getInitialCapacity() {
+//
+//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
+//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
+//
+//    }
+//
+//    /**
+//     * @see HashMapAnnotations#LOAD_FACTOR
+//     */
+//    public float getLoadFactor() {
+//
+//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
+//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
+//
+//    }
 
     @Override
     public BOpStats newStats() {
@@ -287,44 +279,46 @@ public class JVMHashIndexOp extends PipelineOp {
         
         private final NamedSolutionSetStats stats;
         
-        /** Metadata to identify the named solution set. */
-        private final NamedSolutionSetRef namedSetRef;
-
-        /**
-         * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
-         * we will hang the named solution set.
-         */
-        private final IQueryAttributes attrs;
-
-        /**
-         * The {@link IVariable}[]s to be projected.
-         */
-        @SuppressWarnings("rawtypes")
-        private final IVariable[] selected; 
+        private final JVMHashJoinUtility state;
         
-        /**
-         * The join variables.
-         */
-        @SuppressWarnings("rawtypes")
-        private final IVariable[] joinVars;
-        
-        /**
-         * <code>true</code> iff this is the first time the task is being
-         * invoked, in which case we allocate the {@link #solutions} map.
-         */
-        private final boolean first;
-        
-        /**
-         * <code>true</code> iff the solutions will be reintegrated by an
-         * OPTIONAL join. 
-         */
-        private final boolean optional;
-        
-        /**
-         * The generated solution set (hash index using the specified join
-         * variables).
-         */
-        private final Map<Key,Bucket> solutions;
+//        /** Metadata to identify the named solution set. */
+//        private final NamedSolutionSetRef namedSetRef;
+//
+//        /**
+//         * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
+//         * we will hang the named solution set.
+//         */
+//        private final IQueryAttributes attrs;
+//
+//        /**
+//         * The {@link IVariable}[]s to be projected.
+//         */
+//        @SuppressWarnings("rawtypes")
+//        private final IVariable[] selected; 
+//        
+//        /**
+//         * The join variables.
+//         */
+//        @SuppressWarnings("rawtypes")
+//        private final IVariable[] joinVars;
+//        
+//        /**
+//         * <code>true</code> iff this is the first time the task is being
+//         * invoked, in which case we allocate the {@link #solutions} map.
+//         */
+//        private final boolean first;
+//        
+//        /**
+//         * <code>true</code> iff the solutions will be reintegrated by an
+//         * OPTIONAL join. 
+//         */
+//        private final boolean optional;
+//        
+//        /**
+//         * The generated solution set (hash index using the specified join
+//         * variables).
+//         */
+//        private final Map<Key,Bucket> solutions;
         
         public ControllerTask(final JVMHashIndexOp op,
                 final BOpContext<IBindingSet> context) {
@@ -341,15 +335,15 @@ public class JVMHashIndexOp extends PipelineOp {
             
             this.stats = ((NamedSolutionSetStats) context.getStats());
 
-            this.selected = (IVariable[]) op.getProperty(Annotations.SELECT);
-            
-            this.optional = op.isOptional();
+//            this.selected = (IVariable[]) op.getProperty(Annotations.SELECT);
+//            
+//            this.optional = op.isOptional();
 
-            this.namedSetRef = (NamedSolutionSetRef) op
+            NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            this.joinVars = (IVariable[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            this.joinVars = (IVariable[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -362,38 +356,34 @@ public class JVMHashIndexOp extends PipelineOp {
                 
                 // Lookup the attributes for the query on which we will hang the
                 // solution set.
-                attrs = context.getQueryAttributes(namedSetRef.queryId);
+                final IQueryAttributes attrs = context
+                        .getQueryAttributes(namedSetRef.queryId);
 
-                @SuppressWarnings("unchecked")
-                Map<Key, Bucket> solutions = (Map<Key, Bucket>) attrs
+                JVMHashJoinUtility state = (JVMHashJoinUtility) attrs
                         .get(namedSetRef);
 
-                if (solutions == null) {
+                if (state == null) {
 
-                    /*
-                     * Create the map(s).
-                     */
+                    final boolean optional = op.getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
                     
-                    /*
-                     * Materialize the binding sets and populate a hash map.
-                     */
-                    solutions = new LinkedHashMap<Key, Bucket>(//
-                            op.getInitialCapacity(),//
-                            op.getLoadFactor()//
-                    );
-
-                    this.first = true;
+                    state = new JVMHashJoinUtility(op, optional, false/*filter*/);
+//                    solutions = new LinkedHashMap<Key, Bucket>(//
+//                            op.getInitialCapacity(),//
+//                            op.getLoadFactor()//
+//                    );
+//
+//                    this.first = true;
                  
-                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
+                    if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
 
-                } else {
-                    
-                    this.first = false;
+//                } else {
+//                    
+//                    this.first = false;
                     
                 }
 
-                this.solutions = solutions;
+                this.state = state;
 
             }
             
@@ -437,8 +427,10 @@ public class JVMHashIndexOp extends PipelineOp {
          */
         private void acceptSolutions() {
 
-            JVMHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
-                    stats, solutions, optional);
+            state.acceptSolutions(context.getSource(), stats);
+            
+//            JVMHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+//                    stats, solutions, optional);
 
         }
 
@@ -453,30 +445,11 @@ public class JVMHashIndexOp extends PipelineOp {
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            // source.
-            final Iterator<Bucket> bucketIterator = solutions.values().iterator();
-
-            while (bucketIterator.hasNext()) {
-
-                final Bucket bucket = bucketIterator.next();
-
-                for (SolutionHit solutionHit : bucket) {
-                    
-                    IBindingSet bset = solutionHit.solution;
-
-                    if (selected != null) {
-
-                        // Drop variables which are not projected.
-                        bset = bset.copy(selected);
-
-                    }
-
-                    unsyncBuffer.add(bset);
-
-                }
-
-            }
-
+            state.outputSolutions(unsyncBuffer);
+            
+//            JVMHashJoinUtility.outputSolutions(unsyncBuffer, selected,
+//                    solutions);
+            
             unsyncBuffer.flush();
 
             sink.flush();

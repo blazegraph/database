@@ -50,13 +50,13 @@ import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.solutions.DistinctBindingSetOp;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Unit tests for {@link DistinctBindingSetOp}.
+ * Unit tests for {@link JVMDistinctBindingSetsOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

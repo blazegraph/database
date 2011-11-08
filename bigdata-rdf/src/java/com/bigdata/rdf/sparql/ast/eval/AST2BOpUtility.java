@@ -52,8 +52,8 @@ import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.solutions.DistinctBindingSetOp;
-import com.bigdata.bop.solutions.DistinctBindingSetsWithHTreeOp;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
+import com.bigdata.bop.solutions.HTreeDistinctBindingSetsOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.GroupByState;
@@ -1050,8 +1050,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
@@ -1059,15 +1059,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             );
             } else {
                 left = new JVMHashIndexOp(leftOrEmpty(left),//
-                        new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER),//
-                        new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                        new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                        new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
-                        new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-//                        new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
-                        new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                    new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
                 ); 
             }
 
@@ -1112,10 +1113,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -1977,15 +1978,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         );
         } else {
             op = new JVMHashIndexOp(leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ); 
         }
 
@@ -2021,9 +2022,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
@@ -2105,13 +2106,13 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             /*
              * DISTINCT on the JVM heap.
              */
-            op = new DistinctBindingSetOp(
+            op = new JVMDistinctBindingSetsOp(
                     leftOrEmpty(left),//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID, bopId),
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES, vars),
-                    new NV(DistinctBindingSetOp.Annotations.EVALUATION_CONTEXT,
+                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID, bopId),
+                    new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES, vars),
+                    new NV(JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
                            BOpEvaluationContext.CONTROLLER),
-                    new NV(DistinctBindingSetOp.Annotations.SHARED_STATE, true)//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true)//
             );
         } else {
             /*
@@ -2119,14 +2120,14 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              */
             final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                     ctx.queryId, "--distinct-"+ctx.nextId(), vars);
-            op = new DistinctBindingSetsWithHTreeOp(leftOrEmpty(left),//
-                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.BOP_ID,
+            op = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
+                    new NV(HTreeDistinctBindingSetsOp.Annotations.BOP_ID,
                            bopId),//
-                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.VARIABLES,
+                    new NV(HTreeDistinctBindingSetsOp.Annotations.VARIABLES,
                            vars),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(DistinctBindingSetsWithHTreeOp.Annotations.NAMED_SET_REF,
+                    new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
                            namedSolutionSet),//
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// for live stat updates.
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1)//

@@ -2,7 +2,7 @@ package com.bigdata.bop;
 
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.solutions.DistinctBindingSetOp;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.bop.solutions.SliceOp;
 
 /**

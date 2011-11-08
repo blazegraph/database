@@ -1619,4 +1619,38 @@ public class BOpUtility {
 
     }
 
+    /**
+     * Combine two arrays of constraints. Either may be <code>null</code> or
+     * empty. If both were <code>null</code> or empty, then a <code>null</code>
+     * will be returned.
+     * 
+     * @param a
+     *            One set of constraints.
+     * @param b
+     *            Another set of constraints.
+     * 
+     * @return The combined constraints.
+     */
+    static public IConstraint[] concat(final IConstraint[] a,
+            final IConstraint[] b) {
+
+        final List<IConstraint> list = new LinkedList<IConstraint>();
+        
+        if (a != null) {
+            for (IConstraint c : a) {
+                list.add(c);
+            }
+        }
+        
+        if (b != null) {
+            for (IConstraint c : b) {
+                list.add(c);
+            }
+        }
+        
+        return list.isEmpty() ? null : list
+                .toArray(new IConstraint[list.size()]);
+
+    }
+
 }

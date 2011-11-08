@@ -36,10 +36,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class DistinctBindingSetOp extends PipelineOp {
+public class JVMDistinctBindingSetsOp extends PipelineOp {
 
 	private final static transient Logger log = Logger
-			.getLogger(DistinctBindingSetOp.class);
+			.getLogger(JVMDistinctBindingSetsOp.class);
 	
     /**
      * 
@@ -54,14 +54,14 @@ public class DistinctBindingSetOp extends PipelineOp {
     /**
      * Required deep copy constructor.
      */
-    public DistinctBindingSetOp(final DistinctBindingSetOp op) {
+    public JVMDistinctBindingSetsOp(final JVMDistinctBindingSetsOp op) {
         super(op);
     }
 
     /**
      * Required shallow copy constructor.
      */
-    public DistinctBindingSetOp(final BOp[] args,
+    public JVMDistinctBindingSetsOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
 		super(args, annotations);
@@ -89,7 +89,7 @@ public class DistinctBindingSetOp extends PipelineOp {
 
     }
 
-    public DistinctBindingSetOp(final BOp[] args, NV... annotations) {
+    public JVMDistinctBindingSetsOp(final BOp[] args, NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -203,7 +203,7 @@ public class DistinctBindingSetOp extends PipelineOp {
         private final IVariable<?>[] vars;
         
         @SuppressWarnings("unchecked")
-        DistinctTask(final DistinctBindingSetOp op,
+        DistinctTask(final JVMDistinctBindingSetsOp op,
                 final BOpContext<IBindingSet> context) {
 
             this.context = context;

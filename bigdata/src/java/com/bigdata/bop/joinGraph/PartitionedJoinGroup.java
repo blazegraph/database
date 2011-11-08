@@ -24,7 +24,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.EndOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
-import com.bigdata.bop.solutions.DistinctBindingSetOp;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis_CanJoin;
 
 /**
@@ -1121,14 +1121,14 @@ public class PartitionedJoinGroup {
         }
 
 		if (distinct) {
-			lastOp = new DistinctBindingSetOp(new BOp[] { lastOp }, NV
+			lastOp = new JVMDistinctBindingSetsOp(new BOp[] { lastOp }, NV
 					.asMap(new NV[] {
 							new NV(PipelineOp.Annotations.BOP_ID, idFactory
 									.nextId()), //
 							new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
 									BOpEvaluationContext.CONTROLLER),//
 							new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-							new NV(DistinctBindingSetOp.Annotations.VARIABLES,
+							new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,
 									selected),//
 					})//
 			);
