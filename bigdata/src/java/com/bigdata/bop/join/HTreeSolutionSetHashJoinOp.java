@@ -27,14 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
@@ -245,7 +244,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                 
             }
 
-            if (state.optional && !op.isLastPassRequested()) {
+            if (state.isOptional() && !op.isLastPassRequested()) {
 
                 /*
                  * An optional join requires that we observe all solutions
@@ -269,23 +268,26 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
              * location, it is necessary that we can override/expand on the join
              * constraints for this operator.
              */
-            {
-                final IConstraint[] tmp = (IConstraint[]) op
-                        .getProperty(Annotations.CONSTRAINTS);
-                final List<IConstraint> list = new LinkedList<IConstraint>();
-                if (tmp != null) {
-                    for (IConstraint c : tmp) {
-                        list.add(c);
-                    }
-                }
-                if (state.constraints != null) {
-                    for (IConstraint c : state.constraints) {
-                        list.add(c);
-                    }
-                }
-                this.constraints = list.isEmpty() ? null : list
-                        .toArray(new IConstraint[list.size()]);
-            }
+            this.constraints = BOpUtility.concat(
+                    (IConstraint[]) op.getProperty(Annotations.CONSTRAINTS),
+                    state.getConstraints());
+//            {
+//                final IConstraint[] tmp = (IConstraint[]) op
+//                        .getProperty(Annotations.CONSTRAINTS);
+//                final List<IConstraint> list = new LinkedList<IConstraint>();
+//                if (tmp != null) {
+//                    for (IConstraint c : tmp) {
+//                        list.add(c);
+//                    }
+//                }
+//                if (state.getConstraints() != null) {
+//                    for (IConstraint c : state.getConstraints()) {
+//                        list.add(c);
+//                    }
+//                }
+//                this.constraints = list.isEmpty() ? null : list
+//                        .toArray(new IConstraint[list.size()]);
+//            }
             
         }
 
@@ -344,7 +346,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
             state.hashJoin2(leftItr, unsyncBuffer, true/* leftIsPipeline */,
                     constraints);
 
-            if (state.optional && context.isLastInvocation()) {
+            if (state.isOptional() && context.isLastInvocation()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer

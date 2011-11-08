@@ -87,8 +87,7 @@ public class HTreeHashIndexOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HTreeHashJoinAnnotations,
-            HashJoinAnnotations {
+    public interface Annotations extends HTreeHashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the

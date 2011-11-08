@@ -56,7 +56,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Unit tests for {@link DistinctBindingSetOp}.
+ * Unit tests for {@link JVMDistinctBindingSetsOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -171,9 +171,9 @@ public class TestDistinctBindingSets extends TestCase2 {
 
         // w/o variables.
         try {
-        new DistinctBindingSetOp(new BOp[]{},
+        new JVMDistinctBindingSetsOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
 //                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
@@ -188,10 +188,10 @@ public class TestDistinctBindingSets extends TestCase2 {
 
         // w/o evaluation on the query controller.
         try {
-        new DistinctBindingSetOp(new BOp[]{},
+        new JVMDistinctBindingSetsOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
 //                    new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
 //                            BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,
@@ -205,10 +205,10 @@ public class TestDistinctBindingSets extends TestCase2 {
 
         // w/o shared state.
         try {
-        new DistinctBindingSetOp(new BOp[]{},
+        new JVMDistinctBindingSetsOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
 //                    new NV(PipelineOp.Annotations.SHARED_STATE,
@@ -236,10 +236,10 @@ public class TestDistinctBindingSets extends TestCase2 {
         
         final int distinctId = 1;
         
-        final DistinctBindingSetOp query = new DistinctBindingSetOp(new BOp[]{},
+        final JVMDistinctBindingSetsOp query = new JVMDistinctBindingSetsOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.BOP_ID,distinctId),//
+                    new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,new IVariable[]{x}),//
                     new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,

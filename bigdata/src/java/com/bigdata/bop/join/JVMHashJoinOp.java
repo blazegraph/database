@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -39,14 +37,11 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -161,47 +156,47 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
     }
     
-    /**
-     * Return <code>true</code> iff the predicate associated with the join is
-     * optional.
-     * 
-     * @see IPredicate.Annotations#OPTIONAL
-     */
-    private boolean isOptional() {
-        
-        return getPredicate().isOptional();
-        
-    }
-    
-    /**
-     * 
-     * @see Annotations#CONSTRAINTS
-     */
-    public IConstraint[] constraints() {
-
-        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
-
-    }    
-
-    /**
-     * @see HashMapAnnotations#INITIAL_CAPACITY
-     */
-    public int getInitialCapacity() {
-
-        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-
-    }
-
-    /**
-     * @see HashMapAnnotations#LOAD_FACTOR
-     */
-    public float getLoadFactor() {
-
-        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-
-    }
+//    /**
+//     * Return <code>true</code> iff the predicate associated with the join is
+//     * optional.
+//     * 
+//     * @see IPredicate.Annotations#OPTIONAL
+//     */
+//    private boolean isOptional() {
+//        
+//        return getPredicate().isOptional();
+//        
+//    }
+//    
+//    /**
+//     * 
+//     * @see Annotations#CONSTRAINTS
+//     */
+//    public IConstraint[] constraints() {
+//
+//        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
+//
+//    }    
+//
+//    /**
+//     * @see HashMapAnnotations#INITIAL_CAPACITY
+//     */
+//    public int getInitialCapacity() {
+//
+//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
+//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
+//
+//    }
+//
+//    /**
+//     * @see HashMapAnnotations#LOAD_FACTOR
+//     */
+//    public float getLoadFactor() {
+//
+//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
+//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
+//
+//    }
     
     public BaseJoinStats newStats() {
 
@@ -229,13 +224,13 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
         
         private final IPredicate<E> pred;
         
-        private final IVariable<E>[] joinVars;
-        
-        private final IConstraint[] constraints;
-
-        private final IVariable<?>[] selectVars;
-        
-        private final boolean optional;
+//        private final IVariable<E>[] joinVars;
+//        
+//        private final IConstraint[] constraints;
+//
+//        private final IVariable<?>[] selectVars;
+//        
+//        private final boolean optional;
         
         private final BaseJoinStats stats;
 
@@ -247,15 +242,16 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 //        
 //        private final Object sourceSolutionsKey;
 
-        /**
-         * The hash index.
-         * <p>
-         * Note: The map is shared state and can not be discarded or cleared
-         * until the last invocation!!!
-         */
-        private final Map<Key,Bucket> rightSolutions;
+//        /**
+//         * The hash index.
+//         * <p>
+//         * Note: The map is shared state and can not be discarded or cleared
+//         * until the last invocation!!!
+//         */
+//        private final Map<Key,Bucket> rightSolutions;
 
-        @SuppressWarnings("unchecked")
+        private final JVMHashJoinUtility state;
+        
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final JVMHashJoinOp<E> op) {
 
@@ -267,61 +263,63 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
             this.relation = context.getRelation(pred);
 
-            this.selectVars = (IVariable<?>[]) op
-                    .getProperty(Annotations.SELECT);
-
-            this.joinVars = (IVariable<E>[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
-            
-            this.constraints = op.constraints();
-
-            this.optional = op.isOptional();
+//            this.selectVars = (IVariable<?>[]) op
+//                    .getProperty(Annotations.SELECT);
+//
+//            this.joinVars = (IVariable<E>[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            
+//            this.constraints = op.constraints();
+//
+//            this.optional = op.isOptional();
 
             this.sink = context.getSink();
 
             this.sink2 = context.getSink2();
 
             this.op = op;
+            
+            this.state = new JVMHashJoinUtility(op, pred.isOptional(), false/* filter */);
 
-            {
-
-//                /*
-//                 * First, see if the map already exists.
-//                 * 
-//                 * Note: Since the operator is not thread-safe, we do not need
-//                 * to use a putIfAbsent pattern here.
-//                 */
-//                attrs = context.getRunningQuery().getAttributes();
+//            {
 //
-//                sourceSolutionsKey = op.getId() + ".sourceSolutions";
-//
-//                Map<Key, Bucket> rightSolutions = (Map<Key, Bucket>) attrs
-//                        .get(sourceSolutionsKey);
-//
-//                if (rightSolutions == null) {
-//
+////                /*
+////                 * First, see if the map already exists.
+////                 * 
+////                 * Note: Since the operator is not thread-safe, we do not need
+////                 * to use a putIfAbsent pattern here.
+////                 */
+////                attrs = context.getRunningQuery().getAttributes();
+////
+////                sourceSolutionsKey = op.getId() + ".sourceSolutions";
+////
+////                Map<Key, Bucket> rightSolutions = (Map<Key, Bucket>) attrs
+////                        .get(sourceSolutionsKey);
+////
+////                if (rightSolutions == null) {
+////
+////                    /*
+////                     * Create the map(s).
+////                     */
+//                    
 //                    /*
-//                     * Create the map(s).
+//                     * Materialize the binding sets and populate a hash map.
 //                     */
-                    
-                    /*
-                     * Materialize the binding sets and populate a hash map.
-                     */
-                    rightSolutions = new LinkedHashMap<Key, Bucket>(//
-                            op.getInitialCapacity(),//
-                            op.getLoadFactor()//
-                    );
-
-//                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
-//                        throw new AssertionError();
-                    
-//                }
-
-//                // The map is shared state across invocations of this operator
-//                // task.
-//                this.rightSolutions = rightSolutions;
-
-            }
+//                    rightSolutions = new LinkedHashMap<Key, Bucket>(//
+//                            op.getInitialCapacity(),//
+//                            op.getLoadFactor()//
+//                    );
+//
+////                    if (attrs.putIfAbsent(sourceSolutionsKey, rightSolutions) != null)
+////                        throw new AssertionError();
+//                    
+////                }
+//
+////                // The map is shared state across invocations of this operator
+////                // task.
+////                this.rightSolutions = rightSolutions;
+//
+//            }
 
         }
 
@@ -375,8 +373,9 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
          */
         private void acceptSolutions() {
 
-            JVMHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
-                    stats, rightSolutions, optional);
+            state.acceptSolutions(context.getSource(), stats);
+//            JVMHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
+//                    stats, rightSolutions, optional);
 
         }
 
@@ -385,15 +384,13 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
          */
         private void doHashJoin() {
 
-            if (rightSolutions.isEmpty())
+            if (state.isEmpty())
                 return;
             
             final IAccessPath<?> accessPath = context.getAccessPath(relation,
                     pred);
 
             if (log.isDebugEnabled()) {
-                log.debug("rightSolutions=" + rightSolutions.size());
-                log.debug("joinVars=" + Arrays.toString(joinVars));
                 log.debug("accessPath=" + accessPath);
             }
 
@@ -405,19 +402,25 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            JVMHashJoinUtility.hashJoin(
+            state.hashJoin(
                     ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
-                    unsyncBuffer, joinVars, selectVars, constraints,
-                    rightSolutions, optional, false/*leftIsPipeline*/);
+                    unsyncBuffer, 
+                    false//leftIsPipeline
+                    );
+//            JVMHashJoinUtility.hashJoin(
+//                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
+//                    unsyncBuffer, joinVars, selectVars, constraints,
+//                    rightSolutions, optional, false/*leftIsPipeline*/);
 
-            if (optional) {
+            if (state.isOptional()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
                         : new UnsyncLocalOutputBuffer<IBindingSet>(
                                 op.getChunkCapacity(), sink2);
 
-                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
+                state.outputOptionals(unsyncBuffer2);
+//                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)

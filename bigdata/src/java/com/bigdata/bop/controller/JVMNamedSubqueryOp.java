@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -39,7 +38,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
@@ -49,10 +47,8 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.JVMHashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinUtility;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -84,8 +80,8 @@ public class JVMNamedSubqueryOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryAnnotations, HashMapAnnotations,
-            HashJoinAnnotations {
+    public interface Annotations extends SubqueryAnnotations,
+            JVMHashJoinAnnotations {
 
         /**
          * The name of {@link IQueryAttributes} attribute under which the
@@ -156,25 +152,25 @@ public class JVMNamedSubqueryOp extends PipelineOp {
         
     }
 
-    /**
-     * @see HashMapAnnotations#INITIAL_CAPACITY
-     */
-    public int getInitialCapacity() {
-
-        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-
-    }
-
-    /**
-     * @see HashMapAnnotations#LOAD_FACTOR
-     */
-    public float getLoadFactor() {
-
-        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-
-    }
+//    /**
+//     * @see HashMapAnnotations#INITIAL_CAPACITY
+//     */
+//    public int getInitialCapacity() {
+//
+//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
+//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
+//
+//    }
+//
+//    /**
+//     * @see HashMapAnnotations#LOAD_FACTOR
+//     */
+//    public float getLoadFactor() {
+//
+//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
+//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
+//
+//    }
     
     @Override
     public BOpStats newStats() {
@@ -186,7 +182,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
     /**
      * Adds reporting for the size of the named solution set.
      */
-    private static class NamedSolutionSetStats extends BOpStats {
+    public static class NamedSolutionSetStats extends BOpStats {
         
         private static final long serialVersionUID = 1L;
         
@@ -241,13 +237,13 @@ public class JVMNamedSubqueryOp extends PipelineOp {
          * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
          * we will hang the named solution set.
          */
-        final IQueryAttributes attrs;
+        private final IQueryAttributes attrs;
         
-        /**
-         * The join variables.
-         */
-        @SuppressWarnings("rawtypes")
-        private final IVariable[] joinVars;
+//        /**
+//         * The join variables.
+//         */
+//        @SuppressWarnings("rawtypes")
+//        private final IVariable[] joinVars;
         
         /**
          * <code>true</code> iff this is the first time the task is being
@@ -256,12 +252,14 @@ public class JVMNamedSubqueryOp extends PipelineOp {
          */
         private final boolean first;
         
-        /**
-         * The generated solution set (hash index using the specified join
-         * variables).
-         */
-        private final Map<Key,Bucket> solutions;
+//        /**
+//         * The generated solution set (hash index using the specified join
+//         * variables).
+//         */
+//        private final Map<Key,Bucket> solutions;
         
+        private final JVMHashJoinUtility state;
+
         public ControllerTask(final JVMNamedSubqueryOp op,
                 final BOpContext<IBindingSet> context) {
 
@@ -281,8 +279,8 @@ public class JVMNamedSubqueryOp extends PipelineOp {
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            this.joinVars = (IVariable[]) op
-                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            this.joinVars = (IVariable[]) op
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -297,21 +295,18 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                 // solution set.
                 attrs = context.getQueryAttributes(namedSetRef.queryId);
 
-                @SuppressWarnings("unchecked")
-                Map<Key, Bucket> solutions = (Map<Key, Bucket>) attrs
+                JVMHashJoinUtility state = (JVMHashJoinUtility) attrs
                         .get(namedSetRef);
 
-                if (solutions == null) {
+                if (state == null) {
 
                     /*
-                     * Create the map(s).
+                     * Note: This operator does not support optional semantics.
                      */
-                    
-                    solutions = new LinkedHashMap<Key, Bucket>(
-                            op.getInitialCapacity(), op.getLoadFactor());
+                    state = new JVMHashJoinUtility(op, false/* optional */,
+                            false/* filter */);
 
-                    // Save reference as a query attribute.
-                    if (attrs.putIfAbsent(namedSetRef, solutions) != null)
+                    if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
 
                     this.first = true;
@@ -322,7 +317,8 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                     
                 }
 
-                this.solutions = solutions;
+                this.state = state;
+
 
             }
             
@@ -453,9 +449,11 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 						subquerySolutionItr = runningSubquery.iterator();
 
 						// Buffer the solutions on the hash index.
-                        final long ncopied = JVMHashJoinUtility.acceptSolutions(
-                                subquerySolutionItr, joinVars, stats,
-                                solutions, false/* optional */);
+                        final long ncopied = state.acceptSolutions(
+                                subquerySolutionItr, stats);
+//                        final long ncopied = JVMHashJoinUtility.acceptSolutions(
+//                                subquerySolutionItr, joinVars, stats,
+//                                solutions, false/* optional */);
 
 						// Wait for the subquery to halt / test for errors.
 						runningSubquery.get();

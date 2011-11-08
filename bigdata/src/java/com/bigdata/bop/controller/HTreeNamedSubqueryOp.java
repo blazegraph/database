@@ -30,7 +30,6 @@ package com.bigdata.bop.controller;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -44,6 +43,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.controller.JVMNamedSubqueryOp.NamedSolutionSetStats;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -148,37 +148,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         this(args, NV.asMap(annotations));
         
     }
-
-//    /**
-//     * @see Annotations#ADDRESS_BITS
-//     */
-//    public int getAddressBits() {
-//
-//        return getProperty(Annotations.ADDRESS_BITS,
-//                Annotations.DEFAULT_ADDRESS_BITS);
-//
-//    }
-//
-//    /**
-//     * @see Annotations#RAW_RECORDS
-//     */
-//    public boolean getRawRecords() {
-//
-//        return getProperty(Annotations.RAW_RECORDS,
-//                Annotations.DEFAULT_RAW_RECORDS);
-//
-//    }
-//    
-//    /**
-//     * @see Annotations#MAX_RECLEN
-//     */
-//    public int getMaxRecLen() {
-//
-//        return getProperty(Annotations.MAX_RECLEN,
-//                Annotations.DEFAULT_MAX_RECLEN);
-//
-//    }
-
+    
     @Override
     public BOpStats newStats() {
 
@@ -186,36 +156,36 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
     }
 
-    /**
-     * Adds reporting for the size of the named solution set.
-     */
-    private static class NamedSolutionSetStats extends BOpStats {
-        
-        private static final long serialVersionUID = 1L;
-        
-        final AtomicLong solutionSetSize = new AtomicLong();
-
-        public void add(final BOpStats o) {
-
-            super.add(o);
-
-            if (o instanceof NamedSolutionSetStats) {
-
-                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
-
-                solutionSetSize.addAndGet(t.solutionSetSize.get());
-
-            }
-
-        }
-
-        @Override
-        protected void toString(final StringBuilder sb) {
-            super.toString(sb);
-            sb.append(",solutionSetSize=" + solutionSetSize.get());
-        }
-
-    }
+//    /**
+//     * Adds reporting for the size of the named solution set.
+//     */
+//    private static class NamedSolutionSetStats extends BOpStats {
+//        
+//        private static final long serialVersionUID = 1L;
+//        
+//        final AtomicLong solutionSetSize = new AtomicLong();
+//
+//        public void add(final BOpStats o) {
+//
+//            super.add(o);
+//
+//            if (o instanceof NamedSolutionSetStats) {
+//
+//                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
+//
+//                solutionSetSize.addAndGet(t.solutionSetSize.get());
+//
+//            }
+//
+//        }
+//
+//        @Override
+//        protected void toString(final StringBuilder sb) {
+//            super.toString(sb);
+//            sb.append(",solutionSetSize=" + solutionSetSize.get());
+//        }
+//
+//    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -244,7 +214,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
          * The {@link IQueryAttributes} for the {@link IRunningQuery} off which
          * we will hang the named solution set.
          */
-        final IQueryAttributes attrs;
+        private final IQueryAttributes attrs;
         
         /**
          * <code>true</code> iff this is the first time the task is being

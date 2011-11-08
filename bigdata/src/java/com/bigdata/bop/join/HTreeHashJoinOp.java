@@ -384,7 +384,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
                     ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
                     unsyncBuffer, false/* leftIsPipeline */);
 
-            if (state.optional) {
+            if (state.isOptional()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
