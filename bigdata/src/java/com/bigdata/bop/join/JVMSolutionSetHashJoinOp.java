@@ -345,35 +345,6 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                     state.getConstraints());
             
         }
-
-//        /**
-//         * Discard the data.
-//         */
-//        private void release() {
-//
-//            if (rightSolutions != null) {
-//
-//                // FIXME Clear the query attribute.
-//                if(false) {
-//
-//                    // The name of the attribute used to discover the solution
-//                    // set.
-//                    final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
-//                            .getRequiredProperty(Annotations.NAMED_SET_REF);
-//
-//                    // Lookup the attributes for the query on which we will hang
-//                    // the solution set.
-//                    final IQueryAttributes attrs = context
-//                            .getQueryAttributes(namedSetRef.queryId);
-//
-//                    // The hash index holding the solutions.
-//                    attrs.put(namedSetRef, null);
-//
-//                }
-//
-//            }
-//
-//        }
         
         public Void call() throws Exception {
 

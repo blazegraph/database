@@ -22,6 +22,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -31,6 +32,12 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * Note: This implementation is a pipelined operator which inspects each chunk
  * of solutions as they arrive and those solutions which are distinct for each
  * chunk are passed on. It uses a {@link ConcurrentMap} and is thread-safe.
+ * 
+ * TODO Look into reconciling this class with {@link JVMHashJoinUtility}.
+ * However, note that this implementation is thread-safe and uses a
+ * {@link ConcurrentMap}. It may be better to leave things as they are since
+ * this implementation may be more efficient for the special case which it
+ * handles.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z

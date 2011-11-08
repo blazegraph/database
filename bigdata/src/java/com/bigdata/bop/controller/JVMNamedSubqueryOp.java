@@ -151,26 +151,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
         this(args, NV.asMap(annotations));
         
     }
-
-//    /**
-//     * @see HashMapAnnotations#INITIAL_CAPACITY
-//     */
-//    public int getInitialCapacity() {
-//
-//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-//
-//    }
-//
-//    /**
-//     * @see HashMapAnnotations#LOAD_FACTOR
-//     */
-//    public float getLoadFactor() {
-//
-//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-//
-//    }
     
     @Override
     public BOpStats newStats() {
@@ -252,12 +232,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
          */
         private final boolean first;
         
-//        /**
-//         * The generated solution set (hash index using the specified join
-//         * variables).
-//         */
-//        private final Map<Key,Bucket> solutions;
-        
         private final JVMHashJoinUtility state;
 
         public ControllerTask(final JVMNamedSubqueryOp op,
@@ -278,9 +252,6 @@ public class JVMNamedSubqueryOp extends PipelineOp {
 
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
-
-//            this.joinVars = (IVariable[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -373,31 +344,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
             }
             
         }
-
-//        /**
-//         * Checkpoint the {@link HTree} containing the results of the subquery,
-//         * re-load the {@link HTree} in a read-only mode from that checkpoint
-//         * and then set the reference to the read-only view of the {@link HTree}
-//         * on the {@link IQueryAttributes}. This exposes a view of the
-//         * {@link HTree} which is safe for concurrent readers.
-//         */
-//        private void saveSolutionSet() {
-//            
-//            // Checkpoint the HTree.
-//            final Checkpoint checkpoint = solutions.writeCheckpoint2();
-//            
-//            // Get a read-only view of the HTree.
-//            final HTree readOnly = HTree.load(solutions.getStore(),
-//                    checkpoint.getCheckpointAddr(), true/* readOnly */);
-//
-////            final IQueryAttributes attrs = context.getRunningQuery()
-////                    .getAttributes();
-//
-//            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
-//                throw new AssertionError();
-//
-//        }
-        
+      
         /**
          * Run a subquery.
          */

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -38,8 +37,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -48,8 +45,6 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinUtility;
-import com.bigdata.bop.join.JVMHashJoinUtility.Bucket;
-import com.bigdata.bop.join.JVMHashJoinUtility.Key;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -128,25 +123,25 @@ public class SubqueryHashJoinOp extends PipelineOp {
         
     }
 
-    /**
-     * @see HashMapAnnotations#INITIAL_CAPACITY
-     */
-    public int getInitialCapacity() {
-
-        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-
-    }
-
-    /**
-     * @see HashMapAnnotations#LOAD_FACTOR
-     */
-    public float getLoadFactor() {
-
-        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-
-    }
+//    /**
+//     * @see HashMapAnnotations#INITIAL_CAPACITY
+//     */
+//    public int getInitialCapacity() {
+//
+//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
+//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
+//
+//    }
+//
+//    /**
+//     * @see HashMapAnnotations#LOAD_FACTOR
+//     */
+//    public float getLoadFactor() {
+//
+//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
+//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
+//
+//    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -173,29 +168,29 @@ public class SubqueryHashJoinOp extends PipelineOp {
          */
         private final SubqueryHashJoinOp joinOp;
         
-        /**
-         * The join variables.
-         * 
-         * @see SubqueryHashJoinOp.Annotations#JOIN_VARS
-         */
-        private final IVariable<?>[] joinVars;
-
-        /**
-         * The variables to be retained by the join operator. Variables not
-         * appearing in this list will be stripped before writing out the
-         * binding set onto the output sink(s).
-         * 
-         * @see SubqueryHashJoinOp.Annotations#SELECT
-         */
-        final private IVariable<?>[] selectVars;
-
-        /**
-         * An array of constraints to be applied to the generated solutions
-         * (optional).
-         * 
-         * @see SubqueryHashJoinOp.Annotations#CONSTRAINTS
-         */
-        final private IConstraint[] constraints;
+//        /**
+//         * The join variables.
+//         * 
+//         * @see SubqueryHashJoinOp.Annotations#JOIN_VARS
+//         */
+//        private final IVariable<?>[] joinVars;
+//
+//        /**
+//         * The variables to be retained by the join operator. Variables not
+//         * appearing in this list will be stripped before writing out the
+//         * binding set onto the output sink(s).
+//         * 
+//         * @see SubqueryHashJoinOp.Annotations#SELECT
+//         */
+//        final private IVariable<?>[] selectVars;
+//
+//        /**
+//         * An array of constraints to be applied to the generated solutions
+//         * (optional).
+//         * 
+//         * @see SubqueryHashJoinOp.Annotations#CONSTRAINTS
+//         */
+//        final private IConstraint[] constraints;
         
         /**
          * The subquery to be evaluated.
@@ -204,13 +199,15 @@ public class SubqueryHashJoinOp extends PipelineOp {
          */
         private final PipelineOp subquery;
         
-        /**
-         * <code>true</code> iff the subquery has OPTIONAL semantics.
-         * 
-         * @see IPredicate.Annotations#OPTIONAL
-         */
-        private final boolean optional;
+//        /**
+//         * <code>true</code> iff the subquery has OPTIONAL semantics.
+//         * 
+//         * @see IPredicate.Annotations#OPTIONAL
+//         */
+//        private final boolean optional;
 
+        private final JVMHashJoinUtility state;
+        
         /**
          * Where the join results are written.
          * <p>
@@ -232,10 +229,10 @@ public class SubqueryHashJoinOp extends PipelineOp {
          */
         final private IBlockingBuffer<IBindingSet[]> sink2;
 
-        public ControllerTask(final SubqueryHashJoinOp joinOp,
+        public ControllerTask(final SubqueryHashJoinOp op,
                 final BOpContext<IBindingSet> context) {
 
-            if (joinOp == null)
+            if (op == null)
                 throw new IllegalArgumentException();
 
             if (context == null)
@@ -243,22 +240,24 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
             this.context = context;
 
-            this.joinOp = joinOp;
+            this.joinOp = op;
             
-            this.joinVars = (IVariable<?>[]) joinOp
-                    .getRequiredProperty(Annotations.JOIN_VARS);
+//            this.joinVars = (IVariable<?>[]) joinOp
+//                    .getRequiredProperty(Annotations.JOIN_VARS);
+//
+//            this.selectVars = (IVariable<?>[]) joinOp
+//                    .getProperty(Annotations.SELECT);
+//
+//            this.constraints = joinOp.getProperty(
+//                    Annotations.CONSTRAINTS, null/* defaultValue */);
 
-            this.selectVars = (IVariable<?>[]) joinOp
-                    .getProperty(Annotations.SELECT);
-
-            this.constraints = joinOp.getProperty(
-                    Annotations.CONSTRAINTS, null/* defaultValue */);
-
-            this.subquery = (PipelineOp) joinOp
+            this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
-            this.optional = joinOp.getProperty(Annotations.OPTIONAL,
+            final boolean optional = op.getProperty(Annotations.OPTIONAL,
                     Annotations.DEFAULT_OPTIONAL);
+
+            this.state = new JVMHashJoinUtility(op, optional, false/* filter */);
 
             this.sink = context.getSink();
 
@@ -268,8 +267,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-            if (log.isDebugEnabled())
-                log.debug("Evaluating subquery hash join: " + joinOp);
+//            if (log.isDebugEnabled())
+//                log.debug("Evaluating subquery hash join: " + joinOp);
 
             final BaseJoinStats stats = (BaseJoinStats) context.getStats();
 
@@ -278,16 +277,18 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
             try {
 
-                /*
-                 * Materialize the binding sets and populate a hash map.
-                 */
-                final Map<Key, Bucket> map = new LinkedHashMap<Key, Bucket>(//
-                        joinOp.getInitialCapacity(),//
-                        joinOp.getLoadFactor()//
-                );
+//                /*
+//                 * Materialize the binding sets and populate a hash map.
+//                 */
+//                final Map<Key, Bucket> map = new LinkedHashMap<Key, Bucket>(//
+//                        joinOp.getInitialCapacity(),//
+//                        joinOp.getLoadFactor()//
+//                );
 
-                JVMHashJoinUtility.acceptSolutions(context.getSource(),
-                        joinVars, stats, map, optional);
+                state.acceptSolutions(context.getSource(), stats);
+                
+//                JVMHashJoinUtility.acceptSolutions(context.getSource(),
+//                        joinVars, stats, map, optional);
 
                 /*
                  * Run the subquery once.
@@ -330,14 +331,20 @@ public class SubqueryHashJoinOp extends PipelineOp {
                     final IAsynchronousIterator<IBindingSet[]> subquerySolutionItr = runningSubquery
                             .iterator();
 
-                    JVMHashJoinUtility
-                            .hashJoin(new Dechunkerator<IBindingSet>(
-                                    subquerySolutionItr),
-                                    unsyncBuffer/* outputBuffer */, joinVars,
-                                    selectVars, constraints, map, optional,
-                                    true/* leftIsPipeline */);
+                    state.hashJoin(new Dechunkerator<IBindingSet>(
+                            subquerySolutionItr),// leftItr
+                            unsyncBuffer,// outputBuffer,
+                            true// leftIsPipeline
+                    );
+
+//                    JVMHashJoinUtility
+//                            .hashJoin(new Dechunkerator<IBindingSet>(
+//                                    subquerySolutionItr),
+//                                    unsyncBuffer/* outputBuffer */, joinVars,
+//                                    selectVars, constraints, map, optional,
+//                                    true/* leftIsPipeline */);
                     
-                    if (optional) {
+                    if (state.isOptional()) {
 
                         final IBuffer<IBindingSet> outputBuffer;
                         if (unsyncBuffer2 == null) {
@@ -348,7 +355,9 @@ public class SubqueryHashJoinOp extends PipelineOp {
                             outputBuffer = unsyncBuffer2;
                         }
 
-                        JVMHashJoinUtility.outputOptionals(outputBuffer, map);
+                        state.outputOptionals(outputBuffer);
+                        
+//                        JVMHashJoinUtility.outputOptionals(outputBuffer, map);
 
                         if (sink2 != null) {
                             unsyncBuffer2.flush();
