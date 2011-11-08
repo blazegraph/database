@@ -552,8 +552,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      * mf:requires mf:KnownTypesDefault2Neq ;
      * mf:requires mf:LangTagAwareness ;
      * </pre>
-     * 
-     * FIXME Missing 2 solutions.
      */
     public void test_open_eq_12() throws Exception {
 
@@ -580,8 +578,6 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
      *         } .
      *     }
      * </pre>
-     * 
-     * FIXME Note: Missing [title="TITLE 2"].
      */
     public void test_OPTIONAL_FILTER() throws Exception {
         
