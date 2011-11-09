@@ -53,8 +53,10 @@ import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
+import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
+import cutthecrap.utils.striterators.Visitor;
 
 /**
  * Utility class supporting hash join against a Java hash collection.
@@ -1117,33 +1119,104 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             final boolean optional,//
             final IBuffer<IBindingSet> outputBuffer) {
 
-        final int nsources = currentBucket.length;
+		final int nsources = currentBucket.length;
 
-        // The bucket for the first source.
-        final Bucket firstBucket = currentBucket[0];
+		// The bucket for the first source.
+		final Bucket firstBucket = currentBucket[0];
 
-        assert firstBucket != null; // never allowed for the 1st source.
-        
-        for (int i = 1; i < nsources; i++) {
+		assert firstBucket != null; // never allowed for the 1st source.
 
-            // A bucket having the same hash code for another source.
-            final Bucket otherBucket = currentBucket[i];
-            
-            if(otherBucket == null) {
-                
-                assert optional; // only allowed if the join is optional.
-                
-                continue;
-                
+		for (int i = 1; i < nsources; i++) {
+
+			// A bucket having the same hash code for another source.
+			final Bucket otherBucket = currentBucket[i];
+
+			if (otherBucket == null) {
+
+				assert optional; // only allowed if the join is optional.
+
+				continue;
+
+			}
+
+			// Must be the same hash code.
+			assert firstBucket.hashCode == otherBucket.hashCode;
+
+		}
+
+		final SolutionHit[] set = new SolutionHit[nsources];
+		Striterator sols1 = new Striterator(firstBucket.solutions
+				.listIterator());
+		sols1.addFilter(new Visitor() {
+
+			@Override
+			protected void visit(Object obj) {
+				set[0] = (SolutionHit) obj;
+			}
+
+		});
+		
+		// now add in Expanders and Visitors for each Bucket
+		for (int i = 1; i < nsources; i++) {
+			// A bucket having the same hash code for another source.
+			final int slot = i;
+			final Bucket otherBucket = currentBucket[i];
+			
+			// if optional then if there are no solutions don't try and
+			// expand further
+			if (!(optional && otherBucket.solutions.isEmpty())) {
+				sols1.addFilter(new Expander() {
+	
+					@Override
+					protected Iterator expand(Object obj) {
+						return otherBucket.iterator();
+					}
+	
+				});
+				sols1.addFilter(new Visitor() {
+	
+					@Override
+					protected void visit(Object obj) {
+						set[slot] = (SolutionHit) obj;
+					}
+	
+				});
+			}
+		}
+
+		while (sols1.hasNext()) {
+			sols1.next();
+            IBindingSet in = set[0].solution;
+            System.out.println("Set 0: " + in);
+            for (int i = 1; i < set.length; i++) {
+
+                System.out.println("Set " + i + ": " + set[i].solution);
+                // See if the solutions join. 
+                in = //
+                BOpContext.bind(//
+                		in,// 
+                        set[i].solution,// 
+                        constraints,//
+                        null//
+                        );
+
+                if (in == null) {
+                    // Join failed.
+                    continue;
+                }
+
+                if (log.isDebugEnabled())
+                    log.debug("Output solution: " + in);
+
             }
-            
-            // Must be the same hash code.
-            assert firstBucket.hashCode == otherBucket.hashCode;
-            
-        }
+            // Accept this binding set.
+            if (in != null) {
+            	System.out.println(in.toString());
+            	outputBuffer.add(in);
+            }
+		}
+		// FIXME Output solutions which join. (apply constraints).
 
-        // FIXME Output solutions which join. (apply constraints).
-
-    }
+	}
 
 }   
