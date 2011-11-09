@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -53,6 +52,9 @@ import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Utility class supporting hash join against a Java hash collection.
@@ -347,7 +349,21 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         public Iterator<SolutionHit> iterator() {
             
-            return Collections.unmodifiableList(solutions).iterator();
+//            return Collections.unmodifiableList(solutions).iterator();
+            return solutions.iterator();
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        public Iterator<IBindingSet> bindingSetIterator() {
+            
+            return new Striterator(solutions.iterator()).addFilter(new Resolver() {
+                
+                @Override
+                protected Object resolve(Object obj) {
+                    return ((SolutionHit)obj).solution;
+                }
+            });
             
         }
 
