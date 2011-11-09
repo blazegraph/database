@@ -1164,7 +1164,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 			
 			// if optional then if there are no solutions don't try and
 			// expand further
-			if (!(optional && otherBucket.solutions.isEmpty())) {
+			if (!(optional && (otherBucket == null || otherBucket.solutions.isEmpty()))) {
 				sols1.addFilter(new Expander() {
 	
 					@Override
