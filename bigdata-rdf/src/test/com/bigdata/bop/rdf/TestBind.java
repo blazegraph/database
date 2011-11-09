@@ -83,7 +83,7 @@ public class TestBind extends TestCase2 {
         final ListBindingSet left = new ListBindingSet();
         final ListBindingSet right = new ListBindingSet();
         
-        final IBindingSet actual = BOpContext.bind(left, right, true/*leftIsPipeline*/,
+        final IBindingSet actual = BOpContext.bind(left, right, //true/*leftIsPipeline*/,
                 null/*constraints*/, null/*varsToKeep*/);
         
         assertEquals(expected, actual);
@@ -109,14 +109,14 @@ public class TestBind extends TestCase2 {
         final ListBindingSet right = new ListBindingSet();
         
         final IBindingSet actual = BOpContext
-                .bind(left, right, true/* leftIsPipeline */,
+                .bind(left, right, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertEquals(expected, actual);
 
         // Test symmetry.
         final IBindingSet actual2 = BOpContext
-                .bind(right, left, true/* leftIsPipeline */,
+                .bind(right, left, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertEquals(expected, actual2);
@@ -143,14 +143,14 @@ public class TestBind extends TestCase2 {
         right.set(x, val);
 
         final IBindingSet actual = BOpContext
-                .bind(left, right, true/* leftIsPipeline */,
+                .bind(left, right, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertEquals(expected, actual);
 
         // Test symmetry.
         final IBindingSet actual2 = BOpContext
-                .bind(left, right, true/* leftIsPipeline */,
+                .bind(left, right, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertEquals(expected, actual2);
@@ -177,14 +177,14 @@ public class TestBind extends TestCase2 {
         right.set(x, val2);
 
         final IBindingSet actual = BOpContext
-                .bind(left, right, true/* leftIsPipeline */,
+                .bind(left, right, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertNull(actual);
 
         // Test symmetry.
         final IBindingSet actual2 = BOpContext
-                .bind(left, right, true/* leftIsPipeline */,
+                .bind(left, right, //true/* leftIsPipeline */,
                         null/* constraints */, null/* varsToKeep */);
 
         assertNull(actual2);
@@ -223,7 +223,7 @@ public class TestBind extends TestCase2 {
         final ListBindingSet right = new ListBindingSet();
         right.set(x, val2);
         
-        final IBindingSet actual = BOpContext.bind(left, right, true/*leftIsPipeline*/,
+        final IBindingSet actual = BOpContext.bind(left, right, //true/*leftIsPipeline*/,
                 null/*constraints*/, null/*varsToKeep*/);
         
         assertEquals(expected, actual);
@@ -264,7 +264,7 @@ public class TestBind extends TestCase2 {
         final ListBindingSet right = new ListBindingSet();
         right.set(x, val2);
         
-        final IBindingSet actual = BOpContext.bind(left, right, true/*leftIsPipeline*/,
+        final IBindingSet actual = BOpContext.bind(left, right, //true/*leftIsPipeline*/,
                 null/*constraints*/, null/*varsToKeep*/);
         
         assertEquals(expected, actual);
@@ -304,7 +304,7 @@ public class TestBind extends TestCase2 {
         final ListBindingSet right = new ListBindingSet();
         right.set(x, val2);
         
-        final IBindingSet actual = BOpContext.bind(left, right, true/*leftIsPipeline*/,
+        final IBindingSet actual = BOpContext.bind(left, right, //true/*leftIsPipeline*/,
                 null/*constraints*/, null/*varsToKeep*/);
         
         assertEquals(expected, actual);

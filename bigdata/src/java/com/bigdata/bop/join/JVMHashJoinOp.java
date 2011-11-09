@@ -279,8 +279,8 @@ public class JVMHashJoinOp<E> extends PipelineOp implements
 
             state.hashJoin(
                     ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
-                    unsyncBuffer, 
-                    false//leftIsPipeline
+                    unsyncBuffer 
+//                    false//leftIsPipeline
                     );
 //            JVMHashJoinUtility.hashJoin(
 //                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left

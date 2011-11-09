@@ -314,7 +314,7 @@ public class ServiceCallJoin extends PipelineOp {
                         final IBindingSet right = serviceSolutionItr.next();
                         
                         final IBindingSet out = BOpContext.bind(left, right,
-                                true/* leftIsPipeline */,
+//                                true/* leftIsPipeline */,
                                 constraints, null/*varsToKeep*/);
                         
                         if (out != null) {

@@ -155,7 +155,7 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
         final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
         
         // Compute the "required" solutions.
-        state.hashJoin(leftItr, outputBuffer, true/*leftIsPipeline*/);
+        state.hashJoin(leftItr, outputBuffer);// true/*leftIsPipeline*/);
         
 //        JVMHashJoinUtility
 //                .hashJoin(leftItr, outputBuffer, joinVars, selectVars,

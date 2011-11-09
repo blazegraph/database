@@ -333,8 +333,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
                     state.hashJoin(new Dechunkerator<IBindingSet>(
                             subquerySolutionItr),// leftItr
-                            unsyncBuffer,// outputBuffer,
-                            true// leftIsPipeline
+                            unsyncBuffer// outputBuffer,
+//                            true// leftIsPipeline
                     );
 
 //                    JVMHashJoinUtility

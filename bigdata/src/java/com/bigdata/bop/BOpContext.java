@@ -524,14 +524,6 @@ public class BOpContext<E> extends BOpContextBase {
      *            The left binding set.
      * @param right
      *            The right binding set.
-     * @param leftIsPipeline
-     *            <code>true</code> iff <i>left</i> is a solution from upstream
-     *            in the query pipeline. Otherwise, <i>right</i> is the upstream
-     *            solution. The upstream solution may be associated with a
-     *            symbol table stack used to manage the visibility of variables
-     *            in SPARQL 1.1 subqueries. Therefore, this is the solution
-     *            which must be clone and into which the bindings must be
-     *            propagated.
      * @param constraints
      *            An array of constraints (optional). When given, destination
      *            {@link IBindingSet} will be validated <em>after</em> mutation.
@@ -543,19 +535,31 @@ public class BOpContext<E> extends BOpContextBase {
      * @return The solution with the combined bindings and <code>null</code> if
      *         the bindings were not consistent, if a constraint was violated,
      *         etc.
-     * 
-     *         FIXME Strip out [leftIsPipeline] entirely from the API, including
-     *         the API of all callers.
-     * 
-     *         TODO Optimize the case when left is an empty binding set, there
-     *         are no constraints, and we are keeping all variables. This
-     *         corresponds to a named subquery include.
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static public IBindingSet bind(final IBindingSet left,
-            final IBindingSet right, final boolean leftIsPipeline,
-            final IConstraint[] constraints, final IVariable[] varsToKeep) {
+    static public IBindingSet bind(//
+            final IBindingSet left,//
+            final IBindingSet right,//
+            final IConstraint[] constraints, //
+            final IVariable[] varsToKeep//
+            ) {
  
+        if (constraints == null && varsToKeep == null) {
+            
+            /*
+             * Optimize the case when left is an empty binding set, there are no
+             * constraints, and we are keeping all variables. This corresponds
+             * to a named subquery include.
+             */
+
+            if (left.isEmpty())
+                return right;
+            
+            if (right.isEmpty())
+                return left;
+
+        }
+        
 //        /*
 //         * Note: The binding sets from the query pipeline are always chosen as
 //         * the destination into which we will copy the bindings. This allows us

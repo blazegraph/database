@@ -60,7 +60,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JVMHashJoinUtility implements IHashJoinUtility {
+public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> {
 
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
     
@@ -627,10 +627,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
 
     @Override
-    public void hashJoin(ICloseableIterator<IBindingSet> leftItr,
-            IBuffer<IBindingSet> outputBuffer, boolean leftIsPipeline) {
+    public void hashJoin(//
+            final ICloseableIterator<IBindingSet> leftItr,//
+            final IBuffer<IBindingSet> outputBuffer//
+            ) {
         
-        hashJoin2(leftItr, outputBuffer, leftIsPipeline, constraints);
+        hashJoin2(leftItr, outputBuffer, constraints);
         
     }
 
@@ -646,9 +648,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * hit counter is used to support optional joins.
      */
     @Override
-    public void hashJoin2(final ICloseableIterator<IBindingSet> leftItr,
-            final IBuffer<IBindingSet> outputBuffer,
-            final boolean leftIsPipeline, final IConstraint[] constraints) {
+    public void hashJoin2(//
+            final ICloseableIterator<IBindingSet> leftItr,//
+            final IBuffer<IBindingSet> outputBuffer,//
+            final IConstraint[] constraints//
+            ) {
 
         final Map<Key,Bucket> rightSolutions = getRightSolutions();
           
@@ -690,7 +694,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     BOpContext.bind(//
                             right.solution,// 
                             left,// 
-                            leftIsPipeline,//
+//                            leftIsPipeline,//
                             constraints,//
                             selectVars//
                             );
@@ -792,6 +796,16 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         }       
 
+    }
+
+    @Override
+    public void mergeJoin(//
+            JVMHashJoinUtility[] others,//
+            IBuffer<IBindingSet> outputBuffer, //
+            IConstraint[] constraints//
+            ) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
     }
 
 }

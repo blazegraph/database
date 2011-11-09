@@ -399,7 +399,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
             final ICloseableIterator<IBindingSet> leftItr = new Dechunkerator<IBindingSet>(
                     context.getSource());
 
-            state.hashJoin2(leftItr, unsyncBuffer, true/* leftIsPipeline */,
+            state.hashJoin2(leftItr, unsyncBuffer, //true/* leftIsPipeline */,
                     constraints);
             
 //            JVMHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,

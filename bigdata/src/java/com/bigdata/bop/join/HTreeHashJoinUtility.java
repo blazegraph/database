@@ -107,7 +107,8 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinUtility.java 5568 2011-11-07 19:39:12Z thompsonbry
  */
-public class HTreeHashJoinUtility implements IHashJoinUtility {
+public class HTreeHashJoinUtility implements
+        IHashJoinUtility<HTreeHashJoinUtility> {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeHashJoinUtility.class);
@@ -1216,11 +1217,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     @Override
     public void hashJoin(//
             final ICloseableIterator<IBindingSet> leftItr,//
-            final IBuffer<IBindingSet> outputBuffer,//
-            final boolean leftIsPipeline//
+            final IBuffer<IBindingSet> outputBuffer//
             ) {
 
-        hashJoin2(leftItr, outputBuffer, leftIsPipeline, constraints);
+        hashJoin2(leftItr, outputBuffer, constraints);
         
     }
 
@@ -1228,7 +1228,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     public void hashJoin2(//
             final ICloseableIterator<IBindingSet> leftItr,//
             final IBuffer<IBindingSet> outputBuffer,//
-            final boolean leftIsPipeline,//
             final IConstraint[] constraints//
             ) {
 
@@ -1337,7 +1336,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                                 // Join.
                                 final IBindingSet outSolution = BOpContext
                                         .bind(leftSolution, rightSolution,
-                                                leftIsPipeline,
                                                 constraints,
                                                 selectVars);
 
@@ -1774,6 +1772,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             
         }
 
+    }
+
+    @Override
+    public void mergeJoin(final HTreeHashJoinUtility[] others,
+            final IBuffer<IBindingSet> outputBuffer,
+            final IConstraint[] constraints) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
     }
 
 }

@@ -382,7 +382,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
 
             state.hashJoin(
                     ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
-                    unsyncBuffer, false/* leftIsPipeline */);
+                    unsyncBuffer);//, false/* leftIsPipeline */);
 
             if (state.isOptional()) {
 

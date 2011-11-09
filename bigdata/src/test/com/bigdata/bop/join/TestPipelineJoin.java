@@ -49,13 +49,12 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.MockRunningQuery;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -205,7 +204,7 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} });
+                new IBindingSet[][] { new IBindingSet[] { new ListBindingSet()} });
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -300,8 +299,8 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source;
         {
 
-        	final IBindingSet bset1 = new HashBindingSet();
-        	final IBindingSet bset2 = new HashBindingSet();
+        	final IBindingSet bset1 = new ListBindingSet();
+        	final IBindingSet bset2 = new ListBindingSet();
 
         	bset1.set(Var.var("y"), new Constant<String>("Jack"));
         	bset2.set(Var.var("z"), new Constant<String>("Jill"));
@@ -391,8 +390,8 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source;
         {
 
-            final IBindingSet bset1 = new HashBindingSet();
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
 
             bset1.set(Var.var("x"), new Constant<String>("John"));
             bset1.set(Var.var("y"), new Constant<String>("Jack"));
@@ -491,7 +490,7 @@ public class TestPipelineJoin extends TestCase2 {
 
         // submit TWO (2) empty binding sets in ONE (1) chunk.
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet(), new HashBindingSet()} });
+                new IBindingSet[][] { new IBindingSet[] { new ListBindingSet(), new ListBindingSet()} });
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -586,7 +585,7 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
+                new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } });
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -691,7 +690,7 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
+                new IBindingSet[][] { new IBindingSet[] { new ListBindingSet() } });
 
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(query, stats);
 
@@ -771,8 +770,8 @@ public class TestPipelineJoin extends TestCase2 {
          */
         final IAsynchronousIterator<IBindingSet[]> source;
         {
-            final IBindingSet bset1 = new HashBindingSet();
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
             {
              
                 bset2.set(x, new Constant<String>("Luke"));
@@ -876,8 +875,8 @@ public class TestPipelineJoin extends TestCase2 {
          */
         final IAsynchronousIterator<IBindingSet[]> source;
         {
-            final IBindingSet bset1 = new HashBindingSet();
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
             {
              
                 bset2.set(x, new Constant<String>("Luke"));
@@ -1002,16 +1001,16 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source;
         {
             
-            final IBindingSet bset1 = new HashBindingSet();
+            final IBindingSet bset1 = new ListBindingSet();
             
-            final IBindingSet bset2 = new HashBindingSet();
+            final IBindingSet bset2 = new ListBindingSet();
             {
              
                 bset2.set(x, new Constant<String>("Luke"));
                 
             }
             
-            final IBindingSet bset3 = new HashBindingSet();
+            final IBindingSet bset3 = new ListBindingSet();
             {
              
                 bset3.set(x, new Constant<String>("Paul"));

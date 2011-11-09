@@ -45,6 +45,7 @@ import cutthecrap.utils.striterators.EmptyIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 final public class EmptyBindingSet implements IBindingSet, Serializable {
 
     /**
@@ -85,7 +86,6 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         throw new UnsupportedOperationException();
     }
 
-    @SuppressWarnings("unchecked")
     public Iterator<Entry<IVariable, IConstant>> iterator() {
         
         return EmptyIterator.DEFAULT;
@@ -96,6 +96,10 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         throw new UnsupportedOperationException();
     }
 
+    public boolean isEmpty() {
+        return true;
+    }
+    
     public int size() {
         return 0;
     }
