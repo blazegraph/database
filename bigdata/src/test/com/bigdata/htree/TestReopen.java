@@ -23,16 +23,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.htree;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.util.PseudoRandom;
 
 /**
  * Unit tests for the close/checkpoint/reopen protocol designed to manage the
@@ -181,8 +186,6 @@ public class TestReopen extends AbstractHTreeTestCase {
 	public void test_reopen03() {
 
 		final Random r = new Random();
-//		final PseudoRandom psr = new PseudoRandom(100, 13);
-//		final PseudoRandom psr2 = new PseudoRandom(255, 13);
 
         final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
                 Integer.MAX_VALUE);
@@ -208,6 +211,7 @@ public class TestReopen extends AbstractHTreeTestCase {
 				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
 
 		        gmd.setAddressBits(10);
+
 				groundTruth = HTree.create(store, gmd);
 				
 				final IndexMetadata hmd = new IndexMetadata(indexUUID);
@@ -215,19 +219,17 @@ public class TestReopen extends AbstractHTreeTestCase {
 				hmd.setWriteRetentionQueueCapacity(30);
 				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
 
-				hmd.setAddressBits(2);
+				hmd.setAddressBits(10);
 				htree = HTree.create(store, hmd);
 
 			}
 
 			final int limit = 20000; // 20000
-            final int keylen = r.nextInt(12) + 1;
-//			final int keylen = 8;
-            
+			final int keylen = 1 + r.nextInt(12);
+			
 			for (int i = 0; i < limit; i++) {
 
-                final int n = r.nextInt(100);
-//                final int n = psr.next(); // r.nextInt(100);
+				final int n = r.nextInt(100);
 
 				if (n < 5) {
 					/* periodically force a checkpoint + close of the btree. */
@@ -238,24 +240,208 @@ public class TestReopen extends AbstractHTreeTestCase {
 				} else if (n < 20) {
 					// remove an entry.
 					final byte[] key = new byte[keylen];
-//					psr2.nextBytes(key, i);
 					r.nextBytes(key);
 					htree.remove(key);
 					groundTruth.remove(key);
 				} else {
 					// add an entry.
 					final byte[] key = new byte[keylen];
-//					psr2.nextBytes(key, i);
-					 r.nextBytes(key);
+					r.nextBytes(key);
 					htree.insert(key, key);
 					groundTruth.insert(key, key);
 				}
 
 			}
 
-//			assertSameHTree(groundTruth, htree);
-            assertSameIterator(groundTruth.rangeIterator(),
-                    htree.rangeIterator());
+			try {
+				assertSameHTree(groundTruth, htree);
+			} catch (AssertionFailedError ae) {
+				throw ae;
+			}
+
+		} finally {
+
+			store.destroy();
+
+		}
+        
+    }
+	
+	public void test_reopenPseudoRandom() {
+
+		final Random r = new Random();
+		final PseudoRandom psr = new PseudoRandom(100, 13);
+		final PseudoRandom psr2 = new PseudoRandom(255, 13);
+
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
+                Integer.MAX_VALUE);
+
+		try {
+
+			final UUID indexUUID = UUID.randomUUID();
+
+			/*
+			 * The btree used to maintain ground truth.
+			 * 
+			 * Note: the fixture factory is NOT used here since the stress test
+			 * will eventually overflow the hard reference queue and begin
+			 * evicting nodes and leaves onto the store.
+			 */
+			final HTree htree ;
+			final HTree groundTruth;
+			{
+
+				final IndexMetadata gmd = new IndexMetadata(indexUUID);
+
+				gmd.setWriteRetentionQueueCapacity(100);
+				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
+
+		        gmd.setAddressBits(10);
+
+				groundTruth = HTree.create(store, gmd);
+				
+				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+
+				hmd.setWriteRetentionQueueCapacity(30);
+				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
+
+				hmd.setAddressBits(10);
+				htree = HTree.create(store, hmd);
+
+			}
+			
+			final int limit = 20000; // 20000
+            final int keylen = r.nextInt(12) + 1;
+//			final int keylen = 8;
+            
+			for (int i = 0; i < limit; i++) {
+
+				final int n = psr.next(); // r.nextInt(100);
+
+				if (n < 5) {
+					/* periodically force a checkpoint + close of the btree. */
+					if (htree.isOpen()) {
+						htree.writeCheckpoint();
+						htree.close();
+					} 
+					
+				} else if (n < 20) {
+					// remove an entry.
+					final byte[] key = new byte[keylen];
+					psr2.nextBytes(key, i);
+					//r.nextBytes(key);
+					htree.remove(key);
+					groundTruth.remove(key);
+				} else {
+					// add an entry.
+					final byte[] key = new byte[keylen];
+					psr2.nextBytes(key, i);
+					// r.nextBytes(key);
+					htree.insert(key, key);
+					groundTruth.insert(key, key);
+				}
+
+			}
+
+			try {
+				assertSameHTree(groundTruth, htree);
+			} catch (AssertionFailedError ae) {
+				throw ae;
+			}
+
+		} finally {
+
+			store.destroy();
+
+		}
+        
+    }
+	
+	public void test_multipleTreesPseudoRandom() {
+
+		final PseudoRandom psr = new PseudoRandom(100, 13);
+		final PseudoRandom psr2 = new PseudoRandom(255, 13);
+
+        final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
+                Integer.MAX_VALUE);
+
+		try {
+
+			final UUID indexUUID = UUID.randomUUID();
+
+			/*
+			 * The btree used to maintain ground truth.
+			 * 
+			 * Note: the fixture factory is NOT used here since the stress test
+			 * will eventually overflow the hard reference queue and begin
+			 * evicting nodes and leaves onto the store.
+			 */
+			final HTree htree ;
+			final HTree groundTruth;
+			{
+
+				final IndexMetadata gmd = new IndexMetadata(indexUUID);
+
+				gmd.setWriteRetentionQueueCapacity(100);
+				gmd.setWriteRetentionQueueScan(5); // Must be LTE capacity.
+
+		        gmd.setAddressBits(3); // 3
+
+				groundTruth = HTree.create(store, gmd);
+				
+				final IndexMetadata hmd = new IndexMetadata(indexUUID);
+
+				hmd.setWriteRetentionQueueCapacity(30);
+				hmd.setWriteRetentionQueueScan(1); // Must be LTE capacity.
+
+				hmd.setAddressBits(8); // 4,6
+				htree = HTree.create(store, hmd);
+
+			}
+
+			final int limit = 20000; // 20000
+			final int keylen = 8; // r.nextInt(1 + 12);
+			int entries = 0;
+			for (int i = 0; i < limit; i++) {
+
+				final int n = psr.next(); // r.nextInt(100);
+
+				if (n < 20) {
+					// remove an entry.
+					final byte[] key = new byte[keylen];
+					psr2.nextBytes(key, i);
+					byte[] r1 = htree.remove(key);
+					byte[] r2 = groundTruth.remove(key);
+					if (r1 == null && r2 != null || r1 != null && r2 == null)
+						fail("Inconsistency on remove!");
+					if (r1 != null) entries--;
+				} else {
+					// add an entry.
+					final byte[] key = new byte[keylen];
+					psr2.nextBytes(key, i);
+					htree.insert(key, key);
+					groundTruth.insert(key, key);
+					entries++;
+				}
+
+			}
+			int gcnt = count(groundTruth.getRoot().getTuples());
+			int tcnt = count(htree.getRoot().getTuples());
+			assertTrue(gcnt == entries && gcnt == tcnt);
+			try {
+				assertSameIterator(groundTruth.getRoot().getTuples(), htree.getRoot().getTuples());
+			} catch (AssertionFailedError afe) {
+//				FileWriter writer;
+//				try {
+//					writer = new FileWriter("/tmp/PP.txt");
+//					writer.write(htree.PP(false));
+//					writer.write(groundTruth.PP(false));
+//				} catch (IOException e) {
+//					e.printStackTrace();
+//				}
+				
+				throw afe;
+			}
 
 		} finally {
 
@@ -265,25 +451,13 @@ public class TestReopen extends AbstractHTreeTestCase {
         
     }
 
-    public void test_reopen3Stress() {
-
-        for (int i = 0; i < 50; i++) {
-
-            if (log.isInfoEnabled())
-                log.info("Trial#" + i);
-
-            try {
-
-                test_reopen03();
-
-            } catch (Throwable t) {
-
-                fail("Trial#" + i + " : " + t, t);
-                
-            }
-
-	    }
-	    
+	private int count(ITupleIterator tuples) {
+		int ret = 0;
+		while (tuples.hasNext()) {
+			tuples.next();
+			ret++;
+		}
+		return ret;
 	}
-	
+
 }

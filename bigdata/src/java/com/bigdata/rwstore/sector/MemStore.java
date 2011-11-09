@@ -37,7 +37,6 @@ import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.TransientResourceMetadata;
-import com.bigdata.rwstore.RWStore;
 
 /**
  * An {@link IRawStore} backed by an {@link IMemoryManager}.
@@ -316,6 +315,10 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 
 	public String toString(final long addr) {
 		return m_am.toString(addr);
+	}
+	
+	public long getUtilizedBytes() {
+		return m_store.getUserBytes();
 	}
 
 	private static class MemStoreAddressManager implements IAddressManager {
