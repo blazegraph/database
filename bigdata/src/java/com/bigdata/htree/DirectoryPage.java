@@ -1755,6 +1755,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
                 // Stash reference to the new child.
                 // childRefs[i] = btree.newRef(newChild);
                 childRefs[i] = (Reference) newChild.self;
+                if (newChild.isPersistent()) {
+                	data.childAddr[i] = newChild.getIdentity();
+                }
 
                 // // Add the new child to the dirty list.
                 // dirtyChildren.add(newChild);
@@ -1780,17 +1783,20 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
     }
     
-    void replaceChildRef(final Reference<?> oldRef, final AbstractPage newChild) {
+    int replaceChildRef(final Reference<?> oldRef, final AbstractPage newChild) {
     	
         final int slotsOnPage = 1 << htree.addressBits;
 
 		final MutableDirectoryPageData data = (MutableDirectoryPageData) this.data;
 		
 		// Scan for location in weak references.
+		int firstSlot = -1;
 		int npointers = 0;
 		for (int i = 0; i < slotsOnPage; i++) {
 
             if (childRefs[i] == oldRef) {
+            	
+            	if (firstSlot == -1) firstSlot = i; 
 
                 // Clear the old key.
                 data.childAddr[i] = NULL;
@@ -1799,6 +1805,10 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
                 // childRefs[i] = btree.newRef(newChild);
                 if (newChild != null) {
 	                childRefs[i] = (Reference) newChild.self;
+	                
+	                if (newChild.isPersistent()) {
+	                	data.childAddr[i] = newChild.getIdentity();
+	                }
 	
 	                newChild.parent = (Reference) this.self;
                 } else {
@@ -1811,6 +1821,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         }
 		
 		assert npointers > 0;
+		
+		return firstSlot;
     	
     }
 
@@ -1950,16 +1962,16 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
      * Return the last non-<code>null</code> child of an overflow directory
      * page.
      */
-	AbstractPage lastChild() {
+	BucketPage lastChild() {
         assert isOverflowDirectory();
         for (int i = data.getChildCount() - 1; i >= 0; i--) {
-            final AbstractPage aChild = deref(i);
+            final BucketPage aChild = (BucketPage) deref(i);
             if (aChild != null) {
                 // htree.touch(aChild);
                 return aChild;
             }
             if (data.getChildAddr(i) != NULL)
-                return getChild(i);
+                return (BucketPage) getChild(i);
         }
 		
 		throw new AssertionError();
@@ -2593,6 +2605,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
  	    * 
  	    * If so, then we need to ensure the BucketPage is not empty after removal
  	    * and, if so, to remove the reference and mark as deleted.
+ 	    * 
+ 	    * This is further complicated if the previous sibling is a DirectoryPage.
+ 	    * In this case, the original parent directory should be replaced
  	    */
  	   if (BytesUtil.compareBytes(key, getOverflowKey()) == 0) {
  		   
@@ -2603,8 +2618,30 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 				final byte[] ret = lastbp.removeFirst(key);
 				
 				if (lastbp.getValues().isEmpty()) {
-					lastbp.getParentDirectory().replaceChildRef(lastbp.self, null);
+					DirectoryPage dp = lastbp.getParentDirectory();
+					
+					final int slot = dp.replaceChildRef(lastbp.self, null);
 					lastbp.delete();
+					if (slot == 1) { // check first child for OverflowDirectory
+						AbstractPage odc = dp.getChild(0);
+						if (!odc.isLeaf()) {
+							DirectoryPage od = (DirectoryPage) odc;
+							
+							assert od.isOverflowDirectory();
+							
+							// Right then, since this (dp) only has a single child
+							// AND that child is already an overflowDirectory, then
+							// its parent must replace the dp.self with the
+							// odc.self
+							DirectoryPage gdp = dp.getParentDirectory();
+							assert gdp != null;
+							gdp.replaceChildRef(dp.self, od);
+							dp.delete();
+							if (log.isDebugEnabled()) {
+								log.debug("Promoted child overflowDirectory after remove from last BucketPage");
+							}
+						}
+					} 
 				}
 				
 				return ret;

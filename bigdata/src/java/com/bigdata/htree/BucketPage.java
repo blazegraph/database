@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
@@ -94,6 +95,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
 class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	static int createdPages = 0;
 	
+    private static final Logger log = Logger.getLogger(BucketPage.class);
+
 	/**
 	 * The data record. {@link MutableBucketData} is used for all mutation
 	 * operations. {@link ReadOnlyLeafData} is used when the {@link BucketPage}
@@ -535,8 +538,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			int insIndex = keys.search(key);
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
-//			} else {
-//				System.err.println("Insert collision");
+			} else if (log.isTraceEnabled()){
+				log.trace("Insert duplicate key");
 			}
 			
 			((MutableBucketData) data).insert(insIndex, key, ival, ival != val);
