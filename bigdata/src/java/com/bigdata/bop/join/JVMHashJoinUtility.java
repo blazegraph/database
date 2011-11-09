@@ -834,6 +834,47 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
 
     /**
+     * Combine constraints for each source with the given constraints.
+     * 
+     * @param constraints
+     *            Explicitly given constraints for this join.
+     * @param all
+     *            The sources for the join.
+     * 
+     * @return The combined constraints and <code>null</code> iff there are no
+     *         constraints.
+     */
+    static IConstraint[] combineConstraints(final IConstraint[] constraints,
+            final IHashJoinUtility[] all) {
+
+        final List<IConstraint> list = new LinkedList<IConstraint>();
+
+        // For each source.
+        for (int i = 0; i < all.length; i++) {
+
+            final IHashJoinUtility tmp = all[i];
+
+            if (tmp.getConstraints() != null) {
+
+                list.addAll(Arrays.asList(tmp.getConstraints()));
+
+            }
+
+        }
+
+        // The join constraints specified by the caller.
+        if (constraints != null) {
+
+            list.addAll(Arrays.asList(constraints));
+
+        }
+
+        return list.isEmpty() ? null : list
+                .toArray(new IConstraint[list.size()]);
+        
+    }
+
+    /**
      * Export the {@link Bucket}s as an array.
      */
     static private Bucket[] toArray(final Map<Key,Bucket> rightSolutions) {
@@ -974,10 +1015,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     // Must have the same join variables.
                     throw new IllegalArgumentException();
                 }
-//                if (this.optional != o.optional) {
-//                    // Must all be either optional or not optional.
-//                    throw new IllegalArgumentException();
-//                }
                 all[i + 1] = o;
             }
 
@@ -986,35 +1023,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         /*
          * Combine constraints for each source with the given constraints.
          */
-        final IConstraint[] c;
-        {
-            
-            final List<IConstraint> list = new LinkedList<IConstraint>();
-
-            // For each source.
-            for (int i = 0; i < all.length; i++) {
-
-                final IHashJoinUtility tmp = all[i];
-
-                if (tmp.getConstraints() != null) {
-
-                    list.addAll(Arrays.asList(tmp.getConstraints()));
-
-                }
-                
-            }
-            
-            // The join constraints specified by the caller.
-            if(constraints != null) {
-
-                list.addAll(Arrays.asList(constraints));
-                
-            }
-
-            c = list.isEmpty() ? null : list.toArray(new IConstraint[list
-                    .size()]);
-            
-        }
+        final IConstraint[] c = combineConstraints(constraints, all);
 
         /*
          * The JVM hash collections do not maintain the data in hash code order.
@@ -1070,7 +1079,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             if (advanceOtherSources(sortedSourceBuckets, sourceIndex,
                     currentBucket, optional)) {
 
-                log.error("sourceIndex[]=" + Arrays.toString(sourceIndex));
+//                log.error("sourceIndex[]=" + Arrays.toString(sourceIndex));
                 
                 // Join those buckets, outputting solutions which join.
                 mergeJoin(currentBucket, c, optional, outputBuffer);
