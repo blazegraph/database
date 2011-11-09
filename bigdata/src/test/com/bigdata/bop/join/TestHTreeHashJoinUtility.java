@@ -27,23 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.List;
-import java.util.concurrent.FutureTask;
-
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rwstore.sector.MemoryManager;
-import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for the {@link HTreeHashJoinUtility}.
@@ -102,91 +89,11 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
     }
 
-    /**
-     * Test helper.
-     * 
-     * @param optional
-     * @param joinVars
-     * @param selectVars
-     * @param left
-     * @param right
-     * @param expected
-     */
-    protected void doHashJoinTest(//
-            final boolean optional,//
-            final IVariable<?>[] joinVars,//
-            final IVariable<?>[] selectVars,//
-            final IConstraint[] constraints,//
-            final List<IBindingSet> left, //
-            final List<IBindingSet> right,//
-            final IBindingSet[] expected//
-            ) {
+    @Override
+    protected HTreeHashJoinUtility newHashJoinUtility(PipelineOp op,
+            boolean optional, boolean filter) {
 
-        // Setup a mock PipelineOp for the test.
-        final PipelineOp op = new PipelineOp(BOp.NOARGS, NV.asMap(//
-                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
-                        new String[] { getName() }),//
-                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                new NV(JoinAnnotations.SELECT, selectVars),//
-                new NV(JoinAnnotations.CONSTRAINTS, constraints)//
-                )) {
-
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
-
-        final HTreeHashJoinUtility state = new HTreeHashJoinUtility(mmgr, op,
-                optional, false/*filter*/);
-
-        try {
-
-            // Load the right solutions into the HTree.
-            {
-
-                final BOpStats stats = new BOpStats();
-
-                state.acceptSolutions(
-                        new Chunkerator<IBindingSet>(right.iterator()), stats);
-
-                assertEquals(right.size(), state.getRightSolutionCount());
-
-                assertEquals(right.size(), stats.unitsIn.get());
-
-            }
-
-            /*
-             * Run the hash join.
-             */
-
-            final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
-                    left.iterator());
-
-            // Buffer used to collect the solutions.
-            final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
-
-            // Compute the "required" solutions.
-            state.hashJoin(leftItr, outputBuffer);//, true/* leftIsPipeline */);
-
-            if (optional) {
-
-                // Output the optional solutions.
-                state.outputOptionals(outputBuffer);
-
-            }
-
-            // Verify the expected solutions.
-            assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
-
-        } finally {
-
-            state.release();
-
-        }
+        return new HTreeHashJoinUtility(mmgr, op, optional, filter);
 
     }
 

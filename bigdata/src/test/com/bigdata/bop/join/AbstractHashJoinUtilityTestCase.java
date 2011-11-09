@@ -27,25 +27,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase;
 
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -53,6 +60,9 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.striterator.Chunkerator;
+import com.bigdata.striterator.CloseableIteratorWrapper;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for both {@link HTreeHashJoinUtility} and {@link JVMHashJoinUtility}.
@@ -214,8 +224,67 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
     }
 
+    @SuppressWarnings("deprecation")
+    protected static void assertSameSolutionsAnyOrder(
+            final IBindingSet[] expected, final Iterator<IBindingSet> actual) {
+
+        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
+                actual);
+
+    }
+    
     /**
-     * Test helper.
+     * A buffer which absorbs solutions and let's us replay them via an
+     * iterator.
+     */
+    protected static class TestBuffer<E> implements IBuffer<E> {
+        
+        @SuppressWarnings({ "rawtypes", "unchecked" })
+        private final List<E> a = new LinkedList();
+        
+        public Iterator<E> iterator() {
+            return a.iterator();
+        }
+
+        public int size() {
+            return a.size();
+        }
+
+        public boolean isEmpty() {
+            return a.isEmpty();
+        }
+
+        public void add(E e) {
+            a.add(e);
+        }
+
+        public long flush() {
+            return 0;
+        }
+
+        public void reset() {
+        }
+        
+    }
+
+    protected class MockPipelineOp extends PipelineOp {
+
+        public MockPipelineOp(final BOp[] args, final NV... anns) {
+
+            super(args, NV.asMap(anns));
+
+        };
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+            throw new UnsupportedOperationException();
+        }
+    }
+    
+    /**
+     * Test helper for required or optional join tests.
      * 
      * @param optional
      * @param joinVars
@@ -224,7 +293,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * @param right
      * @param expected
      */
-    abstract protected void doHashJoinTest(//
+    protected void doHashJoinTest(//
             final boolean optional,//
             final IVariable<?>[] joinVars,//
             final IVariable<?>[] selectVars,//
@@ -232,8 +301,82 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             final List<IBindingSet> left, //
             final List<IBindingSet> right,//
             final IBindingSet[] expected//
-            );
+            ) {
+
+        // Setup a mock PipelineOp for the test.
+        final PipelineOp op = new MockPipelineOp(BOp.NOARGS, 
+                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                        new String[] { getName() }),//
+                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                new NV(JoinAnnotations.SELECT, selectVars),//
+                new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                );
+
+        final IHashJoinUtility state = newHashJoinUtility(op, optional, false/* filter */);
+
+        try {
+
+            // Load the right solutions into the HTree.
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                state.acceptSolutions(
+                        new Chunkerator<IBindingSet>(right.iterator()), stats);
+
+                assertEquals(right.size(), state.getRightSolutionCount());
+
+                assertEquals(right.size(), stats.unitsIn.get());
+
+            }
+
+            /*
+             * Run the hash join.
+             */
+
+            final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
+                    left.iterator());
+
+            // Buffer used to collect the solutions.
+            final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+
+            // Compute the "required" solutions.
+            state.hashJoin(leftItr, outputBuffer);//, true/* leftIsPipeline */);
+
+            if (optional) {
+
+                // Output the optional solutions.
+                state.outputOptionals(outputBuffer);
+
+            }
+
+            // Verify the expected solutions.
+            assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
+
+        } finally {
+
+            state.release();
+
+        }
+
+    }
     
+    /**
+     * Factory for {@link IHashJoinUtility} instances under test.
+     * 
+     * @param op
+     *            The operator from which much of the state will be initialized.
+     * @param optional
+     *            <code>true</code> if the use case is a JOIN with OPTIONAL
+     *            semantics.
+     * @param filter
+     *            <code>true</code> if the use case is a DISTINCT SOLUTIONS
+     *            filter.
+     * @return
+     */
+    abstract protected IHashJoinUtility newHashJoinUtility(PipelineOp op,
+            boolean optional, boolean filter);
+
     /**
      * Empty lhs and rhs with non-optional join.
      */
@@ -443,48 +586,338 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
     }
 
+    /**
+     * Unit test of a required MERGE JOIN involving two sources. The join
+     * variable is <code>?a</code>. One source has <code>(?a,?x)</code>. The
+     * other has <code>(?a,?y)</code>. For this test, all solutions having the
+     * same value for the join variable will join (there are no join constraints
+     * and the solutions can not conflict as they do not bind the same variables
+     * for the non-join variables).
+     * <p>
+     * The following represents the solutions for each source organized by the
+     * join variable <code>?a</code>.
+     * <pre>
+     * (?a,     ?x)   (?a,     ?y)
+     * (john, mary)   (john, brad)   // many-to-many join
+     * (john, leon)   (john, fred) 
+     *                (john, leon) 
+     * (mary, john)   (mary, brad)   // 1-1 join.
+     * (fred, brad)                  // does not join (would join if OPTIONAL).   
+     *                (brad, fred)   // does not join.
+     * (leon, john)   (leon, brad)   // many-1 join.
+     * (leon, mary)                  // 
+     * (paul, leon)   (paul, leon)   // 1-many join.
+     *                (paul, brad)
+     * </pre>
+     */
+    public void test_mergeJoin01() {
+        
+        final JoinSetup setup = new JoinSetup(getName());
 
-    @SuppressWarnings("deprecation")
-    protected static void assertSameSolutionsAnyOrder(
-            final IBindingSet[] expected, final Iterator<IBindingSet> actual) {
+        final boolean optional = false;
 
-        AbstractQueryEngineTestCase.assertSameSolutionsAnyOrder(expected,
-                actual);
+        final IVariable<?> a = Var.var("a");
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        // The join variables. This must be the same for each source.
+        final IVariable<?>[] joinVars = new IVariable[]{a};
 
+        // The variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;
+        
+        // The join constraints.
+        final IConstraint[] constraints = null;
+
+        /**
+         * Setup the solutions for [first].
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] firstSolutions = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.mary) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.leon) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.mary),
+                                          new Constant<IV>(setup.john) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.fred),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.leon),
+                                          new Constant<IV>(setup.john) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.leon),
+                                          new Constant<IV>(setup.mary) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.paul),
+                                          new Constant<IV>(setup.leon) }//
+                ),//
+        };
+        assertEquals(7,firstSolutions.length);
+
+        /**
+         * Setup the source solutions for [other].
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] otherSolutions = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.fred) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.leon) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.mary),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.brad),
+                                          new Constant<IV>(setup.fred) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.leon),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.paul),
+                                          new Constant<IV>(setup.leon) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.paul),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+        };
+        assertEquals(8,otherSolutions.length);
+        
+        /**
+         * The expected solutions to the join.
+         * 
+         * The source solutions are:
+         * <pre>
+         * (?a,     ?x)   (?a,     ?y)
+         * (john, mary)   (john, brad)   // many-to-many join
+         * (john, leon)   (john, fred) 
+         *                (john, leon) 
+         * (mary, john)   (mary, brad)   // 1-1 join.
+         * (fred, brad)                  // does not join.   
+         *                (brad, fred)   // does not join.
+         * (leon, john)   (leon, brad)   // many-1 join.
+         * (leon, mary)                  // 
+         * (paul, leon)   (paul, leon)   // 1-many join.
+         *                (paul, brad)
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected = new IBindingSet[] {//
+            // many-to-many join
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.mary),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.mary),
+                                      new Constant<IV>(setup.fred)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.mary),
+                                      new Constant<IV>(setup.leon)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.fred)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.leon)}//
+            ),//
+            // 1-to-1 join
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.mary),
+                                      new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+            // many-to-1 join
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.john),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.mary),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+            // 1-many join
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.paul),
+                                      new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.leon)}//
+            ),//
+            new ListBindingSet(//
+                    new IVariable[] { a, x, y },//
+                    new IConstant[] { new Constant<IV>(setup.paul),
+                                      new Constant<IV>(setup.leon),
+                                      new Constant<IV>(setup.brad)}//
+            ),//
+        };
+
+        IHashJoinUtility first = null;
+        IHashJoinUtility other = null;
+        try {
+
+            // Setup a mock PipelineOp for the test.
+            final PipelineOp firstOp = new MockPipelineOp(BOp.NOARGS, 
+                    new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                            new String[] { getName() }),//
+                    new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                    new NV(JoinAnnotations.SELECT, selectVars)//
+//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    );
+
+            // Setup a mock PipelineOp for the test.
+            final PipelineOp otherOp = new MockPipelineOp(BOp.NOARGS, 
+                    new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                            new String[] { getName() }),//
+                    new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                    new NV(JoinAnnotations.SELECT, selectVars)//
+//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    );
+
+            first = newHashJoinUtility(firstOp, optional, false/* filter */);
+
+            other = newHashJoinUtility(otherOp, optional, false/* filter */);
+
+            // Load into [first].
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                first.acceptSolutions(new Chunkerator<IBindingSet>(Arrays
+                        .asList(firstSolutions).iterator()), stats);
+
+                assertEquals(firstSolutions.length, first.getRightSolutionCount());
+
+                assertEquals(firstSolutions.length, stats.unitsIn.get());
+
+            }
+            
+            // Load into [other].
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                other.acceptSolutions(new Chunkerator<IBindingSet>(Arrays
+                        .asList(otherSolutions).iterator()), stats);
+
+                assertEquals(otherSolutions.length, other.getRightSolutionCount());
+
+                assertEquals(otherSolutions.length, stats.unitsIn.get());
+
+            }
+
+            // Do the merge join and verify the expected solutions.
+            doMergeJoinTest(constraints, expected, optional, first, other);
+
+        } finally {
+
+            if (first != null) {
+                first.release();
+            }
+
+            if (other != null) {
+                other.release();
+            }
+            
+        }
+        
+    }
+
+    // FIXME test for optional merge join. This is a simple variant on the one
+    // above. There is one additional solution.
+    public void test_mergeJoin02() {
+        fail("write test for optional merge join");
     }
     
     /**
-     * A buffer which absorbs solutions and let's us replay them via an
-     * iterator.
+     * @param first
+     *            The instances from which the required joins will be reported
+     *            if the join is OPTIONAL.
+     * @param others
+     *            The other instances. There must be at least two instances to
+     *            be joined when [first] and [others] are considered together.
+     * @param constraints
+     *            The join constraints.
+     * @param expected
+     *            The expected solutions.
      */
-    protected static class TestBuffer<E> implements IBuffer<E> {
+    protected void doMergeJoinTest(
+            final IConstraint[] constraints,//
+            final IBindingSet[] expected,//
+            final boolean optional,//
+            final IHashJoinUtility first,//
+            final IHashJoinUtility... others
+            ) {
+
+        // Buffer used to collect the solutions.
+        final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
+
+        // Do the merge join,
+        first.mergeJoin(others, outputBuffer, constraints, optional);
         
-        @SuppressWarnings({ "rawtypes", "unchecked" })
-        private final List<E> a = new LinkedList();
-        
-        public Iterator<E> iterator() {
-            return a.iterator();
-        }
-
-        public int size() {
-            return a.size();
-        }
-
-        public boolean isEmpty() {
-            return a.isEmpty();
-        }
-
-        public void add(E e) {
-            a.add(e);
-        }
-
-        public long flush() {
-            return 0;
-        }
-
-        public void reset() {
-        }
+        // Verify the expected solutions.
+        assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
         
     }
-    
+
 }
