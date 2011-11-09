@@ -1201,11 +1201,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 		while (sols1.hasNext()) {
 			sols1.next();
             IBindingSet in = set[0].solution;
-            log.error("Set 0: " + in);
+//            log.error("Set 0: " + in);
             for (int i = 1; i < set.length; i++) {
 
-                log.error("Set " + i + ": " + set[i]==null?"N/A":set[i].solution);
-                // See if the solutions join. 
+//                log.error("Set " + i + ": " + set[i]==null?"N/A":set[i].solution);
+                // See if the solutions join.
+                if(set[i]!=null) {
                 in = //
                 BOpContext.bind(//
                 		in,// 
@@ -1213,7 +1214,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                         constraints,//
                         null//
                         );
-
+                }
                 if (in == null) {
                     // Join failed.
                     continue;
@@ -1225,7 +1226,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             }
             // Accept this binding set.
             if (in != null) {
-            	System.out.println(in.toString());
+//            	log.error(in.toString());
             	outputBuffer.add(in);
             }
 		}
