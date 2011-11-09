@@ -890,7 +890,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     public void test_mergeJoin02() {
         final JoinSetup setup = new JoinSetup(getName());
 
-        final boolean optional = false;
+        final boolean optional = true;
 
         final IVariable<?> a = Var.var("a");
         final IVariable<?> x = Var.var("x");
