@@ -1062,7 +1062,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             ),//
             // OPTIONAL JOIN
             new ListBindingSet(//
-                    new IVariable[] { a, x, y },//
+                    new IVariable[] { a, x },//
                     new IConstant[] { new Constant<IV>(setup.fred),
                                       new Constant<IV>(setup.brad)}//
             ),//
