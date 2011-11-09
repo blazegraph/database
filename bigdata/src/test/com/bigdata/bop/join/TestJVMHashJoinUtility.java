@@ -27,20 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.util.List;
-import java.util.concurrent.FutureTask;
-
-import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.CloseableIteratorWrapper;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for the {@link JVMHashJoinUtility}.
@@ -63,115 +50,13 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
     public TestJVMHashJoinUtility(String name) {
         super(name);
     }
-    
-//    private Map<Key,Bucket> rightSolutions;
-//
-//    @Override
-//    protected void tearDown() throws Exception {
-//
-//        if (rightSolutions != null) {
-//            rightSolutions = null;
-//        }
-//
-//        super.tearDown();
-//
-//    }
-//
-//    @Override
-//    protected void setUp() throws Exception {
-//
-//        super.setUp();
-//    
-//        rightSolutions = new LinkedHashMap<Key, Bucket>();
-//
-//    }
 
-    /**
-     * Test helper.
-     * 
-     * @param optional
-     * @param joinVars
-     * @param selectVars
-     * @param left
-     * @param right
-     * @param expected
-     */
-    protected void doHashJoinTest(//
-            final boolean optional,//
-            final IVariable<?>[] joinVars,//
-            final IVariable<?>[] selectVars,//
-            final IConstraint[] constraints,//
-            final List<IBindingSet> left, //
-            final List<IBindingSet> right,//
-            final IBindingSet[] expected//
-            ) {
-
-        // Setup a mock PipelineOp for the test.
-        final PipelineOp op = new PipelineOp(BOp.NOARGS, NV.asMap(//
-//                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
-//                        new String[] { getName() }),//
-                new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                new NV(JoinAnnotations.SELECT, selectVars),//
-                new NV(JoinAnnotations.CONSTRAINTS, constraints)//
-                )) {
-
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
-
-        final JVMHashJoinUtility state = new JVMHashJoinUtility(op,
-                optional, false/*filter*/);
+    @Override
+    protected JVMHashJoinUtility newHashJoinUtility(PipelineOp op,
+            boolean optional, boolean filter) {
         
-        // Load the right solutions into the HTree.
-        {
-        
-            final BOpStats stats = new BOpStats();
-            
-            state.acceptSolutions(new Chunkerator<IBindingSet>(right.iterator()), stats);
-            
-//            JVMHashJoinUtility.acceptSolutions(
-//                    new Chunkerator<IBindingSet>(right.iterator()), joinVars, stats,
-//                    rightSolutions, optional);
-
-//            assertEquals(right.size(), rightSolutions.size();getEntryCount());
-
-            assertEquals(right.size(), stats.unitsIn.get());
-
-        }
-
-        /*
-         * Run the hash join.
-         */
-
-        final ICloseableIterator<IBindingSet> leftItr = new CloseableIteratorWrapper<IBindingSet>(
-                left.iterator());
-
-        // Buffer used to collect the solutions.
-        final TestBuffer<IBindingSet> outputBuffer = new TestBuffer<IBindingSet>();
-        
-        // Compute the "required" solutions.
-        state.hashJoin(leftItr, outputBuffer);// true/*leftIsPipeline*/);
-        
-//        JVMHashJoinUtility
-//                .hashJoin(leftItr, outputBuffer, joinVars, selectVars,
-//                        constraints, rightSolutions, optional, true/* leftIsPipeline */);
-
-        if(optional) {
-            
-            // Output the optional solutions.
-            state.outputOptionals(outputBuffer);
-//            JVMHashJoinUtility.outputOptionals(outputBuffer, rightSolutions);
-            
-        }
-
-        // Verify the expected solutions.
-        assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
+        return new JVMHashJoinUtility(op, optional, filter);
         
     }
-
+    
 }

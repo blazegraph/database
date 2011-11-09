@@ -60,7 +60,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> {
+public class JVMHashJoinUtility implements IHashJoinUtility {
 
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
     
@@ -257,8 +257,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
      * Each solution is paired with a hit counter so we can support OPTIONAL
      * semantics for the join.
      */
-    private static class Bucket implements Iterable<SolutionHit>{
+    private static class Bucket implements Iterable<SolutionHit>,
+            Comparable<Bucket> {
 
+        /** The hash code for this collision bucket. */
+        private final int hashCode;
+        
         /**
          * A set of solutions (and their hit counters) which have the same
          * as-bound values for the join variables.
@@ -266,13 +270,16 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
         private final List<SolutionHit> solutions = new LinkedList<SolutionHit>(); 
 
         public String toString() {
-            return super.toString() + //
-                    "{#solutions=" + solutions.size() + //
-                    "}";
+            return super.toString()
+                    + //
+                    "{hashCode=" + hashCode + ",#solutions=" + solutions.size()
+                    + "}";
         }
         
-        public Bucket(final IBindingSet solution) {
+        public Bucket(final int hashCode, final IBindingSet solution) {
 
+            this.hashCode = hashCode;
+            
             add(solution);
             
         }
@@ -342,6 +349,18 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
             
             return Collections.unmodifiableList(solutions).iterator();
             
+        }
+
+        /**
+         * Orders the buckets based on their hash codes.
+         */
+        @Override
+        public int compareTo(final Bucket o) {
+            if (hashCode > o.hashCode)
+                return 1;
+            if (hashCode < o.hashCode)
+                return -1;
+            return 0;
         }
 
     } // Bucket
@@ -539,7 +558,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
             
             if(b == null) {
                 
-                map.put(key, b = new Bucket(bset));
+                map.put(key, b = new Bucket(key.hash, bset));
                 
             } else {
                 
@@ -598,7 +617,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
             
             if(b == null) {
                 
-                map.put(key, b = new Bucket(bset));
+                map.put(key, b = new Bucket(key.hash, bset));
                 
             } else {
                 
@@ -798,14 +817,308 @@ public class JVMHashJoinUtility implements IHashJoinUtility<JVMHashJoinUtility> 
 
     }
 
-    @Override
-    public void mergeJoin(//
-            JVMHashJoinUtility[] others,//
-            IBuffer<IBindingSet> outputBuffer, //
-            IConstraint[] constraints//
-            ) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+    /**
+     * Export the {@link Bucket}s as an array.
+     */
+    static private Bucket[] toArray(final Map<Key,Bucket> rightSolutions) {
+
+        // source.
+        final Iterator<Bucket> bucketIterator = rightSolutions.values()
+                .iterator();
+
+        final Bucket[] a = new Bucket[rightSolutions.size()];
+
+        int i = 0;
+
+        while (bucketIterator.hasNext()) {
+
+            a[i++] = bucketIterator.next();
+
+        }
+
+        return a;
+
     }
 
-}
+    /**
+     * Advance each other source to the first hash code GTE the hashCode for the
+     * first source.
+     * <p>
+     * If the source does not have a bucket for the hash code in the first
+     * bucket then either (a) if this is a required join, this method will
+     * return <code>false</code> and the caller must advance to the next bucket
+     * in the first source; or (b) if this is an optional join, there will be a
+     * <code>null</code> in the <i>currentBucket[]</i> for that source.
+     * 
+     * @param sortedSourceBuckets
+     *            An array of {@link Bucket}[]s for each source. The vector of
+     *            {@link Bucket}s for each source has been sorted. This means
+     *            that we can scan down those vectors and observe {@link Bucket}
+     *            s having strictly increasing hash codes for each source.
+     * @param sourceIndex
+     *            The next index into each source.
+     * @param currentBucket
+     *            The current bucket for each source.
+     * @param optional
+     *            <code>true</code> iff this is an optional join.
+     * 
+     * @return <code>true</code> if we are on a bucket which might join. if this
+     *         method returns <code>false</code>, then the caller should
+     *         immediately advance to the next bucket from the first source
+     *         without attempting a join.
+     */
+    static private boolean advanceOtherSources(//
+            final Bucket[][] sortedSourceBuckets,//
+            final int[] sourceIndex,//
+            final Bucket[] currentBucket,//
+            final boolean optional//
+            ) {
+
+        // The next collision bucket in hash code order from the 1st source.
+        final Bucket firstBucket = sortedSourceBuckets[0][sourceIndex[0]];
+        final int hashCode = firstBucket.hashCode;
+        currentBucket[0] = firstBucket;
+
+        for (int i = 1; i < sourceIndex.length; i++) {
+
+            // Advance source to first bucket GTE hashCode.
+            while (true) {
+
+                // Next bucket index for the other source
+                final int j = sourceIndex[i];
+
+                final Bucket otherBucket;
+                if (j >= sortedSourceBuckets[i].length) {
+                    // This source is exhausted.
+                    if (!optional) {
+                        // Nothing is left which can join.
+                        return false;
+                    }
+                    otherBucket = null;
+                } else {
+                    otherBucket = sortedSourceBuckets[i][j];
+                }
+
+                if (otherBucket.hashCode < hashCode) {
+
+                    sourceIndex[i]++;
+
+                    continue;
+
+                }
+
+                if (!optional && otherBucket.hashCode > hashCode) {
+
+                    // The bucket on the first source can not join.
+                    return false;
+
+                }
+
+                currentBucket[i] = otherBucket;
+
+                break;
+
+            }
+
+        }
+        
+        return true;
+        
+    }
+    
+    @Override
+    public void mergeJoin(//
+            final IHashJoinUtility[] others,//
+            final IBuffer<IBindingSet> outputBuffer, //
+            final IConstraint[] constraints,//
+            final boolean optional//
+            ) {
+
+        /*
+         * Validate arguments.
+         */
+
+        if (others == null)
+            throw new IllegalArgumentException();
+        
+        if (others.length == 0)
+            throw new IllegalArgumentException();
+        
+        if (outputBuffer == null)
+            throw new IllegalArgumentException();
+        
+        final JVMHashJoinUtility[] all = new JVMHashJoinUtility[others.length + 1];
+        {
+            all[0] = this;
+            for (int i = 0; i < others.length; i++) {
+                final JVMHashJoinUtility o = (JVMHashJoinUtility) others[i];
+                if (o == null)
+                    throw new IllegalArgumentException();
+                if (!this.joinVars.equals(o.joinVars)) {
+                    // Must have the same join variables.
+                    throw new IllegalArgumentException();
+                }
+//                if (this.optional != o.optional) {
+//                    // Must all be either optional or not optional.
+//                    throw new IllegalArgumentException();
+//                }
+                all[i + 1] = o;
+            }
+
+        }
+        
+        /*
+         * Combine constraints for each source with the given constraints.
+         */
+        final IConstraint[] c;
+        {
+            
+            final List<IConstraint> list = new LinkedList<IConstraint>();
+
+            // For each source.
+            for (int i = 0; i < all.length; i++) {
+
+                final IHashJoinUtility tmp = all[i];
+
+                if (tmp.getConstraints() != null) {
+
+                    list.addAll(Arrays.asList(tmp.getConstraints()));
+
+                }
+                
+            }
+            
+            // The join constraints specified by the caller.
+            if(constraints != null) {
+
+                list.addAll(Arrays.asList(constraints));
+                
+            }
+
+            c = list.isEmpty() ? null : list.toArray(new IConstraint[list
+                    .size()]);
+            
+        }
+
+        /*
+         * The JVM hash collections do not maintain the data in hash code order.
+         * Therefore, we materialize and sort the collision buckets for each
+         * hash index.
+         */
+        final Bucket[][] sortedSourceBuckets = new Bucket[all.length][];
+        {
+
+            for (int i = 0; i < all.length; i++) {
+                
+                // Fully materialize the solution set as a Bucket[].
+                final Bucket[] t = toArray(all[i].getRightSolutions());
+                
+                /*
+                 * Sort the array. It's natural sort order is by the hash code
+                 * of the join variables.
+                 */
+                Arrays.sort(t);
+                
+                sortedSourceBuckets[i] = t;
+                
+            }
+            
+        }
+
+        /*
+         * Synchronize each source.
+         */
+
+        // The next index into each source (not used for the 1st source).
+        final int[] sourceIndex = new int[all.length];
+
+        // The current bucket for each source.
+        final Bucket[] currentBucket = new Bucket[all.length];
+
+        while (sourceIndex[0] < sortedSourceBuckets[0].length) {
+
+            if (!optional) {
+                /*
+                 * If the join is not optional, then we are done as soon as any
+                 * source is exhausted.
+                 */
+                for (int i = 1; i < sourceIndex.length; i++) {
+                    if (sourceIndex[i] >= sortedSourceBuckets[i].length) {
+                        // All done.
+                        return;
+                    }
+                }
+            }
+            
+            // Synchronous the other sources.
+            if (advanceOtherSources(sortedSourceBuckets, sourceIndex,
+                    currentBucket, optional)) {
+
+                log.error("sourceIndex[]=" + Arrays.toString(sourceIndex));
+                
+                // Join those buckets, outputting solutions which join.
+                mergeJoin(currentBucket, c, optional, outputBuffer);
+
+            }
+
+            // Advance the first source to the next bucket.
+            sourceIndex[0]++;
+            
+        }
+
+    }
+
+    /**
+     * MERGE JOIN
+     * <p>
+     * Join the solution sets from each source. This will consider the full
+     * cross product of the solutions in each source bucket. All buckets will
+     * have the same hash code. If this is an optional join, then some entries
+     * in buckets[] MAY be <code>null</code>. However, the first entry is never
+     * <code>null</code> since that is the primary source for the join.
+     * 
+     * @param currentBucket
+     *            The current {@link Bucket} from each source. The first entry
+     *            in this array is the source from which optional solutions will
+     *            be reported if the join is optional.
+     * @param constraints
+     * @param optional
+     *            <code>true</code> iff the join is optional.
+     * @param outputBuffer
+     */
+    static private void mergeJoin(//
+            final Bucket[] currentBucket,//
+            final IConstraint[] constraints,//
+            final boolean optional,//
+            final IBuffer<IBindingSet> outputBuffer) {
+
+        final int nsources = currentBucket.length;
+
+        // The bucket for the first source.
+        final Bucket firstBucket = currentBucket[0];
+
+        assert firstBucket != null; // never allowed for the 1st source.
+        
+        for (int i = 1; i < nsources; i++) {
+
+            // A bucket having the same hash code for another source.
+            final Bucket otherBucket = currentBucket[i];
+            
+            if(otherBucket == null) {
+                
+                assert optional; // only allowed if the join is optional.
+                
+                continue;
+                
+            }
+            
+            // Must be the same hash code.
+            assert firstBucket.hashCode == otherBucket.hashCode;
+            
+        }
+
+        // FIXME Output solutions which join. (apply constraints).
+
+    }
+
+}   

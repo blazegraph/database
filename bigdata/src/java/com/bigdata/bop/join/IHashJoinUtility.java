@@ -69,7 +69,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-interface IHashJoinUtility<T extends IHashJoinUtility<T>> {
+interface IHashJoinUtility {
 
     /**
      * Return <code>true</code> iff this is a JOIN with OPTIONAL semantics.
@@ -233,16 +233,20 @@ interface IHashJoinUtility<T extends IHashJoinUtility<T>> {
      * in such an order but the JVM collections do not.)
      * 
      * @param others
-     *            The other solution sets to be joined.
+     *            The other solution sets to be joined. All instances must be of
+     *            the same concrete type as <i>this</i>.
      * @param outputBuffer
      *            Where to write the solutions.
      * @param constraints
      *            The join constraints.
+     * @param optional
+     *            <code>true</code> iff the join is optional.
      */
     void mergeJoin(//
-            T[] others,//
+            IHashJoinUtility[] others,//
             IBuffer<IBindingSet> outputBuffer,//
-            IConstraint[] constraints//
+            IConstraint[] constraints,//
+            boolean optional//
     );
     
     /**

@@ -104,11 +104,20 @@ import com.bigdata.striterator.ICloseableIterator;
  * separate mapping must be maintained from {@link IV} to {@link BigdataValue}
  * for those {@link IV}s which have a materialized {@link BigdataValue}.
  * 
+ * TODO Do a 64-bit hash version which could be used for hash indices having
+ * more than 500M distinct join variable combinations. Note that at 500M
+ * distinct join variable combinations we have a 1 in 4 chance of a hash
+ * collision. Whether or not that turns into a cost really depends on the
+ * cardinality of the solutions per distinct combination of the join variables.
+ * If there is only one solution per join variable combination, then those
+ * collisions will cause basically no increase in the work to be done. However,
+ * if there are 50,000 solutions per distinct combination of the join variables
+ * then we would be better off using a 64-bit hash code.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: HTreeHashJoinUtility.java 5568 2011-11-07 19:39:12Z thompsonbry
  */
-public class HTreeHashJoinUtility implements
-        IHashJoinUtility<HTreeHashJoinUtility> {
+public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeHashJoinUtility.class);
@@ -168,7 +177,9 @@ public class HTreeHashJoinUtility implements
             // Works Ok.
             h = 31 * h + c.hashCode();
             
-//            // Martyn's version.  Also works Ok.
+//          // Martyn's version.  Also works Ok.
+            // @see http://burtleburtle.net/bob/hash/integer.html
+//            
 //            final int hc = c.hashCode();
 //            h += ~(hc<<15);
 //            h ^=  (hc>>10);
@@ -1775,9 +1786,11 @@ public class HTreeHashJoinUtility implements
     }
 
     @Override
-    public void mergeJoin(final HTreeHashJoinUtility[] others,
+    public void mergeJoin(//
+            final IHashJoinUtility[] others,
             final IBuffer<IBindingSet> outputBuffer,
-            final IConstraint[] constraints) {
+            final IConstraint[] constraints,
+            final boolean optional) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
     }
