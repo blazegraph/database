@@ -100,6 +100,11 @@ public interface IBindingSet extends Cloneable, Serializable {
     public void clearAll();
 
     /**
+     * <code>true</code> iff there are no variable bindings in the binding set.
+     */
+    public boolean isEmpty();
+    
+    /**
      * The #of bound variables.
      */
     public int size();

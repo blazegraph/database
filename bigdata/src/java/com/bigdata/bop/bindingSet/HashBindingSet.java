@@ -476,6 +476,12 @@ public class HashBindingSet implements IBindingSet {
         
     }
     
+    public boolean isEmpty() {
+        
+        return current().isEmpty();
+        
+    }
+    
     public int size() {
 
         return current().size();

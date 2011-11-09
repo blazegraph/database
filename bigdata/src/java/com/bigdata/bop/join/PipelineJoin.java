@@ -1779,7 +1779,8 @@ public class PipelineJoin<E> extends PipelineOp implements
 
                             // join solutions.
                             final IBindingSet bset = context.bind(left, right,
-                                    true/* leftIsPipeline */, constraints,
+//                                    true/* leftIsPipeline */,
+                                    constraints,
                                     variablesToKeep);
                             
                             if (bset != null) {

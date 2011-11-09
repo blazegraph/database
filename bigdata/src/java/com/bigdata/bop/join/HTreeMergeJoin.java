@@ -40,19 +40,8 @@ import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.htree.HTree;
 
 /**
- * An N-way merge join, for N GTE 2.
- * 
- * <h2>Algorithm</h2>
- * 
- * The merge join takes a set of solution sets in the same order and some join
- * variables. It examines the next solution for each set and compares them,
- * finding the solution which has the earliest order among those solutions on
- * the join variables. For each solution set which reported a solution having
- * the same join variables as that earliest solution, it outputs the cross
- * product and advances the iterator on that solution set.
- * 
- * <p>
- * 
+ * An N-way merge join based on the {@link HTree}.
+ * <p> 
  * For the {@link HTree}, the entries are in key order. Those keys are hash
  * codes computed from the solutions using the join variables. While this does
  * not change the fact that the {@link HTree} puts an order over the solutions,
@@ -62,15 +51,6 @@ import com.bigdata.htree.HTree;
  * changes, which signifies a new hash code and hence a new collision bucket.
  * The solutions in the last collision bucket must be placed into a total order
  * and delivered to the merge join algorithm in that total order.
- * <p>
- * If the MERGE JOIN is REQUIRED, then we want to synchronize the source
- * {@link HTree} iterators on the next lowest key (aka hash code) which they all
- * have in common.
- * <p>
- * If the MERGE JOIN is OPTIONAL, then we want to synchronize the source
- * {@link HTree} iterators on the next lowest key (aka hash code) which appears
- * for any source iterator. Solutions will not be drawn from iterators not
- * having that key in that pass.
  * 
  * TODO We could do the same thing with JVM hash indices. The
  * {@link JVMHashJoinUtility} explicitly models those collision buckets.

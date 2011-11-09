@@ -9,15 +9,15 @@ Contact:
      licenses@bigdata.com
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
+it under the terms of the GNU General License as published by
 the Free Software Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GNU General License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU General License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -32,6 +32,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -68,26 +69,26 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IHashJoinUtility {
+interface IHashJoinUtility<T extends IHashJoinUtility<T>> {
 
     /**
      * Return <code>true</code> iff this is a JOIN with OPTIONAL semantics.
      * 
      * @see IPredicate.Annotations#OPTIONAL
      */
-    public boolean isOptional();
+    boolean isOptional();
     
     /**
      * Return <code>true</code> iff this is a DISTINCT SOLUTIONS filter.
      */
-    public boolean isFilter();
+    boolean isFilter();
     
     /**
      * The join variables.
      * 
      * @see HashJoinAnnotations#JOIN_VARS
      */
-    public IVariable<?>[] getJoinVars();
+    IVariable<?>[] getJoinVars();
 
     /**
      * The variables to be retained (optional, all variables are retained if
@@ -95,29 +96,29 @@ public interface IHashJoinUtility {
      * 
      * @see JoinAnnotations#SELECT
      */
-    public IVariable<?>[] getSelectVars();
+    IVariable<?>[] getSelectVars();
 
     /**
      * The join constraints (optional).
      * 
      * @see JoinAnnotations#CONSTRAINTS
      */
-    public IConstraint[] getConstraints();
+    IConstraint[] getConstraints();
     
     /**
      * Return <code>true</code> iff there are no solutions in the hash index.
      */
-    public boolean isEmpty();
+    boolean isEmpty();
 
     /**
      * Return the #of solutions in the hash index.
      */
-    public long getRightSolutionCount();
+    long getRightSolutionCount();
 
     /**
      * Discard the hash index.
      */
-    public void release();
+    void release();
 
     /**
      * Buffer solutions on a hash index.
@@ -136,8 +137,8 @@ public interface IHashJoinUtility {
      * 
      * @return The #of solutions that were buffered.
      */
-    public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
-            final BOpStats stats);
+    long acceptSolutions(ICloseableIterator<IBindingSet[]> itr,
+            BOpStats stats);
 
     /**
      * Filter solutions, writing only the DISTINCT solutions onto the sink.
@@ -151,8 +152,8 @@ public interface IHashJoinUtility {
      *            
      * @return The #of source solutions which pass the filter.
      */
-    public long filterSolutions(final ICloseableIterator<IBindingSet[]> itr,
-            final BOpStats stats, final IBuffer<IBindingSet> sink);
+    long filterSolutions(ICloseableIterator<IBindingSet[]> itr,
+            BOpStats stats, IBuffer<IBindingSet> sink);
 
     /**
      * Do a hash join between a stream of source solutions (left) and a hash
@@ -167,17 +168,10 @@ public interface IHashJoinUtility {
      *            (left).
      * @param outputBuffer
      *            Where to write the solutions which join.
-     * @param leftIsPipeline
-     *            <code>true</code> iff <i>left</i> is a solution from upstream
-     *            in the query pipeline. Otherwise, <i>right</i> is the upstream
-     *            solution.
-     * 
-     *            TODO Drop [leftIsPipeline]
      */
-    public void hashJoin(//
-            final ICloseableIterator<IBindingSet> leftItr,//
-            final IBuffer<IBindingSet> outputBuffer,//
-            final boolean leftIsPipeline//
+    void hashJoin(//
+            ICloseableIterator<IBindingSet> leftItr,//
+            IBuffer<IBindingSet> outputBuffer//
     );
 
     /**
@@ -187,19 +181,70 @@ public interface IHashJoinUtility {
      * join filters in the join group in which the solution set is included.
      * 
      * @param leftItr
+     *            A stream of solutions to be joined against the hash index
+     *            (left).
      * @param outputBuffer
-     * @param leftIsPipeline
+     *            Where to write the solutions which join.
      * @param constraints
-     * 
-     *            TODO Drop [leftIsPipeline]
+     *            Constraints attached to this join (optional). Any constraints
+     *            specified here are combined with those specified in the
+     *            constructor.
      */
-    public void hashJoin2(//
-            final ICloseableIterator<IBindingSet> leftItr,//
-            final IBuffer<IBindingSet> outputBuffer,//
-            final boolean leftIsPipeline,//
-            final IConstraint[] constraints//
+    void hashJoin2(//
+            ICloseableIterator<IBindingSet> leftItr,//
+            IBuffer<IBindingSet> outputBuffer,//
+            IConstraint[] constraints//
     );
 
+    /**
+     * Perform an N-way merge join. For an OPTIONAL join, <i>this</i> instance
+     * is understood to be the index having the "required" solutions.
+     * <p>
+     * The merge join takes a set of solution sets in the some order and having
+     * the same join variables. It examines the next solution in order for each
+     * solution set and compares them. For each solution set which reported a
+     * solution having the same join variables as that earliest solution, it
+     * outputs the cross product and advances the iterator on that solution set.
+     * <p>
+     * The iterators draining the source solution sets need to be synchronized
+     * such that we consider only solutions having the same hash code in each
+     * cycle of the MERGE JOIN. The synchronization step is different depending
+     * on whether or not the MERGE JOIN is OPTIONAL.
+     * <p>
+     * If the MERGE JOIN is REQUIRED, then we want to synchronize the source
+     * solution iterators on the next lowest key (aka hash code) which they all
+     * have in common.
+     * <p>
+     * If the MERGE JOIN is OPTIONAL, then we want to synchronize the source
+     * solution iterators on the next lowest key (aka hash code) which appears
+     * for any source iterator. Solutions will not be drawn from iterators not
+     * having that key in that pass.
+     * <p>
+     * Note that each hash code may be an alias for solutions having different
+     * values for their join variables. Such solutions will not join. However,
+     * only solutions having the same values for the hash code can join. Thus,
+     * by proceeding with synchronized iterators and operating only on solutions
+     * having the same hash code in each round, we will consider all solutions
+     * which COULD join with one another in each round.
+     * <p>
+     * Note: If the solutions are not in a stable and mutually consistent order
+     * by hash code in the hash indices then the solutions in each hash index
+     * MUST be SORTED before proceeding. (The {@link HTree} maintains solutions
+     * in such an order but the JVM collections do not.)
+     * 
+     * @param others
+     *            The other solution sets to be joined.
+     * @param outputBuffer
+     *            Where to write the solutions.
+     * @param constraints
+     *            The join constraints.
+     */
+    void mergeJoin(//
+            T[] others,//
+            IBuffer<IBindingSet> outputBuffer,//
+            IConstraint[] constraints//
+    );
+    
     /**
      * Identify and output the optional solutions. Optionals are identified
      * using a <i>joinSet</i> containing each right solution which joined with
@@ -211,7 +256,7 @@ public interface IHashJoinUtility {
      * @param outputBuffer
      *            Where to write the optional solutions.
      */
-    public void outputOptionals(final IBuffer<IBindingSet> outputBuffer);
+    void outputOptionals(IBuffer<IBindingSet> outputBuffer);
 
     /**
      * Output the solutions buffered in the hash index. This is used when an
@@ -220,6 +265,6 @@ public interface IHashJoinUtility {
      * @param out
      *            Where to write the solutions.
      */
-    public void outputSolutions(final IBuffer<IBindingSet> out);
+    void outputSolutions(IBuffer<IBindingSet> out);
 
 }
