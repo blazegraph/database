@@ -2031,7 +2031,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         // Join.
                         final IBindingSet outSolution = BOpContext
                                 .bind(leftSolution, rightSolution,
-                                        constraints,
+                                        c,
                                         null//selectVars
                                         );
 
