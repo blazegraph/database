@@ -1785,14 +1785,301 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
+    /**
+     * Return <code>true</code> iff the tuple contains a solution having the
+     * same hash code.
+     * 
+     * @param key
+     *            The hash code (as an unsigned byte[]).
+     * @param t
+     *            The tuple.
+     * 
+     * @return <code>true</code> iff the tuple has the same hash code.
+     */
+    static private boolean sameHashCode(byte[] key, ITuple<?> t) {
+
+        final ByteArrayBuffer b = t.getKeyBuffer();
+
+        return 0 == BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+                key.length/* alen */, key, 0/* boff */, b.limit()/* blen */,
+                b.array());
+
+    }
+
+    /**
+     * Copy the key (an unsigned byte[] representing an int32 hash code) from
+     * the tuple into the caller's the buffer.
+     * 
+     * @param t
+     *            The tuple.
+     * @param key
+     *            The caller's buffer.
+     */
+    static private void copyKey(ITuple<?> t, byte[] key) {
+        
+        final ByteArrayBuffer b = t.getKeyBuffer();
+        
+        System.arraycopy(b.array()/* src */, 0/* srcPos */, key/* dest */,
+                0/* destPos */, key.length);
+    
+    }
+
+    /**
+     * Synchronize the other sources (this just verifies that the join is
+     * possible given the hash code).
+     * 
+     * @param key
+     *            A key from the first source (aka a hash code).
+     * @param all
+     *            All of the sources.
+     * @param optional
+     *            <code>true</code> iff the join is optional.
+     * @return iff a join is possible for the given key (aka hash code).
+     */
+    static private boolean canJoin(final byte[] key,
+            final HTreeHashJoinUtility[] all, final boolean optional) {
+        if (optional) {
+            // The join can always proceed. No need to check.
+            return true;
+        }
+        for (int i = 1; i < all.length; i++) {
+            final boolean found = all[i].getRightSolutions().contains(key);
+            if (!found) {
+                // No join is possible against this source.
+                return false;
+            }
+        }
+        // The join is possible against all sources.
+        return true;
+    }
+
+    /**
+     * Synchronize the iterators for the other sources.
+     * 
+     * @param key
+     *            A key from the first source (aka a hash code).
+     * @param all
+     *            All of the sources.
+     * @param oitr
+     *            An array with one iterator per source. The first index
+     *            position is unused and will always be <code>null</code>. The
+     *            other positions will never be <code>null</code>, but the
+     *            iterator in a given position might not visit any tuples if the
+     *            join is optional. (For a required join, each iterator will
+     *            always visit at least one tuple.)
+     * @param index
+     *            The index of the first source iterator to be reset. The
+     *            iterator for that source and all remaining sources will be
+     *            reset to read on the given key.
+     * @param optional
+     *            <code>true</code> iff the join is optional.
+     */
+    static private void synchronizeOtherSources(//
+            final byte[] key,//
+            final HTreeHashJoinUtility[] all,//
+            final ITupleIterator<?>[] oitr,//
+            final int index,//
+            final boolean optional) {
+
+        if (index < 1)
+            throw new IllegalArgumentException();
+        
+        if (index >= all.length)
+            throw new IllegalArgumentException();
+        
+        for (int i = index; i < all.length; i++) {
+        
+            oitr[i] = all[i].getRightSolutions().lookupAll(key);
+            
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: For the {@link HTree}, the entries are in key order. Those keys are
+     * hash codes computed from the solutions using the join variables. Since
+     * the keys are hash codes and not the join variable bindings, each hash
+     * code identifies a collision bucket from the perspective of the merge join
+     * algorithm. Of course, from the perspective of the {@link HTree} those
+     * solutions are just consequective tuples readily identified using
+     * {@link HTree#lookupAll(int)}.
+     * 
+     * FIXME Either always project everything or raise [select] into a parameter
+     * for this method. We DO NOT want to only project whatever was projected by
+     * the first source.
+     */
     @Override
     public void mergeJoin(//
             final IHashJoinUtility[] others,
             final IBuffer<IBindingSet> outputBuffer,
             final IConstraint[] constraints,
             final boolean optional) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        /*
+         * Validate arguments.
+         */
+
+        if (others == null)
+            throw new IllegalArgumentException();
+
+        if (others.length == 0)
+            throw new IllegalArgumentException();
+
+        if (outputBuffer == null)
+            throw new IllegalArgumentException();
+
+        final HTreeHashJoinUtility[] all = new HTreeHashJoinUtility[others.length + 1];
+        {
+            all[0] = this;
+            for (int i = 0; i < others.length; i++) {
+                final HTreeHashJoinUtility o = (HTreeHashJoinUtility) others[i];
+                if (o == null)
+                    throw new IllegalArgumentException();
+                if (!this.joinVars.equals(o.joinVars)) {
+                    // Must have the same join variables.
+                    throw new IllegalArgumentException();
+                }
+                all[i + 1] = o;
+            }
+
+        }
+
+        if(isEmpty()) {
+            // NOP
+            return;
+        }
+        
+        /*
+         * Combine constraints for each source with the given constraints.
+         */
+        final IConstraint[] c = JVMHashJoinUtility.combineConstraints(
+                constraints, all);
+
+        /*
+         * Synchronize each source.
+         * 
+         * We follow the iterator on the first source. For each hash code which
+         * it visits, we synchronize iterators against the remaining sources. If
+         * the join is optional, then the iterator will be null for a source
+         * which does not have that hash code. Otherwise false is returned if
+         * any source lacks tuples for the current hash code.
+         */
+        long njoined = 0, nrejected = 0;
+        final ITupleIterator<?> itr = all[0].getRightSolutions()
+                .rangeIterator();
+        {
+            /*
+             * Note: Initialized by the first tuple we visit. Updated each time
+             * we finish joining that solution against all solutions having the
+             * same hash code for all of the other sources.
+             */
+//            int hashCode = 0;
+//            ITuple<?> t = null;
+            final byte[] key = new byte[Bytes.SIZEOF_INT];
+            final ITupleIterator<?>[] oitr = new ITupleIterator[all.length];
+            ITuple<?> t = itr.next(); // Start with the first solution.
+            copyKey(t,key); // Make a copy of that key.
+            while (true) {
+                // Synchronize the other sources on the same key (aka hashCode)
+                log.error("Considering firstSource: "+decodeSolution(t));
+                if (!canJoin(key, all, optional)) {
+                    // Scan until we reach a tuple with a different key.
+                    boolean found = false;
+                    while (itr.hasNext() && !found) {
+                        t = itr.next(); // scan forward.
+                        if (!sameHashCode(key, t)) {
+                            // We have reached a solution from the first source
+                            // having a different hash code.
+                            found = true;
+                        }
+                        log.error("Skipping firstSource: "+decodeSolution(t));
+                    }
+                    if (!found) {
+                        // The first source is exhausted.
+                        return;
+                    }
+                    copyKey(t,key); // Make a copy of that key.
+                    // Attempt to resynchronize.
+                    continue;
+                }
+                /*
+                 * MERGE JOIN
+                 * 
+                 * Note: At this point we have a solution which might join with
+                 * the other sources (they all have the same hash code). We can
+                 * now decode the solution from the first source and ...
+                 * 
+                 * FIXME Must vector the resolution of the ivCache / blobsCache
+                 * for the output solutions.
+                 */
+                
+                // Setup each source.
+                synchronizeOtherSources(key, all, oitr, 1/* index */, optional);
+
+                if(true) {
+                    /*
+                     * FIXME This just demonstrates the join for the simple case
+                     * of a single 'other' source.
+                     */
+                    final IBindingSet leftSolution = all[0].decodeSolution(t);
+                    final ITupleIterator<?> aitr = oitr[1];
+                    while(aitr.hasNext()) {
+                        final ITuple<?> rightTuple = aitr.next();
+                        final IBindingSet rightSolution = all[1].decodeSolution(rightTuple);
+                        // Join.
+                        final IBindingSet outSolution = BOpContext
+                                .bind(leftSolution, rightSolution,
+                                        constraints,
+                                        null//selectVars
+                                        );
+
+                        if (outSolution == null) {
+                            if(optional) {
+                                outputBuffer.add(leftSolution);
+                                if (log.isDebugEnabled())
+                                    log.debug("OPT : #joined="
+                                            + njoined + ", #rejected="
+                                            + nrejected + ", solution="
+                                            + outSolution);
+                            } else {
+                                nrejected++;
+                                if (log.isTraceEnabled())
+                                    log.trace("FAIL: #joined=" + njoined
+                                            + ", #rejected=" + nrejected
+                                            + ", leftSolution=" + leftSolution
+                                            + ", rightSolution="
+                                            + rightSolution);
+                            }
+                        } else {
+                            njoined++;
+                            outputBuffer.add(outSolution);
+                            if (log.isDebugEnabled())
+                                log.debug("JOIN: #joined="
+                                        + njoined + ", #rejected="
+                                        + nrejected + ", solution="
+                                        + outSolution);
+                        }
+                    }
+                }
+                
+                // Decode the solution.
+//                final IBindingSet b = decodeSolution(t);
+//                mergeJoin(b, oitr, c, optional);
+
+                if (!itr.hasNext()) {
+                    // The first source is exhausted.
+                    return;
+                }
+                // Skip to the next tuple from that source.
+                itr.next();
+                copyKey(t, key); // Make a copy of that key.
+
+            }
+
+        }
+
     }
 
 }
