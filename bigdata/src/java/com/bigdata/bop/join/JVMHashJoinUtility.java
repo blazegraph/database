@@ -966,10 +966,22 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                 }
 
-                if (!optional && otherBucket.hashCode > hashCode) {
+                if (otherBucket.hashCode > hashCode) {
 
-                    // The bucket on the first source can not join.
-                    return false;
+                    if (!optional) {
+
+                        // The bucket on the first source can not join.
+                        return false;
+                        
+                    } else {
+
+                        // The bucket will be ignored.
+                        currentBucket[i] = null;
+                        
+                        // Exit the inner loop.
+                        break;
+                        
+                    }
 
                 }
 
@@ -1139,8 +1151,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
 			}
 
-			// Must be the same hash code.
-			assert firstBucket.hashCode == otherBucket.hashCode;
+            // Must be the same hash code.
+            if (firstBucket.hashCode != otherBucket.hashCode) {
+                throw new AssertionError();
+            }
 
 		}
 
@@ -1187,10 +1201,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 		while (sols1.hasNext()) {
 			sols1.next();
             IBindingSet in = set[0].solution;
-            System.out.println("Set 0: " + in);
+            log.error("Set 0: " + in);
             for (int i = 1; i < set.length; i++) {
 
-                System.out.println("Set " + i + ": " + set[i].solution);
+                log.error("Set " + i + ": " + set[i]==null?"N/A":set[i].solution);
                 // See if the solutions join. 
                 in = //
                 BOpContext.bind(//
