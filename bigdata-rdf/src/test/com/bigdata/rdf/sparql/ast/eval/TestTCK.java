@@ -144,6 +144,20 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * This is not a DAWG test.
+     */
+    public void test_sparql11_in_02() throws Exception {
+        
+        new TestHelper(
+                "sparql11-in-02", // testURI,
+                "sparql11-in-02.rq",// queryFileURL
+                "sparql11-in-02.ttl",// dataFileURL
+                "sparql11-in-02.srx"// resultFileURL
+                ).runTest();
+        
+    }
+
 //    /**
 //     * TODO I can not figure out why these "dataset" tests fail.
 //     */
