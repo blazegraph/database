@@ -50,43 +50,43 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 /**
  * Return the datatype of the literal argument.
  */
-public class DatatypeBOp extends IVValueExpression<IV> 
+public class DatatypeBOp extends IVValueExpression<IV>
 		implements INeedsMaterialization {
 
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 7391999162162545704L;
-	
+
 	private static final transient Logger log = Logger.getLogger(DatatypeBOp.class);
-	
+
 
 	public interface Annotations extends BOp.Annotations {
 
 		String NAMESPACE = (DatatypeBOp.class.getName() + ".namespace").intern();
 
     }
-	
+
     public DatatypeBOp(final IValueExpression<? extends IV> x, final String lex) {
-        
-        this(new BOp[] { x }, 
+
+        this(new BOp[] { x },
         		NV.asMap(new NV(Annotations.NAMESPACE, lex)));
-        
+
     }
-    
+
     /**
      * Required shallow copy constructor.
      */
     public DatatypeBOp(final BOp[] args, final Map<String, Object> anns) {
 
     	super(args, anns);
-    	
+
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
 
 		if (getProperty(Annotations.NAMESPACE) == null)
 			throw new IllegalArgumentException();
-		
+
     }
 
     /**
@@ -97,15 +97,15 @@ public class DatatypeBOp extends IVValueExpression<IV>
     }
 
     public IV get(final IBindingSet bs) {
-     
+
         final String namespace = (String)
 			getRequiredProperty(Annotations.NAMESPACE);
-	
-	    final BigdataValueFactory vf = 
+
+	    final BigdataValueFactory vf =
 	    	BigdataValueFactoryImpl.getInstance(namespace);
-    	
+
         final IV iv = get(0).get(bs);
-        
+
         if (log.isDebugEnabled()) {
         	log.debug(iv);
         }
@@ -113,84 +113,84 @@ public class DatatypeBOp extends IVValueExpression<IV>
         // not yet bound
         if (iv == null)
         	throw new SparqlTypeErrorException();
-        
-        if (iv.isNumeric()) {
-        	
+
+        if (iv.isInline()&&!iv.isExtension()) {
+
 //            final BigdataURI datatype = vf.createURI(iv.getDTE().getDatatype());
             final BigdataURI datatype = vf.asValue(iv.getDTE().getDatatypeURI());
-        	
+
 	    	IV datatypeIV = datatype.getIV();
-	    	
+
 	    	if (datatypeIV == null) {
-	    		
+
                 datatypeIV = TermId.mockIV(VTE.URI);
 	    		datatype.setIV(datatypeIV);
-		    	
+
 	    	}
-	    	
+
 	    	// cache the value on the IV
 	    	datatypeIV.setValue(datatype);
-	    	
+
 	    	return datatypeIV;
-        	
+
         }
-        
+
         final BigdataValue val = iv.getValue();
-        
+
         if (val == null)
         	throw new NotMaterializedException();
-        
+
         if (val instanceof BigdataLiteral) {
-        	
+
         	final BigdataLiteral literal = (BigdataLiteral) val;
-        	
+
         	final BigdataURI datatype;
-        	
+
 			if (literal.getDatatype() != null) {
-				
+
 				// literal with datatype
 				datatype = literal.getDatatype();
-				
+
 			} else if (literal.getLanguage() == null) {
-				
+
 				// simple literal
 				datatype = vf.asValue(XSD.STRING);
-				
+
 			} else {
-				
+
 				throw new SparqlTypeErrorException();
-				
+
 			}
-			
+
 	    	IV datatypeIV = datatype.getIV();
-	    	
+
 	    	if (datatypeIV == null) {
-	    		
+
 	    	    datatypeIV = TermId.mockIV(VTE.URI);
-	    		
+
 	    	    datatype.setIV(datatypeIV);
-		    	
+
 	    	}
-	    	
+
 	    	// cache the value on the IV
 	    	datatypeIV.setValue(datatype);
-	    	
+
 	    	return datatypeIV;
-        	
+
         }
-        
+
         throw new SparqlTypeErrorException();
-        
+
     }
-    
+
     /**
-     * The DatatypeBOp can evaluate against unmaterialized inline numerics.  
+     * The DatatypeBOp can evaluate against unmaterialized inline numerics.
      */
     public Requirement getRequirement() {
-    	
+
     	return INeedsMaterialization.Requirement.SOMETIMES;
-    	
+
     }
-    
-    
+
+
 }
