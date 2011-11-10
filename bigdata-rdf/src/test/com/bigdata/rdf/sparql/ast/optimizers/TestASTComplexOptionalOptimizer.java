@@ -77,7 +77,7 @@ public class TestASTComplexOptionalOptimizer extends
      * Rewrite:
      * 
      * <pre>
-     * SELECT ?_var1
+     * SELECT ?_var1 ?_var6 ?_var4 ?_var10
      *  WHERE {
      *         ?_var1 a <http://www.rdfabout.com/rdf/schema/politico/Politician>
      *         OPTIONAL {
@@ -97,7 +97,7 @@ public class TestASTComplexOptionalOptimizer extends
      * as:
      * 
      * <pre>
-     * SELECT  ?_var1
+     * SELECT  ?_var1 ?_var6 ?_var4 ?_var10
      * WITH {
      *         SELECT ?_var1 ?_var6
      *         WHERE {
@@ -108,7 +108,7 @@ public class TestASTComplexOptionalOptimizer extends
      *         }
      * } as %_set1
      * WITH {
-     *         SELECT ?_var1 ?_var4 ?_var12
+     *         SELECT ?_var1 ?_var4
      *         WHERE {
      *            INCLUDE %_set1
      *            OPTIONAL {
@@ -118,7 +118,7 @@ public class TestASTComplexOptionalOptimizer extends
      *         }
      * } as %_set2
      * WITH {
-     *      SELECT ?_var1 ?_var10 ?_var13
+     *      SELECT ?_var1 ?_var10
      *      WHERE {
      *         INCLUDE %_set1
      *         OPTIONAL {
@@ -135,8 +135,37 @@ public class TestASTComplexOptionalOptimizer extends
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
      * 
-     * TODO We need a unit test where there are some filters which should
-     * move and some which should not.
+     *      TODO We need a unit test where there are some filters which should
+     *      move and some which should not.
+     * 
+     *      FIXME We should not be lifting the simple optional into the first
+     *      named subquery. In is independent of the other optionals (they do
+     *      not use the variable which is bound by the simple optional).
+     *      Therefore it should be left in place in step (1) and then lifted out
+     *      in step (2) into its own named subquery in support of a more
+     *      efficient MERGE JOIN pattern.
+     *      
+     *      FIXME The test is currently predicting var6 as projected from the
+     *      lifted complex optional groups. This is because the only way that
+     *      var6 makes it into the top-level projection is through inclusion
+     *      of %set1 in the two lifted complex optional groups.  I need to come
+     *      back to the test and modify it represent the simple optional as an
+     *      optional group instead and modify the code to translate both simple
+     *      and complex optional groups into named subqueries.  At that point
+     *      the test should conform to the best known query plan.
+     * 
+     *      FIXME Turn this into a unit test where we predict a MERGE JOIN. The
+     *      N-way include should be MERGE %_set1, %_set2, _set3. That is, %_set1
+     *      is the hub which provides the primary join index. The other sets are
+     *      secondary sources for the merge join. All sets MUST have the same
+     *      join variables.
+     * 
+     *      FIXME Do a variant of this test where there is already an INCLUDE
+     *      for the required joins (the step 1 post-condition) and verify that
+     *      Step 2 still runs and produces the MERGE JOIN pattern.
+     * 
+     *      FIXME Unit test with exogenousVars to make sure that they are being
+     *      respected.
      */
     public void test_rewriteComplexOptional() {
         /*
@@ -163,9 +192,15 @@ public class TestASTComplexOptionalOptimizer extends
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
         {
 
-            final ProjectionNode projection = new ProjectionNode();
-            given.setProjection(projection);
-            projection.addProjectionVar(new VarNode("var1"));
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+                projection.addProjectionVar(new VarNode("var1"));
+                projection.addProjectionVar(new VarNode("var6"));
+                projection.addProjectionVar(new VarNode("var4"));
+                projection.addProjectionVar(new VarNode("var10"));
+            }
 
             final JoinGroupNode whereClause = new JoinGroupNode();
             given.setWhereClause(whereClause);
@@ -223,10 +258,14 @@ public class TestASTComplexOptionalOptimizer extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
+            // Top-level projection
             {
                 final ProjectionNode projection = new ProjectionNode();
                 expected.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
+                projection.addProjectionVar(new VarNode("var6"));
+                projection.addProjectionVar(new VarNode("var4"));
+                projection.addProjectionVar(new VarNode("var10"));
             }
 
             final String set1 = "--nsr-1";
@@ -280,7 +319,6 @@ public class TestASTComplexOptionalOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var12"));
                 projection.addProjectionVar(new VarNode("var4"));
                 
                 whereClause.addChild(new NamedSubqueryInclude(set1));
@@ -317,7 +355,6 @@ public class TestASTComplexOptionalOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var13"));
                 projection.addProjectionVar(new VarNode("var10"));
                 
                 whereClause.addChild(new NamedSubqueryInclude(set1));
@@ -362,7 +399,7 @@ public class TestASTComplexOptionalOptimizer extends
                 given/* queryNode */, bsets);
 
         assertSameAST(expected, actual);
-        
+
     }
     
 }

@@ -72,6 +72,9 @@ public interface IJoinNode extends IBindingProducerNode {
      * NOT rely on materialization of variables which would not have been bound
      * before that JOIN.
      * 
+     * @return The attached join filters and never <code>null</code> (it may
+     *         return an empty list)(.
+     * 
      * @see ASTSimpleOptionalOptimizer
      * @see ASTAttachJoinFiltersOptimizer
      */

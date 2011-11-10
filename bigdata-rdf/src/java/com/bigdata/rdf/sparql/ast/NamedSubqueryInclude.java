@@ -28,10 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
@@ -147,6 +150,32 @@ public class NamedSubqueryInclude extends
 
     }
 
+    /**
+     * Return the ordered set of join variables.
+     * 
+     * @return The ordered set of join variables and never <code>null</code>.
+     */
+    @SuppressWarnings("rawtypes")
+    public Set<IVariable<?>> getJoinVarSet() {
+
+        final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
+
+        final VarNode[] a = getJoinVars();
+
+        if (a != null && a.length > 0) {
+
+            for (IVariable v : ASTUtil.convert(a)) {
+
+                set.add(v);
+
+            }
+
+        }
+
+        return set;
+
+    }
+    
     /**
      * Return the corresponding {@link NamedSubqueryRoot}.
      * 

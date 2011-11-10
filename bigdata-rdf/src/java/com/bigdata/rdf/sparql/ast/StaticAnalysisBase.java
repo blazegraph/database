@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -85,14 +87,14 @@ public class StaticAnalysisBase {
      *            An operator.
      * @param varSet
      *            The variables are inserted into this {@link Set}.
-     *            
+     * 
      * @return The caller's {@link Set}.
      */
     public Set<IVariable<?>> getSpannedVariables(final BOp op,
             final Set<IVariable<?>> varSet) {
 
-        return getSpannedVariables(op, true/*filters*/, varSet);
-        
+        return getSpannedVariables(op, true/* filters */, varSet);
+
     }
 
     /**
@@ -124,7 +126,11 @@ public class StaticAnalysisBase {
 
             return varSet;
             
-        } else if (op instanceof IVariable<?>) {
+        }
+        
+//        System.err.println("vars=" + varSet + ", op=" + op.toShortString());
+        
+        if (op instanceof IVariable<?>) {
          
             varSet.add((IVariable<?>)op);
             
@@ -154,7 +160,8 @@ public class StaticAnalysisBase {
 
             final SubqueryRoot subquery = (SubqueryRoot) op;
 
-            addProjectedVariables(subquery, varSet);
+            subquery.getProjectedVars(varSet);
+//            addProjectedVariables(subquery, varSet);
             
             // DO NOT RECURSE INTO THE SUBQUERY!
             return varSet;
@@ -166,36 +173,41 @@ public class StaticAnalysisBase {
             final NamedSubqueryRoot subquery = namedInclude
                     .getRequiredNamedSubqueryRoot(queryRoot);
 
-            addProjectedVariables(subquery, varSet);
+            subquery.getProjectedVars(varSet);
+//            addProjectedVariables(subquery, varSet);
             
             // DO NOT RECURSE INTO THE SUBQUERY!
             return varSet;
             
+//        } else {
+//            
+//            throw new AssertionError("Not handled: " + op);
+            
         }
         
-        /*
-         * Recursion.
-         */
-        if(filters) {
-            if(op instanceof IJoinNode) {
-                /*
-                 * Join nodes may have attached filters.
-                 */
-                final IJoinNode t = (IJoinNode) op;
-                final List<FilterNode> list = t.getAttachedJoinFilters();
-                if (list != null) {
-                    for (FilterNode f : list) {
-                        getSpannedVariables(f, filters, varSet);
-                    }
+        if (filters && op instanceof IJoinNode) {
+            /*
+             * Join nodes may have attached filters.
+             */
+            final IJoinNode t = (IJoinNode) op;
+            final List<FilterNode> list = t.getAttachedJoinFilters();
+            if (list != null) {
+                for (FilterNode f : list) {
+                    getSpannedVariables(f, filters, varSet);
                 }
             }
         }
 
+        /*
+         * Recursion.
+         */
         final int arity = op.arity();
 
         for (int i = 0; i < arity; i++) {
 
-            getSpannedVariables(op.get(i), filters, varSet);
+            final BOp child = op.get(i);
+            
+            getSpannedVariables(child, filters, varSet);
 
         }
 
@@ -204,31 +216,58 @@ public class StaticAnalysisBase {
     }
 
     /**
-     * Add all variables on the {@link ProjectionNode} of the subquery to the
-     * set of distinct variables visible within the scope of the parent query.
+     * Add all variables spanned by the operator.
+     * <p>
+     * <strong>WARNING:</strong> This method does not consider the variable
+     * scoping rules. It is safe to use with a FILTER as all variables will be
+     * in scope, but it is not safe to use with a {@link SubqueryBase} as only
+     * the projected variables will be in scope.
      * 
-     * @param subquery
-     * @param varSet
+     * @param bindings
+     *            The set to which the variables will be added.
+     * @param op
+     *            The operator.
      */
-    static private void addProjectedVariables(final SubqueryBase subquery,
-            final Set<IVariable<?>> varSet) {
-        
-        final ProjectionNode proj = subquery.getProjection();
+    protected void addAll(final Set<IVariable<?>> bindings,
+            final IGroupMemberNode op) {
 
-        if (proj.isWildcard()) {
-            /* The subquery's projection should already have been rewritten. */
-            throw new AssertionError();
+        final Iterator<IVariable<?>> it = BOpUtility
+                .getSpannedVariables((BOp) op);
+
+        while (it.hasNext()) {
+
+            bindings.add(it.next());
+
         }
 
-        proj.getProjectionVars(varSet);
-        
-//        for (IVariable<?> var : proj.getProjectionVars()) {
-//
-//            varSet.add(var);
-//
-//        }
-        
     }
+
+//    /**
+//     * Add all variables on the {@link ProjectionNode} of the subquery to the
+//     * set of distinct variables visible within the scope of the parent query.
+//     * 
+//     * @param subquery
+//     * @param varSet
+//     */
+//    static private void addProjectedVariables(final QueryBase subquery,
+//            final Set<IVariable<?>> varSet) {
+//        
+//        final ProjectionNode proj = subquery.getProjection();
+//
+//        if (proj.isWildcard()) {
+//            /* The subquery's projection should already have been rewritten. */
+//            throw new AssertionError();
+//        }
+//
+//        proj.getProjectionVars(varSet);
+//        
+////        for (IVariable<?> var : proj.getProjectionVars()) {
+////
+////            varSet.add(var);
+////
+////        }
+//        
+//    }
 
     /**
      * Return <code>true</code> if the {@link FilterNode} is fully bound for the

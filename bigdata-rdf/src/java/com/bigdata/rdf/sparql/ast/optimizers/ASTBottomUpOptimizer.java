@@ -38,7 +38,6 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
@@ -519,24 +518,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
-        /*
-         * All exogenous variables (given in the source solutions).
-         * 
-         * TODO We might want to compile this information, and perhaps even
-         * statistics about IBindingSet[] and put it on the [context]. Note that
-         * the context does not currently have that information available, but
-         * maybe it should.
-         */
-        final Set<IVariable<?>> exogenous = new LinkedHashSet<IVariable<?>>();
-        if(bindingSets != null) {
-            for (IBindingSet bset : bindingSets) {
-                final Iterator<Map.Entry<IVariable, IConstant>> itr = bset
-                        .iterator();
-                while (itr.hasNext()) {
-                    exogenous.add(itr.next().getKey());
-                }
-            }
-        }
+        // All exogenous variables (given in the source solutions).
+        final Set<IVariable<?>> exogenous = sa.getExogenousVars(bindingSets,
+                new LinkedHashSet<IVariable<?>>());
 
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 

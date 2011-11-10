@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
@@ -46,21 +47,23 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
+import com.bigdata.bop.join.HTreeMergeJoin;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
+import com.bigdata.bop.join.JVMMergeJoin;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
-import com.bigdata.bop.solutions.HTreeDistinctBindingSetsOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.GroupByState;
+import com.bigdata.bop.solutions.HTreeDistinctBindingSetsOp;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.bop.solutions.IGroupByState;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.bop.solutions.IVComparator;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.bop.solutions.MemoryGroupByOp;
 import com.bigdata.bop.solutions.MemorySortOp;
 import com.bigdata.bop.solutions.PipelinedAggregationOp;
@@ -913,8 +916,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
                             namedSolutionSetRef),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS,
-                            joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS,
+//                            joinVars),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS,
                             joinConstraints),//
                     new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE,
@@ -960,6 +963,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * for {@link ExistsNode} and {@link NotExistsNode}.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
@@ -1550,8 +1554,27 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         final Set<FilterNode> inFilters = new LinkedHashSet<FilterNode>();
         inFilters.addAll(joinGroup.getInFilters());
+
+        final int arity = joinGroup.arity();
+
+        final AtomicInteger start = new AtomicInteger(0);
+        if(ctx.mergeJoin) {
+
+            /*
+             * Attempt to interpret the leading sequence in the group as a merge
+             * join.
+             */
+            
+            left = doMergeJoin(left, joinGroup, doneSet, start, ctx);
+            
+        }
         
-        for (IGroupMemberNode child : joinGroup) {
+        /*
+         * Translate the remainder of the group. 
+         */
+        for (int i = start.get(); i < arity; i++) {
+
+            final IGroupMemberNode child = (IGroupMemberNode) joinGroup.get(i);
 
             if (child instanceof StatementPatternNode) {
                 final StatementPatternNode sp = (StatementPatternNode) child;
@@ -1646,6 +1669,263 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
     }
 
+    /**
+     * Attempt to translate the join group using a merge join.
+     * <P>
+     * We recognize a merge join when there is a series of INCLUDEs -or-
+     * OPTIONAL {INCLUDE}s in the group. Each INCLUDE must have the same join
+     * variables. If the OPTIONAL {INCLUDE}s pattern is recognized then the
+     * MERGE JOIN is itself OPTIONAL. The sequences of such INCLUDEs in this
+     * group is then translated into a single MERGE JOIN operator.
+     * 
+     * 
+     * @param left
+     * @param joinGroup
+     * @param doneSet
+     * @param start
+     *            Modified by side-effect to indicate how many children were
+     *            absorbed by the "merge-join" IFF a merge join was used.
+     * @param ctx
+     * 
+     * @return <i>left</i> if no merge join was recognized and otherwise the
+     *         merge join plan.
+     * 
+     *         TODO Test against BSBM Q5 (must first push down the subgroups,
+     *         but we can do that rewrite in the SPARQL template).
+     * 
+     *         TODO We also need to handle join filters which appear between
+     *         INCLUDES. That should not prevent a merge join. Instead, those
+     *         join filters can just be moved to after the MERGE JOIN.
+     * 
+     *         TODO Pre-filters could also mess this up. The should be lifted
+     *         out into the parent join group.
+     * 
+     *         TODO This should be done in the AST where we can manage the join
+     *         order, verify the join variables, etc.
+     */
+    private static PipelineOp doMergeJoin(PipelineOp left,
+            final JoinGroupNode joinGroup,
+            final Set<IVariable<?>> doneSet,
+            final AtomicInteger start,
+            final AST2BOpContext ctx) {
+        
+        final StaticAnalysis sa = ctx.sa;
+        
+        boolean mergeJoin = true; // until proven otherwise.
+        
+        final List<NamedSubqueryInclude> requiredIncludes = new LinkedList<NamedSubqueryInclude>();
+        final List<NamedSubqueryInclude> optionalIncludes = new LinkedList<NamedSubqueryInclude>();
+
+        // Collect the join constraints from each INCLUDE that we will use.
+        final List<FilterNode> joinConstraints = new LinkedList<FilterNode>();
+        
+        // Join variables for merge join (must be the same for all sources).
+        final Set<IVariable<?>> joinVars = new LinkedHashSet<IVariable<?>>();
+
+        int j;
+        // The named solution set which is the hub of the merge join and null if we do not find such a hub.
+        NamedSubqueryRoot hub = null;
+        final int arity = joinGroup.arity();
+        for (j = 0; j < arity && mergeJoin; j++) {
+
+            final IGroupMemberNode child = (IGroupMemberNode) joinGroup
+                    .get(j);
+
+            if (requiredIncludes.isEmpty()
+                    && (child instanceof JoinGroupNode)
+                    && ((JoinGroupNode) child).isOptional()
+                    && ((JoinGroupNode) child).arity() == 1
+                    && (((JoinGroupNode) child).get(0) instanceof NamedSubqueryInclude)) {
+
+                /*
+                 * OPTIONAL {INCLUDE x}.
+                 */
+
+                final NamedSubqueryInclude nsi = (NamedSubqueryInclude) ((JoinGroupNode) child)
+                        .get(0);
+
+                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
+                        .getQueryRoot());
+
+                final Set<IVariable<?>> theJoinVars = nsi.getJoinVarSet();
+
+                if (hub == null) {
+                    hub = nsr;
+                    joinVars.addAll(theJoinVars);
+                } else if (hub != nsr) {
+                    mergeJoin = false;
+                    continue;
+                } else if (!joinVars.equals(theJoinVars)) {
+                    /*
+                     * The join variables are not the same.
+                     * 
+                     * FIXME It is possible to fix this for some queries
+                     * since the there is some flexibility in how we choose
+                     * the join variables. However, we need to model the
+                     * MERGE JOIN in the AST in order to do that since, by
+                     * this time, we have already generated the physical
+                     * query plan for the named subquery and the join vars
+                     * are backed into that plan.
+                     */
+                    mergeJoin = false;
+                    continue;
+                }
+
+                optionalIncludes.add(nsi);
+
+                // Combine the attached join filters (if any).
+                joinConstraints.addAll(nsi.getAttachedJoinFilters());
+
+            } else if (optionalIncludes.isEmpty()
+                    && child instanceof NamedSubqueryInclude) {
+
+                /*
+                 * INCLUDE x.
+                 */
+
+                final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
+
+                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
+                        .getQueryRoot());
+
+                final Set<IVariable<?>> theJoinVars = nsi.getJoinVarSet();
+
+                if (hub == null) {
+                    hub = nsr;
+                    joinVars.addAll(theJoinVars);
+                } else if (hub != nsr) {
+                    mergeJoin = false;
+                    continue;
+                } else if (!joinVars.equals(theJoinVars)) {
+                    /*
+                     * The join variables are not the same.
+                     * 
+                     * FIXME It is possible to fix this for some queries
+                     * since the there is some flexibility in how we choose
+                     * the join variables. However, we need to model the
+                     * MERGE JOIN in the AST in order to do that since, by
+                     * this time, we have already generated the physical
+                     * query plan for the named subquery and the join vars
+                     * are backed into that plan.
+                     */
+                    mergeJoin = false;
+                    continue;
+                }
+
+                requiredIncludes.add(nsi);
+
+                // Combine the attached join filters (if any).
+                joinConstraints.addAll(nsi.getAttachedJoinFilters());
+
+            } else {
+
+                // End of the INCLUDEs.
+                break;
+
+            }
+
+        }
+
+        final int minIncludes = 2;
+        if (hub == null
+                || (requiredIncludes.size() < minIncludes && optionalIncludes
+                        .size() < minIncludes)) {
+            /*
+             * The primary source will be the [hub] identified above. In
+             * addition, we need at least one INCLUDEs which satisify the
+             * criteria to do a MERGE JOIN. If we do not have that then we
+             * can not do a MERGE JOIN.
+             */
+            mergeJoin = false;
+        }
+
+        if (!mergeJoin) {
+            
+            return left;
+            
+        }
+
+        /*
+         * We will do a merge join.
+         */
+        assert hub != null;
+        
+        // Figure out if the join is required or optional.
+        final boolean optional = requiredIncludes.isEmpty();
+        
+        // The list of includes that we will process.
+        final List<NamedSubqueryInclude> includes = optional ? optionalIncludes
+                : requiredIncludes;
+        
+        /*
+         * Setup the sources (one per INCLUDE).
+         */
+        final NamedSolutionSetRef[] namedSolutionSetRefs;
+        {
+            final List<NamedSolutionSetRef> list = new LinkedList<NamedSolutionSetRef>();
+
+            final IVariable<?>[] joinvars2 = joinVars
+                    .toArray(new IVariable[joinVars.size()]);
+
+            for (NamedSubqueryInclude nsi : includes) {
+
+                list.add(new NamedSolutionSetRef(
+                        ctx.queryId, nsi.getName(), joinvars2));
+
+            }
+            
+            namedSolutionSetRefs = list
+                    .toArray(new NamedSolutionSetRef[list.size()]);
+
+        }
+
+        /*
+         * TODO Figure out if we can release the named solution sets.
+         * 
+         * Note: We are very likely to be able to release the named
+         * solution sets after the merge join, but it is not guaranteed
+         * that none of the source solution sets is being INCLUDEd more
+         * than once.
+         */
+        boolean release = false;
+
+        if (ctx.nativeHashJoins) {
+            
+            left = new HTreeMergeJoin(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(HTreeMergeJoin.Annotations.NAMED_SET_REF,
+                            namedSolutionSetRefs),//
+                    new NV(HTreeMergeJoin.Annotations.CONSTRAINTS,
+                                    joinConstraints),//
+                    new NV(HTreeMergeJoin.Annotations.RELEASE,
+                                release)//
+            );
+
+        } else {
+            
+            left = new JVMMergeJoin(leftOrEmpty(left), //
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(JVMMergeJoin.Annotations.NAMED_SET_REF,
+                            namedSolutionSetRefs),//
+                    new NV(JVMMergeJoin.Annotations.CONSTRAINTS,
+                            joinConstraints),//
+                    new NV(JVMMergeJoin.Annotations.RELEASE,
+                            release)//
+            );
+            
+        }
+
+        // Advance beyond the last consumed INCLUDE.
+        start.set( j);
+        
+        return left;
+
+    }
+    
     /**
      * Conditionally add a {@link StartOp} iff the query will rin on a cluster.
      * 
@@ -1883,6 +2163,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * @param subgroup
      * @param ctx
      * @return
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
      */
 	private static PipelineOp addSubgroup(//
 			PipelineOp left,//
