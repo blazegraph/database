@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.constraints;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -32,26 +30,31 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class EncodeForURIBOp extends AbstractLiteralBOp {
+public class BNodeBOp extends AbstractLiteralBOp {
 
     private static final long serialVersionUID = -8448763718374010166L;
 
-    public EncodeForURIBOp(IValueExpression<? extends IV> x, String lex) {
+    public BNodeBOp(final String lex) {
+    	super(lex);
+    }
+    
+    public BNodeBOp(IValueExpression<? extends IV> x, String lex) {
         super(x, lex);
     }
 
-    public EncodeForURIBOp(BOp[] args, Map<String, Object> anns) {
+    public BNodeBOp(BOp[] args, Map<String, Object> anns) {
         super(args, anns);
         if (args.length != 1 || args[0] == null)
             throw new IllegalArgumentException();
     }
 
-    public EncodeForURIBOp(EncodeForURIBOp op) {
+    public BNodeBOp(BNodeBOp op) {
         super(op);
     }
 
@@ -60,13 +63,32 @@ public class EncodeForURIBOp extends AbstractLiteralBOp {
     }
 
     public IV _get(final IBindingSet bs) throws SparqlTypeErrorException {
-        IV iv = getAndCheck(0, bs);
-        final BigdataLiteral lit =literalValue(iv);
-        try {
-            final BigdataLiteral str = getValueFactory().createLiteral(URLEncoder.encode(lit.getLabel(), "UTF-8").replace("+", "%20"));
-            return DummyConstantNode.toDummyIV(str);
-        } catch (UnsupportedEncodingException uee) {
+        
+    	if (arity() == 0) {
+    		
+    		return DummyConstantNode.toDummyIV(getValueFactory().createBNode());
+    		
+    	}
+    	
+    	IV iv = get(0).get(bs);
+    	
+        if (iv == null)
+            throw new SparqlTypeErrorException.UnboundVarException();
+
+        if (!iv.isLiteral())
+        	throw new SparqlTypeErrorException();
+        
+        final BigdataLiteral lit = literalValue(iv);
+        
+        final BigdataURI dt = lit.getDatatype();
+        
+        if (dt != null && !dt.stringValue().equals(XSD.STRING.stringValue()))
             throw new SparqlTypeErrorException();
-        }
+        	
+        final BigdataBNode bnode = getValueFactory().createBNode("-bnode-func-"+lit.getLabel());
+            
+        return DummyConstantNode.toDummyIV(bnode);
+            
     }
+    
 }

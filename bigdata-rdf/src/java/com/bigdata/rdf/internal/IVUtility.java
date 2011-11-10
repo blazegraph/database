@@ -442,11 +442,11 @@ public class IVUtility {
         case ABS:
             return new XSDDecimalIV(left.abs());
         case CEIL:
-            return new XSDNumericIV(Math.ceil(left.doubleValue()));
+            return new XSDDecimalIV(new BigDecimal(Math.round(Math.ceil(left.doubleValue()))));
         case FLOOR:
-            return new XSDNumericIV(Math.floor(left.doubleValue()));
+            return new XSDDecimalIV(new BigDecimal(Math.round(Math.floor(left.doubleValue()))));
         case ROUND:
-            return new XSDDecimalIV(left.round(MathContext.UNLIMITED));
+            return new XSDDecimalIV(new BigDecimal(Math.round(left.doubleValue())));
         default:
             throw new UnsupportedOperationException();
         }

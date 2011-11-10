@@ -93,7 +93,10 @@ final public class MathBOp extends IVValueExpression
 		MULTIPLY,
 		DIVIDE,
 		MIN,
-		MAX;
+		MAX,
+		ROUND,
+		CEIL,
+		FLOOR;
 
 		public static MathOp valueOf(org.openrdf.query.algebra.MathExpr.MathOp op) {
 			switch(op) {

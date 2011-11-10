@@ -7,6 +7,7 @@ import javax.xml.datatype.DatatypeFactory;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
@@ -64,6 +65,12 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV>
         
     }
 
+    public AbstractLiteralBOp(final String lex) {
+    	
+    	this(BOpBase.NOARGS, NV.asMap(new NV(Annotations.NAMESPACE, lex)));
+    	
+    }
+    
     /**
      * Convenience constructor for most common unary function
      * @param x
@@ -121,7 +128,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV>
 
         return iv;
     }
-
+    
     protected BigdataLiteral literalValue(IV iv) {
 
         if (iv.isInline()&&!iv.isExtension()) {
@@ -151,5 +158,7 @@ abstract public class AbstractLiteralBOp extends IVValueExpression<IV>
             throw new NotMaterializedException();
         }
     }
+
+
 
 }
