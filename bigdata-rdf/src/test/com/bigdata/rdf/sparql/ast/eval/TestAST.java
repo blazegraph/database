@@ -31,14 +31,14 @@ import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
  * Port of unit tests originally written at the AST layer.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class TestAST extends AbstractDataDrivenSPARQLTestCase {
 
     /**
-     * 
+     *
      */
     public TestAST() {
     }
@@ -54,7 +54,7 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
      * <pre>
      * select ?s where { ?s ?p ?o }
      * </pre>
-     * 
+     *
      * Note: This is a port of TestASTTriplesModeEvaluation#testAST() (as are
      * all of the ast_01x methods).
      */
@@ -68,7 +68,7 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
      * <pre>
      * select ?s where { ?s ?p ?o } order by ?s limit 1
      * </pre>
-     * 
+     *
      * Note: I had to add an ORDER BY into this method in order to make the
      * results stable. The original unit test only checked the #of results but
      * not their data.
@@ -104,14 +104,14 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
     /**
      * <pre>
      * select ?s ?o
-     * where { 
+     * where {
      *    ?s rdf:type :C .
      *    OPTIONAL {
      *       ?s :B ?o
      *    }
      * }
      * </pre>
-     * 
+     *
      * Note: This is a port of
      * TestASTTriplesModeEvaluation#testOptionalDistinct() (as are all of the
      * ast_02x methods).
@@ -125,7 +125,7 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
     /**
      * <pre>
      * select DISTINCT ?s ?o
-     * where { 
+     * where {
      *    ?s rdf:type :C .
      *    OPTIONAL {
      *       ?s :B ?o
@@ -141,14 +141,14 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * <pre>
-     * select ?index 
+     * select ?index
      * where {
      *   ?s rdf:type :C .
      *   ?s :predicate1 ?o .
      * }
      * GROUP BY (?o+1 as ?index)
      * </pre>
-     * 
+     *
      * Note: This is a port of
      * TestASTTriplesModeEvaluation#testProjectedGroupWithConstant().
      */
@@ -177,18 +177,18 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
      * something that needs materialization. Does the fact that a
      * ValueExpression returns a non computed IV value, ie returns one of its
      * arguments, have to be captured in order to somehow handle this?
-     * 
+     *
      * <pre>
-     * 
+     *
      * QueryType: SELECT
      * SELECT VarNode(index)
      *   JoinGroupNode {
      *     StatementPatternNode(VarNode(s), ConstantNode(TermId(4U)), ConstantNode(TermId(2U)), DEFAULT_CONTEXTS)
-     *     StatementPatternNode(VarNode(s), ConstantNode(TermId(5U)), VarNode(o), DEFAULT_CONTEXTS)    
+     *     StatementPatternNode(VarNode(s), ConstantNode(TermId(5U)), VarNode(o), DEFAULT_CONTEXTS)
      *     ( com.bigdata.rdf.sparql.ast.ValueExpressionNode()[ valueExpr=com.bigdata.rdf.internal.constraints.StrBOp(com.bigdata.rdf.internal.constraints.CoalesceBOp(s,o))[ com.bigdata.rdf.internal.constraints.StrBOp.namespace=kb]] AS VarNode(index) )
      *   }
      * </pre>
-     * 
+     *
      * Note: This is a port of
      * TestASTTriplesModeEvaluation#testProjectedGroupByWithNestedVars()
      */
@@ -197,5 +197,10 @@ public class TestAST extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper("ast_04").runTest();
 
     }
-    
+
+    public void test_materialization_extensions() throws Exception {
+
+    	new TestHelper("materialization-extensions").runTest();
+
+    }
 }

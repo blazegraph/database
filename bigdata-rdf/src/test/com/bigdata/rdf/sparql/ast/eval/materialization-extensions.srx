@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+  	<variable name="date"/>
+  	<variable name="dateStr"/>
+  </head>
+  <results>
+    <result>
+      <binding name="date">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2009-07-28T12:53:25.000Z</literal>
+      </binding>
+      <binding name="dateStr">
+      	<literal >2009-07-28T12:53:25.000Z</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="date">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2009-07-28T12:53:25.000Z</literal>
+      </binding>
+       <binding name="dateStr">
+      	<literal >2009-07-28T12:53:25.000Z</literal>
+      </binding>
+    </result>
+  </results>
+</sparql>
