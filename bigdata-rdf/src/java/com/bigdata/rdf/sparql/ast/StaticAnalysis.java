@@ -28,17 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
@@ -175,17 +176,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * They should be pruned from the AST.</dd>
  * </dl>
  * 
- * FIXME [This should all change once we move to a more dynamic approach to
- * ordering the joins.] The main "gotcha" when looking "up" the tree is that we
- * need to know the position at which everything above us in the tree is being
- * evaluated. Historically, the evaluation order for binding producers was
- * organized into fairly simple regions : required pipelined joins of statement
- * pattern nodes and optional join groups. Life is more complex now that we also
- * have SPARQL 1.1 subqueries, SERVICE calls, and named subquery includes. We
- * probably need a concept which reflects these different evaluation regions
- * within a group, but even then it is not enough since we would have to specify
- * this for each parent group in the AST.
- * 
  * TODO We can probably cache the heck out of things on this class. There is no
  * reason to recompute the SA of the know or maybe/must bound variables until
  * there is an AST change, and the caller can build a new SA when that happens.
@@ -221,49 +211,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         
     }
     
-//    /**
-//     * Return the set of variables which MUST be bound coming into this group
-//     * during top-down, left-to-right evaluation. The returned set is based on a
-//     * non-recursive analysis of the definitely (MUST) bound variables in each
-//     * of the parent groups. The analysis is non-recursive for each parent
-//     * group, but all parents of this group are considered. This approach
-//     * excludes information about variables which MUST or MIGHT be bound from
-//     * both <i>this</i> group and child groups.
-//     * <p>
-//     * This method DOES NOT pay attention to bottom up variable scoping rules.
-//     * Queries which are badly designed MUST be rewritten (by lifting out named
-//     * subqueries) such that they become well designed and adhere to bottom-up
-//     * evaluation semantics.
-//     * 
-//     * @param vars
-//     *            Where to store the "MUST" bound variables.
-//     * 
-//     * @return The argument.
-//     */
-//    public Set<IVariable<?>> getIncomingBindings(
-//            final IBindingProducerNode node, final Set<IVariable<?>> vars) {
-//    
-//        GraphPatternGroup<?> parent = node instanceof IGroupMemberNode ? ((IGroupMemberNode) node)
-//                .getParentGraphPatternGroup() : null;
-//        
-//        while (parent != null) {
-//
-//            /*
-//             * Note: This needs to be a non-recursive definition of the
-//             * definitely produced bindings. Just those for *this* group for
-//             * each parent considered.
-//             */
-//
-//            getDefinitelyProducedBindings(parent, vars, false/* recursive */);
-//
-//            parent = parent.getParentGraphPatternGroup();
-//            
-//        }
-//        
-//        return vars;
-//        
-//    }
-
     /**
      * Return the set of variables which MUST be bound coming into this group
      * during top-down, left-to-right evaluation. The returned set is based on a
@@ -318,10 +265,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     
                     final boolean optional = child instanceof IJoinNode
                             && ((IJoinNode) child).isOptional();
+                    
                     if (!optional) {
                         getDefinitelyProducedBindings(
                                 (IBindingProducerNode) child, vars, true/* recursive */);
                     }
+                    
                 }
                 
             }
@@ -333,6 +282,81 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * coming into the parent.  
          */
         return getDefinitelyIncomingBindings(parent, vars);
+        
+    }
+
+    /**
+     * Return the set of variables which MIGHT be bound coming into this group
+     * during top-down, left-to-right evaluation. The returned set is based on a
+     * non-recursive analysis of the "maybe" bound variables in each of the
+     * parent groups. The analysis is non-recursive for each parent group, but
+     * all parents of this group are considered. This approach excludes
+     * information about variables which MUST or MIGHT be bound from both
+     * <i>this</i> group and child groups.
+     * <p>
+     * This method DOES NOT pay attention to bottom up variable scoping rules.
+     * Queries which are badly designed MUST be rewritten (by lifting out named
+     * subqueries) such that they become well designed and adhere to bottom-up
+     * evaluation semantics.
+     * 
+     * @param vars
+     *            Where to store the "maybe" bound variables. This includes ANY
+     *            variable which MIGHT or MUST be bound.
+     * 
+     * @return The argument.
+     */
+    public Set<IVariable<?>> getMaybeIncomingBindings(
+            final IGroupMemberNode node, final Set<IVariable<?>> vars) {
+    
+        final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
+        
+        /*
+         * We've reached the root.
+         */
+        if (parent == null) {
+            
+            return vars;
+            
+        }
+
+        /*
+         * Do the siblings of the node first.  Unless it is a Union.  Siblings
+         * don't see each other's bindings in a Union.
+         */
+        if (!(parent instanceof UnionNode)) {
+            
+            for (IGroupMemberNode child : parent) {
+                
+                /*
+                 * We've found ourself. Stop collecting vars.
+                 */
+                if (child == node) {
+                    
+                    break;
+                    
+                }
+                
+                if (child instanceof IBindingProducerNode) {
+                    
+                    final boolean optional = child instanceof IJoinNode
+                            && ((IJoinNode) child).isOptional();
+                    
+                    if (!optional) {
+                        getMaybeProducedBindings(
+                                (IBindingProducerNode) child, vars, true/* recursive */);
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+        /*
+         * Next we recurse upwards to figure out what is definitely bound 
+         * coming into the parent.  
+         */
+        return getMaybeIncomingBindings(parent, vars);
         
     }
 
@@ -395,26 +419,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final SubqueryRoot subquery = (SubqueryRoot) node;
 
-            if(true) {
-
-                /*
-                 * FIXME Although the sub-select is also a required join, this
-                 * code is being used to find the join variables for the
-                 * sub-select so we can not consider the sub-select's
-                 * contribution.
-                 * 
-                 * Note: By failing to consider the sub-select's contribution
-                 * here we are letting in any number of nasty consequences which
-                 * can range from not predicting join variables in other
-                 * circumstances to failing to bind filters early enough.
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/398
-                 * (Convert the static optimizer into an AST rewrite)
-                 */
-
-                vars.addAll(getDefinitelyProducedBindings(subquery));
-                
-            }
+            vars.addAll(getDefinitelyProducedBindings(subquery));
 
         } else if (node instanceof NamedSubqueryInclude) {
 
@@ -490,69 +495,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 addAll(vars, op);
 
-//            } else if (op instanceof IBindingProducerNode) {
-//
-//                if (op instanceof StatementPatternNode) {
-//
-//                    addAll(vars, op);
-//
-//                } else if (op instanceof SubqueryRoot) {
-//
-//                    final SubqueryRoot subqueryRoot = (SubqueryRoot) op;
-//
-//                    vars.addAll((List) Arrays.asList(subqueryRoot
-//                            .getProjection().getProjectionVars()));
-//
-//                } else if (op instanceof NamedSubqueryInclude) {
-//
-//                    final NamedSubqueryInclude nsi = (NamedSubqueryInclude) op;
-//
-//                    final NamedSubqueryRoot nsr = nsi
-//                            .getNamedSubqueryRoot(queryRoot);
-//
-//                    vars.addAll((List) Arrays.asList(nsr.getProjection()
-//                            .getProjectionVars()));
-//
-//                } else if (op instanceof ServiceNode) {
-//
-//                    /*
-//                     * todo Add all maybe bound variables from the service
-//                     * node's graph pattern.
-//                     */
-//
-//                } else {
-//                    throw new AssertionError(op + " in " + group);
-//
-//                }
-//                
             }
             
         }
 
         return vars;
         
-    }
-    
-    /**
-     * Add all variables spanned by the operator.
-     * 
-     * @param bindings
-     *            The set to which the variables will be added.
-     * @param op
-     *            The operator.
-     */
-    private void addAll(final Set<IVariable<?>> bindings,
-            final IGroupMemberNode op) {
-
-        final Iterator<IVariable<?>> it = BOpUtility
-                .getSpannedVariables((BOp) op);
-
-        while (it.hasNext()) {
-
-            bindings.add(it.next());
-
-        }
-
     }
 
     /**
@@ -573,8 +521,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * @return The argument.
      */
     public Set<IVariable<?>> getMaybeProducedBindings(
-            final IBindingProducerNode node, final Set<IVariable<?>> vars,
-            boolean recursive) {
+            final IBindingProducerNode node,//
+            final Set<IVariable<?>> vars,//
+            final boolean recursive) {
 
         if (node instanceof GraphPatternGroup<?>) {
         
@@ -582,11 +531,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             
                 getMaybeProducedBindings((JoinGroupNode) node, vars,
                         recursive);
-                
+
             } else if (node instanceof UnionNode) {
-                
+
                 getMaybeProducedBindings((UnionNode) node, vars, recursive);
-                
+
             } else {
 
                 throw new AssertionError(node.toString());
@@ -643,9 +592,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             vars.add(((AssignmentNode) node).getVar());
             
         } else if(node instanceof FilterNode) {
-            
+
             // NOP
-            
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -1433,26 +1382,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            The named subquery.
      * @param anInclude
      *            An include for that subquery.
-     * 
-     *            FIXME This is currently disabled and will always return an
-     *            empty set. This has the effect of forcing named subquery
-     *            INCLUDEs to run before the required statement pattern joins in
-     *            a join group. This needs to be changed as part of the RTO
-     *            integration.
      */
     public Set<IVariable<?>> getJoinVars(
             final NamedSubqueryRoot aNamedSubquery,
             final NamedSubqueryInclude anInclude, final Set<IVariable<?>> vars) {
 
-        if (false) {
-
-            return Collections.emptySet();
-
-        } else {
-
-            return _getJoinVars(aNamedSubquery, anInclude, vars);
-
-        }
+        return _getJoinVars(aNamedSubquery, anInclude, vars);
 
     }
     
@@ -1475,7 +1410,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     
     /**
      * Identify the join variables for the specified subquery for the position
-     * within the query in which it appears.
+     * within the query in which it appears. For a named subquery, it considers
+     * the position in which the INCLUDE appears.
      * 
      * @param aSubquery
      *            Either a {@link NamedSubqueryRoot} or a {@link SubqueryRoot}.
@@ -1486,19 +1422,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            {@link SubqueryRoot} itself.
      * 
      * @return The join variables.
-     * 
-     *         FIXME This code must figure out which variables "must" be bound
-     *         by both the the subquery and context in which the INCLUDE appears
-     *         and return just those variables. The problem is that we can not
-     *         really decide this until we decide the evaluation order since the
-     *         named subquery include could run at any point in the required
-     *         joins. That includes the pipelined statement pattern joins, the
-     *         inline access path joins, the named subquery joins, the service
-     *         node joins, etc. The code will currently only report join
-     *         variables based on those variables which are known bound on entry
-     *         to the group. Thus it completely ignores the order of evaluation
-     *         of the required joins in the join group. This is an RTO
-     *         integration issue.
      */
     private Set<IVariable<?>> _getJoinVars(final SubqueryBase aSubquery,
             final IGroupMemberNode theNode, final Set<IVariable<?>> vars) {
@@ -1515,8 +1438,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          */
         final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
                 theNode, new LinkedHashSet<IVariable<?>>());
-//        final Set<IVariable<?>> incomingBindings = getIncomingBindings(
-//                theNode.getParentJoinGroup(), new LinkedHashSet<IVariable<?>>());
         
         /*
          * This is only those variables which are bound on entry into the group
@@ -1530,30 +1451,190 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         return vars;
 
     }
-
+    
     /**
-     * Return a {@link ProjectionNode} for all variables appearing in the WHERE
-     * clause.
+     * Return any variables which are used after then given node in the current
+     * ordering of its parent {@link JoinGroupNode}.
      * 
-     * @param whereClause
-     *            The where clause (or any group).
-     *            
-     * @return The projection.
+     * @param node
+     *            A node which is a direct child of some {@link JoinGroupNode}.
+     * @param vars
+     *            Where to store the variables.
+     * 
+     * @return The caller's set.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>node</i> is not the direct child of some
+     *             {@link JoinGroupNode}.
      */
-    public ProjectionNode getProjection(final GraphPatternGroup<?> whereClause) {
+    public Set<IVariable<?>> getAfterVars(final IGroupMemberNode node,
+            final Set<IVariable<?>> vars) {
 
-        final Set<IVariable<?>> projectedVars = getSpannedVariables(
-                whereClause, new LinkedHashSet<IVariable<?>>());
+        if (node.getParent() == null) {
+            // Immediate parent MUST be defined.
+            throw new IllegalArgumentException();
+        }
 
-        final ProjectionNode projection = new ProjectionNode();
+        if (!(node.getParent() instanceof JoinGroupNode)) {
+            // Immediate parent MUST be a join group node.
+            throw new IllegalArgumentException();
+        }
+        
+        final JoinGroupNode p = node.getParentJoinGroup();
+        
+        boolean found = false;
+        
+        for (IGroupMemberNode c : p) {
+        
+            if (found) {
+            
+                // Add in any variables referenced after this proxy node.
+                getSpannedVariables((BOp) c, true/* filters */, vars);
+                
+            }
 
-        for (IVariable<?> v : projectedVars) {
-
-            projection.addProjectionVar(new VarNode(v.getName()));
+            if (c == node) {
+            
+                // Found the position of the proxy node in the group.
+                found = true;
+                
+            }
 
         }
 
-        return projection;
+        assert found;
+        
+        return vars;
+        
+    }
+
+    /**
+     * Return a {@link ProjectionNode} for all variables appearing in the WHERE
+     * clause. This is used when converting a sub-group into a sub-query.
+     * 
+     * @param proxy
+     *            The join group which will be replaced by a sub-query. This is
+     *            used to decide which variables are known bound (and hence
+     *            should be projected into the WHERE clause if they are used
+     *            within that WHERE clause). It is also used to decide which
+     *            variables which become bound in the WHERE clause will be used
+     *            outside of its scope and hence must be projected out of the
+     *            WHERE clause. (The parent of this proxy MUST be a
+     *            {@link JoinGroupNode}, not a {@link UnionNode} and not
+     *            <code>null</code>. This condition is readily satisified if the
+     *            rewrite is considering the children of some join group node as
+     *            the parent of the proxy will be that join group node.)
+     * @param whereClause
+     *            The where clause (or any group) whose projection will be
+     *            computed.
+     * @param query
+     *            The query (or sub-query) in which that proxy node exists. This
+     *            is used to identify anything which is PROJECTed out of the
+     *            query.
+     * @param exogenousVars
+     *            Any variables which are bound outside of the query.
+     * @param projectedVars
+     *            The variables which must be projected will be added to this
+     *            collection.
+     * @return The projection.
+     * 
+     *         TODO We should recognize conditions under which this can be made
+     *         into a DISTINCT projection. This involves a somewhat tricky
+     *         analysis of the context in which each projected variable is used.
+     *         There is *substantial* benefit to be gained from this analysis as
+     *         a DISTINCT projection can radically reduce the size of the
+     *         intermediate solution sets and the work performed by the overall
+     *         query. However, if the analysis is incorrect and we mark the
+     *         PROJECTION as DISTINCT when that is not allowed by the semantics
+     *         of the query, then the query will not have the same behavior. So,
+     *         getting this analysis correct is very important.
+     */
+    public Set<IVariable<?>> getProjectedVars(//
+            final IGroupMemberNode proxy,
+            final GraphPatternGroup<?> whereClause,//
+            final QueryBase query,// 
+            final Set<IVariable<?>> exogenousVars,//
+            final Set<IVariable<?>> projectedVars) {
+
+        // All variables which are used within the WHERE clause.
+        final Set<IVariable<?>> groupVars = getSpannedVariables(whereClause,
+                new LinkedHashSet<IVariable<?>>());
+
+        /*
+         * Figure out what we need to project INTO the group.
+         */
+        // All variables which might be incoming bound into the proxy node.
+        final Set<IVariable<?>> beforeVars = getMaybeIncomingBindings(
+                proxy, new LinkedHashSet<IVariable<?>>());
+
+        // Add in anything which is known to be bound outside of the query.
+        beforeVars.addAll(exogenousVars);
+
+        // Drop anything not used within the group.
+        beforeVars.retainAll(groupVars);
+
+        /*
+         * Figure out what we need to project FROM the group.
+         */
+
+        // All variables used after the proxy node in its's parent join group.
+        final Set<IVariable<?>> afterVars = getAfterVars(proxy,
+                new LinkedHashSet<IVariable<?>>());
+        
+        // All variables projected out of the query in which this group appears.
+        query.getProjectedVars(afterVars);
+
+        // Drop anything not used within the group.
+        afterVars.retainAll(groupVars);
+        
+        /*
+         * The projection for the group is anything MAYBE bound on entry to the
+         * group which is also used within the group PLUS anything used after
+         * the group which is used within the group.
+         */
+        projectedVars.addAll(beforeVars);
+        projectedVars.addAll(afterVars);
+        
+        return projectedVars;
+
+    }
+
+    /**
+     * Extract any variables which are bound in any of the given solutions.
+     * 
+     * @param bindingSets
+     *            The given solutions (optional).
+     * @param vars
+     *            The exogenous variables are added to the caller's set.
+     * 
+     * @return The caller's set.
+     * 
+     *         TODO We might want to compile this information, and perhaps even
+     *         statistics about IBindingSet[] and put it on the [context]. Note
+     *         that the context does not currently have that information
+     *         available, but maybe it should.
+     */
+    public Set<IVariable<?>> getExogenousVars(final IBindingSet[] bindingSets,
+            final Set<IVariable<?>> vars) {
+
+        if (bindingSets == null)
+            return vars;
+
+        for (IBindingSet bset : bindingSets) {
+
+            @SuppressWarnings("rawtypes")
+            final Iterator<Map.Entry<IVariable, IConstant>> itr = bset
+                    .iterator();
+
+            while (itr.hasNext()) {
+
+                vars.add(itr.next().getKey());
+
+            }
+
+        }
+
+        return vars;
 
     }
 

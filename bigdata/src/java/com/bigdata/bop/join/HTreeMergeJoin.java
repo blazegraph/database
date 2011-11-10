@@ -41,22 +41,8 @@ import com.bigdata.htree.HTree;
 
 /**
  * An N-way merge join based on the {@link HTree}.
- * <p> 
- * For the {@link HTree}, the entries are in key order. Those keys are hash
- * codes computed from the solutions using the join variables. While this does
- * not change the fact that the {@link HTree} puts an order over the solutions,
- * there is a wrinkle as the hash code represents a collision bucket - a set of
- * solutions which have the same hash code. Thus we need to order the solutions
- * in each collision bucket. To do this, the iterator must advance until the key
- * changes, which signifies a new hash code and hence a new collision bucket.
- * The solutions in the last collision bucket must be placed into a total order
- * and delivered to the merge join algorithm in that total order.
  * 
- * TODO We could do the same thing with JVM hash indices. The
- * {@link JVMHashJoinUtility} explicitly models those collision buckets.
- * 
- * TODO Need to specify a {@link NamedSolutionSetRef}[] for this operator. This
- * makes it very {@link HTree} specific.
+ * TODO Need to specify a {@link NamedSolutionSetRef}[] for this operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -78,35 +64,39 @@ public class HTreeMergeJoin extends PipelineOp {
          * @see NamedSolutionSetRef
          * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
          */
-        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
+        String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
         
         /**
          * Constraints to be applied by the join (in addition to any associated
          * with the {@link HTreeHashJoinUtility} state in the
          * {@link #NAMED_SET_REF}).
          */
-        final String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
+        String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
         
-//        /**
-//         * When <code>true</code> the hash index identified by
-//         * {@link #NAMED_SET_REF} will be released when this operator is done
-//         * (default {@value #DEFAULT_RELEASE}).
-//         * <p>
-//         * Note: Whether or not the hash index can be released depends on
-//         * whether or not the hash index will be consumed by more than one
-//         * operator in the query plan. For example, a named solution set can be
-//         * consumed by more than one operator and thus must not be released
-//         * until all such operators are done.
-//         * 
-//         * TODO Alternatively, we could specify the #of different locations in
-//         * the query plan where the named solution set will be consumed. This
-//         * could be part of the {@link HTreeHashJoinUtility} state, in which
-//         * case it would only be set as an annotation on the operator which
-//         * generates the hash index.
-//         */
-//        final String RELEASE = HTreeSolutionSetHashJoinOp.class + ".release";
-//
-//        final boolean DEFAULT_RELEASE = true;
+        String OPTIONAL = JoinAnnotations.OPTIONAL;
+        
+        boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
+        
+        /**
+         * When <code>true</code> the hash index identified by
+         * {@link #NAMED_SET_REF} will be released when this operator is done
+         * (default {@value #DEFAULT_RELEASE}).
+         * <p>
+         * Note: Whether or not the hash index can be released depends on
+         * whether or not the hash index will be consumed by more than one
+         * operator in the query plan. For example, a named solution set can be
+         * consumed by more than one operator and thus must not be released
+         * until all such operators are done.
+         * 
+         * TODO Alternatively, we could specify the #of different locations in
+         * the query plan where the named solution set will be consumed. This
+         * could be part of the {@link HTreeHashJoinUtility} state, in which
+         * case it would only be set as an annotation on the operator which
+         * generates the hash index.
+         */
+        final String RELEASE = HTreeSolutionSetHashJoinOp.class + ".release";
+
+        final boolean DEFAULT_RELEASE = true;
         
     }
 

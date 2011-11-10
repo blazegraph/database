@@ -100,6 +100,12 @@ public class AST2BOpContext implements IdFactory {
     boolean nativeHashJoins = false;
     
     /**
+     * When <code>true</code>, a merge-join pattern will be recognized if it
+     * appears in a join group.
+     */
+    boolean mergeJoin = false;
+    
+    /**
      * When <code>true</code>, the projection of the query will be materialized
      * by an {@link ChunkedMaterializationOp} within the query plan unless a
      * LIMIT and/or OFFSET was specified. When <code>false</code>, the

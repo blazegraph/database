@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * Contains the projection clause, where clause, and solution modified clauses.
@@ -191,6 +193,30 @@ abstract public class QueryBase extends QueryNodeBase implements
         return (ProjectionNode) getProperty(Annotations.PROJECTION);
 
     }
+    
+    /**
+     * Return the set of variables projected by this query (this is a NOP if
+     * there is no {@link ProjectionNode} for the query, which can happen for an
+     * ASK query).
+     * 
+     * @param vars
+     *            The projected variables are added to this set.
+     * 
+     * @return The caller's set.
+     */
+    public Set<IVariable<?>> getProjectedVars(final Set<IVariable<?>> vars) {
+        
+        final ProjectionNode tmp = getProjection();
+        
+        if(tmp != null) {
+            
+            tmp.getProjectionVars(vars);
+            
+        }
+        
+        return vars;
+        
+    }
 
     /**
      * Set or clear the projection.
@@ -222,7 +248,7 @@ abstract public class QueryBase extends QueryNodeBase implements
      * @param whereClause
      *            The "WHERE" clause.
      */
-    @SuppressWarnings({ "rawtypes" })
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void setWhereClause(final GraphPatternGroup whereClause) {
 
         /*

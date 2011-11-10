@@ -27,13 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -45,6 +48,8 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -52,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -138,6 +144,9 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
+        final Set<IVariable<?>> exogenousVars = sa.getExogenousVars(
+                bindingSets, new LinkedHashSet<IVariable<?>>());
+
         // First, process any pre-existing named subqueries.
         {
             
@@ -148,7 +157,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
                 for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
 
-                    convertComplexOptionalGroups(context, sa, namedSubquery.getWhereClause());
+                    convertComplexOptionalGroups(context, sa, namedSubquery,
+                            namedSubquery.getWhereClause(), exogenousVars);
 
                 }
 
@@ -157,7 +167,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
         }
         
         // Now process the main where clause.
-        convertComplexOptionalGroups(context, sa, queryRoot.getWhereClause());
+        convertComplexOptionalGroups(context, sa, queryRoot,
+                queryRoot.getWhereClause(), exogenousVars);
 
         return queryNode;
 
@@ -171,7 +182,9 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
      */
     private void convertComplexOptionalGroups(final AST2BOpContext context,
             final StaticAnalysis sa,
-            final GraphPatternGroup<IGroupMemberNode> group) {
+            final QueryBase query,
+            final GraphPatternGroup<IGroupMemberNode> group,
+            final Set<IVariable<?>> exogenousVars) {
 
         final int arity = group.arity();
 
@@ -187,9 +200,11 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                  * Note: Do recursion *before* we do the rewrite.
                  */
 
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                convertComplexOptionalGroups(context, sa, childGroup);
+                convertComplexOptionalGroups(context, sa, query, childGroup,
+                        exogenousVars);
 
                 if (childGroup.isOptional()) {
                     /*
@@ -205,8 +220,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
                 final SubqueryRoot subqueryRoot = (SubqueryRoot) child;
 
-                convertComplexOptionalGroups(context, sa,
-                        subqueryRoot.getWhereClause());
+                convertComplexOptionalGroups(context, sa, query,
+                        subqueryRoot.getWhereClause(), exogenousVars);
 
             }
 
@@ -219,7 +234,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
              * complex optional group.
              */
             
-            convertJoinGroup(context, sa, (JoinGroupNode) group);
+            convertJoinGroup(context, sa, query, (JoinGroupNode) group,
+                    exogenousVars);
 
         }
         
@@ -228,21 +244,37 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
     /**
      * 1. Move the required joins (INCLUDEs, statement pattern nodes, and
      * required subqueries) plus any simple OPTIONALs (which are statement
-     * patter nodes) into a new named subquery.
+     * pattern nodes) into a new named subquery (unless the required joins are
+     * already a single INCLUDE).
      * <p>
      * 2. Lift each complex optional group into a new named subquery which
-     * INCLUDEs the result from (1), replacing it with an INCLUDE of the
-     * named subquery in this group.
+     * INCLUDEs the result from (1), replacing it with an INCLUDE of the named
+     * subquery in this group.
      * <p>
-     * Note: The named solution set from (1) is NOT directly INCLUDEd back
-     * into this join group. Instead, it is INCLUDEd into each the named
-     * subquery for each complex optional lifted out of this join group.
+     * Note: The named solution set from (1) is NOT directly INCLUDEd back into
+     * this join group. Instead, it is INCLUDEd into each the named subquery for
+     * each complex optional lifted out of this join group.
+     * 
+     * @param query
+     *            The (sub-)query in which the join group appears. We need to
+     *            know what is being projected out of the (sub-)query in order
+     *            to compute the projections when converting sub-groups into
+     *            subqueries.
+     * @param group
+     *            The join group to be rewritten.
+     * @param exogenousVars
+     *            The exogenous variables for the query.
      */
     private void convertJoinGroup(final AST2BOpContext context,
-            final StaticAnalysis sa, final JoinGroupNode group) {
+            final StaticAnalysis sa, final QueryBase query,
+            final JoinGroupNode group, final Set<IVariable<?>> exogenousVars) {
 
         /*
          * Step 1.
+         * 
+         * FIXME This MUST recognize the case where everything is already in a
+         * single INCLUDE, which is the post-condition for Step 1.  Test this
+         * by feeding the post-condition of this step into a unit test.
          */
         
         // The name of the solution set for this join group.
@@ -320,8 +352,52 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
             }
 
-            nsr.setProjection(sa.getProjection(whereClause));
+            /*
+             * Create the PROJECTION for the lifted named subquery.
+             * 
+             * Note: Everything which was lifted is no longer present in the
+             * WHERE clause. Thus, when computing the projection of the lifted
+             * subquery we want to project anything which appeared in the lifted
+             * where clause IF it is referenced again by those things which
+             * remain in the group (but paying attention to variable scoping for
+             * sub-queries).
+             * 
+             * TODO Make this projection DISTINCT if that does not change the
+             * query semantics.
+             */
+            {
 
+                // All variables which are used within the WHERE clause of the lifted named subquery.
+                final Set<IVariable<?>> groupVars = sa.getSpannedVariables(whereClause,
+                        new LinkedHashSet<IVariable<?>>());
+
+                // All variables still referenced in the joins or filters of
+                // the group (after extracting the named subquery).
+                final Set<IVariable<?>> afterVars = sa.getSpannedVariables(
+                        (BOp) group, new LinkedHashSet<IVariable<?>>());
+
+                if (query.getProjection() != null) {
+                    // Include anything that we must project out of the query.
+                    final ProjectionNode tmp = query.getProjection();
+                    tmp.getProjectionVars(afterVars);
+                }
+
+                final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
+                projectedVars.addAll(groupVars);
+                projectedVars.retainAll(afterVars);
+
+                final ProjectionNode projection = new ProjectionNode();
+
+                for (IVariable<?> v : projectedVars) {
+
+                    projection.addProjectionVar(new VarNode(v.getName()));
+
+                }
+
+                nsr.setProjection(projection);
+
+            }
+            
         }
 
         // Step 2 (for each direct child complex optional group).
@@ -339,17 +415,45 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final JoinGroupNode whereClause = new JoinGroupNode();
             nsr.setWhereClause(whereClause);
 
-            whereClause.addChild(new NamedSubqueryInclude(mainSolutionSetName));
+            final NamedSubqueryInclude mainInclude = new NamedSubqueryInclude(
+                    mainSolutionSetName);
+
+            whereClause.addChild(mainInclude);
 
             // Replace the complex optional group with an INCLUDE of the
             // generated solution set back into the main query.
-            if (group.replaceWith(childGroup, new NamedSubqueryInclude(
-                    solutionSetName)) != 1)
+
+            final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
+                    solutionSetName);
+            
+            if (group.replaceWith(childGroup, anInclude) != 1)
                 throw new AssertionError();
 
             whereClause.addChild(childGroup);
 
-            nsr.setProjection(sa.getProjection(whereClause));
+            /*
+             * Create the projection for the named subquery.
+             * 
+             * TODO Make this projection DISTINCT if that does not change the
+             * query semantics.
+             */
+            {
+
+                final Set<IVariable<?>> projectedVars = sa.getProjectedVars(
+                        anInclude, whereClause, query, exogenousVars,
+                        new LinkedHashSet<IVariable<?>>());
+
+                final ProjectionNode projection = new ProjectionNode();
+
+                for (IVariable<?> v : projectedVars) {
+
+                    projection.addProjectionVar(new VarNode(v.getName()));
+
+                }
+
+                nsr.setProjection(projection);
+
+            }
 
         }
         

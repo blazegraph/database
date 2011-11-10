@@ -358,7 +358,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * </pre>
          * 
          * 
-         * ASTPruneUnknownTerms : If an unknown terms appears in a
+         * ASTUnknownTermOptimizer: If an unknown terms appears in a
          * StatementPatternNode then we get to either fail the query or prune
          * that part of the query. If it appears in an optional, then prune the
          * optional. if it appears in union, the prune that part of the union.
@@ -369,10 +369,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * will throw an UnknownValueException if the term is not known to the
          * database.
          * 
-         * FIXME Isolate pruning logic since we need to use it in more than one
-         * place.
+         * FIXME Mike started on this, but it is not yet finished.
          */
-//        add(new ASTUnknownIVOptimizer()); // FIXME
+//        add(new ASTUnknownTermOptimizer());
         
         /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
@@ -389,6 +388,10 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSimpleOptionalOptimizer());
 
+        /*
+         * Join Order Optimization
+         */
+        
         /**
          * Rearranges the children in group nodes in order to put the same types
          * of join nodes together. It also puts the type groups into the order
@@ -404,6 +407,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTStaticJoinOptimizer());
 
+        /*
+         * The joins are now ordered. Everything from here down MUST NOT change
+         * the join order when making changes to the join groups and MAY rely on
+         * the join order to make decisions about filter attachment, whether a
+         * variable will be needed outside of a sub-group context, etc.
+         */
+        
         /**
          * Optimizer attaches FilterNodes which will run as "join filters" to
          * StatementPatternNodes.
@@ -411,16 +421,42 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTAttachJoinFiltersOptimizer());
         
         /**
-         * Rewrite a join group having complex optionals using a hash join
-         * pattern as a named subquery.
+         * Rewrite each join group having two or more complex optionals as named
+         * subqueries. This optimizer proceeds in two steps.
          * 
-         * Note: Complex optionals are handled using a hash join pattern even
-         * without this optimizer, but they are not lifted into named subqueries
-         * unless this optimizer runs.
+         * (1) Any required joins before the first such complex optional are
+         * lifted out into a single named subquery.
          * 
-         * TODO Validate that using this optimizer provides a performance
-         * advantage over complex optionals run as sub-groups using a hash join
-         * pattern, which is what happens if we do not run this optimizer.
+         * (2) Each complex optional is then turned into a named subquery. Any
+         * intermediate variables used solely within the complex optional group
+         * are NOT projected out of the named subquery (variable pruning).
+         * 
+         * Each such named subquery will INCLUDE either
+         * 
+         * (a) the named subquery lifted out in step (1) (if the complex
+         * optionals are independent)
+         * 
+         * -or-
+         * 
+         * (b) the result of the previous named subquery (if they complex
+         * optionals must be fed into one another).
+         * 
+         * FIXME Only (b) is currently implemented. (a) is what gives us the
+         * MERGE JOIN.
+         * 
+         * FIXME This could be modified to lift any complex group. As long as
+         * those groups are independent we can do a merge join. As long as they
+         * are dependent we can feed them into one another.
+         * 
+         * FIXME Simple optionals for queries which otherwise satisify the
+         * criteria outlined above MUST NOT be lifted out if we want to do a
+         * MERGE-JOIN.
+         * 
+         * Note: Sub-groups, including complex optionals, are handled using a
+         * hash join pattern even without this optimizer, but they are not
+         * lifted into named subqueries unless this optimizer runs and
+         * intermediate variables used solely during the complex optional group
+         * are not eliminated from the query.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
          */
@@ -429,7 +465,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Rewrites join groups having one or more joins which would involve a
          * full cross product as hash joins of sub-groups. This handles queries
-         * such as BSBM Q5.
+         * such as BSBM Q5 by, in effect, "pushing down" sub-groups.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/253
          * 
@@ -439,9 +475,67 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          *      the static optimizer into an AST rewrite)
          */
 //        add(new ASTHashJoinOptimizer());
+
+//        /**
+//         * Recognizes cases where intermediate variables are not required
+//         * outside of a group and rewrites the group into a subquery having a
+//         * projection which does not include the intermediate variables.
+//         * 
+//         * Note: The sub-group and sub-query evaluation plans are nearly
+//         * identical (they are both based on building a hash index, flooding the
+//         * sub-group/query with the solutions from the hash index, and then
+//         * joining the solutions from the sub-group/query back against the hash
+//         * index). The advantage of turning the group into a sub-query is that
+//         * we can eliminate variables using the projection of the subquery. So,
+//         * the subquery is used simply for the added flexibility rather than
+//         * extending the AST to allow a PROJECTION for a sub-group.
+//         * 
+//         * TODO There is a lot of overlap with the ASTHashJoinOptimizer. That
+//         * optimizer is responsible for creating sub-groups when there are
+//         * intermediate variables in a join group which could be eliminated if
+//         * we move some of the joins into a subgroup and then rewrite the
+//         * subgroup as a subquery in which the intermediate variables are not
+//         * projected out of the subquery.
+//         */
+////        add(new ASTSubgroupProjectionOptimizer());
+//
+//        /**
+//         * Recognizes a join group having a series of subgroup(s), subquery(s),
+//         * and/or INCLUDEs which share the same join variables and rewrites the
+//         * query to use a N-Way MERGE JOIN.
+//         * 
+//         * Any subgroup or SPARQL 1.1 subquery must be converted into a named
+//         * subquery, resulting in a series of INCLUDEs. The INCLUDEs are then
+//         * rewritten into a single N-way INCLUDE, which is then evaluated using
+//         * a MERGE JOIN operator.
+//         * 
+//         * The N-Way MERGE JOIN critically depends on the hash index solution
+//         * sets created by the named subqueries. The first named solution set
+//         * 
+//         * TODO One of the tricky bits is managing the changes to the query plan
+//         * once the static join optimizer has given us a decent join ordering.
+//         * We could probably make the static join optimizer more robust by
+//         * modifying it to process a "flattened" join group, in which SPs are 
+//         * lifted up from child groups and subqueries.  (This is possible unless
+//         * the subquery uses some aggregation mechanisms, SLICE, etc.).
+//         * 
+//         * TODO Complex optionals are already rewritten into named subqueries by
+//         * the ASTComplexOptimalOptimizer (above). The same logic could be used
+//         * to rewrite a complex non-optional sub-group.
+//         * 
+//         * TODO In fact, we could just recognize the series of INCLUDEs and use
+//         * the MERGE JOIN operator, but I like making this explicit in the AST.
+//         * (The only reason why we would need to have this be an explicit
+//         * rewrite is if there were SPARQL 1.1 subqueries involved rather than
+//         * named subqueries.)
+//         * 
+//         * TODO This might need to run after the ASTSubGroupJoinVarOptimizer.
+//         */
+////        add(new ASTMergeJoinOptimizer());
         
         /**
-         * Lift {@link SubqueryRoot}s into named subqueries when appropriate.
+         * Lift {@link SubqueryRoot}s into named subqueries when appropriate or
+         * necessary.
          */
         add(new ASTSparql11SubqueryOptimizer());
 
@@ -449,6 +543,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Validates named subquery / include patterns, identifies the join
          * variables, and annotates the named subquery root and named subquery
          * include with those join variables.
+         * 
+         * TODO This should probably recognize the pattern of INCLUDEs which
+         * licenses a MERGE JOIN. Or we can just do that when we generate the
+         * query plan (might be simpler since we do not have to mess with the
+         * INCLUDE AST).
          */
         add(new ASTNamedSubqueryOptimizer());
         
@@ -456,15 +555,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Identify and assign the join variables to sub-groups.
          */
         add(new ASTSubGroupJoinVarOptimizer());
-        
-        /**
-         * TODO Add an AST optimizer which prunes out out unnecessary variables
-         * from the named and SPARQL 1.1 subquery projections. The optimizer
-         * should also cause variables to be dropped from the query plan once
-         * their bound values will no longer be utilized. The main impact of
-         * this optimizer will be on the heap and NIO traffic.
-         */
-//        add(new ASTPruneVariablesOptimizer());
         
     }
 
