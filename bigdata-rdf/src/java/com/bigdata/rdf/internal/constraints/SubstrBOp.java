@@ -105,7 +105,7 @@ public class SubstrBOp extends AbstractLiteralBOp {
 
         String label = lit.getLabel();
 
-        if (arity() > 2) {
+        if (arity() > 2 && get(2) != null) {
 
             /*
              * substr(start,length)
@@ -113,15 +113,17 @@ public class SubstrBOp extends AbstractLiteralBOp {
 
             final IV lengthArg = get(2).get(bs);
 
-            final int length = Math.min(label.length(),
-                    (int) Math.round(literalValue(lengthArg).doubleValue()));
+//            final int length = Math.min(label.length(),
+//                    (int) Math.round(literalValue(lengthArg).doubleValue()));
 
+            final int length = (int) Math.round(literalValue(lengthArg).doubleValue());
+            
             label = label
-                    .substring(start - 1/* origin zero for Java */, length);
+                    .substring(start, Math.min(label.length(), start+length));
 
         } else {
 
-            label = label.substring(start - 1/* origin zero for Java */);
+            label = label.substring(start);
 
         }
 

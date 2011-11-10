@@ -237,8 +237,26 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         }
 
-        return new FunctionNode(FunctionRegistry.COALESCE,
-                null/* scalarValues */, args);
+        if (functionURI.equals(FunctionRegistry.COALESCE)) {
+        	
+		    return new FunctionNode(FunctionRegistry.COALESCE,
+		            null/* scalarValues */, args);
+		    
+        } else if (functionURI.equals(FN.SUBSTRING)) {
+        	
+		    return new FunctionNode(FunctionRegistry.SUBSTR,
+		            null/* scalarValues */, args);
+		    
+        } else if (functionURI.equals(FN.CONCAT)) {
+        	
+		    return new FunctionNode(FunctionRegistry.CONCAT,
+		            null/* scalarValues */, args);
+		    
+        } else {
+        	
+        	throw new IllegalArgumentException();
+        	
+        }
 
     }
 

@@ -20,6 +20,7 @@ import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
+import com.bigdata.rdf.internal.constraints.BNodeBOp;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.ComputedIN;
@@ -35,6 +36,7 @@ import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.internal.constraints.FuncBOp;
 import com.bigdata.rdf.internal.constraints.IfBOp;
 import com.bigdata.rdf.internal.constraints.InHashBOp;
+import com.bigdata.rdf.internal.constraints.IriBOp;
 import com.bigdata.rdf.internal.constraints.IsBNodeBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.IsLiteralBOp;
@@ -55,8 +57,10 @@ import com.bigdata.rdf.internal.constraints.SameTermBOp;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.internal.constraints.StrBOp;
 import com.bigdata.rdf.internal.constraints.StrdtBOp;
+import com.bigdata.rdf.internal.constraints.StrendsBOp;
 import com.bigdata.rdf.internal.constraints.StrlangBOp;
 import com.bigdata.rdf.internal.constraints.StrlenBOp;
+import com.bigdata.rdf.internal.constraints.StrstartsBOp;
 import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
@@ -481,13 +485,19 @@ public class FunctionRegistry {
                 final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
                         lex, args[0]);
 
-                final IValueExpression<? extends IV> start = AST2BOpUtility
-                        .toVE(lex, args[1]);
-                
-                final IValueExpression<? extends IV> length = args.length >= 2 ? AST2BOpUtility
-                        .toVE(lex, args[2]) : null;
-                
-                return new SubstrBOp(var, start, length, lex);
+//                if (args.length == 2) {
+//                	
+//                } else {
+                	
+	                final IValueExpression<? extends IV> start = AST2BOpUtility
+	                        .toVE(lex, args[1]);
+	                
+	                final IValueExpression<? extends IV> length = args.length >= 3 ? AST2BOpUtility
+	                        .toVE(lex, args[2]) : null;
+	                
+	                return new SubstrBOp(var, start, length, lex);
+	                
+//                }
 
             }
         });
@@ -673,6 +683,77 @@ public class FunctionRegistry {
 			}
 		});
 
+		add(IRI,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class);
+
+//                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+                return new IriBOp(ve, lex);
+
+            }
+        });
+
+		add(BNODE,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+            	if (args.length == 0) {
+            		
+            		return new BNodeBOp(lex);
+            		
+            	} else {
+                
+            		checkArgs(args, ValueExpressionNode.class);
+
+//                final IValueExpression<? extends IV> var = args[0].getValueExpression();
+	                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+	
+	                return new BNodeBOp(ve, lex);
+
+            	}
+            	
+            }
+            
+        });
+
+		add(STARTS_WITH,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                        lex, args[0]);
+                
+                final IValueExpression<? extends IV> token = AST2BOpUtility
+                        .toVE(lex, args[1]);
+	                
+                return new StrstartsBOp(var, token, lex);
+	                
+            }
+        });
+		
+		add(ENDS_WITH,new Factory() {
+            public IValueExpression<? extends IV> create(final String lex,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
+
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                        lex, args[0]);
+                
+                final IValueExpression<? extends IV> token = AST2BOpUtility
+                        .toVE(lex, args[1]);
+	                
+                return new StrendsBOp(var, token, lex);
+	                
+            }
+        });
+		
 		add(IN, new InFactory(false/*not*/));
 
         add(NOT_IN, new InFactory(true/*not*/));
@@ -751,6 +832,8 @@ public class FunctionRegistry {
 
         add(NOT_EXISTS, new ExistsFactory(false));
 
+        
+        
     }
 
     public static boolean containsFunction(URI functionUri){
