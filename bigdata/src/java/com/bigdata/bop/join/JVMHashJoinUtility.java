@@ -958,6 +958,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     otherBucket = sortedSourceBuckets[i][j];
                 }
 
+                if (otherBucket == null) {
+                	assert optional;
+                    currentBucket[i] = null;
+                	break;
+                }
+                
                 if (otherBucket.hashCode < hashCode) {
 
                     sourceIndex[i]++;
@@ -1151,10 +1157,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
 			}
 
-            // Must be the same hash code.
-            if (firstBucket.hashCode != otherBucket.hashCode) {
-                throw new AssertionError();
-            }
+			// Must be the same hash code.
+			assert firstBucket.hashCode == otherBucket.hashCode;
 
 		}
 
@@ -1201,20 +1205,19 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 		while (sols1.hasNext()) {
 			sols1.next();
             IBindingSet in = set[0].solution;
-//            log.error("Set 0: " + in);
             for (int i = 1; i < set.length; i++) {
 
-//                log.error("Set " + i + ": " + set[i]==null?"N/A":set[i].solution);
-                // See if the solutions join.
-                if(set[i]!=null) {
-                in = //
+                // See if the solutions join. 
+            	if (set[i] != null) {
+                in = 
                 BOpContext.bind(//
                 		in,// 
                         set[i].solution,// 
                         constraints,//
                         null//
                         );
-                }
+            	}
+
                 if (in == null) {
                     // Join failed.
                     continue;
@@ -1225,12 +1228,16 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
             }
             // Accept this binding set.
+			// FIXME Output solutions which join. (apply constraints).
             if (in != null) {
-//            	log.error(in.toString());
             	outputBuffer.add(in);
             }
+            
+            // now clear set!
+            for (int i = 1; i < set.length; i++) {
+            	set[i] = null;
+            }
 		}
-		// FIXME Output solutions which join. (apply constraints).
 
 	}
 

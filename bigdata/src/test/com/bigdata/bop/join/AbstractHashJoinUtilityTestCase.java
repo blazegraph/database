@@ -1163,6 +1163,271 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             
         }
         
+    }    
+    
+    /**
+     * Test with more than 2 join sets.
+     */
+    public void test_mergeJoin03_nonOpt() {
+    	mergeJoin03(false);
+    }
+    
+    public void test_mergeJoin03_opt() {
+    	mergeJoin03(true);
+    }
+    
+    public void mergeJoin03(final boolean optional) {
+        final JoinSetup setup = new JoinSetup(getName());
+
+        final IVariable<?> a = Var.var("a");
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        final IVariable<?> z = Var.var("z");
+        
+        // The join variables. This must be the same for each source.
+        final IVariable<?>[] joinVars = new IVariable[]{a};
+
+        // The variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;
+        
+        // The join constraints.
+        final IConstraint[] constraints = null;
+
+        /**
+         * Setup the solutions for [first].
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] firstSolutions = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.mary) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.leon) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.fred),
+                                          new Constant<IV>(setup.leon) }//
+                )//
+        };
+        assertEquals(3,firstSolutions.length);
+
+        /**
+         * Setup the source solutions for [other].
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] otherSolutions = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { a, y },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.brad) }//
+                ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, y },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.fred) }//
+                )
+        };
+        assertEquals(2,otherSolutions.length);
+        
+        /**
+         * Setup the source solutions for [other].
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] moreSolutions = new IBindingSet[] {
+                new ListBindingSet(//
+                        new IVariable[] { a, z },//
+                        new IConstant[] { new Constant<IV>(setup.john),
+                                          new Constant<IV>(setup.mary) }//
+                ),//
+        };
+        assertEquals(1,moreSolutions.length);
+        
+        /**
+         * The expected solutions to the join.
+         * 
+         * The source solutions are:
+         * <pre>
+         * (?a,     ?x)   (?a,     ?y)   (?a,     ?z)
+         * (john, mary)   (john, brad)   (john, mary)// many-to-many join
+         * (john, leon)   (john, fred) 
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected;
+        if (optional) {
+	        	expected = new IBindingSet[] {//
+	            // many-to-many join
+	            new ListBindingSet(//
+	                    new IVariable[] { a, x, y, z },//
+	                    new IConstant[] { new Constant<IV>(setup.john),
+	                                      new Constant<IV>(setup.mary),
+	                                      new Constant<IV>(setup.brad),
+	                                      new Constant<IV>(setup.mary)}//
+	            ),//
+	            new ListBindingSet(//
+	                    new IVariable[] { a, x, y, z },//
+	                    new IConstant[] { new Constant<IV>(setup.john),
+	                                      new Constant<IV>(setup.mary),
+	                                      new Constant<IV>(setup.fred),
+	                                      new Constant<IV>(setup.mary)}//
+	            ),//
+	            new ListBindingSet(//
+	                    new IVariable[] { a, x, y, z },//
+	                    new IConstant[] { new Constant<IV>(setup.john),
+	                                      new Constant<IV>(setup.leon),
+	                                      new Constant<IV>(setup.brad),
+	                                      new Constant<IV>(setup.mary)}//
+	            ),//
+	            new ListBindingSet(//
+	                    new IVariable[] { a, x, y, z },//
+	                    new IConstant[] { new Constant<IV>(setup.john),
+	                                      new Constant<IV>(setup.leon),
+	                                      new Constant<IV>(setup.fred),
+	                                      new Constant<IV>(setup.mary)}//
+	            ),//
+                new ListBindingSet(//
+                        new IVariable[] { a, x },//
+                        new IConstant[] { new Constant<IV>(setup.fred),
+                                          new Constant<IV>(setup.leon)})
+	        };
+        } else {
+        	expected = new IBindingSet[] {//
+                    // many-to-many join
+                    new ListBindingSet(//
+                            new IVariable[] { a, x, y, z },//
+                            new IConstant[] { new Constant<IV>(setup.john),
+                                              new Constant<IV>(setup.mary),
+                                              new Constant<IV>(setup.brad),
+                                              new Constant<IV>(setup.mary)}//
+                    ),//
+                    new ListBindingSet(//
+                            new IVariable[] { a, x, y, z },//
+                            new IConstant[] { new Constant<IV>(setup.john),
+                                              new Constant<IV>(setup.mary),
+                                              new Constant<IV>(setup.fred),
+                                              new Constant<IV>(setup.mary)}//
+                    ),//
+                    new ListBindingSet(//
+                            new IVariable[] { a, x, y, z },//
+                            new IConstant[] { new Constant<IV>(setup.john),
+                                              new Constant<IV>(setup.leon),
+                                              new Constant<IV>(setup.brad),
+                                              new Constant<IV>(setup.mary)}//
+                    ),//
+                    new ListBindingSet(//
+                            new IVariable[] { a, x, y, z },//
+                            new IConstant[] { new Constant<IV>(setup.john),
+                                              new Constant<IV>(setup.leon),
+                                              new Constant<IV>(setup.fred),
+                                              new Constant<IV>(setup.mary)}//
+                    )
+                };
+        }
+
+        IHashJoinUtility first = null;
+        IHashJoinUtility other = null;
+        IHashJoinUtility more = null;
+        try {
+
+            // Setup a mock PipelineOp for the test.
+            final PipelineOp firstOp = new MockPipelineOp(BOp.NOARGS, 
+                    new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                            new String[] { getName() }),//
+                    new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                    new NV(JoinAnnotations.SELECT, selectVars)//
+//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    );
+
+            // Setup a mock PipelineOp for the test.
+            final PipelineOp otherOp = new MockPipelineOp(BOp.NOARGS, 
+                    new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                            new String[] { getName() }),//
+                    new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                    new NV(JoinAnnotations.SELECT, selectVars)//
+//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    );
+
+            // Setup a mock PipelineOp for the test.
+            final PipelineOp moreOp = new MockPipelineOp(BOp.NOARGS, 
+                    new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                            new String[] { getName() }),//
+                    new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
+                    new NV(JoinAnnotations.SELECT, selectVars)//
+//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    );
+
+            first = newHashJoinUtility(firstOp, optional, false/* filter */);
+
+            other = newHashJoinUtility(otherOp, optional, false/* filter */);
+
+            more = newHashJoinUtility(otherOp, optional, false/* filter */);
+
+            // Load into [first].
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                first.acceptSolutions(new Chunkerator<IBindingSet>(Arrays
+                        .asList(firstSolutions).iterator()), stats);
+
+                assertEquals(firstSolutions.length, first.getRightSolutionCount());
+
+                assertEquals(firstSolutions.length, stats.unitsIn.get());
+
+            }
+            
+            // Load into [other].
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                other.acceptSolutions(new Chunkerator<IBindingSet>(Arrays
+                        .asList(otherSolutions).iterator()), stats);
+
+                assertEquals(otherSolutions.length, other.getRightSolutionCount());
+
+                assertEquals(otherSolutions.length, stats.unitsIn.get());
+
+            }
+
+            // Load into [more].
+            {
+
+                final BOpStats stats = new BOpStats();
+
+                more.acceptSolutions(new Chunkerator<IBindingSet>(Arrays
+                        .asList(moreSolutions).iterator()), stats);
+
+                assertEquals(moreSolutions.length, more.getRightSolutionCount());
+
+                assertEquals(moreSolutions.length, stats.unitsIn.get());
+
+            }
+
+            // Do the merge join and verify the expected solutions.
+            doMergeJoinTest(constraints, expected, optional, first, other, more);
+
+        } finally {
+
+            if (first != null) {
+                first.release();
+            }
+
+            if (other != null) {
+                other.release();
+            }
+            
+            if (more != null) {
+                more.release();
+            }
+            
+        }
+        
     }
     
     /**
@@ -1192,6 +1457,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         first.mergeJoin(others, outputBuffer, constraints, optional);
         
         // Verify the expected solutions.
+        assertEquals(expected.length, outputBuffer.size());
         assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
         
     }
