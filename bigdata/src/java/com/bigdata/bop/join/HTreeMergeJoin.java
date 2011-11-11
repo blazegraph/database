@@ -39,8 +39,8 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.join.JVMMergeJoin.Annotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -59,16 +59,7 @@ public class HTreeMergeJoin extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends AccessPathJoinAnnotations,
-            HTreeHashJoinAnnotations {
-
-        /**
-         * The {@link NamedSolutionSetRef}[] used to locate the named solution
-         * sets.  There must be at least 2 entries in the array.
-         * 
-         * @see NamedSolutionSetRef
-         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
-         */
-        String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
+            HTreeHashJoinAnnotations, NamedSetAnnotations {
         
         /**
          * Constraints to be applied by the join (in addition to any associated

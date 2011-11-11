@@ -18,6 +18,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
@@ -102,8 +103,12 @@ public class AST2BOpContext implements IdFactory {
     /**
      * When <code>true</code>, a merge-join pattern will be recognized if it
      * appears in a join group.
+     * 
+     * FIXME {@link ASTSimpleOptionalOptimizer} currently looks at this field
+     * and will not run when it is set. Even simple optional groups should be
+     * turned into named subqueries when we expect to do a MERGE JOIN.
      */
-    boolean mergeJoin = false;
+    public boolean mergeJoin = false;
     
     /**
      * When <code>true</code>, the projection of the query will be materialized

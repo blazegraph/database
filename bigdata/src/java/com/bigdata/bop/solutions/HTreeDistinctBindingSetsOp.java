@@ -12,10 +12,9 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
@@ -55,18 +54,18 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
 	public interface Annotations extends PipelineOp.Annotations,
-			HTreeAnnotations, DistinctAnnotations {
+			HTreeAnnotations, DistinctAnnotations, NamedSetAnnotations {
 
-        /**
-         * The name of {@link IQueryAttributes} attribute under which the
-         * {@link HTreeHashJoinState} for this operator is stored. The attribute
-         * name includes the query UUID. The query UUID must be extracted and
-         * used to lookup the {@link IRunningQuery} to which the solution set
-         * was attached.
-         * 
-         * @see NamedSolutionSetRef
-         */
-        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
+//        /**
+//         * The name of {@link IQueryAttributes} attribute under which the
+//         * {@link HTreeHashJoinState} for this operator is stored. The attribute
+//         * name includes the query UUID. The query UUID must be extracted and
+//         * used to lookup the {@link IRunningQuery} to which the solution set
+//         * was attached.
+//         * 
+//         * @see NamedSolutionSetRef
+//         */
+//        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
 	}
 

@@ -82,18 +82,19 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends SubqueryAnnotations, HTreeHashJoinAnnotations {
+    public interface Annotations extends SubqueryAnnotations,
+            HTreeHashJoinAnnotations, NamedSetAnnotations {
 
-        /**
-         * The name of {@link IQueryAttributes} attribute under which the
-         * subquery solution set is stored (a {@link HTreeHashJoinState}
-         * reference). The attribute name includes the query UUID. The query
-         * UUID must be extracted and used to lookup the {@link IRunningQuery}
-         * to which the solution set was attached.
-         * 
-         * @see NamedSolutionSetRef
-         */
-        final String NAMED_SET_REF = "namedSetRef";
+//        /**
+//         * The name of {@link IQueryAttributes} attribute under which the
+//         * subquery solution set is stored (a {@link HTreeHashJoinState}
+//         * reference). The attribute name includes the query UUID. The query
+//         * UUID must be extracted and used to lookup the {@link IRunningQuery}
+//         * to which the solution set was attached.
+//         * 
+//         * @see NamedSolutionSetRef
+//         */
+//        final String NAMED_SET_REF = "namedSetRef";
         
     }
 
