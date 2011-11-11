@@ -1163,11 +1163,13 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 		}
 
 		final SolutionHit[] set = new SolutionHit[nsources];
-		Striterator sols1 = new Striterator(firstBucket.solutions
+		
+		final Striterator sols1 = new Striterator(firstBucket.solutions
 				.listIterator());
+		
 		sols1.addFilter(new Visitor() {
-
-			@Override
+            private static final long serialVersionUID = 1L;
+            @Override
 			protected void visit(Object obj) {
 				set[0] = (SolutionHit) obj;
 			}
@@ -1184,17 +1186,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 			// expand further
 			if (!(optional && (otherBucket == null || otherBucket.solutions.isEmpty()))) {
 				sols1.addFilter(new Expander() {
-	
-					@Override
-					protected Iterator expand(Object obj) {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+					protected Iterator<?> expand(final Object obj) {
 						return otherBucket.iterator();
 					}
 	
 				});
 				sols1.addFilter(new Visitor() {
-	
-					@Override
-					protected void visit(Object obj) {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+					protected void visit(final Object obj) {
 						set[slot] = (SolutionHit) obj;
 					}
 	
@@ -1213,7 +1215,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 BOpContext.bind(//
                 		in,// 
                         set[i].solution,// 
-                        constraints,//
+                        constraints,// TODO constraint[][]
                         null//
                         );
             	}
@@ -1227,16 +1229,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     log.debug("Output solution: " + in);
 
             }
+
             // Accept this binding set.
-			// FIXME Output solutions which join. (apply constraints).
             if (in != null) {
             	outputBuffer.add(in);
             }
             
-            // now clear set!
-            for (int i = 1; i < set.length; i++) {
-            	set[i] = null;
-            }
+//            // now clear set!
+//            for (int i = 1; i < set.length; i++) {
+//            	set[i] = null;
+//            }
+
 		}
 
 	}
