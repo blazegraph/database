@@ -1963,7 +1963,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 				constraints, all);
 
 		/*
-		 * Synchronize each source.
+		 * MERGE JOIN
 		 * 
 		 * We follow the iterator on the first source. For each hash code which
 		 * it visits, we synchronize iterators against the remaining sources. If
@@ -1972,90 +1972,107 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 		 * any source lacks tuples for the current hash code.
 		 */
 		long njoined = 0, nrejected = 0;
-		final HTree root = getRightSolutions();
-		final ITupleIterator<?> itr = root.rangeIterator();
 		{
-			/*
-			 * Note: Initialized by the first tuple we visit. Updated each time
-			 * we finish joining that solution against all solutions having the
-			 * same hash code for all of the other sources.
-			 */
-			// int hashCode = 0;
-			// ITuple<?> t = null;
-			final byte[] key = new byte[Bytes.SIZEOF_INT];
-			final ITupleIterator<?>[] oitr = new ITupleIterator[all.length];
-			copyKey(root.rangeIterator().next(), key);
 
-			/*
-			 * MERGE JOIN
-			 * 
-			 * Note: At this point we have a solution which might join with the
-			 * other sources (they all have the same hash code). We can now
-			 * decode the solution from the first source and ...
-			 * 
-			 * FIXME Must vector the resolution of the ivCache / blobsCache for
-			 * the output solutions.
-			 */
+            // if optional then if there are no solutions don't try and
+            // expand further, we need a place-holder object
+            final Object NULL_VALUE = "NULL";
 
+            final int nsources = all.length;
+            
+            final ITuple<?>[] set = new ITuple<?>[nsources + 1];
 
-			final int nsources = all.length;
-			final ITuple<?>[] set = new ITuple<?>[nsources+1];
-			Striterator sols1 = new Striterator(all[0].getRightSolutions()
+            // Visit everything in the first source.
+			final Striterator sols0 = new Striterator(all[0].getRightSolutions()
 					.rangeIterator());
-			sols1.addFilter(new Visitor() {
+			{
 
-				@Override
-				protected void visit(Object obj) {
-					set[0] = (ITuple<?>) obj;
-				}
+			    sols0.addFilter(new Visitor() {
+                    private static final long serialVersionUID = 1L;
+                    /**
+                     * Set the tuple for the first source each time it advances.
+                     * 
+                     * @param obj
+                     *            The tuple.
+                     */
+                    @Override
+                    protected void visit(final Object obj) {
+                        set[0] = (ITuple<?>) obj;
+                    }
 
-			});
+                });
 
-			// Setup each source.
-			// Just do it the long way at first
-            // copyKey(t,key); // Make a copy of that key.
-			// synchronizeOtherSources(key, all, oitr, 1/* index */, optional);
+                // now add in Expanders and Visitors for each remaining source.
+                for (int i = 1; i < nsources; i++) {
+                    // Final variables used inside inner classes.
+                    final int slot = i;
+                    final HTree thisTree = all[slot].getRightSolutions();
 
-			// now add in Expanders and Visitors for each Bucket
-			for (int i = 1; i < nsources; i++) {
-				// A bucket having the same hash code for another source.
-				final int slot = i;
-				final HTree thisTree = all[slot].getRightSolutions();
-
-				// if optional then if there are no solutions don't try and
-				// expand further, we need a place-holder object
-				final Object NULL_VALUE = "NULL";
-				if (true /*|| !(optional && (sol == null || !sol.hasNext()))*/) {
-					sols1.addFilter(new Expander() {
-
+					sols0.addFilter(new Expander() {
+	                    private static final long serialVersionUID = 1L;
+                        /**
+                         * Expansion pattern gives solutions for source @ slot.
+                         * 
+                         * @param obj
+                         *            The tuple in set[slot-1].
+                         */
 						@Override
-						protected Iterator expand(final Object obj) {
+						protected Iterator<?> expand(final Object obj) {
 							if (obj == NULL_VALUE) {
 								assert optional;
 								return new SingleValueIterator(NULL_VALUE);
 							}
-							final Iterator ret = thisTree.lookupAll(((ITuple) obj).getKey());
+							// Sync itr for this source to key for prior src.
+							final byte[] key2 = ((ITuple<?>) obj).getKey();
+							final ITupleIterator<?> ret = thisTree.lookupAll(key2);
 							if (optional && !ret.hasNext()) {
+                                /*
+                                 * Nothing for that key from this source. Return
+                                 * a single marker value so we can proceed to
+                                 * the remaining sources rather than halting.
+                                 */
 								return new SingleValueIterator(NULL_VALUE);
 							} else {
+                                /*
+                                 * Iterator visiting solutions from this source
+                                 * for the current key in the prior source.
+                                 */
 								return ret;
 							}
 						}
 
 					});
-					sols1.addFilter(new Visitor() {
 
+					sols0.addFilter(new Visitor() {
+	                    private static final long serialVersionUID = 1L;
+                        /**
+                         * Assign tuple to set[slot].
+                         * 
+                         * Note: If [obj==NULL_VALUE] then no solutions for that
+                         * slot.
+                         */
 						@Override
 						protected void visit(final Object obj) {
 							set[slot] = (ITuple<?>) (obj == NULL_VALUE ? null : obj);
 						}
 
 					});
-				}
-			}
+			    }
+			} // end of striterator setup.
 
-			while (sols1.hasNext()) {
-				sols1.next();
+            /*
+             * This will visit after all expansions. That means that we will
+             * observe the cross product of the solutions from the remaining
+             * sources having the same hash for each from the first source.
+             * 
+             * Each time we visit something, set[] is the tuple[] which
+             * describes a specific set of solutions from that cross product.
+             * 
+             * TODO Lift out the decodeSolution() for all slots into the
+             * expander pattern.
+             */
+			while (sols0.hasNext()) {
+				sols0.next();
 				IBindingSet in = all[0].decodeSolution(set[0]);
 				for (int i = 1; i < set.length; i++) {
 
@@ -2065,7 +2082,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 						in = BOpContext.bind(//
 								in,// 
 								right,// 
-								constraints,//
+								c,// TODO constraint[][]
 								null//
 								);
 					}
@@ -2077,17 +2094,18 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
 				}
 				// Accept this binding set.
-				// FIXME Output solutions which join. (apply constraints).
 				if (in != null) {
 					if (log.isDebugEnabled())
 						log.debug("Output solution: " + in);
+					// FIXME Vector resolution of ivCache.
 					outputBuffer.add(in);
 				}
 
-				// now clear set!
-				for (int i = 1; i < set.length; i++) {
-					set[i] = null;
-				}
+//				// now clear set!
+//				for (int i = 1; i < set.length; i++) {
+//					set[i] = null;
+//				}
+				
 			}
 
 		}
