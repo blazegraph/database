@@ -929,6 +929,35 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     }
 
     /**
+     * Return the {@link RunStateEnum} for an operator.
+     * 
+     * @param bopId
+     *            The operator.
+     *            
+     * @return It's {@link RunStateEnum}.
+     */
+    protected RunStateEnum getRunState(final int bopId) {
+        
+        lock.lock();
+        
+        try {
+
+//          if (isDone()) {
+//              // The query has already halted.
+//              throw new InterruptedException();
+//          }
+            
+            return runState.getOperatorRunState(bopId);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
+    }
+    
+    /**
      * Release native memory associated with this operator, if any (NOP, but
      * overridden in scale-out to release NIO buffers used to move solutions
      * around in the cluster).

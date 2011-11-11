@@ -216,6 +216,7 @@ public class QueryLog {
         sb.append("\tnvars"); // #of variables in the predicate for a join.
         sb.append("\tfastRangeCount"); // fast range count used by the static optimizer.
         // dynamics (aggregated for totals as well).
+        sb.append("\trunState"); // true iff the operator will not be evaluated again.
         sb.append("\tfanIO");
         sb.append("\tsumMillis"); // cumulative milliseconds for eval of this operator.
         sb.append("\topCount"); // cumulative #of invocations of tasks for this operator.
@@ -438,7 +439,14 @@ public class QueryLog {
 		/*
 		 * Dynamics.
 		 */
-		
+
+		sb.append('\t');
+        if (bop != null) {
+            sb.append(((AbstractRunningQuery) q).getRunState(bopId));
+        } else {
+            sb.append(NA);
+        }
+
 		int fanIO = 0; // @todo aggregate from RunState.
 
 		final PipelineJoinStats stats = new PipelineJoinStats();
@@ -584,6 +592,7 @@ public class QueryLog {
         w.write("<th>fastRangeCount</th>"); // fast range count used by the
                                             // static optimizer.
         // dynamics (aggregated for totals as well).
+        w.write("<th>runState</th>");
         w.write("<th>fanIO</th>");
         w.write("<th>sumMillis</th>"); // cumulative milliseconds for eval of
                                        // this operator.
@@ -919,7 +928,15 @@ public class QueryLog {
         /*
          * Dynamics.
          */
-        
+
+        w.write(TD);
+        if (bop != null) {
+            w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
+        } else {
+            w.write(cdata(NA));
+        }
+        w.write(TDx);
+
         int fanIO = 0; // @todo aggregate from RunState.
 
         final PipelineJoinStats stats = new PipelineJoinStats();
