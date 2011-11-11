@@ -96,6 +96,14 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
 
+        if (context.mergeJoin) {
+            /*
+             * Do not translate simple optional groups when we expect to do a
+             * merge join.
+             */
+            return queryNode;
+        }
+        
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         /*

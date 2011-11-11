@@ -206,8 +206,13 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 convertComplexOptionalGroups(context, sa, query, childGroup,
                         exogenousVars);
 
-                if (childGroup.isOptional()) {
+                if (childGroup.isOptional()
+                        && (!(childGroup.arity() == 1 && childGroup.get(0) instanceof NamedSubqueryInclude))) {
                     /*
+                     * Note: Do NOT translate a child group which consists
+                     * solely of a named subquery include. That is the target
+                     * output for this optimizer!
+                     * 
                      * Note: This presumes that simple optionals were already
                      * translated into optional statement patterns.
                      */

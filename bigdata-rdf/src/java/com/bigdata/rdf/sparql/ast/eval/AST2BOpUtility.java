@@ -40,6 +40,7 @@ import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.bset.Tee;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.JVMNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
@@ -727,7 +728,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(HTreeNamedSubqueryOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF,
+                new NV(NamedSetAnnotations.NAMED_SET_REF,
                         namedSolutionSet)//
         );
         } else {
@@ -738,7 +739,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                     new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF,
+                    new NV(NamedSetAnnotations.NAMED_SET_REF,
                             namedSolutionSet)//
             );
         }

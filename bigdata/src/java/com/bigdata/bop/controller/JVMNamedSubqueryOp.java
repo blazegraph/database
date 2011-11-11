@@ -84,20 +84,8 @@ public class JVMNamedSubqueryOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends SubqueryAnnotations,
-            JVMHashJoinAnnotations {
+            JVMHashJoinAnnotations, NamedSetAnnotations {
 
-        /**
-         * The name of {@link IQueryAttributes} attribute under which the
-         * subquery solution set is stored (a {@link HTree} reference). The
-         * attribute name includes the query UUID. The query UUID must be
-         * extracted and used to lookup the {@link IRunningQuery} to which the
-         * solution set was attached.
-         * 
-         * @see NamedSolutionSetRef
-         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
-         */
-        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
-        
     }
 
     /**

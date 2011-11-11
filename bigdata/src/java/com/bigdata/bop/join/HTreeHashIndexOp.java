@@ -40,7 +40,7 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -87,19 +87,9 @@ public class HTreeHashIndexOp extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends HTreeHashJoinAnnotations {
+    public interface Annotations extends HTreeHashJoinAnnotations,
+            NamedSetAnnotations {
 
-        /**
-         * The name of {@link IQueryAttributes} attribute under which the
-         * subquery solution set is stored (a {@link HTreeHashJoinState}
-         * reference). The attribute name includes the query UUID. The query
-         * UUID must be extracted and used to lookup the {@link IRunningQuery}
-         * to which the solution set was attached.
-         * 
-         * @see NamedSolutionSetRef
-         */
-        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
-        
     }
 
     /**

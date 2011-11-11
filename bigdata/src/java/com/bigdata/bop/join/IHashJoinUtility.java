@@ -69,7 +69,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-interface IHashJoinUtility {
+public interface IHashJoinUtility {
 
     /**
      * Return <code>true</code> iff this is a JOIN with OPTIONAL semantics.

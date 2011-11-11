@@ -338,14 +338,22 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     @Override
     public boolean isEmpty() {
         
-        return getRightSolutions().getEntryCount() == 0;
+        return getRightSolutionCount() == 0;
         
     }
     
     @Override
     public long getRightSolutionCount() {
-        
-        return getRightSolutions().getEntryCount();
+
+        final HTree htree = getRightSolutions();
+
+        if (htree != null) {
+
+            return htree.getEntryCount();
+
+        }
+
+        return 0L;
         
     }
 

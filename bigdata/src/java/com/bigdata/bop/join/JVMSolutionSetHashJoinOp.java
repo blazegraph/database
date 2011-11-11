@@ -40,6 +40,7 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -77,19 +78,19 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends PipelineOp.Annotations,
-            HashJoinAnnotations {
+            HashJoinAnnotations, NamedSetAnnotations {
 
-        /**
-         * The {@link NamedSolutionSetRef} used to locate the hash index having
-         * the data for the named solution set. The query UUID must be extracted
-         * and used to lookup the {@link IRunningQuery} to which the solution
-         * set was attached. The hash index is then resolved against the
-         * {@link IQueryAttributes} on that {@link IRunningQuery}.
-         * 
-         * @see NamedSolutionSetRef
-         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
-         */
-        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
+//        /**
+//         * The {@link NamedSolutionSetRef} used to locate the hash index having
+//         * the data for the named solution set. The query UUID must be extracted
+//         * and used to lookup the {@link IRunningQuery} to which the solution
+//         * set was attached. The hash index is then resolved against the
+//         * {@link IQueryAttributes} on that {@link IRunningQuery}.
+//         * 
+//         * @see NamedSolutionSetRef
+//         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
+//         */
+//        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
 
 //        /**
 //         * An optional {@link IVariable}[] identifying the variables to be

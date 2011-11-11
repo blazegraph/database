@@ -39,6 +39,7 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -57,18 +58,18 @@ public class JVMMergeJoin extends PipelineOp {
     private static final long serialVersionUID = 1L;
 
     public interface Annotations extends AccessPathJoinAnnotations,
-            JVMHashJoinAnnotations {
+            JVMHashJoinAnnotations, NamedSetAnnotations {
 
-        /**
-         * The {@link NamedSolutionSetRef} used to locate the named solution
-         * sets. The value stored under the attribute must be an
-         * {@link IHashJoinUtility}[]. There must be at least 2 entries in the
-         * array.
-         * 
-         * @see NamedSolutionSetRef
-         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
-         */
-        String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
+//        /**
+//         * The {@link NamedSolutionSetRef} used to locate the named solution
+//         * sets. The value stored under the attribute must be an
+//         * {@link IHashJoinUtility}[]. There must be at least 2 entries in the
+//         * array.
+//         * 
+//         * @see NamedSolutionSetRef
+//         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
+//         */
+//        String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
         
         /**
          * Constraints to be applied by the join (in addition to any associated
