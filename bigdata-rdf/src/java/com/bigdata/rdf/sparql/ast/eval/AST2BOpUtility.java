@@ -725,6 +725,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeNamedSubqueryOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                 new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
@@ -737,6 +738,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeNamedSubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
                     new NV(HTreeNamedSubqueryOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(NamedSetAnnotations.NAMED_SET_REF,
@@ -1986,6 +1988,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required?
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required?
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
                     new NV(HTreeMergeJoin.Annotations.OPTIONAL, optional),//
@@ -2002,6 +2005,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required?
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required?
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(JVMMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
                     new NV(JVMMergeJoin.Annotations.OPTIONAL, optional),//
