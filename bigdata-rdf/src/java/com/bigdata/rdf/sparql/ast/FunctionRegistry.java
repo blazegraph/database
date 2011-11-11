@@ -1396,11 +1396,17 @@ public class FunctionRegistry {
             if (args.length == 2) {
 
                 /*
-                 * "foo IN(bar)" is SameTerm(foo,bar).
+                 * "foo IN(bar)" is SameTerm(foo,bar) if bar is a URI, otherwise CompareBOp.
                  */
 
-                final IValueExpression ret = SameTermFactory.INSTANCE.create(
-                        lex, scalarValues, args);
+//            	final IValueExpression<? extends IV> val = AST2BOpUtility.toVE(lex, args[1]);
+            	
+//                final IValueExpression ret = SameTermFactory.INSTANCE.create(
+//                        lex, scalarValues, args);
+            	
+            	// compare factory is smart enough to optimize for SameTerm when necessary
+            	final IValueExpression ret = new CompareFactory(CompareOp.EQ).create(
+                      lex, scalarValues, args);
 
                 if (not)
                     return new NotBOp(ret);
@@ -1422,13 +1428,50 @@ public class FunctionRegistry {
 
                 final IConstant<? extends IV> set[] = new IConstant[args.length - 1];
 
-                for (int i = 1; i < args.length; i++) {
+                try {
+                
+                	for (int i = 1; i < args.length; i++) {
 
-                    set[i - 1] = ((ConstantNode) args[i]).getValueExpression();
+                		set[i - 1] = ((ConstantNode) args[i]).getValueExpression();
+                		
+                		final IV iv = set[i - 1].get();
+                		
+                		if (iv.isLiteral()) {
+                			
+                			throw new IllegalArgumentException("must use CompareBOps for literals");
+                			
+                		}
 
+                	}
+                	
+                	return new InHashBOp(not, arg, set);
+                	
+                } catch (IllegalArgumentException ex) {
+                	
+                	IValueExpression ret = null;
+                	
+                	final CompareFactory compare = new CompareFactory(CompareOp.EQ);
+                	
+                	for (int i = 1; i < args.length; i++) {
+                		
+                		if (ret == null) {
+                			
+                			ret = compare.create(lex, scalarValues, args[0], args[i]);
+                			
+                		} else {
+                			
+                			ret = new OrBOp(ret, compare.create(lex, scalarValues, args[0], args[i]));
+                			
+                		}
+                		
+                	}
+                	
+                    if (not)
+                        return new NotBOp(ret);
+
+                    return ret;
+                    
                 }
-
-                return new InHashBOp(not, arg, set);
 
             } catch (IllegalArgumentException iae) {
 
