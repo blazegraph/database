@@ -74,6 +74,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.BindingConstraint;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
@@ -83,6 +84,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
@@ -1591,7 +1593,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                  * correlate them with the {@link IJoinNode}s.
                  */
                 final Predicate<?> pred = toPredicate(sp, ctx);
-                left = join(ctx.db, ctx.queryEngine, left, pred, doneSet,
+                final boolean optional = sp.isOptional();
+                left = join(ctx.db, ctx.queryEngine, left, pred,
+                        optional ? new LinkedHashSet<IVariable<?>>(doneSet)
+                                : doneSet,
                         getJoinConstraints(sp), new BOpContextBase(
                                 ctx.queryEngine), ctx.idFactory,
                         sp.getQueryHints());
@@ -1637,7 +1642,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                  */
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
-                left = addSubgroup(left, subgroup, doneSet, ctx);
+                final boolean optional = subgroup.isOptional();
+                left = addSubgroup(left, subgroup,
+                        optional ? new LinkedHashSet<IVariable<?>>(doneSet)
+                                : doneSet, ctx);
                 continue;
             } else if (child instanceof FilterNode) {
                 final FilterNode filter = (FilterNode) child;
@@ -1995,8 +2003,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * Get the vars this filter needs materialized.
          */
-        vars.addAll(assignmentNode.getMaterializationRequirement()
-                .getVarsToMaterialize());
+        final ComputedMaterializationRequirement req = assignmentNode
+                .getMaterializationRequirement();
+
+        vars.addAll(req.getVarsToMaterialize());
 
         /*
          * Remove the ones we've already done.
@@ -2020,11 +2030,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
             left = addMaterializationSteps(left, bopId, ve, vars, ctx);
 
-            /*
-             * Add all the newly materialized variables to the set we've
-             * already done.
-             */
-            doneSet.addAll(vars);
+            if(req.getRequirement()==Requirement.ALWAYS) {
+
+                /*
+                 * Add all the newly materialized variables to the set we've
+                 * already done.
+                 */
+
+                doneSet.addAll(vars);
+                
+            }
 
             c = new TryBeforeMaterializationConstraint(c);
 
@@ -2070,8 +2085,10 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * Get the variables that this filter needs materialized.
          */
-        vars.addAll(filter.getMaterializationRequirement()
-                .getVarsToMaterialize());
+        final ComputedMaterializationRequirement req = filter
+                .getMaterializationRequirement();
+
+        vars.addAll(req.getVarsToMaterialize());
 
         /*
          * Remove the ones we've already done.
@@ -2089,8 +2106,16 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             // Add materialization steps for those variables.
             left = addMaterializationSteps(left, bopId, ve, vars, ctx);
 
-            // Add the newly materialized vars to the set we've already done.
-            doneSet.addAll(vars);
+            if (req.getRequirement() == Requirement.ALWAYS) {
+                
+                /*
+                 * Add all the newly materialized variables to the set we've
+                 * already done.
+                 */
+
+                doneSet.addAll(vars);
+                
+            }
 
         }
 
