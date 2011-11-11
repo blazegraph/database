@@ -2072,7 +2072,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
 					if (in == null) {
 						// Join failed.
-						continue;
+						break;
 					}
 
 				}
