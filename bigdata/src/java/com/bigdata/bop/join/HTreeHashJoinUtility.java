@@ -89,6 +89,11 @@ import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
+import cutthecrap.utils.striterators.Visitor;
+
 /**
  * Utility methods to support hash index builds and hash index joins using a
  * scalable native memory data structures.
@@ -1911,7 +1916,185 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * the first source.
      */
     @Override
-    public void mergeJoin(//
+    public void mergeJoin(
+			//
+			final IHashJoinUtility[] others,
+			final IBuffer<IBindingSet> outputBuffer,
+			final IConstraint[] constraints, final boolean optional) {
+
+		/*
+		 * Validate arguments.
+		 */
+
+		if (others == null)
+			throw new IllegalArgumentException();
+
+		if (others.length == 0)
+			throw new IllegalArgumentException();
+
+		if (outputBuffer == null)
+			throw new IllegalArgumentException();
+
+		final HTreeHashJoinUtility[] all = new HTreeHashJoinUtility[others.length + 1];
+		{
+			all[0] = this;
+			for (int i = 0; i < others.length; i++) {
+				final HTreeHashJoinUtility o = (HTreeHashJoinUtility) others[i];
+				if (o == null)
+					throw new IllegalArgumentException();
+				if (!this.joinVars.equals(o.joinVars)) {
+					// Must have the same join variables.
+					throw new IllegalArgumentException();
+				}
+				all[i + 1] = o;
+			}
+
+		}
+
+		if (isEmpty()) {
+			// NOP
+			return;
+		}
+
+		/*
+		 * Combine constraints for each source with the given constraints.
+		 */
+		final IConstraint[] c = JVMHashJoinUtility.combineConstraints(
+				constraints, all);
+
+		/*
+		 * Synchronize each source.
+		 * 
+		 * We follow the iterator on the first source. For each hash code which
+		 * it visits, we synchronize iterators against the remaining sources. If
+		 * the join is optional, then the iterator will be null for a source
+		 * which does not have that hash code. Otherwise false is returned if
+		 * any source lacks tuples for the current hash code.
+		 */
+		long njoined = 0, nrejected = 0;
+		final HTree root = getRightSolutions();
+		final ITupleIterator<?> itr = root.rangeIterator();
+		{
+			/*
+			 * Note: Initialized by the first tuple we visit. Updated each time
+			 * we finish joining that solution against all solutions having the
+			 * same hash code for all of the other sources.
+			 */
+			// int hashCode = 0;
+			// ITuple<?> t = null;
+			final byte[] key = new byte[Bytes.SIZEOF_INT];
+			final ITupleIterator<?>[] oitr = new ITupleIterator[all.length];
+			copyKey(root.rangeIterator().next(), key);
+
+			/*
+			 * MERGE JOIN
+			 * 
+			 * Note: At this point we have a solution which might join with the
+			 * other sources (they all have the same hash code). We can now
+			 * decode the solution from the first source and ...
+			 * 
+			 * FIXME Must vector the resolution of the ivCache / blobsCache for
+			 * the output solutions.
+			 */
+
+
+			final int nsources = all.length;
+			final ITuple<?>[] set = new ITuple<?>[nsources+1];
+			Striterator sols1 = new Striterator(all[0].getRightSolutions()
+					.rangeIterator());
+			sols1.addFilter(new Visitor() {
+
+				@Override
+				protected void visit(Object obj) {
+					set[0] = (ITuple<?>) obj;
+				}
+
+			});
+
+			// Setup each source.
+			// Just do it the long way at first
+            // copyKey(t,key); // Make a copy of that key.
+			// synchronizeOtherSources(key, all, oitr, 1/* index */, optional);
+
+			// now add in Expanders and Visitors for each Bucket
+			for (int i = 1; i < nsources; i++) {
+				// A bucket having the same hash code for another source.
+				final int slot = i;
+				final HTree thisTree = all[slot].getRightSolutions();
+
+				// if optional then if there are no solutions don't try and
+				// expand further, we need a place-holder object
+				final Object NULL_VALUE = "NULL";
+				if (true /*|| !(optional && (sol == null || !sol.hasNext()))*/) {
+					sols1.addFilter(new Expander() {
+
+						@Override
+						protected Iterator expand(final Object obj) {
+							if (obj == NULL_VALUE) {
+								assert optional;
+								return new SingleValueIterator(NULL_VALUE);
+							}
+							final Iterator ret = thisTree.lookupAll(((ITuple) obj).getKey());
+							if (optional && !ret.hasNext()) {
+								return new SingleValueIterator(NULL_VALUE);
+							} else {
+								return ret;
+							}
+						}
+
+					});
+					sols1.addFilter(new Visitor() {
+
+						@Override
+						protected void visit(final Object obj) {
+							set[slot] = (ITuple<?>) (obj == NULL_VALUE ? null : obj);
+						}
+
+					});
+				}
+			}
+
+			while (sols1.hasNext()) {
+				sols1.next();
+				IBindingSet in = all[0].decodeSolution(set[0]);
+				for (int i = 1; i < set.length; i++) {
+
+					// See if the solutions join.
+					if (set[i] != null) {
+						final IBindingSet right = all[i].decodeSolution(set[i]); 
+						in = BOpContext.bind(//
+								in,// 
+								right,// 
+								constraints,//
+								null//
+								);
+					}
+
+					if (in == null) {
+						// Join failed.
+						continue;
+					}
+
+				}
+				// Accept this binding set.
+				// FIXME Output solutions which join. (apply constraints).
+				if (in != null) {
+					if (log.isDebugEnabled())
+						log.debug("Output solution: " + in);
+					outputBuffer.add(in);
+				}
+
+				// now clear set!
+				for (int i = 1; i < set.length; i++) {
+					set[i] = null;
+				}
+			}
+
+		}
+
+	}    
+    
+    public void oldmergeJoin(//
             final IHashJoinUtility[] others,
             final IBuffer<IBindingSet> outputBuffer,
             final IConstraint[] constraints,
@@ -2038,6 +2221,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         if (outSolution == null) {
                             if(optional) {
                                 outputBuffer.add(leftSolution);
+            					System.err.println("Output solution: " + leftSolution);
                                 if (log.isDebugEnabled())
                                     log.debug("OPT : #joined="
                                             + njoined + ", #rejected="
@@ -2055,6 +2239,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                         } else {
                             njoined++;
                             outputBuffer.add(outSolution);
+        					System.err.println("Output solution: " + outSolution);
                             if (log.isDebugEnabled())
                                 log.debug("JOIN: #joined="
                                         + njoined + ", #rejected="
