@@ -113,17 +113,17 @@ public class SubstrBOp extends AbstractLiteralBOp {
 
             final IV lengthArg = get(2).get(bs);
 
-//            final int length = Math.min(label.length(),
-//                    (int) Math.round(literalValue(lengthArg).doubleValue()));
+            final int length = Math.min(label.length(),
+                    (int) Math.round(literalValue(lengthArg).doubleValue()));
 
-            final int length = (int) Math.round(literalValue(lengthArg).doubleValue());
+//            final int length = (int) Math.round(literalValue(lengthArg).doubleValue());
             
             label = label
-                    .substring(start, Math.min(label.length(), start+length));
+                    .substring(start-1, Math.min(label.length(), start-1+length));
 
         } else {
 
-            label = label.substring(start);
+            label = label.substring(start-1);
 
         }
 

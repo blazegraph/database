@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sail;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.repository.RepositoryException;
@@ -27,8 +28,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    
-//	private static transient final Logger log = Logger
-//			.getLogger(BigdataSailRepositoryConnection.class);
+	private static transient final Logger log = Logger
+			.getLogger(BigdataSailRepositoryConnection.class);
 
 	public String toString() {
 		return getClass().getName() + "{timestamp="
@@ -128,6 +129,10 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         if (ql != QueryLanguage.SPARQL)
             throw new UnsupportedOperationException(ql.toString());
 
+        if (log.isDebugEnabled()) {
+        	log.debug(queryStr);
+        }
+        
         // Flush buffers since we are about to resolve Values to IVs.
         getSailConnection()
                 .flushStatementBuffers(true/* assertions */, true/* retractions */);
