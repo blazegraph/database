@@ -47,9 +47,13 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-class SolutionsLog {
+public class SolutionsLog {
 
-    static final Logger solutionsLog = Logger.getLogger(SolutionsLog.class);
+    /**
+     * Logging for this class should be performed when this logger has a detail
+     * level of at least INFO.
+     */
+    public static final Logger solutionsLog = Logger.getLogger(SolutionsLog.class);
 
     /**
      * A single buffer is reused to keep down the heap churn.
@@ -76,7 +80,7 @@ class SolutionsLog {
 
         sb.append(queryId);
         sb.append('\t');
-        sb.append(bop.getClass().getSimpleName());
+        sb.append(bop == null ? "N/A" : bop.getClass().getSimpleName());
 //        sb.append('\t');
 //        sb.append(getPredSummary(bop));
         sb.append('\t');
@@ -182,7 +186,7 @@ class SolutionsLog {
 //
 //    }
 
-    synchronized static void log(final UUID queryId, final BOp bop,
+    public synchronized static void log(final UUID queryId, final BOp bop,
             final int bopId, final int partitionId, final IBindingSet[] a) {
 
         prefix(queryId, bop, bopId, partitionId, a.length);

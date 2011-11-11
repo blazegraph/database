@@ -563,6 +563,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             log.debug("Materialized: " + all.length
                     + " source solutions.");
 
+        long naccepted = 0;
+        
         for (IBindingSet bset : all) {
 
             final Key key = makeKey(joinVars, bset, optional);
@@ -583,6 +585,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 b.add(bset);
                 
             }
+            
+            naccepted++;
 
         }
 
@@ -591,8 +595,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     + " distinct combinations of the join vars: "
                     + Arrays.toString(joinVars));
 
-        final long naccepted = all.length;
-        
         rightSolutionCount.add(naccepted);
         
         return naccepted;
@@ -1031,13 +1033,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 final JVMHashJoinUtility o = (JVMHashJoinUtility) others[i];
                 if (o == null)
                     throw new IllegalArgumentException();
-                if (!this.joinVars.equals(o.joinVars)) {
+                if (!Arrays.equals(this.joinVars, o.joinVars)) {
                     // Must have the same join variables.
                     throw new IllegalArgumentException();
                 }
                 all[i + 1] = o;
             }
 
+        }
+
+        if(isEmpty()) {
+            return;
         }
         
         /*

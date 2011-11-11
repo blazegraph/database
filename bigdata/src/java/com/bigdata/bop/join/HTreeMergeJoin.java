@@ -28,21 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
+import com.bigdata.bop.join.JVMMergeJoin.Annotations;
 import com.bigdata.htree.HTree;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
 /**
  * An N-way merge join based on the {@link HTree}.
- * 
- * TODO Need to specify a {@link NamedSolutionSetRef}[] for this operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -123,8 +127,151 @@ public class HTreeMergeJoin extends PipelineOp {
     
     @Override
     public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
-        // TODO Auto-generated method stub
-        return null;
+
+        return new FutureTask<Void>(new ChunkTask<IBindingSet>(context, this));
+        
     }
+
+    /**
+     * Task executing on the node.
+     */
+    private static class ChunkTask<E> implements Callable<Void> {
+
+        private final BOpContext<IBindingSet> context;
+
+        private final HTreeMergeJoin op;
+
+        private final HTreeHashJoinUtility[] state;
+        
+        private final IConstraint[] constraints;
+
+//        private final IVariable<?>[] selectVars;
+
+        private final boolean optional;
+        
+        private final boolean release;
+        
+//        private final BaseJoinStats stats;
+
+        private final IBlockingBuffer<IBindingSet[]> sink;
+        
+        private final IBlockingBuffer<IBindingSet[]> sink2;
+
+        public ChunkTask(final BOpContext<IBindingSet> context,
+                final HTreeMergeJoin op) {
+
+            this.context = context;
+
+//            this.stats = (BaseJoinStats) context.getStats();
+
+//            this.selectVars = (IVariable<?>[]) op
+//                    .getProperty(Annotations.SELECT);
+
+            this.constraints = (IConstraint[]) op
+                    .getProperty(Annotations.CONSTRAINTS);
+
+            this.optional = op.getProperty(Annotations.OPTIONAL,
+                    Annotations.DEFAULT_OPTIONAL);
+
+            this.release = op.getProperty(Annotations.RELEASE,
+                    Annotations.DEFAULT_RELEASE);
+
+            this.sink = context.getSink();
+
+            this.sink2 = context.getSink2();
+
+            this.op = op;
+
+            // The names of the attributes used to discover the solution sets.
+            final NamedSolutionSetRef[] namedSetRef = (NamedSolutionSetRef[]) op
+                    .getRequiredProperty(Annotations.NAMED_SET_REF);
+
+            state = new HTreeHashJoinUtility[namedSetRef.length];
+
+            if (state.length < 2) {
+
+                throw new RuntimeException(
+                        "Merge join requires at least 2 sources.");
+
+            }
+            
+            for (int i = 0; i < state.length; i++) {
+
+                final IQueryAttributes attrs = context
+                        .getQueryAttributes(namedSetRef[i].queryId);
+
+                state[i] = (HTreeHashJoinUtility) attrs.get(namedSetRef[i]);
+                
+                if (state[i] == null) {
+
+                    // The solution set was not found!
+                    throw new RuntimeException("Not found: " + namedSetRef[i]);
+
+                }
+
+            }
+            
+        }
+        
+        public Void call() throws Exception {
+
+            try {
+
+                if (context.isLastInvocation()) {
+
+                    final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
+                            op.getChunkCapacity(), sink);
+
+                    final IHashJoinUtility[] others = new IHashJoinUtility[state.length - 1];
+
+                    for (int i = 1; i < state.length; i++) {
+
+                        others[i - 1] = state[i];
+
+                    }
+
+                    state[0].mergeJoin(others, unsyncBuffer, constraints,
+                            optional);
+
+                    unsyncBuffer.flush();
+
+                    sink.flush();
+                    
+                }
+                
+                // Done.
+                return null;
+                
+            } finally {
+
+                if (release && context.isLastInvocation()) {
+
+                    /*
+                     * Note: It is possible to INCLUDE the named temporary
+                     * solution set multiple times within a query. If we want to
+                     * release() the hash tree then we need to know how many
+                     * times the temporary solution set is being included and
+                     * decrement a counter each time. When the counter reaches
+                     * zero, we can release the hash index.
+                     */
+                    
+                    for (IHashJoinUtility h : state) {
+                     
+                        h.release();
+                        
+                    }
+
+                }
+                
+                sink.close();
+
+                if (sink2 != null)
+                    sink2.close();
+                
+            }
+
+        }
+                
+    } // class ChunkTask
 
 }

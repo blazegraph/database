@@ -1557,8 +1557,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final Set<FilterNode> inFilters = new LinkedHashSet<FilterNode>();
         inFilters.addAll(joinGroup.getInFilters());
 
-        final int arity = joinGroup.arity();
-
         final AtomicInteger start = new AtomicInteger(0);
         if(ctx.mergeJoin) {
 
@@ -1574,6 +1572,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * Translate the remainder of the group. 
          */
+        final int arity = joinGroup.arity();
         for (int i = start.get(); i < arity; i++) {
 
             final IGroupMemberNode child = (IGroupMemberNode) joinGroup.get(i);
@@ -1680,12 +1679,27 @@ public class AST2BOpUtility extends Rule2BOpUtility {
     /**
      * Attempt to translate the join group using a merge join.
      * <P>
-     * We recognize a merge join when there is a series of INCLUDEs -or-
-     * OPTIONAL {INCLUDE}s in the group. Each INCLUDE must have the same join
-     * variables. If the OPTIONAL {INCLUDE}s pattern is recognized then the
-     * MERGE JOIN is itself OPTIONAL. The sequences of such INCLUDEs in this
-     * group is then translated into a single MERGE JOIN operator.
-     * 
+     * We recognize a merge join when there an INCLUDEs followed by either a
+     * series of INCLUDEs -or- a series of OPTIONAL {INCLUDE}s in the group. The
+     * initial INCLUDE becomes the primary source for the merge join (the hub).
+     * Each INCLUDE after the first must have the same join variables. If the
+     * OPTIONAL {INCLUDE}s pattern is recognized then the MERGE JOIN is itself
+     * OPTIONAL. The sequences of such INCLUDEs in this group is then translated
+     * into a single MERGE JOIN operator.
+     * <p>
+     * Note: The critical pattern for a merge join is that we have a hash index
+     * against which we may join several other hash indices. To join, of course,
+     * the hash indices must all have the same join variables. The pattern
+     * recognized here is based on an initial INCLUDE (defining the first hash
+     * index) followed by several either required or OPTIONAL INCLUDEs, which
+     * are the additional hash indices. The merge join itself is the N-way
+     * solution set hash join and replaces the sequence of 2-way solution set
+     * hash joins which we would otherwise do for those solution sets. It is
+     * more efficient because the output of each 2-way join is fed into the next
+     * 2-way join, which blows up the input cardinality for the next 2-way hash
+     * join. While the merge join will consider the same combinations of
+     * solutions, it does so with a very efficient linear pass over the hash
+     * indices.
      * 
      * @param left
      * @param joinGroup
@@ -1703,7 +1717,12 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      *         TODO We also need to handle join filters which appear between
      *         INCLUDES. That should not prevent a merge join. Instead, those
-     *         join filters can just be moved to after the MERGE JOIN.
+     *         join filters can just be moved to after the MERGE JOIN. (The join
+     *         filters wind up not attached to the INCLUDE when there is a
+     *         materialization requirement for the filter. The materialization
+     *         step can not occur in the merge join, so we either have to move
+     *         the filter beyond the merge-join or we have to stop collecting
+     *         INCLUDEs at the first unattached join filter.)
      * 
      *         TODO Pre-filters could also mess this up. The should be lifted
      *         out into the parent join group.
@@ -1717,9 +1736,24 @@ public class AST2BOpUtility extends Rule2BOpUtility {
             final AtomicInteger start,
             final AST2BOpContext ctx) {
         
-        final StaticAnalysis sa = ctx.sa;
+//        final StaticAnalysis sa = ctx.sa;
         
         boolean mergeJoin = true; // until proven otherwise.
+        
+        final int arity = joinGroup.arity();
+
+        /*
+         * The named solution set which is the hub of the merge join and null if
+         * we do not find such a hub.
+         */
+        final NamedSubqueryInclude firstInclude;
+//        final NamedSubqueryRoot hub;
+        if (arity >= 2 && joinGroup.get(0) instanceof NamedSubqueryInclude) {
+            firstInclude = (NamedSubqueryInclude) joinGroup.get(0);
+//            hub = firstInclude.getNamedSubqueryRoot(sa.getQueryRoot());
+        } else {
+            return left;
+        }
         
         final List<NamedSubqueryInclude> requiredIncludes = new LinkedList<NamedSubqueryInclude>();
         final List<NamedSubqueryInclude> optionalIncludes = new LinkedList<NamedSubqueryInclude>();
@@ -1727,14 +1761,15 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         // Collect the join constraints from each INCLUDE that we will use.
         final List<FilterNode> joinConstraints = new LinkedList<FilterNode>();
         
-        // Join variables for merge join (must be the same for all sources).
+        /*
+         * Join variables must be the same for all secondary sources. They are
+         * set once we find the first secondary source.
+         */
         final Set<IVariable<?>> joinVars = new LinkedHashSet<IVariable<?>>();
 
+        // Start at the 2nd member in the group.
         int j;
-        // The named solution set which is the hub of the merge join and null if we do not find such a hub.
-        NamedSubqueryRoot hub = null;
-        final int arity = joinGroup.arity();
-        for (j = 0; j < arity && mergeJoin; j++) {
+        for (j = 1; j < arity && mergeJoin; j++) {
 
             final IGroupMemberNode child = (IGroupMemberNode) joinGroup
                     .get(j);
@@ -1752,31 +1787,25 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 final NamedSubqueryInclude nsi = (NamedSubqueryInclude) ((JoinGroupNode) child)
                         .get(0);
 
-                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
-                        .getQueryRoot());
+//                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
+//                        .getQueryRoot());
 
                 final Set<IVariable<?>> theJoinVars = nsi.getJoinVarSet();
 
-                if (hub == null) {
-                    hub = nsr;
+                if (joinVars.isEmpty()) {
                     joinVars.addAll(theJoinVars);
-                } else if (hub != nsr) {
-                    mergeJoin = false;
-                    continue;
                 } else if (!joinVars.equals(theJoinVars)) {
                     /*
                      * The join variables are not the same.
                      * 
-                     * FIXME It is possible to fix this for some queries
-                     * since the there is some flexibility in how we choose
-                     * the join variables. However, we need to model the
-                     * MERGE JOIN in the AST in order to do that since, by
-                     * this time, we have already generated the physical
-                     * query plan for the named subquery and the join vars
-                     * are backed into that plan.
+                     * FIXME It is possible to fix this for some queries since
+                     * the there is some flexibility in how we choose the join
+                     * variables. However, we need to model the MERGE JOIN in
+                     * the AST in order to do that since, by this time, we have
+                     * already generated the physical query plan for the named
+                     * subquery and the join vars are backed into that plan.
                      */
-                    mergeJoin = false;
-                    continue;
+                    break;
                 }
 
                 optionalIncludes.add(nsi);
@@ -1793,31 +1822,25 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
                 final NamedSubqueryInclude nsi = (NamedSubqueryInclude) child;
 
-                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
-                        .getQueryRoot());
+//                final NamedSubqueryRoot nsr = nsi.getNamedSubqueryRoot(sa
+//                        .getQueryRoot());
 
                 final Set<IVariable<?>> theJoinVars = nsi.getJoinVarSet();
 
-                if (hub == null) {
-                    hub = nsr;
+                if (joinVars.isEmpty()) {
                     joinVars.addAll(theJoinVars);
-                } else if (hub != nsr) {
-                    mergeJoin = false;
-                    continue;
                 } else if (!joinVars.equals(theJoinVars)) {
                     /*
                      * The join variables are not the same.
                      * 
-                     * FIXME It is possible to fix this for some queries
-                     * since the there is some flexibility in how we choose
-                     * the join variables. However, we need to model the
-                     * MERGE JOIN in the AST in order to do that since, by
-                     * this time, we have already generated the physical
-                     * query plan for the named subquery and the join vars
-                     * are backed into that plan.
+                     * FIXME It is possible to fix this for some queries since
+                     * the there is some flexibility in how we choose the join
+                     * variables. However, we need to model the MERGE JOIN in
+                     * the AST in order to do that since, by this time, we have
+                     * already generated the physical query plan for the named
+                     * subquery and the join vars are backed into that plan.
                      */
-                    mergeJoin = false;
-                    continue;
+                    break;
                 }
 
                 requiredIncludes.add(nsi);
@@ -1834,14 +1857,13 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         }
 
-        final int minIncludes = 2;
-        if (hub == null
-                || (requiredIncludes.size() < minIncludes && optionalIncludes
-                        .size() < minIncludes)) {
+        final int minIncludes = 1;
+        if (requiredIncludes.size() < minIncludes
+                && optionalIncludes.size() < minIncludes) {
             /*
-             * The primary source will be the [hub] identified above. In
-             * addition, we need at least one INCLUDEs which satisify the
-             * criteria to do a MERGE JOIN. If we do not have that then we
+             * The primary source will be the [firstInclude] identified above.
+             * In addition, we need at least one other INCLUDE which satisify
+             * the criteria to do a MERGE JOIN. If we do not have that then we
              * can not do a MERGE JOIN.
              */
             mergeJoin = false;
@@ -1856,8 +1878,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         /*
          * We will do a merge join.
          */
-        assert hub != null;
-        
+
         // Figure out if the join is required or optional.
         final boolean optional = requiredIncludes.isEmpty();
         
@@ -1865,15 +1886,61 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         final List<NamedSubqueryInclude> includes = optional ? optionalIncludes
                 : requiredIncludes;
         
+        // The join variables as an IVariable[].
+        final IVariable<?>[] joinvars2 = joinVars
+                .toArray(new IVariable[joinVars.size()]);
+        
+        // The hash index for the first source.
+        final NamedSolutionSetRef firstNamedSolutionSetRef = new NamedSolutionSetRef(
+                ctx.queryId, firstInclude.getName(), joinvars2);
+        
+        if(!firstInclude.getJoinVarSet().equals(joinVars)) {
+            
+            /*
+             * If the primary source does not share the same join variables, then we
+             * need to build a hash index on the join variables which are used by
+             * the other sources.
+             */
+            
+            left = addNamedSubqueryInclude(left, firstInclude, doneSet, ctx);
+            
+            if(ctx.nativeHashJoins) {
+                left = new HTreeHashIndexOp(leftOrEmpty(left),//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
+        //                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
+        //                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
+                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
+            );
+            } else {
+                left = new JVMHashIndexOp(leftOrEmpty(left),//
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+//                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                        new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
+        //                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
+                    new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
+                ); 
+            }
+        }
+        
         /*
          * Setup the sources (one per INCLUDE).
          */
         final NamedSolutionSetRef[] namedSolutionSetRefs;
         {
+            
             final List<NamedSolutionSetRef> list = new LinkedList<NamedSolutionSetRef>();
 
-            final IVariable<?>[] joinvars2 = joinVars
-                    .toArray(new IVariable[joinVars.size()]);
+            list.add(firstNamedSolutionSetRef);
 
             for (NamedSubqueryInclude nsi : includes) {
 
@@ -1897,16 +1964,31 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          */
         boolean release = false;
 
+        /*
+         * FIXME This needs to be an IConstraint[][] which causes the join
+         * constraints to be attached to the same joins that they were attached
+         * to in the original query plan.  I need to change the code in the
+         * merge join operators first.  Right now, the merge join does not
+         * properly handle join constraints.
+         */
+        final IConstraint[] c = joinConstraints.toArray(new IConstraint[0]);
+
+        /*
+         * FIXME Update the doneSet *after* the merge join based on the doneSet
+         * for each INCLUDE which is folded into the merge join.
+         */
         if (ctx.nativeHashJoins) {
             
             left = new HTreeMergeJoin(leftOrEmpty(left), //
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required?
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required?
                     new NV(HTreeMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
-                    new NV(HTreeMergeJoin.Annotations.CONSTRAINTS,
-                                    joinConstraints),//
+                    new NV(HTreeMergeJoin.Annotations.OPTIONAL, optional),//
+                    new NV(HTreeMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(HTreeMergeJoin.Annotations.RELEASE,
                                 release)//
             );
@@ -1917,19 +1999,21 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required?
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required?
                     new NV(JVMMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
-                    new NV(JVMMergeJoin.Annotations.CONSTRAINTS,
-                            joinConstraints),//
+                    new NV(JVMMergeJoin.Annotations.OPTIONAL, optional),//
+                    new NV(JVMMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(JVMMergeJoin.Annotations.RELEASE,
                             release)//
             );
-            
+
         }
 
         // Advance beyond the last consumed INCLUDE.
-        start.set( j);
-        
+        start.set(j);
+
         return left;
 
     }

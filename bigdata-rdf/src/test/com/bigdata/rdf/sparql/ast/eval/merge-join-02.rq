@@ -9,6 +9,6 @@ WITH {
   SELECT ?a ?y {?a :y ?y}
 } as %set2
 WHERE {
-   OPTIONAL {INCLUDE %set1}.
+   INCLUDE %set1.
    OPTIONAL {INCLUDE %set2}.
 }

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.controller;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -52,6 +53,8 @@ import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+
+import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Evaluation of a subquery, producing a named result set. This operator passes
@@ -295,18 +298,31 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         public Void call() throws Exception {
             
             try {
-                
+
+                final IBindingSet[] a = BOpUtility.toArray(context.getSource(),
+                        stats);
+
                 if(first) {
 
+                    final IBindingSet tmp;
+                    if(a.length != 1) {
+                        // Unbound if more than one source solution (should not happen).
+                        tmp = new ListBindingSet();
+                    } else {
+                        // Only one solution.
+                        tmp = a[0];
+                    }
+
                     // Generate the result set and write it on the HTree.
-                    new SubqueryTask(new ListBindingSet(), subquery, context)
-                            .call();
+                    new SubqueryTask(tmp, subquery, context).call();
 
                 }
 
                 // source.
-                final IAsynchronousIterator<IBindingSet[]> source = context
-                        .getSource();
+//                final IAsynchronousIterator<IBindingSet[]> source = context
+//                        .getSource();
+                @SuppressWarnings("unchecked")
+                final Iterator<IBindingSet[]> source = new SingleValueIterator(a);
 
                 // default sink
                 final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
@@ -318,7 +334,8 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                         null, // mergeSolution (aka parent's source solution).
                         null, // selectVars (aka projection).
                         null, // constraints
-                        context.getStats()//
+                        null  // stats updated above.
+                        //context.getStats()//
                         );
 
                 sink.flush();

@@ -436,28 +436,6 @@ public class TestASTNamedSubqueryOptimizer extends
     /**
      * This unit test is a based on
      * <code>bigdata-perf/CI/govtrack/queries/query10.rq</code>
-     * <p>
-     * Rewrite:
-     * 
-     * <pre>
-     * SELECT ?_var1
-     *  WHERE {
-     *         ?_var1 a <http://www.rdfabout.com/rdf/schema/politico/Politician>
-     *         OPTIONAL {
-     *                 ?_var1 <http://www.rdfabout.com/rdf/schema/usgovt/name> ?_var6
-     *         }.
-     *         OPTIONAL {
-     *                 ?_var12 <http://www.rdfabout.com/rdf/schema/usbill/sponsor> ?_var1.
-     *                 ?_var12 <http://www.rdfabout.com/rdf/schema/usbill/title> ?_var4
-     *         }.
-     *         OPTIONAL {
-     *                 ?_var1 <http://www.w3.org/2001/vcard-rdf/3.0#N> ?_var13.
-     *                 ?_var13 <http://www.w3.org/2001/vcard-rdf/3.0#Family> ?_var10
-     *         }
-     * }
-     * </pre>
-     * 
-     * as:
      * 
      * <pre>
      * SELECT  ?_var1
@@ -497,11 +475,8 @@ public class TestASTNamedSubqueryOptimizer extends
      * </pre>
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
-     * 
-     * TODO We need a unit test where there are some filters which should
-     * move and some which should not.
      */
-    public void test_rewriteComplexOptional() {
+    public void test_govtrack_query10() {
         /*
          * Note: DO NOT share structures in this test!!!!
          */
@@ -583,7 +558,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var12"));
+//                projection.addProjectionVar(new VarNode("var12"));
                 projection.addProjectionVar(new VarNode("var4"));
                 
                 whereClause.addChild(new NamedSubqueryInclude(set1));
@@ -620,7 +595,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var13"));
+//                projection.addProjectionVar(new VarNode("var13"));
                 projection.addProjectionVar(new VarNode("var10"));
                 
                 whereClause.addChild(new NamedSubqueryInclude(set1));
@@ -681,6 +656,7 @@ public class TestASTNamedSubqueryOptimizer extends
                         QueryType.SELECT, set1);
                 namedSubqueries.add(nsr);
                 nsr.setJoinVars(new VarNode[]{/*none*/});
+//                nsr.setJoinVars(new VarNode[]{new VarNode("var1")});
                 nsr.setDependsOn(new String[]{});
 
                 final ProjectionNode projection = new ProjectionNode();
@@ -714,6 +690,7 @@ public class TestASTNamedSubqueryOptimizer extends
                         QueryType.SELECT, set2);
                 namedSubqueries.add(nsr);
                 nsr.setJoinVars(new VarNode[]{/*none*/});
+//                nsr.setJoinVars(new VarNode[]{new VarNode("var1")});
                 nsr.setDependsOn(new String[]{set1});
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
@@ -723,11 +700,12 @@ public class TestASTNamedSubqueryOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var12"));
+//                projection.addProjectionVar(new VarNode("var12"));
                 projection.addProjectionVar(new VarNode("var4"));
                 
                 final NamedSubqueryInclude nsi1 = new NamedSubqueryInclude(set1);
                 nsi1.setJoinVars(new VarNode[]{/*none*/});
+//                nsi1.setJoinVars(new VarNode[]{new VarNode("var1")});
                 whereClause.addChild(nsi1);
 
                 {
@@ -765,11 +743,12 @@ public class TestASTNamedSubqueryOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
-                projection.addProjectionVar(new VarNode("var13"));
+//                projection.addProjectionVar(new VarNode("var13"));
                 projection.addProjectionVar(new VarNode("var10"));
                 
                 final NamedSubqueryInclude nsi1 = new NamedSubqueryInclude(set1);
                 nsi1.setJoinVars(new VarNode[]{/*none*/});
+//                nsi1.setJoinVars(new VarNode[]{new VarNode("var1")});
                 whereClause.addChild(nsi1);
 
                 {
@@ -801,6 +780,7 @@ public class TestASTNamedSubqueryOptimizer extends
                 
                 final NamedSubqueryInclude nsi2 = new NamedSubqueryInclude(set2);
                 nsi2.setJoinVars(new VarNode[]{/*none*/});
+//                nsi2.setJoinVars(new VarNode[]{new VarNode("var1")});
                 whereClause.addChild(nsi2);
                 
                 final NamedSubqueryInclude nsi3 = new NamedSubqueryInclude(set3);

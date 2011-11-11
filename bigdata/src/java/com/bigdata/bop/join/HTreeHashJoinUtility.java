@@ -1942,7 +1942,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 				final HTreeHashJoinUtility o = (HTreeHashJoinUtility) others[i];
 				if (o == null)
 					throw new IllegalArgumentException();
-				if (!this.joinVars.equals(o.joinVars)) {
+                if (!Arrays.equals(joinVars, o.joinVars)) {
 					// Must have the same join variables.
 					throw new IllegalArgumentException();
 				}
@@ -2074,13 +2074,15 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 			while (sols0.hasNext()) {
 				sols0.next();
 				IBindingSet in = all[0].decodeSolution(set[0]);
+				// FIXME apply constraint to source[0] (JVM version also).
 				for (int i = 1; i < set.length; i++) {
 
 					// See if the solutions join.
+                    final IBindingSet left = in;
 					if (set[i] != null) {
 						final IBindingSet right = all[i].decodeSolution(set[i]); 
 						in = BOpContext.bind(//
-								in,// 
+								left,// 
 								right,// 
 								c,// TODO constraint[][]
 								null//
@@ -2088,6 +2090,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 					}
 
 					if (in == null) {
+//					    if(optional) {
+//					        in = left;
+//					        continue;
+//					    }
 						// Join failed.
 						break;
 					}
@@ -2098,6 +2104,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 					if (log.isDebugEnabled())
 						log.debug("Output solution: " + in);
 					// FIXME Vector resolution of ivCache.
+                    resolveCachedValues(ivCache.get(), blobsCache.get(), in);
 					outputBuffer.add(in);
 				}
 

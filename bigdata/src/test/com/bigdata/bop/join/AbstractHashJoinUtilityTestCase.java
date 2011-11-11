@@ -1183,7 +1183,30 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     public void test_mergeJoin03_optConstrain() {
     	mergeJoin03(true, true);
     }
-    
+
+    /**
+     * 
+     * <pre>
+     * (?a     ?x) (?a     ?y) (?a     ?z)
+     * (john mary) (john brad) (john mary)
+     * (john leon) (john fred)
+     * (fred leon)
+     * </pre>
+     * 
+     * <pre>
+     * (?a     ?x   ?y   ?z)
+     * (john mary brad mary) // required join 
+     * (john mary fred mary) // required join unless constraint
+     * (john leon brad mary) // required join 
+     * (john leon fred mary) // required join unless constraint
+     * (fred leon ---- ----) // iff optional (regardless of constraint)
+     * </pre>
+     * 
+     * @param optional
+     * @param constrain
+     *            When <code>true</code>, we constrain <code>?y = brad</code>
+     */
+    @SuppressWarnings("rawtypes")
     public void mergeJoin03(final boolean optional, final boolean constrain) {
         final JoinSetup setup = new JoinSetup(getName());
 
@@ -1207,7 +1230,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         /**
          * Setup the solutions for [first].
          */
-        @SuppressWarnings("rawtypes")
         final IBindingSet[] firstSolutions = new IBindingSet[] {
                 new ListBindingSet(//
                         new IVariable[] { a, x },//
@@ -1248,7 +1270,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         /**
          * Setup the source solutions for [other].
          */
-        @SuppressWarnings("rawtypes")
         final IBindingSet[] moreSolutions = new IBindingSet[] {
                 new ListBindingSet(//
                         new IVariable[] { a, z },//
@@ -1268,7 +1289,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
          * (john, leon)   (john, fred) 
          * </pre>
          */
-        @SuppressWarnings("rawtypes")
         final IBindingSet[] expected;
         if (optional) {
         	if (constraints == null) {
@@ -1408,7 +1428,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     );
 
             // Setup a mock PipelineOp for the test.
-            final PipelineOp moreOp = new MockPipelineOp(BOp.NOARGS, 
+            final PipelineOp moreOp = new MockPipelineOp(BOp.NOARGS,
                     new NV(HTreeHashJoinAnnotations.RELATION_NAME,
                             new String[] { getName() }),//
                     new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
@@ -1420,7 +1440,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
             other = newHashJoinUtility(otherOp, optional, false/* filter */);
 
-            more = newHashJoinUtility(otherOp, optional, false/* filter */);
+            more = newHashJoinUtility(moreOp, optional, false/* filter */);
 
             // Load into [first].
             {

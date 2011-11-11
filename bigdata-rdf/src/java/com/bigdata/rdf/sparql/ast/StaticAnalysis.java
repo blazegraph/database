@@ -229,6 +229,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            Where to store the "MUST" bound variables.
      * 
      * @return The argument.
+     * 
+     *         FIXME This needs to consider the exogenous variables. Perhaps
+     *         modify the StaticAnalysis constructor to pass in the exogenous
+     *         IBindingSet[]?
      */
     public Set<IVariable<?>> getDefinitelyIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
@@ -1445,7 +1449,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * variables projected by the subquery.
          */
         boundBySubquery.retainAll(incomingBindings);
-
+            
         vars.addAll(boundBySubquery);
 
         return vars;
