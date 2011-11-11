@@ -1220,7 +1220,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                 if (in == null) {
                     // Join failed.
-                    continue;
+                    break;
                 }
 
                 if (log.isDebugEnabled())

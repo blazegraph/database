@@ -1169,14 +1169,22 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * Test with more than 2 join sets.
      */
     public void test_mergeJoin03_nonOpt() {
-    	mergeJoin03(false);
+    	mergeJoin03(false, false);
     }
     
     public void test_mergeJoin03_opt() {
-    	mergeJoin03(true);
+    	mergeJoin03(true, false);
     }
     
-    public void mergeJoin03(final boolean optional) {
+    public void test_mergeJoin03_nonOptConstrain() {
+    	mergeJoin03(false, true);
+    }
+    
+    public void test_mergeJoin03_optConstrain() {
+    	mergeJoin03(true, true);
+    }
+    
+    public void mergeJoin03(final boolean optional, final boolean constrain) {
         final JoinSetup setup = new JoinSetup(getName());
 
         final IVariable<?> a = Var.var("a");
@@ -1190,8 +1198,11 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         // The variables projected by the join (iff non-null).
         final IVariable<?>[] selectVars = null;
         
+        
         // The join constraints.
-        final IConstraint[] constraints = null;
+        final IConstraint[] constraints = constrain ? new IConstraint[] { Constraint
+                .wrap(new EQConstant(y, new Constant<IV>(setup.brad))),//
+        } : null;
 
         /**
          * Setup the solutions for [first].
@@ -1260,6 +1271,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         @SuppressWarnings("rawtypes")
         final IBindingSet[] expected;
         if (optional) {
+        	if (constraints == null) {
 	        	expected = new IBindingSet[] {//
 	            // many-to-many join
 	            new ListBindingSet(//
@@ -1295,7 +1307,31 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                         new IConstant[] { new Constant<IV>(setup.fred),
                                           new Constant<IV>(setup.leon)})
 	        };
+        	} else {
+	        	expected = new IBindingSet[] {//
+	    	            // many-to-many join
+	    	            new ListBindingSet(//
+	    	                    new IVariable[] { a, x, y, z },//
+	    	                    new IConstant[] { new Constant<IV>(setup.john),
+	    	                                      new Constant<IV>(setup.mary),
+	    	                                      new Constant<IV>(setup.brad),
+	    	                                      new Constant<IV>(setup.mary)}//
+	    	            ),//
+	    	            new ListBindingSet(//
+	    	                    new IVariable[] { a, x, y, z },//
+	    	                    new IConstant[] { new Constant<IV>(setup.john),
+	    	                                      new Constant<IV>(setup.leon),
+	    	                                      new Constant<IV>(setup.brad),
+	    	                                      new Constant<IV>(setup.mary)}//
+	    	            ),//
+	                    new ListBindingSet(//
+	                            new IVariable[] { a, x },//
+	                            new IConstant[] { new Constant<IV>(setup.fred),
+	                                              new Constant<IV>(setup.leon)})
+	        	};
+        	}
         } else {
+        	if (constraints == null) {
         	expected = new IBindingSet[] {//
                     // many-to-many join
                     new ListBindingSet(//
@@ -1327,6 +1363,25 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                                               new Constant<IV>(setup.mary)}//
                     )
                 };
+        	} else {
+            	expected = new IBindingSet[] {//
+                        // many-to-many join
+                        new ListBindingSet(//
+                                new IVariable[] { a, x, y, z },//
+                                new IConstant[] { new Constant<IV>(setup.john),
+                                                  new Constant<IV>(setup.mary),
+                                                  new Constant<IV>(setup.brad),
+                                                  new Constant<IV>(setup.mary)}//
+                        ),//
+                        new ListBindingSet(//
+                                new IVariable[] { a, x, y, z },//
+                                new IConstant[] { new Constant<IV>(setup.john),
+                                                  new Constant<IV>(setup.leon),
+                                                  new Constant<IV>(setup.brad),
+                                                  new Constant<IV>(setup.mary)}//
+                        )
+                    };
+        	}
         }
 
         IHashJoinUtility first = null;
@@ -1339,8 +1394,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     new NV(HTreeHashJoinAnnotations.RELATION_NAME,
                             new String[] { getName() }),//
                     new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                    new NV(JoinAnnotations.SELECT, selectVars)//
-//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    new NV(JoinAnnotations.SELECT, selectVars),//
+                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
             // Setup a mock PipelineOp for the test.
@@ -1348,8 +1403,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     new NV(HTreeHashJoinAnnotations.RELATION_NAME,
                             new String[] { getName() }),//
                     new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                    new NV(JoinAnnotations.SELECT, selectVars)//
-//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    new NV(JoinAnnotations.SELECT, selectVars),//
+                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
             // Setup a mock PipelineOp for the test.
@@ -1357,8 +1412,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     new NV(HTreeHashJoinAnnotations.RELATION_NAME,
                             new String[] { getName() }),//
                     new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
-                    new NV(JoinAnnotations.SELECT, selectVars)//
-//                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
+                    new NV(JoinAnnotations.SELECT, selectVars),//
+                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
             first = newHashJoinUtility(firstOp, optional, false/* filter */);
