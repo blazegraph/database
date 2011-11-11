@@ -31,6 +31,8 @@ import java.io.Serializable;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import cern.colt.Arrays;
+
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
@@ -58,7 +60,7 @@ public class ComputedMaterializationRequirement implements
 
     public String toString() {
 
-        return "{requirement=" + requirement + ", vars=" + varsToMaterialize
+        return "{requirement=" + requirement + ", vars=" + Arrays.toString(varsToMaterialize.toArray())
                 + "}";
 
     }

@@ -59,6 +59,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
+import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.IsInlineBOp;
 import com.bigdata.rdf.internal.constraints.IsMaterializedBOp;
@@ -486,14 +487,18 @@ public class AST2BOpFilters extends AST2BOpBase {
                 needsMaterialization.entrySet()) {
 
                 final IConstraint c = e.getKey();
-
+                
                 final Set<IVariable<IV>> terms = e.getValue();
 
                 // remove any terms already materialized
                 terms.removeAll(alreadyMaterialized);
 
-                // add any new terms to the list of already materialized
-                alreadyMaterialized.addAll(terms);
+                if (c instanceof INeedsMaterialization && ((INeedsMaterialization) c).getRequirement() == Requirement.ALWAYS) {
+                	
+	                // add any new terms to the list of already materialized
+	                alreadyMaterialized.addAll(terms);
+	                
+                }
 
                 final int condId = idFactory.incrementAndGet();
 

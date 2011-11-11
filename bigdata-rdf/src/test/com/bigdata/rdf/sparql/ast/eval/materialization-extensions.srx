@@ -10,10 +10,10 @@
   <results>
     <result>
       <binding name="date">
-      	<literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2009-07-28T12:53:25.000Z</literal>
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">2008-07-28T12:53:25.000Z</literal>
       </binding>
       <binding name="dateStr">
-      	<literal >2009-07-28T12:53:25.000Z</literal>
+      	<literal >2008-07-28T12:53:25.000Z</literal>
       </binding>
     </result>
     <result>
