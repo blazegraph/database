@@ -84,17 +84,13 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      *             given named solution set.
      */
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
-            /*DatasetNode dataset,*/ IBindingSet[] bindingSet) {
+    public IQueryNode optimize(final AST2BOpContext context,
+            final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-        /*
-         * Order the named subqueries in order to support nested includes
-         */
-        orderNamedSubqueries(queryRoot, queryRoot.getNamedSubqueries());
-
-        final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
+        final NamedSubqueriesNode namedSubqueries = queryRoot
+                .getNamedSubqueries();
 
         if (namedSubqueries == null || namedSubqueries.isEmpty()) {
 
@@ -102,6 +98,15 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
             return queryRoot;
 
         }
+
+        /*
+         * Order the named subqueries in order to support nested includes.
+         * 
+         * Note: The named subqueries must form an acyclic graph. They can
+         * INCLUDE one another, but not in patterns which form cycles. This puts
+         * them into an evaluation order.
+         */
+        orderNamedSubqueries(queryRoot, namedSubqueries);
 
         // The set of all INCLUDEs in the query.
         final NamedSubqueryInclude[] allIncludes = findAllIncludes(queryRoot);
@@ -128,7 +133,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * Return all {@link NamedSubqueryInclude}s which appear in the WHERE clause
      * of the main query.
      */
-    private NamedSubqueryInclude[] findAllIncludes(final QueryRoot queryRoot) {
+    static private NamedSubqueryInclude[] findAllIncludes(final QueryRoot queryRoot) {
 
         final Striterator itr = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
@@ -169,7 +174,15 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
     }
 
-    private List<NamedSubqueryInclude> findSubqueryIncludes(final SubqueryBase queryRoot){
+    /**
+     * TODO This seems to be inefficient. We do not need to proceed
+     * {@link SubqueryBase} by {@link SubqueryBase}.
+     * {@link BOpUtility#visitAll(BOp, Class)} can be used to locate all
+     * INCLUDEs in the entire query and then we can build up whatever indices we
+     * need in optimize() and use them elsewhere as required.
+     */
+    static private List<NamedSubqueryInclude> findSubqueryIncludes(final SubqueryBase queryRoot){
+        
         final Striterator itr = new Striterator(
                 BOpUtility.postOrderIterator((BOp) queryRoot.getWhereClause()));
 
@@ -205,7 +218,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * @param namedSubqueries
      * @param allIncludes
      */
-    private void assertNamedSubqueryForEachInclude(
+    static private void assertNamedSubqueryForEachInclude(
             final NamedSubqueriesNode namedSubqueries,
             final NamedSubqueryInclude[] allIncludes) {
 
@@ -243,7 +256,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * @param namedSubqueries
      * @param allIncludes
      */
-    private void assertEachNamedSubqueryIsUsed(
+    static private void assertEachNamedSubqueryIsUsed(
             final NamedSubqueriesNode namedSubqueries,
             final NamedSubqueryInclude[] allIncludes) {
 
@@ -306,7 +319,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * @param namedSubqueries
      * @param allIncludes
      */
-    private void assignJoinVars(//
+    static private void assignJoinVars(//
             final QueryRoot queryRoot,
             final NamedSubqueriesNode namedSubqueries,
             final NamedSubqueryInclude[] allIncludes) {
@@ -352,12 +365,27 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
                     /*
                      * Since no query hint was used, then figure out the join
                      * variables using a static analysis of the query.
+                     * 
+                     * Note: Since the named subqueries run with only the
+                     * exogenous bindings as input, anything which is
+                     * exogenously bound plus anything which is known bound can
+                     * serve as a join variable. [TODO There is a StaticAnalysis
+                     * bug - it fails to consider the exogenous bindings when
+                     * computing the definitely bound variables.]
+                     * 
+                     * Note: If there are no exogenous bindings, then the sole
+                     * source solution for the named subquery is an empty
+                     * solution set.
+                     * 
+                     * Note: If there are exogenous bindings, then the sole
+                     * source solution for the named subquery is formed from
+                     * those exogenous bindings.
                      */
 
                     final Set<IVariable<?>> set = new LinkedHashSet<IVariable<?>>();
                     
                     sa.getJoinVars(aNamedSubquery, anInclude, set);
-                    
+
                     joinvars = set.toArray(new IVariable[set.size()]);
 
                     // Sort.
@@ -450,26 +478,35 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
     }
 
     /**
-     * Order the named subqueries based on nested includes
+     * Order the named subqueries based on nested includes.
+     * 
+     * TODO This should reuse the same arrays/collections that are generated for
+     * the other logic in this class. No need to repeatedly traverse the query
+     * looking for INCLUDEs.
      */
-    private void orderNamedSubqueries(final QueryRoot queryRoot,
+    static private void orderNamedSubqueries(final QueryRoot queryRoot,
             final NamedSubqueriesNode namedSubqueries) {
+    
+        // Map from solution set name to named subquery root.
+        final Map<String, NamedSubqueryRoot> nameToSubquery = new LinkedHashMap<String, NamedSubqueryRoot>();
+        {
         
-        if (namedSubqueries != null) {
-
-            /*
-             * List of named solutions on which each named subquery depends.
-             */
-            final Map<NamedSubqueryRoot, List<String>> subqueryToIncludes = new LinkedHashMap<NamedSubqueryRoot, List<String>>();
-
-            final Map<String, NamedSubqueryRoot> nameToSubquery = new LinkedHashMap<String, NamedSubqueryRoot>();
-
             for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
                 nameToSubquery.put(aNamedSubquery.getName(), aNamedSubquery);
 
             }
 
+        }
+
+        /*
+         * Map from named subquery root to the list of named solutions on which
+         * each named subquery depends. Those named solutions must be computed
+         * before any named subquery root which will consume them.
+         */
+        final Map<NamedSubqueryRoot, List<String>> subqueryToIncludes = new LinkedHashMap<NamedSubqueryRoot, List<String>>();
+        {
+            
             for (NamedSubqueryRoot aNamedSubquery : namedSubqueries) {
 
                 final List<String> includes = new LinkedList<String>();
@@ -484,9 +521,17 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
 
                 // Set the DEPENDS_ON annotation.
                 aNamedSubquery.setDependsOn(includes.toArray(new String[0]));
-                
+
             }
             
+        }
+        
+        /*
+         * Create a new NamedSubqueriesNode which corresponds to a valid
+         * evaluation order for the named subqueries.
+         */
+        {
+
             final Set<String> processed = new HashSet<String>();
 
             final NamedSubqueriesNode newNode = new NamedSubqueriesNode();
@@ -524,8 +569,12 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
                     }
                 }
             }
+
+            // Update the QueryRoot with the named subquery evaluation order.
             queryRoot.setNamedSubqueries(newNode);
+
         }
+
     }
 
     /**

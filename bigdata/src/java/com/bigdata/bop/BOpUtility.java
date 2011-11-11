@@ -47,7 +47,6 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -1086,7 +1085,7 @@ public class BOpUtility {
      * @return The #of binding sets copied.
      */
     static public long copy(
-            final IAsynchronousIterator<IBindingSet[]> source,
+            final Iterator<IBindingSet[]> source,
             final IBlockingBuffer<IBindingSet[]> sink,
             final IBlockingBuffer<IBindingSet[]> sink2,
             final IBindingSet mergeSolution,

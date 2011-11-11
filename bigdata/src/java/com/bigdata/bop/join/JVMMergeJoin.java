@@ -200,28 +200,32 @@ public class JVMMergeJoin extends PipelineOp {
 
             this.op = op;
 
-            // The name of the attribute used to discover the solution set.
-            final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+            // The names of the attributes used to discover the solution sets.
+            final NamedSolutionSetRef[] namedSetRef = (NamedSolutionSetRef[]) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
 
-            // Lookup the attributes for the query on which we will hang the
-            // solution set.
-            final IQueryAttributes attrs = context
-                    .getQueryAttributes(namedSetRef.queryId);
-
-            state = (JVMHashJoinUtility[]) attrs.get(namedSetRef);
-
-            if (state == null) {
-
-                // The solution set was not found!
-                throw new RuntimeException("Not found: " + namedSetRef);
-
-            }
+            state = new JVMHashJoinUtility[namedSetRef.length];
 
             if (state.length < 2) {
 
                 throw new RuntimeException(
                         "Merge join requires at least 2 sources.");
+
+            }
+            
+            for (int i = 0; i < state.length; i++) {
+
+                final IQueryAttributes attrs = context
+                        .getQueryAttributes(namedSetRef[i].queryId);
+
+                state[i] = (JVMHashJoinUtility) attrs.get(namedSetRef[i]);
+                
+                if (state[i] == null) {
+
+                    // The solution set was not found!
+                    throw new RuntimeException("Not found: " + namedSetRef[i]);
+
+                }
 
             }
             
@@ -249,6 +253,8 @@ public class JVMMergeJoin extends PipelineOp {
 
                     unsyncBuffer.flush();
 
+                    sink.flush();
+                    
                 }
                 
                 // Done.

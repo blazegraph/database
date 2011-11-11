@@ -15,6 +15,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.engine.SolutionsLog;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -221,7 +222,6 @@ public class BigdataBindingSetResolverator
          * Assemble a chunk of resolved elements.
          */
         {
-
             final IBindingSet[] chunk2 = new IBindingSet[chunk.length];
             int i = 0;
             for (IBindingSet e : chunk) {
@@ -232,6 +232,13 @@ public class BigdataBindingSetResolverator
 
             }
 
+            if (SolutionsLog.solutionsLog.isInfoEnabled()) {
+
+                SolutionsLog.log(null/* queryId */, null/* bop */,
+                        -1/* bopId */, -1/* partitionId */, chunk2);
+
+            }
+            
             if (log.isInfoEnabled())
                 log.info("Resolved chunk: size=" + chunk2.length + ", chunk="
                         + Arrays.toString(chunk2));
