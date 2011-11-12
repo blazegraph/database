@@ -31,6 +31,7 @@ package com.bigdata.bop.engine;
 import java.io.IOException;
 import java.io.Writer;
 import java.text.DateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
@@ -42,12 +43,14 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
+import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -392,6 +395,11 @@ public class QueryLog {
                 }
 //                sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
             }
+        }
+        if (bop instanceof ChunkedMaterializationOp) {
+            final IVariable<?>[] vars = (IVariable<?>[]) bop
+                    .getProperty(ChunkedMaterializationOp.Annotations.VARS);
+            sb.append(Arrays.toString(vars));
         }
 
 		/*
@@ -873,6 +881,11 @@ public class QueryLog {
                 }
 //                w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
             }
+        }
+        if (bop instanceof ChunkedMaterializationOp) {
+            final IVariable<?>[] vars = (IVariable<?>[]) bop
+                    .getProperty(ChunkedMaterializationOp.Annotations.VARS);
+            w.write(cdata(Arrays.toString(vars)));
         }
         w.write(TDx);
 
