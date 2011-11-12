@@ -244,6 +244,16 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      */
     private final boolean filter;
     
+//    /**
+//     * The operator which was used to construct the {@link IHashJoinUtility}
+//     * state.
+//     * <p>
+//     * Note: This is NOT necessarily the operator which is currently executing.
+//     * Hash indices are often built by one operator and then consumed by
+//     * other(s).
+//     */
+//    private final PipelineOp op;
+    
     /**
      * The join variables.
      */
@@ -335,6 +345,45 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
     
+    /**
+     * Human readable representation of the {@link IHashJoinUtility} metadata
+     * (but not the solutions themselves).
+     */
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName()+"{");
+        
+        sb.append(",open="+open);
+        sb.append(",chunkSize="+chunkSize);
+        /*
+         * Note: schema and ivCacheSchema are not thread-safe, so it is not safe
+         * to show their state here. A concurrent modification exception could
+         * easily be thrown. Not synchronizing on these things is currently
+         * valued more than observing their contents outside of a debugger.
+         */
+//        sb.append(",schema="+schema);
+//        sb.append(",ivCacheSchema="+ivCacheSchema);
+        sb.append(",optional="+optional);
+        sb.append(",filter="+filter);
+        sb.append(",joinVars="+Arrays.toString(joinVars));
+        sb.append(",selectVars="+selectVars==null?null:Arrays.toString(selectVars));
+        sb.append(",constraints="+constraints==null?constraints:Arrays.toString(constraints));
+        sb.append(",namespace="+namespace);
+        sb.append(",size="+getRightSolutionCount());
+        if(joinSet.get()!=null)
+            sb.append(",joinSetSize="+getJoinSetSize());
+        if(ivCache.get()!=null)
+            sb.append(",ivCacheSize="+getIVCacheSize());
+        if(blobsCache.get()!=null)
+            sb.append(",blobCacheSize="+getBlobsCacheSize());
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+
     @Override
     public boolean isEmpty() {
         
@@ -350,6 +399,48 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (htree != null) {
 
             return htree.getEntryCount();
+
+        }
+
+        return 0L;
+        
+    }
+
+    private long getJoinSetSize() {
+
+        final HTree htree = getJoinSet();
+
+        if (htree != null) {
+
+            return htree.getEntryCount();
+
+        }
+
+        return 0L;
+        
+    }
+
+    private long getIVCacheSize() {
+
+        final BTree ndx = ivCache.get();
+
+        if (ndx != null) {
+
+            return ndx.getEntryCount();
+
+        }
+
+        return 0L;
+        
+    }
+
+    private long getBlobsCacheSize() {
+
+        final BTree ndx = blobsCache.get();
+
+        if (ndx != null) {
+
+            return ndx.getEntryCount();
 
         }
 
@@ -545,6 +636,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (op == null)
             throw new IllegalArgumentException();
 
+//        this.op = op;
+        
         // The join variables (required).
         this.joinVars = (IVariable<?>[]) op
                 .getRequiredProperty(HashJoinAnnotations.JOIN_VARS);
@@ -780,6 +873,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (stats == null)
             throw new IllegalArgumentException();
 
+        try {
+
         long naccepted = 0L;
         
         final HTree htree = getRightSolutions();
@@ -860,6 +955,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         }
         
         return naccepted;
+        
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
 
     }
 
@@ -873,6 +972,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (stats == null)
             throw new IllegalArgumentException();
 
+        try {
+        
         long naccepted = 0L;
         
         final HTree htree = getRightSolutions();
@@ -981,6 +1082,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         }
         
         return naccepted;
+
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
 
     }
     
@@ -1431,6 +1536,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
             } // while(itr.hasNext()
 
+        } catch(Throwable t) {
+
+            throw launderThrowable(t);
+            
         } finally {
 
             leftItr.close();
@@ -1570,6 +1679,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
+        try {
+        
         if (log.isInfoEnabled()) {
             final HTree htree = this.getRightSolutions();
             log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
@@ -1652,12 +1763,19 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             }
 
         }
+        
+        } catch(Throwable t) {
 
+            throw launderThrowable(t);
+        }
+        
     } // handleOptionals.
 
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
+        try {
+        
         final HTree rightSolutions = getRightSolutions();
 
         if (log.isInfoEnabled()) {
@@ -1691,6 +1809,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             
             out.add(bset);
 
+        }
+
+        } catch(Throwable t) {
+
+            throw launderThrowable(t);
+            
         }
 
     }
@@ -2300,4 +2424,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     }
 
+    /**
+     * Adds metadata about the {@link IHashJoinUtility} state to the stack
+     * trace.
+     * 
+     * @param t
+     *            The thrown error.
+     * 
+     * @return The laundered exception.
+     * 
+     * @throws Exception
+     */
+    private RuntimeException launderThrowable(final Throwable t) {
+        
+        return new RuntimeException("cause=" + t + ", state=" + toString(), t);
+        
+    }
+    
 }
