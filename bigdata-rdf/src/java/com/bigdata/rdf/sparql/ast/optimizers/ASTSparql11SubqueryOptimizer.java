@@ -105,7 +105,11 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
             if (namedSubqueries != null) {
 
-                for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
+                // Note: works around concurrent modification error.
+                final List<NamedSubqueryRoot> list = BOpUtility.toList(
+                        namedSubqueries, NamedSubqueryRoot.class);
+                
+                for (NamedSubqueryRoot namedSubquery : list) {
 
                     liftSubqueries(context, sa, namedSubquery.getWhereClause());
 
