@@ -1091,6 +1091,7 @@ public class NanoSparqlClient {
 
 		public void run() {
 
+		    final long begin = System.nanoTime();
 			try {
 
 				final QueryTrial trial = query.runQuery(opts);
@@ -1107,6 +1108,13 @@ public class NanoSparqlClient {
 			} catch (Throwable t) {
 
 				nerrors.incrementAndGet();
+
+				final long elapsedNanos = System.nanoTime() - begin;
+				
+                System.err.println("resultCount=ERR, elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                        + "ms, source=" + query.source + ", cause="
+                        + t.getLocalizedMessage());
 
 				log.error("nerrors=" + nerrors + ", source=" + query.source
 						+ ", query=" + query.queryStr + ", cause=" + t);// , t);
@@ -1271,6 +1279,7 @@ public class NanoSparqlClient {
 		File file = null; // When non-null, file or directory containing query(s).
 		Pattern delim = null; // When non-null, this delimits queries within a file.
 		String queryStr = null; // A query given directly on the command line.
+		boolean reportScores = false; // Report the average time for each query.
 		int nclients = 1; // The #of clients.
 		int threadsPerClient = 1; // TODO The #of threads per client IFF groupQueriesBySource is true.
 		boolean groupQueriesBySource = false; // TODO When true, each source represents a batch of queries.
@@ -1313,9 +1322,13 @@ public class NanoSparqlClient {
 
 					opts.showParseTree = true;
 
-				} else if (arg.equals("-showResults")) {
+                } else if (arg.equals("-showResults")) {
 
-					opts.showResults = true;
+                    opts.showResults = true;
+
+                } else if (arg.equals("-reportScores")) {
+
+                    reportScores = true;
 
                 } else if (arg.equals("-verbose")) {
                     
@@ -1599,7 +1612,8 @@ public class NanoSparqlClient {
 		 * Report the average query latency for queries with at least a
 		 * specified latency.
 		 */
-		reportScores(getScores(queries), minLatencyToReport);
+		if(reportScores)
+		    reportScores(getScores(queries), minLatencyToReport);
 
 		System.out.println("Total elapsed time: "
 				+ (System.currentTimeMillis() - beginTrials) + "ms for "
