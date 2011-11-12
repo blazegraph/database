@@ -370,7 +370,7 @@ public class QueryLog {
                     sb.append(state.toString());
                 } else {
                     // Otherwise the NamedSolutionSetRef
-                    sb.append(ref.namedSet.toString());
+                    sb.append(ref.toString());
                 }
 //                sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
             } else {
@@ -387,7 +387,7 @@ public class QueryLog {
                         sb.append(state.toString());
                     } else {
                         // Otherwise the NamedSolutionSetRef
-                        sb.append(ref.namedSet.toString());
+                        sb.append(ref.toString());
                     }
                 }
 //                sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
@@ -851,7 +851,7 @@ public class QueryLog {
                     w.write(cdata(state.toString()));
                 } else {
                     // Otherwise the NamedSolutionSetRef
-                    w.write(cdata(ref.namedSet));
+                    w.write(cdata(ref.toString()));
                 }
 //                w.write(cdata(", joinvars=" + Arrays.toString(ref.joinVars)));
             } else {
@@ -868,7 +868,7 @@ public class QueryLog {
                         w.write(cdata(state.toString()));
                     } else {
                         // Otherwise the NamedSolutionSetRef
-                        w.write(cdata(ref.namedSet));
+                        w.write(cdata(ref.toString()));
                     }
                 }
 //                w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
