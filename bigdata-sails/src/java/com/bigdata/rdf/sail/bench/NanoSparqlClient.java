@@ -1111,10 +1111,11 @@ public class NanoSparqlClient {
 
 				final long elapsedNanos = System.nanoTime() - begin;
 				
+				// Note: This is the same format as the result line above!
                 System.err.println("resultCount=ERR, elapsed="
                         + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
-                        + "ms, source=" + query.source + ", cause="
-                        + t.getLocalizedMessage());
+                        + "ms, source=" + query.source);
+//                + ", cause="+ t.getLocalizedMessage());
 
 				log.error("nerrors=" + nerrors + ", source=" + query.source
 						+ ", query=" + query.queryStr + ", cause=" + t);// , t);
