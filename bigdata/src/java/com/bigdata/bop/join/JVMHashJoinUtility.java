@@ -428,6 +428,31 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final CAT rightSolutionCount = new CAT();
     
     /**
+     * Human readable representation of the {@link IHashJoinUtility} metadata
+     * (but not the solutions themselves).
+     */
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{open=" + open);
+        sb.append(",optional=" + optional);
+        sb.append(",filter=" + filter);
+        sb.append(",joinVars=" + Arrays.toString(joinVars));
+        if (selectVars != null)
+            sb.append(",selectVars=" + Arrays.toString(selectVars));
+        if (constraints != null)
+            sb.append(",constraints=" + Arrays.toString(constraints));
+        sb.append(",size=" + getRightSolutionCount());
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+
+    /**
      * 
      * @param op
      *            The operator whose annotation will inform construction the

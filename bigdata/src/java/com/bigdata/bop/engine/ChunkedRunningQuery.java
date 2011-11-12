@@ -1210,8 +1210,14 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
             } catch (Throwable t) {
                 halt(t);  // ensure query halts.
                 if (getCause() != null) {
-                    // abnormal termination - wrap and rethrow.
-                    throw new Exception(t);
+                    /*
+                     * Abnormal termination - wrap and rethrow.
+                     * 
+                     * Note: This is also where we attach the metadata about the
+                     * operator and query for which the error was observed.
+                     */
+                    throw new Exception("task=" + toString() + ", cause=" + t,
+                            t);
                 }
                 // otherwise ignore exception (normal completion).
             } finally {
