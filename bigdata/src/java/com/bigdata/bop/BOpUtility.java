@@ -434,7 +434,38 @@ public class BOpUtility {
         return toList(it).toArray(new IVariable[] {});
 
     }
-    
+
+    /**
+     * Return a list containing references to all nodes of the given type
+     * (recursive, including annotations).
+     * <p>
+     * Note: This may be used to work around concurrent modification errors
+     * since the returned list is structurally independent of the original
+     * operator tree.
+     * 
+     * @param op
+     *            The root of the operator tree.
+     * @param clas
+     *            The type of the node to be extracted.
+     * 
+     * @return A list containing those references.
+     */
+    public static <C> List<C> toList(final BOp op, final Class<C> clas) {
+        
+        final List<C> list = new LinkedList<C>();
+        
+        final Iterator<C> it = visitAll(op,clas);
+        
+        while(it.hasNext()) {
+
+            list.add(it.next());
+            
+        }
+        
+        return list;
+        
+    }
+
     @SuppressWarnings("unchecked")
 	public static <C> Iterator<C> visitAll(final BOp op, final Class<C> clas) {
     	
