@@ -353,10 +353,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         final StringBuilder sb = new StringBuilder();
         
-        sb.append(getClass().getSimpleName()+"{");
+        sb.append(getClass().getSimpleName());
         
-        sb.append(",open="+open);
-        sb.append(",chunkSize="+chunkSize);
+        sb.append("{open=" + open);
+        sb.append(",chunkSize=" + chunkSize);
         /*
          * Note: schema and ivCacheSchema are not thread-safe, so it is not safe
          * to show their state here. A concurrent modification exception could
@@ -365,19 +365,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
          */
 //        sb.append(",schema="+schema);
 //        sb.append(",ivCacheSchema="+ivCacheSchema);
-        sb.append(",optional="+optional);
-        sb.append(",filter="+filter);
-        sb.append(",joinVars="+Arrays.toString(joinVars));
-        sb.append(",selectVars="+selectVars==null?null:Arrays.toString(selectVars));
-        sb.append(",constraints="+constraints==null?constraints:Arrays.toString(constraints));
-        sb.append(",namespace="+namespace);
-        sb.append(",size="+getRightSolutionCount());
-        if(joinSet.get()!=null)
-            sb.append(",joinSetSize="+getJoinSetSize());
-        if(ivCache.get()!=null)
-            sb.append(",ivCacheSize="+getIVCacheSize());
-        if(blobsCache.get()!=null)
-            sb.append(",blobCacheSize="+getBlobsCacheSize());
+        sb.append(",optional=" + optional);
+        sb.append(",filter=" + filter);
+        sb.append(",joinVars=" + Arrays.toString(joinVars));
+        if (selectVars != null)
+            sb.append(",selectVars=" + Arrays.toString(selectVars));
+        if (constraints != null)
+            sb.append(",constraints=" + Arrays.toString(constraints));
+        sb.append(",namespace=" + namespace);
+        sb.append(",size=" + getRightSolutionCount());
+        if (joinSet.get() != null)
+            sb.append(",joinSetSize=" + getJoinSetSize());
+        if (ivCache.get() != null)
+            sb.append(",ivCacheSize=" + getIVCacheSize());
+        if (blobsCache.get() != null)
+            sb.append(",blobCacheSize=" + getBlobsCacheSize());
         sb.append("}");
         
         return sb.toString();

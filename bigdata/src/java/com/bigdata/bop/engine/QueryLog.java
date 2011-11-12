@@ -31,7 +31,6 @@ package com.bigdata.bop.engine;
 import java.io.IOException;
 import java.io.Writer;
 import java.text.DateFormat;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
@@ -363,29 +362,35 @@ public class QueryLog {
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
             if (namedSetRef instanceof NamedSolutionSetRef) {
                 final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                sb.append(ref.namedSet);
                 final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
                 final IQueryAttributes attrs = t==null?null:t.getAttributes();
                 final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
                 if(state!=null) {
-                    sb.append(cdata("(#"+state.getRightSolutionCount())+")");
+                    // Prefer the IHashUtilityState
+                    sb.append(state.toString());
+                } else {
+                    // Otherwise the NamedSolutionSetRef
+                    sb.append(ref.namedSet.toString());
                 }
-                sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
+//                sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
             } else {
                 final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
                 for (int i = 0; i < refs.length; i++) {
                     final NamedSolutionSetRef ref = refs[i];
                     if (i > 0)
-                        sb.append(cdata(","));
-                    sb.append(cdata(ref.namedSet));
+                        sb.append(",");
                     final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
                     final IQueryAttributes attrs = t==null?null:t.getAttributes();
                     final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
                     if(state!=null) {
-                        sb.append(cdata("(#"+state.getRightSolutionCount())+")");
+                        // Prefer the IHashUtilityState
+                        sb.append(state.toString());
+                    } else {
+                        // Otherwise the NamedSolutionSetRef
+                        sb.append(ref.namedSet.toString());
                     }
                 }
-                sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
+//                sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
             }
         }
 
@@ -838,29 +843,35 @@ public class QueryLog {
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
             if (namedSetRef instanceof NamedSolutionSetRef) {
                 final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                w.write(cdata(ref.namedSet));
                 final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
                 final IQueryAttributes attrs = t==null?null:t.getAttributes();
                 final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
                 if(state!=null) {
-                    w.write(cdata("(#"+state.getRightSolutionCount())+")");
+                    // Prefer the IHashUtilityState
+                    w.write(cdata(state.toString()));
+                } else {
+                    // Otherwise the NamedSolutionSetRef
+                    w.write(cdata(ref.namedSet));
                 }
-                w.write(cdata(", joinvars=" + Arrays.toString(ref.joinVars)));
+//                w.write(cdata(", joinvars=" + Arrays.toString(ref.joinVars)));
             } else {
                 final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
                 for (int i = 0; i < refs.length; i++) {
                     final NamedSolutionSetRef ref = refs[i];
                     if (i > 0)
                         w.write(cdata(","));
-                    w.write(cdata(ref.namedSet));
                     final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
                     final IQueryAttributes attrs = t==null?null:t.getAttributes();
                     final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
                     if(state!=null) {
-                        w.write(cdata("(#"+state.getRightSolutionCount())+")");
+                        // Prefer the IHashUtilityState
+                        w.write(cdata(state.toString()));
+                    } else {
+                        // Otherwise the NamedSolutionSetRef
+                        w.write(cdata(ref.namedSet));
                     }
                 }
-                w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
+//                w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
             }
         }
         w.write(TDx);
