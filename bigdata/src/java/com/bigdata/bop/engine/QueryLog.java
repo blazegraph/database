@@ -354,7 +354,8 @@ public class QueryLog {
                 }
             }
             sb.append(")");
-        } else if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
+        }
+        if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
             /*
              * Named Solution Set(s) summary.
              */
@@ -386,8 +387,6 @@ public class QueryLog {
                 }
                 sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
             }
-        } else {
-            sb.append(NA);
         }
 
 		/*
@@ -440,13 +439,6 @@ public class QueryLog {
 		 * Dynamics.
 		 */
 
-		sb.append('\t');
-        if (bop != null) {
-            sb.append(((AbstractRunningQuery) q).getRunState(bopId));
-        } else {
-            sb.append(NA);
-        }
-
 		int fanIO = 0; // @todo aggregate from RunState.
 
 		final PipelineJoinStats stats = new PipelineJoinStats();
@@ -463,6 +455,17 @@ public class QueryLog {
 		}
 		final long unitsIn = stats.unitsIn.get();
 		final long unitsOut = stats.unitsOut.get();
+
+        sb.append('\t');
+        if (bop != null) {
+//            if (stats.opCount.get() == 0)
+//                sb.append("NotStarted");
+//            else
+                sb.append(((AbstractRunningQuery) q).getRunState(bopId));
+        } else {
+            sb.append(NA);
+        }
+
 		sb.append('\t');
 		sb.append(Integer.toString(fanIO));
 		sb.append('\t');
@@ -826,7 +829,8 @@ public class QueryLog {
                 }
             }
             w.write(cdata(")"));
-        } else if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
+        }
+        if (bop.getProperty(NamedSetAnnotations.NAMED_SET_REF) != null) {
             /*
              * Named Solution Set(s) summary.
              */
@@ -858,8 +862,6 @@ public class QueryLog {
                 }
                 w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
             }
-        } else {
-            w.write(cdata(NA));
         }
         w.write(TDx);
 
@@ -929,14 +931,6 @@ public class QueryLog {
          * Dynamics.
          */
 
-        w.write(TD);
-        if (bop != null) {
-            w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
-        } else {
-            w.write(cdata(NA));
-        }
-        w.write(TDx);
-
         int fanIO = 0; // @todo aggregate from RunState.
 
         final PipelineJoinStats stats = new PipelineJoinStats();
@@ -953,6 +947,18 @@ public class QueryLog {
         }
         final long unitsIn = stats.unitsIn.get();
         final long unitsOut = stats.unitsOut.get();
+
+        w.write(TD);
+        if (bop != null) {
+//            if (stats.opCount.get() == 0)
+//                w.write(cdata("NotStarted"));
+//            else
+                w.write(cdata(((AbstractRunningQuery) q).getRunState(bopId).name()));
+        } else {
+            w.write(cdata(NA));
+        }
+        w.write(TDx);
+
         w.write(TD);
         w.write(Integer.toString(fanIO));
         w.write(TDx);
