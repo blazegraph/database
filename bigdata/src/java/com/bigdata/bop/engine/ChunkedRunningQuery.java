@@ -1208,16 +1208,16 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
                     altSink.close();
                 }
             } catch (Throwable t) {
-                halt(t);  // ensure query halts.
+                /*
+                 * Ensure query halts.
+                 * 
+                 * Note: This is where we attach the metadata about the operator
+                 * and query for which the error was observed.
+                 */
+                halt(new Exception("task=" + toString() + ", cause=" + t, t));
                 if (getCause() != null) {
-                    /*
-                     * Abnormal termination - wrap and rethrow.
-                     * 
-                     * Note: This is also where we attach the metadata about the
-                     * operator and query for which the error was observed.
-                     */
-                    throw new Exception("task=" + toString() + ", cause=" + t,
-                            t);
+                    // Abnormal termination - wrap and rethrow.
+                    
                 }
                 // otherwise ignore exception (normal completion).
             } finally {
