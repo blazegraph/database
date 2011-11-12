@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
@@ -207,6 +209,38 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     }
 
+    /**
+     * Collect the variables used by the SELECT EXPRESSIONS for this projection
+     * node.
+     * <p>
+     * Note: This DOES NOT report the variables which are projected OUT of the
+     * query. It reports the variables on which those projected variables
+     * depend.
+     * 
+     * @param vars
+     *            The variables are inserted into this set.
+     *            
+     * @return The caller's set.
+     */
+    public Set<IVariable<?>> getSelectExprVars(final Set<IVariable<?>> vars) {
+        
+        for(AssignmentNode n : this) {
+
+            final Iterator<IVariable<?>> itr = BOpUtility.getSpannedVariables(n
+                    .getValueExpression());
+
+            while (itr.hasNext()) {
+
+                vars.add(itr.next());
+
+            }
+            
+        }
+        
+        return vars;
+        
+    }
+    
     /**
      * Return the {@link IValueExpression}s for this {@link ProjectionNode}.
      */

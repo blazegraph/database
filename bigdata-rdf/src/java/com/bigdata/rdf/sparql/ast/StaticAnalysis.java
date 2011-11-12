@@ -1458,7 +1458,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     
     /**
      * Return any variables which are used after then given node in the current
-     * ordering of its parent {@link JoinGroupNode}.
+     * ordering of its parent {@link JoinGroupNode} but DOES NOT consider the
+     * parent or the PROJECTION for the query in which this group appears.
      * 
      * @param node
      *            A node which is a direct child of some {@link JoinGroupNode}.
@@ -1553,7 +1554,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *         of the query, then the query will not have the same behavior. So,
      *         getting this analysis correct is very important.
      */
-    public Set<IVariable<?>> getProjectedVars(//
+    public Set<IVariable<?>> getProjectedVars(// FIXME Rename as GET PROJECTION and possible just return the PROJECTION NODE.
             final IGroupMemberNode proxy,
             final GraphPatternGroup<?> whereClause,//
             final QueryBase query,// 
@@ -1586,7 +1587,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 new LinkedHashSet<IVariable<?>>());
         
         // All variables projected out of the query in which this group appears.
-        query.getProjectedVars(afterVars);
+        query.getSelectExprVars(afterVars);
+//        query.getProjectedVars(afterVars); // FIXME This needs to collect the variables used in the SELECT EXPRESSIONS -NOT- the variables projected out of the query.
 
         // Drop anything not used within the group.
         afterVars.retainAll(groupVars);

@@ -195,9 +195,11 @@ abstract public class QueryBase extends QueryNodeBase implements
     }
     
     /**
-     * Return the set of variables projected by this query (this is a NOP if
+     * Return the set of variables projected out of this query (this is a NOP if
      * there is no {@link ProjectionNode} for the query, which can happen for an
-     * ASK query).
+     * ASK query).  This DOES NOT report the variables which are used by the
+     * SELECT expressions, just the variables which are PROJECTED out by the
+     * BINDs.
      * 
      * @param vars
      *            The projected variables are added to this set.
@@ -211,6 +213,33 @@ abstract public class QueryBase extends QueryNodeBase implements
         if(tmp != null) {
             
             tmp.getProjectionVars(vars);
+            
+        }
+        
+        return vars;
+        
+    }
+
+    /**
+     * Return the set of variables on which the {@link ProjectionNode} for this
+     * query depends (this is a NOP if there is no {@link ProjectionNode} for
+     * the query, which can happen for an ASK query). This DOES NOT report the
+     * variables which are projected OUT of the query, just those used by the
+     * SELECT expressions.
+     * 
+     * @param vars
+     *            The variables used by the select expressions are added to this
+     *            set.
+     * 
+     * @return The caller's set.
+     */
+    public Set<IVariable<?>> getSelectExprVars(final Set<IVariable<?>> vars) {
+        
+        final ProjectionNode tmp = getProjection();
+        
+        if(tmp != null) {
+            
+            tmp.getSelectExprVars(vars);
             
         }
         

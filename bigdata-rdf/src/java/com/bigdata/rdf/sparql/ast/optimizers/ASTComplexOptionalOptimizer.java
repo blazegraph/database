@@ -384,7 +384,8 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 if (query.getProjection() != null) {
                     // Include anything that we must project out of the query.
                     final ProjectionNode tmp = query.getProjection();
-                    tmp.getProjectionVars(afterVars);
+                    tmp.getSelectExprVars(afterVars);
+//                    tmp.getProjectionVars(afterVars);// FIXME This needs to be the variables USED in the SELECT expressions, NOT the variables projected out of the query.
                 }
 
                 final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
