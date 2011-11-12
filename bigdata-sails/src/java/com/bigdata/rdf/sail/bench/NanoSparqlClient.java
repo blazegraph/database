@@ -1098,7 +1098,7 @@ public class NanoSparqlClient {
 
 				if (!opts.quiet) {
 					// Show the query run time, #of results, source, etc.
-					System.err.println("resultCount="
+					System.out.println("resultCount="
 							+ (trial.resultCount == -1 ? "N/A"
 									: trial.resultCount) + ", elapsed="
 							+ TimeUnit.NANOSECONDS.toMillis(trial.elapsedNanos)
@@ -1112,7 +1112,7 @@ public class NanoSparqlClient {
 				final long elapsedNanos = System.nanoTime() - begin;
 				
 				// Note: This is the same format as the result line above!
-                System.err.println("resultCount=ERR, elapsed="
+                System.out.println("resultCount=ERR, elapsed="
                         + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
                         + "ms, source=" + query.source);
 //                + ", cause="+ t.getLocalizedMessage());
