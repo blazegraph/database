@@ -236,35 +236,35 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      */
     final private IAsynchronousIterator<IBindingSet[]> queryIterator;
 
-    /**
-     * The #of solutions delivered to the {@link #queryBuffer}.
-     */
-    public long getSolutionCount() {
-
-        if (queryBuffer != null) {
-            
-            ((BlockingBufferWithStats<?>) queryBuffer).getElementsAddedCount();
-            
-        }
-
-        return 0L;
-        
-    }
-
-    /**
-     * The #of solution chunks delivered to the {@link #queryBuffer}.
-     */
-    public long getSolutionChunkCount() {
-
-        if (queryBuffer != null) {
-            
-            ((BlockingBufferWithStats<?>) queryBuffer).getChunksAddedCount();
-            
-        }
-
-        return 0L;
-        
-    }
+//    /**
+//     * The #of solutions delivered to the {@link #queryBuffer}.
+//     */
+//    public long getSolutionCount() {
+//
+//        if (queryBuffer != null) {
+//            
+//            ((BlockingBufferWithStats<?>) queryBuffer).getElementsAddedCount();
+//            
+//        }
+//
+//        return 0L;
+//        
+//    }
+//
+//    /**
+//     * The #of solution chunks delivered to the {@link #queryBuffer}.
+//     */
+//    public long getSolutionChunkCount() {
+//
+//        if (queryBuffer != null) {
+//            
+//            ((BlockingBufferWithStats<?>) queryBuffer).getChunksAddedCount();
+//            
+//        }
+//
+//        return 0L;
+//        
+//    }
     
     /**
      * A lock guarding various state changes. This guards changes to the
