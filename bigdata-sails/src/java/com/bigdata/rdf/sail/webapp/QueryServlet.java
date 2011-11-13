@@ -131,7 +131,7 @@ public class QueryServlet extends BigdataRDFServlet {
 			
 			final BigdataRDFContext context = getBigdataRDFContext();
 			
-			final boolean explain = req.getParameter(BigdataRDFContext.EXPLAIN) != null;
+//			final boolean explain = req.getParameter(BigdataRDFContext.EXPLAIN) != null;
 
 			final AbstractQueryTask queryTask;
             try {
@@ -162,6 +162,22 @@ public class QueryServlet extends BigdataRDFServlet {
 
             resp.setStatus(HTTP_OK);
 
+            if(queryTask.explain) {
+                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
+                final Writer w = new OutputStreamWriter(os, queryTask.charset);
+                try {
+                    // Begin executing the query (asynchronous)
+                    getBigdataRDFContext().queryService.execute(ft);
+                    // Send an explanation instead of the query results.
+                    explainQuery(queryStr, queryTask, ft, w);
+                } finally {
+                    w.flush();
+                    w.close();
+                    os.flush();
+                    os.close();
+                }
+                
+            } else {
             resp.setContentType(queryTask.mimeType);
 
             if (queryTask.charset != null) {
@@ -219,21 +235,9 @@ public class QueryServlet extends BigdataRDFServlet {
 			// Begin executing the query (asynchronous)
 			getBigdataRDFContext().queryService.execute(ft);
 
-			if (explain) {
-				final Writer w = new OutputStreamWriter(os, queryTask.charset);
-				try {
-					// Send an explanation instead of the query results.
-					explainQuery(queryStr, queryTask, ft, w);
-				} finally {
-					w.flush();
-					w.close();
-					os.flush();
-					os.close();
-				}
-			} else {
 				// Wait for the Future.
 				ft.get();
-			}
+		}
 
 		} catch (Throwable e) {
 			try {
@@ -374,7 +378,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
 			{
 				current.node("h2",
-						"Query Evaluation Statistics").node("p");
+						"Query Evaluation Statistics").node("p").close();
 				if (q != null) {
 
 				    // redundant with the ASTCOntainer.

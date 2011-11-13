@@ -12,9 +12,18 @@
 
 Welcome to bigdata&#174;.  Please consult the 
 <a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"> 
-documentation </a> for information on using the NanoSparqlServer's REST Api.
+documentation</a> for information on using the NanoSparqlServer's REST Api.
 
 </p>
+
+<FORM action="sparql" method="get">
+   <P>
+   <TEXTAREA name="query" rows="20" cols="80"
+   >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
+   <INPUT type="submit" value="Send">
+   </P><P>
+   <INPUT type="checkbox" name="explain" value="explain"> Explain</P>
+</FORM>
 
 <p>
 The following URLs should be active when deployed in the default configuration:
@@ -25,15 +34,15 @@ The following URLs should be active when deployed in the default configuration:
 <dt>http://hostname:port/bigdata/sparql/</dt>
 <dd>The SPARQL REST API.</dd>
 <dt>http://hostname:port/bigdata/status</dt>
-<dd>A status page</dd>
+<dd>A <a href="status">status</a> page.</dd>
 <dt>http://hostname:port/bigdata/counters</dt>
-<dd>A performance counters page</dd>
+<dd>A <a href="counters"> performance counters</a> page.</dd>
 </dl>
 
 <p>
 Where <i>hostname</i> is the name of this host and <i>port</i> is the port at
 which this page was accessed.
 </p>
- 
+
 </body>
 </html>
