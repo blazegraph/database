@@ -18,6 +18,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
 
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
@@ -388,18 +389,16 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 final long elapsedMillis = q.getElapsed();
 
-                /*
-                 * Note: The unitsOut and chunksOut are not necessarily up to
-                 * date by the time the query reports that it is done so this
-                 * does not give a nice indication of the work performed.
-                 */
-                
-//                final BOpStats stats = q.getStats().get(q.getQuery().getId());
-//                    final long unitsOut = stats.unitsOut.get();
-//                    final long chunksOut = stats.chunksOut.get();
+//              final BOpStats stats = q.getStats().get(q.getQuery().getId());
+//              final long unitsOut = stats.unitsOut.get();
+//              final long chunksOut = stats.chunksOut.get();
+                final long solutionsOut = ((AbstractRunningQuery)q).getSolutionCount();
+                final long chunksOut = ((AbstractRunningQuery)q).getSolutionChunkCount();
 
                 current.node("h2", "Query Evaluation Statistics").node("p")//
-                        .text("elapsed=" + elapsedMillis + "ms")//
+                        .text("solutions=" + solutionsOut)//
+                        .text(", chunks=" + chunksOut)//
+                        .text(", elapsed=" + elapsedMillis + "ms")//
                         .close()//
                 ;
 
