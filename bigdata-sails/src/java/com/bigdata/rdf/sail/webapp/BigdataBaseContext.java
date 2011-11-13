@@ -1,7 +1,5 @@
 package com.bigdata.rdf.sail.webapp;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.journal.IIndexManager;
 
 /**
