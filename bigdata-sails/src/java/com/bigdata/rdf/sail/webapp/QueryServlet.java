@@ -376,55 +376,45 @@ public class QueryServlet extends BigdataRDFServlet {
 			// wait for the Future (will toss any exceptions).
 			ft.get();
 
-			{
-				current.node("h2",
-						"Query Evaluation Statistics").node("p").close();
-				if (q != null) {
+            if (q == null) {
+                /*
+                 * This can happen if we fail to get the IRunningQuery reference
+                 * before the query terminates. E.g., if the query runs too
+                 * quickly there is a data race and the reference may not be
+                 * available anymore.
+                 */
+                current.text("Not available.");
+            } else {
 
-				    // redundant with the ASTCOntainer.
-//					current.node("h2", "BOP Plan").node(
-//							"pre",
-//							HTMLUtility.escapeForXHTML(BOpUtility
-//									.toString(q.getQuery())));
+                final long elapsedMillis = q.getElapsed();
 
-					/*
-					 * Format query statistics as a table.
-					 * 
-					 * Note: This is writing on the Writer so it goes directly
-					 * into the HTML document we are building for the client.
-					 */
-					QueryLog.getTableXHTML(queryStr, q, w,
-							false/* summaryOnly */, 0/* maxBopLength */);
+                /*
+                 * Note: The unitsOut and chunksOut are not necessarily up to
+                 * date by the time the query reports that it is done so this
+                 * does not give a nice indication of the work performed.
+                 */
+                
+//                final BOpStats stats = q.getStats().get(q.getQuery().getId());
+//                    final long unitsOut = stats.unitsOut.get();
+//                    final long chunksOut = stats.chunksOut.get();
 
-//					// Add into the HTML document.
-//					statsNode.text(w.toString());
-				} else {
-					/*
-					 * This can happen if we fail to get the IRunningQuery
-					 * reference before the query terminates.  E.g., if the
-					 * query runs too quickly there is a data race and the
-					 * reference may not be available anymore.
-					 */
-					current
-							.text("Not available.");
-				}
-			}
-			doc.closeAll(current);
-		}
+                current.node("h2", "Query Evaluation Statistics").node("p")//
+                        .text("elapsed=" + elapsedMillis + "ms")//
+                        .close()//
+                ;
 
-//		/*
-//		 * Send the response.
-//		 * 
-//		 * TODO It would be better to stream this rather than buffer it in
-//		 * RAM. That also opens up the opportunity for real-time updates for
-//		 * long-running (analytic) queries, incremental information from the
-//		 * runtime query optimizer, etc.
-//		 */
-//		if(log.isDebugEnabled())
-//			log.debug("Sending explanation.");
-//		os.write(doc.toString().getBytes("UTF-8"));
-//		if(log.isDebugEnabled())
-//			log.debug("Sent explanation.");
+                /*
+                 * Format query statistics as a table.
+                 * 
+                 * Note: This is writing on the Writer so it goes directly into
+                 * the HTML document we are building for the client.
+                 */
+                QueryLog.getTableXHTML(queryStr, q, w, false/* summaryOnly */,
+                        0/* maxBopLength */);
+
+            }
+            doc.closeAll(current);
+        }
 
     }
     
