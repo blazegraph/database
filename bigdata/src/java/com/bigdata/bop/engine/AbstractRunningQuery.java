@@ -57,7 +57,6 @@ import com.bigdata.bop.engine.QueryEngine.Counters;
 import com.bigdata.bop.engine.RunState.RunStateEnum;
 import com.bigdata.bop.fed.EmptyChunkMessage;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.counters.CAT;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.journal.IIndexManager;
@@ -1166,6 +1165,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * </ul>
      */
     final public boolean cancel(final boolean mayInterruptIfRunning) {
+        /*
+         * Set if we notice an interrupt during clean up of the query and then
+         * propagated to the caller in the finally {} clause.
+         */
+        boolean interrupted = false;
         lock.lock();
         try {
             // halt the query.
@@ -1179,8 +1183,23 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                     realSource.release();
                 // close() IAsynchronousIterators for accepted messages.
                 releaseAcceptedMessages();
-                // cancel any running operators for this query on this node.
+                /*
+                 * Cancel any running operators for this query on this node.
+                 * 
+                 * Note: This can interrupt *this* thread. E.g., when SLICE
+                 * calls halt().
+                 */
                 cancelled |= cancelRunningOperators(mayInterruptIfRunning);
+                /*
+                 * Test and clear the interrupt status.
+                 * 
+                 * Note: This prevents a thread from interrupting itself during
+                 * the query tear down. If we do not do this then the interrupt
+                 * tends to get "noticed" by the next lock acquisition, which
+                 * happens to be the one where we release the native memory
+                 * buffers.
+                 */
+                interrupted |= Thread.interrupted();
                 if (controller) {
                     // cancel query on other peers.
                     cancelled |= cancelQueryOnPeers(future.getCause(),
@@ -1228,6 +1247,10 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
             return cancelled;
         } finally {
             lock.unlock();
+            if(interrupted) {
+                // Propagate the interrupt.
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

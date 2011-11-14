@@ -1637,6 +1637,16 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
 
             for(ChunkFutureTask f : set.keySet()) {
 
+                /*
+                 * Note: This can wind up setting the interrupt status on the
+                 * thread in which it is called. For example, SLICE will call
+                 * halt(), which calls AbstractRunningQuery#cancel(), which
+                 * calls this method. Since the SliceOp() is still running it's
+                 * future will be cancelled here. The code in
+                 * AbstractRunningQuery#cancel() needs to be robust in the face
+                 * of that interrupt.
+                 */
+
                 if (f.cancel(mayInterruptIfRunning))
                     cancelled = true;
                 
