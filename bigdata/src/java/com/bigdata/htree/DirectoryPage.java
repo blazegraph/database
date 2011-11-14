@@ -154,10 +154,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 //			final ITuple tuple = tuples.next();
 //			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
 //		}
-        final int bucketSlotsPerPage = bucketPage.slotsOnPage();
-        for (int i = 0; i < bucketSlotsPerPage; i++) {
-            ((HTree) htree).insertRawTuple(bucketPage, i);
-        }
         // ...and finally delete old page
         if (bucketPage.isPersistent()) {
             htree.deleteNodeOrLeaf(bucketPage.getIdentity());
@@ -166,6 +162,11 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         // remove original page and correct leaf count
         bucketPage.delete();
 		((HTree) htree).nleaves--;
+
+		final int bucketSlotsPerPage = bucketPage.slotsOnPage();
+        for (int i = 0; i < bucketSlotsPerPage; i++) {
+            ((HTree) htree).insertRawTuple(bucketPage, i);
+        }
 	}
 
 	private BucketPage createPage(final int depth) {
@@ -209,12 +210,26 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			slots >>= 1;
 			bucketPage.globalDepth--;
 		}
+		
+		// assert (1 << (htree.addressBits - bucketPage.globalDepth)) == countChildRefs(bucketPage);
 	}
 	
+	int countChildRefs(BucketPage bucketPage) {
+		int count = 0;
+		for (int i = 0; i < childRefs.length; i++) {
+			if (childRefs[i] == bucketPage.self) {
+				count++;
+			}
+		}
+		return count;
+	}
+
 	private int fillEmptySlots(final int slot, final BucketPage bucketPage, final int from, final int to) {
 		if (from > slot | to < slot) {
 			throw new IllegalArgumentException();
 		}
+		
+		assert !bucketPage.isPersistent();
 		
 		if (from == slot && to == slot+1) {
 			childRefs[slot] = (Reference<AbstractPage>) bucketPage.self;
@@ -1896,18 +1911,21 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		// now replace the reference to the old bucket page with the new directory
 		replaceChildRef(bucketPage.self, ndir);
 		
-		// insert old tuples
-		final int bucketSlotsPerPage = bucketPage.slotsOnPage();
-		for (int i = 0; i < bucketSlotsPerPage; i++) {
-			((HTree) htree).insertRawTuple(bucketPage, i);
-		}
-
+		// ensure that the bucket page doesn't evict
 		// ...and finally delete old page
 		if (bucketPage.isPersistent()) {
 			htree.deleteNodeOrLeaf(bucketPage.getIdentity());
 		}
 		
 		bucketPage.delete();
+		
+		// insert old tuples
+		final int bucketSlotsPerPage = bucketPage.slotsOnPage();
+		for (int i = 0; i < bucketSlotsPerPage; i++) {
+			((HTree) htree).insertRawTuple(bucketPage, i);
+		}
+
+		
 	}
 
 	/**
@@ -1931,6 +1949,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		    if (aChild == null && pdata.childAddr[i] == NULL) {
 
 				childRefs[i] = (Reference<AbstractPage>) child.self;
+				
+				assert !child.isPersistent();
 				
 				child.parent = (Reference<DirectoryPage>) self;
 				
@@ -2143,6 +2163,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			
 			// update the references to the new bucket.
 			childRefs[i] = (Reference) newChild.self;
+			
+			assert !newChild.isPersistent();
 			
 		}
 			
@@ -2419,6 +2441,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			final int slot = newdir.getLocalHashCode(overflowKey, newdir._getPrefixLength());
 			
 			newdir.childRefs[slot] = (Reference<AbstractPage>) current.self;
+			((MutableDirectoryPageData) newdir.data).childAddr[slot] = current.identity;
 			current.parent = (Reference<DirectoryPage>) newdir.self;
 			
 			try {
