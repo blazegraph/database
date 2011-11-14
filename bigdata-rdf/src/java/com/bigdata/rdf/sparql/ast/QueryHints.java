@@ -162,14 +162,21 @@ public interface QueryHints {
 
     /**
      * When <code>true</code>, enables all query hints pertaining to analytic
-     * query patterns.
+     * query patterns. When <code>false</code>, disables those features.
+     * <p>
+     * Note: This query hint MUST be applied in the {@link QueryHintScope#Query}
+     * . Hash indices are often created by one operator and then consumed by
+     * another so the same kinds of hash indices MUST be used throughout the
+     * query.
+     * 
+     * @see #NATIVE_DISTINCT
+     * @see #NATIVE_HASH_JOINS
+     * @see #MERGE_JOIN
      */
     String ANALYTIC = QueryHints.class.getName() + ".analytic";
 
     boolean DEFAULT_ANALYTIC = false;
 
-    
-    
     /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).
      * This query hint makes it possible for the application to assign the
