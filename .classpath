@@ -21,6 +21,7 @@
 	<classpathentry kind="src" path="junit-ext/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
+	<classpathentry kind="src" path="bigdata-war/src"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
