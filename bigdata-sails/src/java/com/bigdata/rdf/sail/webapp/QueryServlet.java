@@ -31,6 +31,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.util.HTMLUtility;
@@ -259,17 +260,45 @@ public class QueryServlet extends BigdataRDFServlet {
 	
 	}
 
-	/**
-	 * Sends an explanation for the query rather than the query results. The
-	 * query is still run, but the query statistics are reported instead of the
-	 * query results.
-	 * 
-	 * @param queryStr
-	 * @param queryTask
-	 * @param ft
-	 * @param os
-	 * @throws Exception
-	 */
+    /**
+     * Sends an explanation for the query rather than the query results. The
+     * query is still run, but the query statistics are reported instead of the
+     * query results.
+     * 
+     * @param queryStr
+     * @param queryTask
+     * @param ft
+     * @param os
+     * @throws Exception
+     * 
+     *             TODO The complexity here is due to the lack of a tight
+     *             coupling between the {@link RunningQuery}, the
+     *             {@link BigdataSailQuery}, and the {@link IRunningQuery}. It
+     *             was not possible to obtain that tight coupling with the 1.0.x
+     *             releases of bigdata due to the integration with the Sail.
+     *             This led to the practice of setting the query {@link UUID} so
+     *             we could resolve it once the query was executing using
+     *             {@link QueryEngine#getRunningQuery(UUID)}. This also required
+     *             the spin loops in explainQuery() since we had to wait for the
+     *             {@link IRunningQuery} to become available. This is also the
+     *             reason why we can fail to report parts of the explanation for
+     *             fast queries.
+     *             <p>
+     *             This issue could be revisited now. Probably the right way to
+     *             do this is by defining our own evaluate() method on the
+     *             {@link BigdataSailQuery} which would provide either an object
+     *             to be monitored or an interface for a query listener. Either
+     *             approach could be used to ensure that we always have the
+     *             {@link IRunningQuery} for an {@link AbstractQueryTask} which
+     *             was submitted for evaluation.
+     *             <p>
+     *             I have not moved on this issue because the RTO integration
+     *             will change things again. Right now, we have one
+     *             {@link IRunningQuery} per top-level submitted query (plus one
+     *             for each named subquery). With the RTO integration, there
+     *             could be more {@link IRunningQuery}s issued and we will also
+     *             want to paint the statics which it uncovers in its rounds.
+     */
 	private void explainQuery(final String queryStr,
 			final AbstractQueryTask queryTask, final FutureTask<Void> ft,
 			final Writer w) throws Exception {
