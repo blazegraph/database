@@ -93,6 +93,7 @@ public class TestASTQueryHintOptimizer extends
      * PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
      * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
      * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX hint: <http://www.bigdata.com/queryHints#>
      * 
      * SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
      * WITH {
@@ -105,21 +106,21 @@ public class TestASTQueryHintOptimizer extends
      * } AS %_set1
      *         WHERE {
      *             
-     *             INCLUDE %_set1
-     *             . 
+     *             INCLUDE %_set1 . 
      *             OPTIONAL {
      *                 ?_var3 p1:name ?_var9
      *             }. 
      *             OPTIONAL {
      *                 ?_var10 p2:votedBy ?_var3. 
-     *                 ?_var10 rdfs:label ?_var2
+     *                 ?_var10 rdfs:label ?_var2.
+     *                 hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity "200".
      *             }
      *         }
      *         GROUP BY ?_var2 ?_var3
      * </pre>
      * 
-     * The complex optional group in this query should have <code>_var1</code>
-     * specified as a join variable.
+     * The complex optional group in this query should have the
+     * {@link BufferAnnotations#CHUNK_CAPACITY} overridden.
      */
     public void test_query_hints() {
 
@@ -506,6 +507,143 @@ public class TestASTQueryHintOptimizer extends
                     sp2.setQueryHint(QueryHints.OPTIMIZER, "None");
                     sp2.setQueryHint(AST2BOpBase.Annotations.HASH_JOIN, "true");
                     sp2.setQueryHint(IPredicate.Annotations.KEY_ORDER, "PCSO");
+
+                }
+
+            }
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTQueryHintOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+        
+    /**
+     * Test verifies that a query hint with "group" scope is applied to the
+     * top-level group.
+     * 
+     * <pre>
+     * PREFIX hint: <http://www.bigdata.com/queryHints#>
+     * SELECT (COUNT(?_var3) as ?count)
+     * WHERE {
+     *   hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+     *   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.
+     *   ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M, 17623ms for AP scan.
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_query_hints_3() throws Exception {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV option = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/vote/Option"));
+        @SuppressWarnings("rawtypes")
+        final IV votedBy = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/vote/votedBy"));
+
+        @SuppressWarnings("rawtypes")
+        final IV scopeGroup = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Group));
+        @SuppressWarnings("rawtypes")
+        final IV optimizer = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.OPTIMIZER));
+        @SuppressWarnings("rawtypes")
+        final IV none = makeIV(new LiteralImpl("None"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+
+                projection
+                        .addProjectionExpression(new AssignmentNode(//
+                                new VarNode("count"),// var
+                                new FunctionNode(
+                                        // expr
+                                        FunctionRegistry.COUNT,
+                                        Collections
+                                                .singletonMap(
+                                                        AggregateBase.Annotations.DISTINCT,
+                                                        (Object) Boolean.FALSE)/* scalarValues */,
+                                        new ValueExpressionNode[] { new VarNode(
+                                                "_var3") })));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopeGroup), new ConstantNode(optimizer),
+                        new ConstantNode(none), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(a),
+                        new ConstantNode(option), new VarNode("g"),
+                        Scope.NAMED_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(votedBy), new VarNode(
+                        "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+            }
+
+        }
+        
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {            // Main Query
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+
+                projection
+                        .addProjectionExpression(new AssignmentNode(//
+                                new VarNode("count"),// var
+                                new FunctionNode(
+                                        // expr
+                                        FunctionRegistry.COUNT,
+                                        Collections
+                                                .singletonMap(
+                                                        AggregateBase.Annotations.DISTINCT,
+                                                        (Object) Boolean.FALSE)/* scalarValues */,
+                                        new ValueExpressionNode[] { new VarNode(
+                                                "_var3") })));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+                whereClause.setQueryHint(QueryHints.OPTIMIZER, "None");
+                {
+
+                    final StatementPatternNode sp1 = new StatementPatternNode(
+                            new VarNode("_var10"), new ConstantNode(a),
+                            new ConstantNode(option), new VarNode("g"),
+                            Scope.NAMED_CONTEXTS);
+                    whereClause.addChild(sp1);
+                    sp1.setQueryHint(QueryHints.OPTIMIZER, "None");
+
+                    final StatementPatternNode sp2 = new StatementPatternNode(new VarNode(
+                            "_var10"), new ConstantNode(votedBy), new VarNode(
+                            "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS);
+                    whereClause.addChild(sp2);
+                    sp2.setQueryHint(QueryHints.OPTIMIZER, "None");
 
                 }
 

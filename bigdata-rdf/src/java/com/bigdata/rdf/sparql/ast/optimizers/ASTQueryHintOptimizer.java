@@ -149,16 +149,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
                 for (NamedSubqueryRoot namedSubquery : namedSubqueries) {
 
-                    processGroup(context, queryRoot, namedSubquery.getWhereClause());
+                    processGroup(context, queryRoot, namedSubquery,
+                            namedSubquery.getWhereClause());
 
                 }
 
             }
 
         }
-        
+
         // Now process the main where clause.
-        processGroup(context, queryRoot, queryRoot.getWhereClause());
+        processGroup(context, queryRoot, queryRoot, queryRoot.getWhereClause());
 
         return queryNode;
 
@@ -289,7 +290,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            The join group.
      */
     @SuppressWarnings("unchecked")
-    private void processGroup(final AST2BOpContext context, final QueryRoot queryRoot, 
+    private void processGroup(final AST2BOpContext context,
+            final QueryRoot queryRoot, final QueryBase queryBase,
             final GraphPatternGroup<IGroupMemberNode> group) {
 
         if(group == null)
@@ -324,13 +326,13 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                  * Recursion.
                  */
                 if(child instanceof GraphPatternGroup<?>) {
-                    processGroup(context, queryRoot,
+                    processGroup(context, queryRoot, queryBase,
                             (GraphPatternGroup<IGroupMemberNode>) child);
                 } else if (child instanceof SubqueryRoot) {
-                    processGroup(context, queryRoot,
+                    processGroup(context, queryRoot, (SubqueryRoot)child,
                             ((SubqueryRoot) child).getWhereClause());
                 } else if (child instanceof ServiceNode) {
-                    processGroup(context, queryRoot,
+                    processGroup(context, queryRoot, queryBase,
                             ((ServiceNode) child).getGroupNode());
                 }
                 
@@ -344,8 +346,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                     continue;
                 }
 
-                applyQueryHint(context, queryRoot, group, lastSP, sp);
-                
+                applyQueryHint(context, queryRoot, queryBase, group, lastSP, sp);
+
                 nfound++;
 
             }
@@ -545,7 +547,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      */
     private void applyQueryHint(//
             final AST2BOpContext context,//
-            final QueryRoot queryRoot,//
+            final QueryRoot queryRoot,// top-level query
+            final QueryBase queryBase,// either top-level query or subquery.
             final GraphPatternGroup<IGroupMemberNode> group,//
             final StatementPatternNode lastSP, // MAY be null IFF scope != BGP
             final StatementPatternNode hint //
@@ -574,7 +577,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             break;
         }
         case SubQuery: {
-            applyToSubQuery(group, name, value);
+            applyToSubQuery(queryBase, group, name, value);
             break;
         }
         case Group: {
@@ -605,25 +608,32 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param name
      * @param value
      */
-    private void applyToSubQuery(GraphPatternGroup<IGroupMemberNode> group,
-            String name, String value) {
-        
+    private void applyToSubQuery(final QueryBase queryBase,
+            GraphPatternGroup<IGroupMemberNode> group, final String name,
+            final String value) {
+
         /*
          * Find the top-level parent group for the given group.
          */
         GraphPatternGroup<IGroupMemberNode> parent = group;
-        
-        while(parent != null) {
+
+        while (parent != null) {
 
             group = parent;
 
             parent = parent.getParentGraphPatternGroup();
-            
+
         }
-        
+
         // Apply to all child groups of that top-level group.
         applyToGroupAndSubGroups(group, name, value);
-        
+
+        if (isNodeAcceptingQueryHints(queryBase)) {
+
+            ((ASTBase) queryBase).setQueryHint(name, value);
+
+        }
+
     }
 
     /**
@@ -634,7 +644,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToQuery(final AST2BOpContext context,
-            final QueryRoot queryRoot, final String name, String value) {
+            final QueryRoot queryRoot, final String name, final String value) {
 
         if (context.queryHints != null) {
             /*
@@ -702,6 +712,12 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         }
 
+        if(isNodeAcceptingQueryHints(group)) {
+
+            ((ASTBase) group).setQueryHint(name, value);
+            
+        }
+
     }
 
     /**
@@ -718,6 +734,12 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             ((ASTBase) child).setQueryHint(name, value);
 
+        }
+
+        if(isNodeAcceptingQueryHints(group)) {
+
+            ((ASTBase) group).setQueryHint(name, value);
+            
         }
 
     }
