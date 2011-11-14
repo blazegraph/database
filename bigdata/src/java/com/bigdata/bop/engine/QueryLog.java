@@ -365,35 +365,44 @@ public class QueryLog {
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
             if (namedSetRef instanceof NamedSolutionSetRef) {
                 final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
-                final IQueryAttributes attrs = t==null?null:t.getAttributes();
-                final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
-                if(state!=null) {
-                    // Prefer the IHashUtilityState
-                    sb.append(state.toString());
-                } else {
-                    // Otherwise the NamedSolutionSetRef
-                    sb.append(ref.toString());
-                }
-//                sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
-            } else {
-                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
-                for (int i = 0; i < refs.length; i++) {
-                    final NamedSolutionSetRef ref = refs[i];
-                    if (i > 0)
-                        sb.append(",");
-                    final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
-                    final IQueryAttributes attrs = t==null?null:t.getAttributes();
-                    final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
-                    if(state!=null) {
+                final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                if (t != null) {
+                    final IQueryAttributes attrs = t == null ? null : t
+                            .getAttributes();
+                    final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
+                            : attrs.get(ref));
+                    if (state != null) {
                         // Prefer the IHashUtilityState
                         sb.append(state.toString());
                     } else {
                         // Otherwise the NamedSolutionSetRef
                         sb.append(ref.toString());
                     }
+                    // sb.append(", joinvars=" + Arrays.toString(ref.joinVars));
                 }
-//                sb.append(", joinvars=" + Arrays.toString(refs[0].joinVars));
+            } else {
+                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
+                for (int i = 0; i < refs.length; i++) {
+                    final NamedSolutionSetRef ref = refs[i];
+                    if (i > 0)
+                        sb.append(",");
+                    final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                    if (t != null) {
+                        final IQueryAttributes attrs = t == null ? null : t
+                                .getAttributes();
+                        final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
+                                : attrs.get(ref));
+                        if (state != null) {
+                            // Prefer the IHashUtilityState
+                            sb.append(state.toString());
+                        } else {
+                            // Otherwise the NamedSolutionSetRef
+                            sb.append(ref.toString());
+                        }
+                    }
+                    // sb.append(", joinvars=" +
+                    // Arrays.toString(refs[0].joinVars));
+                }
             }
         }
         if (bop instanceof ChunkedMaterializationOp) {
@@ -851,35 +860,45 @@ public class QueryLog {
                     .getProperty(NamedSetAnnotations.NAMED_SET_REF);
             if (namedSetRef instanceof NamedSolutionSetRef) {
                 final NamedSolutionSetRef ref = (NamedSolutionSetRef) namedSetRef;
-                final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
-                final IQueryAttributes attrs = t==null?null:t.getAttributes();
-                final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
-                if(state!=null) {
-                    // Prefer the IHashUtilityState
-                    w.write(cdata(state.toString()));
-                } else {
-                    // Otherwise the NamedSolutionSetRef
-                    w.write(cdata(ref.toString()));
-                }
-//                w.write(cdata(", joinvars=" + Arrays.toString(ref.joinVars)));
-            } else {
-                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
-                for (int i = 0; i < refs.length; i++) {
-                    final NamedSolutionSetRef ref = refs[i];
-                    if (i > 0)
-                        w.write(cdata(","));
-                    final IRunningQuery t = q.getQueryEngine().getRunningQuery(ref.queryId);
-                    final IQueryAttributes attrs = t==null?null:t.getAttributes();
-                    final IHashJoinUtility state = (IHashJoinUtility)(attrs==null?null:attrs.get(ref));
-                    if(state!=null) {
+                final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                if (t != null) {
+                    final IQueryAttributes attrs = t == null ? null : t
+                            .getAttributes();
+                    final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
+                            : attrs.get(ref));
+                    if (state != null) {
                         // Prefer the IHashUtilityState
                         w.write(cdata(state.toString()));
                     } else {
                         // Otherwise the NamedSolutionSetRef
                         w.write(cdata(ref.toString()));
                     }
+                    // w.write(cdata(", joinvars=" +
+                    // Arrays.toString(ref.joinVars)));
                 }
-//                w.write(cdata(", joinvars=" + Arrays.toString(refs[0].joinVars)));
+            } else {
+                final NamedSolutionSetRef[] refs = (NamedSolutionSetRef[]) namedSetRef;
+                for (int i = 0; i < refs.length; i++) {
+                    final NamedSolutionSetRef ref = refs[i];
+                    if (i > 0)
+                        w.write(cdata(","));
+                    final IRunningQuery t = getRunningQuery(q, ref.queryId);
+                    if (t != null) {
+                        final IQueryAttributes attrs = t == null ? null : t
+                                .getAttributes();
+                        final IHashJoinUtility state = (IHashJoinUtility) (attrs == null ? null
+                                : attrs.get(ref));
+                        if (state != null) {
+                            // Prefer the IHashUtilityState
+                            w.write(cdata(state.toString()));
+                        } else {
+                            // Otherwise the NamedSolutionSetRef
+                            w.write(cdata(ref.toString()));
+                        }
+                    }
+                    // w.write(cdata(", joinvars=" +
+                    // Arrays.toString(refs[0].joinVars)));
+                }
             }
         }
         if (bop instanceof ChunkedMaterializationOp) {
@@ -1099,6 +1118,43 @@ public class QueryLog {
     	
     	return s;
     	
+    }
+    
+    /**
+     * Return the {@link IRunningQuery} for that queryId iff it is available.
+     * 
+     * @param q
+     *            The query that you already have.
+     * @param queryId
+     *            The {@link UUID} of the desired query.
+     * 
+     * @return The {@link IRunningQuery} iff it can be found and otherwise
+     *         <code>null</code>.
+     */
+    static private IRunningQuery getRunningQuery(final IRunningQuery q,
+            final UUID queryId) {
+
+        if (q.getQueryId().equals(queryId)) {
+
+            /*
+             * Avoid lookup perils if we already have the right query.
+             */
+
+            return q;
+
+        }
+
+        try {
+
+            return q.getQueryEngine().getRunningQuery(queryId);
+            
+        } catch (RuntimeException t) {
+            
+            // Done and gone.
+            return null;
+            
+        }
+
     }
     
 }
