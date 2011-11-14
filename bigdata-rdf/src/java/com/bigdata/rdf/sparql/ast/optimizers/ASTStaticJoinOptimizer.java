@@ -38,6 +38,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -88,28 +89,28 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
 
-    	/*
-    	 * TODO Lift this check up a few levels?
-    	 */
-    	{
-    		
-	    	final QueryOptimizerEnum optimizer = 
-	    		context == null || context.queryHints == null 
-	    			? QueryOptimizerEnum.Static
-	                : QueryOptimizerEnum.valueOf(context.queryHints.getProperty(
-	                        QueryHints.OPTIMIZER, QueryOptimizerEnum.Static
-	                                .toString()));
-	    	
-	    	if (optimizer != QueryOptimizerEnum.Static)
-	    		return queryNode;
-	    	
-    	}
+//    	{
+//    		
+//	    	final QueryOptimizerEnum optimizer = 
+//	    		context == null || context.queryHints == null 
+//	    			? QueryOptimizerEnum.Static
+//	                : QueryOptimizerEnum.valueOf(context.queryHints.getProperty(
+//	                        QueryHints.OPTIMIZER, QueryOptimizerEnum.Static
+//	                                .toString()));
+//	    	
+//	    	if (optimizer != QueryOptimizerEnum.Static)
+//	    		return queryNode;
+//	    	
+//    	}
     	
         if (!(queryNode instanceof QueryRoot))
             return queryNode;
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
+        final IBindingSet exogenousBindings = StaticAnalysis
+                .getExogenousBindings(bindingSets);
+        
         // Named subqueries
         if (queryRoot.getNamedSubqueries() != null) {
 
@@ -128,7 +129,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
                 if (whereClause != null) {
 
-                    optimize(context, queryRoot, new IJoinNode[] { }, whereClause);
+                    optimize(context, exogenousBindings, queryRoot, new IJoinNode[] { }, whereClause);
 
                 }
 
@@ -145,7 +146,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
             if (whereClause != null) {
 
-                optimize(context, queryRoot, new IJoinNode[] { }, whereClause);
+                optimize(context, exogenousBindings, queryRoot, new IJoinNode[] { }, whereClause);
                 
             }
 
@@ -158,12 +159,46 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     }
 
     /**
+     * Return <code>true</code> if the static join optimizer is enabled for the
+     * given join group.
+     */
+    private boolean isStaticOptimizer(AST2BOpContext context,
+            final JoinGroupNode joinGroup) {
+
+        QueryOptimizerEnum optimizer = null;
+
+        if (joinGroup.getQueryHint(QueryHints.OPTIMIZER) != null) {
+
+            optimizer = QueryOptimizerEnum.valueOf(joinGroup
+                    .getQueryHint(QueryHints.OPTIMIZER));
+
+        } else {
+
+            optimizer = context == null || context.queryHints == null ? QueryOptimizerEnum.Static
+                    : QueryOptimizerEnum.valueOf(context.queryHints
+                            .getProperty(QueryHints.OPTIMIZER,
+                                    QueryOptimizerEnum.Static.toString()));
+
+        }
+
+        return optimizer == QueryOptimizerEnum.Static;
+
+    }
+    
+    /**
      * Eliminate a parent join group whose only child is another join group by
      * lifting the child (it replaces the parent).
      * 
+     * @param ctx
+     * @param exogenousBindings
+     *            The exogenous bindings -or- <code>null</code> iff there are
+     *            none.
+     * @param queryRoot
+     * @param ancestry
      * @param op
      */
-    private void optimize(final AST2BOpContext ctx, final QueryRoot queryRoot, 
+    private void optimize(final AST2BOpContext ctx,
+            final IBindingSet exogenousBindings, final QueryRoot queryRoot,
             IJoinNode[] ancestry, final GraphPatternGroup<?> op) {
 
     	if (op instanceof JoinGroupNode) {
@@ -238,76 +273,114 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     		
 	        if (!spNodes.isEmpty()) {
 	        
-	        	attachRangeCounts(ctx, spNodes);
+	            // Always attach the range counts.
+	        	attachRangeCounts(ctx, spNodes, exogenousBindings);
 	        	
-	        	/*
-	        	 * Find the "slots" where the statement patterns currently
-	        	 * show up in the join group.  We will later fill in these
-	        	 * slots with the same statement patterns, but in a different
-	        	 * (optimized) ordering.
-	        	 */
-	        	final int[] slots = new int[spNodes.size()];
-	        	
-	        	int j = 0;
-	        	for (int i = 0; i < joinGroup.arity(); i++) {
-	        		
-	        		if (joinGroup.get(i) instanceof StatementPatternNode) {
-	        			
-	        			slots[j++] = i;
-	        			
-	        		}
-	        		
+                if (isStaticOptimizer(ctx, joinGroup)) {
+
+                    /*
+                     * Find the "slots" where the statement patterns currently
+                     * show up in the join group. We will later fill in these
+                     * slots with the same statement patterns, but in a
+                     * different (optimized) ordering.
+                     */
+                    final int[] slots = new int[spNodes.size()];
+
+                    int j = 0;
+                    for (int i = 0; i < joinGroup.arity(); i++) {
+
+                        if (joinGroup.get(i) instanceof StatementPatternNode) {
+
+                            slots[j++] = i;
+
+                        }
+
+                    }
+
+                    /*
+                     * Calculate the optimized join ordering.
+                     */
+                    final StaticOptimizer opt = new StaticOptimizer(queryRoot,
+                            ancestry, spNodes);
+
+                    final int[] order = opt.getOrder();
+
+                    /*
+                     * Reorder the statement pattern nodes within the join
+                     * group.
+                     */
+                    for (int i = 0; i < order.length; i++) {
+
+                        final StatementPatternNode sp = spNodes.get(order[i]);
+
+                        joinGroup.setArg(slots[i], sp);
+
+                    }
+
+                    /*
+                     * Update the ancestry for recursion. Only add the
+                     * non-optional statement pattern nodes - the ones that we
+                     * can count on to bind their variables.
+                     */
+                    final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+
+                    for (IJoinNode ancestor : ancestry) {
+
+                        tmp.add(ancestor);
+
+                    }
+
+                    for (int i = 0; i < order.length; i++) {
+
+                        final StatementPatternNode sp = spNodes.get(order[i]);
+
+                        if (!sp.isOptional()) {
+
+                            tmp.add(sp);
+
+                        }
+
+                    }
+
+                    if (tmp.size() > ancestry.length) {
+
+                        ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
+
+                    }
+
+	        	} else {
+	        	    
+                    /*
+                     * Update the ancestry for recursion. Only add the
+                     * non-optional statement pattern nodes - the ones that we
+                     * can count on to bind their variables.
+                     */
+                    final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+	                
+	                for (IJoinNode ancestor : ancestry) {
+	                    
+	                    tmp.add(ancestor);
+	                    
+	                }
+	                
+	                for(StatementPatternNode sp : spNodes) {
+	                    
+	                    if (!sp.isOptional()) {
+	                        
+	                        tmp.add(sp);
+	                        
+	                    }
+	                    
+	                }
+	                
+	                if (tmp.size() > ancestry.length) {
+	                    
+	                    ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
+	                    
+	                }
+	                
 	        	}
-	        	
-	            /*
-	             * Calculate the optimized join ordering.
-	             */
-	        	final StaticOptimizer opt = new StaticOptimizer(queryRoot, ancestry, spNodes);
-	        	
-	        	final int[] order = opt.getOrder();
-	        	
-	        	/*
-	        	 * Reorder the statement pattern nodes within the join group.
-	        	 */
-	        	for (int i = 0; i < order.length; i++) {
-	        		
-	        		final StatementPatternNode sp = spNodes.get(order[i]);
-	        		
-	        		joinGroup.setArg(slots[i], sp);
-	        		
-	        	}
-	        	
-	        	/*
-	        	 * Update the ancestry for recursion.  Only add the non-optional
-	        	 * statement pattern nodes - the ones that we can count on to
-	        	 * bind their variables.
-	        	 */
-	        	final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
-	        	
-	        	for (IJoinNode ancestor : ancestry) {
-	        		
-	        		tmp.add(ancestor);
-	        		
-	        	}
-	        	
-	        	for (int i = 0; i < order.length; i++) {
-	        		
-	        		final StatementPatternNode sp = spNodes.get(order[i]);
-	        		
-	        		if (!sp.isOptional()) {
-	        			
-	        			tmp.add(sp);
-	        			
-	        		}
-	        		
-	        	}
-	        	
-	        	if (tmp.size() > ancestry.length) {
-	        		
-	        		ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
-	        		
-	        	}
-	        	
+	        
 	        }
 	        
     	}
@@ -324,7 +397,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-                optimize(ctx, queryRoot, ancestry, childGroup);
+                optimize(ctx, exogenousBindings, queryRoot, ancestry, childGroup);
                 
             } else if (child instanceof QueryBase) {
 
@@ -333,7 +406,20 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
-                optimize(ctx, queryRoot, ancestry, childGroup);
+                /*
+                 * Only the projected variables are in scope in the subquery.
+                 */
+
+                final Set<IVariable<?>> projectedVars = subquery
+                        .getProjectedVars(new LinkedHashSet<IVariable<?>>());
+
+                final IVariable<?>[] variablesToKeep = BOpUtility
+                        .toArray(projectedVars.iterator());
+                
+                final IBindingSet tmp = exogenousBindings == null ? null
+                        : exogenousBindings.copy(variablesToKeep);
+                
+                optimize(ctx, tmp, queryRoot, ancestry, childGroup);
 
             }
             
@@ -349,16 +435,17 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * tests without real data.
      */
     private final void attachRangeCounts(final AST2BOpContext ctx,
-    		final List<StatementPatternNode> spNodes) {
-    	
+            final List<StatementPatternNode> spNodes,
+            final IBindingSet exogenousBindings) {
+
     	for (StatementPatternNode sp : spNodes) {
     		
     		if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
     			
-                final IV<?, ?> s = getIV(sp.s());
-                final IV<?, ?> p = getIV(sp.p());
-                final IV<?, ?> o = getIV(sp.o());
-                final IV<?, ?> c = getIV(sp.c());
+                final IV<?, ?> s = getIV(sp.s(), exogenousBindings);
+                final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
+                final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
+                final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
     			
                 final IAccessPath<?> ap = ctx.db.getAccessPath(s, p, o, c);
                 
@@ -383,9 +470,27 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     /**
      * Helper method grabs the IV out of the TermNode, doing the appropriate
      * NULL and constant/var checks.
+     * 
+     * @param term
+     * @param exogenousBindings
+     *            The externally given bindings (optional).
      */
-    private final IV getIV(final TermNode term) {
-    	
+    private final IV getIV(final TermNode term,
+            final IBindingSet exogenousBindings) {
+
+        if (term != null && term.isVariable() && exogenousBindings != null) {
+
+            final IConstant<IV> c = (IConstant<IV>) exogenousBindings
+                    .get((IVariable) term.getValueExpression());
+            
+            if(c != null) {
+                
+                return c.get();
+                
+            }
+            
+        }
+        
     	if (term != null && term.isConstant()) {
     		
     		final IV iv = ((IConstant<IV>) term.getValueExpression()).get();

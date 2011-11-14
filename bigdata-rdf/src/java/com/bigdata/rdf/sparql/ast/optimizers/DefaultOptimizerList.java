@@ -402,8 +402,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
         /**
          * Run the static join order optimizer. This attaches the estimated
-         * cardinality data and uses fast algorithm to reorder the joins in each
-         * required or optional join group.
+         * cardinality data (fast range counts) and uses fast algorithm to
+         * reorder the joins in each required or optional join group.
          */
         add(new ASTStaticJoinOptimizer());
 

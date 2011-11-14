@@ -1620,8 +1620,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *         that the context does not currently have that information
      *         available, but maybe it should.
      */
-    public Set<IVariable<?>> getExogenousVars(final IBindingSet[] bindingSets,
-            final Set<IVariable<?>> vars) {
+    static public Set<IVariable<?>> getExogenousVars(
+            final IBindingSet[] bindingSets, final Set<IVariable<?>> vars) {
 
         if (bindingSets == null)
             return vars;
@@ -1641,6 +1641,27 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         }
 
         return vars;
+
+    }
+
+    /**
+     * Return the exogenous bindings.
+     * 
+     * @param bindingSets
+     *            The given solutions (optional).
+     * 
+     *            TODO The exogenous bindings are passed around as an
+     *            {@link IBindingSet}[] for historical reasons, but we are only
+     *            passing in a single {@link IBindingSet} which is what is
+     *            returned from this method.
+     */
+    static public IBindingSet getExogenousBindings(
+            final IBindingSet[] bindingSets) {
+
+        if (bindingSets == null || bindingSets.length == 0)
+            return null;
+
+        return bindingSets[0];
 
     }
 
