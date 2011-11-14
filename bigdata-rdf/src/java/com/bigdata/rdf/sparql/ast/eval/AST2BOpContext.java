@@ -78,27 +78,22 @@ public class AST2BOpContext implements IdFactory {
      * When <code>true</code>, will use the version of DISTINCT which operators
      * on the native heap.
      * 
-     * TODO Intelligently choose JVM versus HTree for this option based on the
-     * estimated cardinality of the query.
-     * 
-     * TODO Query hint to control this.
+     * @see QueryHints#NATIVE_DISTINCT
      * 
      * @see AST2BOpBase#nativeDefaultGraph
      */
-    boolean nativeDistinct = false;
+    public boolean nativeDistinct = QueryHints.DEFAULT_NATIVE_DISTINCT;
 
     /**
-     * When <code>true</code>, use hash joins based on the {@link HTree}.
-     * Otherwise use hash joins based on the Java collection classes. The
-     * {@link HTree} is more scalable but has higher overhead for small
-     * cardinality hash joins.
      * 
-     * TODO Intelligently choose JVM versus HTree for this option based on the
-     * estimated cardinality of the hash join.
+     * When <code>true</code>, use hash index operations based on the
+     * {@link HTree}. Otherwise use hash index operations based on the Java
+     * collection classes. The {@link HTree} is more scalable but has higher
+     * overhead for small cardinality hash joins.
      * 
-     * TODO Query hint to control this on an overall and per join basis.
+     * @see QueryHints#NATIVE_HASH_JOINS
      */
-    boolean nativeHashJoins = false;
+    public boolean nativeHashJoins = QueryHints.DEFAULT_HASH_JOINS;
     
     /**
      * When <code>true</code>, a merge-join pattern will be recognized if it
@@ -114,7 +109,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * @see QueryHints#MERGE_JOIN
      */
-    public boolean mergeJoin = false;
+    public boolean mergeJoin = QueryHints.DEFAULT_MERGE_JOIN;
     
     /**
      * When <code>true</code>, the projection of the query will be materialized

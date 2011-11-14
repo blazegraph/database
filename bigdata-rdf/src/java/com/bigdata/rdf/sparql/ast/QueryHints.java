@@ -33,6 +33,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.htree.HTree;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
+import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint directives understood by a bigdata SPARQL end point.
@@ -121,11 +124,41 @@ public interface QueryHints {
 //    String DEFAULT_HASH_JOIN = "false";
 
     /**
-     * Enable merge joins for this query.
+     * When <code>true</code>, will use the version of DISTINCT based on the
+     * {@link HTree} and the native (C process) heap. When <code>false</code>,
+     * use the version based on a JVM collection class. The JVM version does not
+     * scale-up as well, but it offers higher concurrency.
+     * 
+     * @see AST2BOpBase#nativeDefaultGraph
+     */
+    String NATIVE_DISTINCT = QueryHints.class.getName() + ".nativeDistinct";
+
+    boolean DEFAULT_NATIVE_DISTINCT = false;
+
+    /**
+     * When <code>true</code>, use hash index operations based on the
+     * {@link HTree} and backed by the native (C process) heap. When
+     * <code>false</code>, use hash index operations based on the Java
+     * collection classes. The {@link HTree} is more scalable but has higher
+     * overhead for small cardinality hash joins.
+     * <p>
+     * Note: This query hint MUST be applied in the {@link QueryHintScope#Query}
+     * . Hash indices are often created by one operator and then consumed by
+     * another so the same kinds of hash indices MUST be used throughout the
+     * query.
+     */
+    String NATIVE_HASH_JOINS = QueryHints.class.getName() + ".nativeHashJoins";
+
+    boolean DEFAULT_HASH_JOINS = false;
+
+    /**
+     * When <code>true</code>, a merge-join pattern will be recognized if it
+     * appears in a join group. When <code>false</code>, this can still be
+     * selectively enabled using a query hint.
      */
     String MERGE_JOIN = QueryHints.class.getName() + ".mergeJoin";
 
-    String DEFAULT_MERGE_JOIN = "false";
+    boolean DEFAULT_MERGE_JOIN = false;
 
     /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).

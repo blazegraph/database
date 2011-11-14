@@ -123,6 +123,37 @@ public class ASTBase extends ModifiableBOpBase {
     }
 
     /**
+     * Return the boolean value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     * @param defaultValue
+     *            The default value to use if the query hint is not defined.
+     */
+    public boolean getQueryHintAsBoolean(final String name,
+            final String defaultValue) {
+
+        return Boolean.valueOf(getQueryHint(name, defaultValue));
+
+    }
+    
+    /**
+     * Return the boolean value of the query hint.
+     * 
+     * @param name
+     *            The name of the query hint.
+     * @param defaultValue
+     *            The default value to use if the query hint is not defined.
+     */
+    public boolean getQueryHintAsBoolean(final String name,
+            final boolean defaultValue) {
+
+        return Boolean.valueOf(getQueryHint(name,
+                Boolean.toString(defaultValue)));
+
+    }
+
+    /**
      * Set a query hint.
      * 
      * @param name

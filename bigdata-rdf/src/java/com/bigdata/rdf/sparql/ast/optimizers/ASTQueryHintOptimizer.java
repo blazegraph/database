@@ -135,7 +135,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         if (context.queryHints != null && !context.queryHints.isEmpty()) {
 
             // Apply any given query hints globally.
-            applyGlobalQueryHints(queryRoot, context.queryHints);
+            applyGlobalQueryHints(context, queryRoot, context.queryHints);
             
         }
         
@@ -188,13 +188,13 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param queryRoot
      * @param queryHints
      */
-    private void applyGlobalQueryHints(final QueryRoot queryRoot,
-            final Properties queryHints) {
+    private void applyGlobalQueryHints(final AST2BOpContext context,
+            final QueryRoot queryRoot, final Properties queryHints) {
 
         if (queryHints == null || queryHints.isEmpty())
             return;
         
-        validateQueryHints(queryHints);
+        validateQueryHints(context, queryHints);
         
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIteratorWithAnnotations(queryRoot);
@@ -212,58 +212,89 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final ASTBase t = (ASTBase) op;
 
             list.add(t);
-            
+
         }
-        
-        for(ASTBase t : list) {
-            
-            if (t.getProperty(ASTBase.Annotations.QUERY_HINTS) != null) {
 
-                /*
-                 * Normally, there will not be any query hints applied yet.
-                 * 
-                 * However, this can happen if someone fusses with the
-                 * ASTContainer after running the query parser and before
-                 * running the optimizers. To handle this case, we just copy the
-                 * query hints into the existing properties object on the AST
-                 * Node.
-                 */
+        for (ASTBase t : list) {
 
-                final Properties properties = (Properties) t
-                        .getProperty(ASTBase.Annotations.QUERY_HINTS);
+            applyQueryHints(context, t, queryHints);
 
-                @SuppressWarnings("rawtypes")
-                final Enumeration e = queryHints.propertyNames();
-
-                while (e.hasMoreElements()) {
-
-                    final String name = (String) e.nextElement();
-
-                    properties.setProperty(name, queryHints.getProperty(name));
-
-                }
-
-            }
-
-            /*
-             * Set a properties object on each AST node. The properties object
-             * for each AST node will use the global query hints for its
-             * defaults so it can be overridden selectively.
-             */
-
-            t.setProperty(ASTBase.Annotations.QUERY_HINTS, new Properties(
-                    queryHints));
-            
         }
         
     }
 
     /**
+     * Apply each query hint in turn to the AST node.
+     * 
+     * @param t
+     *            The AST node.
+     * @param queryHints
+     *            The query hints.
+     */
+    private void applyQueryHints(final AST2BOpContext context, final ASTBase t,
+            final Properties queryHints) {
+
+        /*
+         * Apply the query hints to the node.
+         */
+
+        @SuppressWarnings("rawtypes")
+        final Enumeration e = queryHints.propertyNames();
+
+        while (e.hasMoreElements()) {
+
+            final String name = (String) e.nextElement();
+
+            final String value = queryHints.getProperty(name);
+
+            applyQueryHint(context, t, name, value);
+
+        }
+        
+    }
+    
+    /**
+     * Apply the query hint to the AST node.
+     * 
+     * @param t
+     *            The AST node.
+     * @param name
+     *            The name of the query hint.
+     * @param value
+     *            The value.
+     * 
+     *            TODO This method is a hook for query hints which have
+     *            side-effects on other things. That hook should be made more
+     *            declarative.
+     * 
+     *            TODO The {@link QueryHintScope} needs to be passed in here as
+     *            some hints are only allowed in some scopes. (For example,
+     *            native hash joins are only allowed in the Query scope since
+     *            the producers and consumers of hash indices need to be using
+     *            the same hash index implementations.)
+     */
+    private void applyQueryHint(final AST2BOpContext context, final ASTBase t,
+            final String name, final String value) {
+
+        if (name.equals(QueryHints.MERGE_JOIN)) {
+            context.mergeJoin = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.NATIVE_DISTINCT)) {
+            context.nativeDistinct = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
+            context.nativeHashJoins = Boolean.valueOf(value);
+        } else {
+            t.setQueryHint(name, value);
+        }
+
+    }
+    
+    /**
      * Validate the global query hints.
      * 
      * @param queryHints
      */
-    private void validateQueryHints(Properties queryHints) {
+    private void validateQueryHints(final AST2BOpContext context,
+            final Properties queryHints) {
 
         final Enumeration<?> e = queryHints.propertyNames();
 
@@ -273,7 +304,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final String value = queryHints.getProperty(name);
 
-            validateQueryHint(name, value);
+            validateQueryHint(context, name, value);
             
         }
         
@@ -479,7 +510,9 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *             against that registry. This would also let us control what
      *             people are able to override.
      */
-    private void validateQueryHint(final String name, final String value) {
+    private void validateQueryHint(final AST2BOpContext context,
+            //final QueryRoot queryRoot, final QueryBase queryBase,final ASTBase node, 
+            final String name, final String value) {
 
 //        final int pos = name.lastIndexOf('.');
 //
@@ -566,26 +599,26 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         final QueryHintScope scope = getScope(hint.s());
 
         final String name = getName(hint.p());
-        
+
         final String value = getValue(hint.o());
-        
-        validateQueryHint(name, value);
-        
+
+        validateQueryHint(context, name, value);
+
         switch (scope) {
         case Query: {
-            applyToQuery(context,queryRoot,name,value);
+            applyToQuery(context, queryRoot, name, value);
             break;
         }
         case SubQuery: {
-            applyToSubQuery(queryBase, group, name, value);
+            applyToSubQuery(context, queryBase, group, name, value);
             break;
         }
         case Group: {
-            applyToGroup(group,name,value);
+            applyToGroup(context, group, name, value);
             break;
         }
         case GroupAndSubGroups: {
-            applyToGroupAndSubGroups(group,name,value);
+            applyToGroupAndSubGroups(context, group, name, value);
             break;
         }
         case BGP: {
@@ -594,7 +627,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                         "Query hint with BGP scope must follow the statement pattern to which it will bind.");
             }
             // Apply to just the last SP.
-            ((ASTBase) lastSP).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) lastSP, name, value);
             break;
         }
         default:
@@ -608,7 +641,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param name
      * @param value
      */
-    private void applyToSubQuery(final QueryBase queryBase,
+    private void applyToSubQuery(final AST2BOpContext context,
+            final QueryBase queryBase,
             GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
 
@@ -626,11 +660,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         }
 
         // Apply to all child groups of that top-level group.
-        applyToGroupAndSubGroups(group, name, value);
+        applyToGroupAndSubGroups(context, group, name, value);
 
         if (isNodeAcceptingQueryHints(queryBase)) {
 
-            ((ASTBase) queryBase).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) queryBase, name, value);
 
         }
 
@@ -681,7 +715,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         for(ASTBase t : list) {
 
-            t.setQueryHint(name, value);
+            applyQueryHint(context, t, name, value);
             
         }
         
@@ -695,16 +729,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     @SuppressWarnings("unchecked")
-    private void applyToGroupAndSubGroups(
-            GraphPatternGroup<IGroupMemberNode> group, String name, String value) {
+    private void applyToGroupAndSubGroups(final AST2BOpContext context,
+            final GraphPatternGroup<IGroupMemberNode> group, final String name,
+            final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            ((ASTBase) child).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) child, name, value);
 
             if (child instanceof GraphPatternGroup<?>) {
 
-                applyToGroupAndSubGroups(
+                applyToGroupAndSubGroups(context,
                         (GraphPatternGroup<IGroupMemberNode>) child, name,
                         value);
 
@@ -714,7 +749,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         if(isNodeAcceptingQueryHints(group)) {
 
-            ((ASTBase) group).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) group, name, value);
             
         }
 
@@ -727,18 +762,19 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param name
      * @param value
      */
-    private void applyToGroup(GraphPatternGroup<IGroupMemberNode> group,
-            String name, String value) {
+    private void applyToGroup(final AST2BOpContext context,
+            final GraphPatternGroup<IGroupMemberNode> group, final String name,
+            final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            ((ASTBase) child).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) child, name, value);
 
         }
 
-        if(isNodeAcceptingQueryHints(group)) {
+        if (isNodeAcceptingQueryHints(group)) {
 
-            ((ASTBase) group).setQueryHint(name, value);
+            applyQueryHint(context, (ASTBase) group, name, value);
             
         }
 
