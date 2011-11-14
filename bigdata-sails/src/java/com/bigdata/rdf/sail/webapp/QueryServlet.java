@@ -17,7 +17,10 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -25,8 +28,11 @@ import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.util.HTMLUtility;
 import com.bigdata.util.InnerCause;
 
@@ -102,20 +108,21 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doQuery(final HttpServletRequest req,
                 final HttpServletResponse resp) throws IOException {
 
-    	final String namespace = getNamespace(req);
+        final String namespace = getNamespace(req);
 
-		final long timestamp = getTimestamp(req);
+        final long timestamp = getTimestamp(req);
 
-		// The SPARQL query.
-		final String queryStr = req.getParameter("query");
+        // The SPARQL query.
+        final String queryStr = req.getParameter("query");
 
-		if(queryStr == null) {
+        if (queryStr == null) {
 
-		    buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "Not found: query");
-		    
-		    return;
-		    
-		}
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Not found: query");
+
+            return;
+
+        }
 
         /*
          * Setup task to execute the query. The task is executed on a thread
@@ -126,29 +133,30 @@ public class QueryServlet extends BigdataRDFServlet {
          * InputStream will be closed and the task will terminate rather than
          * running on in the background with a disconnected client.
          */
-		try {
+        try {
 
-			final OutputStream os = resp.getOutputStream();
-			
-			final BigdataRDFContext context = getBigdataRDFContext();
-			
-//			final boolean explain = req.getParameter(BigdataRDFContext.EXPLAIN) != null;
+            final OutputStream os = resp.getOutputStream();
 
-			final AbstractQueryTask queryTask;
+            final BigdataRDFContext context = getBigdataRDFContext();
+
+            // final boolean explain =
+            // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
+
+            final AbstractQueryTask queryTask;
             try {
                 /*
                  * Attempt to construct a task which we can use to evaluate the
                  * query.
                  */
                 queryTask = context.getQueryTask(namespace, timestamp,
-                        queryStr, null/*acceptOverride*/, req, os);
+                        queryStr, null/* acceptOverride */, req, os);
             } catch (MalformedQueryException ex) {
                 /*
                  * Send back a BAD REQUEST (400) along with the text of the
                  * syntax error message.
                  */
-                resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex
-                        .getLocalizedMessage());
+                resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                        ex.getLocalizedMessage());
                 return;
             }
 
@@ -163,7 +171,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
             resp.setStatus(HTTP_OK);
 
-            if(queryTask.explain) {
+            if (queryTask.explain) {
                 resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
                 final Writer w = new OutputStreamWriter(os, queryTask.charset);
                 try {
@@ -177,68 +185,69 @@ public class QueryServlet extends BigdataRDFServlet {
                     os.flush();
                     os.close();
                 }
-                
+
             } else {
-            resp.setContentType(queryTask.mimeType);
+                resp.setContentType(queryTask.mimeType);
 
-            if (queryTask.charset != null) {
+                if (queryTask.charset != null) {
 
-                // Note: Binary encodings do not specify charset.
-                resp.setCharacterEncoding(queryTask.charset.name());
-                
+                    // Note: Binary encodings do not specify charset.
+                    resp.setCharacterEncoding(queryTask.charset.name());
+
+                }
+
+                if (isAttachment(queryTask.mimeType)) {
+                    /*
+                     * Mark this as an attachment (rather than inline). This is
+                     * just a hint to the user agent. How the user agent handles
+                     * this hint is up to it.
+                     */
+                    resp.setHeader("Content-disposition",
+                            "attachment; filename=query" + queryTask.queryId
+                                    + "." + queryTask.fileExt);
+                }
+
+                if (TimestampUtility.isCommitTime(queryTask.timestamp)) {
+
+                    /*
+                     * A read against a commit time or a read-only tx. Such
+                     * results SHOULD be cached because the data from which the
+                     * response was constructed have snapshot isolation. (Note:
+                     * It is possible that the commit point against which the
+                     * query reads will be aged out of database and that the
+                     * query would therefore fail if it were retried. This can
+                     * happen with the RWStore or in scale-out.)
+                     * 
+                     * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
+                     * requests will read against then current committed state
+                     * of the database each time they are processed.
+                     * 
+                     * Note: UNISOLATED queries SHOULD NOT be cached. Such
+                     * operations will read on (and write on) the then current
+                     * state of the unisolated indices on the database each time
+                     * they are processed. The results of such operations could
+                     * be different with each request.
+                     * 
+                     * Note: Full read-write transaction requests SHOULD NOT be
+                     * cached unless they are queries and the transaction scope
+                     * is limited to the request (rather than running across
+                     * multiple requests).
+                     */
+
+                    resp.addHeader("Cache-Control", "public");
+
+                    // to disable caching.
+                    // r.addHeader("Cache-Control", "no-cache");
+
+                }
+
+                // Begin executing the query (asynchronous)
+                getBigdataRDFContext().queryService.execute(ft);
+
+                // Wait for the Future.
+                ft.get();
+
             }
-
-            if (isAttachment(queryTask.mimeType)) {
-                /*
-                 * Mark this as an attachment (rather than inline). This is just
-                 * a hint to the user agent. How the user agent handles this
-                 * hint is up to it.
-                 */
-                resp.setHeader("Content-disposition",
-                        "attachment; filename=query" + queryTask.queryId + "."
-                                + queryTask.fileExt);
-            }
-
-            if(TimestampUtility.isCommitTime(queryTask.timestamp)) {
-
-                /*
-                 * A read against a commit time or a read-only tx. Such results
-                 * SHOULD be cached because the data from which the response was
-                 * constructed have snapshot isolation. (Note: It is possible
-                 * that the commit point against which the query reads will be
-                 * aged out of database and that the query would therefore fail
-                 * if it were retried. This can happen with the RWStore or in
-                 * scale-out.)
-                 * 
-                 * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
-                 * requests will read against then current committed state of
-                 * the database each time they are processed.
-                 * 
-                 * Note: UNISOLATED queries SHOULD NOT be cached. Such
-                 * operations will read on (and write on) the then current state
-                 * of the unisolated indices on the database each time they are
-                 * processed. The results of such operations could be different
-                 * with each request.
-                 * 
-                 * Note: Full read-write transaction requests SHOULD NOT be
-                 * cached unless they are queries and the transaction scope is
-                 * limited to the request (rather than running across multiple
-                 * requests).
-                 */
-
-                resp.addHeader("Cache-Control", "public");
-                
-                // to disable caching.
-                // r.addHeader("Cache-Control", "no-cache");
-
-            }
-            
-			// Begin executing the query (asynchronous)
-			getBigdataRDFContext().queryService.execute(ft);
-
-				// Wait for the Future.
-				ft.get();
-		}
 
 		} catch (Throwable e) {
 			try {
@@ -331,13 +340,50 @@ public class QueryServlet extends BigdataRDFServlet {
 			}
 			current = current.node("body");
 
-//			// TODO Redundant if using native SPARQL evaluation.
-//			current.node("h2", "SPARQL").node("p",
-//					HTMLUtility.escapeForXHTML(queryTask.queryStr));
+			current = current.node("h1", "Query");
 
-			current.node("h2", "Query").node("pre",
-					HTMLUtility.escapeForXHTML(queryTask.sailQuery.toString()));
-			
+            final ASTContainer astContainer = ((BigdataSailQuery) queryTask.sailQuery)
+                    .getASTContainer();
+
+            /*
+             * These things are available as soon as the parser runs, so we can
+             * paint them onto the page now.
+             * 
+             * Note: The code is written defensively even though all of this
+             * information should be available
+             */
+            {
+
+                final String queryString = astContainer.getQueryString();
+
+                if (queryString != null) {
+
+                    current.node("h2", "SPARQL").node("pre",
+                            HTMLUtility.escapeForXHTML(queryString));
+
+                }
+
+                final SimpleNode parseTree = ((SimpleNode) astContainer
+                        .getParseTree());
+
+                if (parseTree != null) {
+
+                    current.node("h2", "Parse Tree").node("pre",
+                            HTMLUtility.escapeForXHTML(parseTree.dump("")));
+
+                }
+
+                final QueryRoot originalAST = astContainer.getOriginalAST();
+
+                if (originalAST != null) {
+
+                    current.node("h2", "Original AST").node("pre",
+                            HTMLUtility.escapeForXHTML(originalAST.toString()));
+
+                }
+                
+            }
+            
 			/*
 			 * Spin until we get the IRunningQuery reference or the query is
 			 * done, in which case we won't get it.
@@ -373,29 +419,66 @@ public class QueryServlet extends BigdataRDFServlet {
 					if(log.isDebugEnabled())
 						log.debug("Resolved IRunningQuery: query=" + q);
 			}
-			
+
+            /*
+             * Once the IRunningQuery is available, we know that the query has
+             * been optimized and can paint the final (optimized) AST and the
+             * query plan onto the page.
+             * 
+             * Note: The code is written defensively even though all of this
+             * information should be available
+             */
+            if (q != null) {
+
+                final QueryRoot optimizedAST = astContainer.getOptimizedAST();
+
+                if (optimizedAST != null) {
+
+                    current.node("h2", "Optimized AST")
+                            .node("pre",
+                                    HTMLUtility.escapeForXHTML(optimizedAST
+                                            .toString()));
+
+                }
+
+                final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+                if (queryPlan != null) {
+
+                    current.node("h2", "Query Plan").node(
+                            "pre",
+                            HTMLUtility.escapeForXHTML(BOpUtility
+                                    .toString(queryPlan)));
+
+                }
+
+            }
+
 			// wait for the Future (will toss any exceptions).
 			ft.get();
 
+			current = current.node("h2", "Query Evaluation Statistics");
+			
             if (q == null) {
+            
                 /*
                  * This can happen if we fail to get the IRunningQuery reference
                  * before the query terminates. E.g., if the query runs too
                  * quickly there is a data race and the reference may not be
                  * available anymore.
                  */
-                current.text("Statistics are not available for this query (query already terminated).");
+                
+                current.text("Statistics are not available (query already terminated).");
+                
             } else {
 
                 final long elapsedMillis = q.getElapsed();
 
-              final BOpStats stats = q.getStats().get(q.getQuery().getId());
-              final long solutionsOut = stats.unitsOut.get();
-              final long chunksOut = stats.chunksOut.get();
-//                final long solutionsOut = ((AbstractRunningQuery)q).getSolutionCount();
-//                final long chunksOut = ((AbstractRunningQuery)q).getSolutionChunkCount();
+                final BOpStats stats = q.getStats().get(q.getQuery().getId());
+                final long solutionsOut = stats.unitsOut.get();
+                final long chunksOut = stats.chunksOut.get();
 
-                current.node("h2", "Query Evaluation Statistics").node("p")//
+                current.node("p")//
                         .text("solutions=" + solutionsOut)//
                         .text(", chunks=" + chunksOut)//
                         .text(", elapsed=" + elapsedMillis + "ms")//
