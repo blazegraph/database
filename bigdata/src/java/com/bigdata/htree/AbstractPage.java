@@ -710,7 +710,6 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
              * reference queue.
              */
             parent.replaceChildRef(oldId, newNode);
-            // parent.replaceChildRef(this.self, newNode);
 
         }
 

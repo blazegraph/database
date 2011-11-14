@@ -604,6 +604,9 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 			
 			newPage.insert(key, val);
 			
+			// assert (1 << (htree.addressBits - this.globalDepth)) == getParentDirectory().countChildRefs(this);
+			// assert (1 << (htree.addressBits - newPage.globalDepth)) == getParentDirectory().countChildRefs(newPage);
+			
 			assert dirtyHierarchy();
 //		} finally {
 //			protect.release();
