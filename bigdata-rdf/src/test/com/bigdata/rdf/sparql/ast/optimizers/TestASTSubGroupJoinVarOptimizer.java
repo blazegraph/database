@@ -100,22 +100,20 @@ public class TestASTSubGroupJoinVarOptimizer extends
      *     }
      * } AS %_set1
      *         WHERE {
-     *             
-     *             INCLUDE %_set1
-     *             . 
+     *             INCLUDE %_set1 . 
      *             OPTIONAL {
      *                 ?_var3 p1:name ?_var9
      *             }. 
      *             OPTIONAL {
      *                 ?_var10 p2:votedBy ?_var3. 
-     *                 ?_var10 rdfs:label ?_var2
+     *                 ?_var10 rdfs:label ?_var2.
      *             }
      *         }
      *         GROUP BY ?_var2 ?_var3
      * </pre>
      * 
-     * The complex optional group in this query should have <code>_var1</code>
-     * specified as a join variable.
+     * Both the simple optional group and the complex optional group in this
+     * query should have <code>_var3</code> specified as a join variable.
      */
     public void test_govtrack_21() {
 

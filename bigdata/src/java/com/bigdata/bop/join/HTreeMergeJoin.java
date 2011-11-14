@@ -51,7 +51,7 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class HTreeMergeJoin extends PipelineOp {
+public class HTreeMergeJoin extends AbstractMergeJoin {
 
     /**
      * 

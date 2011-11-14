@@ -257,8 +257,14 @@ public class AST2BOpFilters extends AST2BOpBase {
              * on a Journal or a cluster.
              */
             return (PipelineOp) new ChunkedMaterializationOp(leftOrEmpty(left),
-                    vars.toArray(new IVariable[nvars]), ns, timestamp)
-                    .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
+                    new NV(ChunkedMaterializationOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
+                    new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
+                    new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                    new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+                    );
+//                    vars.toArray(new IVariable[nvars]), ns, timestamp)
+//                    .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
         }
 
         final Iterator<IVariable<IV>> it = vars.iterator();

@@ -121,6 +121,13 @@ public interface QueryHints {
 //    String DEFAULT_HASH_JOIN = "false";
 
     /**
+     * Enable merge joins for this query.
+     */
+    String MERGE_JOIN = QueryHints.class.getName() + ".mergeJoin";
+
+    String DEFAULT_MERGE_JOIN = "false";
+
+    /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).
      * This query hint makes it possible for the application to assign the
      * {@link UUID} under which the query will run. This can be used to locate

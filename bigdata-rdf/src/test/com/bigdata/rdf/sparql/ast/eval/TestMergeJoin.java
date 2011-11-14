@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.join.AbstractHashJoinUtilityTestCase;
+import com.bigdata.bop.join.AbstractMergeJoin;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 
 /**
  * Data driven test suite.
@@ -97,20 +100,17 @@ public class TestMergeJoin extends AbstractDataDrivenSPARQLTestCase {
      * </pre>
      * 
      * @see AbstractHashJoinUtilityTestCase#test_mergeJoin01()
-     * 
-     *      FIXME This is blocking on the first NSI which is not getting a join
-     *      variable assigned. For that NSI, we need to recognize that there are
-     *      no incoming MUST or MAYBE bound variables. However, that SHOULD NOT
-     *      prevent us from using ?a as the join variable since it is known
-     *      bound by the time the query runs and since there are NO source
-     *      solutions. (If there was an exogenous solution and it did NOT have
-     *      ?a bound then this would be a problem (actually, I think that the
-     *      NSI might run without the exogenous solution, which could be a
-     *      bug.)
      */
     public void test_merge_join_01() throws Exception {
 
-        new TestHelper("merge-join-01").runTest();
+        final ASTContainer astContainer = new TestHelper("merge-join-01")
+                .runTest();
+
+        // Verify that a MERGE JOIN operator was used.
+        assertTrue(
+                "No merge join?",
+                BOpUtility.visitAll(astContainer.getQueryPlan(),
+                        AbstractMergeJoin.class).hasNext());
 
     }
 
@@ -121,13 +121,34 @@ public class TestMergeJoin extends AbstractDataDrivenSPARQLTestCase {
      * level merge join code.
      * 
      * <pre>
+     * prefix : <http://www.bigdata.com/>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * SELECT ?a ?x ?y
+     * WITH {
+     *   SELECT ?a ?x {?a :x ?x}
+     * } as %set1
+     * WITH {
+     *   SELECT ?a ?y {?a :y ?y}
+     * } as %set2
+     * WHERE {
+     *    INCLUDE %set1.
+     *    OPTIONAL {INCLUDE %set2}.
+     * }
      * </pre>
      * 
      * @see AbstractHashJoinUtilityTestCase#test_mergeJoin01()
      */
     public void test_merge_join_02() throws Exception {
 
-        new TestHelper("merge-join-02").runTest();
+        final ASTContainer astContainer = new TestHelper("merge-join-02")
+                .runTest();
+
+        // Verify that a MERGE JOIN operator was used.
+        assertTrue(
+                "No merge join?",
+                BOpUtility.visitAll(astContainer.getQueryPlan(),
+                        AbstractMergeJoin.class).hasNext());
 
     }
 
