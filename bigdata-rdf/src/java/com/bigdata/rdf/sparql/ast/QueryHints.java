@@ -66,22 +66,22 @@ public interface QueryHints {
     
     String NAMESPACE = "http://www.bigdata.com/queryHints#";
 
-	/**
-	 * Specify the query optimizer. For example, you can disable the query
-	 * optimizer using
-	 * 
-	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.optimizer=None&gt;
-	 * </pre>
-	 * 
-	 * Disabling the query optimizer can be useful if you have a query for which
-	 * the static query optimizer is producing a inefficient join ordering. With
-	 * the query optimizer disabled for that query, the joins will be run in the
-	 * order given.  This makes it possible for you to decide on the right join
-	 * ordering for that query.
-	 * 
-	 * @see QueryOptimizerEnum
-	 */
+    /**
+     * Specify the join order optimizer. For example, you can disable the query
+     * optimizer using
+     * 
+     * <pre>
+     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.optimizer=None&gt;
+     * </pre>
+     * 
+     * Disabling the join order optimizer can be useful if you have a query for
+     * which the static optimizer is producing a inefficient join ordering. With
+     * the query optimizer disabled for that query, the joins will be run in the
+     * order given. This makes it possible for you to decide on the right join
+     * ordering for that query.
+     * 
+     * @see QueryOptimizerEnum
+     */
     String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
 
 	/**
