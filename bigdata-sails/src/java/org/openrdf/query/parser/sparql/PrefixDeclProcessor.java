@@ -17,6 +17,8 @@ import org.openrdf.query.parser.sparql.ast.ASTQName;
 import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 /**
  * Processes the prefix declarations in a SPARQL query model.
  *
@@ -87,9 +89,13 @@ public class PrefixDeclProcessor {
 			String prefix = qname.substring(0, colonIdx);
 			String localName = qname.substring(colonIdx + 1);
 
-			String namespace = prefixMap.get(prefix);
-			if (namespace == null) {
-				throw new VisitorException("QName '" + qname + "' uses an undefined prefix");
+            String namespace = prefixMap.get(prefix);
+            if (namespace == null) {
+                if (prefix.equals("hint")) {
+                    prefixMap.put("hint", namespace = QueryHints.NAMESPACE);
+                } else {
+                    throw new VisitorException("QName '" + qname + "' uses an undefined prefix");
+                }
 			}
 
 			// Replace the qname node with a new IRI node in the parent node

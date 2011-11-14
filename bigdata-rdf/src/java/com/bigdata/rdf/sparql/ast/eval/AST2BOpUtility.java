@@ -107,6 +107,7 @@ import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceCall;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -782,6 +783,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(ServiceCallJoin.Annotations.SERVICE_URI,
                         serviceNode.getServiceURI()),//
                 new NV(ServiceCallJoin.Annotations.GROUP_NODE,
@@ -904,6 +906,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
                             namedSolutionSetRef),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS,
@@ -920,6 +923,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF,
                             namedSolutionSetRef),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS,
@@ -1060,6 +1064,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
@@ -1074,6 +1079,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
@@ -1109,6 +1115,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
@@ -1124,6 +1131,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
@@ -1563,7 +1571,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         inFilters.addAll(joinGroup.getInFilters());
 
         final AtomicInteger start = new AtomicInteger(0);
-        if(ctx.mergeJoin) {
+        if (ctx.mergeJoin
+                || Boolean.valueOf(joinGroup.getQueryHint(
+                        QueryHints.MERGE_JOIN, QueryHints.DEFAULT_MERGE_JOIN))) {
 
             /*
              * Attempt to interpret the leading sequence in the group as a merge
@@ -1716,9 +1726,6 @@ public class AST2BOpUtility extends Rule2BOpUtility {
      * 
      * @return <i>left</i> if no merge join was recognized and otherwise the
      *         merge join plan.
-     * 
-     *         TODO Test against BSBM Q5 (must first push down the subgroups,
-     *         but we can do that rewrite in the SPARQL template).
      * 
      *         TODO We also need to handle join filters which appear between
      *         INCLUDES. That should not prevent a merge join. Instead, those
@@ -1902,9 +1909,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
         if(!firstInclude.getJoinVarSet().equals(joinVars)) {
             
             /*
-             * If the primary source does not share the same join variables, then we
-             * need to build a hash index on the join variables which are used by
-             * the other sources.
+             * If the primary source does not share the same join variables,
+             * then we need to build a hash index on the join variables which
+             * are used by the other sources.
              */
             
             left = addNamedSubqueryInclude(left, firstInclude, doneSet, ctx);
@@ -1916,6 +1923,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
         //                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
@@ -1929,8 +1937,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
-                        new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
+                    new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
         //                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                     new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
                 ); 
@@ -2368,6 +2377,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
@@ -2381,6 +2391,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
@@ -2405,6 +2416,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//
@@ -2420,6 +2432,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, selectVars),//

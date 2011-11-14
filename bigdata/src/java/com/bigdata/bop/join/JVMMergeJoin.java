@@ -37,8 +37,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -50,7 +48,7 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JVMMergeJoin extends PipelineOp {
+public class JVMMergeJoin extends AbstractMergeJoin  {
 
     /**
      * 

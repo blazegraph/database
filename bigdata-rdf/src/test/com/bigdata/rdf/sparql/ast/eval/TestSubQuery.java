@@ -285,4 +285,30 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * <pre>
+     * prefix : <http://www.bigdata.com/>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * SELECT ?a ?x ?y
+     * WITH {
+     *   SELECT ?a ?x {?a :x ?x}
+     * } as %set1
+     * WITH {
+     *   SELECT ?a ?y {?a :y ?y}
+     * } as %set2
+     * WHERE {
+     *    OPTIONAL {INCLUDE %set1}.
+     *    OPTIONAL {INCLUDE %set2}.
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_double_optional_include() throws Exception {
+
+        new TestHelper("double-optional-include").runTest();
+        
+    }
+    
 }
