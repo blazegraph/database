@@ -208,12 +208,6 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             if (!isNodeAcceptingQueryHints(op))
                 continue;
 
-            /*
-             * Set a properties object on each AST node. The properties object
-             * for each AST node will use the global query hints for its
-             * defaults so it can be overridden selectively.
-             */
-
             final ASTBase t = (ASTBase) op;
 
             list.add(t);
@@ -223,12 +217,38 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         for(ASTBase t : list) {
             
             if (t.getProperty(ASTBase.Annotations.QUERY_HINTS) != null) {
+
                 /*
-                 * There should not be any query hints applied yet.
+                 * Normally, there will not be any query hints applied yet.
+                 * 
+                 * However, this can happen if someone fusses with the
+                 * ASTContainer after running the query parser and before
+                 * running the optimizers. To handle this case, we just copy the
+                 * query hints into the existing properties object on the AST
+                 * Node.
                  */
-                throw new AssertionError("Query hints are already present: "
-                        + t);
+
+                final Properties properties = (Properties) t
+                        .getProperty(ASTBase.Annotations.QUERY_HINTS);
+
+                @SuppressWarnings("rawtypes")
+                final Enumeration e = queryHints.propertyNames();
+
+                while (e.hasMoreElements()) {
+
+                    final String name = (String) e.nextElement();
+
+                    properties.setProperty(name, queryHints.getProperty(name));
+
+                }
+
             }
+
+            /*
+             * Set a properties object on each AST node. The properties object
+             * for each AST node will use the global query hints for its
+             * defaults so it can be overridden selectively.
+             */
 
             t.setProperty(ASTBase.Annotations.QUERY_HINTS, new Properties(
                     queryHints));
