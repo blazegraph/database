@@ -663,4 +663,164 @@ public class TestASTQueryHintOptimizer extends
 
     }
         
+    /**
+     * Test verifies that we can enable native DISTINCT, native HASH JOINS, and
+     * MERGE JOINs using query hints.
+     * 
+     * <pre>
+     * PREFIX hint: <http://www.bigdata.com/queryHints#>
+     * SELECT (COUNT(?_var3) as ?count)
+     * WHERE {
+     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeDistinct "true" .
+     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "true" .
+     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.mergeJoins "true" .
+     *   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>.
+     *   ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3.
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_query_hints_4() throws Exception {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV option = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/vote/Option"));
+        @SuppressWarnings("rawtypes")
+        final IV votedBy = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/vote/votedBy"));
+
+        @SuppressWarnings("rawtypes")
+        final IV scopeGroup = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Group));
+        @SuppressWarnings("rawtypes")
+        final IV nativeDistinct = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_DISTINCT));
+        @SuppressWarnings("rawtypes")
+        final IV nativeHashJoins= makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_HASH_JOINS));
+        @SuppressWarnings("rawtypes")
+        final IV mergeJoin = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.MERGE_JOIN));
+        @SuppressWarnings("rawtypes")
+        final IV t = makeIV(new LiteralImpl("true"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+
+                projection
+                        .addProjectionExpression(new AssignmentNode(//
+                                new VarNode("count"),// var
+                                new FunctionNode(
+                                        // expr
+                                        FunctionRegistry.COUNT,
+                                        Collections
+                                                .singletonMap(
+                                                        AggregateBase.Annotations.DISTINCT,
+                                                        (Object) Boolean.FALSE)/* scalarValues */,
+                                        new ValueExpressionNode[] { new VarNode(
+                                                "_var3") })));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopeGroup), new ConstantNode(nativeDistinct),
+                        new ConstantNode(t), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopeGroup), new ConstantNode(nativeHashJoins),
+                        new ConstantNode(t), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopeGroup), new ConstantNode(mergeJoin),
+                        new ConstantNode(t), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(a),
+                        new ConstantNode(option), new VarNode("g"),
+                        Scope.NAMED_CONTEXTS));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(votedBy), new VarNode(
+                        "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+            }
+
+        }
+        
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {            // Main Query
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+
+                projection
+                        .addProjectionExpression(new AssignmentNode(//
+                                new VarNode("count"),// var
+                                new FunctionNode(
+                                        // expr
+                                        FunctionRegistry.COUNT,
+                                        Collections
+                                                .singletonMap(
+                                                        AggregateBase.Annotations.DISTINCT,
+                                                        (Object) Boolean.FALSE)/* scalarValues */,
+                                        new ValueExpressionNode[] { new VarNode(
+                                                "_var3") })));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+                {
+
+                    final StatementPatternNode sp1 = new StatementPatternNode(
+                            new VarNode("_var10"), new ConstantNode(a),
+                            new ConstantNode(option), new VarNode("g"),
+                            Scope.NAMED_CONTEXTS);
+                    whereClause.addChild(sp1);
+
+                    final StatementPatternNode sp2 = new StatementPatternNode(new VarNode(
+                            "_var10"), new ConstantNode(votedBy), new VarNode(
+                            "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS);
+                    whereClause.addChild(sp2);
+
+                }
+
+            }
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTQueryHintOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+        
+        // Turn them off before hand.
+        context.nativeDistinct = false;
+        context.nativeHashJoins = false;
+        context.mergeJoin = false;
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
+        // Verify true after.
+        assertTrue(context.nativeDistinct);
+        assertTrue(context.nativeHashJoins);
+        assertTrue(context.mergeJoin);
+        
+        assertSameAST(expected, actual);
+
+    }
+
 }

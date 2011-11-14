@@ -1572,8 +1572,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
 
         final AtomicInteger start = new AtomicInteger(0);
         if (ctx.mergeJoin
-                || Boolean.valueOf(joinGroup.getQueryHint(
-                        QueryHints.MERGE_JOIN, QueryHints.DEFAULT_MERGE_JOIN))) {
+                || joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
+                        QueryHints.DEFAULT_MERGE_JOIN)) {
 
             /*
              * Attempt to interpret the leading sequence in the group as a merge
