@@ -247,7 +247,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final String value = queryHints.getProperty(name);
 
-            applyQueryHint(context, t, name, value);
+            _applyQueryHint(context, t, name, value);
 
         }
         
@@ -273,10 +273,14 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            the producers and consumers of hash indices need to be using
      *            the same hash index implementations.)
      */
-    private void applyQueryHint(final AST2BOpContext context, final ASTBase t,
+    private void _applyQueryHint(final AST2BOpContext context, final ASTBase t,
             final String name, final String value) {
 
-        if (name.equals(QueryHints.MERGE_JOIN)) {
+        if (name.equals(QueryHints.ANALYTIC)) {
+            context.mergeJoin = Boolean.valueOf(value);
+            context.nativeDistinct = Boolean.valueOf(value);
+            context.nativeHashJoins = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.MERGE_JOIN)) {
             context.mergeJoin = Boolean.valueOf(value);
         } else if (name.equals(QueryHints.NATIVE_DISTINCT)) {
             context.nativeDistinct = Boolean.valueOf(value);
@@ -627,7 +631,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                         "Query hint with BGP scope must follow the statement pattern to which it will bind.");
             }
             // Apply to just the last SP.
-            applyQueryHint(context, (ASTBase) lastSP, name, value);
+            _applyQueryHint(context, (ASTBase) lastSP, name, value);
             break;
         }
         default:
@@ -664,7 +668,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         if (isNodeAcceptingQueryHints(queryBase)) {
 
-            applyQueryHint(context, (ASTBase) queryBase, name, value);
+            _applyQueryHint(context, (ASTBase) queryBase, name, value);
 
         }
 
@@ -715,7 +719,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         for(ASTBase t : list) {
 
-            applyQueryHint(context, t, name, value);
+            _applyQueryHint(context, t, name, value);
             
         }
         
@@ -735,7 +739,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         for (IGroupMemberNode child : group) {
 
-            applyQueryHint(context, (ASTBase) child, name, value);
+            _applyQueryHint(context, (ASTBase) child, name, value);
 
             if (child instanceof GraphPatternGroup<?>) {
 
@@ -749,7 +753,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         if(isNodeAcceptingQueryHints(group)) {
 
-            applyQueryHint(context, (ASTBase) group, name, value);
+            _applyQueryHint(context, (ASTBase) group, name, value);
             
         }
 
@@ -768,13 +772,13 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         for (IGroupMemberNode child : group) {
 
-            applyQueryHint(context, (ASTBase) child, name, value);
+            _applyQueryHint(context, (ASTBase) child, name, value);
 
         }
 
         if (isNodeAcceptingQueryHints(group)) {
 
-            applyQueryHint(context, (ASTBase) group, name, value);
+            _applyQueryHint(context, (ASTBase) group, name, value);
             
         }
 
