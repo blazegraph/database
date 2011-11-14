@@ -462,6 +462,8 @@ public class TestASTQueryHintOptimizer extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {            // Main Query
 
+            expected.setQueryHint(QueryHints.OPTIMIZER, "None");
+
             {
                 final ProjectionNode projection = new ProjectionNode();
                 expected.setProjection(projection);
@@ -481,11 +483,13 @@ public class TestASTQueryHintOptimizer extends
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
+                whereClause.setQueryHint(QueryHints.OPTIMIZER, "None");
 
                 whereClause.setContext(new VarNode("g"));
 
                 final JoinGroupNode graphGroup = new JoinGroupNode();
                 whereClause.addChild(graphGroup);
+                graphGroup.setQueryHint(QueryHints.OPTIMIZER, "None");
                 {
 
                     final StatementPatternNode sp1 = new StatementPatternNode(

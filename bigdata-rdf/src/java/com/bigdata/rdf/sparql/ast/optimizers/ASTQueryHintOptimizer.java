@@ -46,8 +46,10 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -172,7 +174,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @return
      */
     private boolean isNodeAcceptingQueryHints(final BOp op) {
-        if (op instanceof StatementPatternNode) {
+        if (op instanceof StatementPatternNode || op instanceof JoinGroupNode
+                || op instanceof QueryBase) {
             return true;
         }
         return false;
