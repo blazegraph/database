@@ -474,6 +474,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
             );
             
@@ -1094,6 +1095,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
                     new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
             );
             
