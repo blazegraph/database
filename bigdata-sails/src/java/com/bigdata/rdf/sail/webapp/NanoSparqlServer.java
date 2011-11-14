@@ -23,12 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -40,6 +41,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Utility class provides a simple SPARQL end point with a REST API.
@@ -80,7 +82,7 @@ import com.bigdata.rdf.store.DataLoader;
  */
 public class NanoSparqlServer {
 	
-//	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
+	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
 
     /**
      * Run an httpd service exposing a SPARQL endpoint. The service will respond
@@ -273,6 +275,26 @@ public class NanoSparqlServer {
 
         server.start();
 
+        {
+
+            final int actualPort = server.getConnectors()[0].getLocalPort();
+
+            String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+                    true/* loopbackOk */);
+
+            if (hostAddr == null) {
+
+                hostAddr = "localhost";
+
+            }
+
+            final String serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
+                    .toExternalForm();
+
+            System.out.println("serviceURL: " + serviceURL);
+
+        }
+        
         server.join();
 
     }
@@ -291,23 +313,29 @@ public class NanoSparqlServer {
      * 
      * @return The server instance.
      */
-    static public Server newInstance(final int port, final IIndexManager indexManager,
+    static public Server newInstance(final int port,
+            final IIndexManager indexManager,
             final Map<String, String> initParams) {
 
-        final ServletContextHandler context = getContextHandler(initParams);
+        final Server server = new Server(port);
+
+        final ServletContextHandler context = getContextHandler(server,
+                initParams);
 
         // Force the use of the caller's IIndexManager.
         context.setAttribute(IIndexManager.class.getName(), indexManager);
         
         final HandlerList handlers = new HandlerList();
 
+        final ResourceHandler resourceHandler = new ResourceHandler();
+        
+        setupStaticResources(server, resourceHandler);
+
         handlers.setHandlers(new Handler[] {
                 context,//
-                getResourceHandler(initParams),//
+                resourceHandler,//
 //                new DefaultHandler()//
                 });
-
-        final Server server = new Server(port);
 
         server.setHandler(handlers);
 
@@ -334,17 +362,21 @@ public class NanoSparqlServer {
     static public Server newInstance(final int port, final String propertyFile,
             final Map<String, String> initParams) {
 
-        final ServletContextHandler context = getContextHandler(initParams);
+        final Server server = new Server(port);
+
+        final ServletContextHandler context = getContextHandler(server,initParams);
         
         final HandlerList handlers = new HandlerList();
 
+        final ResourceHandler resourceHandler = new ResourceHandler();
+        
+        setupStaticResources(server, resourceHandler);
+        
         handlers.setHandlers(new Handler[] {
                 context,//
-                getResourceHandler(initParams),//
+                resourceHandler,//
 //                new DefaultHandler()//
                 });
-
-        final Server server = new Server(port);
 
         server.setHandler(handlers);
 
@@ -359,6 +391,7 @@ public class NanoSparqlServer {
      *            The init parameters, per the web.xml definition.
      */
     static private ServletContextHandler getContextHandler(
+            final Server server,
             final Map<String, String> initParams) {
 
         if (initParams == null)
@@ -368,8 +401,11 @@ public class NanoSparqlServer {
                 ServletContextHandler.NO_SECURITY
                         | ServletContextHandler.NO_SESSIONS);
 
-        context.setContextPath("/");
-
+//        /*
+//         * Setup resolution for the static web app resources (index.html).
+//         */
+//        setupStaticResources(server, context);
+        
         /*
          * Register a listener which will handle the life cycle events for the
          * ServletContext.
@@ -403,28 +439,111 @@ public class NanoSparqlServer {
         
     }
 
-    private static ResourceHandler getResourceHandler(
-            final Map<String, String> initParams) {
+    /**
+     * Setup access to the web app resources, especially index.html.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
+     * 
+     * @param server
+     * @param context
+     */
+    private static void setupStaticResources(final Server server,
+            final ServletContextHandler context) {
+
+        final URL url = getStaticResourceURL(server);
+
+        if(url != null) {
+
+            /*
+             * We have located the resource. Set it as the resource base from
+             * which static content will be served.
+             */
+
+            final String webDir = url.toExternalForm();
+
+            context.setResourceBase(webDir);
+
+            context.setContextPath("/");
+
+        }
+
+    }
+
+    /**
+     * Setup access to the welcome page (index.html).
+     */
+    private static void setupStaticResources(final Server server,
+            final ResourceHandler context) {
+
+        context.setDirectoriesListed(false); // Nope!
+
+        final URL url = getStaticResourceURL(server);
+
+        if(url != null) {
+            
+            /*
+             * We have located the resource. Set it as the resource base from
+             * which static content will be served.
+             */
+
+            final String webDir = url.toExternalForm();
+
+            context.setResourceBase(webDir);
+
+            // FIXME Set to locate the flot files as part of the CountersServlet
+            // setup.
+            // resource_handler.setResourceBase(config.resourceBase);
+
+            // Note: FileResource or ResourceCollection.
+//            resourceHandler.setBaseResource(new FileResource(...));
+            
+            context.setWelcomeFiles(new String[]{"index.html"});
+
+//            context.setContextPath("/");
+
+        }
+
+    }
+
+    /**
+     * Return the URL for the static web app resources (index.html).
+     * 
+     * @param server
+     * 
+     * @return The URL for the web app resource directory -or- <code>null</code>
+     *         if it could not be found on the class path.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
+     */
+    private static URL getStaticResourceURL(final Server server) {
         
-        if (initParams == null)
-            throw new IllegalArgumentException();
+        /*
+         * This is the resource path in the JAR.
+         */
+        final String WEB_DIR_JAR = "bigdata-war/src/html";
 
-        final ResourceHandler resourceHandler = new ResourceHandler();
+        /*
+         * This is the resource path in the IDE when NOT using the JAR.
+         * 
+         * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
+         */
+        final String WEB_DIR_IDE = "html";
 
-        resourceHandler.setDirectoriesListed(false); // Nope!
+        URL url = server.getClass().getClassLoader().getResource(WEB_DIR_JAR);
 
-        // FIXME Set to locate the flot files as part of the CountersServlet
-        // setup.
-        // resource_handler.setResourceBase(config.resourceBase);
+        if (url == null) {
 
-        // Note: FileResource or ResourceCollection.
-//        resourceHandler.setBaseResource(new FileResource(...));
-        
-        resourceHandler.setResourceBase("bigdata-war/src/html");
-        
-        resourceHandler.setWelcomeFiles(new String[]{"index.html"});
-      
-        return resourceHandler;
+            url = server.getClass().getClassLoader().getResource("html");
+
+        }
+
+        if (url == null) {
+
+            log.error("Could not locate: " + WEB_DIR_JAR + " -or- "
+                    + WEB_DIR_IDE);
+        }
+
+        return url;
 
     }
 

@@ -384,7 +384,7 @@ public class QueryServlet extends BigdataRDFServlet {
                  * quickly there is a data race and the reference may not be
                  * available anymore.
                  */
-                current.text("Not available.");
+                current.text("Statistics are not available for this query (query already terminated).");
             } else {
 
                 final long elapsedMillis = q.getElapsed();

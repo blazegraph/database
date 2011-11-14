@@ -233,8 +233,8 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
             
         }
         // Start server for that kb instance.
-		m_fixture = NanoSparqlServer.newInstance(0/* port */, m_indexManager,
-				initParams);
+        m_fixture = NanoSparqlServer.newInstance(0/* port */,
+                m_indexManager, initParams);
 
         m_fixture.start();
 
