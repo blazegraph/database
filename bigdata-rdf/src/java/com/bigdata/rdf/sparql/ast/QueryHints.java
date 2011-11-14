@@ -161,6 +161,16 @@ public interface QueryHints {
     boolean DEFAULT_MERGE_JOIN = false;
 
     /**
+     * When <code>true</code>, enables all query hints pertaining to analytic
+     * query patterns.
+     */
+    String ANALYTIC = QueryHints.class.getName() + ".analytic";
+
+    boolean DEFAULT_ANALYTIC = false;
+
+    
+    
+    /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).
      * This query hint makes it possible for the application to assign the
      * {@link UUID} under which the query will run. This can be used to locate
