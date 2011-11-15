@@ -698,7 +698,7 @@ public class TestASTQueryHintOptimizer extends
         @SuppressWarnings("rawtypes")
         final IV scopeGroup = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Group));
         @SuppressWarnings("rawtypes")
-        final IV nativeDistinct = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_DISTINCT));
+        final IV nativeDistinct = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_DISTINCT_SOLUTIONS));
         @SuppressWarnings("rawtypes")
         final IV nativeHashJoins= makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_HASH_JOINS));
         @SuppressWarnings("rawtypes")
@@ -807,7 +807,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
         
         // Turn them off before hand.
-        context.nativeDistinct = false;
+        context.nativeDistinctSolutions = false;
         context.nativeHashJoins = false;
         context.mergeJoin = false;
 
@@ -815,7 +815,7 @@ public class TestASTQueryHintOptimizer extends
                 given/* queryNode */, bsets);
 
         // Verify true after.
-        assertTrue(context.nativeDistinct);
+        assertTrue(context.nativeDistinctSolutions);
         assertTrue(context.nativeHashJoins);
         assertTrue(context.mergeJoin);
         

@@ -2512,7 +2512,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IVariable<?>[] vars = projection.getProjectionVars();
 
         final PipelineOp op;
-        if (!ctx.nativeDistinct) {
+        if (!ctx.nativeDistinctSolutions) {
             /*
              * DISTINCT on the JVM heap.
              */

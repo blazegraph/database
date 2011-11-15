@@ -34,6 +34,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.htree.HTree;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
@@ -102,36 +103,41 @@ public interface QueryHints {
      * @see #TAG
      */
     String DEFAULT_TAG = "";
-    
-    // See AST2BOpBase.Annotations.HASH_JOINS
-//	/**
-//	 * If true, this query hint will let the evaluation strategy know it should
-//	 * try to use the {@link SubqueryHashJoinOp} to perform a hash join between
-//	 * subqueries.  Subqueries are identified in several ways: either an optional
-//	 * join group, or a set of tails within one join group that create a cross
-//	 * product if run normally (i.e. multiple free text searches).
-//	 *  
-//	 * <pre>
-//	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.hashJoin=true&gt;
-//	 * </pre>
-//	 */
-//    String HASH_JOIN = QueryHints.class.getName() + ".hashJoin";
-//
-//    /**
-//     * @see #HASH_JOIN
-//     */
-//    String DEFAULT_HASH_JOIN = "false";
-
+ 
     /**
      * When <code>true</code>, will use the version of DISTINCT SOLUTIONS based
      * on the {@link HTree} and the native (C process) heap. When
      * <code>false</code>, use the version based on a JVM collection class. The
      * JVM version does not scale-up as well, but it offers higher concurrency.
      */
-    String NATIVE_DISTINCT = QueryHints.class.getName() + ".nativeDistinct";
+    String NATIVE_DISTINCT_SOLUTIONS = QueryHints.class.getName() + ".nativeDistinctSolutions";
 
-    boolean DEFAULT_NATIVE_DISTINCT = false;
+    boolean DEFAULT_NATIVE_DISTINCT_SOLUTIONS = false;
 
+    /**
+     * When <code>true</code> and the range count of the default graph access
+     * path exceeds the {@link #NATIVE_DISTINCT_SPO_THRESHOLD}, will use the
+     * version of DISTINCT SPO for a hash join against a DEFAULT GRAPH access
+     * path based on the {@link HTree} and the native (C process) heap. When
+     * <code>false</code>, use the version based on a JVM collection class. The
+     * JVM version does not scale-up as well.
+     */
+    String NATIVE_DISTINCT_SPO = QueryHints.class.getName()
+            + ".nativeDistinctSPO";
+
+    boolean DEFAULT_NATIVE_DISTINCT_SPO = false;
+
+    /**
+     * The minimum range count for a default graph access path before the native
+     * DISTINCT SPO filter will be used.
+     * 
+     * @see #NATIVE_DISTINCT_SPO
+     */
+    String NATIVE_DISTINCT_SPO_THRESHOLD = QueryHints.class.getName()
+            + ".nativeDistinctSPO";
+
+    long DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD = 100 * Bytes.kilobyte32;
+    
     /**
      * When <code>true</code>, use hash index operations based on the
      * {@link HTree} and backed by the native (C process) heap. When
@@ -166,13 +172,38 @@ public interface QueryHints {
      * another so the same kinds of hash indices MUST be used throughout the
      * query.
      * 
-     * @see #NATIVE_DISTINCT
+     * @see #NATIVE_DISTINCT_SPO
+     * @see #NATIVE_DISTINCT_SOLUTIONS
      * @see #NATIVE_HASH_JOINS
      * @see #MERGE_JOIN
      */
     String ANALYTIC = QueryHints.class.getName() + ".analytic";
 
     boolean DEFAULT_ANALYTIC = false;
+
+    /**
+     * When <code>true</code>, force the use of REMOTE access paths in scale-out
+     * joins. This is intended as a tool when analyzing query patterns in
+     * scale-out. It should normally be <code>false</code>.
+     */
+    String REMOTE_APS = QueryHints.class.getName() + ".remoteAPs";
+
+    /**
+     * FIXME Make this [false]. It is currently enabled so we can go to native
+     * SPARQL evaluation in CI.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
+     */
+    boolean DEFAULT_REMOTE_APS = true;
+
+    /**
+     * The #of samples to take when comparing the cost of a SCAN with an IN
+     * filter to as-bound evaluation for each graph in the data set.
+     */
+    String ACCESS_PATH_SAMPLE_LIMIT = QueryHints.class.getName()
+            + ".accessPathSampleLimit";
+
+    int DEFAULT_ACCESS_PATH_SAMPLE_LIMIT = 100;
 
     /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).

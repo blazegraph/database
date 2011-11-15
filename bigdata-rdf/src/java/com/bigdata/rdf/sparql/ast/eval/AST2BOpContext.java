@@ -12,7 +12,6 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -83,12 +82,26 @@ public class AST2BOpContext implements IdFactory {
     final BOpContextBase context;
     
     /**
+     * When <code>true</code>, may use the version of DISTINCT which operates on
+     * the native heap (this is only used when we are doing a hash join against
+     * a default graph access path and the predicate for that access path has a
+     * large cardinality).
+     */
+    public boolean nativeDistinctSPO = QueryHints.DEFAULT_NATIVE_DISTINCT_SPO;
+
+    /**
+     * The threshold at which we will use a native hash set rather than a
+     * default hash set for a default graph access path.
+     */
+    public final long nativeDistinctSPOThreshold = QueryHints.DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD;
+
+    /**
      * When <code>true</code>, will use the version of the DISTINCT SOLUTIONS
      * operator which uses the {@link HTree} against the native heap.
      * 
-     * @see QueryHints#NATIVE_DISTINCT
+     * @see QueryHints#NATIVE_DISTINCT_SOLUTIONS
      */
-    public boolean nativeDistinct = QueryHints.DEFAULT_NATIVE_DISTINCT;
+    public boolean nativeDistinctSolutions = QueryHints.DEFAULT_NATIVE_DISTINCT_SOLUTIONS;
 
     /**
      * 
@@ -152,44 +165,16 @@ public class AST2BOpContext implements IdFactory {
     boolean materializeProjectionInQuery = false;
     
     /**
-     * Flag to conditionally force the use of REMOTE access paths in scale-out
-     * joins. This is intended as a tool when analyzing query patterns in
-     * scale-out. It should normally be <code>false</code>.
-     * 
-     * FIXME Make this [false]. It is currently enabled so we can go to native
-     * SPARQL evaluation in CI.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
-     * 
-     * TODO Query hint.
+     * When <code>true</code>, force the use of REMOTE access paths in scale-out
+     * joins.
      */
-    protected final boolean forceRemoteAPs = true;
-
-    /**
-     * When <code>true</code>, may use the version of DISTINCT which operates on
-     * the native heap (this is only used when we are doing a hash join against
-     * a default graph access path and the predicate for that access path has a
-     * large cardinality).
-     * 
-     * TODO Query hint.
-     */
-    protected boolean nativeDefaultGraph = true;
-
-    /**
-     * The threshold at which we will use a native hash set rather than a
-     * default hash set for a default graph access path.
-     * 
-     * TODO Query hint.
-     */
-    protected final long nativeDefaultGraphThreshold = 100 * Bytes.kilobyte32;
+    public boolean remoteAPs = QueryHints.DEFAULT_REMOTE_APS;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
-     * filter to subquery for each graph in the data set.
-     * 
-     * TODO Query hint.
+     * filter to as-bound evaluation for each graph in the data set.
      */
-    protected final int SAMPLE_LIMIT = 100;
+    public int accessPathSampleLimit = QueryHints.DEFAULT_ACCESS_PATH_SAMPLE_LIMIT;
 
     private int varIdFactory = 0;
 
