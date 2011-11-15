@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.DistinctFilter;
-import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.engine.QueryEngine;
@@ -68,7 +66,6 @@ import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -96,38 +93,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
     }
 
     /**
-     * @deprecated This is part of the {@link SOp2BOpUtility} integration.
-     */
-    @SuppressWarnings("rawtypes")
-    public static PipelineOp join(final AbstractTripleStore db,
-            final QueryEngine queryEngine,
-            final PipelineOp left, final Predicate pred,
-            final Collection<IConstraint> constraints,
-            final AtomicInteger idFactory, final Properties queryHints) {
-
-        return join(db, queryEngine, left, pred,
-                new LinkedHashSet<IVariable<?>>()/* doneSet */, constraints,
-                new BOpContextBase(queryEngine), idFactory, queryHints);
-
-    }
-
-    /**
      * Add a join for a statement pattern. This handles triples-mode,
      * named-graph and default graph join patterns whether on a single machine
      * or on a cluster.
-     * <p>
-     * If there are join constraints, then their materialization requirements
-     * are considered. Constraints are attached directly to the join if they do
-     * not have materialization requirements, or if those materialization
-     * requirements either have been or *may* have been satisified (
-     * {@link Requirement#SOMETIMES}).
-     * <p>
-     * Constraints which can not be attached to the join, or which *might* not
-     * have their materialization requirements satisified by the time the join
-     * runs ({@link Requirement#SOMETIMES}) cause a materialization pattern to
-     * be appended to the pipeline. Once the materialization requirements have
-     * been satisified, the constraint is then imposed by a
-     * {@link ConditionalRoutingOp}.
      * 
      * @param db
      * @param queryEngine
@@ -143,7 +111,24 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * @param queryHints
      *            Query hints associated with that statement pattern.
      * @return
+     * 
+     * TODO Refactor this and pass in AST2BOPContext.  This is blocked by the
+     * Rule2BOpUtility#convert() methods, but those are only used by a single
+     * test class. 
      */
+//    * <p>
+//    * If there are join constraints, then their materialization requirements
+//    * are considered. Constraints are attached directly to the join if they do
+//    * not have materialization requirements, or if those materialization
+//    * requirements either have been or *may* have been satisified (
+//    * {@link Requirement#SOMETIMES}).
+//    * <p>
+//    * Constraints which can not be attached to the join, or which *might* not
+//    * have their materialization requirements satisified by the time the join
+//    * runs ({@link Requirement#SOMETIMES}) cause a materialization pattern to
+//    * be appended to the pipeline. Once the materialization requirements have
+//    * been satisified, the constraint is then imposed by a
+//    * {@link ConditionalRoutingOp}.
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
             final AbstractTripleStore db,//
