@@ -61,6 +61,7 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.store.BD;
@@ -85,6 +86,28 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     private static final Logger log = Logger
             .getLogger(ASTStaticJoinOptimizer.class);
 
+    public interface Annotations extends AST2BOpBase.Annotations {
+    	
+    	/**
+    	 * When set to true, the optimizer will choose the MIN range count
+    	 * of the two sides of any join when deciding on the join cardinality.
+    	 * This is a more "optimistic" view of the cardinality - that the join
+    	 * will be relatively selective and narrow the results more towards
+    	 * the minimum of the two range counts.  When set to false, the optimizer
+    	 * will take a more pessimistic view of the join and use the MAX range
+    	 * count of the two sides of the join when deciding the join cardinality.
+    	 * 
+    	 * BSBM BI Q1 is a good example of a query that benefits from the 
+    	 * pessimistic approach, and LUBM Q2 is a good example of a query that
+    	 * benefits from the optimistic approach.
+    	 * 
+    	 * Defaults to true, that is to say, the MIN range count is used for
+    	 * the join cardinality be default.
+    	 */
+    	String OPTIMISTIC = ASTStaticJoinOptimizer.class.getName()+".optimistic";
+    	
+    }
+    
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
@@ -297,11 +320,14 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
                     }
 
+                    final boolean optimistic = 
+                    	joinGroup.getQueryHintAsBoolean(Annotations.OPTIMISTIC, true);
+                    
                     /*
                      * Calculate the optimized join ordering.
                      */
                     final StaticOptimizer opt = new StaticOptimizer(queryRoot,
-                            ancestry, spNodes);
+                            ancestry, spNodes, optimistic);
 
                     final int[] order = opt.getOrder();
 
@@ -588,6 +614,11 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          */
         private boolean empty = false;
         
+        /**
+         * See {@link Annotations#OPTIMISTIC}.
+         */
+        private final boolean optimistic;
+        
         public boolean isEmpty() {
             
             return empty;
@@ -604,7 +635,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          */
         public StaticOptimizer(final QueryRoot queryRoot,
         		final IJoinNode[] ancestry, 
-        		final List<StatementPatternNode> spNodes) {
+        		final List<StatementPatternNode> spNodes,
+        		final boolean optimistic) {
             
             if (queryRoot == null)
                 throw new IllegalArgumentException();
@@ -622,6 +654,8 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
             this.spNodes = spNodes;
             
             this.arity = spNodes.size();
+            
+            this.optimistic = optimistic;
         
             calc();
             
@@ -1117,44 +1151,64 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                         Math.min(d1.getCardinality(), d2.getCardinality());
                 } else {
                     // shared vars and unshared vars - take the max
-                    /*
-                     * This modification to the join planner results in
-                     * significantly faster queries for the bsbm benchmark (3x - 5x
-                     * overall). It takes a more optimistic perspective on the
-                     * intersection of two statement patterns, predicting that this
-                     * will constraint, rather than increase, the multiplicity of
-                     * the solutions. However, this COULD lead to pathological cases
-                     * where the resulting join plan is WORSE than it would have
-                     * been otherwise. For example, this change produces a 3x to 5x
-                     * improvement in the BSBM benchmark results. However, it has a
-                     * negative effect on LUBM Q2.
-                     * 
-                     * Update: Ok so just to go into a little detail - yesterday's
-                     * change means we choose the join ordering based on an
-                     * optimistic view of the cardinality of any particular join. If
-                     * you have two triple patterns that share variables but that
-                     * also have unshared variables, then technically the maximum
-                     * cardinality of the join is the maximum range count of the two
-                     * tails. But often the true cardinality of the join is closer
-                     * to the minimum range count than the maximum. So yesterday we
-                     * started assigning an expected cardinality for the join of the
-                     * minimum range count rather than the maximum. What this means
-                     * is that a lot of the time when those joins move toward the
-                     * front of the line the query will do a lot better, but
-                     * occasionally (LUBM 2), the query will do much much worse
-                     * (when the true cardinality is closer to the max range count).
-                     * 
-                     * Today we put in an extra tie-breaker condition. We already
-                     * had one tie-breaker - if two joins have the same expected
-                     * cardinality we chose the one with the lower minimum range
-                     * count. But the new tie-breaker is that if two joins have the
-                     * same expected cardinality and minimum range count, we now
-                     * chose the one that has the minimum range count on the other
-                     * tail (the minimum maximum if that makes sense).
-                     */
-                    joinCardinality = 
-                        Math.min(d1.getCardinality(), d2.getCardinality());
-//                        Math.max(d1.getCardinality(), d2.getCardinality());
+					/*
+					 * This modification to the join planner results in
+					 * significantly faster queries for the bsbm benchmark (3x -
+					 * 5x overall). It takes a more optimistic perspective on
+					 * the intersection of two statement patterns, predicting
+					 * that this will constraint, rather than increase, the
+					 * multiplicity of the solutions. However, this COULD lead
+					 * to pathological cases where the resulting join plan is
+					 * WORSE than it would have been otherwise. For example,
+					 * this change produces a 3x to 5x improvement in the BSBM
+					 * benchmark results. However, it has a negative effect on
+					 * LUBM Q2.
+					 * 
+					 * Update: Ok so just to go into a little detail -
+					 * yesterday's change means we choose the join ordering
+					 * based on an optimistic view of the cardinality of any
+					 * particular join. If you have two triple patterns that
+					 * share variables but that also have unshared variables,
+					 * then technically the maximum cardinality of the join is
+					 * the maximum range count of the two tails. But often the
+					 * true cardinality of the join is closer to the minimum
+					 * range count than the maximum. So yesterday we started
+					 * assigning an expected cardinality for the join of the
+					 * minimum range count rather than the maximum. What this
+					 * means is that a lot of the time when those joins move
+					 * toward the front of the line the query will do a lot
+					 * better, but occasionally (LUBM 2), the query will do much
+					 * much worse (when the true cardinality is closer to the
+					 * max range count).
+					 * 
+					 * Today we put in an extra tie-breaker condition. We
+					 * already had one tie-breaker - if two joins have the same
+					 * expected cardinality we chose the one with the lower
+					 * minimum range count. But the new tie-breaker is that if
+					 * two joins have the same expected cardinality and minimum
+					 * range count, we now chose the one that has the minimum
+					 * range count on the other tail (the minimum maximum if
+					 * that makes sense).
+					 * 
+					 * 11/14/2011:
+					 * The static join order optimizer should consider the swing
+					 * in stakes when choosing between either the MIN or the MAX
+					 * of the cardinality of two join dimensions in order to
+					 * decide which join to schedule next. Historically it took
+					 * the MAX, but there are counter examples to that decision
+					 * such as LUBM Q2. Subsequently it was modified to take the
+					 * MIN, but BSBM BI Q1 is a counter example for that. 
+					 * 
+					 * Modify the static optimizer to consider the swing in
+					 * stakes between the choice of MAX versus MIN. I believe
+					 * that this boils down to something like "If an incorrect
+					 * guess of MIN would cause us to suffer a very bad MAX,
+					 * then choose based on the MAX to avoid paying that
+					 * penalty."
+					 */
+                    joinCardinality = optimistic ?
+                        Math.min(d1.getCardinality(), d2.getCardinality()) :
+                        Math.max(d1.getCardinality(), d2.getCardinality());
                 }
             }
             return joinCardinality;
