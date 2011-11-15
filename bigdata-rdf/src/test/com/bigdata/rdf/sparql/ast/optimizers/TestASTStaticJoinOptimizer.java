@@ -1555,7 +1555,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("reviewer"),
                     new ConstantNode(country), new ConstantNode(US), 61000l));
             
-            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "false");
+            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "0.67d");
 
             given.setProjection(projection);
             given.setWhereClause(whereClause);
@@ -1592,7 +1592,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             whereClause.addChild(newStatementPatternNode(new VarNode("productType"),
                     new ConstantNode(type), new ConstantNode(productType), 2000l));
 
-            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "false");
+            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "0.67d");
 
             expected.setProjection(projection);
             expected.setWhereClause(whereClause);
