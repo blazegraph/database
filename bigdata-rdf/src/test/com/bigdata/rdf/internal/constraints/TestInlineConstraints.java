@@ -37,7 +37,10 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -63,6 +66,19 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
@@ -156,39 +172,90 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> age = new Constant<IV>(AGE.getIV());
                 final IVariable<IV> a = Var.var("a");
                 
-                final IRule rule =
-                        new Rule("test_greater_than", null, // head
-                                new IPredicate[] {
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, age, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
-                                }
-                        );
+//                final IRule rule =
+//                        new Rule("test_greater_than", null, // head
+//                                new IPredicate[] {
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, age, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GT))
+//                                }
+//                        );
                 
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(age), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.GT,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new ConstantNode(_35.getIV())//
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
                 
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        assertEquals(bs.get(s).get(), B.getIV());
+//                        assertEquals(bs.get(a).get(), _45.getIV());
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        assertEquals(bs.get(s).get(), B.getIV());
-                        assertEquals(bs.get(a).get(), _45.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("s")).getIV(), B.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("a")).getIV(), _45.getIV());
                         
                         numSolutions++;
                         
                     }
-
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -264,40 +331,94 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> age = new Constant<IV>(AGE.getIV());
                 final IVariable<IV> a = Var.var("a");
                 
-                final IRule rule =
-                        new Rule("test_greater_than", null, // head
-                                new IPredicate[] {
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, age, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
-                                });
+//                final IRule rule =
+//                        new Rule("test_greater_than", null, // head
+//                                new IPredicate[] {
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, age, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.GE))
+//                                });
                 
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(age), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.GE,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new ConstantNode(_35.getIV())//
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
                 
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        final IV _s = (IV) bs.get(s).get();
+//                        final IV _a = (IV) bs.get(a).get();
+//                        assertTrue(_s.equals(B.getIV()) || _s.equals(C.getIV()));
+//                        assertTrue(_a.equals(_45.getIV()) || _a.equals(_35.getIV()));
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//                    
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        final IV _s = (IV) bs.get(s).get();
-                        final IV _a = (IV) bs.get(a).get();
-                        assertTrue(_s.equals(B.getIV()) || _s.equals(C.getIV()));
-                        assertTrue(_a.equals(_45.getIV()) || _a.equals(_35.getIV()));
+                        
+	                    final IV _s = ((BigdataValue) bs.getValue("s")).getIV();
+	                    final IV _a = ((BigdataValue) bs.getValue("a")).getIV();
+	                    assertTrue(_s.equals(B.getIV()) || _s.equals(C.getIV()));
+	                    assertTrue(_a.equals(_45.getIV()) || _a.equals(_35.getIV()));
                         
                         numSolutions++;
                         
                     }
-                    
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
@@ -373,41 +494,92 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> age = new Constant<IV>(AGE.getIV());
                 final IVariable<IV> a = Var.var("a");
                 
-                final IRule rule =
-                        new Rule("test_less_than", null, // head
-                                new IPredicate[] {
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, age, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
-                                });
+//                final IRule rule =
+//                        new Rule("test_less_than", null, // head
+//                                new IPredicate[] {
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, age, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LT))
+//                                });
+//                
+//                if (log.isInfoEnabled())
+//                    log.info("running rule: " + rule);
                 
-                if (log.isInfoEnabled())
-                    log.info("running rule: " + rule);
-                
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(age), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.LT,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new ConstantNode(_35.getIV())//
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
                 
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        assertEquals(bs.get(s).get(), A.getIV());
+//                        assertEquals(bs.get(a).get(), _25.getIV());
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//                    
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        assertEquals(bs.get(s).get(), A.getIV());
-                        assertEquals(bs.get(a).get(), _25.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("s")).getIV(), A.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("a")).getIV(), _25.getIV());
                         
                         numSolutions++;
                         
                     }
-                    
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -483,43 +655,96 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> age = new Constant<IV>(AGE.getIV());
                 final IVariable<IV> a = Var.var("a");
                 
-                final IRule rule =
-                        new Rule("test_less_than", null, // head
-                                new IPredicate[] {
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, age, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
-                                });
+//                final IRule rule =
+//                        new Rule("test_less_than", null, // head
+//                                new IPredicate[] {
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, age, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                        			new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(_35.getIV()), CompareOp.LE))
+//                                });
+//                
+//                if (log.isInfoEnabled())
+//                    log.info("running rule: " + rule);
                 
-                if (log.isInfoEnabled())
-                    log.info("running rule: " + rule);
-                
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(age), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.LE,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new ConstantNode(_35.getIV())//
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
                 
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        final IV _s = (IV) bs.get(s).get();
+//                        final IV _a = (IV) bs.get(a).get();
+//                        assertTrue(_s.equals(A.getIV()) || _s.equals(C.getIV()));
+//                        assertTrue(_a.equals(_25.getIV()) || _a.equals(_35.getIV()));
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//                    
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        final IV _s = (IV) bs.get(s).get();
-                        final IV _a = (IV) bs.get(a).get();
+                        final IV _s = ((BigdataValue) bs.getValue("s")).getIV();
+                        final IV _a = ((BigdataValue) bs.getValue("a")).getIV();
                         assertTrue(_s.equals(A.getIV()) || _s.equals(C.getIV()));
                         assertTrue(_a.equals(_25.getIV()) || _a.equals(_35.getIV()));
                         
                         numSolutions++;
                         
                     }
-                    
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
@@ -601,39 +826,100 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> d = new Constant<IV>(D.getIV());
                 final IVariable<IV> dAge = Var.var("dAge");
                 
-                final IRule rule =
-                        new Rule("test_math", null, // head
-                                new IPredicate[] {
-                        			toPredicate(db, idFactory, d, age, dAge),
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, age, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                        			new SPARQLConstraint(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS,SPO), CompareOp.GT))
-                                });
+//                final IRule rule =
+//                        new Rule("test_math", null, // head
+//                                new IPredicate[] {
+//                        			toPredicate(db, idFactory, d, age, dAge),
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, age, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                        			new SPARQLConstraint(new CompareBOp(a, new MathBOp(dAge, new Constant<IV>(_5.getIV()), MathOp.PLUS,SPO), CompareOp.GT))
+//                                });
                 
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new ConstantNode(d),
+                            new ConstantNode(age), new VarNode(dAge)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(age), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.GT,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new FunctionNode(
+                                        		FunctionRegistry.ADD,
+                                    			null,
+                                    			new ValueExpressionNode[]{
+                                        				new VarNode(dAge),
+                                        				new ConstantNode(_5.getIV())//		
+                                        		}
+                                        		)
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
                 
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        assertEquals(bs.get(s).get(), B.getIV());
+//                        assertEquals(bs.get(a).get(), _45.getIV());
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//                    
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        assertEquals(bs.get(s).get(), B.getIV());
-                        assertEquals(bs.get(a).get(), _45.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("s")).getIV(), B.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("a")).getIV(), _45.getIV());
                         
                         numSolutions++;
                         
                     }
-                    
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
@@ -717,17 +1003,50 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IConstant<IV> birthday = new Constant<IV>(BIRTHDAY.getIV());
                 final IVariable<IV> a = Var.var("a");
                 
-                final IRule rule =
-                        new Rule("test_greater_than", null, // head
-                                new IPredicate[] {
-                                    toPredicate(db, idFactory, s, type, x),
-                                    toPredicate(db, idFactory, s, birthday, a) 
-                                },
-                                // constraints on the rule.
-                                new IConstraint[] {
-                                    new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
-                                });
+//                final IRule rule =
+//                        new Rule("test_greater_than", null, // head
+//                                new IPredicate[] {
+//                                    toPredicate(db, idFactory, s, type, x),
+//                                    toPredicate(db, idFactory, s, birthday, a) 
+//                                },
+//                                // constraints on the rule.
+//                                new IConstraint[] {
+//                                    new SPARQLConstraint(new CompareBOp(a, new Constant<IV>(l2.getIV()), CompareOp.GT))
+//                                });
                 
+                // The source AST.
+                final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+                {
+
+                    final ProjectionNode projection = new ProjectionNode();
+                    projection.addProjectionVar(new VarNode("s"));
+                    
+                    final JoinGroupNode whereClause = new JoinGroupNode();
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(type), new ConstantNode(x)));
+
+                    whereClause.addChild(new StatementPatternNode(new VarNode(s),
+                            new ConstantNode(birthday), new VarNode(a)));
+                    
+                    final FilterNode filterNode = new FilterNode(
+                            new FunctionNode(//
+                                    FunctionRegistry.GT,//
+                                    null,// scalarValues(Map)Collections.emptyMap(),//
+                                    new ValueExpressionNode[]{//
+                                        new VarNode(a),//
+                                        new ConstantNode(l2.getIV())//
+                                    }//
+                                    )//
+                            );
+
+                    whereClause.addChild(filterNode);
+
+                    queryRoot.setProjection(projection);
+                    queryRoot.setWhereClause(whereClause);
+                    
+                }
+
                 try {
 
                 	final IV left = l3.getIV();
@@ -735,23 +1054,41 @@ public class TestInlineConstraints extends ProxyTestCase {
                 	
                     int numSolutions = 0;
                     
-                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
+//                    
+//                    while (solutions.hasNext()) {
+//                        
+//                        final IBindingSet bs = solutions.next();
+//                        
+//                        if (log.isInfoEnabled())
+//                        	log.info(bs);
+//                        
+//                        assertEquals(bs.get(s).get(), C.getIV());
+//                        assertEquals(bs.get(a).get(), l3.getIV());
+//                        
+//                        numSolutions++;
+//                        
+//                    }
+//                    
+//                    solutions.close();
                     
-                    while (solutions.hasNext()) {
-                        
-                        final IBindingSet bs = solutions.next();
-                        
+                    final TupleQueryResult queryResult = ASTEvalHelper
+                    .evaluateTupleQuery(db, new ASTContainer(queryRoot),
+                            new QueryBindingSet());
+                    
+                    while (queryResult.hasNext()) {
+                    	
+                    	final BindingSet bs = queryResult.next();
+                    	
                         if (log.isInfoEnabled())
                         	log.info(bs);
                         
-                        assertEquals(bs.get(s).get(), C.getIV());
-                        assertEquals(bs.get(a).get(), l3.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("s")).getIV(), C.getIV());
+                        assertEquals(((BigdataValue) bs.getValue("a")).getIV(), l3.getIV());
                         
                         numSolutions++;
                         
                     }
-                    
-                    solutions.close();
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
