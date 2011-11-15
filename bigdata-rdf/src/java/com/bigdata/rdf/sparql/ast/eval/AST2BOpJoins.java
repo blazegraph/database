@@ -242,7 +242,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final Properties queryHints) {
 
         final boolean scaleOut = ctx.isCluster();
-        if (scaleOut && !ctx.forceRemoteAPs) {
+        if (scaleOut && !ctx.remoteAPs) {
             /*
              * All triples queries can run shard-wise in scale-out.
              */
@@ -288,7 +288,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final DatasetNode dataset, final Properties queryHints) {
 
         final boolean scaleOut = ctx.isCluster();
-        if (scaleOut && !ctx.forceRemoteAPs) {
+        if (scaleOut && !ctx.remoteAPs) {
             /*
              * All named graph patterns in scale-out are partitioned (sharded).
              */
@@ -410,7 +410,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * actually running the query.
          */
         final SubqueryCostReport subqueryCostReport = summary
-                .estimateSubqueryCost(ctx.context, ctx.SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                .estimateSubqueryCost(ctx.context, ctx.accessPathSampleLimit, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
@@ -553,7 +553,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             pred = pred.asBound((IVariable<?>) pred.get(3),
                     new Constant<IV<?, ?>>(summary.firstContext));
 
-            if (scaleOut && !ctx.forceRemoteAPs) {
+            if (scaleOut && !ctx.remoteAPs) {
                 // use a partitioned join.
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.SHARDED));
@@ -668,7 +668,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * partitioned or global index views when it is evaluated.
          */
         final SubqueryCostReport subqueryCostReport = dataset == null ? null
-                : summary.estimateSubqueryCost(ctx.context, ctx.SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                : summary.estimateSubqueryCost(ctx.context, ctx.accessPathSampleLimit, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
@@ -800,7 +800,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final boolean hashJoin) {
         
         // Never use native distinct for as-bound "pipeline" joins.
-        boolean nativeDistinct = hashJoin && ctx.nativeDefaultGraph;
+        boolean nativeDistinct = hashJoin && ctx.nativeDistinctSPO;
         
         if (nativeDistinct) {
             /*
@@ -811,7 +811,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final Long rangeCount = (Long) pred
                     .getProperty(Annotations.ESTIMATED_CARDINALITY);
             if (rangeCount != null) {
-                if (rangeCount.longValue() < ctx.nativeDefaultGraphThreshold) {
+                if (rangeCount.longValue() < ctx.nativeDistinctSPOThreshold) {
                     // Small range count.
                     nativeDistinct = false;
                 }
@@ -830,7 +830,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             /*
              * Examine the cardinality of the defaultGraph *contexts*.
              */
-            if (summary.nknown < ctx.nativeDefaultGraphThreshold) {
+            if (summary.nknown < ctx.nativeDistinctSPOThreshold) {
                 // Only a few graphs in the defaultGraph.
                 nativeDistinct = false;
             }

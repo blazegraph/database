@@ -382,7 +382,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                 anns.add(new NV(BOp.Annotations.BOP_ID, lexJoinId));
                 anns.add(new NV(PipelineOp.Annotations.SINK_REF, endId));
                 
-                if (ctx.isCluster() && !ctx.forceRemoteAPs) {
+                if (ctx.isCluster() && !ctx.remoteAPs) {
                     // use a partitioned join.
                     anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.SHARDED));

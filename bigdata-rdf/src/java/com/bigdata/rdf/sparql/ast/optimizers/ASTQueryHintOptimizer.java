@@ -277,15 +277,23 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final String name, final String value) {
 
         if (name.equals(QueryHints.ANALYTIC)) {
+            // TODO MERGE_JOIN is not really an analytic option. More experimenal.
             context.mergeJoin = Boolean.valueOf(value);
-            context.nativeDistinct = Boolean.valueOf(value);
             context.nativeHashJoins = Boolean.valueOf(value);
+            context.nativeDistinctSolutions = Boolean.valueOf(value);
+            context.nativeDistinctSPO = Boolean.valueOf(value);
         } else if (name.equals(QueryHints.MERGE_JOIN)) {
             context.mergeJoin = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.NATIVE_DISTINCT)) {
-            context.nativeDistinct = Boolean.valueOf(value);
         } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
             context.nativeHashJoins = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.NATIVE_DISTINCT_SOLUTIONS)) {
+            context.nativeDistinctSolutions = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.NATIVE_DISTINCT_SPO)) {
+            context.nativeDistinctSPO = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.REMOTE_APS)) {
+            context.remoteAPs = Boolean.valueOf(value);
+        } else if (name.equals(QueryHints.ACCESS_PATH_SAMPLE_LIMIT)) {
+            context.accessPathSampleLimit = Integer.valueOf(value);
         } else {
             t.setQueryHint(name, value);
         }
