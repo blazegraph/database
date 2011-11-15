@@ -113,6 +113,21 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
     /**
      * {@inheritDoc}
      * <p>
+     * Overridden to set the parent reference on the child
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public void addArg(final int index, final BOp newArg) {
+
+        super.addArg(index, newArg);
+
+        ((E) newArg).setParent((IGroupNode<IGroupMemberNode>) this);
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
      * Overridden to clear the parent reference on the child.
      */
     @SuppressWarnings("unchecked")
