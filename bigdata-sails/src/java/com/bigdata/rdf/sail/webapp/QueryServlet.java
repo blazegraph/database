@@ -371,8 +371,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
 			current = current.node("h1", "Query");
 
-            final ASTContainer astContainer = ((BigdataSailQuery) queryTask.sailQuery)
-                    .getASTContainer();
+            final ASTContainer astContainer = queryTask.astContainer;
 
             /*
              * These things are available as soon as the parser runs, so we can
