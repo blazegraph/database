@@ -29,7 +29,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
@@ -1456,6 +1456,146 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
             
             expected.setWhereClause(joinGroup1);
             expected.getNamedSubqueriesNotNull().add(namedSubquery);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+    
+    /**
+     * Given
+     * 
+     * ?producer bsbm:country <http://downlode.org/rdf/iso-3166/countries#RU> . # card=2081
+   	 * ?product bsbm:producer ?producer . # card=280k
+     * ?review bsbm:reviewFor ?product . # card=2.8m
+     * ?review rev:reviewer ?reviewer . # card=2.8m
+     * ?reviewer bsbm:country <http://downlode.org/rdf/iso-3166/countries#US> . #card=61k
+     * ?product a ?productType . # card=10m
+     * ?productType a bsbm:ProductType . # card=2011
+     *
+     * <pre>
+     *   select *
+     *   JoinGroupNode {
+     *     StatementPatternNode(VarNode(productType), ConstantNode(rdf:type), ConstantNode(#ProductType)) [2000]
+     *     StatementPatternNode(VarNode(product), ConstantNode(rdf:type), VarNode(productType)) [10m]
+     *     StatementPatternNode(VarNode(product), ConstantNode(#producer), VarNode(producer)) [280k]
+     *     StatementPatternNode(VarNode(producer), ConstantNode(#country), ConstantNode(#RU)) [7000]
+     *     StatementPatternNode(VarNode(review), ConstantNode(#reviewFor), VarNode(product)) [2.8m]
+     *     StatementPatternNode(VarNode(review), ConstantNode(#reviewer), VarNode(reviewer)) [2.8m]
+     *     StatementPatternNode(VarNode(reviewer), ConstantNode(#country), ConstantNode(#US)) [61k]
+     *     hint:BGP hint:com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.optimistic "false" .
+     *   }
+     * </pre>
+     *
+     * Reorder as
+     * 
+     * <pre>
+     *   select *
+     *   JoinGroupNode {
+     *     StatementPatternNode(VarNode(producer), ConstantNode(#country), ConstantNode(#RU)) [7000]
+     *     StatementPatternNode(VarNode(product), ConstantNode(#producer), VarNode(producer)) [280k]
+     *     StatementPatternNode(VarNode(review), ConstantNode(#reviewFor), VarNode(product)) [2.8m]
+     *     StatementPatternNode(VarNode(review), ConstantNode(#reviewer), VarNode(reviewer)) [2.8m]
+     *     StatementPatternNode(VarNode(reviewer), ConstantNode(#country), ConstantNode(#US)) [61k]
+     *     StatementPatternNode(VarNode(product), ConstantNode(rdf:type), VarNode(productType)) [10m]
+     *     StatementPatternNode(VarNode(productType), ConstantNode(rdf:type), ConstantNode(#ProductType)) [2000]
+     *   }
+     * </pre>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_pessimistic() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV country = makeIV(new URIImpl("http://example/country"));
+        final IV producer = makeIV(new URIImpl("http://example/producer"));
+        final IV reviewFor = makeIV(new URIImpl("http://example/reviewFor"));
+        final IV reviewer = makeIV(new URIImpl("http://example/reviewer"));
+        final IV RU = makeIV(new URIImpl("http://example/RU"));
+        final IV US = makeIV(new URIImpl("http://example/US"));
+        final IV type = makeIV(RDF.TYPE);
+        final IV productType = makeIV(new URIImpl("http://example/ProductType"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("*"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("productType"),
+                    new ConstantNode(type), new ConstantNode(productType), 2000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("product"),
+                    new ConstantNode(type), new VarNode("productType"), 10000000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("product"),
+                    new ConstantNode(producer), new VarNode("producer"), 280000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("producer"),
+                    new ConstantNode(country), new ConstantNode(RU), 7000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("review"),
+                    new ConstantNode(reviewFor), new VarNode("product"), 2800000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("review"),
+                    new ConstantNode(reviewer), new VarNode("reviewer"), 2800000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("reviewer"),
+                    new ConstantNode(country), new ConstantNode(US), 61000l));
+            
+            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "false");
+
+            given.setProjection(projection);
+            given.setWhereClause(whereClause);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("*"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("producer"),
+                    new ConstantNode(country), new ConstantNode(RU), 7000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("product"),
+                    new ConstantNode(producer), new VarNode("producer"), 280000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("review"),
+                    new ConstantNode(reviewFor), new VarNode("product"), 2800000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("review"),
+                    new ConstantNode(reviewer), new VarNode("reviewer"), 2800000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("reviewer"),
+                    new ConstantNode(country), new ConstantNode(US), 61000l));
+            
+            whereClause.addChild(newStatementPatternNode(new VarNode("product"),
+                    new ConstantNode(type), new VarNode("productType"), 10000000l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("productType"),
+                    new ConstantNode(type), new ConstantNode(productType), 2000l));
+
+            whereClause.setQueryHint(ASTStaticJoinOptimizer.Annotations.OPTIMISTIC, "false");
+
+            expected.setProjection(projection);
+            expected.setWhereClause(whereClause);
             
         }
 
