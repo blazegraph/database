@@ -236,6 +236,35 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     }
 
     /**
+     * Add a new argument (core mutation method) at the specified index.
+     * 
+     * @param index
+     *            The index of the child expression to be replaced.
+     * @param newArg
+     *            The argument.
+     * 
+     * @return <i>this</i>.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the argument is <i>this</i>.
+     */
+    public void addArg(final int index, final BOp newArg) {
+        
+        if(newArg == null)
+            throw new IllegalArgumentException();
+
+        if(newArg == this)
+            throw new IllegalArgumentException();
+        
+        args.add(index, newArg);
+        
+        mutation();
+        
+    }
+
+    /**
      * Add an argument iff it is not already present.
      * 
      * @param arg
