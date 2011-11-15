@@ -34,7 +34,6 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.htree.HTree;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
@@ -124,12 +123,10 @@ public interface QueryHints {
 //    String DEFAULT_HASH_JOIN = "false";
 
     /**
-     * When <code>true</code>, will use the version of DISTINCT based on the
-     * {@link HTree} and the native (C process) heap. When <code>false</code>,
-     * use the version based on a JVM collection class. The JVM version does not
-     * scale-up as well, but it offers higher concurrency.
-     * 
-     * @see AST2BOpBase#nativeDefaultGraph
+     * When <code>true</code>, will use the version of DISTINCT SOLUTIONS based
+     * on the {@link HTree} and the native (C process) heap. When
+     * <code>false</code>, use the version based on a JVM collection class. The
+     * JVM version does not scale-up as well, but it offers higher concurrency.
      */
     String NATIVE_DISTINCT = QueryHints.class.getName() + ".nativeDistinct";
 

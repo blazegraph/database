@@ -16,7 +16,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
@@ -142,7 +141,7 @@ import cutthecrap.utils.striterators.NOPFilter;
  *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=QueryEvaluation"
  *      >Query Evaluation</a>.
  */
-public class AST2BOpUtility extends Rule2BOpUtility {
+public class AST2BOpUtility extends AST2BOpJoins {
 
     private static final transient Logger log = Logger
             .getLogger(AST2BOpUtility.class);
@@ -800,8 +799,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(left, doneSet, needsMaterialization,
-                serviceNode.getQueryHints(), ctx);
+        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
+                serviceNode.getQueryHints());
 
         return left;
 
@@ -941,8 +940,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(left, doneSet, needsMaterialization,
-                subqueryInclude.getQueryHints(), ctx);
+        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
+                subqueryInclude.getQueryHints());
 
         return left;
 
@@ -1154,8 +1153,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(left, doneSet, needsMaterialization,
-                subqueryRoot.getQueryHints(), ctx);
+        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
+                subqueryRoot.getQueryHints());
 
         return left;
 
@@ -1608,11 +1607,11 @@ public class AST2BOpUtility extends Rule2BOpUtility {
                  */
                 final Predicate<?> pred = toPredicate(sp, ctx);
                 final boolean optional = sp.isOptional();
-                left = join(ctx.db, ctx.queryEngine, left, pred,
+                left = join(ctx, left, pred,
                         optional ? new LinkedHashSet<IVariable<?>>(doneSet)
                                 : doneSet,
-                        getJoinConstraints(sp), new BOpContextBase(
-                                ctx.queryEngine), ctx.idFactory,
+                        getJoinConstraints(sp), 
+//                        new BOpContextBase(ctx.queryEngine), ctx.idFactory,
                         sp.getQueryHints());
                 continue;
             } else if (child instanceof ServiceNode) {
@@ -2448,8 +2447,8 @@ public class AST2BOpUtility extends Rule2BOpUtility {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(left, doneSet, needsMaterialization,
-                subgroup.getQueryHints(), ctx);
+        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
+                subgroup.getQueryHints());
 
         return left;
         
@@ -2989,9 +2988,9 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              */
 
             // quads mode.
-            anns.add(new NV(Rule2BOpUtility.Annotations.QUADS, true));
+            anns.add(new NV(AST2BOpJoins.Annotations.QUADS, true));
             // attach the Scope.
-            anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, sp.getScope()));
+            anns.add(new NV(AST2BOpJoins.Annotations.SCOPE, sp.getScope()));
 
             /*
              * Note: For a default graph access path, [cvar] can not become
@@ -2999,7 +2998,7 @@ public class AST2BOpUtility extends Rule2BOpUtility {
              */
             if (dataset != null) {
                 // attach the DataSet.
-                anns.add(new NV(Rule2BOpUtility.Annotations.DATASET, dataset));
+                anns.add(new NV(AST2BOpJoins.Annotations.DATASET, dataset));
                 switch (sp.getScope()) {
                 case DEFAULT_CONTEXTS: {
                     if (dataset.getDefaultGraphFilter() != null) {

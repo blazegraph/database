@@ -34,13 +34,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstraint;
@@ -53,7 +51,6 @@ import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
@@ -64,12 +61,11 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
@@ -97,8 +93,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * named-graph and default graph join patterns whether on a single machine
      * or on a cluster.
      * 
-     * @param db
-     * @param queryEngine
+     * @param ctx
      * @param left
      * @param pred
      *            The predicate describing the statement pattern.
@@ -106,42 +101,25 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *            The set of variables already known to be materialized.
      * @param constraints
      *            Constraints on that join (optional).
-     * @param context
-     * @param idFactory
      * @param queryHints
-     *            Query hints associated with that statement pattern.
+     *            Query hints associated with that {@link StatementPatternNode}.
      * @return
-     * 
-     * TODO Refactor this and pass in AST2BOPContext.  This is blocked by the
-     * Rule2BOpUtility#convert() methods, but those are only used by a single
-     * test class. 
      */
-//    * <p>
-//    * If there are join constraints, then their materialization requirements
-//    * are considered. Constraints are attached directly to the join if they do
-//    * not have materialization requirements, or if those materialization
-//    * requirements either have been or *may* have been satisified (
-//    * {@link Requirement#SOMETIMES}).
-//    * <p>
-//    * Constraints which can not be attached to the join, or which *might* not
-//    * have their materialization requirements satisified by the time the join
-//    * runs ({@link Requirement#SOMETIMES}) cause a materialization pattern to
-//    * be appended to the pipeline. Once the materialization requirements have
-//    * been satisified, the constraint is then imposed by a
-//    * {@link ConditionalRoutingOp}.
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
-            final AbstractTripleStore db,//
-            final QueryEngine queryEngine,//
+            final AST2BOpContext ctx,
+//            final AbstractTripleStore db,//
+//            final QueryEngine queryEngine,//
             PipelineOp left,//
             Predicate pred,//
             final Set<IVariable<?>> doneSet,// variables known to be materialized.
             final Collection<IConstraint> constraints,//
-            final BOpContextBase context, //
-            final AtomicInteger idFactory,//
-            final Properties queryHints) {
+//            final BOpContextBase context, //
+//            final AtomicInteger idFactory,//
+            final Properties queryHints
+            ) {
 
-        final int joinId = idFactory.incrementAndGet();
+        final int joinId = ctx.idFactory.incrementAndGet();
 
         // annotations for this join.
         final List<NV> anns = new LinkedList<NV>();
@@ -188,11 +166,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
                 switch (scope) {
                 case NAMED_CONTEXTS:
-                    left = namedGraphJoin(queryEngine, context, idFactory,
+                    left = namedGraphJoin(ctx,//queryEngine, context, idFactory,
                             left, anns, pred, dataset, queryHints);
                     break;
                 case DEFAULT_CONTEXTS:
-                    left = defaultGraphJoin(queryEngine, context, idFactory,
+                    left = defaultGraphJoin(ctx,//queryEngine, context, idFactory,
                             left, anns, pred, dataset, queryHints);
                     break;
                 default:
@@ -210,7 +188,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                  * the code base.
                  */
 
-                final boolean scaleOut = queryEngine.isScaleOut();
+                final boolean scaleOut = ctx.isCluster();
 
                 if (scaleOut)
                     throw new UnsupportedOperationException();
@@ -220,7 +198,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
                 anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-                left = newJoin(left, anns, queryHints,
+                left = newJoin(ctx, left, anns, queryHints,
                         false/* defaultGraphFilter */, null/* summary */);
 
             }
@@ -231,7 +209,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Triples or provenance mode.
              */
 
-            left = triplesModeJoin(queryEngine, left, anns, pred, queryHints);
+            left = triplesModeJoin(ctx, left, anns, pred, queryHints);
 
         }
 
@@ -240,8 +218,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(left, doneSet, needsMaterialization, db,
-                queryEngine, idFactory, context, queryHints);
+        left = addMaterializationSteps(ctx,
+                left, doneSet, needsMaterialization, 
+//                db, queryEngine, idFactory, context, 
+                queryHints);
 
         return left;
 
@@ -257,12 +237,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *
      * @return The join operator.
      */
-    private static PipelineOp triplesModeJoin(final QueryEngine queryEngine,
+    private static PipelineOp triplesModeJoin(final AST2BOpContext ctx,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final Properties queryHints) {
 
-        final boolean scaleOut = queryEngine.isScaleOut();
-        if (scaleOut && !forceRemoteAPs) {
+        final boolean scaleOut = ctx.isCluster();
+        if (scaleOut && !ctx.forceRemoteAPs) {
             /*
              * All triples queries can run shard-wise in scale-out.
              */
@@ -277,7 +257,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-        return newJoin(left, anns, queryHints, false/* defaultGraphFilter */,
+        return newJoin(ctx, left, anns, queryHints, false/* defaultGraphFilter */,
                 null/* summary */);
 
     }
@@ -301,13 +281,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       decision until we actually evaluate that access path. This is
      *       basically a special case of runtime query optimization.
      */
-    private static PipelineOp namedGraphJoin(final QueryEngine queryEngine,
-            final BOpContextBase context, final AtomicInteger idFactory,
+    private static PipelineOp namedGraphJoin(final AST2BOpContext ctx,
+//            final BOpContextBase context, 
+//            final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
-        final boolean scaleOut = queryEngine.isScaleOut();
-        if (scaleOut && !forceRemoteAPs) {
+        final boolean scaleOut = ctx.isCluster();
+        if (scaleOut && !ctx.forceRemoteAPs) {
             /*
              * All named graph patterns in scale-out are partitioned (sharded).
              */
@@ -329,7 +310,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, null/* summary */);
 
         }
@@ -342,7 +323,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, null/* summary */);
         }
 
@@ -370,7 +351,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
@@ -396,7 +377,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
@@ -412,9 +393,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * layer on any cost for the optional expander.
          */
         @SuppressWarnings("rawtypes")
-        final IRelation r = context.getRelation(pred);
+        final IRelation r = ctx.context.getRelation(pred);
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        final ScanCostReport scanCostReport = ((AccessPath) context
+        final ScanCostReport scanCostReport = ((AccessPath) ctx.context
                 .getAccessPath(r, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
                 .estimateCost();
@@ -429,7 +410,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * actually running the query.
          */
         final SubqueryCostReport subqueryCostReport = summary
-                .estimateSubqueryCost(context, SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                .estimateSubqueryCost(ctx.context, ctx.SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
@@ -450,7 +431,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         } else {
@@ -481,7 +462,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                     NV.asMap(new NV[] {//
                                     new NV(DataSetJoin.Annotations.VAR, var),//
                                     new NV(DataSetJoin.Annotations.BOP_ID,
-                                            idFactory.incrementAndGet()),//
+                                            ctx.idFactory.incrementAndGet()),//
                                     new NV(DataSetJoin.Annotations.GRAPHS,
                                             summary.getGraphs()) //
                             }));
@@ -498,7 +479,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(dataSetJoin, anns, queryHints,
+            return newJoin(ctx, dataSetJoin, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
@@ -520,15 +501,17 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       basically a special case of runtime query optimization.
      */
     @SuppressWarnings("rawtypes")
-    private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
-            final BOpContextBase context, final AtomicInteger idFactory,
+    private static PipelineOp defaultGraphJoin(
+            final AST2BOpContext ctx,
+//            final QueryEngine queryEngine,
+//            final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
         final DataSetSummary summary = dataset == null ? null
                 : dataset.getDefaultGraphs();
 
-        final boolean scaleOut = queryEngine.isScaleOut();
+        final boolean scaleOut = ctx.isCluster();
 
         if (dataset != null && summary == null) {
 
@@ -536,7 +519,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, queryHints, true/* defaultGraphFilter */,
+            return newJoin(ctx, left, anns, queryHints, true/* defaultGraphFilter */,
                     summary);
         }
 
@@ -554,7 +537,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
@@ -570,7 +553,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             pred = pred.asBound((IVariable<?>) pred.get(3),
                     new Constant<IV<?, ?>>(summary.firstContext));
 
-            if (scaleOut && !forceRemoteAPs) {
+            if (scaleOut && !ctx.forceRemoteAPs) {
                 // use a partitioned join.
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.SHARDED));
@@ -583,13 +566,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
 
         /*
-         * @todo This optimization can only be applied at runtime. It can not be
+         * Note: This optimization can only be applied at runtime. It can not be
          * decided statically because the actual index used may change as
          * variable bindings propagate [it could be decided statically if we
          * examined the predicate as it would be evaluated by propagating fake
@@ -669,9 +652,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * needs to be probably 25% of the named graphs, which is probably too
          * much data to have in memory anyway.
          */
-        final IRelation r = context.getRelation(pred);
+        final IRelation r = ctx.context.getRelation(pred);
         @SuppressWarnings("unchecked")
-        final ScanCostReport scanCostReport = ((AccessPath) context
+        final ScanCostReport scanCostReport = ((AccessPath) ctx.context
                 .getAccessPath(r, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
                 .estimateCost();
@@ -685,7 +668,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * partitioned or global index views when it is evaluated.
          */
         final SubqueryCostReport subqueryCostReport = dataset == null ? null
-                : summary.estimateSubqueryCost(context, SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                : summary.estimateSubqueryCost(ctx.context, ctx.SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
                         IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
@@ -734,7 +717,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     true/* defaultGraphFilter */, summary);
 
         } else {
@@ -745,11 +728,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * pattern and layer on a filter to strip off the context position.
              * The asBound access paths write on a shared buffer. That shared
              * buffer is read from by the expander.
-             *
+             * 
              * Scale-out: JOIN is ANY or HASHED. AP is REMOTE.
              * 
-             * FIXME This is still using an expander pattern. Rewrite it to use
-             * a join against the default contexts in the data set.
+             * TODO This is still using an expander pattern (DGExpander).
+             * Rewrite it to use a join against the default contexts in the data
+             * set.
              */
 
             final long estimatedRangeCount = subqueryCostReport.rangeCount;
@@ -786,7 +770,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
            
-            return newJoin(left, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     true/* defaultGraphFilter */, summary);
             
         }
@@ -810,24 +794,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *            <code>true</code> iff a hash join was chosen for this
      *            predicate.
      * @return
-     * 
-     *         TODO The HTree variant of the distinct filter is more scalable
-     *         but it does not have access to the memory manager for the
-     *         IRunningQuery and hence will allocate its own memory manager,
-     *         which means that it will use at a minimum of 1M of native memory.
-     *         We need to look at the integration of the filters with the
-     *         IRunningQuery to fix this.
-     * 
-     *         TODO The HTree benefits very much from vectoring. However, in
-     *         order to vector the filter we need to be operating on IV chunks.
-     *         Maybe we can resolve this issue and the issue of access to the
-     *         memory manager at the same time?
      */
-    static private BOpFilterBase newDistinctFilter(final Predicate<?> pred,
-            final DataSetSummary summary, final boolean hashJoin) {
+    static private BOpFilterBase newDistinctFilter(final AST2BOpContext ctx,
+            final Predicate<?> pred, final DataSetSummary summary,
+            final boolean hashJoin) {
         
         // Never use native distinct for as-bound "pipeline" joins.
-        boolean nativeDistinct = hashJoin && AST2BOpBase.nativeDefaultGraph;
+        boolean nativeDistinct = hashJoin && ctx.nativeDefaultGraph;
         
         if (nativeDistinct) {
             /*
@@ -838,7 +811,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final Long rangeCount = (Long) pred
                     .getProperty(Annotations.ESTIMATED_CARDINALITY);
             if (rangeCount != null) {
-                if (rangeCount.longValue() < nativeDefaultGraphThreshold) {
+                if (rangeCount.longValue() < ctx.nativeDefaultGraphThreshold) {
                     // Small range count.
                     nativeDistinct = false;
                 }
@@ -857,7 +830,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             /*
              * Examine the cardinality of the defaultGraph *contexts*.
              */
-            if (summary.nknown < nativeDefaultGraphThreshold) {
+            if (summary.nknown < ctx.nativeDefaultGraphThreshold) {
                 // Only a few graphs in the defaultGraph.
                 nativeDistinct = false;
             }
@@ -895,8 +868,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
      * @see Annotations#ESTIMATED_CARDINALITY
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static private PipelineOp newJoin(PipelineOp left, final List<NV> anns,
-            final Properties queryHints, final boolean defaultGraphFilter,
+    static private PipelineOp newJoin(final AST2BOpContext ctx,
+            PipelineOp left, final List<NV> anns,
+            final Properties queryHints, 
+            final boolean defaultGraphFilter,
             final DataSetSummary summary) {
 
         final Map<String, Object> map = NV.asMap(anns.toArray(new NV[anns
@@ -921,8 +896,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Filter for distinct SPOs.
              */
 
-            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary,
-                    hashJoin));
+            pred = pred.addAccessPathFilter(newDistinctFilter(ctx, pred,
+                    summary, hashJoin));
             
             // Update the annotation map with the predicate now that we have
             // attached the appropriate distinct filter.
@@ -934,21 +909,21 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
             /*
              * TODO Choose HTree versus JVM hash join operator based on the the
-             * estimated input cardinality to the join.
+             * estimated input cardinality to the join. The RTO can give us that
+             * (the static join optimizer does not really provide a decent
+             * estimate of the input/output cardinality of a join).
              * 
              * TODO If we partition the hash join on a cluster then we should
              * divide the estimated input cardinality by the #of partitions to
              * get the estimated input cardinality per partition.
              */
             
-//            final long fastRangeCount = (Long) pred
-//                    .getRequiredProperty(Annotations.ESTIMATED_CARDINALITY);
-            
-            final long estimatedInputCardinality = Long.MAX_VALUE; // FIXME From the RTO. 
-            
-            // FIXME From query hint / *AST2BaseContext* default.
-            final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
+//            final long estimatedInputCardinality = Long.MAX_VALUE; 
+//            
+//            final boolean useHTree = estimatedInputCardinality > 20 * Bytes.megabyte;
 
+            final boolean useHTree = ctx.nativeHashJoins;
+            
             /*
              * The join variable(s) are variables which are (a) bound by the
              * predicate and (b) are known bound in the source solutions.

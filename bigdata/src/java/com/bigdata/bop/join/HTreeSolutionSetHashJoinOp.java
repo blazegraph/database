@@ -42,7 +42,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -93,6 +92,28 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
          */
         final String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
         
+//        /**
+//         * When <code>true</code>, the source is presumed to have very low
+//         * cardinality (typically one solution, often with no bindings) and the
+//         * JOIN is performed using a full scan of the hash index, joining each
+//         * solution in turn against each of the source solution(s) (default
+//         * <code>false</code>). This approach allows us to perform a join when
+//         * the hash index was build using join variable(s) but the source
+//         * solution(s) will not have binding(s) for those join variable(s).
+//         * <p>
+//         * The most common use case is an INCLUDE of a named solution set at the
+//         * start of a (sub-)query plan. There is just one empty solution flowing
+//         * into the hash join. Since there is nothing bound in that solution, if
+//         * we restrict the hash index to share join variables with that solution
+//         * it will not have any join variables.
+//         * 
+//         * @see bigdata-perf/CI/govtrack/queries/query10.rq
+//         * @see bigdata-perf/CI/govtrack/queries/query0021.rq
+//         */
+//        String FLIP_JOIN = HashJoinAnnotations.class.getName() + ".flipJoin";
+//        
+//        boolean DEFAULT_FLIP_JOIN = false;
+
         /**
          * When <code>true</code> the hash index identified by
          * {@link #NAMED_SET_REF} will be released when this operator is done
@@ -136,7 +157,8 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
 
         super(args, annotations);
 
-        if (isRelease() && !isLastPassRequested()) {
+        if (getProperty(Annotations.RELEASE, Annotations.DEFAULT_RELEASE)
+                && !isLastPassRequested()) {
             /*
              * In order to release the hash index, this operator needs to be
              * notified when no more source solutions will become available.
@@ -156,14 +178,14 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
         
     }
 
-    /**
-     * @see Annotations#RELEASE
-     */
-    public boolean isRelease() {
-        
-        return getProperty(Annotations.RELEASE,Annotations.DEFAULT_RELEASE);
-        
-    }
+//    /**
+//     * @see Annotations#RELEASE
+//     */
+//    protected boolean isRelease() {
+//        
+//        return getProperty(Annotations.RELEASE, Annotations.DEFAULT_RELEASE);
+//        
+//    }
     
     public BaseJoinStats newStats() {
 

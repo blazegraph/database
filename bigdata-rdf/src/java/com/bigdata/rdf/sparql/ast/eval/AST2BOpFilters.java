@@ -35,12 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
@@ -50,7 +48,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.InlineMaterializeOp;
@@ -73,7 +70,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Class handles the materialization pattern for filters.
@@ -138,14 +134,17 @@ public class AST2BOpFilters extends AST2BOpBase {
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public static PipelineOp addMaterializationSteps(
-            final AbstractTripleStore db,
-            final QueryEngine queryEngine, PipelineOp left, final int right,
+            final AST2BOpContext context,
+//            final AbstractTripleStore db,
+//            final QueryEngine queryEngine, 
+            PipelineOp left, final int right,
             final IConstraint c,
             final Collection<IVariable<IV>> varsToMaterialize,
-            final AtomicInteger idFactory, final Properties queryHints) {
+//            final AtomicInteger idFactory, 
+            final Properties queryHints) {
 
-        final AST2BOpContext context = new AST2BOpContext(
-                null/* astContainer */, idFactory, db, queryEngine, queryHints);
+//        final AST2BOpContext context = new AST2BOpContext(
+//                null/* astContainer */, idFactory, db, queryEngine, queryHints);
 
         final IValueExpression<IV> ve = (IValueExpression) c.get(0);
 
@@ -383,7 +382,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                 anns.add(new NV(BOp.Annotations.BOP_ID, lexJoinId));
                 anns.add(new NV(PipelineOp.Annotations.SINK_REF, endId));
                 
-                if (ctx.isCluster() && !AST2BOpBase.forceRemoteAPs) {
+                if (ctx.isCluster() && !ctx.forceRemoteAPs) {
                     // use a partitioned join.
                     anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.SHARDED));
@@ -437,27 +436,27 @@ public class AST2BOpFilters extends AST2BOpBase {
 
     }
     
-    /**
-     * Wrapper for handling the {@link AST2BOpContext} / {@link BOpContextBase}
-     * API mismatch.
-     * 
-     * @param left
-     * @param doneSet
-     * @param needsMaterialization
-     * @param queryHints
-     * @param ctx
-     */
-    protected static PipelineOp addMaterializationSteps(PipelineOp left,
-            final Set<IVariable<?>> doneSet,
-            final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization,
-            final Properties queryHints,
-            final AST2BOpContext ctx) {
-
-        return addMaterializationSteps(left, doneSet, needsMaterialization, ctx.db,
-                ctx.queryEngine, ctx.idFactory, new BOpContextBase(
-                        ctx.queryEngine), queryHints);
-    
-    }
+//    /**
+//     * Wrapper for handling the {@link AST2BOpContext} / {@link BOpContextBase}
+//     * API mismatch.
+//     * 
+//     * @param left
+//     * @param doneSet
+//     * @param needsMaterialization
+//     * @param queryHints
+//     * @param ctx
+//     */
+//    protected static PipelineOp addMaterializationSteps(PipelineOp left,
+//            final Set<IVariable<?>> doneSet,
+//            final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization,
+//            final Properties queryHints,
+//            final AST2BOpContext ctx) {
+//
+//        return addMaterializationSteps(left, doneSet, needsMaterialization, ctx.db,
+//                ctx.queryEngine, ctx.idFactory, new BOpContextBase(
+//                        ctx.queryEngine), queryHints);
+//    
+//    }
     
     /**
      * For each filter which requires materialization steps, add the
@@ -476,13 +475,15 @@ public class AST2BOpFilters extends AST2BOpBase {
      * @param queryHints
      */
     @SuppressWarnings("rawtypes")
-    protected static PipelineOp addMaterializationSteps(PipelineOp left,
+    protected static PipelineOp addMaterializationSteps(
+            final AST2BOpContext ctx,
+            PipelineOp left,
             final Set<IVariable<?>> doneSet,
             final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization,
-            final AbstractTripleStore db,//
-            final QueryEngine queryEngine,//
-            final AtomicInteger idFactory,//
-            final BOpContextBase context,//
+//            final AbstractTripleStore db,//
+//            final QueryEngine queryEngine,//
+//            final AtomicInteger idFactory,//
+//            final BOpContextBase context,//
             final Properties queryHints) {
 
         if (!needsMaterialization.isEmpty()) {
@@ -506,18 +507,24 @@ public class AST2BOpFilters extends AST2BOpBase {
 	                
                 }
 
-                final int condId = idFactory.incrementAndGet();
+                final int condId = ctx.idFactory.incrementAndGet();
 
                 // we might have already materialized everything we need
                 if (!terms.isEmpty()) {
 
                     // Add materialization steps for remaining variables.
-                    left = addMaterializationSteps(db, queryEngine, left,
-                            condId, c, terms, idFactory, queryHints);
+                    left = addMaterializationSteps(
+                            ctx,
+//                            db, queryEngine, 
+                            left,
+                            condId, c, terms, 
+                            // idFactory, 
+                            queryHints
+                            );
 
                 }
 
-                left = Rule2BOpUtility.applyQueryHints(//
+                left = applyQueryHints(//
                     new ConditionalRoutingOp(leftOrEmpty(left),//
                         new NV(BOp.Annotations.BOP_ID, condId),//
                         new NV(ConditionalRoutingOp.Annotations.CONDITION,c)//
