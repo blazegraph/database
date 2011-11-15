@@ -242,14 +242,18 @@ public class StatusServlet extends BigdataRDFServlet {
 
 		{
 
-			final Iterator<IRunningQuery> itr = runningQueryAge.values()
-					.iterator();
+            final Iterator<Map.Entry<Long/* age */, IRunningQuery>> itr = runningQueryAge
+                    .entrySet().iterator();
 
 //			final StringWriter w = new StringWriter(Bytes.kilobyte32 * 8);
 
 			while (itr.hasNext()) {
 
-				final IRunningQuery query = itr.next();
+			    final Map.Entry<Long/*age*/, IRunningQuery> e = itr.next();
+			    
+			    final long age = e.getKey();
+			    
+				final IRunningQuery query = e.getValue();
 
 				if (query.isDone() && query.getCause() != null) {
 					// Already terminated (normal completion).
@@ -264,24 +268,15 @@ public class StatusServlet extends BigdataRDFServlet {
 
 				if (acceptedQuery != null) {
 
-					final AbstractQueryTask queryTask = acceptedQuery.queryTask;
-					
+				    // TODO Add "cancelQuery" link (cancel just this query).
+				    // TODO Add "queryDetails" link (details for just this query).
+				    
 					queryStr = acceptedQuery.queryTask.queryStr;
 
-//					// TODO redundant if using native SPARQL evaluation.
-//					current.node("h2", "SPARQL").node("p",
-//							HTMLUtility.escapeForXHTML(queryTask.queryStr));
-
-					current.node("h2", "Query").node(
+                    current.node("h2", "Query (age=" + age + "ms)").node(
 							"pre",
-							HTMLUtility.escapeForXHTML(queryTask.sailQuery
-									.toString()));
-
-                    // redundant with the ASTCOntainer.
-//					current.node("h2", "BOP Plan").node(
-//							"pre",
-//							HTMLUtility.escapeForXHTML(BOpUtility
-//									.toString(query.getQuery())));
+                                HTMLUtility
+                                        .escapeForXHTML(queryStr));
 					
 				} else {
 				
@@ -289,20 +284,17 @@ public class StatusServlet extends BigdataRDFServlet {
 					
 				}
 
+                /*
+                 * TODO Probably not worth while to show this at all unless
+                 * "details" are requested, and then we should show
+                 * everything about the query (parseTree, original and optimized
+                 * AST, and the detailed query evaluation statistics).
+                 */
 				current.node("h2", "Query Evaluation Statistics").node("p").close();
 
 				// Format as a table, writing onto the response.
 				QueryLog.getTableXHTML(queryStr, query, w,
 						!showQueryDetails, maxBopLength);
-
-//				// Extract as String
-//				final String s = w.getBuffer().toString();
-//
-//				// Add into the HTML document.
-//				current.text(s);
-//
-//				// Clear the buffer.
-//				w.getBuffer().setLength(0);
 
 			} // next IRunningQuery.
 
@@ -316,8 +308,6 @@ public class StatusServlet extends BigdataRDFServlet {
         	w.close();
         	
         }
-
-//        buildResponse(resp, HTTP_OK, MIME_TEXT_HTML, doc.toString());
 
     }
 
