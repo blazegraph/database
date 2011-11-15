@@ -116,7 +116,7 @@ public class TestInlineConstraints extends ProxyTestCase {
     	return props;
     }
     
-    public void testGT() {
+    public void testGT() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -190,6 +190,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -217,8 +218,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                 }
 
-                try {
-                
                     int numSolutions = 0;
                     
 //                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
@@ -259,12 +258,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
@@ -275,7 +268,7 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    public void testGE() {
+    public void testGE() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -348,6 +341,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -375,8 +369,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                 }
 
-                try {
-                
                     int numSolutions = 0;
                     
 //                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
@@ -422,12 +414,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
@@ -438,7 +424,7 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    public void testLT() {
+    public void testLT() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -514,6 +500,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -541,8 +528,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                 }
 
-                try {
-                
                     int numSolutions = 0;
                     
 //                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
@@ -583,12 +568,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
@@ -599,7 +578,7 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    public void testLE() {
+    public void testLE() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -675,6 +654,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -702,8 +682,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                 }
 
-                try {
-                
                     int numSolutions = 0;
                     
 //                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
@@ -748,12 +726,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 2, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
@@ -764,7 +736,7 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    public void testMath() {
+    public void testMath() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -844,6 +816,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -881,8 +854,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                 }
 
-                try {
-                
                     int numSolutions = 0;
                     
 //                    final IChunkedOrderedIterator<IBindingSet> solutions = runQuery(db, rule);
@@ -923,12 +894,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
@@ -939,7 +904,7 @@ public class TestInlineConstraints extends ProxyTestCase {
         
     }
 
-    public void testCompareDates() {
+    public void testCompareDates() throws Exception {
         
         // store with no owl:sameAs closure
         final AbstractTripleStore db = getStore();
@@ -1020,6 +985,7 @@ public class TestInlineConstraints extends ProxyTestCase {
 
                     final ProjectionNode projection = new ProjectionNode();
                     projection.addProjectionVar(new VarNode("s"));
+                    projection.addProjectionVar(new VarNode("a"));
                     
                     final JoinGroupNode whereClause = new JoinGroupNode();
 
@@ -1046,8 +1012,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     queryRoot.setWhereClause(whereClause);
                     
                 }
-
-                try {
 
                 	final IV left = l3.getIV();
                 	final IV right = l2.getIV();
@@ -1092,12 +1056,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                     
                     assertEquals("wrong # of solutions", 1, numSolutions);
                     
-                } catch(Exception ex) {
-                    
-                    ex.printStackTrace();
-                    
-                }
-                
             }
 
         } finally {
