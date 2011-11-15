@@ -401,6 +401,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTJoinOrderByTypeOptimizer());
 
         /**
+         * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
+         */
+        add(new ASTRunFirstRunLastOptimizer());
+
+        /**
          * Run the static join order optimizer. This attaches the estimated
          * cardinality data (fast range counts) and uses fast algorithm to
          * reorder the joins in each required or optional join group.
