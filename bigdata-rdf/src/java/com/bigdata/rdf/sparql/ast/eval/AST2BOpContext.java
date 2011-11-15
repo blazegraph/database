@@ -5,12 +5,14 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.htree.HTree;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -73,14 +75,18 @@ public class AST2BOpContext implements IdFactory {
      * and query rewrites for performance optimizations).
      */
     public final ASTOptimizerList optimizers;
+
+    /**
+     * Factory for resolving relations and access paths used primarily by
+     * {@link AST2BOpJoins}s.
+     */
+    final BOpContextBase context;
     
     /**
-     * When <code>true</code>, will use the version of DISTINCT which operators
-     * on the native heap.
+     * When <code>true</code>, will use the version of the DISTINCT SOLUTIONS
+     * operator which uses the {@link HTree} against the native heap.
      * 
      * @see QueryHints#NATIVE_DISTINCT
-     * 
-     * @see AST2BOpBase#nativeDefaultGraph
      */
     public boolean nativeDistinct = QueryHints.DEFAULT_NATIVE_DISTINCT;
 
@@ -145,23 +151,46 @@ public class AST2BOpContext implements IdFactory {
      */
     boolean materializeProjectionInQuery = false;
     
-//    /**
-//     * When <code>true</code>, use a hash join pattern for sub-group evaluation.
-//     * When <code>false</code>, use a {@link SubqueryOp}. This effects handling
-//     * of OPTIONAL groups. It also effect handle of UNION iff UNION is modeled
-//     * as sub-groups rather than using a TEE pattern.
-//     */
-//    boolean hashJoinPatternForSubGroup = true;
-    
-//    /**
-//     * When <code>true</code>, use a hash join pattern for sub-select
-//     * evaluation. When <code>false</code>, use a {@link SubqueryOp}.
-//     * 
-//     * @see https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert the
-//     *      static optimizer into an AST rewrite)
-//     */
-//    boolean hashJoinPatternForSubSelect = true;
-    
+    /**
+     * Flag to conditionally force the use of REMOTE access paths in scale-out
+     * joins. This is intended as a tool when analyzing query patterns in
+     * scale-out. It should normally be <code>false</code>.
+     * 
+     * FIXME Make this [false]. It is currently enabled so we can go to native
+     * SPARQL evaluation in CI.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
+     * 
+     * TODO Query hint.
+     */
+    protected final boolean forceRemoteAPs = true;
+
+    /**
+     * When <code>true</code>, may use the version of DISTINCT which operates on
+     * the native heap (this is only used when we are doing a hash join against
+     * a default graph access path and the predicate for that access path has a
+     * large cardinality).
+     * 
+     * TODO Query hint.
+     */
+    protected boolean nativeDefaultGraph = true;
+
+    /**
+     * The threshold at which we will use a native hash set rather than a
+     * default hash set for a default graph access path.
+     * 
+     * TODO Query hint.
+     */
+    protected final long nativeDefaultGraphThreshold = 100 * Bytes.kilobyte32;
+
+    /**
+     * The #of samples to take when comparing the cost of a SCAN with an IN
+     * filter to subquery for each graph in the data set.
+     * 
+     * TODO Query hint.
+     */
+    protected final int SAMPLE_LIMIT = 100;
+
     private int varIdFactory = 0;
 
     /**
@@ -170,43 +199,45 @@ public class AST2BOpContext implements IdFactory {
      */
     StaticAnalysis sa = null;
     
-    /**
-     * 
-     * @param astContainer
-     *            The top-level {@link ASTContainer}.
-     * @param idFactory
-     *            A factory for assigning identifiers to {@link BOp}s.
-     * @param db
-     *            The database.
-     * @param queryEngine
-     *            The query engine.
-     * @param queryHints
-     *            The query hints.
-     * 
-     * @deprecated by the other constructor.
-     */
-	public AST2BOpContext(final ASTContainer astContainer,
-			final AtomicInteger idFactory, final AbstractTripleStore db,
-    		final QueryEngine queryEngine, final Properties queryHints) {
-
-        this.astContainer = astContainer;
-        this.idFactory = idFactory;
-        this.db = db;
-        this.optimizers = new DefaultOptimizerList();
-        
-        this.queryEngine = queryEngine;
-        this.queryHints = queryHints;
-
-        // Use either the caller's UUID or a random UUID.
-        final String queryIdStr = queryHints == null ? null : queryHints
-                .getProperty(QueryHints.QUERYID);
-
-        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
-                .fromString(queryIdStr);
-
-        this.queryId = queryId;
-		
-	}
+//    /**
+//     * 
+//     * @param astContainer
+//     *            The top-level {@link ASTContainer}.
+//     * @param idFactory
+//     *            A factory for assigning identifiers to {@link BOp}s.
+//     * @param db
+//     *            The database.
+//     * @param queryEngine
+//     *            The query engine.
+//     * @param queryHints
+//     *            The query hints.
+//     * 
+//     * @deprecated by the other constructor.
+//     */
+//	public AST2BOpContext(final ASTContainer astContainer,
+//			final AtomicInteger idFactory, final AbstractTripleStore db,
+//    		final QueryEngine queryEngine, final Properties queryHints) {
+//
+//        this.astContainer = astContainer;
+//        this.idFactory = idFactory;
+//        this.db = db;
+//        this.optimizers = new DefaultOptimizerList();
+//        
+//        this.queryEngine = queryEngine;
+//        this.queryHints = queryHints;
+//
+//        // Use either the caller's UUID or a random UUID.
+//        final String queryIdStr = queryHints == null ? null : queryHints
+//                .getProperty(QueryHints.QUERYID);
+//
+//        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
+//                .fromString(queryIdStr);
+//
+//        this.queryId = queryId;
+//
+//        this.context = new BOpContextBase(queryEngine);
+//        
+//	}
 
     /**
      * 
@@ -267,6 +298,8 @@ public class AST2BOpContext implements IdFactory {
 
         this.queryId = queryId;
         
+        this.context = new BOpContextBase(queryEngine);
+
     }
 
     public int nextId() {

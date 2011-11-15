@@ -14,8 +14,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -29,7 +29,7 @@ import com.bigdata.striterator.IKeyOrder;
  * <p>
  * Note: The annotations on the class are mostly interpreted by the
  * toPredicate() method in {@link AST2BOpUtility} and by the logic in
- * {@link Rule2BOpUtility} which handles the default and named graph access
+ * {@link AST2BOpJoins} which handles the default and named graph access
  * patterns.
  * <p>
  * Note: If a variable is bound, then we bind that slot of the predicate. If a

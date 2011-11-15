@@ -37,11 +37,9 @@ import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -52,12 +50,8 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -69,15 +63,11 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.striterator.ChunkedWrappedIterator;
-import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 
@@ -1012,53 +1002,56 @@ public class TestInlineConstraints extends ProxyTestCase {
     private IChunkedOrderedIterator<IBindingSet> runQuery(
     		final AbstractTripleStore db, final IRule rule)
     		throws Exception {
-    
-	    final QueryEngine queryEngine = 
-	    	QueryEngineFactory.getQueryController(db.getIndexManager());
-	
-		final PipelineOp query;
-		{
-			/*
-			 * Note: The ids are assigned using incrementAndGet() so ONE (1) is
-			 * the first id that will be assigned when we pass in ZERO (0) as
-			 * the initial state of the AtomicInteger.
-			 */
-			final AtomicInteger idFactory = new AtomicInteger(0);
-	
-			// Convert the step to a bigdata operator tree.
-			query = Rule2BOpUtility.convert(rule, idFactory, db,
-					queryEngine, new Properties());
-	
-			if (log.isInfoEnabled())
-				log.info("\n"+BOpUtility.toString2(query));
-	
-		}
-		
-	    IRunningQuery runningQuery = null;
-    	try {
-    		
-    		// Submit query for evaluation.
-    		runningQuery = queryEngine.eval(query);
 
-    		// The iterator draining the query solutions.
-    		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
-    				.iterator();
+        fail("refactor test suite");
 
-    	    // De-chunk the IBindingSet[] visited by that iterator.
-    	    final IChunkedOrderedIterator<IBindingSet> it2 = 
-    	    	new ChunkedWrappedIterator<IBindingSet>(
-    	            new Dechunkerator<IBindingSet>(it1));
-    	    
-    	    return it2;
-
-		} catch (Throwable t) {
-			if (runningQuery != null) {
-				// ensure query is halted.
-				runningQuery.cancel(true/* mayInterruptIfRunning */);
-			}
-//			log.error("Remove log stmt"+t,t);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
-			throw new QueryEvaluationException(t);
-		}
+        return null;
+//        final QueryEngine queryEngine = 
+//	    	QueryEngineFactory.getQueryController(db.getIndexManager());
+//	
+//		final PipelineOp query;
+//		{
+//			/*
+//			 * Note: The ids are assigned using incrementAndGet() so ONE (1) is
+//			 * the first id that will be assigned when we pass in ZERO (0) as
+//			 * the initial state of the AtomicInteger.
+//			 */
+//			final AtomicInteger idFactory = new AtomicInteger(0);
+//	
+//			// Convert the step to a bigdata operator tree.
+//			query = Rule2BOpUtility.convert(rule, idFactory, db,
+//					queryEngine, new Properties());
+//	
+//			if (log.isInfoEnabled())
+//				log.info("\n"+BOpUtility.toString2(query));
+//	
+//		}
+//		
+//	    IRunningQuery runningQuery = null;
+//    	try {
+//    		
+//    		// Submit query for evaluation.
+//    		runningQuery = queryEngine.eval(query);
+//
+//    		// The iterator draining the query solutions.
+//    		final IAsynchronousIterator<IBindingSet[]> it1 = runningQuery
+//    				.iterator();
+//
+//    	    // De-chunk the IBindingSet[] visited by that iterator.
+//    	    final IChunkedOrderedIterator<IBindingSet> it2 = 
+//    	    	new ChunkedWrappedIterator<IBindingSet>(
+//    	            new Dechunkerator<IBindingSet>(it1));
+//    	    
+//    	    return it2;
+//
+//		} catch (Throwable t) {
+//			if (runningQuery != null) {
+//				// ensure query is halted.
+//				runningQuery.cancel(true/* mayInterruptIfRunning */);
+//			}
+////			log.error("Remove log stmt"+t,t);// FIXME remove this - I am just looking for the root cause of something in the SAIL.
+//			throw new QueryEvaluationException(t);
+//		}
 		
     }
 

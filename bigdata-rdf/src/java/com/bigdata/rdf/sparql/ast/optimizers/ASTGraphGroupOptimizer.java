@@ -47,9 +47,9 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
-import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
 
 /**
  * Handles a variety of special constructions related to graph graph groups.
@@ -147,7 +147,7 @@ import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
  *          a specific constant then we would rewrite <code>?g</code> using
  *          Constant/2 and then handle this as <code>GRAPH uri {}</code>
  *          <p>
- *          This is basically what {@link Rule2BOpUtility} does when it follows
+ *          This is basically what {@link AST2BOpJoins} does when it follows
  *          the decision tree for named and default graphs. So, maybe that logic
  *          can be lifted into this class as a rewrite?
  */

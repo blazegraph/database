@@ -40,14 +40,13 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
- * was refactored from the {@link Rule2BOpUtility}.
+ * was refactored from the old Rule2BOpUtility class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -79,56 +78,17 @@ public class AST2BOpBase {
     protected static final boolean enableDecisionTree = true;
 
     /**
-     * Flag to conditionally force the use of REMOTE access paths in scale-out
-     * joins. This is intended as a tool when analyzing query patterns in
-     * scale-out. It should normally be <code>false</code>.
-     * 
-     * FIXME Make this [false]. It is currently enabled so we can go to native
-     * SPARQL evaluation in CI.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
-     */
-    protected static final boolean forceRemoteAPs = true;
-
-    /**
-     * When <code>true</code>, may use the version of DISTINCT which operates on
-     * the native heap (this is only used when we are doing a hash join against
-     * a default graph access path and the predicate for that access path has a
-     * large cardinality).
-     */
-    protected static boolean nativeDefaultGraph = true;
-
-    /**
-     * The threshold at which we will use a native hash set rather than a
-     * default hash set for a default graph access path.
-     */
-    protected static final long nativeDefaultGraphThreshold = 100 * Bytes.kilobyte32;
-    
-    /**
-     * The #of samples to take when comparing the cost of a SCAN with an IN
-     * filter to subquery for each graph in the data set.
-     *
-     * @todo Add query hint to override this default.
-     */
-    protected static final int SAMPLE_LIMIT = 100;
-
-    /**
-     * Annotations used by the {@link BigdataEvaluationStrategyImpl} to
-     * communicate with the {@link Rule2BOpUtility}.
-     * <p>
-     * <h3>Quads Mode</h3>
-     * Several annotations are used to mark named and default graph patterns on
-     * the {@link IPredicate}s. Rather than attaching a named or default graph
+     * Annotations used to mark named and default graph patterns on the
+     * {@link IPredicate}s. Rather than attaching a named or default graph
      * expander, we annotate the predicate with the metadata for the access path
-     * and then convert that annotation to the appropriate bop pattern in
-     * {@link Rule2BOpUtility}.
+     * and then convert that annotation to the appropriate pipeline operators.
      */
     public interface Annotations {
 
         /**
          * Boolean flag indicates that the database is operating in quads mode.
          */
-        String QUADS = Rule2BOpUtility.class.getName() + ".quads";
+        String QUADS = AST2BOpBase.class.getName() + ".quads";
 
         boolean DEFAULT_QUADS = false;
 
@@ -143,7 +103,7 @@ public class AST2BOpBase {
          * is not {@link Serializable}, can be quite large, and is captured by
          * other constructions in the generated query plan).
          */
-        String DATASET = Rule2BOpUtility.class.getName() + ".dataset";
+        String DATASET = AST2BOpBase.class.getName() + ".dataset";
 
         /**
          * The {@link Scope} of the access path (quads mode only). In quads mode
@@ -152,7 +112,7 @@ public class AST2BOpBase {
          * @see Scope#NAMED_CONTEXTS
          * @see Scope#DEFAULT_CONTEXTS
          */
-        String SCOPE = Rule2BOpUtility.class.getName() + ".scope";
+        String SCOPE = AST2BOpBase.class.getName() + ".scope";
 
         /*
          * Query planner and cost estimates.
@@ -166,7 +126,7 @@ public class AST2BOpBase {
          * predicate. In scale-out, the binding sets are send to the node having
          * the shard on which the asBound predicate would read.
          */
-        String ORIGINAL_INDEX = Rule2BOpUtility.class.getName()
+        String ORIGINAL_INDEX = AST2BOpBase.class.getName()
                 + ".originalIndex";
 
         /**
@@ -177,27 +137,27 @@ public class AST2BOpBase {
          * optional joins to the end since they can not increase the selectivity
          * of the query).
          */
-        String ESTIMATED_CARDINALITY = Rule2BOpUtility.class.getName()
+        String ESTIMATED_CARDINALITY = AST2BOpBase.class.getName()
                 + ".estimatedCardinality";
 
         /**
          * The estimated cost of a SCAN + FILTER approach to a default graph or
          * named graph query.
          */
-        String COST_SCAN = Rule2BOpUtility.class.getName() + ".cost.scan";
+        String COST_SCAN = AST2BOpBase.class.getName() + ".cost.scan";
 
         /**
          * A {@link SubqueryCostReport} on the estimated cost of a SUBQUERY
          * approach to a default graph or named graph query.
          */
-        String COST_SUBQUERY = Rule2BOpUtility.class.getName()
+        String COST_SUBQUERY = AST2BOpBase.class.getName()
                 + ".cost.subquery";
 
         /**
          * The #of known graphs in the {@link Dataset} for a default graph or
          * named graph query.
          */
-        String NKNOWN = Rule2BOpUtility.class.getName() + ".nknown";
+        String NKNOWN = AST2BOpBase.class.getName() + ".nknown";
 
         /**
          * Query hint to use a hash join against the access path for a given

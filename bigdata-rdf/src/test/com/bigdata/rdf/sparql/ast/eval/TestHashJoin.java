@@ -36,11 +36,10 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.join.HTreeHashJoinOp;
+import com.bigdata.bop.join.AbstractHashJoinOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-
 
 /**
  * Test suite for queries designed to exercise a hash join against an access
@@ -90,19 +89,17 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
     public void test_hash_join_1() throws Exception {
 
         final ASTContainer astContainer = new TestHelper("hash-join-1")
-        .runTest();
+                .runTest();
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        /*
-         * Note: This assumes that the htree was used for the hash join. It
-         * could have been a JVMHashJoinOp as well.
-         */
-        if (!BOpUtility.visitAll(queryPlan, HTreeHashJoinOp.class).hasNext()
-                && !BOpUtility.visitAll(queryPlan, HTreeHashJoinOp.class)
+        if (!BOpUtility.visitAll(queryPlan, AbstractHashJoinOp.class).hasNext()
+                && !BOpUtility.visitAll(queryPlan, AbstractHashJoinOp.class)
                         .hasNext()) {
+
             fail("Expecting a hash join in the query plan: "
                     + astContainer.toString());
+            
         }
 
     }

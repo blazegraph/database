@@ -54,7 +54,7 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.eval.Rule2BOpUtility;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -424,14 +424,14 @@ public class QueryLog {
 			
 			    // Static optimizer key order (if run).
 				final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
-						.getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
+						.getProperty(AST2BOpJoins.Annotations.ORIGINAL_INDEX);
 				
                 // Explicit override of the key order (if given).
                 final Object overrideKeyOrder = pred
                         .getProperty(IPredicate.Annotations.KEY_ORDER);
 
 				final Long rangeCount = (Long) pred
-						.getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
+						.getProperty(AST2BOpJoins.Annotations.ESTIMATED_CARDINALITY);
 				
                 sb.append('\t'); // keyorder
                 if (keyOrder != null)
@@ -921,14 +921,14 @@ public class QueryLog {
             
                 // Static optimizer key order (if run).
                 final IKeyOrder<?> keyOrder = (IKeyOrder<?>) pred
-                        .getProperty(Rule2BOpUtility.Annotations.ORIGINAL_INDEX);
+                        .getProperty(AST2BOpJoins.Annotations.ORIGINAL_INDEX);
                 
                 // Explicit override of the key order (if given).
                 final Object overrideKeyOrder = pred
                         .getProperty(IPredicate.Annotations.KEY_ORDER);
 
                 final Long rangeCount = (Long) pred
-                        .getProperty(Rule2BOpUtility.Annotations.ESTIMATED_CARDINALITY);
+                        .getProperty(AST2BOpJoins.Annotations.ESTIMATED_CARDINALITY);
 
                 // keyorder
                 w.write(TD);

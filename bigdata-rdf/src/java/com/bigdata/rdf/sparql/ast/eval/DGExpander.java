@@ -8,6 +8,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -40,6 +42,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public class DGExpander implements IAccessPathExpander<ISPO> {
+
+    protected static final Logger log = Logger.getLogger(DGExpander.class);
 
     private static final long serialVersionUID = 1L;
 
@@ -348,7 +352,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
                     } catch (Throwable t) {
 
-                        Rule2BOpUtility.log.error(t, t);
+                        log.error(t, t);
 
                     }
 
@@ -490,8 +494,8 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
                 public Void call() throws Exception {
 
-                    if (Rule2BOpUtility.log.isDebugEnabled())
-                        Rule2BOpUtility.log.debug("Running iterator: c="
+                    if (log.isDebugEnabled())
+                        log.debug("Running iterator: c="
                                 + termId);
 
                     /*
@@ -548,8 +552,8 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
                         }
 
-                        if (Rule2BOpUtility.log.isDebugEnabled())
-                            Rule2BOpUtility.log.debug("Ran iterator: c="
+                        if (log.isDebugEnabled())
+                            log.debug("Ran iterator: c="
                                     + termId + ", nvisited=" + n);
 
                     } finally {

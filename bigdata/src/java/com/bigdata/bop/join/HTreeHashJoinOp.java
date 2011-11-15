@@ -38,7 +38,6 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IQueryAttributes;
-import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -107,8 +106,7 @@ import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class HTreeHashJoinOp<E> extends PipelineOp implements
-        IShardwisePipelineOp<E> {
+public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
     
     static private final transient Logger log = Logger
             .getLogger(HTreeHashJoinOp.class);
@@ -118,7 +116,7 @@ public class HTreeHashJoinOp<E> extends PipelineOp implements
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AccessPathJoinAnnotations,
+    public interface Annotations extends AbstractHashJoinOp.Annotations,
             HTreeHashJoinAnnotations {
         
     }
