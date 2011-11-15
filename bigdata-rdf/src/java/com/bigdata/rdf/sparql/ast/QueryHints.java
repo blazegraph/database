@@ -105,6 +105,24 @@ public interface QueryHints {
     String DEFAULT_TAG = "";
  
     /**
+     * When <code>true</code>, enables all query hints pertaining to analytic
+     * query patterns. When <code>false</code>, disables those features.
+     * <p>
+     * Note: This query hint MUST be applied in the {@link QueryHintScope#Query}
+     * . Hash indices are often created by one operator and then consumed by
+     * another so the same kinds of hash indices MUST be used throughout the
+     * query.
+     * 
+     * @see #NATIVE_DISTINCT_SPO
+     * @see #NATIVE_DISTINCT_SOLUTIONS
+     * @see #NATIVE_HASH_JOINS
+     * @see #MERGE_JOIN
+     */
+    String ANALYTIC = QueryHints.class.getName() + ".analytic";
+
+    boolean DEFAULT_ANALYTIC = false;
+
+    /**
      * When <code>true</code>, will use the version of DISTINCT SOLUTIONS based
      * on the {@link HTree} and the native (C process) heap. When
      * <code>false</code>, use the version based on a JVM collection class. The
@@ -112,7 +130,7 @@ public interface QueryHints {
      */
     String NATIVE_DISTINCT_SOLUTIONS = QueryHints.class.getName() + ".nativeDistinctSolutions";
 
-    boolean DEFAULT_NATIVE_DISTINCT_SOLUTIONS = false;
+    boolean DEFAULT_NATIVE_DISTINCT_SOLUTIONS = DEFAULT_ANALYTIC;
 
     /**
      * When <code>true</code> and the range count of the default graph access
@@ -125,7 +143,7 @@ public interface QueryHints {
     String NATIVE_DISTINCT_SPO = QueryHints.class.getName()
             + ".nativeDistinctSPO";
 
-    boolean DEFAULT_NATIVE_DISTINCT_SPO = false;
+    boolean DEFAULT_NATIVE_DISTINCT_SPO = DEFAULT_ANALYTIC;
 
     /**
      * The minimum range count for a default graph access path before the native
@@ -152,7 +170,7 @@ public interface QueryHints {
      */
     String NATIVE_HASH_JOINS = QueryHints.class.getName() + ".nativeHashJoins";
 
-    boolean DEFAULT_HASH_JOINS = false;
+    boolean DEFAULT_NATIVE_HASH_JOINS = DEFAULT_ANALYTIC;
 
     /**
      * When <code>true</code>, a merge-join pattern will be recognized if it
@@ -161,25 +179,7 @@ public interface QueryHints {
      */
     String MERGE_JOIN = QueryHints.class.getName() + ".mergeJoin";
 
-    boolean DEFAULT_MERGE_JOIN = false;
-
-    /**
-     * When <code>true</code>, enables all query hints pertaining to analytic
-     * query patterns. When <code>false</code>, disables those features.
-     * <p>
-     * Note: This query hint MUST be applied in the {@link QueryHintScope#Query}
-     * . Hash indices are often created by one operator and then consumed by
-     * another so the same kinds of hash indices MUST be used throughout the
-     * query.
-     * 
-     * @see #NATIVE_DISTINCT_SPO
-     * @see #NATIVE_DISTINCT_SOLUTIONS
-     * @see #NATIVE_HASH_JOINS
-     * @see #MERGE_JOIN
-     */
-    String ANALYTIC = QueryHints.class.getName() + ".analytic";
-
-    boolean DEFAULT_ANALYTIC = false;
+    boolean DEFAULT_MERGE_JOIN = true;
 
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
