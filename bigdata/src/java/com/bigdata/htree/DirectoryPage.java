@@ -154,11 +154,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 //			final ITuple tuple = tuples.next();
 //			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
 //		}
-        // ...and finally delete old page
-        if (bucketPage.isPersistent()) {
-            htree.deleteNodeOrLeaf(bucketPage.getIdentity());
-        }
-        
         // remove original page and correct leaf count
         bucketPage.delete();
 		((HTree) htree).nleaves--;
@@ -167,6 +162,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
         for (int i = 0; i < bucketSlotsPerPage; i++) {
             ((HTree) htree).insertRawTuple(bucketPage, i);
         }
+        
+        // ...and finally delete old page data
+        if (bucketPage.isPersistent()) {
+            htree.deleteNodeOrLeaf(bucketPage.getIdentity());
+        }
+        
 	}
 
 	private BucketPage createPage(final int depth) {
@@ -1912,10 +1913,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		replaceChildRef(bucketPage.self, ndir);
 		
 		// ensure that the bucket page doesn't evict
-		// ...and finally delete old page
-		if (bucketPage.isPersistent()) {
-			htree.deleteNodeOrLeaf(bucketPage.getIdentity());
-		}
 		
 		bucketPage.delete();
 		
@@ -1925,6 +1922,10 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			((HTree) htree).insertRawTuple(bucketPage, i);
 		}
 
+		// ...and finally delete old data
+		if (bucketPage.isPersistent()) {
+			htree.deleteNodeOrLeaf(bucketPage.getIdentity());
+		}
 		
 	}
 
