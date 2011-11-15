@@ -89,22 +89,28 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     public interface Annotations extends AST2BOpBase.Annotations {
     	
     	/**
-    	 * When set to true, the optimizer will choose the MIN range count
-    	 * of the two sides of any join when deciding on the join cardinality.
-    	 * This is a more "optimistic" view of the cardinality - that the join
-    	 * will be relatively selective and narrow the results more towards
-    	 * the minimum of the two range counts.  When set to false, the optimizer
-    	 * will take a more pessimistic view of the join and use the MAX range
-    	 * count of the two sides of the join when deciding the join cardinality.
+    	 * The value of this query hint determines how optimistic the optimizer
+    	 * will be in selecting the join cardinality for its joins.  Basically
+    	 * when there is a join that has both shared and unshared variables,
+    	 * the join cardinality will be somewhere in between the cardinality
+    	 * of the two sides (range count for a statement pattern, previous
+    	 * join cardinality for a predecessor join).  The default value is
+    	 * 0.67, which is to say the optimizer takes a mostly optimistic view
+    	 * by default - the join cardinality will be 0.67 * the MIN + 0.33 *
+    	 * the MAX, that way we eliminate some of the worst possible outcomes.
     	 * 
     	 * BSBM BI Q1 is a good example of a query that benefits from the 
     	 * pessimistic approach, and LUBM Q2 is a good example of a query that
     	 * benefits from the optimistic approach.
-    	 * 
-    	 * Defaults to true, that is to say, the MIN range count is used for
-    	 * the join cardinality be default.
     	 */
     	String OPTIMISTIC = ASTStaticJoinOptimizer.class.getName()+".optimistic";
+    	
+    	/**
+    	 * See {@link #OPTIMISTIC}.
+    	 * <p>
+    	 * Note: temporarily set to 1.0d to mimic old fully optimistic behavior.
+    	 */
+    	String DEFAULT_OPTIMISTIC = "1.0d";
     	
     }
     
@@ -320,8 +326,9 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
                     }
 
-                    final boolean optimistic = 
-                    	joinGroup.getQueryHintAsBoolean(Annotations.OPTIMISTIC, true);
+                    final double optimistic = Double.parseDouble( 
+                    	joinGroup.getQueryHint(Annotations.OPTIMISTIC, 
+                    			Annotations.DEFAULT_OPTIMISTIC));
                     
                     /*
                      * Calculate the optimized join ordering.
@@ -617,7 +624,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         /**
          * See {@link Annotations#OPTIMISTIC}.
          */
-        private final boolean optimistic;
+        private final double optimistic;
         
         public boolean isEmpty() {
             
@@ -636,7 +643,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         public StaticOptimizer(final QueryRoot queryRoot,
         		final IJoinNode[] ancestry, 
         		final List<StatementPatternNode> spNodes,
-        		final boolean optimistic) {
+        		final double optimistic) {
             
             if (queryRoot == null)
                 throw new IllegalArgumentException();
@@ -783,6 +790,15 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     continue;
                 }
                 final StatementPatternNode pred = spNodes.get(i);
+                
+                /*
+                 * We need the optimizer to play nice with the run first hint.
+                 */
+                if (pred.getQueryHintAsBoolean(QueryHints.RUN_FIRST, false)) {
+                	preferredFirstTail = i;
+                	break;
+                }
+                
                 if (log.isDebugEnabled()) {
                 	log.debug("considering pred against ancestry: " + pred);
                 }
@@ -1206,9 +1222,9 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 					 * then choose based on the MAX to avoid paying that
 					 * penalty."
 					 */
-                    joinCardinality = optimistic ?
-                        Math.min(d1.getCardinality(), d2.getCardinality()) :
-                        Math.max(d1.getCardinality(), d2.getCardinality());
+                    joinCardinality = (long) ((long)
+                        (optimistic * Math.min(d1.getCardinality(), d2.getCardinality())) +
+                        ((1.0d-optimistic) * Math.max(d1.getCardinality(), d2.getCardinality())));
                 }
             }
             return joinCardinality;
