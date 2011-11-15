@@ -112,7 +112,7 @@ public class AST2BOpContext implements IdFactory {
      * 
      * @see QueryHints#NATIVE_HASH_JOINS
      */
-    public boolean nativeHashJoins = QueryHints.DEFAULT_HASH_JOINS;
+    public boolean nativeHashJoins = QueryHints.DEFAULT_NATIVE_HASH_JOINS;
     
     /**
      * When <code>true</code>, a merge-join pattern will be recognized if it

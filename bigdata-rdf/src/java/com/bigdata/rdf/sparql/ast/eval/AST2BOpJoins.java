@@ -388,7 +388,10 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * Note: We need to use global index view in order to estimate the cost
          * of the scan even though the scan will be shard-wise when we actually
          * run the query.
-         *
+         * 
+         * FIXME We need a higher threshold (and a cheaper test) to decide when
+         * we should SCAN+FILTER. 
+         * 
          * @todo must pass estimateCost() to the underlying access path plus
          * layer on any cost for the optional expander.
          */

@@ -277,8 +277,6 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final String name, final String value) {
 
         if (name.equals(QueryHints.ANALYTIC)) {
-            // TODO MERGE_JOIN is not really an analytic option. More experimenal.
-            context.mergeJoin = Boolean.valueOf(value);
             context.nativeHashJoins = Boolean.valueOf(value);
             context.nativeDistinctSolutions = Boolean.valueOf(value);
             context.nativeDistinctSPO = Boolean.valueOf(value);
