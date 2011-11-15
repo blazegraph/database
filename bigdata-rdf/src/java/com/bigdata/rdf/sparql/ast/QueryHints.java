@@ -236,5 +236,19 @@ public interface QueryHints {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
      */
     String QUERYID = QueryHints.class.getName() + ".queryId";
+
+	/**
+	 * This is an IJoinNode scope query hint that marks a particular join to be
+	 * run first among in a particular group. Only one "run first" join is
+	 * permitted.  This query hint is not permitted on optional joins.
+	 */
+	String RUN_FIRST = QueryHints.class.getName()+".runFirst";
+	
+	/**
+	 * This is an IJoinNode scope query hint that marks a particular join to be
+	 * run last among in a particular group. Only one "run last" join is
+	 * permitted.
+	 */
+	String RUN_LAST = QueryHints.class.getName()+".runLast";
     
 }
