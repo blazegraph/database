@@ -1613,15 +1613,17 @@ public class NanoSparqlClient {
 		 * Report the average query latency for queries with at least a
 		 * specified latency.
 		 */
-		if(reportScores)
-		    reportScores(getScores(queries), minLatencyToReport);
+        if (reportScores) {
+            reportScores(getScores(queries), minLatencyToReport);
+            System.out.println("Reporting only queries with at least "
+                    + minLatencyToReport + "ms latency.");
+		}
 
-		System.out.println("Total elapsed time: "
+        System.out.println("Total elapsed time: "
 				+ (System.currentTimeMillis() - beginTrials) + "ms for "
 				+ queries.length + " queries with " + repeat
 				+ " trials each and " + nclients
-				+ " clients.  Reporting only queries with at least "
-				+ minLatencyToReport + "ms latency.");
+				+ " clients.");
 
 		// Normal exit.
 		System.exit(0);
