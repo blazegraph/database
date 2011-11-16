@@ -57,6 +57,8 @@ public class BSBMVocabularyDecl implements VocabularyDecl {
     public static final String VOCABULARY = "http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/";
 
     public static final String INSTANCES = "http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/";
+
+    public static final URI USD = new URIImpl(VOCABULARY + "USD");
     
     static private final URI[] uris = new URI[]{//
         // namespace for instance data.
@@ -70,6 +72,7 @@ public class BSBMVocabularyDecl implements VocabularyDecl {
         new URIImpl(VOCABULARY + "rating2"),//
         new URIImpl(VOCABULARY + "rating3"),//
         new URIImpl(VOCABULARY + "rating4"),//
+        USD,//
     };
 
     public BSBMVocabularyDecl() {
