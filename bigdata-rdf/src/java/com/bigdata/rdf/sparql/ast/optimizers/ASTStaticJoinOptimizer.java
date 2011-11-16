@@ -111,8 +111,6 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     	
     	/**
     	 * See {@link #OPTIMISTIC}.
-    	 * <p>
-    	 * Note: temporarily set to 1.0 to mimic old fully optimistic behavior.
     	 */
     	String DEFAULT_OPTIMISTIC = "1.0";
     	
