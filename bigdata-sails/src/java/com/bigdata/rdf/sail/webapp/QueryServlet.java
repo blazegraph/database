@@ -34,7 +34,6 @@ import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
-import com.bigdata.util.HTMLUtility;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -367,9 +366,11 @@ public class QueryServlet extends BigdataRDFServlet {
 				current.node("title").text("bigdata&#174;").close();
 				current = current.close();// close the head.
 			}
+
+			// open the body
 			current = current.node("body");
 
-			current = current.node("h1", "Query");
+			current.node("h1", "Query");
 
             final ASTContainer astContainer = queryTask.astContainer;
 
@@ -386,8 +387,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 if (queryString != null) {
 
-                    current.node("h2", "SPARQL").node("pre",
-                            HTMLUtility.escapeForXHTML(queryString));
+                    current.node("h2", "SPARQL");
+                    
+                    current.node("pre", queryString);
 
                 }
 
@@ -396,8 +398,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 if (parseTree != null) {
 
-                    current.node("h2", "Parse Tree").node("pre",
-                            HTMLUtility.escapeForXHTML(parseTree.dump("")));
+                    current.node("h2", "Parse Tree");
+                    
+                    current.node("pre", parseTree.dump(""));
 
                 }
 
@@ -405,8 +408,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 if (originalAST != null) {
 
-                    current.node("h2", "Original AST").node("pre",
-                            HTMLUtility.escapeForXHTML(originalAST.toString()));
+                    current.node("h2", "Original AST");
+                    
+                    current.node("pre", originalAST.toString());
 
                 }
                 
@@ -462,10 +466,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 if (optimizedAST != null) {
 
-                    current.node("h2", "Optimized AST")
-                            .node("pre",
-                                    HTMLUtility.escapeForXHTML(optimizedAST
-                                            .toString()));
+                    current.node("h2", "Optimized AST");
+
+                    current.node("pre", optimizedAST.toString());
 
                 }
 
@@ -473,10 +476,9 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 if (queryPlan != null) {
 
-                    current.node("h2", "Query Plan").node(
-                            "pre",
-                            HTMLUtility.escapeForXHTML(BOpUtility
-                                    .toString(queryPlan)));
+                    current.node("h2", "Query Plan");
+                    
+                    current.node("pre", BOpUtility.toString(queryPlan));
 
                 }
 
@@ -485,7 +487,7 @@ public class QueryServlet extends BigdataRDFServlet {
 			// wait for the Future (will toss any exceptions).
 			ft.get();
 
-			current = current.node("h2", "Query Evaluation Statistics");
+			current.node("h2", "Query Evaluation Statistics");
 			
             if (q == null) {
             
@@ -496,22 +498,28 @@ public class QueryServlet extends BigdataRDFServlet {
                  * available anymore.
                  */
                 
-                current.text("Statistics are not available (query already terminated).");
+                current.node("p",
+                        "Statistics are not available (query already terminated).");
                 
             } else {
 
                 final long elapsedMillis = q.getElapsed();
 
-                final BOpStats stats = q.getStats().get(q.getQuery().getId());
-                final long solutionsOut = stats.unitsOut.get();
-                final long chunksOut = stats.chunksOut.get();
+                final BOpStats stats = q.getStats().get(
+                        q.getQuery().getId());
+
+                final String solutionsOut = stats == null ? NA : Long
+                        .toString(stats.unitsOut.get());
+
+                final String chunksOut = stats == null ? NA : Long
+                        .toString(stats.chunksOut.get());
 
                 current.node("p")//
                         .text("solutions=" + solutionsOut)//
                         .text(", chunks=" + chunksOut)//
                         .text(", elapsed=" + elapsedMillis + "ms")//
-                        .close()//
-                ;
+                        .text(q.isCancelled()?", CANCELLED.":".")
+                        .close();
 
                 /*
                  * Format query statistics as a table.

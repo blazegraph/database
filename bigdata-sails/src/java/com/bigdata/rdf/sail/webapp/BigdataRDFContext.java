@@ -252,8 +252,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         public final long timestamp;
 
-        /** The SPARQL query string. */
-        protected final String queryStr;
+//        /** The SPARQL query string. */
+//        protected final String queryStr;
 
         /**
          * The baseURI is set from the effective request URI.
@@ -266,6 +266,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //         * {@link QueryType}.
 //         */
 //        protected final ParsedQuery parsedQuery;
+        
         /**
          * The {@link ASTContainer} provides access to the original SPARQL
          * query, the query model, the query plan, etc.
@@ -345,8 +346,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * @param timestamp
          *            The timestamp of the view for that namespace against which
          *            the query will be run.
-         * @param queryStr
-         *            The SPARQL query string.
+         * @param baseURI
+         *            The base URI.
+         * @param astContainer
+         *            The container with all the information about the submitted
+         *            query, including the original SPARQL query, the parse
+         *            tree, etc.
          * @param mimeType
          *            The MIME type to be used for the response. The caller must
          *            verify that the MIME Type is appropriate for the query
@@ -365,7 +370,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected AbstractQueryTask(//
                 final String namespace,//
                 final long timestamp, //
-                final String queryStr,//
+//                final String queryStr,//
                 final String baseURI,
                 final ASTContainer astContainer,//
                 final QueryType queryType,//
@@ -378,8 +383,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             if (namespace == null)
                 throw new IllegalArgumentException();
-            if (queryStr == null)
-                throw new IllegalArgumentException();
+//            if (queryStr == null)
+//                throw new IllegalArgumentException();
             if (baseURI == null)
                 throw new IllegalArgumentException();
             if (astContainer == null)
@@ -399,7 +404,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             this.namespace = namespace;
             this.timestamp = timestamp;
-            this.queryStr = queryStr;
+//            this.queryStr = queryStr;
             this.baseURI = baseURI;
             this.astContainer = astContainer;
             this.queryType = queryType;
@@ -480,7 +485,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			
 			// Stuff it in the map of running queries.
             m_queries.put(queryId, new RunningQuery(queryId.longValue(),
-                    queryId2, queryStr, begin, this));
+                    queryId2, begin, this));
 
             return sailQuery;
             
@@ -632,12 +637,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class AskQueryTask extends AbstractQueryTask {
 
         public AskQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final String baseURI,
+                final String baseURI,
                 final ASTContainer astContainer, final QueryType queryType,
                 final BooleanQueryResultFormat format,
                 final HttpServletRequest req, final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, astContainer,
+            super(namespace, timestamp, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -670,13 +675,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	private class TupleQueryTask extends AbstractQueryTask {
 
         public TupleQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final String baseURI,
+                final String baseURI,
                 final ASTContainer astContainer, final QueryType queryType,
                 final TupleQueryResultFormat format,
                 final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, astContainer,
+            super(namespace, timestamp, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -707,12 +712,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
     private class GraphQueryTask extends AbstractQueryTask {
 
         public GraphQueryTask(final String namespace, final long timestamp,
-                final String queryStr, final String baseURI,
+                final String baseURI,
                 final ASTContainer astContainer, final QueryType queryType,
                 final RDFFormat format, final HttpServletRequest req,
                 final OutputStream os) {
 
-            super(namespace, timestamp, queryStr, baseURI, astContainer,
+            super(namespace, timestamp, baseURI, astContainer,
                     queryType, format.getDefaultMIMEType(),
                     format.getCharset(), format.getDefaultFileExtension(), req,
                     os);
@@ -847,7 +852,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BooleanQueryResultFormat format = BooleanQueryResultFormat
                     .forMIMEType(acceptStr, BooleanQueryResultFormat.SPARQL);
 
-            return new AskQueryTask(namespace, timestamp, queryStr, baseURI,
+            return new AskQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);
 
         }
@@ -857,7 +862,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final RDFFormat format = RDFFormat.forMIMEType(acceptStr,
                     RDFFormat.RDFXML);
 
-            return new GraphQueryTask(namespace, timestamp, queryStr, baseURI,
+            return new GraphQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);
 
         }
@@ -866,7 +871,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final TupleQueryResultFormat format = TupleQueryResultFormat
                     .forMIMEType(acceptStr, TupleQueryResultFormat.SPARQL);
 
-            return new TupleQueryTask(namespace, timestamp, queryStr, baseURI,
+            return new TupleQueryTask(namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, os);
 
         }
@@ -906,7 +911,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		final long begin;
 
 		public RunningQuery(final long queryId, final UUID queryId2,
-				final String query, final long begin,
+				final long begin,
 				final AbstractQueryTask queryTask) {
 
 			this.queryId = queryId;

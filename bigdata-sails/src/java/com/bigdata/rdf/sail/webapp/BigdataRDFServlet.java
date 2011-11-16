@@ -59,6 +59,13 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     static private final transient Logger log = Logger.getLogger(BigdataRDFServlet.class);
 
     /**
+     * The name of the <code>UTF-8</code> character encoding.
+     */
+    protected static final String UTF8 = "UTF-8";
+    
+    protected static final String NA = "N/A";
+    
+    /**
      * A SPARQL results set in XML.
      * 
      * @see http://www.w3.org/TR/rdf-sparql-XMLres/
