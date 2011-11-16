@@ -67,6 +67,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
+import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
@@ -326,6 +327,30 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     private final AtomicReference<BTree> blobsCache = new AtomicReference<BTree>();
 
     /**
+     * The maximum #of (left,right) solution joins that will be considered
+     * before failing the join. This is used IFF there are no join variables.
+     * 
+     * FIXME Annotation and query hint for this. Probably on
+     * {@link HashJoinAnnotations}.
+     */
+    private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
+    
+    /**
+     * The #of left solutions considered for a join.
+     */
+    private final CAT nleftConsidered = new CAT();
+
+    /**
+     * The #of right solutions considered for a join.
+     */
+    private final CAT nrightConsidered = new CAT();
+
+    /**
+     * The #of solution pairs considered for a join.
+     */
+    private final CAT nJoinsConsidered = new CAT();
+    
+    /**
      * The hash index.
      */
     private HTree getRightSolutions() {
@@ -374,6 +399,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             sb.append(",constraints=" + Arrays.toString(constraints));
         sb.append(",namespace=" + namespace);
         sb.append(",size=" + getRightSolutionCount());
+        sb.append(",considered(left=" + nleftConsidered + ",right="
+                + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
         if (joinSet.get() != null)
             sb.append(",joinSetSize=" + getJoinSetSize());
         if (ivCache.get() != null)
@@ -1383,6 +1410,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
             final Iterator<IBindingSet[]> it = new Chunkerator<IBindingSet>(
                     leftItr, chunkSize, IBindingSet.class);
 
+            // true iff there are no join variables.
+            final boolean noJoinVars = joinVars.length == 0;
+            
             final AtomicInteger vectorSize = new AtomicInteger();
             while (it.hasNext()) {
 
@@ -1392,6 +1422,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 
                 final int n = vectorSize.get();
 
+                nleftConsidered.add(n);
+                
                 int fromIndex = 0;
 
                 while (fromIndex < n) {
@@ -1460,6 +1492,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                              */
                             final IBindingSet rightSolution = decodeSolution(t);
 
+                            nrightConsidered.increment();
+
                             for (int i = fromIndex; i < toIndex; i++) {
 
                                 final IBindingSet leftSolution = a[i].bset;
@@ -1470,6 +1504,23 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                                                 constraints,
                                                 selectVars);
 
+                                nJoinsConsidered.increment();
+
+                                if (noJoinVars&&
+                                        nJoinsConsidered.get() == noJoinVarsLimit) {
+
+                                    if (nleftConsidered.get() > 1
+                                            && nrightConsidered.get() > 1) {
+
+                                        throw new UnconstrainedJoinException(
+                                                "Large join with no join variables"
+                                                        + ": state="
+                                                        + toString());
+
+                                    }
+
+                                }
+                                
                                 if (outSolution == null) {
 
                                     nrejected++;

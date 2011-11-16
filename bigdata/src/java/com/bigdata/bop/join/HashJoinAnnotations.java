@@ -53,4 +53,21 @@ public interface HashJoinAnnotations {
      */
     String JOIN_VARS = HashJoinAnnotations.class.getName() + ".joinVars";
 
+//    /**
+//     * The maximum number of solutions that will be considered before a hash
+//     * join without any join variables is failed.
+//     * <p>
+//     * The purpose of this annotation is to identify hash joins which are doing
+//     * too much work because they lack any join variables.
+//     */
+//    String NO_JOIN_VARS_LIMIT = HashJoinAnnotations.class.getName()
+//            + ".noJoinVarsLimit";
+
+    /**
+     * FIXME Annotation and query hint for this.
+     * 
+     * @see UnconstrainedJoinException
+     */
+    long DEFAULT_NO_JOIN_VARS_LIMIT = Long.MAX_VALUE;
+    
 }
