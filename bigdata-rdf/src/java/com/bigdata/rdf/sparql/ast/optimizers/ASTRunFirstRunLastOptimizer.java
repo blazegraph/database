@@ -46,6 +46,15 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 /**
  * This optimizer simply puts each type of {@link IGroupMemberNode} within a
  * {@link JoinGroupNode} in the right order w.r.t. to the other types.
+ * <p>
+ * Basically the ASTRunFirstRunLastOptimizer will look for IJoinNodes that have
+ * a query hint of QueryHints.RUN_FIRST=true or RUN_LAST=true. If it finds more
+ * than one "run first" or "run last" it will throw an exception. If it finds an
+ * optional marked as "run first" it will throw an exception. It will then scan
+ * the group and identify the first and last indices for IJoinNodes, and place
+ * the run first and run last IJoinNodes at those indices. The static optimizer
+ * will also look for a "run first" IJoinNode in a group and make sure that it
+ * gets run first in the group (of the statement patterns). 
  */
 public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
 
