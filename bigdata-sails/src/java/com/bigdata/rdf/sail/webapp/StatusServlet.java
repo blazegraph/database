@@ -512,49 +512,57 @@ public class StatusServlet extends BigdataRDFServlet {
 
                         }
 
-                        final SimpleNode parseTree = ((SimpleNode) astContainer
-                                .getParseTree());
+                        if (showQueryDetails) {
 
-                        if (parseTree != null) {
+                            final SimpleNode parseTree = ((SimpleNode) astContainer
+                                    .getParseTree());
 
-                            current.node("h2", "Parse Tree");
-                            
-                            current.node("pre", parseTree.dump(""));
+                            if (parseTree != null) {
+
+                                current.node("h2", "Parse Tree");
+
+                                current.node("pre", parseTree.dump(""));
+
+                            }
+
+                            final QueryRoot originalAST = astContainer
+                                    .getOriginalAST();
+
+                            if (originalAST != null) {
+
+                                current.node("h2", "Original AST");
+
+                                current.node("pre", originalAST.toString());
+
+                            }
+
+                            final QueryRoot optimizedAST = astContainer
+                                    .getOptimizedAST();
+
+                            if (optimizedAST != null) {
+
+                                current.node("h2", "Optimized AST");
+
+                                current.node("pre", optimizedAST.toString());
+
+                            }
+
+                            final PipelineOp queryPlan = astContainer
+                                    .getQueryPlan();
+
+                            if (queryPlan != null) {
+
+                                current.node("h2", "Query Plan");
+
+                                current.node("pre",
+                                        BOpUtility.toString(queryPlan));
+
+                            }
 
                         }
 
-                        final QueryRoot originalAST = astContainer.getOriginalAST();
-
-                        if (originalAST != null) {
-
-                            current.node("h2", "Original AST");
-                            
-                            current.node("pre", originalAST.toString());
-
-                        }
-
-                        final QueryRoot optimizedAST = astContainer.getOptimizedAST();
-
-                        if (optimizedAST != null) {
-
-                            current.node("h2", "Optimized AST");
-
-                            current.node("pre", optimizedAST.toString());
-
-                        }
-
-                        final PipelineOp queryPlan = astContainer.getQueryPlan();
-
-                        if (queryPlan != null) {
-
-                            current.node("h2", "Query Plan");
-                            
-                            current.node("pre", BOpUtility.toString(queryPlan));
-
-                        }
-                        
                     } else {
-                        
+
                         /*
                          * Typically a sub-query for some top-level query, but
                          * this could also be something submitted via a
@@ -566,7 +574,7 @@ public class StatusServlet extends BigdataRDFServlet {
                     }
 
                     if (showQueryDetails) {
-                        
+
                         current.node("h2", "Query Evaluation Statistics");
 
                         // Format as a table, writing onto the response.
