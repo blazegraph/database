@@ -88,29 +88,33 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
     public interface Annotations extends AST2BOpBase.Annotations {
     	
-    	/**
-    	 * The value of this query hint determines how optimistic the optimizer
-    	 * will be in selecting the join cardinality for its joins.  Basically
-    	 * when there is a join that has both shared and unshared variables,
-    	 * the join cardinality will be somewhere in between the cardinality
-    	 * of the two sides (range count for a statement pattern, previous
-    	 * join cardinality for a predecessor join).  The default value is
-    	 * 0.67, which is to say the optimizer takes a mostly optimistic view
-    	 * by default - the join cardinality will be 0.67 * the MIN + 0.33 *
-    	 * the MAX, that way we eliminate some of the worst possible outcomes.
-    	 * 
-    	 * BSBM BI Q1 is a good example of a query that benefits from the 
-    	 * pessimistic approach, and LUBM Q2 is a good example of a query that
-    	 * benefits from the optimistic approach.
-    	 */
+        /**
+         * The value of this query hint determines how optimistic the optimizer
+         * will be in selecting the join cardinality for its joins. Basically
+         * when there is a join that has both shared and unshared variables, the
+         * join cardinality will be somewhere in between the cardinality of the
+         * two sides (range count for a statement pattern, previous join
+         * cardinality for a predecessor join). The default value is
+         * <code>1.0</code>, which is the historical behavior.
+         * <p>
+         * For a value of <code>0.67</code> the optimizer takes a mostly
+         * optimistic view by default - the join cardinality will be <code>0.67
+         * * the MIN + 0.33 * the MAX</code>. This settting will eliminate some
+         * of the worst possible outcomes (ones where we guess wrong and get a
+         * very bad join order as a result).
+         * <p>
+         * BSBM BI Q1 is a good example of a query that benefits from the
+         * pessimistic approach, and LUBM Q2 is a good example of a query that
+         * benefits from the optimistic approach.
+         */
     	String OPTIMISTIC = ASTStaticJoinOptimizer.class.getName()+".optimistic";
     	
     	/**
     	 * See {@link #OPTIMISTIC}.
     	 * <p>
-    	 * Note: temporarily set to 1.0d to mimic old fully optimistic behavior.
+    	 * Note: temporarily set to 1.0 to mimic old fully optimistic behavior.
     	 */
-    	String DEFAULT_OPTIMISTIC = "1.0d";
+    	String DEFAULT_OPTIMISTIC = "1.0";
     	
     }
     
