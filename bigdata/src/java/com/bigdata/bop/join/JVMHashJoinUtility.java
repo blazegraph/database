@@ -428,6 +428,27 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final CAT rightSolutionCount = new CAT();
     
     /**
+     * The maximum #of (left,right) solution joins that will be considered
+     * before failing the join. This is used IFF there are no join variables.
+     */
+    private final long noJoinVarsLimit = HashJoinAnnotations.DEFAULT_NO_JOIN_VARS_LIMIT;
+    
+    /**
+     * The #of left solutions considered for a join.
+     */
+    private final CAT nleftConsidered = new CAT();
+
+    /**
+     * The #of right solutions considered for a join.
+     */
+    private final CAT nrightConsidered = new CAT();
+
+    /**
+     * The #of solution pairs considered for a join.
+     */
+    private final CAT nJoinsConsidered = new CAT();
+    
+    /**
      * Human readable representation of the {@link IHashJoinUtility} metadata
      * (but not the solutions themselves).
      */
@@ -446,6 +467,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         if (constraints != null)
             sb.append(",constraints=" + Arrays.toString(constraints));
         sb.append(",size=" + getRightSolutionCount());
+        sb.append(",considered(left=" + nleftConsidered + ",right="
+                + nrightConsidered + ",joins=" + nJoinsConsidered + ")");
         sb.append("}");
         
         return sb.toString();
@@ -725,12 +748,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     + ",#solutions=" + getRightSolutionCount());
         }
 
+        // true iff there are no join variables.
+        final boolean noJoinVars = joinVars.length == 0;
+
         try {
 
             while (leftItr.hasNext()) {
 
                 final IBindingSet left = leftItr.next();
 
+                nleftConsidered.increment();
+                
                 if (log.isDebugEnabled())
                     log.debug("Considering " + left);
 
@@ -750,8 +778,26 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                 for (SolutionHit right : b) {
 
+                    nrightConsidered.increment();
+                    
                     if (log.isDebugEnabled())
                         log.debug("Join with " + right);
+
+                    nJoinsConsidered.increment();
+
+                    if (noJoinVars
+                            && nJoinsConsidered.get() == noJoinVarsLimit) {
+
+                        if (nleftConsidered.get() > 1
+                                && nrightConsidered.get() > 1) {
+
+                            throw new UnconstrainedJoinException(
+                                    "Large join with no join variables"
+                                            + ": state=" + toString());
+
+                        }
+
+                    }
 
                     // See if the solutions join. 
                     final IBindingSet outSolution = //
