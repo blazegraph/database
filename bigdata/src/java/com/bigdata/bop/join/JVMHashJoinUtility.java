@@ -603,6 +603,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     public long acceptSolutions(final ICloseableIterator<IBindingSet[]> itr,
             final BOpStats stats) {
 
+        try {
+        
         final Map<Key,Bucket> map = getRightSolutions();
         
         final IBindingSet[] all = BOpUtility.toArray(itr, stats);
@@ -647,12 +649,18 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         return naccepted;
 
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
+
     }
 
     @Override
     public long filterSolutions(ICloseableIterator<IBindingSet[]> itr,
             BOpStats stats, IBuffer<IBindingSet> sink) {
 
+        try {
+        
         final Map<Key, Bucket> map = getRightSolutions();
         
         final IBindingSet[] all = BOpUtility.toArray(itr, stats);
@@ -710,6 +718,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         rightSolutionCount.add(naccepted);
 
         return naccepted;
+
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
 
     }
 
@@ -791,9 +803,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                         if (nleftConsidered.get() > 1
                                 && nrightConsidered.get() > 1) {
 
-                            throw new UnconstrainedJoinException(
-                                    "Large join with no join variables"
-                                            + ": state=" + toString());
+                            throw new UnconstrainedJoinException();
 
                         }
 
@@ -826,6 +836,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
             }
 
+        } catch(Throwable t) {
+
+            throw launderThrowable(t);
+            
         } finally {
 
             leftItr.close();
@@ -836,6 +850,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
+
+        try {
         
         final Map<Key,Bucket> rightSolutions = getRightSolutions();
         
@@ -867,12 +883,17 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             }
             
         }
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
         
     }
 
     @Override
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
+        try {
+        
         final Map<Key,Bucket> rightSolutions = getRightSolutions();
 
         final IVariable<?>[] selected = getSelectVars();
@@ -905,6 +926,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             }
 
         }       
+
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
 
     }
 
@@ -1320,5 +1345,26 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 		}
 
 	}
+
+    /**
+     * Adds metadata about the {@link IHashJoinUtility} state to the stack
+     * trace.
+     * 
+     * @param t
+     *            The thrown error.
+     * 
+     * @return The laundered exception.
+     * 
+     * @throws Exception
+     */
+    private RuntimeException launderThrowable(final Throwable t) {
+
+        final String msg = "cause=" + t + ", state=" + toString();
+
+        log.error(msg);
+
+        return new RuntimeException(msg, t);
+
+    }
 
 }   

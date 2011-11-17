@@ -207,16 +207,17 @@ public class PipelinedAggregationOp extends GroupByOp {
          *            The binding set.
          * 
          * @return The new {@link SolutionGroup} -or- <code>null</code> if any
-         *         of the value expressions evaluates or a <code>null</code>
+         *         of the value expressions evaluates to a <code>null</code>
          *         -OR- throws a {@link SparqlTypeErrorException}.
          */
         static SolutionGroup newInstance(final IValueExpression<?>[] groupBy,
-                final IBindingSet bset) {
+                final IBindingSet bset, final BOpStats stats) {
 
             final IConstant<?>[] r = new IConstant<?>[groupBy.length];
 
             for (int i = 0; i < groupBy.length; i++) {
 
+                final IValueExpression<?> expr = groupBy[i];
                 final Object asBound;
                 try {
                     /*
@@ -225,8 +226,9 @@ public class PipelinedAggregationOp extends GroupByOp {
                      * on the solution. This is necessary in order for us to
                      * compute the aggregates incrementally.
                      */
-                    asBound = groupBy[i].get(bset);
+                    asBound = expr.get(bset);
                 } catch (SparqlTypeErrorException ex) {
+                    TypeErrorLog.handleTypeError(ex, expr, stats);
                     // Drop solution.
                     return null;
                 }
@@ -524,6 +526,8 @@ public class PipelinedAggregationOp extends GroupByOp {
 
         private final Object sharedStateKey;
         
+        private final BOpStats stats;
+
         ChunkTask(final PipelinedAggregationOp op,
                 final BOpContext<IBindingSet> context) {
 
@@ -532,12 +536,13 @@ public class PipelinedAggregationOp extends GroupByOp {
             this.sharedStateKey = op.getId();
             
             final AggregateStats stats = (AggregateStats) context.getStats();
+            this.stats = stats;
 
             final SharedState sharedState;
             synchronized (stats) {
                 if (stats.first) {
                     /*
-                     * Setup the shared state
+                     * Setup the shared state.
                      */
                     stats.first = false;
                     sharedState = new SharedState(op, stats);
@@ -583,7 +588,8 @@ public class PipelinedAggregationOp extends GroupByOp {
             if (bset == null)
                 throw new IllegalArgumentException();
 
-            final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset);
+            final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset,
+                    stats);
 
             if (s == null) {
 
@@ -611,13 +617,11 @@ public class PipelinedAggregationOp extends GroupByOp {
                 log.trace("Accepting solution: " + bset);
 
             // Update the aggregates.
-            doAggregate(m.aggExpr, bset);
+            doAggregate(m.aggExpr, bset, stats);
             
         }
 
         public Void call() throws Exception {
-
-            final BOpStats stats = context.getStats();
 
             final IAsynchronousIterator<IBindingSet[]> itr = context
                     .getSource();
@@ -640,7 +644,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                             /*
                              * A single implicit group.
                              */
-                            doAggregate(aggExpr, bset);
+                            doAggregate(aggExpr, bset, stats);
 
                         } else {
 
@@ -684,7 +688,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                         final IBindingSet aggregates = new ListBindingSet();
 
                         // Finalize and bind on [aggregates].
-                        finalizeAggregates(aggExpr, aggregates);
+                        finalizeAggregates(aggExpr, aggregates, stats);
                         
                         // Evaluate SELECT expressions.
                         for (IValueExpression<?> expr : rewrite.getSelect2()) {
@@ -692,7 +696,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                             try {
                                 expr.get(aggregates);
                             } catch (SparqlTypeErrorException ex) {
-                                handleTypeError(log, ex, expr);
+                                TypeErrorLog.handleTypeError(ex, expr, stats);
                                 continue;
                             } catch (IllegalArgumentException ex) {
                                 /*
@@ -704,7 +708,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                                  * that we are not trying to drop the entire
                                  * group!)
                                  */
-                                handleTypeError(log, ex, expr);
+                                TypeErrorLog.handleTypeError(ex, expr, stats);
                                 continue;
                             }
 
@@ -750,7 +754,8 @@ public class PipelinedAggregationOp extends GroupByOp {
                             final IBindingSet aggregates = groupState.aggregates;
 
                             // Finalize and bind on [aggregates].
-                            finalizeAggregates(groupState.aggExpr, aggregates);
+                            finalizeAggregates(groupState.aggExpr, aggregates,
+                                    stats);
 
                             // Evaluate SELECT expressions.
                             for (IValueExpression<?> expr : rewrite
@@ -759,7 +764,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                                 try {
                                     expr.get(aggregates);
                                 } catch (SparqlTypeErrorException ex) {
-                                    handleTypeError(log, ex, expr);
+                                    TypeErrorLog.handleTypeError(ex, expr, stats);
                                     continue;
                                 } catch (IllegalArgumentException ex) {
                                     /*
@@ -771,7 +776,7 @@ public class PipelinedAggregationOp extends GroupByOp {
                                      * expression. (Note that we are not trying
                                      * to drop the entire group!)
                                      */
-                                    handleTypeError(log, ex, expr);
+                                    TypeErrorLog.handleTypeError(ex, expr, stats);
                                     continue;
                                 }
 
@@ -845,10 +850,13 @@ public class PipelinedAggregationOp extends GroupByOp {
      *            The aggregate expressions to be evaluated.
      * @param bset
      *            The binding set.
+     * @param stats
+     *            Used to report type errors.
      */
     static private void doAggregate(
             final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr,
-            final IBindingSet bset) {
+            final IBindingSet bset,
+            final BOpStats stats) {
 
         for (IAggregate<?> a : aggExpr.keySet()) {
 
@@ -865,8 +873,9 @@ public class PipelinedAggregationOp extends GroupByOp {
                      * aggregate will not bind a value for that group (the
                      * aggregate will track its error state internally.)
                      */
-                    if (log.isInfoEnabled())
-                        log.info("type error: expr=" + a + " : " + t);
+                    TypeErrorLog.handleTypeError(t, a, stats);
+//                    if (log.isInfoEnabled())
+//                        log.info("type error: expr=" + a + " : " + t);
 
                 }
 
@@ -889,7 +898,8 @@ public class PipelinedAggregationOp extends GroupByOp {
      */
     static private void finalizeAggregates(
             final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr,
-            final IBindingSet aggregates) {
+            final IBindingSet aggregates,
+            final BOpStats stats) {
 
         for (Map.Entry<IAggregate<?>, IVariable<?>> e : aggExpr.entrySet()) {
 
@@ -905,11 +915,11 @@ public class PipelinedAggregationOp extends GroupByOp {
 
                 if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
 
-                    // trap the type error and filter out the
-                    // solution
-                    if (log.isInfoEnabled())
-                        log.info("aggregate will not bind due type error: expr="
-                                + expr + " : " + t);
+                    // trap the type error and filter out the solution
+                    TypeErrorLog.handleTypeError(t, expr, stats);
+//                    if (log.isInfoEnabled())
+//                        log.info("aggregate will not bind due type error: expr="
+//                                + expr + " : " + t);
 
                     // No binding.
                     continue;

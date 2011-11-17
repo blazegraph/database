@@ -264,6 +264,9 @@ public class MemorySortOp extends SortOp {
 
                     for (IBindingSet bset : a) {
 
+                        // Note: Necessary scope for type error reporting.
+                        IValueExpression<?> expr = null;
+                        
                         try {
 
                             for (ISortOrder<?> s : sortOrder) {
@@ -272,15 +275,17 @@ public class MemorySortOp extends SortOp {
                                  * Evaluate. A BIND() will have side-effect on
                                  * [bset].
                                  */
-                                s.getExpr().get(bset);
+                                (expr = s.getExpr()).get(bset);
 
                             }
 
                         } catch (SparqlTypeErrorException ex) {
 
-                            if (log.isInfoEnabled())
-                                log.info("Dropping solution due to type error: "
-                                        + bset);
+                            // drop solution with type error.
+                            TypeErrorLog.handleTypeError(ex, expr, stats);
+//                            if (log.isInfoEnabled())
+//                                log.info("Dropping solution due to type error: "
+//                                        + bset);
                             
                             continue;
                             

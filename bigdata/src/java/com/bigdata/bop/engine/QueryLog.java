@@ -226,6 +226,7 @@ public class QueryLog {
         sb.append("\tunitsIn");
         sb.append("\tchunksOut");
         sb.append("\tunitsOut");
+        sb.append("\ttypeErrors");
         sb.append("\tjoinRatio"); // expansion rate multipler in the solution count.
         sb.append("\taccessPathDups");
         sb.append("\taccessPathCount");
@@ -502,6 +503,8 @@ public class QueryLog {
 		sb.append(stats.chunksOut.get());
 		sb.append('\t');
 		sb.append(stats.unitsOut.get());
+        sb.append('\t');
+        sb.append(stats.typeErrors.get());
 		sb.append('\t');
 		sb.append(unitsIn == 0 ? NA : unitsOut / (double) unitsIn);
 		sb.append('\t');
@@ -627,6 +630,7 @@ public class QueryLog {
         w.write("<th>unitsIn</th>");
         w.write("<th>chunksOut</th>");
         w.write("<th>unitsOut</th>");
+        w.write("<th>typeErrors</th>"); 
         w.write("<th>joinRatio</th>"); // expansion rate multiplier in the
                                        // solution count.
         w.write("<th>accessPathDups</th>");
@@ -1022,6 +1026,9 @@ public class QueryLog {
         w.write(TDx);
         w.write(TD);
         w.write(Long.toString(stats.unitsOut.get()));
+        w.write(TDx);
+        w.write(TD);
+        w.write(Long.toString(stats.typeErrors.get()));
         w.write(TDx);
         w.write(TD);
         w.write(cdata(unitsIn == 0 ? NA : Double.toString(unitsOut / (double) unitsIn)));
