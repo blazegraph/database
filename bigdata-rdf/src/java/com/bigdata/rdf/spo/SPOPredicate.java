@@ -94,6 +94,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param p
      * @param o
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -118,6 +119,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param o
      * @param c
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -142,6 +144,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param p
      * @param o
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String[] relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -164,6 +167,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param o
      * @param optional
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -189,6 +193,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param expander
      *            MAY be <code>null</code>.
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -216,6 +221,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param expander
      *            MAY be <code>null</code>.
      */
+    @SuppressWarnings("rawtypes")
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
@@ -264,34 +270,37 @@ public class SPOPredicate extends Predicate<ISPO> {
 
     }
     
+    @Override
     public SPOPredicate clone() {
 
-        return (SPOPredicate) super.clone();
+        // Fast path for clone().
+        return new SPOPredicate(this);
+//        return (SPOPredicate) super.clone();
         
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> s() {
         
         return (IVariableOrConstant<IV>) get(0/* s */);
         
     }
     
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> p() {
         
         return (IVariableOrConstant<IV>) get(1/* p */);
         
     }
 
-    @SuppressWarnings("unchecked")
-    final public IVariableOrConstant o() {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    final public IVariableOrConstant<IV> o() {
         
         return (IVariableOrConstant) get(2/* o */);
         
     }
     
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> c() {
         
         return (IVariableOrConstant<IV>) get(3/* c */);
