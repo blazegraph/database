@@ -43,6 +43,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -319,18 +320,29 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 new IConstant[] { val }));
         
     }
-    
+
+    /**
+     * Fast path for as-bound.
+     * <p>
+     * This reuses the annotations map since we know that the annotations will
+     * not be changed by {@link #asBound(IBindingSet)}. That provides a
+     * significant reduction in heap churn.
+     */
     public Predicate<E> asBound(final IBindingSet bindingSet) {
+
+        return new Predicate<E>(argsCopy(), annotationsRef())
+                ._asBound(bindingSet);
+
+    }
+
+    /**
+     * Override any unbound variables for which we were giving bindings.
+     */
+    protected final Predicate<E> _asBound(final IBindingSet bindingSet) {
 
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final Predicate<E> tmp = this.clone();
-
-        /*
-         * Now override any unbound variables for which we were giving bindings.
-         */
-
         final int arity = arity();
         
         for (int i = 0; i < arity; i++) {
@@ -359,19 +371,50 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
              * See
              * https://sourceforge.net/apps/trac/bigdata/ticket/209#comment:7.
              */
-            tmp._set(i, new Constant(var, val.get()));
+            _set(i, new Constant(var, val.get()));
 //            tmp._set(i, val.clone());
 
         }
         
-        return tmp;
+        /*
+         * FIXME When putting the RangeBOp back into use, be very careful of the
+         * optimization in asBound(). Predicate#asBound() is NOT making a copy
+         * of the annotations map. The code below will therefore cause a
+         * modification to the source predicate's annotations, not the copy's.
+         * This violates the "effectively immutable" contract.
+         * 
+         * What the code should probably do is check in asBound() and only use
+         * the code path which avoids the annotations map copy when the RANGE is
+         * not to be set on the new Predicate instance.
+         */
         
-    }
+//        final RangeBOp rangeBOp = range();
+//        
+//        // we don't have a range bop for ?o
+//        if (rangeBOp == null)
+//            return tmp;
+//
+//        /*
+//         * Attempt to evaluate the RangeBOp.
+//         */
+//        final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+//
+//        tmp._setProperty(Annotations.RANGE, asBound);
 
+        return this;
+
+    }
+    
     public Object asBound(final int index, final IBindingSet bindingSet) {
 
         return get(index).get(bindingSet);
 
+    }
+
+    final public RangeBOp range() {
+        
+        return (RangeBOp) getProperty(Annotations.RANGE);
+        
     }
 
     @SuppressWarnings("unchecked")
@@ -588,99 +631,6 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         return sb.toString();
 
     }
-
-//	/**
-//	 * This class may be used to insert instances of {@link IPredicate}s into a
-//	 * hash map where equals is decided based solely on the pattern of variables
-//	 * and constants found on the {@link IPredicate}. This may be used to create
-//	 * access path caches or to identify and eliminate duplicate requests for
-//	 * the same access path.
-//	 */
-//    public static class HashedPredicate<E> {
-//
-//    	/**
-//    	 * The predicate.
-//    	 */
-//		public final IPredicate<E> pred;
-//    	
-//		/**
-//		 * The cached hash code.
-//		 */
-//		final private int hash;
-//	
-//		public HashedPredicate(final IPredicate<E> pred) {
-//
-//			if (pred == null)
-//				throw new IllegalArgumentException();
-//    		
-//    		this.pred = pred;
-//
-//    		this.hash = computeHash();
-//    		
-//		}
-//
-//		public boolean equals(final Object other) {
-//
-//			if (this == other)
-//				return true;
-//
-//			if (!(other instanceof HashedPredicate<?>))
-//				return false;
-//
-//			final IPredicate<?> o = ((HashedPredicate<?>) other).pred;
-//
-//			final int arity = pred.arity();
-//
-//			if (arity != o.arity())
-//				return false;
-//
-//			for (int i = 0; i < arity; i++) {
-//
-//				final IVariableOrConstant<?> x = pred.get(i);
-//
-//				final IVariableOrConstant<?> y = o.get(i);
-//
-//				if (x != y && !(x.equals(y))) {
-//
-//					return false;
-//
-//				}
-//
-//			}
-//
-//			return true;
-//
-//		}
-//
-//		public int hashCode() {
-//
-//			return hash;
-//			
-//		}
-//
-//		private final int computeHash() {
-//
-//			int h = 0;
-//
-//			final int n = pred.arity();
-//
-//			for (int i = 0; i < n; i++) {
-//
-//				h = 31 * h + pred.get(i).hashCode();
-//
-//			}
-//
-//			return h;
-//
-//		}
-//		
-//        public String toString() {
-//
-//            return super.toString() + "{pred=" + pred + ",hash=" + hash + "}";
-//            
-//		}
-//		
-//    }
 
     public final boolean isMutation() {
 

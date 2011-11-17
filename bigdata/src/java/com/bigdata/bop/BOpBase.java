@@ -182,6 +182,36 @@ public class BOpBase extends CoreBaseBOp {
         return Collections.unmodifiableMap(annotations);
     
     }
+
+    /**
+     * A copy of the args[] array.
+     */
+    final protected BOp[] argsCopy() {
+        
+        final BOp[] tmp = new BOp[args.length];
+
+        for (int i = 0; i < args.length; i++) {
+        
+            tmp[i] = args[i];
+            
+        }
+
+        return tmp;
+        
+    }
+
+    /**
+     * A reference to the actual annotations map object. This is used in some
+     * hot spots to avoid creating a new annotations map when we know that the
+     * annotations will not be modified (annotations are always set within the
+     * context in which the {@link BOpBase} instance is created so we can know
+     * this locally by inspection of the code).
+     */
+    final protected Map<String,Object> annotationsRef() {
+        
+        return annotations;
+        
+    }
     
     public BOp get(final int index) {
         

@@ -34,7 +34,6 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
-import com.bigdata.bop.join.AccessPathJoinAnnotations;
 import com.bigdata.bop.joinGraph.IEvaluationPlan;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -353,6 +352,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 		 * @see #MUTATION
 		 */
 		String TIMESTAMP = IPredicate.class.getName() + ".timestamp";
+
+        /**
+         * Note: This annotation is not currently integrated. It is intended to
+         * provide a means to constrain the key-range of the predicate based on
+         * an allowable value range for some slot in that predicate.
+         */
+        String RANGE = IPredicate.class.getName() + ".range";
 
     }
     
