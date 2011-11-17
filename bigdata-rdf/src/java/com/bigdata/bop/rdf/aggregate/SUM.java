@@ -25,7 +25,6 @@ package com.bigdata.bop.rdf.aggregate;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
@@ -34,7 +33,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
@@ -66,6 +64,7 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
         super(args, annotations);
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public SUM(boolean distinct, IValueExpression...expr) {
         super(distinct, expr);
     }
@@ -78,6 +77,7 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
      * <p>
      * Note: This field is guarded by the monitor on the {@link SUM} instance.
      */
+    @SuppressWarnings("rawtypes")
     private transient IV aggregated = ZERO;
     
     /**
@@ -93,6 +93,7 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
         
     }
 
+    @SuppressWarnings("rawtypes")
     synchronized public IV done() {
 
         if (firstCause != null) {
@@ -105,6 +106,7 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
         
     }
 
+    @SuppressWarnings("rawtypes")
     synchronized public IV get(final IBindingSet bindingSet) {
 
         try {
@@ -125,47 +127,54 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
 
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private IV doGet(final IBindingSet bindingSet) {
-        for(int i=0;i<arity();i++){
+
+        final int arity = arity();
+        
+        for (int i = 0; i < arity; i++) {
+
             final IValueExpression<IV> expr = (IValueExpression<IV>) get(i);
 
-        final IV iv = expr.get(bindingSet);
+            final IV iv = expr.get(bindingSet);
 
-        if (iv != null) {
+            if (iv != null) {
 
-            /*
-             * Aggregate non-null values.
-             */
+                /*
+                 * Aggregate non-null values.
+                 */
 
-            if (iv.isInline()) {
+                if (iv.isInline()) {
 
-                // Two IVs.
-                aggregated = IVUtility.numericalMath(iv, aggregated,
-                        MathOp.PLUS);
+                    // Two IVs.
+                    aggregated = IVUtility.numericalMath(iv, aggregated,
+                            MathOp.PLUS);
 
-            } else {
+                } else {
 
-                // One IV and one Literal.
-                final BigdataValue val1 = iv.getValue();
+                    // One IV and one Literal.
+                    final BigdataValue val1 = iv.getValue();
 
-                if (val1 == null)
-                    throw new NotMaterializedException();
+                    if (val1 == null)
+                        throw new NotMaterializedException();
 
-                if (!(val1 instanceof Literal))
-                    throw new SparqlTypeErrorException();
+                    if (!(val1 instanceof Literal))
+                        throw new SparqlTypeErrorException();
 
-                // Only numeric value can be used in math expressions
-                final URI dt1 = ((Literal) val1).getDatatype();
-                if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
-                    throw new SparqlTypeErrorException();
+                    // Only numeric value can be used in math expressions
+                    final URI dt1 = ((Literal) val1).getDatatype();
+                    if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1))
+                        throw new SparqlTypeErrorException();
 
-                aggregated = IVUtility.numericalMath((Literal) val1,
-                        aggregated, MathOp.PLUS);
+                    aggregated = IVUtility.numericalMath((Literal) val1,
+                            aggregated, MathOp.PLUS);
+
+                }
 
             }
-
+            
         }
-        }
+        
         return aggregated;
 
     }
@@ -175,8 +184,6 @@ public class SUM extends AggregateBase<IV> implements INeedsMaterialization {
      * is great. Otherwise it will handle a materialized numeric literal and do
      * type promotion, which always results in a signed inline number IV and
      * then operate on that.
-     * 
-     * FIXME MikeP: What is the right return value here?
      */
     public Requirement getRequirement() {
 
