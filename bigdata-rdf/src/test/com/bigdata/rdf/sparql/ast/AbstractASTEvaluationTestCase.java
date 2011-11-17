@@ -165,6 +165,10 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 //            fail("expected:\n" + BOpUtility.toString((BOp) expected)
 //                    + "\nactual:\n" + BOpUtility.toString((BOp) actual));
 
+        } else if(log.isInfoEnabled()) {
+
+            log.info(BOpUtility.toString((BOp) expected));
+            
         }
 
     }
