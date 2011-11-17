@@ -33,6 +33,7 @@ import java.util.Map;
 import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.CoreBaseBOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IElement;
@@ -397,11 +398,22 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 //        return tmp;
 //
 //    }
-    
-    @SuppressWarnings("unchecked")
+
+    /**
+     * Overridden to provide a fast path clone(). This avoids a constructor
+     * lookup via reflection in favor of simply creating a new {@link Predicate}
+     * instance. However, subclasses MUST override this method. This change was
+     * introduced on 11/17/2011 when a profiler showed a 13% of all time related
+     * to a join intensive process in {@link CoreBaseBOp#clone()} using
+     * reflection to make a copy of an {@link #asBound(IBindingSet)} predicate.
+     */
+    @Override
+//    @SuppressWarnings("unchecked")
     public Predicate<E> clone() {
 
-        return (Predicate<E>) super.clone();
+        // Fast path for clone().
+        return new Predicate<E>(this);
+//        return (Predicate<E>) super.clone();
         
     }
 
