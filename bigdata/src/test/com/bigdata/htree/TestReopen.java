@@ -270,8 +270,8 @@ public class TestReopen extends AbstractHTreeTestCase {
 	public void test_reopenPseudoRandom() {
 
 		final Random r = new Random();
-		final PseudoRandom psr = new PseudoRandom(100, 13);
-		final PseudoRandom psr2 = new PseudoRandom(255, 13);
+		final PseudoRandom psr = new PseudoRandom(2000, 13);
+		final PseudoRandom psr2 = new PseudoRandom(4000, 13);
 
         final IRawStore store = new MemStore(DirectBufferPool.INSTANCE,
                 Integer.MAX_VALUE);
