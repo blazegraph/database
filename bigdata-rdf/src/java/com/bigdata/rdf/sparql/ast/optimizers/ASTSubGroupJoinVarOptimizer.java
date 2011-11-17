@@ -37,6 +37,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -122,6 +123,10 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
 
                 assignJoinVars(sa, (GraphPatternGroup<IGroupMemberNode>) child);
 
+            } else if(child instanceof QueryBase) {
+                
+                assignJoinVars(sa, ((QueryBase) child).getWhereClause());
+                
             }
 
         }
