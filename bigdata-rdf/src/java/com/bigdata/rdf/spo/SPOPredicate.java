@@ -28,12 +28,10 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
@@ -55,13 +53,13 @@ public class SPOPredicate extends Predicate<ISPO> {
 	 */
 	private static final long serialVersionUID = 3517916629931687107L;
 
-	public interface Annotations extends Predicate.Annotations {
-
-	    /** TODO Lift into {@link IPredicate#Annotations}. */
-    	String RANGE = SPOPredicate.class.getName() + ".range";
-    	
-    }
-    
+//	public interface Annotations extends Predicate.Annotations {
+//
+//	    /** TODO Lift into {@link IPredicate#Annotations}. */
+//    	String RANGE = SPOPredicate.class.getName() + ".range";
+//    	
+//    }
+//    
 
     /**
      * Variable argument version of the shallow copy constructor.
@@ -278,7 +276,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 //        return (SPOPredicate) super.clone();
         
     }
-
+    
     @SuppressWarnings({ "unchecked", "rawtypes" })
     final public IVariableOrConstant<IV> s() {
         
@@ -307,11 +305,16 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
     
-    final public RangeBOp range() {
-    	
-    	return (RangeBOp) getProperty(Annotations.RANGE);
-    	
-    }
+    /*
+     * Note: Moved to Predicate. See notes there before putting back into
+     * use.
+     */
+
+//    final public RangeBOp range() {
+//    	
+//    	return (RangeBOp) getProperty(Annotations.RANGE);
+//    	
+//    }
 
     /**
      * Strengthened return type.
@@ -321,23 +324,26 @@ public class SPOPredicate extends Predicate<ISPO> {
     @Override
     public SPOPredicate asBound(final IBindingSet bindingSet) {
 
-        if (bindingSet == null)
-            throw new IllegalArgumentException();
+        final SPOPredicate tmp = (SPOPredicate) new SPOPredicate(this)
+                ._asBound(bindingSet);
+
+        /*
+         * Note: Moved to Predicate. See notes there before putting back into
+         * use.
+         */
         
-        final SPOPredicate tmp = (SPOPredicate) super.asBound(bindingSet);
-
-        final RangeBOp rangeBOp = range();
-        
-        // we don't have a range bop for ?o
-        if (rangeBOp == null)
-        	return tmp;
-
-		/*
-		 * Attempt to evaluate the RangeBOp.
-		 */
-		final RangeBOp asBound = rangeBOp.asBound(bindingSet);
-
-		tmp._setProperty(Annotations.RANGE, asBound);
+//        final RangeBOp rangeBOp = range();
+//        
+//        // we don't have a range bop for ?o
+//        if (rangeBOp == null)
+//        	return tmp;
+//
+//		/*
+//		 * Attempt to evaluate the RangeBOp.
+//		 */
+//		final RangeBOp asBound = rangeBOp.asBound(bindingSet);
+//
+//		tmp._setProperty(Annotations.RANGE, asBound);
 
 		return tmp;
 

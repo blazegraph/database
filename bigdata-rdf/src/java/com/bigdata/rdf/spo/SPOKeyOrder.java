@@ -494,7 +494,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         boolean noneBound = true;
 
         final RangeBOp range = (RangeBOp)
-    		predicate.getProperty(SPOPredicate.Annotations.RANGE);
+    		predicate.getProperty(IPredicate.Annotations.RANGE);
 
         for (int i = 0; i < keyArity; i++) {
 
@@ -534,7 +534,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         boolean noneBound = true;
         
         final RangeBOp range = (RangeBOp)
-        	predicate.getProperty(SPOPredicate.Annotations.RANGE);
+        	predicate.getProperty(IPredicate.Annotations.RANGE);
 
         for (int i = 0; i < keyArity; i++) {
 
@@ -806,7 +806,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         }
         
     	final RangeBOp range = (RangeBOp) 
-    		predicate.getProperty(SPOPredicate.Annotations.RANGE);
+    		predicate.getProperty(IPredicate.Annotations.RANGE);
     	
     	final boolean rangeIsBound = range != null && range.isFullyBound();
     	
