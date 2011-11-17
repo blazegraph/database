@@ -1681,6 +1681,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
              * other than to write it on the disk.
              */
 			if (node.isLeaf()) {
+				
+				assert (1 << (addressBits - node.globalDepth) == parent.countChildRefs((BucketPage) node));
 
 				// code data record and _replace_ the data ref.
 				((BucketPage) node).data = nodeSer
@@ -2269,5 +2271,57 @@ abstract public class AbstractHTree implements ICounterSetAccess {
 			}});
 		
 	}
+	
+	/**
+	 * Exception that can be thrown for asserts and testing, retaining the
+	 * source page of the error
+	 */
+	static public class HTreePageStateException extends RuntimeException {
+		final AbstractPage m_pge;
+		public HTreePageStateException(final AbstractPage pge) {
+			super("Problem with Page: " + pge);
+			
+			m_pge = pge;
+		}
+		public AbstractPage getPage() {
+			return m_pge;
+		}
+	}
+	
+	/**
+	 * Checks globalDepth of each node and also whether any BucketPages
+	 * are empty.
+	 * @param full indicates whether to check consistency on disk
+	 */
+	public void checkConsistency(final boolean full) {
+		checkConsistency(root, full);
+	}
+	
+	public void checkConsistency(final AbstractPage pge, final boolean full) {
+		final DirectoryPage parent = pge.getParentDirectory();
 
+		if (parent != null) { // check depth
+			if (1 << (addressBits-pge.globalDepth) != parent.countChildRefs(pge)) {
+				throw new HTreePageStateException(pge);
+			}
+		}
+		if (pge instanceof BucketPage) {
+			if (parent != root && ((BucketPage)pge).data.getKeyCount() == 0) {
+				throw new HTreePageStateException(pge);
+			}
+		} else {
+			final DirectoryPage dpge = (DirectoryPage) pge;
+			final int nslots = dpge.childRefs.length;
+			for (int i = 0; i < nslots; i++) {
+				AbstractPage ch = dpge.deref(i);
+				if (ch == null && full) {
+					ch = dpge.getChild(i);
+				}
+				if (ch != null) {
+					checkConsistency(ch, full);
+				}
+			}
+		}
+	}
+	
 }
