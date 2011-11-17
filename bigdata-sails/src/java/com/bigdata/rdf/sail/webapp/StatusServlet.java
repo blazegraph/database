@@ -237,7 +237,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 current = current.node("head");
                 current.node("meta").attr("http-equiv", "Content-Type")
                         .attr("content", "text/html;charset=utf-8").close();
-                current.node("title").text("bigdata&#174;").close();
+                current.node("title").textNoEncode("bigdata&#174;").close();
                 current = current.close();// close the head.
             }
             
