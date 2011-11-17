@@ -583,14 +583,18 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 			final DirectoryPage pd = getParentDirectory();
 			if (pd.isOverflowDirectory()) { // already handles blobs
+				assert globalDepth == htree.addressBits;
 				pd._addChild(newPage); // may result in extra level insertion
 			} else {
 				if (pd.getLevel() * htree.addressBits > key.length * 8)
 					throw new AssertionError();
 				
-				// Must ensure that there is only a single refernce to this BucketPage
+				// Must ensure that there is only a single reference to this BucketPage
 				// and that the "active" page is for the overflow key
 				pd._ensureUniqueBucketPage(key, this.self);
+				globalDepth = htree.addressBits;
+				newPage.globalDepth = htree.addressBits;
+				
 	            final DirectoryPage blob = new DirectoryPage((HTree) htree,
 	                    key,// overflowKey
 	                    pd.getOverflowPageDepth());

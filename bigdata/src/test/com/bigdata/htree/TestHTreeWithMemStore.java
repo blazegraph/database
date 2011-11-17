@@ -47,6 +47,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.htree.AbstractHTree.HTreePageStateException;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -195,6 +196,16 @@ public class TestHTreeWithMemStore extends TestCase {
             for (int i = 0; i < inserts; i++) {
 
                 htree.insert(keys[0], val);
+                
+                try {
+                	// This can slow down the stress tests with large numbers, disable for standard CI run
+                	// htree.checkConsistency(false);
+                } catch (HTreePageStateException spe) {
+                	System.err.println("Problem on " + i + "th insert, with key: " + BytesUtil.toString(keys[0]));
+                	System.out.println(htree.PP());
+                	
+                	throw spe;
+                }
                 
                 if (i % 5 == 0) {
                     htree.insert(keys[1], val);
@@ -381,6 +392,15 @@ public class TestHTreeWithMemStore extends TestCase {
                 for (int i = 0; i < s_limit; i++) {
                     final byte[] key = keys[i];
                     htree.insert(key, key);
+                    try {
+                    	// This can slow down the stress tests with large numbers, disable for standard CI run
+                    	// htree.checkConsistency(false);
+                    } catch (HTreePageStateException spe) {
+                    	System.err.println("Problem on " + i + "th insert, with key: " + BytesUtil.toString(keys[0]));
+                    	System.out.println(htree.PP());
+                    	
+                    	throw spe;
+                    }
                     if (log.isTraceEnabled())
                         log.trace("after key=" + i + "\n" + htree.PP());
 

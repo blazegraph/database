@@ -128,10 +128,12 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		assert npointers > 1;
 		assert npointers % 2 == 0;
+		assert npointers == 1 << (htree.addressBits - bucketPage.globalDepth);
 
 		final int crefs = npointers >> 1; // half references for each new child
 		final int newDepth = bucketPage.globalDepth + 1;
 		final boolean fillLowerSlots = bucketSlot < start + crefs;
+		assert bucketSlot >= start && bucketSlot <= last;
 		
 		final BucketPage newPage = createPage(newDepth);
 		
@@ -145,23 +147,21 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			childRefs[s] = (Reference<AbstractPage>) b;
 		}
 		
+		assert !newPage.isPersistent();
 		((HTree) htree).nleaves++; // only definitely add one
 
 
-		// Now insert raw values from original page
-//		final ITupleIterator tuples = bucketPage.tuples();
-//		while (tuples.hasNext()) {
-//			final ITuple tuple = tuples.next();
-//			insertRawTuple(tuple.getKey(), tuple.getValue(), 0);
-//		}
         // remove original page and correct leaf count
         bucketPage.delete();
 		((HTree) htree).nleaves--;
 
+		// insert raw values from original page
 		final int bucketSlotsPerPage = bucketPage.slotsOnPage();
         for (int i = 0; i < bucketSlotsPerPage; i++) {
             ((HTree) htree).insertRawTuple(bucketPage, i);
         }
+        
+        assert ((BucketPage) childRefs[bucketSlot].get()).data.getKeyCount() > 0;
         
         // ...and finally delete old page data
         if (bucketPage.isPersistent()) {
@@ -207,6 +207,9 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		// create with initial max depth
 		int slots = fillEmptySlots(slot, bucketPage, 0, 1 << htree.addressBits); 
 		
+		assert bucketPage.globalDepth == htree.addressBits;
+		
+		bucketPage.globalDepth = htree.addressBits;
 		while (slots > 1) {
 			slots >>= 1;
 			bucketPage.globalDepth--;
@@ -215,10 +218,10 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		// assert (1 << (htree.addressBits - bucketPage.globalDepth)) == countChildRefs(bucketPage);
 	}
 	
-	int countChildRefs(BucketPage bucketPage) {
+	int countChildRefs(AbstractPage pge) {
 		int count = 0;
 		for (int i = 0; i < childRefs.length; i++) {
-			if (childRefs[i] == bucketPage.self) {
+			if (childRefs[i] == pge.self) {
 				count++;
 			}
 		}
@@ -584,7 +587,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 		}
 
-		        /*
+        /*
          * Find the local depth of the child within this node. this becomes the
          * global depth of the child.
          * 
@@ -593,7 +596,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
          */
         final int localDepth = HTreeUtil.getLocalDepth(htree.addressBits,
                 globalDepth, npointers);
-
+        assert npointers == 1 << (htree.addressBits - localDepth);
         /*
          * Read the child from the backing store (potentially reads through to
          * the disk).
@@ -1912,8 +1915,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		// now replace the reference to the old bucket page with the new directory
 		replaceChildRef(bucketPage.self, ndir);
 		
-		// ensure that the bucket page doesn't evict
-		
+		// ensure that the bucket page doesn't evict		
 		bucketPage.delete();
 		
 		// insert old tuples
@@ -2003,7 +2005,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
      * {@link Reference} is <code>null</code>, returns <code>null</code>.
      * Otherwise returns {@link Reference#get()}.
      */
-	private AbstractPage deref(final int index) {
+	protected AbstractPage deref(final int index) {
 
 	    return childRefs[index] == null ? null  : childRefs[index].get();
 
@@ -2577,14 +2579,19 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	    	if (childRefs[i] == bp) {
 	    		start = start == -1 ? i : start;
 	    		refs++;
-	    		if (i != hashBits)
+	    		if (i != hashBits) {
 	    			childRefs[i] = null;
+	    			if (bp.get().isPersistent()) {
+	    				((MutableDirectoryPageData) data).childAddr[i] = IRawStore.NULL;
+	    			}
+	    		}
 	    	}
 	    }
 	    
 	    assert Integer.bitCount(refs) == 1; // MUST be power of 2
 	    
-	    _fillChildSlots(hashBits, start, refs, 0);
+	    // Don't fill slots!
+	    // _fillChildSlots(hashBits, start, refs, 0);
 	}
 
    final public int removeAll(final byte[] key) {

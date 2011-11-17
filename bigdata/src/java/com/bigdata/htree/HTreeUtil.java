@@ -206,6 +206,8 @@ public class HTreeUtil {
 		
 		final int i = Fast.mostSignificantBit(x);
 		
+		assert 1 << (globalDepth-i) == npointers;
+		
 //		System.err.println("addressBits=" + addressBits + ", globalDepth="
 //				+ globalDepth + ", npointers=" + npointers + ", x=" + x
 //				+ ", localDepth=" + i);
