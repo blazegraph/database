@@ -324,7 +324,7 @@ public class SPOPredicate extends Predicate<ISPO> {
     @Override
     public SPOPredicate asBound(final IBindingSet bindingSet) {
 
-        final SPOPredicate tmp = (SPOPredicate) new SPOPredicate(this)
+        return (SPOPredicate) new SPOPredicate(argsCopy(), annotationsRef())
                 ._asBound(bindingSet);
 
         /*
@@ -344,8 +344,8 @@ public class SPOPredicate extends Predicate<ISPO> {
 //		final RangeBOp asBound = rangeBOp.asBound(bindingSet);
 //
 //		tmp._setProperty(Annotations.RANGE, asBound);
-
-		return tmp;
+//
+//		return tmp;
 
 	}
 
