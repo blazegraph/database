@@ -1512,10 +1512,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                                     if (nleftConsidered.get() > 1
                                             && nrightConsidered.get() > 1) {
 
-                                        throw new UnconstrainedJoinException(
-                                                "Large join with no join variables"
-                                                        + ": state="
-                                                        + toString());
+                                        throw new UnconstrainedJoinException();
 
                                     }
 
@@ -2107,6 +2104,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 			final IBuffer<IBindingSet> outputBuffer,
 			final IConstraint[] constraints, final boolean optional) {
 
+        try {
+        
 		/*
 		 * Validate arguments.
 		 */
@@ -2119,7 +2118,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
 		if (outputBuffer == null)
 			throw new IllegalArgumentException();
-
+		
 		final HTreeHashJoinUtility[] all = new HTreeHashJoinUtility[others.length + 1];
 		{
 			all[0] = this;
@@ -2301,181 +2300,185 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 			}
 
 		}
+		
+        } catch(Throwable t) {
+            throw launderThrowable(t);
+        }
 
 	}    
     
-    public void oldmergeJoin(//
-            final IHashJoinUtility[] others,
-            final IBuffer<IBindingSet> outputBuffer,
-            final IConstraint[] constraints,
-            final boolean optional) {
-
-        /*
-         * Validate arguments.
-         */
-
-        if (others == null)
-            throw new IllegalArgumentException();
-
-        if (others.length == 0)
-            throw new IllegalArgumentException();
-
-        if (outputBuffer == null)
-            throw new IllegalArgumentException();
-
-        final HTreeHashJoinUtility[] all = new HTreeHashJoinUtility[others.length + 1];
-        {
-            all[0] = this;
-            for (int i = 0; i < others.length; i++) {
-                final HTreeHashJoinUtility o = (HTreeHashJoinUtility) others[i];
-                if (o == null)
-                    throw new IllegalArgumentException();
-                if (!this.joinVars.equals(o.joinVars)) {
-                    // Must have the same join variables.
-                    throw new IllegalArgumentException();
-                }
-                all[i + 1] = o;
-            }
-
-        }
-
-        if(isEmpty()) {
-            // NOP
-            return;
-        }
-        
-        /*
-         * Combine constraints for each source with the given constraints.
-         */
-        final IConstraint[] c = JVMHashJoinUtility.combineConstraints(
-                constraints, all);
-
-        /*
-         * Synchronize each source.
-         * 
-         * We follow the iterator on the first source. For each hash code which
-         * it visits, we synchronize iterators against the remaining sources. If
-         * the join is optional, then the iterator will be null for a source
-         * which does not have that hash code. Otherwise false is returned if
-         * any source lacks tuples for the current hash code.
-         */
-        long njoined = 0, nrejected = 0;
-        final ITupleIterator<?> itr = all[0].getRightSolutions()
-                .rangeIterator();
-        {
-            /*
-             * Note: Initialized by the first tuple we visit. Updated each time
-             * we finish joining that solution against all solutions having the
-             * same hash code for all of the other sources.
-             */
-//            int hashCode = 0;
-//            ITuple<?> t = null;
-            final byte[] key = new byte[Bytes.SIZEOF_INT];
-            final ITupleIterator<?>[] oitr = new ITupleIterator[all.length];
-            ITuple<?> t = itr.next(); // Start with the first solution.
-            copyKey(t,key); // Make a copy of that key.
-            while (true) {
-                // Synchronize the other sources on the same key (aka hashCode)
-                log.error("Considering firstSource: "+decodeSolution(t));
-                if (!canJoin(key, all, optional)) {
-                    // Scan until we reach a tuple with a different key.
-                    boolean found = false;
-                    while (itr.hasNext() && !found) {
-                        t = itr.next(); // scan forward.
-                        if (!sameHashCode(key, t)) {
-                            // We have reached a solution from the first source
-                            // having a different hash code.
-                            found = true;
-                        }
-                        log.error("Skipping firstSource: "+decodeSolution(t));
-                    }
-                    if (!found) {
-                        // The first source is exhausted.
-                        return;
-                    }
-                    copyKey(t,key); // Make a copy of that key.
-                    // Attempt to resynchronize.
-                    continue;
-                }
-                /*
-                 * MERGE JOIN
-                 * 
-                 * Note: At this point we have a solution which might join with
-                 * the other sources (they all have the same hash code). We can
-                 * now decode the solution from the first source and ...
-                 * 
-                 * FIXME Must vector the resolution of the ivCache / blobsCache
-                 * for the output solutions.
-                 */
-                
-                // Setup each source.
-                synchronizeOtherSources(key, all, oitr, 1/* index */, optional);
-
-                if(true) {
-                    /*
-                     * FIXME This just demonstrates the join for the simple case
-                     * of a single 'other' source.
-                     */
-                    final IBindingSet leftSolution = all[0].decodeSolution(t);
-                    final ITupleIterator<?> aitr = oitr[1];
-                    while(aitr.hasNext()) {
-                        final ITuple<?> rightTuple = aitr.next();
-                        final IBindingSet rightSolution = all[1].decodeSolution(rightTuple);
-                        // Join.
-                        final IBindingSet outSolution = BOpContext
-                                .bind(leftSolution, rightSolution,
-                                        c,
-                                        null//selectVars
-                                        );
-
-                        if (outSolution == null) {
-                            if(optional) {
-                                outputBuffer.add(leftSolution);
-            					System.err.println("Output solution: " + leftSolution);
-                                if (log.isDebugEnabled())
-                                    log.debug("OPT : #joined="
-                                            + njoined + ", #rejected="
-                                            + nrejected + ", solution="
-                                            + outSolution);
-                            } else {
-                                nrejected++;
-                                if (log.isTraceEnabled())
-                                    log.trace("FAIL: #joined=" + njoined
-                                            + ", #rejected=" + nrejected
-                                            + ", leftSolution=" + leftSolution
-                                            + ", rightSolution="
-                                            + rightSolution);
-                            }
-                        } else {
-                            njoined++;
-                            outputBuffer.add(outSolution);
-        					System.err.println("Output solution: " + outSolution);
-                            if (log.isDebugEnabled())
-                                log.debug("JOIN: #joined="
-                                        + njoined + ", #rejected="
-                                        + nrejected + ", solution="
-                                        + outSolution);
-                        }
-                    }
-                }
-                
-                // Decode the solution.
-//                final IBindingSet b = decodeSolution(t);
-//                mergeJoin(b, oitr, c, optional);
-
-                if (!itr.hasNext()) {
-                    // The first source is exhausted.
-                    return;
-                }
-                // Skip to the next tuple from that source.
-                itr.next();
-                copyKey(t, key); // Make a copy of that key.
-
-            }
-
-        }
-
-    }
+//    public void oldmergeJoin(//
+//            final IHashJoinUtility[] others,
+//            final IBuffer<IBindingSet> outputBuffer,
+//            final IConstraint[] constraints,
+//            final boolean optional) {
+//
+//        /*
+//         * Validate arguments.
+//         */
+//
+//        if (others == null)
+//            throw new IllegalArgumentException();
+//
+//        if (others.length == 0)
+//            throw new IllegalArgumentException();
+//
+//        if (outputBuffer == null)
+//            throw new IllegalArgumentException();
+//
+//        final HTreeHashJoinUtility[] all = new HTreeHashJoinUtility[others.length + 1];
+//        {
+//            all[0] = this;
+//            for (int i = 0; i < others.length; i++) {
+//                final HTreeHashJoinUtility o = (HTreeHashJoinUtility) others[i];
+//                if (o == null)
+//                    throw new IllegalArgumentException();
+//                if (!this.joinVars.equals(o.joinVars)) {
+//                    // Must have the same join variables.
+//                    throw new IllegalArgumentException();
+//                }
+//                all[i + 1] = o;
+//            }
+//
+//        }
+//
+//        if(isEmpty()) {
+//            // NOP
+//            return;
+//        }
+//        
+//        /*
+//         * Combine constraints for each source with the given constraints.
+//         */
+//        final IConstraint[] c = JVMHashJoinUtility.combineConstraints(
+//                constraints, all);
+//
+//        /*
+//         * Synchronize each source.
+//         * 
+//         * We follow the iterator on the first source. For each hash code which
+//         * it visits, we synchronize iterators against the remaining sources. If
+//         * the join is optional, then the iterator will be null for a source
+//         * which does not have that hash code. Otherwise false is returned if
+//         * any source lacks tuples for the current hash code.
+//         */
+//        long njoined = 0, nrejected = 0;
+//        final ITupleIterator<?> itr = all[0].getRightSolutions()
+//                .rangeIterator();
+//        {
+//            /*
+//             * Note: Initialized by the first tuple we visit. Updated each time
+//             * we finish joining that solution against all solutions having the
+//             * same hash code for all of the other sources.
+//             */
+////            int hashCode = 0;
+////            ITuple<?> t = null;
+//            final byte[] key = new byte[Bytes.SIZEOF_INT];
+//            final ITupleIterator<?>[] oitr = new ITupleIterator[all.length];
+//            ITuple<?> t = itr.next(); // Start with the first solution.
+//            copyKey(t,key); // Make a copy of that key.
+//            while (true) {
+//                // Synchronize the other sources on the same key (aka hashCode)
+//                log.error("Considering firstSource: "+decodeSolution(t));
+//                if (!canJoin(key, all, optional)) {
+//                    // Scan until we reach a tuple with a different key.
+//                    boolean found = false;
+//                    while (itr.hasNext() && !found) {
+//                        t = itr.next(); // scan forward.
+//                        if (!sameHashCode(key, t)) {
+//                            // We have reached a solution from the first source
+//                            // having a different hash code.
+//                            found = true;
+//                        }
+//                        log.error("Skipping firstSource: "+decodeSolution(t));
+//                    }
+//                    if (!found) {
+//                        // The first source is exhausted.
+//                        return;
+//                    }
+//                    copyKey(t,key); // Make a copy of that key.
+//                    // Attempt to resynchronize.
+//                    continue;
+//                }
+//                /*
+//                 * MERGE JOIN
+//                 * 
+//                 * Note: At this point we have a solution which might join with
+//                 * the other sources (they all have the same hash code). We can
+//                 * now decode the solution from the first source and ...
+//                 * 
+//                 * FIXME Must vector the resolution of the ivCache / blobsCache
+//                 * for the output solutions.
+//                 */
+//                
+//                // Setup each source.
+//                synchronizeOtherSources(key, all, oitr, 1/* index */, optional);
+//
+//                if(true) {
+//                    /*
+//                     * FIXME This just demonstrates the join for the simple case
+//                     * of a single 'other' source.
+//                     */
+//                    final IBindingSet leftSolution = all[0].decodeSolution(t);
+//                    final ITupleIterator<?> aitr = oitr[1];
+//                    while(aitr.hasNext()) {
+//                        final ITuple<?> rightTuple = aitr.next();
+//                        final IBindingSet rightSolution = all[1].decodeSolution(rightTuple);
+//                        // Join.
+//                        final IBindingSet outSolution = BOpContext
+//                                .bind(leftSolution, rightSolution,
+//                                        c,
+//                                        null//selectVars
+//                                        );
+//
+//                        if (outSolution == null) {
+//                            if(optional) {
+//                                outputBuffer.add(leftSolution);
+//            					System.err.println("Output solution: " + leftSolution);
+//                                if (log.isDebugEnabled())
+//                                    log.debug("OPT : #joined="
+//                                            + njoined + ", #rejected="
+//                                            + nrejected + ", solution="
+//                                            + outSolution);
+//                            } else {
+//                                nrejected++;
+//                                if (log.isTraceEnabled())
+//                                    log.trace("FAIL: #joined=" + njoined
+//                                            + ", #rejected=" + nrejected
+//                                            + ", leftSolution=" + leftSolution
+//                                            + ", rightSolution="
+//                                            + rightSolution);
+//                            }
+//                        } else {
+//                            njoined++;
+//                            outputBuffer.add(outSolution);
+//        					System.err.println("Output solution: " + outSolution);
+//                            if (log.isDebugEnabled())
+//                                log.debug("JOIN: #joined="
+//                                        + njoined + ", #rejected="
+//                                        + nrejected + ", solution="
+//                                        + outSolution);
+//                        }
+//                    }
+//                }
+//                
+//                // Decode the solution.
+////                final IBindingSet b = decodeSolution(t);
+////                mergeJoin(b, oitr, c, optional);
+//
+//                if (!itr.hasNext()) {
+//                    // The first source is exhausted.
+//                    return;
+//                }
+//                // Skip to the next tuple from that source.
+//                itr.next();
+//                copyKey(t, key); // Make a copy of that key.
+//
+//            }
+//
+//        }
+//
+//    }
 
     /**
      * Adds metadata about the {@link IHashJoinUtility} state to the stack
@@ -2489,9 +2492,13 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * @throws Exception
      */
     private RuntimeException launderThrowable(final Throwable t) {
-        
-        return new RuntimeException("cause=" + t + ", state=" + toString(), t);
-        
+
+        final String msg = "cause=" + t + ", state=" + toString();
+
+        log.error(msg);
+
+        return new RuntimeException(msg, t);
+
     }
-    
+
 }

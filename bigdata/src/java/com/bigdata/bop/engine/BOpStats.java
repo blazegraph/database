@@ -95,6 +95,16 @@ public class BOpStats implements Serializable {
 //    final public AtomicLong unitsOut = new AtomicLong();
 
     /**
+     * The #of error which were masked by the semantics of the query.
+     * <p>
+     * Note: SPARQL type errors in aggregations often cause bindings or
+     * solutions to fail without causing any runtime exception which can be
+     * observed at the query level. This counter provides a means to observe
+     * those errors.
+     */
+    final public CAT typeErrors = new CAT();
+
+    /**
      * Constructor.
      */
     public BOpStats() {
@@ -120,6 +130,7 @@ public class BOpStats implements Serializable {
         unitsIn.add(o.unitsIn.get());
         unitsOut.add(o.unitsOut.get());
         chunksOut.add(o.chunksOut.get());
+        typeErrors.add(o.typeErrors.get());
     }
     
     public String toString() {
@@ -131,6 +142,7 @@ public class BOpStats implements Serializable {
         sb.append(",unitsIn=" + unitsIn.get());
         sb.append(",chunksOut=" + chunksOut.get());
         sb.append(",unitsOut=" + unitsOut.get());
+        sb.append(",errors=" + typeErrors.get());
         toString(sb); // extension hook
         sb.append("}");
         return sb.toString();

@@ -184,12 +184,13 @@ public class MemoryGroupByOp extends GroupByOp {
          *         -OR- throws a {@link SparqlTypeErrorException}.
          */
         static SolutionGroup newInstance(final IValueExpression<?>[] groupBy,
-                final IBindingSet bset) {
+                final IBindingSet bset, final BOpStats stats) {
 
             final IConstant<?>[] r = new IConstant<?>[groupBy.length];
 
             for (int i = 0; i < groupBy.length; i++) {
 
+                final IValueExpression<?> expr = groupBy[i];
                 final Object asBound;
                 try {
                     /*
@@ -207,8 +208,9 @@ public class MemoryGroupByOp extends GroupByOp {
                      * developing a generalized aggregation operator backed by
                      * the HTree.]
                      */
-                    asBound = groupBy[i].get(bset);
+                    asBound = expr.get(bset);
                 } catch (SparqlTypeErrorException ex) {
+                    TypeErrorLog.handleTypeError(ex, expr, stats);
                     // Drop solution.
                     return null;
                 }
@@ -295,15 +297,15 @@ public class MemoryGroupByOp extends GroupByOp {
         
         private final IValueExpression<?>[] groupBy;
 
-//        private final IValueExpression<?>[] select;
-
-//        private final IConstraint[] having;
+        private final BOpStats stats;
 
         GroupByTask(final MemoryGroupByOp op,
                 final BOpContext<IBindingSet> context) {
         	
             this.context = context;
 
+            this.stats = context.getStats();
+            
             this.groupByState = (IGroupByState) op
                     .getRequiredProperty(Annotations.GROUP_BY_STATE);
 
@@ -311,10 +313,6 @@ public class MemoryGroupByOp extends GroupByOp {
                     .getRequiredProperty(Annotations.GROUP_BY_REWRITE);
             
             this.groupBy = groupByState.getGroupByClause();
-
-//            this.select = groupByState.getSelectClause();
-            
-//            this.having = groupByState.getHavingClause();
 
             // The map is only defined if a GROUP_BY clause was used.
             this.map = groupBy == null ? null
@@ -339,7 +337,8 @@ public class MemoryGroupByOp extends GroupByOp {
             if (bset == null)
                 throw new IllegalArgumentException();
 
-            final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset);
+            final SolutionGroup s = SolutionGroup.newInstance(groupBy, bset,
+                    stats);
 
             if (s == null) {
 
@@ -369,8 +368,6 @@ public class MemoryGroupByOp extends GroupByOp {
         }
 
         public Void call() throws Exception {
-
-			final BOpStats stats = context.getStats();
 
 			final IAsynchronousIterator<IBindingSet[]> itr = context
 					.getSource();
@@ -620,7 +617,7 @@ public class MemoryGroupByOp extends GroupByOp {
                     
                     // Aggregate.
                     doAggregate(e.getKey(), e.getValue(), nestedAggregates,
-                            aggregates, solutions);
+                            aggregates, solutions, stats);
                     
                 }
                 
@@ -635,7 +632,7 @@ public class MemoryGroupByOp extends GroupByOp {
                 try {
                     expr.get(aggregates);
                 } catch (SparqlTypeErrorException ex) {
-                    handleTypeError(log, ex, expr);
+                    TypeErrorLog.handleTypeError(ex, expr, stats);
                     continue;
                 } catch (IllegalArgumentException ex) {
                     /*
@@ -645,7 +642,7 @@ public class MemoryGroupByOp extends GroupByOp {
                      * binding for this SELECT expression. (Note that we are not
                      * trying to drop the entire group!)
                      */
-                    handleTypeError(log, ex, expr);
+                    TypeErrorLog.handleTypeError(ex, expr, stats);
                     continue;
                 }
 
@@ -708,6 +705,8 @@ public class MemoryGroupByOp extends GroupByOp {
      * @param solutions
      *            The input solutions for a solution group across which we will
      *            compute the aggregate.
+     * @param stats
+     *            Used to report type errors.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void doAggregate(//
@@ -715,7 +714,8 @@ public class MemoryGroupByOp extends GroupByOp {
             final IVariable<?> var,//
             final boolean selectDependency,//
             final IBindingSet aggregates,//
-            final Iterable<IBindingSet> solutions//
+            final Iterable<IBindingSet> solutions,//
+            final BOpStats stats//
             ) {
         
         try {
@@ -837,8 +837,9 @@ public class MemoryGroupByOp extends GroupByOp {
             if (InnerCause.isInnerCause(t, SparqlTypeErrorException.class)) {
 
                 // trap the type error and filter out the binding
-                if (log.isInfoEnabled())
-                    log.info("will not bind aggregate: expr=" + expr + " : " + t);
+                TypeErrorLog.handleTypeError(t, expr, stats);
+//                if (log.isInfoEnabled())
+//                    log.info("will not bind aggregate: expr=" + expr + " : " + t);
 
                 return;
                 
@@ -861,11 +862,13 @@ public class MemoryGroupByOp extends GroupByOp {
     private static void propagateAggregateBindings(
             final IBindingSet aggregates, final IBindingSet bset) {
 
+        @SuppressWarnings("rawtypes")
         final Iterator<Map.Entry<IVariable, IConstant>> itr = aggregates
                 .iterator();
 
         while (itr.hasNext()) {
 
+            @SuppressWarnings("rawtypes")
             final Map.Entry<IVariable, IConstant> e = itr.next();
 
             bset.set(e.getKey(), e.getValue());
