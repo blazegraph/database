@@ -27,16 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.mutation;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ITupleSerializer;
@@ -222,11 +223,12 @@ public class InsertOp<E> extends PipelineOp implements
                     stats.unitsIn.add(chunk.length);
 
                     int nwritten = 0;
+                    final List<BOp> args = predicate.args();
                     for (int i = 0; i < chunk.length; i++) {
 
                         final IBindingSet bset = chunk[i];
 
-                        final E e = relation.newElement(predicate.args(), bset);
+                        final E e = relation.newElement(args, bset);
 
                         final byte[] key = keyOrder.getKey(keyBuilder, e);
 

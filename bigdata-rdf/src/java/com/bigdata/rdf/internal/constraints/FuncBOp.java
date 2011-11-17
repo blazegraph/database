@@ -24,10 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
@@ -38,7 +35,6 @@ import org.openrdf.query.algebra.evaluation.function.FunctionRegistry;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
@@ -65,9 +61,9 @@ public class FuncBOp extends IVValueExpression<IV>
 
 	public interface Annotations extends BOp.Annotations {
 
-		String NAMESPACE = (FuncBOp.class.getName() + ".namespace").intern();
+		String NAMESPACE = FuncBOp.class.getName() + ".namespace";
 		
-		String FUNCTION = (FuncBOp.class.getName() + ".function").intern();
+		String FUNCTION = FuncBOp.class.getName() + ".function";
 
     }
 	
@@ -104,13 +100,13 @@ public class FuncBOp extends IVValueExpression<IV>
 
     public IV get(final IBindingSet bs) {
         
-    	final List<BOp> args = args();
+//    	final List<BOp> args = args();
     	
-    	final Value[] vals = new Value[args.size()];
+    	final Value[] vals = new Value[arity()];
     	
     	for (int i = 0; i < vals.length; i++) {
 
-    		final IV iv = get(i).get(bs);
+    		final IV<?,?> iv = get(i).get(bs);
     		
             if (log.isDebugEnabled()) {
             	log.debug(iv);
@@ -169,7 +165,7 @@ public class FuncBOp extends IVValueExpression<IV>
 	    	
 	    }
         
-    }
+    }   
     
     /**
      * This bop can only work with materialized terms.  

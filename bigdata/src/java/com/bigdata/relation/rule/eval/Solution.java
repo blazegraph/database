@@ -103,7 +103,7 @@ public class Solution<E> implements ISolution<E>, Serializable {
             final IRelation relation = joinNexus.getHeadRelationView(head);
 
             // use the relation's element factory.
-            this.e = (E) relation.newElement(head.args(), bindingSet);
+            this.e = (E) relation.newElement(head.args(), bindingSet); // TODO BOp.args() is not efficient!
             
 //            // use the relation's element factory.
 //            this.e = (E) relation.newElement(head, bindingSet);

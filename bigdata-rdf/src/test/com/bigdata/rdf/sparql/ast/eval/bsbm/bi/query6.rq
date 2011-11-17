@@ -1,3 +1,4 @@
+# BSBM BI Q6
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
 prefix rev: <http://purl.org/stuff/rev#>
