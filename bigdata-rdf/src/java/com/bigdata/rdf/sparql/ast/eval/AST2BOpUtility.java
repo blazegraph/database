@@ -2804,7 +2804,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                  * Wrap the expression with a BIND of an anonymous variable.
                  */
 
-                expr = new Bind(Var.var(), expr);
+                expr = new Bind(Var.var("--anon" + ctx.nextId()), expr);
 
             }
 
@@ -3161,7 +3161,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
             if (!database.isQuads() && !database.isStatementIdentifiers()) {
                 vars = new BOp[] { s, p, o };
             } else if (c == null) {
-                vars = new BOp[] { s, p, o, com.bigdata.bop.Var.var() };
+                vars = new BOp[] { s, p, o, Var.var("--anon-"+ctx.nextId()) };
             } else {
                 vars = new BOp[] { s, p, o, c };
             }
