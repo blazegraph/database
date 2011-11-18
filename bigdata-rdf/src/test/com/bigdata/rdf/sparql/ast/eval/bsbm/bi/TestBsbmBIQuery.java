@@ -54,16 +54,16 @@ public class TestBsbmBIQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * PC 100 data set. This is the data set which was used to generate the
+     * PC 10 data set. This is the data set which was used to generate the
      * concrete instances of the queries referenced from within this class.
      */
-     static private final String dataset = "bsbm/bsbm3_dataset_pc10.nt";
+//     static private final String dataset = "bsbm/bsbm3_dataset_pc10.nt";
 
     /**
      * An empty data set. This may be used if you are simply examining the query
      * plans.
      */
-//    static private final String dataset = "bsbm/emptyDataset.nt";
+    static private final String dataset = "bsbm/emptyDataset.nt";
 
     public void test_bsbm_bi_query1() throws Exception {
 
