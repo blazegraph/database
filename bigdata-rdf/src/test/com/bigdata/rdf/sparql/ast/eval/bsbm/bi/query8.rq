@@ -1,4 +1,11 @@
 # BSBM BI Q8
+#
+# Query 8: Find 10 cheapest vendors for a specific product type by the highest percentage of their products below the average.
+#
+# Use Case Motivation: A vendor or customer wants to find "discounter" vendors for competitor analyses and procurement respectively.
+#
+# Note: xsd:string() => str()
+
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
 prefix xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -11,7 +18,8 @@ Select ?vendor (xsd:float(?belowAvg)/?offerCount As ?cheapExpensiveRatio)
         ?offer bsbm:product ?product .
         ?offer bsbm:vendor ?vendor .
         ?offer bsbm:price ?price .
-        { Select ?product (avg(xsd:float(xsd:string(?price))) As ?avgPrice)
+        { Select ?product (avg(xsd:float(str(?price))) As ?avgPrice)
+#        { Select ?product (avg(xsd:float(xsd:string(?price))) As ?avgPrice)
           {
             ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType1> .
             ?offer bsbm:product ?product .
@@ -21,7 +29,8 @@ Select ?vendor (xsd:float(?belowAvg)/?offerCount As ?cheapExpensiveRatio)
           Group By ?product
         }
       } .
-      FILTER (xsd:float(xsd:string(?price)) < ?avgPrice)
+      FILTER (xsd:float(str(?price)) < ?avgPrice)
+#      FILTER (xsd:float(xsd:string(?price)) < ?avgPrice)
     }
     Group By ?vendor
   }

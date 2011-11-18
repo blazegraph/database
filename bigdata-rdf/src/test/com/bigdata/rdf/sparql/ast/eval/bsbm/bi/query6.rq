@@ -1,4 +1,12 @@
-# BSBM BI Q6
+# BSBM BI Q6. Very fast.
+#
+# Query 5: Show the most popular products of a specific product type for each country - by review count
+#
+# Use Case Motivation: For advertisement reasons the owners of the e-commerce platform want to generate profiles for the two dimensions product type and the country of a customer.
+#
+# This is very fast (127ms) as long as the sub-select is extracted and run as 
+# a named subquery.
+
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
 prefix rev: <http://purl.org/stuff/rev#>

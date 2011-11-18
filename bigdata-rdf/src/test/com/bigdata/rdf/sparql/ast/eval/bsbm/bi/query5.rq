@@ -1,4 +1,11 @@
 # BSBM BI Q5
+#
+# Query 5: Show the most popular products of a specific product type for each country - by review count
+#
+# Use Case Motivation: For advertisement reasons the owners of the e-commerce platform want to generate profiles for the two dimensions product type and the country of a customer. 
+#
+# Note: xsd:string() => str()
+
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
 prefix rev: <http://purl.org/stuff/rev#>
@@ -20,7 +27,8 @@ Select ?country ?product ?nrOfReviews ?avgPrice
     }
     Group By ?country
   }
-  { Select ?product (avg(xsd:float(xsd:string(?price))) As ?avgPrice)
+  { Select ?product (avg(xsd:float(str(?price))) As ?avgPrice)
+#  { Select ?product (avg(xsd:float(xsd:string(?price))) As ?avgPrice)
     {
       ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType4> .
       ?offer bsbm:product ?product .
