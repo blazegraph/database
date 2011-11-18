@@ -701,9 +701,6 @@ public class BOpContext<E> extends BOpContextBase {
      *            {@link IElement}s.
      * @param pred
      *            The predicate for that {@link IAccessPath}
-     * @param vars
-     *            The array of distinct variables (no duplicates) to be
-     *            extracted from the visited {@link IElement}s.
      * @param stats
      *            Statistics to be updated as elements and chunks are consumed
      *            (optional).
@@ -719,10 +716,16 @@ public class BOpContext<E> extends BOpContextBase {
      * 
      *      TODO Move to {@link IAccessPath}? {@link AccessPath}?
      */
+//    * @param vars
+//    *            The array of distinct variables (no duplicates) to be
+//    *            extracted from the visited {@link IElement}s.
     @SuppressWarnings({ "rawtypes", "unchecked" })
     static public ICloseableIterator<IBindingSet> solutions(
-            final IChunkedIterator<?> src, final IPredicate<?> pred,
-            final IVariable<?>[] vars, final BaseJoinStats stats) {
+            final IChunkedIterator<?> src, //
+            final IPredicate<?> pred,//
+//            final IVariable<?>[] varsx, 
+            final BaseJoinStats stats//
+            ) {
 
         return new CloseableIteratorWrapper(
                 new com.bigdata.striterator.ChunkedStriterator(src).addFilter(
