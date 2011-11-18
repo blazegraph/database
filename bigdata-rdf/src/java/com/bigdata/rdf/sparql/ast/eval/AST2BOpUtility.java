@@ -510,9 +510,17 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
                             .size()]);
                     
-                    left = (PipelineOp) new ChunkedMaterializationOp(
-                            leftOrEmpty(left), vars, ns, timestamp)
-                            .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
+                    left = new ChunkedMaterializationOp(leftOrEmpty(left),
+                            new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
+                            new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
+                            new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
+                            new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+                            );
+
+//                    left = (PipelineOp) new ChunkedMaterializationOp(
+//                            leftOrEmpty(left), vars, ns, timestamp)
+//                            .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
 
                     // Add to the set of known materialized variables.
                     doneSet.addAll(tmp);
@@ -835,21 +843,22 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         }
 
-        if (joinvars.length == 0) {
-
-            /*
-             * Note: If there are no join variables then the join will examine
-             * the full N x M cross product of solutions. That is very
-             * inefficient, so we are logging a warning.
-             */
-
-            log.warn("No join variables: "
-                    + subqueryInclude.getName()
-                    + ", subquery="
-                    + subqueryInclude.getNamedSubqueryRoot(ctx.sa
-                            .getQueryRoot()));
-
-        }
+//        if (joinvars.length == 0) {
+//
+//            /*
+//             * Note: If there are no join variables then the join will examine
+//             * the full N x M cross product of solutions. That is very
+//             * inefficient, so we are logging a warning.
+//             */
+//
+//            log.warn("No join variables: " // TODO INFO if at all.
+//                    + subqueryInclude.getName()
+//                    + ", subquery="
+//                    + subqueryInclude.getNamedSubqueryRoot(ctx.sa
+//                            .getQueryRoot())
+//                            );
+//
+//        }
 
         final IVariable<?>[] joinVars = ASTUtil.convert(joinvars);
 
@@ -1047,17 +1056,17 @@ public class AST2BOpUtility extends AST2BOpJoins {
             @SuppressWarnings("rawtypes")
             final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
-            if (joinVars.length == 0) {
-
-                /*
-                 * Note: If there are no join variables then the join will
-                 * examine the full N x M cross product of solutions. That is
-                 * very inefficient, so we are logging a warning.
-                 */
-
-                log.warn("No join variables: " + subqueryRoot);
-                
-            }
+//            if (joinVars.length == 0) {
+//
+//                /*
+//                 * Note: If there are no join variables then the join will
+//                 * examine the full N x M cross product of solutions. That is
+//                 * very inefficient, so we are logging a warning.
+//                 */
+//
+//                log.warn("No join variables: " + subqueryRoot); // TODO Info if at all
+//                
+//            }
             
             final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
                     ctx.queryId, solutionSetName, joinVars);
@@ -2363,6 +2372,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         @SuppressWarnings("rawtypes")
         final IVariable[] joinVars = subgroup.getJoinVars();
+       
         if (joinVars == null) {
             /*
              * The AST optimizer which assigns the join variables did not
@@ -2376,17 +2386,18 @@ public class AST2BOpUtility extends AST2BOpJoins {
             throw new RuntimeException("Join variables not specified: "
                     + subgroup);
         }
-        if (joinVars.length == 0) {
-
-            /*
-             * Note: If there are no join variables then the join will examine
-             * the full N x M cross product of solutions. That is very
-             * inefficient, so we are logging a warning.
-             */
-
-            log.warn("No join variables: " + subgroup);
-
-        }
+        
+//        if (joinVars.length == 0) {
+//
+//            /*
+//             * Note: If there are no join variables then the join will examine
+//             * the full N x M cross product of solutions. That is very
+//             * inefficient, so we are logging a warning.
+//             */
+//
+//            log.warn("No join variables: " + subgroup); // TODO INFO if at all.
+//
+//        }
         
 	    // Pass all variable bindings along.
         @SuppressWarnings("rawtypes")
