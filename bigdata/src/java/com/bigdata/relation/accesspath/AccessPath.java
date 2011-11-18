@@ -691,10 +691,10 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      */
     public ICloseableIterator<IBindingSet> solutions(final BaseJoinStats stats) {
 
-        final IVariable<?>[] vars = BOpUtility
-                .getDistinctArgumentVariables(predicate);
+//        final IVariable<?>[] vars = BOpUtility
+//                .getDistinctArgumentVariables(predicate);
 
-        return BOpContext.solutions(iterator(), predicate, vars, stats);
+        return BOpContext.solutions(iterator(), predicate, /*vars,*/ stats);
 
     }
     

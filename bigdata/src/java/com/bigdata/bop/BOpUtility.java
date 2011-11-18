@@ -507,39 +507,39 @@ public class BOpUtility {
 
     }
 
-    /**
-     * Return the variables from the operator's arguments.
-     * 
-     * @param op
-     *            The operator.
-     * 
-     * @return An iterator visiting its {@link IVariable} arguments.
-     * 
-     *         TODO This gets used a LOT, but ONLY by
-     *         {@link AccessPath#solutions(BaseJoinStats). As written, it uses a
-     *         hash map to decide which are the DISTINCT variables in the
-     *         args[]. However variables support reference testing. The fastest
-     *         way to write this method is on the BOP classes. They can spin
-     *         through their args[] and count the distinct variables and then
-     *         copy them into a new array.
-     */
-    @SuppressWarnings("unchecked")
-    static public IVariable<?>[] getDistinctArgumentVariables(final BOp op) {
-        
-        return BOpUtility.toArray(
-        new Striterator(op.argIterator())
-                .addFilter(new Filter() {
-
-                    private static final long serialVersionUID = 1L;
-
-                    @Override
-                    public boolean isValid(final Object arg0) {
-                        return arg0 instanceof IVariable<?>;
-                    }
-                }).makeUnique()
-                );
-
-    }
+//    /**
+//     * Return the variables from the operator's arguments.
+//     * 
+//     * @param op
+//     *            The operator.
+//     * 
+//     * @return An iterator visiting its {@link IVariable} arguments.
+//     * 
+//     *         TODO This gets used a LOT, but ONLY by
+//     *         {@link AccessPath#solutions(BaseJoinStats). As written, it uses a
+//     *         hash map to decide which are the DISTINCT variables in the
+//     *         args[]. However variables support reference testing. The fastest
+//     *         way to write this method is on the BOP classes. They can spin
+//     *         through their args[] and count the distinct variables and then
+//     *         copy them into a new array.
+//     */
+//    @SuppressWarnings("unchecked")
+//    static public IVariable<?>[] getDistinctArgumentVariables(final BOp op) {
+//        
+//        return BOpUtility.toArray(
+//        new Striterator(op.argIterator())
+//                .addFilter(new Filter() {
+//
+//                    private static final long serialVersionUID = 1L;
+//
+//                    @Override
+//                    public boolean isValid(final Object arg0) {
+//                        return arg0 instanceof IVariable<?>;
+//                    }
+//                }).makeUnique()
+//                );
+//
+//    }
 
     /**
      * The #of arguments to this operation which are variables. This method does
