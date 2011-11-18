@@ -97,41 +97,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
         int DEFAULT_MAX_RECLEN = 32;
         
         /**
-         * The key order used to form the keys for the internal DISTINCT SPO
-         * filter. The key order should be choosen so as to have the best
-         * possible locality given the natural order in which the SPOs will be
-         * arriving.
-         * <p>
-         * Note: This is an <code>int[3]</code>. The index into the orderinal
-         * position of the arity 3 key component for the filter keys. The value
-         * at that index is the position in the {@link SPOKeyOrder} of the quads
-         * mode index whose natural order determines the order of arrival of the
-         * {@link ISPO} objects at this filter.
-         * <p>
-         * Thus, given indexKeyOrder = {@link SPOKeyOrder#CSPO}, the array:
-         * 
-         * <pre>
-         * int[] = {1,2,3}
-         * </pre>
-         * 
-         * would correspond to the filter key order SPO, which is the best
-         * possible filter key order for the natural order order of the
-         * {@link SPOKeyOrder#CSPO} index.
-         * <p>
-         * Note, however, that key orders can be expressed in this manner which
-         * are not defined by {@link SPOKeyOrder}. For example, given
-         * {@link SPOKeyOrder#PCSO} the best filter key order is
-         * <code>PSO</code>. While there is no <code>PSO</code> key order
-         * declared by the {@link SPOKeyOrder} class, we can use
-         * 
-         * <pre>
-         * int[] = {0,2,3}
-         * </pre>
-         * 
-         * which models the <code>PSO</code> key order for the purposes of this
-         * class.
          */
-        String FILTER_KEY_ORDER = "filterKeyOrder";
+        String KEY_ORDER = "keyOrder";
         
     }
 
@@ -146,10 +113,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
     public static NativeDistinctFilter newInstance(
             final SPOKeyOrder indexKeyOrder) {
 
-        final int[] filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
-
         return new NativeDistinctFilter(BOp.NOARGS, Collections.singletonMap(
-                Annotations.FILTER_KEY_ORDER, (Object) filterKeyOrder));
+                Annotations.KEY_ORDER, (Object) indexKeyOrder));
 
     }
     
@@ -168,6 +133,9 @@ public class NativeDistinctFilter extends BOpFilterBase {
 
         super(args, annotations);
 
+        // MUST be specified.
+        getRequiredProperty(Annotations.KEY_ORDER);
+
     }
 
     @SuppressWarnings("rawtypes")
@@ -179,13 +147,42 @@ public class NativeDistinctFilter extends BOpFilterBase {
     }
 
     /**
-     * Find the 3-component key order which has the best locality given that the
-     * SPOs will be ariving in the natural order of the [keyOrder] index. This
-     * is the keyOrder that we will use for the filter. This gives the filter
-     * index structure the best possible locality in terms of the order in which
-     * the SPOs are arriving.
+     * Return the 3-component key order which has the best locality given that
+     * the SPOs will be ariving in the natural order of the
+     * <i>indexKeyOrder</i>. This is the keyOrder that we will use for the
+     * filter. This gives the filter index structure the best possible locality
+     * in terms of the order in which the SPOs are arriving.
+     * <p>
+     * The return valuer is an <code>int[3]</code>. The index is the orderinal
+     * position of the triples mode key component for the filter keys. The value
+     * at that index is the position in the {@link SPOKeyOrder} of the quads
+     * mode index whose natural order determines the order of arrival of the
+     * {@link ISPO} objects at this filter.
+     * <p>
+     * Thus, given indexKeyOrder = {@link SPOKeyOrder#CSPO}, the array:
      * 
-     * @see Annotations#FILTER_KEY_ORDER
+     * <pre>
+     * int[] = {1,2,3}
+     * </pre>
+     * 
+     * would correspond to the filter key order SPO, which is the best possible
+     * filter key order for the natural order order of the
+     * {@link SPOKeyOrder#CSPO} index.
+     * <p>
+     * Note, however, that key orders can be expressed in this manner which are
+     * not defined by {@link SPOKeyOrder}. For example, given
+     * {@link SPOKeyOrder#PCSO} the best filter key order is <code>PSO</code>.
+     * While there is no <code>PSO</code> key order declared by the
+     * {@link SPOKeyOrder} class, we can use
+     * 
+     * <pre>
+     * int[] = {0,2,3}
+     * </pre>
+     * 
+     * which models the <code>PSO</code> key order for the purposes of this
+     * class.
+     * 
+     * @see Annotations#INDEX_KEY_ORDER
      */
     public static int[] getFilterKeyOrder(SPOKeyOrder indexKeyOrder) {
 
@@ -246,9 +243,10 @@ public class NativeDistinctFilter extends BOpFilterBase {
         private final IKeyBuilder keyBuilder;
 
         /**
-         * The key order used to build the keys for the DISTINCT SPO filter.
+         * The key order used to build the triples mode keys for the DISTINCT
+         * SPO filter.
          * 
-         * @see Annotations#FILTER_KEY_ORDER
+         * @see NativeDistinctFilter#getFilterKeyOrder(SPOKeyOrder)
          */
         private final int[] filterKeyOrder;
         
@@ -299,8 +297,10 @@ public class NativeDistinctFilter extends BOpFilterBase {
              */
             {
 
-                filterKeyOrder = (int[]) NativeDistinctFilter.this
-                        .getRequiredProperty(Annotations.FILTER_KEY_ORDER);
+                final SPOKeyOrder indexKeyOrder = (SPOKeyOrder) NativeDistinctFilter.this
+                        .getRequiredProperty(Annotations.KEY_ORDER);
+
+                filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
 
                 metadata = new IndexMetadata(UUID.randomUUID());
 
