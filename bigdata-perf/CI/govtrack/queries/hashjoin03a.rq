@@ -1,4 +1,4 @@
-# Default graph query using pipeline join.
+# Default graph query using pipeline join. 18s
 PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT (COUNT(*) as ?count)
 WHERE {
