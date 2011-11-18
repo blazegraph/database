@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop;
 
+import java.util.Collections;
+
 
 /**
  * A constant.
@@ -122,7 +124,9 @@ final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
      */
     public Constant(final IVariable<E> var, final E value) {
 
-        super(BOp.NOARGS, NV.asMap(new NV(Annotations.VAR, var)));
+        super(BOp.NOARGS, Collections.singletonMap(Annotations.VAR,
+                (Object) var));
+//        NV.asMap(new NV(Annotations.VAR, var)));
 
         if (var == null)
             throw new IllegalArgumentException();
