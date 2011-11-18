@@ -42,11 +42,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -510,13 +512,22 @@ public class BOpUtility {
      * 
      * @param op
      *            The operator.
-     *            
+     * 
      * @return An iterator visiting its {@link IVariable} arguments.
+     * 
+     *         TODO This gets used a LOT, but ONLY by
+     *         {@link AccessPath#solutions(BaseJoinStats). As written, it uses a
+     *         hash map to decide which are the DISTINCT variables in the
+     *         args[]. However variables support reference testing. The fastest
+     *         way to write this method is on the BOP classes. They can spin
+     *         through their args[] and count the distinct variables and then
+     *         copy them into a new array.
      */
     @SuppressWarnings("unchecked")
-    static public Iterator<IVariable<?>> getDistinctArgumentVariables(final BOp op) {
-
-        return new Striterator(op.argIterator())
+    static public IVariable<?>[] getDistinctArgumentVariables(final BOp op) {
+        
+        return BOpUtility.toArray(
+        new Striterator(op.argIterator())
                 .addFilter(new Filter() {
 
                     private static final long serialVersionUID = 1L;
@@ -525,7 +536,8 @@ public class BOpUtility {
                     public boolean isValid(final Object arg0) {
                         return arg0 instanceof IVariable<?>;
                     }
-                }).makeUnique();
+                }).makeUnique()
+                );
 
     }
 
