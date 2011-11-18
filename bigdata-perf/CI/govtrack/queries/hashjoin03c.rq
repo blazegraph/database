@@ -1,4 +1,9 @@
-# Default graph hash join with native DISTINCT SPO filter and index override.
+# Default graph hash join with native DISTINCT SPO filter and index override. 
+# 80s.  Note that the change to the native DISTINCT SPO filter to use the best
+# possible index given the natural order of the source index did not impact the
+# run time of this query nearly as much as it did hashjoin03b (this query now 
+# runs in ~ 74s versus an original run time closer to 80s).
+
 PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT (COUNT(*) as ?count)
 WHERE {

@@ -1,5 +1,13 @@
-# Query producing 20968700 results.
+# Named graph query with hash join and PCSO index override. 20968700 results.
 # 30s with htree hash join and PCSO index override.
+#
+# Note: The reason why this is only 50% of the cost of hashjoin02b is that the
+# hash index on _var10 is in the last key component on the POCS index and therefore
+# is changing very rapidly.  By choosing the PCSO index, the S key component changes
+# less frequently and the lookups against the hash index on _var10 have better
+# locality.  The win from the PCSO index would be even bigger if there were more
+# distinct context values than there are in the govtrack data (where context is
+# modeling the year/session of congress).
 
 PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT (COUNT(*) as ?count)

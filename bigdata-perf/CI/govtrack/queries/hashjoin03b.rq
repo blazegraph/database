@@ -1,4 +1,8 @@
 # Default graph hash join with native DISTINCT SPO filter.
+# Originally a 400s query.  Now that the DISTINCT SPO filter uses the best
+# key order based on the natural order of the index against which the hash
+# join is running this has become a 40s query.  10x faster.
+
 PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT (COUNT(*) as ?count)
 WHERE {

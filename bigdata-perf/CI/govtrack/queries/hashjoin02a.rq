@@ -1,4 +1,4 @@
-# Query producing 20968700 results.
+# Named graph query with pipeline joins. 20968700 results.
 # 20s with pipeline join.
 #     [java] resultCount=1, elapsed=17194ms, source=queries/hashjoin02.rq
 #     [java] resultCount=1, elapsed=17680ms, source=queries/hashjoin02.rq

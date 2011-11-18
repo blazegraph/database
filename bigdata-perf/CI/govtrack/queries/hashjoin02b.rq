@@ -1,4 +1,4 @@
-# Query producing 20968700 results.
+# Named graph query with hash joins. 20968700 results.
 # 60s with htree hash join and POCS index (default).
 
 PREFIX hint: <http://www.bigdata.com/queryHints#>
