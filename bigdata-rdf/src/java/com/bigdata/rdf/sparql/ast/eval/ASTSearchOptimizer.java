@@ -40,7 +40,6 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -55,7 +54,6 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -127,7 +125,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             for (NamedSubqueryRoot namedSubquery : queryRoot
                     .getNamedSubqueries()) {
 
-                extractSearches(context.db, queryRoot, namedSubquery,
+                extractSearches(context, queryRoot, namedSubquery,
                         (GroupNodeBase<IGroupMemberNode>) namedSubquery
                                 .getWhereClause());
 
@@ -142,7 +140,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
              * they appear within the main WHERE clause.
              */
             
-            extractSearches(context.db, queryRoot, queryRoot,
+            extractSearches(context, queryRoot, queryRoot,
                     (GroupNodeBase<IGroupMemberNode>) queryRoot
                             .getWhereClause());
 
@@ -212,9 +210,11 @@ public class ASTSearchOptimizer implements IASTOptimizer {
      * such predicates for a given <code>searchVar</code> MUST appear within the
      * same group.
      */
-    private void extractSearches(final AbstractTripleStore database,
-            final QueryRoot queryRoot,
-            final QueryBase queryBase,
+    private void extractSearches(//
+            final AST2BOpContext ctx,
+//            final AbstractTripleStore database,//
+            final QueryRoot queryRoot,//
+            final QueryBase queryBase,//
             final GroupNodeBase<IGroupMemberNode> group) {
 
         // lazily allocate iff we find some search predicates in this group.
@@ -292,7 +292,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
                     @SuppressWarnings("unchecked")
                     final GroupNodeBase<IGroupMemberNode> subGroup = (GroupNodeBase<IGroupMemberNode>) child;
 
-                    extractSearches(database, queryRoot, queryBase, subGroup);
+                    extractSearches(ctx, queryRoot, queryBase, subGroup);
 
                 }
 
@@ -325,7 +325,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
                 group.addChild(serviceNode);
 
 //                if (group.getContext() != null)
-                enforceGraphConstraint(queryRoot, searchVar, group);
+                enforceGraphConstraint(ctx, queryRoot, searchVar, group);
                 
                 if (log.isInfoEnabled())
                     log.info("Rewrote group: " + group);
@@ -356,8 +356,10 @@ public class ASTSearchOptimizer implements IASTOptimizer {
      * @param group
      *            The group in which the search magic predicates appear.
      */
-    private void enforceGraphConstraint(final QueryRoot queryRoot,
-            final IVariable<?> searchVar,
+    private void enforceGraphConstraint(//
+            final AST2BOpContext ctx,//
+            final QueryRoot queryRoot,//
+            final IVariable<?> searchVar,//
             final GroupNodeBase<IGroupMemberNode> group) {
 
         StatementPatternNode subjectJoin = null;
@@ -401,8 +403,8 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             
             // Add the join to impose the named graph constraint.
             group.addChild(new StatementPatternNode(//
-                    new VarNode(Var.var().getName()),// s
-                    new VarNode(Var.var().getName()),// p
+                    new VarNode("--anon-" + ctx.nextId()),// s
+                    new VarNode("--anon-" + ctx.nextId()),// p
                     new VarNode(searchVar.getName()),// o
                     group.getContext(), // c
                     Scope.NAMED_CONTEXTS // scope
@@ -446,8 +448,8 @@ public class ASTSearchOptimizer implements IASTOptimizer {
             
             // Add the join to impose the default graph constraint.
             group.addChild(new StatementPatternNode(//
-                    new VarNode(Var.var().getName()),// s
-                    new VarNode(Var.var().getName()),// p
+                    new VarNode("--anon-" + ctx.nextId()),// s
+                    new VarNode("--anon-" + ctx.nextId()),// p
                     new VarNode(searchVar.getName()),// o
                     null, // // c
                     Scope.DEFAULT_CONTEXTS // scope
