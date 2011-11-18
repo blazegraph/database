@@ -48,7 +48,7 @@ import cutthecrap.utils.striterators.Filterator;
  * instance per as-bound evaluation of the pipeline join.
  * <p>
  * Note: You can change the code over the HTree/BTree by modifying only a few
- * lines.
+ * lines. See the comments in the file.
  * 
  * TODO Reads against the index will eventually degrade since we can not use
  * ordered reads because the iterator filter pattern itself is not vectored. We
@@ -159,8 +159,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * paths for both.
          */
         // TODO Edit HTree/BTree here.
-//        private volatile BTree index;
-        private volatile HTree index;
+        private volatile BTree index;
+//        private volatile HTree index;
         private volatile MemStore store;
         
         @Override
@@ -290,8 +290,8 @@ public class NativeDistinctFilter extends BOpFilterBase {
              * persistence.
              */
             // TODO Edit HTree/BTree here.
-//            index = BTree.create(store, metadata);
-            index = HTree.create(store, metadata);
+            index = BTree.create(store, metadata);
+//            index = HTree.create(store, metadata);
             
         }
         

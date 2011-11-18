@@ -396,6 +396,8 @@ public class QueryLog {
                         if (state != null) {
                             // Prefer the IHashUtilityState
                             sb.append(state.toString());
+                            sb.append(cdata(",namedSet="));
+                            sb.append(cdata(ref.namedSet));
                         } else {
                             // Otherwise the NamedSolutionSetRef
                             sb.append(ref.toString());
@@ -873,6 +875,8 @@ public class QueryLog {
                     if (state != null) {
                         // Prefer the IHashUtilityState
                         w.write(cdata(state.toString()));
+                        w.write(cdata(",namedSet="));
+                        w.write(cdata(ref.namedSet));
                     } else {
                         // Otherwise the NamedSolutionSetRef
                         w.write(cdata(ref.toString()));

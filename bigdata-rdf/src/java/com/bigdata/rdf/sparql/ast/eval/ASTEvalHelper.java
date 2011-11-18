@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
@@ -51,7 +52,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
@@ -76,6 +76,12 @@ import com.bigdata.striterator.ICloseableIterator;
  */
 public class ASTEvalHelper {
 
+    /**
+     * A logger whose sole purpose is to log the SPARQL queries which are being
+     * evaluated.
+     */
+    private static final Logger log = Logger.getLogger(ASTEvalHelper.class);
+    
     /**
      * Return an {@link IAsynchronousIterator} that will read a single, empty
      * {@link IBindingSet}.
@@ -195,7 +201,7 @@ public class ASTEvalHelper {
         final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
 
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bset);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -206,8 +212,12 @@ public class ASTEvalHelper {
 
         CloseableIteration<BindingSet, QueryEvaluationException> itr = null;
         try {
-            itr = ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
-                    context.queryEngine
+            itr = ASTEvalHelper.evaluateQuery(
+                    astContainer,
+                    context,
+//                    store, queryPlan, 
+                    bset
+//                    context.queryEngine
                     , materializeProjectionInQuery//
                     , new IVariable[0]// required
                     );
@@ -246,7 +256,7 @@ public class ASTEvalHelper {
         final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
 
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bset);
 
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -264,8 +274,12 @@ public class ASTEvalHelper {
                 && !optimizedQuery.hasSlice();
 
         return new TupleQueryResultImpl(projectedSet,
-                ASTEvalHelper.evaluateQuery(store, queryPlan, bset,
-                        context.queryEngine
+                ASTEvalHelper.evaluateQuery(
+                        astContainer,
+                        context,
+//                        store, queryPlan, 
+                        bset
+//                        context.queryEngine
                         ,materializeProjectionInQuery//
                         , projected//
                         ));
@@ -297,7 +311,7 @@ public class ASTEvalHelper {
         final IBindingSet bset = toBindingSet(batchResolveIVs(store, bs));
         
         // Convert the query (generates an optimized AST as a side-effect).
-        final PipelineOp queryPlan = AST2BOpUtility.convert(context, bset);
+        AST2BOpUtility.convert(context, bset);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -310,10 +324,11 @@ public class ASTEvalHelper {
                 new ASTConstructIterator(store, //
                         optimizedQuery.getConstruct(), //
                         ASTEvalHelper.evaluateQuery(
-                                store,
-                                queryPlan,
-                                bset,//
-                                context.queryEngine //
+                                astContainer,
+                                context,
+//                                queryPlan,
+                                bset//
+//                                context.queryEngine //
                                 ,materializeProjectionInQuery//
                                 ,optimizedQuery.getProjection()
                                         .getProjectionVars()//
@@ -351,25 +366,35 @@ public class ASTEvalHelper {
      * @throws QueryEvaluationException
      */
     static private CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
-            final AbstractTripleStore database, final PipelineOp queryPlan,
-            final IBindingSet bs, final QueryEngine queryEngine,
+            final ASTContainer astContainer,
+            final AST2BOpContext ctx,            
+//            final AbstractTripleStore database, final PipelineOp queryPlan,
+            final IBindingSet bs, 
+//            final QueryEngine queryEngine,
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
+        if(log.isInfoEnabled()) {
+            // Log the SPARQL query string.
+            log.info(astContainer.getQueryString());
+        }
+        
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+        
         IRunningQuery runningQuery = null;
         IAsynchronousIterator<IBindingSet[]> source = null;
         try {
             
-            source = wrapSource(database, bs);
+            source = wrapSource(ctx.db, bs);
 
             // Submit query for evaluation.
-            runningQuery = queryEngine.eval(queryPlan, source);
+            runningQuery = ctx.queryEngine.eval(queryPlan, source);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
              * compatible iteration with materialized RDF Values.
              */
-            return iterator(runningQuery, database,
+            return iterator(runningQuery, ctx.db,
                     materializeProjectionInQuery, required);
 
         } catch (Throwable t) {
