@@ -65,6 +65,7 @@ import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.internal.constraints.XsdStrBOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.store.BD;
@@ -800,7 +801,25 @@ public class FunctionRegistry {
 
 	    add(XSD_INT, new CastFactory(XMLSchema.INTEGER.toString()));
 
-	    add(XSD_STR, new CastFactory(XMLSchema.STRING.toString()));
+	    /*
+	     * Changed the xsd:string cast operator to use XsdStrBOp instead of the
+	     * Sesame cast function.
+	     */
+//	    add(XSD_STR, new CastFactory(XMLSchema.STRING.toString()));
+		add(XSD_STR, new Factory() {
+			public IValueExpression<? extends IV> create(final String lex,
+					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+				checkArgs(args, ValueExpressionNode.class);
+
+//				final IValueExpression<? extends IV> var = args[0].getValueExpression();
+                final IValueExpression ve = AST2BOpUtility.toVE(lex, args[0]);
+
+				return new XsdStrBOp(ve, lex);
+
+			}
+		});
+
 
 	    add(YEAR,new DateFactory(DateOp.YEAR));
 
