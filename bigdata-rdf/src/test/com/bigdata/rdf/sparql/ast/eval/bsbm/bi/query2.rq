@@ -1,4 +1,9 @@
-# BSBM BI Q2
+# BSBM BI Q2.  Q2 needs further exploration. See my notes.
+# Last Changed Rev: 5682
+# Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
+# 1. solutions=10, chunks=1, elapsed=102699ms.
+# 2. solutions=10, chunks=1, elapsed=89905ms.
+# 3. solutions=10, chunks=1, elapsed=86678ms.
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 
 SELECT ?otherProduct ?sameFeatures

@@ -1,4 +1,17 @@
 # BSBM BI Q3
+# Last Changed Rev: 5682
+# Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
+# solutions=10, chunks=1, elapsed=87239ms.
+# solutions=10, chunks=1, elapsed=84904ms.
+#
+# This query begs for a RangeBOp to handle the constraint on the date range.
+# Right now it winds up running these predicates once in each subquery and
+# then filtering.  If we were going to run it that way we would be better 
+# off extracting the common joins into a named subquery.
+# 
+#       ?review bsbm:reviewFor ?product .
+#       ?review dc:date ?date .
+	
   prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
   prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
   prefix rev: <http://purl.org/stuff/rev#>

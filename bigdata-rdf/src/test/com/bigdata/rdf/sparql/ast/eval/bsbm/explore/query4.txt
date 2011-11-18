@@ -1,0 +1,35 @@
+# BSBM Explore Query 4: Find products matching two different sets of features.
+#
+# Use Case Motivation: After looking at information about some products, the consumer has a more specific idea what we wants. Therefore, he asks for products matching either one set of features or another set.
+#
+#    Uses UNION
+#    Uses ORDER BY, LIMIT and OFFSET
+
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?product ?label ?propertyTextual
+WHERE {
+    {
+       ?product rdfs:label ?label .
+       ?product rdf:type <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType5> .
+       ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature32> .
+           ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature143> .
+       ?product bsbm:productPropertyTextual1 ?propertyTextual .
+           ?product bsbm:productPropertyNumeric1 ?p1 .
+           FILTER ( ?p1 > 180 )
+    } UNION {
+       ?product rdfs:label ?label .
+       ?product rdf:type <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType5> .
+       ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature32> .
+           ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature16> .
+       ?product bsbm:productPropertyTextual1 ?propertyTextual .
+           ?product bsbm:productPropertyNumeric2 ?p2 .
+           FILTER ( ?p2> 353 )
+    }
+}
+ORDER BY ?label
+OFFSET 5
+LIMIT 10

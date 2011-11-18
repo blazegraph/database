@@ -1,9 +1,20 @@
 # BSBM BI Q1
+# Last Changed Rev: 5682
+# Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
+# w/o optimistic join order hint.
+# 1. solutions=10, chunks=1, elapsed=34158ms.
+# 2. solutions=10, chunks=1, elapsed=33888ms.
+# 3. solutions=10, chunks=1, elapsed=33827ms.
+# w/ optimistic=.67 join order hint
+# solutions=10, chunks=1, elapsed=4135ms.
+# solutions=10, chunks=1, elapsed=4202ms.
+# solutions=10, chunks=1, elapsed=4143ms.
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix rev: <http://purl.org/stuff/rev#>
 
 Select ?productType ?reviewCount
 {
+hint:Query hint:com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.optimistic ".67" .
  { Select ?productType (count(?review) As ?reviewCount)
   {
    ?productType a bsbm:ProductType .

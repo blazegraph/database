@@ -1,0 +1,30 @@
+# BSBM Explore Query 12: Export information about an offer into another schemata.
+#
+# Use Case Motivation: After deciding on a specific offer, the consumer wants to save information about this offer on his local machine using a different RDF schema.
+#
+#    Touches a lot of data including products, offers, vendors, reviews and reviewers.
+#    Uses OPTIONAL
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rev: <http://purl.org/stuff/rev#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX bsbm-export: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/export/>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+
+CONSTRUCT {  <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:product ?productURI .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:productlabel ?productlabel .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:vendor ?vendorname .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:vendorhomepage ?vendorhomepage .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:offerURL ?offerURL .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:price ?price .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:deliveryDays ?deliveryDays .
+             <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm-export:validuntil ?validTo }
+WHERE { <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:product ?productURI .
+        ?productURI rdfs:label ?productlabel .
+        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:vendor ?vendorURI .
+        ?vendorURI rdfs:label ?vendorname .
+        ?vendorURI foaf:homepage ?vendorhomepage .
+        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:offerWebpage ?offerURL .
+        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:price ?price .
+        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:deliveryDays ?deliveryDays .
+        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer182> bsbm:validTo ?validTo }
