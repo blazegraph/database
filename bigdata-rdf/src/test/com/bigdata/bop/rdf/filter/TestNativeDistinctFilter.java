@@ -44,6 +44,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
@@ -170,6 +171,31 @@ public class TestNativeDistinctFilter extends TestCase2 {
         }
         
     }
+
+    /**
+     * Unit test for {@link NativeDistinctFilter#getFilterKeyOrder(SPOKeyOrder)}
+     */
+    public void test_filterKeyOrder() {
+
+        assertEquals(new int[] {0,1,2},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.SPOC));
+
+        assertEquals(new int[] {0,1,3},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.POCS));
+
+        assertEquals(new int[] {0,2,3},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.OCSP));
+
+        assertEquals(new int[] {1,2,3},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.CSPO));
+
+        assertEquals(new int[] {0,2,3},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.PCSO));
+
+        assertEquals(new int[] {0,1,2},
+                NativeDistinctFilter.getFilterKeyOrder(SPOKeyOrder.SOPC));
+
+    }
     
     public void test_htreeDistinctSPOFilter() {
 
@@ -180,7 +206,7 @@ public class TestNativeDistinctFilter extends TestCase2 {
             /*
              * The distinct SPOs.
              */
-            final List<SPO> expected = new LinkedList(Arrays.asList(new SPO[] {//
+            final List<SPO> expected = new LinkedList<SPO>(Arrays.asList(new SPO[] {//
                     
                 new SPO(setup.paul, setup.knows, setup.mary, StatementEnum.Explicit),// [0]
                 new SPO(setup.paul, setup.knows, setup.brad, StatementEnum.Explicit),// [1]
@@ -206,7 +232,9 @@ public class TestNativeDistinctFilter extends TestCase2 {
             }));
 
             // Iterator should visit the disinct IVs.
-            final Iterator<SPO> actual = NativeDistinctFilter.newInstance()
+            @SuppressWarnings("unchecked")
+            final Iterator<SPO> actual = NativeDistinctFilter.newInstance(
+                    SPOKeyOrder.CSPO)
                     .filter(given.iterator(), null/* context */);
 
             assertSameIteratorAnyOrder(expected.toArray(new SPO[0]), actual);

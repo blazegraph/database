@@ -1,6 +1,7 @@
 package com.bigdata.bop.rdf.filter;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -27,7 +28,9 @@ import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
 
@@ -93,13 +96,61 @@ public class NativeDistinctFilter extends BOpFilterBase {
          */
         int DEFAULT_MAX_RECLEN = 32;
         
+        /**
+         * The key order used to form the keys for the internal DISTINCT SPO
+         * filter. The key order should be choosen so as to have the best
+         * possible locality given the natural order in which the SPOs will be
+         * arriving.
+         * <p>
+         * Note: This is an <code>int[3]</code>. The index into the orderinal
+         * position of the arity 3 key component for the filter keys. The value
+         * at that index is the position in the {@link SPOKeyOrder} of the quads
+         * mode index whose natural order determines the order of arrival of the
+         * {@link ISPO} objects at this filter.
+         * <p>
+         * Thus, given indexKeyOrder = {@link SPOKeyOrder#CSPO}, the array:
+         * 
+         * <pre>
+         * int[] = {1,2,3}
+         * </pre>
+         * 
+         * would correspond to the filter key order SPO, which is the best
+         * possible filter key order for the natural order order of the
+         * {@link SPOKeyOrder#CSPO} index.
+         * <p>
+         * Note, however, that key orders can be expressed in this manner which
+         * are not defined by {@link SPOKeyOrder}. For example, given
+         * {@link SPOKeyOrder#PCSO} the best filter key order is
+         * <code>PSO</code>. While there is no <code>PSO</code> key order
+         * declared by the {@link SPOKeyOrder} class, we can use
+         * 
+         * <pre>
+         * int[] = {0,2,3}
+         * </pre>
+         * 
+         * which models the <code>PSO</code> key order for the purposes of this
+         * class.
+         */
+        String FILTER_KEY_ORDER = "filterKeyOrder";
+        
     }
 
     /**
      * A instance using the default configuration for the in memory hash map.
+     * 
+     * @param indexKeyOrder
+     *            The natural order in which the {@link ISPO}s will arrive at
+     *            this filter. This is used to decide on the filter key order
+     *            which will have the best locality given the order of arrival.
      */
-    public static NativeDistinctFilter newInstance() {
-        return new NativeDistinctFilter(BOp.NOARGS, BOp.NOANNS);
+    public static NativeDistinctFilter newInstance(
+            final SPOKeyOrder indexKeyOrder) {
+
+        final int[] filterKeyOrder = getFilterKeyOrder(indexKeyOrder);
+
+        return new NativeDistinctFilter(BOp.NOARGS, Collections.singletonMap(
+                Annotations.FILTER_KEY_ORDER, (Object) filterKeyOrder));
+
     }
     
     /**
@@ -127,6 +178,49 @@ public class NativeDistinctFilter extends BOpFilterBase {
         
     }
 
+    /**
+     * Find the 3-component key order which has the best locality given that the
+     * SPOs will be ariving in the natural order of the [keyOrder] index. This
+     * is the keyOrder that we will use for the filter. This gives the filter
+     * index structure the best possible locality in terms of the order in which
+     * the SPOs are arriving.
+     * 
+     * @see Annotations#FILTER_KEY_ORDER
+     */
+    public static int[] getFilterKeyOrder(SPOKeyOrder indexKeyOrder) {
+
+        if (indexKeyOrder == null)
+            throw new IllegalArgumentException();
+
+        if (indexKeyOrder.getKeyArity() != 4)
+            throw new IllegalArgumentException();
+
+        final int[] filterKeyOrder;
+        switch (indexKeyOrder.index()) {
+        case SPOKeyOrder._SPOC:
+            filterKeyOrder = new int[] { 0, 1, 2 };
+            break;
+        case SPOKeyOrder._CSPO:
+            filterKeyOrder = new int[] { 1, 2, 3 };
+            break;
+        case SPOKeyOrder._POCS:
+            filterKeyOrder = new int[] { 0, 1, 3 };
+            break;
+        case SPOKeyOrder._OCSP:
+            filterKeyOrder = new int[] { 0, 2, 3 };
+            break;
+        case SPOKeyOrder._PCSO:
+            filterKeyOrder = new int[] { 0, 2, 3 };
+            break;
+        case SPOKeyOrder._SOPC:
+            filterKeyOrder = new int[] { 0, 1, 2 };
+            break;
+        default:
+            throw new AssertionError();
+        }
+        return filterKeyOrder;
+    }
+    
     private class DistinctFilterImpl extends Filter {
 
         private static final long serialVersionUID = 1L;
@@ -151,6 +245,13 @@ public class NativeDistinctFilter extends BOpFilterBase {
          */
         private final IKeyBuilder keyBuilder;
 
+        /**
+         * The key order used to build the keys for the DISTINCT SPO filter.
+         * 
+         * @see Annotations#FILTER_KEY_ORDER
+         */
+        private final int[] filterKeyOrder;
+        
         /**
          * A persistence capable index for very large data sets. This is
          * allocated IFF the {@link #lru} overflows at least once.
@@ -197,7 +298,10 @@ public class NativeDistinctFilter extends BOpFilterBase {
              * index is created.
              */
             {
-                
+
+                filterKeyOrder = (int[]) NativeDistinctFilter.this
+                        .getRequiredProperty(Annotations.FILTER_KEY_ORDER);
+
                 metadata = new IndexMetadata(UUID.randomUUID());
 
                 // IFF BTree
@@ -330,11 +434,20 @@ public class NativeDistinctFilter extends BOpFilterBase {
                 return false;
             }
 
-            // Build the key.
+            /*
+             * Build the key in the order in which the hash join is visiting the
+             * B+Tree AP. This gives the DISTINCT index the best possible
+             * locality in terms of the natural order in which the SPOs will be
+             * arriving.
+             */
             keyBuilder.reset();
-            IVUtility.encode(keyBuilder, spo.s());
-            IVUtility.encode(keyBuilder, spo.p());
-            IVUtility.encode(keyBuilder, spo.o());
+
+            for (int i = 0; i < 3; i++) {
+
+                IVUtility.encode(keyBuilder, spo.get(filterKeyOrder[i]));
+
+            }
+
             final byte[] key = keyBuilder.getKey();
             
             if (index != null && index.contains(key)) {
