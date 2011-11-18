@@ -30,8 +30,8 @@ package com.bigdata.bop.join;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -1190,7 +1190,12 @@ public class PipelineJoin<E> extends PipelineOp implements
 				if (log.isDebugEnabled())
 					log.debug("chunkSize=" + chunk.length);
 
-				final Map<IPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<E>, Collection<IBindingSet>>(
+                /*
+                 * Note: HashMap is used in preference to LinkedHashMap for
+                 * better speed. We do not need to maintain order in this
+                 * collection.
+                 */
+				final Map<IPredicate<E>, Collection<IBindingSet>> map = new HashMap<IPredicate<E>, Collection<IBindingSet>>(
 						chunk.length);
 
 				for (IBindingSet bindingSet : chunk) {

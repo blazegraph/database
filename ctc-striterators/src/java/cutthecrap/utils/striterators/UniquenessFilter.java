@@ -25,7 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.Set;
 
 /******************************************************************************
  * UniquenessFilter
@@ -40,7 +41,7 @@ public class UniquenessFilter extends Filter {
 
     private static final long serialVersionUID = 424197241022124358L;
 //    ArrayList m_members = new ArrayList();
-    private final LinkedHashSet<Object> m_members = new LinkedHashSet<Object>();
+    private final Set<Object> m_members = new HashSet<Object>();
 	
   public UniquenessFilter() {
   }

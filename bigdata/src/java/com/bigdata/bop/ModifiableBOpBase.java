@@ -144,6 +144,21 @@ public class ModifiableBOpBase extends CoreBaseBOp {
     
     }
     
+    @Override
+    protected boolean annotationsEqual(final BOp o) {
+
+        if (o instanceof ModifiableBOpBase) {
+
+            // Fast path when comparing two modifiable bops.
+            return annotationsEqual(annotations,
+                    ((ModifiableBOpBase) o).annotations);
+
+        }
+
+        return super.annotationsEqual(annotations, o.annotations());
+
+    }
+
     public BOp get(final int index) {
         
         return args.get(index);

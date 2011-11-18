@@ -280,10 +280,29 @@ abstract public class CoreBaseBOp implements BOp {
 
         }
 
-        return annotationsEqual(annotations(), o.annotations());
+        return annotationsEqual(o);
 
     }
 
+    /**
+     * Return <code>true</code> iff the annotations of this {@link BOp} and the
+     * other {@link BOp} are equals.
+     * <p>
+     * Note: This method permits override by subclasses with direct access to
+     * the maps to be compared.
+     * 
+     * @see #annotationsEqual(Map, Map)
+     */
+    protected boolean annotationsEqual(final BOp o) {
+
+        final Map<String, Object> m1 = annotations();
+        
+        final Map<String, Object> m2 = o.annotations();
+        
+        return annotationsEqual(m1,m2);
+        
+    }    
+    
     /**
      * Compares two maps. If the value under a key is an array, then uses
      * {@link Arrays#equals(Object[], Object[])} to compare the values rather
@@ -298,9 +317,11 @@ abstract public class CoreBaseBOp implements BOp {
      *            
      * @return <code>true</code> iff the annotations have the same data.
      */
-    private static final boolean annotationsEqual(final Map<String, Object> m1,
-            final Map<String, Object> m2) {
-
+    static protected final boolean annotationsEqual(
+            final Map<String, Object> m1,//
+            final Map<String, Object> m2//
+            ) {
+        
         if (m1 == m2)
             return true;
 

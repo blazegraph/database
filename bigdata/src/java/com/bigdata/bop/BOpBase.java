@@ -183,6 +183,20 @@ public class BOpBase extends CoreBaseBOp {
     
     }
 
+    @Override
+    protected boolean annotationsEqual(final BOp o) {
+
+        if (o instanceof BOpBase) {
+
+            // Fast path when comparing two immutable bops.
+            return annotationsEqual(annotations, ((BOpBase) o).annotations);
+
+        }
+
+        return super.annotationsEqual(annotations, o.annotations());
+
+    }
+    
     /**
      * A copy of the args[] array.
      */

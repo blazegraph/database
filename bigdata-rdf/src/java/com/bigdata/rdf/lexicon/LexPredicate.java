@@ -147,9 +147,11 @@ public class LexPredicate extends Predicate<BigdataValue> {
         super(op);
     }
 
+    @Override
     public LexPredicate clone() {
 
-        return (LexPredicate) super.clone();
+        // Fast path for clone().
+        return new LexPredicate(this);
         
     }
 
@@ -182,12 +184,10 @@ public class LexPredicate extends Predicate<BigdataValue> {
     @Override
     public LexPredicate asBound(final IBindingSet bindingSet) {
 
-        if (bindingSet == null)
-            throw new IllegalArgumentException();
+        return (LexPredicate) new LexPredicate(argsCopy(), annotationsRef())
+                ._asBound(bindingSet);
         
-        final LexPredicate tmp = (LexPredicate) super.asBound(bindingSet);
-
-        return tmp;
+//        return (LexPredicate) super.asBound(bindingSet);
 
     }
 
