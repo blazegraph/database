@@ -1,4 +1,9 @@
 # BSBM BI Q7
+#
+# Query 7: Products in the top 1000 most offered products of a certain product type that are not sold by vendors of a specific country
+#
+# Use Case Motivation: A vendor wants information about potential market niches to offer new products in the vendor's country of origin.
+
 prefix bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 prefix bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
 prefix xsd: <http://www.w3.org/2001/XMLSchema#>

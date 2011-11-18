@@ -1,4 +1,9 @@
 # BSBM BI Q3
+#
+# Query 3: Products with largest increase of interest (ratio of review counts) from one month to the next.
+#
+# Use Case Motivation: Some stakeholder wants to get a list of products with the highest increase in popularity in a certain period for further investigation.
+#
 # Last Changed Rev: 5682
 # Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
 # solutions=10, chunks=1, elapsed=87239ms.

@@ -1,7 +1,10 @@
 # BSBM BI Q4
 #
-# Note: Sesame xsd:string prevents running the original query.  The modified
-# version works fine.
+# Query 4: Feature with the highest ratio between price with that feature and price without that feature.
+#
+# Use Case Motivation: A customer wants to inform herself which features have the most impact on the product price to get hints on how to restrict the following product search.
+#
+# Note: xsd:string => str(), but 2x faster if you just do sum(?price)!
 #
 # Last Changed Rev: 5682
 # Last Changed Date: 2011-11-17 20:09:12 -0500 (Thu, 17 Nov 2011)
@@ -16,16 +19,14 @@ prefix xsd: <http://www.w3.org/2001/XMLSchema#>
 
 Select ?feature ((?sumF*(?countTotal-?countF))/(?countF*(?sumTotal-?sumF)) As ?priceRatio)
   {
-#    { Select (count(?price) As ?countTotal) (sum(xsd:float(xsd:string(?price))) As ?sumTotal)
-     { Select (count(?price) As ?countTotal) (sum(?price) As ?sumTotal)
+    { Select (count(?price) As ?countTotal) (sum(xsd:float(str(?price))) As ?sumTotal)
       {
         ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> .
         ?offer bsbm:product ?product ;
                bsbm:price ?price .
       }
     }
-#    { Select ?feature (count(?price2) As ?countF) (sum(xsd:float(xsd:string(?price2))) As ?sumF)
-    { Select ?feature (count(?price2) As ?countF) (sum(?price2) As ?sumF)
+    { Select ?feature (count(?price2) As ?countF) (sum(xsd:float(str(?price2))) As ?sumF)
       {
         ?product2 a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType3> ;
                  bsbm:productFeature ?feature .
