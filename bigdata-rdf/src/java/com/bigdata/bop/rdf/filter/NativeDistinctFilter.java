@@ -158,7 +158,9 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * Note: Maybe either a {@link BTree} or an {@link HTree}. The code has
          * paths for both.
          */
-        private volatile BTree index;
+        // TODO Edit HTree/BTree here.
+//        private volatile BTree index;
+        private volatile HTree index;
         private volatile MemStore store;
         
         @Override
@@ -287,7 +289,9 @@ public class NativeDistinctFilter extends BOpFilterBase {
              * Create the index. It will support incremental eviction and
              * persistence.
              */
-            index = BTree.create(store, metadata);
+            // TODO Edit HTree/BTree here.
+//            index = BTree.create(store, metadata);
+            index = HTree.create(store, metadata);
             
         }
         
@@ -379,23 +383,14 @@ public class NativeDistinctFilter extends BOpFilterBase {
          * @param key
          * @return <code>true</code> iff not already present.
          */
-        private boolean add(final HTree members,final byte[] key) {
-            
+        private boolean add(final HTree members, final byte[] key) {
+
             if(members.contains(key)) {
                 
                 return false;
                 
             }
             
-//            final ITupleIterator<?> itr = members.lookupAll(key);
-//
-//            if (itr.hasNext()) {
-//
-//                // Already in the map.
-//                return false;
-//
-//            }
-
             // Add to the map.
             members.insert(key, null/* val */);
 
