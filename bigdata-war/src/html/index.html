@@ -16,7 +16,11 @@ documentation</a> for information on using the NanoSparqlServer's REST Api.
 
 </p>
 
-<FORM action="sparql" method="get">
+<!-- Note: Some applications (firefox 7) can not handle a GET with a very long
+     URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
+     use GET for database queries since they are, by and large, idempotent. 
+     -->
+<FORM action="sparql" method="post">
    <P>
    <TEXTAREA name="query" rows="30" cols="100"
    >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
