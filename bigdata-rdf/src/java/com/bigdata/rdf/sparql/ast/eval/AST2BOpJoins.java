@@ -66,6 +66,7 @@ import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
@@ -839,8 +840,14 @@ public class AST2BOpJoins extends AST2BOpFilters {
             }
         }
         if (nativeDistinct) {
+            /*
+             * The index that will be used to read on the B+Tree access path.
+             */
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            final SPOKeyOrder indexKeyOrder = SPOKeyOrder.getKeyOrder(
+                    (IPredicate) pred, 4/* keyArity */);
             // Native memory based DISTINCT filter.
-            return NativeDistinctFilter.newInstance();
+            return NativeDistinctFilter.newInstance(indexKeyOrder);
         } else {
             // JVM Based DISTINCT filter.
             return DistinctFilter.newInstance();
