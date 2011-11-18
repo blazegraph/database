@@ -26,7 +26,6 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.query.algebra.evaluation.ValueExprEvaluationException;
 import org.openrdf.query.algebra.evaluation.function.Function;
@@ -48,16 +47,15 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 /**
  * Call one of the Sesame casting functions.
  */
-public class FuncBOp extends IVValueExpression<IV> 
-		implements INeedsMaterialization {
+public class FuncBOp extends IVValueExpression<IV> implements
+        INeedsMaterialization {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 2587499644967260639L;
 	
-	private static final transient Logger log = Logger.getLogger(FuncBOp.class);
-	
+//	private static final transient Logger log = Logger.getLogger(FuncBOp.class);
 
 	public interface Annotations extends BOp.Annotations {
 
@@ -67,6 +65,7 @@ public class FuncBOp extends IVValueExpression<IV>
 
     }
 	
+    @SuppressWarnings("rawtypes")
     public FuncBOp(final IValueExpression<? extends IV>[] args, 
     		final String func, final String lex) {
         
@@ -91,6 +90,40 @@ public class FuncBOp extends IVValueExpression<IV>
 		
     }
 
+    private Function getFunc() {
+
+        if (funct == null) {
+
+            final String funcName = (String) getRequiredProperty(Annotations.FUNCTION);
+
+            funct = FunctionRegistry.getInstance().get(funcName);
+
+            if (funct == null) {
+                throw new RuntimeException("Unknown function '" + funcName
+                        + "'");
+            }
+
+        }
+
+        return funct;
+
+    }
+    private transient volatile Function funct;
+
+    private BigdataValueFactory getValueFactory() {
+
+        if (vf == null) {
+
+            final String namespace = (String) getRequiredProperty(Annotations.NAMESPACE);
+
+            vf = BigdataValueFactoryImpl.getInstance(namespace);
+
+        }
+        return vf;
+
+    }
+    private transient volatile BigdataValueFactory vf;
+
     /**
      * Required deep copy constructor.
      */
@@ -98,6 +131,7 @@ public class FuncBOp extends IVValueExpression<IV>
         super(op);
     }
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public IV get(final IBindingSet bs) {
         
 //    	final List<BOp> args = args();
@@ -108,9 +142,9 @@ public class FuncBOp extends IVValueExpression<IV>
 
     		final IV<?,?> iv = get(i).get(bs);
     		
-            if (log.isDebugEnabled()) {
-            	log.debug(iv);
-            }
+//            if (log.isDebugEnabled()) {
+//            	log.debug(iv);
+//            }
 
             // not yet bound
             if (iv == null)
@@ -125,26 +159,15 @@ public class FuncBOp extends IVValueExpression<IV>
             
     	}
     	
-    	final String funcName = 
-    		(String) getRequiredProperty(Annotations.FUNCTION);
-    	
-    	final Function func = FunctionRegistry.getInstance().get(funcName);
+    	final Function func = getFunc();
 
-		if (func == null) {
-			throw new RuntimeException("Unknown function '" + funcName + "'");
-		}
-		
-        final String namespace = (String)
-	    	getRequiredProperty(Annotations.NAMESPACE);
-	    
-	    final BigdataValueFactory vf = 
-	    	BigdataValueFactoryImpl.getInstance(namespace);
+	    final BigdataValueFactory vf = getValueFactory();
     
 	    try {
 	    
 	    	final BigdataValue val = (BigdataValue) func.evaluate(vf, vals);
 	    	
-	    	IV iv = val.getIV();
+            IV iv = val.getIV();
 	    	
 	    	if (iv == null) {
 	    		
@@ -175,6 +198,5 @@ public class FuncBOp extends IVValueExpression<IV>
     	return INeedsMaterialization.Requirement.ALWAYS;
     	
     }
-    
-    
+        
 }
