@@ -198,13 +198,43 @@ public interface QueryHints {
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
-     * filter to as-bound evaluation for each graph in the data set.
+     * filter to as-bound evaluation for each graph in the data set (default
+     * {@value #DEFAULT_ACCESS_PATH_SAMPLE_LIMIT}). The samples are taken from
+     * the data set. Each sample is a graph (aka context) in the data set. The
+     * range counts and estimated cost to visit the AP for each of the sampled
+     * contexts are combined to estimate the total cost of visiting all of the
+     * contexts in the NG or DG access path.
+     * <p>
+     * When ZERO (0), no cost estimation will be performed and the named graph
+     * or default graph join will always use approach specified by the boolean
+     * {@link #ACCESS_PATH_SCAN_AND_FILTER}.
      */
     String ACCESS_PATH_SAMPLE_LIMIT = QueryHints.class.getName()
             + ".accessPathSampleLimit";
 
+    /**
+     * Note: Set to ZERO to disable AP sampling for default and named graphs.
+     */
     int DEFAULT_ACCESS_PATH_SAMPLE_LIMIT = 100;
+    
+    /**
+     * For named and default graph access paths where access path cost
+     * estimation is disabled by setting the {@link #ACCESS_PATH_SAMPLE_LIMIT}
+     * to ZERO (0), this query hint determines whether a SCAN + FILTER or
+     * PARALLEL SUBQUERY (aka as-bound data set join) approach.
+     */
+    String ACCESS_PATH_SCAN_AND_FILTER = QueryHints.class.getName()
+            + ".accessPathScanAndFilter";  
 
+    /**
+     * Note: To ALWAYS use either SCAN + FILTER or PARALLEL subquery, set
+     * {@link #DEFAULT_ACCESS_PATH_SAMPLE_LIMIT} to ZERO (0) and set this to the
+     * desired method for named graph and default graph evaluation. Note that
+     * you MAY still override this behavior within a given scope using a query
+     * hint.
+     */
+    boolean DEFAULT_ACCESS_PATH_SCAN_AND_FILTER = true;
+    
     /**
      * The {@link UUID} to be assigned to the {@link IRunningQuery} (optional).
      * This query hint makes it possible for the application to assign the
