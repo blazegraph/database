@@ -154,52 +154,55 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Quads mode.
              */
 
-            if (enableDecisionTree) {
-                /*
-                 * Strip off the named graph or default graph expander (in the
-                 * long term it will simply not be generated.)
-                 */
-                pred = pred
-                        .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
+//            if (enableDecisionTree) {
+//            /*
+//             * Strip off the named graph or default graph expander (in the long
+//             * term it will simply not be generated.)
+//             */
+//            pred = pred
+//                    .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
+            // TODO Verifying that the expanders are not present.  Take this  
+            // assert out once we have proven that the expanders are not present.
+            assert pred.getProperty(IPredicate.Annotations.ACCESS_PATH_EXPANDER) == null;
 
-                switch (scope) {
-                case NAMED_CONTEXTS:
-                    left = namedGraphJoin(ctx,//queryEngine, context, idFactory,
-                            left, anns, pred, dataset, queryHints);
-                    break;
-                case DEFAULT_CONTEXTS:
-                    left = defaultGraphJoin(ctx,//queryEngine, context, idFactory,
-                            left, anns, pred, dataset, queryHints);
-                    break;
-                default:
-                    throw new AssertionError();
-                }
-
-            } else {
-
-                /*
-                 * This is basically the old way of handling quads query using
-                 * expanders which were attached by toPredicate() in
-                 * BigdataEvaluationStrategyImpl.
-                 * 
-                 * FIXME Remove this code path and the expander patterns from
-                 * the code base.
-                 */
-
-                final boolean scaleOut = ctx.isCluster();
-
-                if (scaleOut)
-                    throw new UnsupportedOperationException();
-
-                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.ANY));
-
-                anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
-
-                left = newJoin(ctx, left, anns, queryHints,
-                        false/* defaultGraphFilter */, null/* summary */);
-
+            switch (scope) {
+            case NAMED_CONTEXTS:
+                left = namedGraphJoin(ctx, left, anns, pred, dataset,
+                        queryHints);
+                break;
+            case DEFAULT_CONTEXTS:
+                left = defaultGraphJoin(ctx, left, anns, pred, dataset,
+                        queryHints);
+                break;
+            default:
+                throw new AssertionError();
             }
+
+//            } else {
+//
+//                /*
+//                 * This is basically the old way of handling quads query using
+//                 * expanders which were attached by toPredicate() in
+//                 * BigdataEvaluationStrategyImpl.
+//                 * 
+//                 * FIXME Remove this code path and the expander patterns from
+//                 * the code base.
+//                 */
+//
+//                final boolean scaleOut = ctx.isCluster();
+//
+//                if (scaleOut)
+//                    throw new UnsupportedOperationException();
+//
+//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.ANY));
+//
+//                anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+//
+//                left = newJoin(ctx, left, anns, queryHints,
+//                        false/* defaultGraphFilter */, null/* summary */);
+//
+//            }
 
         } else {
 
