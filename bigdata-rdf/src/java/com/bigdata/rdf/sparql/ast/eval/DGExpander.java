@@ -40,6 +40,8 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by https://sourceforge.net/apps/trac/bigdata/ticket/407
  */
 public class DGExpander implements IAccessPathExpander<ISPO> {
 

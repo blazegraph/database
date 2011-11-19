@@ -525,7 +525,7 @@ public class TestASTQueryHintOptimizer extends
         assertSameAST(expected, actual);
 
     }
-        
+
     /**
      * Test verifies that a query hint with "group" scope is applied to the
      * top-level group.
@@ -696,7 +696,7 @@ public class TestASTQueryHintOptimizer extends
         final IV votedBy = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/vote/votedBy"));
 
         @SuppressWarnings("rawtypes")
-        final IV scopeGroup = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Group));
+        final IV scopeQuery= makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Query));
         @SuppressWarnings("rawtypes")
         final IV nativeDistinct = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.NATIVE_DISTINCT_SOLUTIONS));
         @SuppressWarnings("rawtypes")
@@ -732,17 +732,17 @@ public class TestASTQueryHintOptimizer extends
                 given.setWhereClause(whereClause);
 
                 whereClause.addChild(new StatementPatternNode(new ConstantNode(
-                        scopeGroup), new ConstantNode(nativeDistinct),
+                        scopeQuery), new ConstantNode(nativeDistinct),
                         new ConstantNode(t), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 
                 whereClause.addChild(new StatementPatternNode(new ConstantNode(
-                        scopeGroup), new ConstantNode(nativeHashJoins),
+                        scopeQuery), new ConstantNode(nativeHashJoins),
                         new ConstantNode(t), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 
                 whereClause.addChild(new StatementPatternNode(new ConstantNode(
-                        scopeGroup), new ConstantNode(mergeJoin),
+                        scopeQuery), new ConstantNode(mergeJoin),
                         new ConstantNode(t), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 

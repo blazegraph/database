@@ -40,6 +40,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
@@ -59,13 +60,6 @@ import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
  * <p>
  * The evaluation context is {@link BOpEvaluationContext#ANY}.
  * 
- * @todo An alternative would be to develop an inline access path and then
- *       specify a standard predicate which references the data in its
- *       annotation. That could then generalize to a predicate which references
- *       persistent data, query or tx local data, or inline data. However, the
- *       DataSetJoin is still far simpler since it does not need to worry about
- *       internal parallelism, alternative sinks, or etc.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -81,14 +75,14 @@ public class DataSetJoin extends PipelineOp {
         /**
          * The variable to be bound.
          */
-        String VAR = (DataSetJoin.class.getName() + ".var").intern();
+        String VAR = DataSetJoin.class.getName() + ".var";
 
         /**
          * The {@link Set} of {@link IV}s to be bound. A {@link LinkedHashSet}
          * should be used for efficiency since it provides fast ordered scans
          * and fast point tests.
          */
-        String GRAPHS = (DataSetJoin.class.getName() + ".graphs").intern();
+        String GRAPHS = DataSetJoin.class.getName() + ".graphs";
 
     }
 
@@ -118,13 +112,19 @@ public class DataSetJoin extends PipelineOp {
 
     }
 
+    public DataSetJoin(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
+        
+    }
+    
     public IVariable<?> getVar() {
 
         return (IVariable<?>) getRequiredProperty(Annotations.VAR);
 
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Set<IV> getGraphs() {
 
         return (Set<IV>) getRequiredProperty(Annotations.GRAPHS);
@@ -148,7 +148,7 @@ public class DataSetJoin extends PipelineOp {
         
         private final IVariable<?> var;
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         private final Set<IV> graphs;
 
         DataSetJoinTask(final DataSetJoin op,
@@ -214,7 +214,7 @@ public class DataSetJoin extends PipelineOp {
          * @param tmp
          *            Where to write the data.
          */
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("rawtypes")
         private void handleChunk(final IBindingSet[] chunk,
                 final UnsynchronizedArrayBuffer<IBindingSet> tmp) {
 

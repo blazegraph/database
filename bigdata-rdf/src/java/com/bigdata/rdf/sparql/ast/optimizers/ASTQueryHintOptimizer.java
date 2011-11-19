@@ -217,7 +217,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         for (ASTBase t : list) {
 
-            applyQueryHints(context, t, queryHints);
+            applyQueryHints(context, QueryHintScope.Query, t, queryHints);
 
         }
         
@@ -231,7 +231,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param queryHints
      *            The query hints.
      */
-    private void applyQueryHints(final AST2BOpContext context, final ASTBase t,
+    private void applyQueryHints(final AST2BOpContext context,
+            final QueryHintScope scope, final ASTBase t,
             final Properties queryHints) {
 
         /*
@@ -247,7 +248,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final String value = queryHints.getProperty(name);
 
-            _applyQueryHint(context, t, name, value);
+            _applyQueryHint(context, scope, t, name, value);
 
         }
         
@@ -266,32 +267,41 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            TODO This method is a hook for query hints which have
      *            side-effects on other things. That hook should be made more
      *            declarative.
-     * 
-     *            TODO The {@link QueryHintScope} needs to be passed in here as
-     *            some hints are only allowed in some scopes. (For example,
-     *            native hash joins are only allowed in the Query scope since
-     *            the producers and consumers of hash indices need to be using
-     *            the same hash index implementations.)
      */
-    private void _applyQueryHint(final AST2BOpContext context, final ASTBase t,
-            final String name, final String value) {
+    private void _applyQueryHint(final AST2BOpContext context,
+            final QueryHintScope scope, final ASTBase t, final String name,
+            final String value) {
 
-        if (name.equals(QueryHints.ANALYTIC)) {
-            context.nativeHashJoins = Boolean.valueOf(value);
-            context.nativeDistinctSolutions = Boolean.valueOf(value);
-            context.nativeDistinctSPO = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.MERGE_JOIN)) {
-            context.mergeJoin = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
-            context.nativeHashJoins = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.NATIVE_DISTINCT_SOLUTIONS)) {
-            context.nativeDistinctSolutions = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.NATIVE_DISTINCT_SPO)) {
-            context.nativeDistinctSPO = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.REMOTE_APS)) {
-            context.remoteAPs = Boolean.valueOf(value);
-        } else if (name.equals(QueryHints.ACCESS_PATH_SAMPLE_LIMIT)) {
-            context.accessPathSampleLimit = Integer.valueOf(value);
+        if (scope == QueryHintScope.Query) {
+            /*
+             * All of these hints either are only permitted in the Query scope
+             * or effect the default settings for the evaluation of this query
+             * when they appear in the Query scope. For the latter category, the
+             * hints may also appear in other scopes. For example, you can
+             * override the access path sampling behavior either for the entire
+             * query, for all BGPs in some scope, or for just a single BGP.
+             */
+            if (name.equals(QueryHints.ANALYTIC)) {
+                context.nativeHashJoins = Boolean.valueOf(value);
+                context.nativeDistinctSolutions = Boolean.valueOf(value);
+                context.nativeDistinctSPO = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.MERGE_JOIN)) {
+                context.mergeJoin = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
+                context.nativeHashJoins = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SOLUTIONS)) {
+                context.nativeDistinctSolutions = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SPO)) {
+                context.nativeDistinctSPO = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.REMOTE_APS)) {
+                context.remoteAPs = Boolean.valueOf(value);
+            } else if (name.equals(QueryHints.ACCESS_PATH_SAMPLE_LIMIT)) {
+                context.accessPathSampleLimit = Integer.valueOf(value);
+            } else if (name.equals(QueryHints.ACCESS_PATH_SCAN_AND_FILTER)) {
+                context.accessPathScanAndFilter = Boolean.valueOf(value);
+            } else {
+                t.setQueryHint(name, value);
+            }
         } else {
             t.setQueryHint(name, value);
         }
@@ -616,19 +626,19 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         switch (scope) {
         case Query: {
-            applyToQuery(context, queryRoot, name, value);
+            applyToQuery(context, scope, queryRoot, name, value);
             break;
         }
         case SubQuery: {
-            applyToSubQuery(context, queryBase, group, name, value);
+            applyToSubQuery(context, scope, queryBase, group, name, value);
             break;
         }
         case Group: {
-            applyToGroup(context, group, name, value);
+            applyToGroup(context, scope, group, name, value);
             break;
         }
         case GroupAndSubGroups: {
-            applyToGroupAndSubGroups(context, group, name, value);
+            applyToGroupAndSubGroups(context, scope, group, name, value);
             break;
         }
         case BGP: {
@@ -637,7 +647,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                         "Query hint with BGP scope must follow the statement pattern to which it will bind.");
             }
             // Apply to just the last SP.
-            _applyQueryHint(context, (ASTBase) lastSP, name, value);
+            _applyQueryHint(context, scope, (ASTBase) lastSP, name, value);
             break;
         }
         default:
@@ -652,6 +662,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToSubQuery(final AST2BOpContext context,
+            final QueryHintScope scope,
             final QueryBase queryBase,
             GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
@@ -670,11 +681,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         }
 
         // Apply to all child groups of that top-level group.
-        applyToGroupAndSubGroups(context, group, name, value);
+        applyToGroupAndSubGroups(context, scope, group, name, value);
 
         if (isNodeAcceptingQueryHints(queryBase)) {
 
-            _applyQueryHint(context, (ASTBase) queryBase, name, value);
+            _applyQueryHint(context, scope, (ASTBase) queryBase, name, value);
 
         }
 
@@ -688,7 +699,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToQuery(final AST2BOpContext context,
-            final QueryRoot queryRoot, final String name, final String value) {
+            final QueryHintScope scope, final QueryRoot queryRoot,
+            final String name, final String value) {
 
         if (context.queryHints != null) {
             /*
@@ -725,7 +737,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
         for(ASTBase t : list) {
 
-            _applyQueryHint(context, t, name, value);
+            _applyQueryHint(context, scope, t, name, value);
             
         }
         
@@ -740,16 +752,17 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      */
     @SuppressWarnings("unchecked")
     private void applyToGroupAndSubGroups(final AST2BOpContext context,
+            final QueryHintScope scope,
             final GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            _applyQueryHint(context, (ASTBase) child, name, value);
+            _applyQueryHint(context, scope, (ASTBase) child, name, value);
 
             if (child instanceof GraphPatternGroup<?>) {
 
-                applyToGroupAndSubGroups(context,
+                applyToGroupAndSubGroups(context, scope,
                         (GraphPatternGroup<IGroupMemberNode>) child, name,
                         value);
 
@@ -759,7 +772,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         if(isNodeAcceptingQueryHints(group)) {
 
-            _applyQueryHint(context, (ASTBase) group, name, value);
+            _applyQueryHint(context, scope, (ASTBase) group, name, value);
             
         }
 
@@ -773,18 +786,19 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param value
      */
     private void applyToGroup(final AST2BOpContext context,
+            final QueryHintScope scope,
             final GraphPatternGroup<IGroupMemberNode> group, final String name,
             final String value) {
 
         for (IGroupMemberNode child : group) {
 
-            _applyQueryHint(context, (ASTBase) child, name, value);
+            _applyQueryHint(context, scope, (ASTBase) child, name, value);
 
         }
 
         if (isNodeAcceptingQueryHints(group)) {
 
-            _applyQueryHint(context, (ASTBase) group, name, value);
+            _applyQueryHint(context, scope, (ASTBase) group, name, value);
             
         }
 

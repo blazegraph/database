@@ -63,6 +63,7 @@ import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -108,16 +109,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
      */
     @SuppressWarnings("rawtypes")
     public static PipelineOp join(//
-            final AST2BOpContext ctx,
-//            final AbstractTripleStore db,//
-//            final QueryEngine queryEngine,//
+            final AST2BOpContext ctx,//
             PipelineOp left,//
             Predicate pred,//
             final Set<IVariable<?>> doneSet,// variables known to be materialized.
             final Collection<IConstraint> constraints,//
-//            final BOpContextBase context, //
-//            final AtomicInteger idFactory,//
-            final Properties queryHints
+            final Properties queryHints//
             ) {
 
         final int joinId = ctx.idFactory.incrementAndGet();
@@ -219,10 +216,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
          * materializations steps to the pipeline and then add the filter to the
          * pipeline.
          */
-        left = addMaterializationSteps(ctx,
-                left, doneSet, needsMaterialization, 
-//                db, queryEngine, idFactory, context, 
-                queryHints);
+
+        left = addMaterializationSteps(ctx, left, doneSet,
+                needsMaterialization, queryHints);
 
         return left;
 
@@ -230,12 +226,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
     /**
      * Generate a {@link PipelineJoin} for a triples mode access path.
-     *
-     * @param queryEngine
+     * 
+     * @param ctx
      * @param left
      * @param anns
      * @param pred
-     *
+     * 
      * @return The join operator.
      */
     private static PipelineOp triplesModeJoin(final AST2BOpContext ctx,
@@ -243,39 +239,46 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final Properties queryHints) {
 
         final boolean scaleOut = ctx.isCluster();
+
         if (scaleOut && !ctx.remoteAPs) {
+
             /*
              * All triples queries can run shard-wise in scale-out.
              */
+
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
+
             pred = (Predicate) pred.setProperty(
                     Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+
         } else {
+
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.ANY));
+
         }
 
-        anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
+        anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
-        return newJoin(ctx, left, anns, queryHints, false/* defaultGraphFilter */,
-                null/* summary */);
+        return newJoin(ctx, left, anns, queryHints,
+                false/* defaultGraphFilter */, null/* summary */);
 
     }
 
     /**
      * Generate a named graph join (quads mode).
      *
-     * @param queryEngine
+     * @param ctx
      * @param left
      * @param anns
      * @param pred
-     * @param cvar
+     * @param dataset
      * @return
      *
      * @todo If the context position is shared by some other variable which we
      *       know to be bound based on the selected join order, then we need to
-     *       treat the context variable as during this analysis.
+     *       treat the context variable as bound during this analysis.
      *
      * @todo Since we do not know the specific asBound values, but only that
      *       they will be bound, we should defer the SCAN versus SUBQUERY
@@ -283,8 +286,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       basically a special case of runtime query optimization.
      */
     private static PipelineOp namedGraphJoin(final AST2BOpContext ctx,
-//            final BOpContextBase context, 
-//            final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
@@ -329,11 +330,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
         }
 
         /*
-         * @todo raise this into the caller and do one per rule rather than once
-         * per access path. While a query can mix default and named graph access
-         * paths, there is only one named graph collection and one default graph
+         * Note: While a query can mix default and named graph access paths,
+         * there is only one named graph collection and one default graph
          * collection within the scope of that query.
          */
+
         final DataSetSummary summary = dataset.getNamedGraphs();
 
         anns.add(new NV(Annotations.NKNOWN, summary.nknown));
@@ -368,8 +369,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * binding onto the variable for solutions which join.
              *
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/359
-             *
-             * Fixed by changing to the two-arg constructor for Constant.
              */
 
             pred = pred.asBound((IVariable<?>) pred.get(3),
@@ -384,42 +383,61 @@ public class AST2BOpJoins extends AST2BOpFilters {
         }
 
         /*
-         * Estimate cost of SCAN with C unbound.
-         *
-         * Note: We need to use global index view in order to estimate the cost
-         * of the scan even though the scan will be shard-wise when we actually
-         * run the query.
-         * 
-         * FIXME We need a higher threshold (and a cheaper test) to decide when
-         * we should SCAN+FILTER. 
-         * 
-         * @todo must pass estimateCost() to the underlying access path plus
-         * layer on any cost for the optional expander.
          */
+        final int accessPathSampleLimit = pred.getProperty(
+                QueryHints.ACCESS_PATH_SAMPLE_LIMIT, ctx.accessPathSampleLimit);
+        final boolean estimateCosts = accessPathSampleLimit >= 0;
         @SuppressWarnings("rawtypes")
         final IRelation r = ctx.context.getRelation(pred);
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        final ScanCostReport scanCostReport = ((AccessPath) ctx.context
-                .getAccessPath(r, (Predicate<?>) pred.setProperty(
-                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
-                .estimateCost();
+        final ScanCostReport scanCostReport;
+        final SubqueryCostReport subqueryCostReport;
+        final boolean scanAndFilter;
 
-        anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
+        if (estimateCosts) {
 
-        /*
-         * Estimate cost of SUBQUERY with C bound (sampling).
-         *
-         * Note: Again, we need to use a remote index view in order to estimate
-         * the cost of the subqueries even though we will use sharded joins when
-         * actually running the query.
-         */
-        final SubqueryCostReport subqueryCostReport = summary
-                .estimateSubqueryCost(ctx.context, ctx.accessPathSampleLimit, (Predicate<?>) pred.setProperty(
-                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
+            /*
+             * Estimate cost of SCAN with C unbound.
+             * 
+             * Note: We need to use global index view in order to estimate the
+             * cost of the scan even though the scan will be shard-wise when we
+             * actually run the query.
+             */
+            scanCostReport = ((AccessPath) ctx.context.getAccessPath(r,
+                    (Predicate<?>) pred.setProperty(
+                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
+                    .estimateCost();
 
-        anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+            anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
 
-        if (scanCostReport.cost < subqueryCostReport.cost) {
+            /*
+             * Estimate cost of SUBQUERY with C bound (sampling).
+             * 
+             * Note: Again, we need to use a remote index view in order to
+             * estimate the cost of the subqueries even though we will use
+             * sharded joins when actually running the query.
+             */
+            subqueryCostReport = summary.estimateSubqueryCost(ctx.context,
+                    accessPathSampleLimit, (Predicate<?>) pred.setProperty(
+                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
+
+            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+            
+            scanAndFilter = subqueryCostReport == null
+                    || scanCostReport.cost < subqueryCostReport.cost;
+            
+        } else {
+            
+            scanCostReport = null;
+
+            subqueryCostReport = null;
+            
+            scanAndFilter = pred.getProperty(
+                    QueryHints.ACCESS_PATH_SCAN_AND_FILTER,
+                    ctx.accessPathScanAndFilter);
+            
+        }
+
+        if (scanAndFilter) {
 
             /*
              * Scan and filter. C is left unbound. We do a range scan on the
@@ -441,21 +459,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
         } else {
 
             /*
-             * Parallel Subquery.
-             */
-
-            /*
-             * Setup the data set join.
-             *
-             * @todo When the #of named graphs is large we need to do something
-             * special to avoid sending huge graph sets around with the query.
-             * For example, we should create named data sets and join against
-             * them rather than having an in-memory DataSetJoin.
-             *
-             * @todo The historical approach performed parallel subquery using
-             * an expander pattern rather than a data set join. The data set
-             * join should have very much the same effect, but it may need to
-             * emit multiple chunks to have good parallelism.
+             * Setup the data set join (aka parallel subquery).
              */
 
             // The variable to be bound.
@@ -463,13 +467,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             // The data set join.
             final DataSetJoin dataSetJoin = new DataSetJoin(leftOrEmpty(left),
-                    NV.asMap(new NV[] {//
-                                    new NV(DataSetJoin.Annotations.VAR, var),//
-                                    new NV(DataSetJoin.Annotations.BOP_ID,
-                                            ctx.idFactory.incrementAndGet()),//
-                                    new NV(DataSetJoin.Annotations.GRAPHS,
-                                            summary.getGraphs()) //
-                            }));
+                    new NV(DataSetJoin.Annotations.VAR, var),//
+                    new NV(DataSetJoin.Annotations.BOP_ID,
+                            ctx.idFactory.incrementAndGet()),//
+                    new NV(DataSetJoin.Annotations.GRAPHS, summary.getGraphs()) //
+            );
 
 //            if (scaleOut) {
 //                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
@@ -493,10 +495,11 @@ public class AST2BOpJoins extends AST2BOpFilters {
     /**
      * Generate a default graph join (quads mode).
      *
-     * @param queryEngine
+     * @param ctx
      * @param left
      * @param anns
      * @param pred
+     * @param dataset
      * @return
      *
      * @todo Since we do not know the specific asBound values, but only that
@@ -507,8 +510,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
     @SuppressWarnings("rawtypes")
     private static PipelineOp defaultGraphJoin(
             final AST2BOpContext ctx,
-//            final QueryEngine queryEngine,
-//            final BOpContextBase context, final AtomicInteger idFactory,
             final PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
@@ -565,7 +566,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                         Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             }
 
-            // Strip of the context position.
+            // Strip of the context position (do not project C from the join).
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
@@ -576,12 +577,15 @@ public class AST2BOpJoins extends AST2BOpFilters {
         }
 
         /*
-         * Note: This optimization can only be applied at runtime. It can not be
-         * decided statically because the actual index used may change as
-         * variable bindings propagate [it could be decided statically if we
-         * examined the predicate as it would be evaluated by propagating fake
-         * variable bindings except when some joins are optional in which case
-         * the actual index can not be known until runtime.]
+         * TODO This optimization COULD be decided statically if we marked the
+         * predicate with the index would would be used when it was evaluated.
+         * That is known in advance EXCEPT except when some joins are optional,
+         * in which case the actual index can not be known until runtime. The
+         * code which attaches the "as-bound" index to the predicate MUST also
+         * consider the exogenous variables (if any). This might be done in the
+         * static join order optimizer, which does consider each join group even
+         * if it does not reorder the joins in a given group (because it was
+         * disabled for that group).
          */
 //        if (pred.getKeyOrder().getIndexName().endsWith("C")) {
 //
@@ -645,40 +649,69 @@ public class AST2BOpJoins extends AST2BOpFilters {
 //        }
 
         /*
-         * Estimate cost of SCAN with C unbound.
+         * FIXME Something appears to be broken in the "DGExpander". It takes
+         * way to long as the #of graphs in the data set increases. Try to put
+         * the DataSetJoin into place instead. It is already present in the
+         * named graphs code path.
          * 
-         * Note: We need to use the global index view in order to estimate the
-         * cost of the scan regardless of whether the query runs with
-         * partitioned or global index views when it is evaluated.
-         * 
-         * FIXME We need a higher threshold (and a cheaper test) to decide when
-         * we should SCAN+FILTER. For a journal, the #of elements in the filter
-         * needs to be probably 25% of the named graphs, which is probably too
-         * much data to have in memory anyway.
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
          */
+        final int accessPathSampleLimit = pred.getProperty(
+                QueryHints.ACCESS_PATH_SAMPLE_LIMIT, ctx.accessPathSampleLimit);
+        final boolean estimateCosts = accessPathSampleLimit >= 0;
         final IRelation r = ctx.context.getRelation(pred);
-        @SuppressWarnings("unchecked")
-        final ScanCostReport scanCostReport = ((AccessPath) ctx.context
-                .getAccessPath(r, (Predicate<?>) pred.setProperty(
-                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
-                .estimateCost();
-        anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
+        final ScanCostReport scanCostReport;
+        final SubqueryCostReport subqueryCostReport;
+        final boolean scanAndFilter;
+        
+        if (estimateCosts) {
 
-        /*
-         * Estimate cost of SUBQUERY with C bound (sampling).
-         *
-         * Note: We need to use the global index view in order to estimate the
-         * cost of the scan regardless of whether the query runs with
-         * partitioned or global index views when it is evaluated.
-         */
-        final SubqueryCostReport subqueryCostReport = dataset == null ? null
-                : summary.estimateSubqueryCost(ctx.context, ctx.accessPathSampleLimit, (Predicate<?>) pred.setProperty(
-                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
+            /*
+             * Estimate cost of SCAN with C unbound.
+             * 
+             * Note: We need to use the global index view in order to estimate
+             * the cost of the scan regardless of whether the query runs with
+             * partitioned or global index views when it is evaluated.
+             */
+            scanCostReport = ((AccessPath) ctx.context.getAccessPath(r,
+                    (Predicate<?>) pred.setProperty(
+                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
+                    .estimateCost();
 
-        anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+            anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
 
-        if (subqueryCostReport == null
-                || scanCostReport.cost < subqueryCostReport.cost) {
+            /*
+             * Estimate cost of SUBQUERY with C bound (sampling).
+             * 
+             * Note: We need to use the global index view in order to estimate
+             * the cost of the scan regardless of whether the query runs with
+             * partitioned or global index views when it is evaluated.
+             */
+            subqueryCostReport = dataset == null ? null : summary
+                    .estimateSubqueryCost(ctx.context,
+                            accessPathSampleLimit,
+                            (Predicate<?>) pred.setProperty(
+                                    IPredicate.Annotations.REMOTE_ACCESS_PATH,
+                                    true));
+
+            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+
+            scanAndFilter = subqueryCostReport == null
+                    || scanCostReport.cost < subqueryCostReport.cost;
+            
+        } else {
+
+            scanCostReport = null;
+            
+            subqueryCostReport = null;
+            
+            scanAndFilter = pred.getProperty(
+                    QueryHints.ACCESS_PATH_SCAN_AND_FILTER,
+                    ctx.accessPathScanAndFilter);
+            
+        }
+
+        if (scanAndFilter) {
 
             /*
              * SCAN AND FILTER. C is not bound. Unless all graphs are used,
@@ -702,7 +735,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
             // Filter to strip off the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
-//            // Filter for distinct SPOs.
+//            // Filter for distinct SPOs. (moved inside of newJoin).
 //            pred = pred.addAccessPathFilter(newDistinctFilter(pred, summary));
 
             if (scaleOut) {

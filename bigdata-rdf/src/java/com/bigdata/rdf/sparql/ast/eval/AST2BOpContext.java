@@ -162,9 +162,24 @@ public class AST2BOpContext implements IdFactory {
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN
-     * filter to as-bound evaluation for each graph in the data set.
+     * filter to as-bound evaluation for each graph in the data set. The samples
+     * are taken from the data set. Each sample is a graph (aka context) in the
+     * data set. The range counts and estimated cost to visit the AP for each of
+     * the sampled contexts are combined to estimate the total cost of visiting
+     * all of the contexts in the NG or DG access path.
+     * <p>
+     * When ZERO (0), no cost estimation will be performed and the named graph
+     * or default graph join will always use the SCAN + FILTER approach.
      */
     public int accessPathSampleLimit = QueryHints.DEFAULT_ACCESS_PATH_SAMPLE_LIMIT;
+
+    /**
+     * For named and default graph access paths where access path cost
+     * estimation is disabled by setting the {@link #accessPathSampleLimit} to
+     * ZERO (0), this determines whether a SCAN + FILTER or PARALLEL SUBQUERY
+     * (aka as-bound data set join) approach.
+     */
+    public boolean accessPathScanAndFilter = QueryHints.DEFAULT_ACCESS_PATH_SCAN_AND_FILTER;
 
     private int varIdFactory = 0;
 
@@ -174,46 +189,6 @@ public class AST2BOpContext implements IdFactory {
      */
     StaticAnalysis sa = null;
     
-//    /**
-//     * 
-//     * @param astContainer
-//     *            The top-level {@link ASTContainer}.
-//     * @param idFactory
-//     *            A factory for assigning identifiers to {@link BOp}s.
-//     * @param db
-//     *            The database.
-//     * @param queryEngine
-//     *            The query engine.
-//     * @param queryHints
-//     *            The query hints.
-//     * 
-//     * @deprecated by the other constructor.
-//     */
-//	public AST2BOpContext(final ASTContainer astContainer,
-//			final AtomicInteger idFactory, final AbstractTripleStore db,
-//    		final QueryEngine queryEngine, final Properties queryHints) {
-//
-//        this.astContainer = astContainer;
-//        this.idFactory = idFactory;
-//        this.db = db;
-//        this.optimizers = new DefaultOptimizerList();
-//        
-//        this.queryEngine = queryEngine;
-//        this.queryHints = queryHints;
-//
-//        // Use either the caller's UUID or a random UUID.
-//        final String queryIdStr = queryHints == null ? null : queryHints
-//                .getProperty(QueryHints.QUERYID);
-//
-//        final UUID queryId = queryIdStr == null ? UUID.randomUUID() : UUID
-//                .fromString(queryIdStr);
-//
-//        this.queryId = queryId;
-//
-//        this.context = new BOpContextBase(queryEngine);
-//        
-//	}
-
     /**
      * 
      * @param queryRoot
