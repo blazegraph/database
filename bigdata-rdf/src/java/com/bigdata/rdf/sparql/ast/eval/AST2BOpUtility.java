@@ -3032,7 +3032,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
             /*
              * Note: For a default graph access path, [cvar] can not become
-             * bound since the context will is stripped from the visited ISPOs.
+             * bound since the context is stripped from the visited ISPOs.
              */
             if (dataset != null) {
                 // attach the DataSet.

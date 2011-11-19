@@ -53,6 +53,8 @@ import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by the decision matrix for default and named graph joins.
  */
 public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 

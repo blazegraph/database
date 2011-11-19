@@ -66,10 +66,13 @@ import com.bigdata.util.concurrent.MappedTaskExecutor;
  * each specified URI, visiting the all (s,p,o,c) quads found in those graph(s).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: NamedGraphSolutionExpander.java 4952 2011-07-19 22:39:35Z
+ *          mrpersonick $
  * 
- *          FIXME See notes on the {@link DefaultGraphSolutionExpander}
- *          concerning scale-out joins.
+ * @deprecated by the decision matrix for named and default graph joins.
+ * 
+ *             FIXME See notes on the {@link DefaultGraphSolutionExpander}
+ *             concerning scale-out joins.
  */
 public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 

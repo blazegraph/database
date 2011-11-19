@@ -76,6 +76,8 @@ import com.bigdata.util.concurrent.MappedTaskExecutor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @deprecated by the decision matrix for named and default graph joins.
+ * 
  * @todo This class will have to be revisited if want to support quad store
  *       inference and expose information about inferred vs explicit statements
  *       when reading on the default graph. All of its access paths strip out
