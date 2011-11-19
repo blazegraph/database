@@ -286,7 +286,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
      *       basically a special case of runtime query optimization.
      */
     private static PipelineOp namedGraphJoin(final AST2BOpContext ctx,
-            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
+            PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
         final boolean scaleOut = ctx.isCluster();
@@ -466,10 +466,9 @@ public class AST2BOpJoins extends AST2BOpFilters {
             final IVariable<?> var = (IVariable<?>) pred.get(3);
 
             // The data set join.
-            final DataSetJoin dataSetJoin = new DataSetJoin(leftOrEmpty(left),
+            left = new DataSetJoin(leftOrEmpty(left),
                     new NV(DataSetJoin.Annotations.VAR, var),//
-                    new NV(DataSetJoin.Annotations.BOP_ID,
-                            ctx.idFactory.incrementAndGet()),//
+                    new NV(DataSetJoin.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(DataSetJoin.Annotations.GRAPHS, summary.getGraphs()) //
             );
 
@@ -485,7 +484,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
             anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
 
-            return newJoin(ctx, dataSetJoin, anns, queryHints,
+            return newJoin(ctx, left, anns, queryHints,
                     false/* defaultGraphFilter */, summary);
 
         }
@@ -510,7 +509,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
     @SuppressWarnings("rawtypes")
     private static PipelineOp defaultGraphJoin(
             final AST2BOpContext ctx,
-            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
+            PipelineOp left, final List<NV> anns, Predicate<?> pred,
             final DatasetNode dataset, final Properties queryHints) {
 
         final DataSetSummary summary = dataset == null ? null
@@ -649,12 +648,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
 //        }
 
         /*
-         * FIXME Something appears to be broken in the "DGExpander". It takes
-         * way to long as the #of graphs in the data set increases. Try to put
-         * the DataSetJoin into place instead. It is already present in the
-         * named graphs code path.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
+//         * FIXME Something appears to be broken in the "DGExpander". It takes
+//         * way to long as the #of graphs in the data set increases. Try to put
+//         * the DataSetJoin into place instead. It is already present in the
+//         * named graphs code path.
+//         * 
+//         * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
          */
         final int accessPathSampleLimit = pred.getProperty(
                 QueryHints.ACCESS_PATH_SAMPLE_LIMIT, ctx.accessPathSampleLimit);
@@ -663,6 +662,24 @@ public class AST2BOpJoins extends AST2BOpFilters {
         final ScanCostReport scanCostReport;
         final SubqueryCostReport subqueryCostReport;
         final boolean scanAndFilter;
+    
+        if(true) {
+        
+            /*
+             * Note: The PARALLEL SUBQUERY code path is currently disabled for
+             * default graphs due to (a) DGExpander does not scale (it is not
+             * efficient and should be debugged in the short term) and (b) we
+             * can not use the DataSetJoin pattern.  See notes below for more
+             * about this issue.
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
+             */
+            
+            scanCostReport = null;
+            subqueryCostReport = null;
+            scanAndFilter = true;
+        
+        } else {
         
         if (estimateCosts) {
 
@@ -711,6 +728,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
             
         }
 
+        }
+    
         if (scanAndFilter) {
 
             /*
@@ -767,23 +786,64 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * buffer is read from by the expander.
              * 
              * Scale-out: JOIN is ANY or HASHED. AP is REMOTE.
-             * 
-             * TODO This is still using an expander pattern (DGExpander).
-             * Rewrite it to use a join against the default contexts in the data
-             * set.
              */
+            final boolean dataSetJoin = false;
 
-            final long estimatedRangeCount = subqueryCostReport.rangeCount;
+            if (dataSetJoin) {
+                
+                /*
+                 * Setup the data set join (aka parallel subquery).
+                 * 
+                 * TODO This code path can not be made to work correctly. The
+                 * problem is that we wind up with duplicate SPOs, even after
+                 * filtering. This is because the scope of the DISTINCT SPO
+                 * filter winds up being the JOIN against the B+Tree statement
+                 * index but it would need to be ALL joins for a given source
+                 * solution flowing through the DataSetJoin.
+                 * 
+                 * However, a conceptually similar pattern COULD be made to
+                 * work. What we would need to do is execute the default graph
+                 * pattern in a sub-group (or sub-query). The sub-group would
+                 * contain the DataSetJoin and the statement index join and
+                 * would project the DISTINCT bindings on the (s,p,o) values.
+                 * That would actually wind up being a DISTINCT solution sets
+                 * operator.
+                 */
 
-            final Set<IV> graphs = summary.getGraphs();
+                // The variable to be bound.
+                final IVariable<?> var = (IVariable<?>) pred.get(3);
 
-            // @todo default with query hint to override and relate to ClientIndexView limit in scale-out.
-            final int maxParallel = 10;
+                // The data set join.
+                left = new DataSetJoin(leftOrEmpty(left), new NV(
+                        DataSetJoin.Annotations.VAR, var),//
+                        new NV(DataSetJoin.Annotations.BOP_ID, ctx.nextId()),//
+                        new NV(DataSetJoin.Annotations.GRAPHS,
+                                summary.getGraphs()) //
+                );
 
-            // Set subquery expander.
-            pred = (Predicate<?>) pred.setUnboundProperty(
-                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
-                    new DGExpander(maxParallel, graphs, estimatedRangeCount));
+            } else {
+
+                /*
+                 * Parallel subquery using the DGExpander.
+                 * 
+                 * TODO This code path is deprecated. But see the nodes on the
+                 * DataSetJoin code path for why we can not use that approach
+                 * for parallel subquery for default graph APs.
+                 */
+                
+                final long estimatedRangeCount = subqueryCostReport.rangeCount;
+
+                // @todo default with query hint to override and relate to
+                // ClientIndexView limit in scale-out.
+                final int maxParallel = PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL;
+
+                // Set subquery expander.
+                pred = (Predicate<?>) pred.setUnboundProperty(
+                        IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                        new DGExpander(maxParallel, summary.getGraphs(),
+                                estimatedRangeCount));
+
+            }
 
             // Filter to strip off the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
