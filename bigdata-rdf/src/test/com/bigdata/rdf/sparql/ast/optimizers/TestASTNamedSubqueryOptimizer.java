@@ -276,6 +276,16 @@ public class TestASTNamedSubqueryOptimizer extends
      * the {@link StatementPatternNode} and the {@link NamedSubqueryInclude} in
      * the main WHERE clause is reversed such that there are no join variables
      * for the INCLUDE.
+     * <pre>
+     * select ?x ?o
+     * with {
+     *  select ?x where { ?x rdf:type foaf:Person }
+     * } AS %namedSet1
+     * where {
+     *  INCLUDE %namedSet1
+     *  ?x rdfs:label ?o
+     * }
+     * </pre>
      */
     public void test_static_analysis_no_join_vars() {
 
@@ -469,8 +479,8 @@ public class TestASTNamedSubqueryOptimizer extends
      *     }
      * } as %_set3
      *  WHERE {
-     *         INCLUDE %_set2 .
-     *         INCLUDE %_set3 JOIN ON (?_var1) .
+     *         INCLUDE %_set2 . # JOIN ON ()
+     *         INCLUDE %_set3 . # JOIN ON (?_var1)
      * }
      * </pre>
      * 
@@ -811,6 +821,9 @@ public class TestASTNamedSubqueryOptimizer extends
         assertEquals(asSet(new Var[] { Var.var("var1") }),
                 sa.getDefinitelyIncomingBindings(complexOpt2,
                         new LinkedHashSet<IVariable<?>>()));
+
+//        System.err.println(new ASTSubGroupJoinVarOptimizer().optimize(context,
+//                actual/* queryNode */, bsets));
 
     }
     
