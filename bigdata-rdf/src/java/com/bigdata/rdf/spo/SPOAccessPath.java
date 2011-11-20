@@ -23,12 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.spo;
 
-import com.bigdata.bop.Constant;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -54,54 +49,13 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * @param predicate
      * @param keyOrder
      */
-//    * @param ndx
-//    * @param flags
-//    * @param chunkOfChunksCapacity
-//    * @param chunkCapacity
-//    * @param fullyBufferedReadThreshold
     public SPOAccessPath(final IRelation<ISPO> relation,
-            final IIndexManager localIndexManager, 
-//            final long timestamp,
-            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder
-//            ,
-//            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
-//            final int chunkCapacity, final int fullyBufferedReadThreshold
-            ) {
+            final IIndexManager localIndexManager,
+            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder) {
 
-        super(relation, localIndexManager, //timestamp, 
-//                relation.getIndexManager(), relation.getTimestamp(),
-                predicate, keyOrder);
-//        , ndx, flags, chunkOfChunksCapacity,
-//                chunkCapacity, fullyBufferedReadThreshold);
+        super(relation, localIndexManager, predicate, keyOrder);
 
     }
-
-//    /**
-//     * Variant does not require the {@link SPORelation} to have been
-//     * materialized. This is useful when you want an {@link IAccessPath} for a
-//     * specific index partition.
-//     * 
-//     * @param indexManager
-//     * @param timestamp
-//     * @param predicate
-//     * @param keyOrder
-//     * @param ndx
-//     * @param flags
-//     * @param chunkOfChunksCapacity
-//     * @param chunkCapacity
-//     * @param fullyBufferedReadThreshold
-//     */
-//    public SPOAccessPath(final IIndexManager indexManager,
-//            final long timestamp, final IPredicate<ISPO> predicate,
-//            final IKeyOrder<ISPO> keyOrder, final IIndex ndx, final int flags,
-//            final int chunkOfChunksCapacity, final int chunkCapacity,
-//            final int fullyBufferedReadThreshold) {
-//
-//        super(null/* relation */, indexManager, timestamp, predicate, keyOrder,
-//                ndx, flags, chunkOfChunksCapacity, chunkCapacity,
-//                fullyBufferedReadThreshold);
-//
-//    }
 
     /**
      * Strengthens the return type.
@@ -132,8 +86,6 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * Strengthened return type.
      * <p>
      * {@inheritDoc}
-     * 
-     * @todo Remove reliance on the {@link SPOPredicate}. It only adds the s(), p(), o(), and c() methods. 
      */
     @Override
     public SPOPredicate getPredicate() {
@@ -148,7 +100,7 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * {@inheritDoc}
      */
     @Override
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public IV get(final int index) {
 
         return (IV) super.get(index);
@@ -171,130 +123,130 @@ public class SPOAccessPath extends AccessPath<ISPO> {
 
     }
 
-    /**
-     * Return a new {@link SPOAccessPath} where the context position has been
-     * bound to the specified constant. The context position MUST be a variable.
-     * All instances of that variable will be replaced by the specified
-     * constant. This is used to constrain an access path to each graph in the
-     * set of default graphs when evaluating a SPARQL query against the
-     * "default graph".
-     * <p>
-     * Note: The added constraint may mean that a different index provides more
-     * efficient traversal. For scale-out, this means that the data may be on
-     * different index partition.
-     * 
-     * @param c
-     *            The context term identifier.
-     * 
-     * @return The constrained {@link IAccessPath}.
-     * 
-     * @deprecated with {@link DefaultGraphSolutionExpander} and
-     *             {@link NamedGraphSolutionExpander}.
-     */
-    public SPOAccessPath bindContext(final IV c) {
-
-        return bindPosition(3, c);
-
-    }
-
-    /**
-     * Return a new {@link SPOAccessPath} where the given position has been
-     * bound to the specified constant. The given position MUST be a variable.
-     * All instances of that variable will be replaced by the specified
-     * constant.
-     * <p>
-     * Note: The added constraint may mean that a different index provides more
-     * efficient traversal. For scale-out, this means that the data may be on
-     * different index partition.
-     * 
-     * @param position
-     *            The position to replace.
-     * @param v
-     *            The constant value to which the variable at the given position
-     *            is to be set
-     * 
-     * @return The constrained {@link IAccessPath}.
-     * 
-     * @deprecated with {@link #bindContext(IV)}
-     */
-    private SPOAccessPath bindPosition(final int position, final IV v) {
-
-        if (v == null) {
-
-            // or return EmptyAccessPath.
-            throw new IllegalArgumentException();
-
-        }
-
-        final IVariableOrConstant<IV> var = getPredicate().get(position);
-
-        /*
-         * Constrain the access path by setting the given position on its
-         * predicate.
-         * 
-         * Note: This option will always do better when you are running against
-         * local data (LocalTripleStore).
-         */
-
-        final SPOPredicate p;
-
-        if (position == 3 && var == null) {
-
-            /*
-             * The context position was never set on the original predicate, so
-             * it is neither a variable nor a constant. In this case we just set
-             * the context position to the desired constant.
-             */
-
-            p = getPredicate().setC(new Constant<IV>(v));
-
-        } else if (var.isVar()) {
-
-            /*
-             * The context position is a variable. Replace all occurrences of
-             * that variable in the predicate with the desired constant.
-             */
-
-            p = getPredicate().asBound(new ListBindingSet(//
-                    new IVariable[] { (IVariable<IV>) var },//
-                    new IConstant[] { new Constant<IV>(v) }//
-                    ));
-        } else {
-
-            /*
-             * The context position is already bound to a constant.
-             */
-
-            if (var.get().equals(v)) {
-
-                /*
-                 * The desired constant is already specified for the context
-                 * position.
-                 */
-
-                return this;
-
-            }
-
-            /*
-             * A different constant is already specified for the context
-             * position. This is an error since you are only allowed to add
-             * constraint, not change an existing constraint.
-             */
-
-            throw new IllegalStateException();
-
-        }
-
-        /*
-         * Let the relation figure out which access path is best given that
-         * added constraint.
-         */
-
-        return (SPOAccessPath) this.getRelation().getAccessPath(p);
-
-    }
-
+//    /**
+//     * Return a new {@link SPOAccessPath} where the context position has been
+//     * bound to the specified constant. The context position MUST be a variable.
+//     * All instances of that variable will be replaced by the specified
+//     * constant. This is used to constrain an access path to each graph in the
+//     * set of default graphs when evaluating a SPARQL query against the
+//     * "default graph".
+//     * <p>
+//     * Note: The added constraint may mean that a different index provides more
+//     * efficient traversal. For scale-out, this means that the data may be on
+//     * different index partition.
+//     * 
+//     * @param c
+//     *            The context term identifier.
+//     * 
+//     * @return The constrained {@link IAccessPath}.
+//     * 
+//     * @deprecated with {@link DefaultGraphSolutionExpander} and
+//     *             {@link NamedGraphSolutionExpander}.
+//     */
+//    public SPOAccessPath bindContext(final IV c) {
+//
+//        return bindPosition(3, c);
+//
+//    }
+//
+//    /**
+//     * Return a new {@link SPOAccessPath} where the given position has been
+//     * bound to the specified constant. The given position MUST be a variable.
+//     * All instances of that variable will be replaced by the specified
+//     * constant.
+//     * <p>
+//     * Note: The added constraint may mean that a different index provides more
+//     * efficient traversal. For scale-out, this means that the data may be on
+//     * different index partition.
+//     * 
+//     * @param position
+//     *            The position to replace.
+//     * @param v
+//     *            The constant value to which the variable at the given position
+//     *            is to be set
+//     * 
+//     * @return The constrained {@link IAccessPath}.
+//     * 
+//     * @deprecated with {@link #bindContext(IV)}
+//     */
+//    private SPOAccessPath bindPosition(final int position, final IV v) {
+//
+//        if (v == null) {
+//
+//            // or return EmptyAccessPath.
+//            throw new IllegalArgumentException();
+//
+//        }
+//
+//        final IVariableOrConstant<IV> var = getPredicate().get(position);
+//
+//        /*
+//         * Constrain the access path by setting the given position on its
+//         * predicate.
+//         * 
+//         * Note: This option will always do better when you are running against
+//         * local data (LocalTripleStore).
+//         */
+//
+//        final SPOPredicate p;
+//
+//        if (position == 3 && var == null) {
+//
+//            /*
+//             * The context position was never set on the original predicate, so
+//             * it is neither a variable nor a constant. In this case we just set
+//             * the context position to the desired constant.
+//             */
+//
+//            p = getPredicate().setC(new Constant<IV>(v));
+//
+//        } else if (var.isVar()) {
+//
+//            /*
+//             * The context position is a variable. Replace all occurrences of
+//             * that variable in the predicate with the desired constant.
+//             */
+//
+//            p = getPredicate().asBound(new ListBindingSet(//
+//                    new IVariable[] { (IVariable<IV>) var },//
+//                    new IConstant[] { new Constant<IV>(v) }//
+//                    ));
+//        } else {
+//
+//            /*
+//             * The context position is already bound to a constant.
+//             */
+//
+//            if (var.get().equals(v)) {
+//
+//                /*
+//                 * The desired constant is already specified for the context
+//                 * position.
+//                 */
+//
+//                return this;
+//
+//            }
+//
+//            /*
+//             * A different constant is already specified for the context
+//             * position. This is an error since you are only allowed to add
+//             * constraint, not change an existing constraint.
+//             */
+//
+//            throw new IllegalStateException();
+//
+//        }
+//
+//        /*
+//         * Let the relation figure out which access path is best given that
+//         * added constraint.
+//         */
+//
+//        return (SPOAccessPath) this.getRelation().getAccessPath(p);
+//
+//    }
+//
 //    /**
 //     * Return a new {@link SPOAccessPath} where the given positions have been bound to the specified constants. The given positions MUST all be variables. All
 //     * instances of that variable will be replaced by the specified constant.

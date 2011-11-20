@@ -1,0 +1,12 @@
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+ 
+SELECT ?src ?bobNick
+FROM NAMED <http://example.org/foaf/aliceFoaf>
+FROM NAMED <http://example.org/foaf/bobFoaf>
+ WHERE
+  {
+     GRAPH ?src
+     { ?x foaf:mbox <mailto:bob@work.example> .
+       ?x foaf:nick ?bobNick
+     }
+  }
