@@ -17,6 +17,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTRangeConstraintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 import com.bigdata.rdf.spo.ISPO;
@@ -38,13 +39,6 @@ import com.bigdata.striterator.IKeyOrder;
  * variable must lie within some key range, then we handle that case using
  * {@link RangeBOp}. If we have no information about a variable, then we just
  * leave the variable unbound.
- * 
- * TODO We should also handle datatype constraints on a variable here. For
- * example, if a variable is known to be numeric, or known to be xsd:int, then
- * we can immediately reject any bindings which would violate that type
- * constraint. To do this right, we need to notice those type constraints and
- * propagate them backwards in the plan so we can reject bindings as early as
- * possible.
  */
 public class StatementPatternNode extends
         GroupMemberNodeBase<StatementPatternNode> implements
@@ -137,7 +131,25 @@ public class StatementPatternNode extends
          * the key-range constraint on the access path. The {@link RangeBOp} is
          * used when there are filters which impose a GT/GTE and/or LT/LTE
          * restriction on the values which a variable may take on for that
-         * access path. 
+         * access path.
+         * 
+         * TODO We should also handle datatype constraints on a variable here.
+         * For example, if a variable is known to be numeric, or known to be
+         * xsd:int, then we can immediately reject any bindings which would
+         * violate that type constraint. To do this right, we need to notice
+         * those type constraints and propagate them backwards in the plan so we
+         * can reject bindings as early as possible. (In fact, we can also do a
+         * range constraint which spans each of the datatypes which the variable
+         * could take on. Datatype constraints and value range constraints are
+         * very much related. The datatype constraint is effectively a value
+         * range constraint allowing the entire value space for that datatype.
+         * Likewise, a value range constraint must be applied across the UNION
+         * of the allowable ground datatypes for the variable.)
+         * 
+         * @see ASTRangeConstraintOptimizer
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (lift range
+         *      constraints onto AP)
          */
         String RANGE = "range";
         

@@ -651,12 +651,12 @@ public class AST2BOpJoins extends AST2BOpFilters {
 //        }
 
         /*
-//         * FIXME Something appears to be broken in the "DGExpander". It takes
-//         * way to long as the #of graphs in the data set increases. Try to put
-//         * the DataSetJoin into place instead. It is already present in the
-//         * named graphs code path.
-//         * 
-//         * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
+         * FIXME Something appears to be broken in the "DGExpander". It takes
+         * way to long as the #of graphs in the data set increases. Try to put
+         * the DataSetJoin into place instead. It is already present in the
+         * named graphs code path.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
          */
         final int accessPathSampleLimit = pred.getProperty(
                 QueryHints.ACCESS_PATH_SAMPLE_LIMIT, ctx.accessPathSampleLimit);

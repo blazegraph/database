@@ -484,6 +484,30 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 //
 //    }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * TODO I think that we should just rely on the correct attachment of the
+     * range constraint filters to the SPs (and the propagation of the
+     * constraints to the IPredicates) rather than doing dynamic attachment
+     * here. Static analysis can determine when the variable will become bound,
+     * whether in the scope of a required join group or an optional join group.
+     * (In the case of the optional join group, the joins in the group are still
+     * required joins, it is just that the solutions outside of the group will
+     * not have a binding for the variable unless it became bound within the
+     * optional group. However, this does not change how we attach the range
+     * constraints to the SPs since a range constraint which is lifted onto the
+     * AP can only be applied when the variable would become bound by that AP.
+     * If the variable is already bound, it is of no consequence. The only
+     * wrinkle would be when one optional group MIGHT have already bound a
+     * variable and then another optional group which could also bind the same
+     * variable could observe either a bound variable or an unbound variable.
+     * The FILTER would have to be in place in both optional groups and the
+     * range constraint would be lifted onto the access path in both groups.)
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (lift range
+     *      constraints onto AP).
+     */
     public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
 
@@ -523,6 +547,19 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
         
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * TODO See my notes on getFromKey(). The issue is exactly the same for the
+     * toKey and fromKey.
+     * 
+     * TODO Each GT(E)/LT(E) constraint should be broken down into a separate
+     * filter so we can apply one even when the other might depend on a variable
+     * which is not yet bound.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (lift range
+     *      constraints onto AP).
+     */
     @Override
     public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
