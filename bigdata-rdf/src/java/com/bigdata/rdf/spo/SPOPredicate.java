@@ -27,7 +27,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
@@ -42,7 +41,6 @@ import com.bigdata.relation.rule.IAccessPathExpander;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * 
  * @todo Remove reliance on the {@link SPOPredicate}. It only adds the s(), p(),
  *       o(), and c() methods.
  */
@@ -52,14 +50,6 @@ public class SPOPredicate extends Predicate<ISPO> {
 	 * 
 	 */
 	private static final long serialVersionUID = 3517916629931687107L;
-
-//	public interface Annotations extends Predicate.Annotations {
-//
-//	    /** TODO Lift into {@link IPredicate#Annotations}. */
-//    	String RANGE = SPOPredicate.class.getName() + ".range";
-//    	
-//    }
-//    
 
     /**
      * Variable argument version of the shallow copy constructor.
@@ -235,38 +225,38 @@ public class SPOPredicate extends Predicate<ISPO> {
     
     }
 
-    /**
-     * Constrain the predicate by setting the context position. If the context
-     * position on the {@link SPOPredicate} is non-<code>null</code>, then you
-     * must use {@link #asBound(IBindingSet)} to replace all occurrences of the
-     * variable appearing in the context position of the predicate with the
-     * desired constant. If the context position is already bound the a
-     * constant, then you can not modify it (you can only increase the
-     * constraint, not change the constraint).
-     * 
-     * @throws IllegalStateException
-     *             unless the context position on the {@link SPOPredicate} is
-     *             <code>null</code>.
-     * 
-     * @deprecated With {@link DefaultGraphSolutionExpander} and
-     *             {@link NamedGraphSolutionExpander}.
-     */
-    @SuppressWarnings("rawtypes")
-    public SPOPredicate setC(final IConstant<IV> c) {
-
-        if (c == null)
-            throw new IllegalArgumentException();
-
-        if (this.get(3) != null)
-            throw new IllegalStateException("Context not null: " + c);
-
-        final SPOPredicate tmp = this.clone();
-
-        tmp._set(3/*c*/, c);
-        
-        return tmp;
-
-    }
+//    /**
+//     * Constrain the predicate by setting the context position. If the context
+//     * position on the {@link SPOPredicate} is non-<code>null</code>, then you
+//     * must use {@link #asBound(IBindingSet)} to replace all occurrences of the
+//     * variable appearing in the context position of the predicate with the
+//     * desired constant. If the context position is already bound the a
+//     * constant, then you can not modify it (you can only increase the
+//     * constraint, not change the constraint).
+//     * 
+//     * @throws IllegalStateException
+//     *             unless the context position on the {@link SPOPredicate} is
+//     *             <code>null</code>.
+//     * 
+//     * @deprecated With {@link DefaultGraphSolutionExpander} and
+//     *             {@link NamedGraphSolutionExpander}.
+//     */
+//    @SuppressWarnings("rawtypes")
+//    public SPOPredicate setC(final IConstant<IV> c) {
+//
+//        if (c == null)
+//            throw new IllegalArgumentException();
+//
+//        if (this.get(3) != null)
+//            throw new IllegalStateException("Context not null: " + c);
+//
+//        final SPOPredicate tmp = this.clone();
+//
+//        tmp._set(3/*c*/, c);
+//        
+//        return tmp;
+//
+//    }
     
     @Override
     public SPOPredicate clone() {

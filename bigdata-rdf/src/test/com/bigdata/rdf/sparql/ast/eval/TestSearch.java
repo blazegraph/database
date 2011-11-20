@@ -316,6 +316,23 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
+    /**
+     * Ported from TestNamedGraphs in the sails package.
+     */
+    public void test_search_query() throws Exception {
+      
+      if(!store.isQuads())
+          return;
+
+      new TestHelper(
+          "search-query",// testURI
+          "search-query.rq", // queryURI
+          "search-query.trig", // dataURI
+          "search-query.srx" // resultURI
+          ).runTest();
+
+  }
+    
 //    /**
 //     * TODO Unit test for search-in-search pattern:
 //     * 

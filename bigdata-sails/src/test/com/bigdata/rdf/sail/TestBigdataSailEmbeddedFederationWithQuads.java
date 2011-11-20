@@ -93,9 +93,10 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends AbstractBigdataS
 
         // misc named graph API stuff.
         suite.addTestSuite(TestQuadsAPI.class);
-
-        // SPARQL named graphs tests.
-        suite.addTestSuite(TestNamedGraphs.class);
+        
+// Note: Ported to data driven test.
+//        // SPARQL named graphs tests.
+//        suite.addTestSuite(TestNamedGraphs.class);
 
         // test suite for optionals handling (left joins).
         suite.addTestSuite(TestOptionals.class);

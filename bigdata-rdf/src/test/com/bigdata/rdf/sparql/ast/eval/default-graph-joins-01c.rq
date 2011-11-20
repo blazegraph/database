@@ -1,0 +1,8 @@
+prefix : <http://bigdata.com/> 
+
+SELECT  ?x ?y ?z
+FROM :c1
+FROM :c2
+WHERE   { ?x :loves ?y .
+          ?y :loves ?z .
+}
