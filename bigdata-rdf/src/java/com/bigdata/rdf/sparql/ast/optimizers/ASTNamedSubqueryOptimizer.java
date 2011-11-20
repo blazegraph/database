@@ -318,6 +318,8 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      * 
      * @param namedSubqueries
      * @param allIncludes
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/405
      */
     static private void assignJoinVars(//
             final QueryRoot queryRoot,
