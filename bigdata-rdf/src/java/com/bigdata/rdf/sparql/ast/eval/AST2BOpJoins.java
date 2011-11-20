@@ -154,13 +154,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Quads mode.
              */
 
-//            if (enableDecisionTree) {
-//            /*
-//             * Strip off the named graph or default graph expander (in the long
-//             * term it will simply not be generated.)
-//             */
-//            pred = pred
-//                    .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
             // TODO Verifying that the expanders are not present.  Take this  
             // assert out once we have proven that the expanders are not present.
             assert pred.getProperty(IPredicate.Annotations.ACCESS_PATH_EXPANDER) == null;
@@ -177,32 +170,6 @@ public class AST2BOpJoins extends AST2BOpFilters {
             default:
                 throw new AssertionError();
             }
-
-//            } else {
-//
-//                /*
-//                 * This is basically the old way of handling quads query using
-//                 * expanders which were attached by toPredicate() in
-//                 * BigdataEvaluationStrategyImpl.
-//                 * 
-//                 * FIXME Remove this code path and the expander patterns from
-//                 * the code base.
-//                 */
-//
-//                final boolean scaleOut = ctx.isCluster();
-//
-//                if (scaleOut)
-//                    throw new UnsupportedOperationException();
-//
-//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.ANY));
-//
-//                anns.add(new NV(PipelineJoin.Annotations.PREDICATE,pred));
-//
-//                left = newJoin(ctx, left, anns, queryHints,
-//                        false/* defaultGraphFilter */, null/* summary */);
-//
-//            }
 
         } else {
 
@@ -672,8 +639,16 @@ public class AST2BOpJoins extends AST2BOpFilters {
              * Note: The PARALLEL SUBQUERY code path is currently disabled for
              * default graphs due to (a) DGExpander does not scale (it is not
              * efficient and should be debugged in the short term) and (b) we
-             * can not use the DataSetJoin pattern.  See notes below for more
+             * can not use the DataSetJoin pattern. See notes below for more
              * about this issue.
+             * 
+             * Note: The problem with the DGExpander could be too much
+             * parallelism. I have since dropped the max parallel from 10 to 5,
+             * which is what we use for pipeline ops. However, since this is the
+             * per-source-solution parallelism, perhaps maxparallel on the order
+             * of 1 or 2 might do better. defaultGraphs12 can be used to test
+             * this by forcing the code to run it with SCAN+FILTER or PARALLEL
+             * SUBQUERY.
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
              */

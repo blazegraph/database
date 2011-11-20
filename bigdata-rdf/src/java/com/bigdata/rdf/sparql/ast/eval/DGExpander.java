@@ -40,8 +40,6 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @deprecated by https://sourceforge.net/apps/trac/bigdata/ticket/407
  */
 public class DGExpander implements IAccessPathExpander<ISPO> {
 
@@ -51,6 +49,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
     final private int maxParallel;
 
+    @SuppressWarnings("rawtypes")
     final private Collection<IV> graphs;
 
     final private long estimatedRangeCount;
@@ -70,6 +69,7 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
      *       . We should be able to override that through annotations on a query
      *       plan.
      */
+    @SuppressWarnings("rawtypes")
     public DGExpander(final int maxParallel, final Collection<IV> graphs,
             final long estimatedRangeCount) {
 
