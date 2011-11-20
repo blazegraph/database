@@ -191,6 +191,12 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * we add an ASTContainer to provide a better home for the queryStr, the parse
  * tree, the original AST, and the optimized AST.
  * 
+ * TODO Static analysis of variables which are projected by a subquery needs to
+ * follow the variable into the subquery under what ever name it has within the
+ * subquery scope. That is, SELECT (?x as ?y) renames the variable. So, if we
+ * are following ?y in the parent scope then we need to follow ?x in the
+ * subquery scope.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

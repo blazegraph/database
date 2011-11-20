@@ -41,16 +41,19 @@ import com.bigdata.rdf.internal.IV;
 /**
  * Operator used to impose a key-range constraint on a variable on access path.
  * 
+ * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (Lift range
+ *      constraints onto AP).
+ *      
  * @author mrpersonick
  */
-final public class RangeBOp extends BOpBase 
-		implements IVariable<Range> {
+@SuppressWarnings("rawtypes")
+final public class RangeBOp extends BOpBase implements IVariable<Range> {
 
     /**
 	 * 
 	 */
-	private static final long serialVersionUID = 3368581489737593349L;
-	
+    private static final long serialVersionUID = 3368581489737593349L;
+
 //	private static final Logger log = Logger.getLogger(RangeBOp.class);
 	
     public interface Annotations extends ImmutableBOp.Annotations {
@@ -72,7 +75,6 @@ final public class RangeBOp extends BOpBase
     /** Cached to/from lookups. */
     private transient volatile IValueExpression<IV> to, from;
 
-	@SuppressWarnings("rawtypes")
     public RangeBOp(final IVariable<IV> var,
     		final IValueExpression<IV> from, 
     		final IValueExpression<IV> to) {
@@ -105,15 +107,15 @@ final public class RangeBOp extends BOpBase
      * Required deep copy constructor.
      */
     public RangeBOp(final RangeBOp op) {
-
         super(op);
-        
     }
 
+    @SuppressWarnings("unchecked")
     public IVariable<IV> var() {
     	return (IVariable<IV>) getRequiredProperty(Annotations.VAR);
     }
     
+    @SuppressWarnings("unchecked")
 	public IValueExpression<IV> from() {
 		if (from == null) {
 			from = (IValueExpression<IV>) getRequiredProperty(Annotations.FROM);
@@ -121,6 +123,7 @@ final public class RangeBOp extends BOpBase
 		return from;
 	}
     
+    @SuppressWarnings("unchecked")
 	public IValueExpression<IV> to() {
 		if (to == null) {
 			to = (IValueExpression<IV>) getRequiredProperty(Annotations.TO);
@@ -165,7 +168,7 @@ final public class RangeBOp extends BOpBase
     
     final public RangeBOp asBound(final IBindingSet bs) {
 
-		IV from, to;
+		final IV from, to;
 		try {
 			// log.debug("getting the asBound value");
 
@@ -202,8 +205,8 @@ final public class RangeBOp extends BOpBase
 		// Note: defer clone() until everything is bound.
 		final RangeBOp asBound = (RangeBOp) this.clone();
 
-		asBound._setProperty(Annotations.FROM, new Constant(from));
-		asBound._setProperty(Annotations.TO, new Constant(to));
+		asBound._setProperty(Annotations.FROM, new Constant<IV>(from));
+		asBound._setProperty(Annotations.TO, new Constant<IV>(to));
 
 		return asBound;
 

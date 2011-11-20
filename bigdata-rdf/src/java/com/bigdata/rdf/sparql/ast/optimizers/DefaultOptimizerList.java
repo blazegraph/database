@@ -409,9 +409,44 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Run the static join order optimizer. This attaches the estimated
          * cardinality data (fast range counts) and uses fast algorithm to
          * reorder the joins in each required or optional join group.
+         * 
+         * FIXME The static optimizer does not take responsibility for all kinds
+         * of IJoinNode. It needs to handle UnionNode, JoinGroupNode,
+         * SubqueryRoot, NamedSubqueryInclude, and ServiceNode, not just
+         * StatementPatternNode. In many cases, it can do this by running the
+         * optimization as if the sub-groups were flattened or as-if the where
+         * clause of a SubqueryRoot were flattened into the query. It must treat
+         * the variables bound by a NamedSubqueryInclude or a ServiceNode, but
+         * it should not attempt to reorder those join nodes when ordering the
+         * joins in an parent join group.
+         * 
+         * FIXME The static optimizer needs to be aware of the effective range
+         * count which results from a datatype and/or range constraints and
+         * treat those variables as "somewhat" bound. The importance of the
+         * range constraint depends on the ordinal index of the key component.
+         * For example, a datatype or value range constraint on the OS(C)P index
+         * is much more selective than a fully unbound SP, but is significantly
+         * less selective than a 1-bound SP. The actual range count can be
+         * determined when the SP appears first in the join order, but it must
+         * be summed over the union of the ground datatypes and value range
+         * constraints for the SP. (This may require reasoning about the
+         * datatypes and value range constraints before the static join
+         * optimizer runs followed by compilation of the appropriate datatype
+         * and range constraint after the join order has been fixed.)
          */
         add(new ASTStaticJoinOptimizer());
 
+        /*
+         * FIXME Datatype and value range constraints. Per the notes immediately
+         * above, incorporate an optimizer which leverages information about
+         * ground and non-ground datatype constraints and value-range
+         * constraints within the allowable ground datatypes for a variable when
+         * it is first bound by an SP.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/238
+         */
+//        add(new ASTRangeConstraintOptimizer());
+        
         /*
          * The joins are now ordered. Everything from here down MUST NOT change
          * the join order when making changes to the join groups and MAY rely on
