@@ -151,6 +151,13 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * expression(s) in which each variable appears and determining which datatypes
  * are (in)consistent with those value expression(s).
  * 
+ * TODO Historically, the range constraints were attached as RangeBOp AND left
+ * in place as normal FILTERs. This is because the range constraints were not
+ * integrated into the optimizers in any depth. If the RangeBOp would up
+ * attached to a JOIN where it could be imposed, then it was. If not, then the
+ * FILTERs would handle the constraint eventually. The code in RangeBOp reflects
+ * this practice.
+ * 
  * TODO Integrate code to attach RangeBOps to predicates. (This code is from the
  * old BigdataEvaluationStrategyImpl3 class. It should be moved into an
  * IASTOptimizer for recognizing range constraints.)
@@ -176,12 +183,13 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (lift range
  *      constraints onto access path)
- *      
+ * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/407 (default graph join
  *      optimization)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTRangeConstraintOptimizer.java 5704 2011-11-20 15:37:22Z
+ *          thompsonbry $
  */
 public class ASTRangeConstraintOptimizer implements IASTOptimizer {
 
