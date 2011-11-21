@@ -536,51 +536,69 @@ public class QueryLog {
 
     }
 
-	/**
-	 * Format the data as an (X)HTML table. The table will include a header
-	 * which declares the columns, a detail row for each operator (optional),
-	 * and a summary row for the query as a whole.
-	 * 
-	 * @param queryStr
-	 *            The original text of the query (e.g., a SPARQL query)
-	 *            (optional).
-	 * @param q
-	 *            The {@link IRunningQuery}.
-	 * @param w
-	 *            Where to write the table.
-	 * @param summaryOnly
-	 *            When <code>true</code> only the summary row will be written.
-	 * @param maxBopLength
-	 *            The maximum length to display from {@link BOp#toString()} and
-	 *            ZERO (0) to display everything.  Data longer than this value
-	 *            will be accessible from a flyover, but not directly visible
-	 *            in the page.
-	 * @throws IOException
-	 */
-	public static void getTableXHTML(final String queryStr,
-			final IRunningQuery q, final Writer w, final boolean summaryOnly,
-			final int maxBopLength)
-			throws IOException {
+    /**
+     * Format the data as an (X)HTML table. The table will include a header
+     * which declares the columns, a detail row for each operator (optional),
+     * and a summary row for the query as a whole.
+     * 
+     * @param queryStr
+     *            The original text of the query (e.g., a SPARQL query)
+     *            (optional).
+     * @param q
+     *            The {@link IRunningQuery}.
+     * @param children
+     *            The child query(s) -or- <code>null</code> if they are not to
+     *            be displayed.
+     * @param w
+     *            Where to write the table.
+     * @param summaryOnly
+     *            When <code>true</code> only the summary row will be written.
+     * @param maxBopLength
+     *            The maximum length to display from {@link BOp#toString()} and
+     *            ZERO (0) to display everything. Data longer than this value
+     *            will be accessible from a flyover, but not directly visible in
+     *            the page.
+     * @throws IOException
+     */
+	public static void getTableXHTML(//
+	        final String queryStr,//
+			final IRunningQuery q,//
+			final IRunningQuery[] children,//
+			final Writer w, final boolean summaryOnly,
+ final int maxBopLength)
+            throws IOException {
 
-		// the table start tag.
-		w.write("<table border=\"1\" summary=\"" + attrib("Query Statistics")
-				+ "\"\n>");
-        
+        // the table start tag.
+        w.write("<table border=\"1\" summary=\"" + attrib("Query Statistics")
+                + "\"\n>");
+
         getTableHeaderXHTML(q, w);
 
-    	if(summaryOnly) {
+        // Summary first.
+        getSummaryRowXHTML(queryStr, q, w, maxBopLength);
 
-    		getSummaryRowXHTML(queryStr, q, w, maxBopLength);
-    		
-    	} else {
+        if (!summaryOnly) {
 
-    		// Summary first.
-    		getSummaryRowXHTML(queryStr, q, w, maxBopLength);
+            // Then the detail rows.
+            getTableRowsXHTML(queryStr, q, w, maxBopLength);
 
-    		// Then the detail rows.
-    		getTableRowsXHTML(queryStr, q, w, maxBopLength);
-    		
-    	}
+            if (children != null) {
+
+                for (int i = 0; i < children.length; i++) {
+
+                    final IRunningQuery c = children[i];
+
+                    // Summary first.
+                    getSummaryRowXHTML(null/* queryStr */, c, w, maxBopLength);
+
+                    // Then the detail rows.
+                    getTableRowsXHTML(null/* queryStr */, c, w, maxBopLength);
+
+                }
+
+            }
+
+        }
 
     	w.write("</table\n>");
     	
