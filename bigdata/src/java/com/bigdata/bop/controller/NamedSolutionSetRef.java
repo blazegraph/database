@@ -68,9 +68,8 @@ public class NamedSolutionSetRef implements Serializable {
     /**
      * 
      * @param queryId
-     *            The {@link UUID} of the {@link IRunningQuery} which generated
-     *            the named solution set (required). This is where you need to
-     *            look to find the data.
+     *            The {@link UUID} of the {@link IRunningQuery} where you need
+     *            to look to find the data (required).
      * @param namedSet
      *            The application level name for the named solution set
      *            (required).
@@ -102,7 +101,6 @@ public class NamedSolutionSetRef implements Serializable {
         if (h == 0) {
             h = queryId.hashCode() + namedSet.hashCode()
                     + Arrays.hashCode(joinVars);
-
         }
         return h;
     }
@@ -172,7 +170,7 @@ public class NamedSolutionSetRef implements Serializable {
 
         final String[] a = joinVarsStr.split(", ");
 
-        final IVariable[] joinVars = new IVariable[a.length];
+        final IVariable<?>[] joinVars = new IVariable[a.length];
 
         for (int i = 0; i < a.length; i++) {
 

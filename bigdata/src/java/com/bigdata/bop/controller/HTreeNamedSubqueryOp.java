@@ -45,6 +45,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.controller.JVMNamedSubqueryOp.NamedSolutionSetStats;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -369,7 +370,11 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                             bset);
 
 					try {
-						
+
+					    // Declare the child query to the parent.
+                        ((AbstractRunningQuery) parentContext.getRunningQuery())
+                                .addChild(runningSubquery);
+					    
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
 
