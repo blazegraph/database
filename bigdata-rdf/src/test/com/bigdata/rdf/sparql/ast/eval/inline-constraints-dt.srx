@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<sparql
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+     xmlns="http://www.w3.org/2005/sparql-results#" >
+   <head>
+    <variable name="s"/>
+    <variable name="a"/>
+   </head>
+   <results>
+     <result>
+		<binding name="s">
+			<uri>http://www.bigdata.com/c</uri>
+		</binding>
+        <binding name="a">
+            <literal datatype="http://www.w3.org/2001/XMLSchema#dateTime">1996-05-30T00:00:00.000Z</literal>
+        </binding>
+     </result>
+   </results>
+</sparql>

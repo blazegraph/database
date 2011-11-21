@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
+import com.bigdata.rdf.sparql.ast.eval.TestInlineConstraints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -56,9 +58,6 @@ public class TestAll extends TestCase {
     {
 
         final TestSuite suite = new TestSuite("IV Constraints and Functions");
-
-        // test suite for inline constraints: GT, LT, GTE, LTE
-        suite.addTestSuite(TestInlineConstraints.class);
 
         suite.addTestSuite(TestSubstrBOp.class);
         
