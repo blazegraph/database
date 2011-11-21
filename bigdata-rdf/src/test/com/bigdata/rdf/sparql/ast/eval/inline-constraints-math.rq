@@ -1,0 +1,10 @@
+prefix : <http://www.bigdata.com/> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+
+select ?s ?a 
+where { 
+:d :age ?dAge .
+?s rdf:type :X .
+?s :age ?a .
+filter (?a > (?dAge+5)) . 
+}

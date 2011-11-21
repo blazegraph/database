@@ -123,6 +123,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTickets.class);
         
+        // test suite for inline constraints: GT, LT, GTE, LTE
+        suite.addTestSuite(TestInlineConstraints.class);
+
         return suite;
         
     }

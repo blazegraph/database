@@ -1,0 +1,12 @@
+@prefix : <http://www.bigdata.com/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+: {
+:a rdf:type :X .
+:a :bd "1976-12-02"^^xsd:dateTime .
+:b rdf:type :X .
+:b :bd "1986-10-15"^^xsd:dateTime .
+:c rdf:type :X .
+:c :bd "1996-05-30"^^xsd:dateTime .
+}
