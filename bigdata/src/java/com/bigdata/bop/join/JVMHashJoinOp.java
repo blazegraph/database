@@ -38,9 +38,11 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -127,6 +129,8 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
         
         assertAtOnceJavaHeapOp();
 
+        getRequiredProperty(Annotations.NAMED_SET_REF);
+
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
@@ -205,12 +209,59 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
 
             this.op = op;
             
-            this.state = new JVMHashJoinUtility(op, pred.isOptional(), false/* filter */);
+            {
+
+                /*
+                 * First, see if the map already exists.
+                 * 
+                 * Note: Since the operator is not thread-safe, we do not need
+                 * to use a putIfAbsent pattern here.
+                 * 
+                 * Note: Publishing the [state] as a query attribute provides
+                 * visiblility into the hash join against the access path even
+                 * though the entire operation will occur within a single
+                 * evaluation pass for this operator.
+                 */
+
+                final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                        .getRequiredProperty(Annotations.NAMED_SET_REF);
+
+                // Lookup the attributes for the query on which we will hang the
+                // solution set.
+                final IQueryAttributes attrs = context
+                        .getQueryAttributes(namedSetRef.queryId);
+
+                JVMHashJoinUtility state = (JVMHashJoinUtility) attrs
+                        .get(namedSetRef);
+
+                if (state == null) {
+
+                    state = new JVMHashJoinUtility(op, pred.isOptional(), false/* filter */);
+
+                    attrs.put(namedSetRef, state);
+
+                }
+
+                this.state = state;
+
+            }
 
         }
         
         public Void call() throws Exception {
 
+            /*
+             * Note: Because this is an at-once operator, the solutions are all
+             * buffered on the query engine and this operator is invoked exactly
+             * once.
+             * 
+             * Unlike the HTreeHashJoinOp, the concept of a LAST PASS evaluation
+             * does not enter in to the evaluation of this operator. However,
+             * but publishing the [state] on the query attribute we do gain
+             * visiblity into the dynamics of the hash join while it is
+             * executing against the B+Tree access path.
+             */
+            
             try {
 
                 acceptSolutions();
@@ -227,9 +278,9 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
             } finally {
 
 //                if (context.isLastInvocation()) {
-//
-//                    release();
-//
+
+                    state.release();
+
 //                }
                 
                 sink.close();

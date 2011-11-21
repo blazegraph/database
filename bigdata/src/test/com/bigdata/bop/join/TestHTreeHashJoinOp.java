@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Map;
+import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -40,6 +41,8 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.controller.NamedSetAnnotations;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -72,6 +75,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
     protected PipelineOp newJoin(final BOp[] args, final int joinId,
             final IVariable<IV>[] joinVars,
             final Predicate<IV> predOp,
+            final UUID queryId,
             final NV... annotations) {
 
         final Map<String,Object> tmp = NV.asMap(
@@ -84,7 +88,8 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                 new NV(HashJoinAnnotations.JOIN_VARS, joinVars),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(PipelineOp.Annotations.MAX_MEMORY, Bytes.megabyte)//
+                new NV(PipelineOp.Annotations.MAX_MEMORY, Bytes.megabyte),//
+                new NV(NamedSetAnnotations.NAMED_SET_REF,new NamedSolutionSetRef(queryId,getName(),joinVars))//
                 );
 
         if (predOp.isOptional()) {
@@ -119,6 +124,13 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
         @SuppressWarnings("unchecked")
         final IVariable<IV> x = Var.var("x");
 
+        final UUID queryId = UUID.randomUUID();
+        
+        final IVariable[] joinVars = new IVariable[]{x};
+
+        final NV namedSet = new NV(NamedSetAnnotations.NAMED_SET_REF,
+                new NamedSolutionSetRef(queryId, getName(), joinVars));
+        
         final Predicate<IV> pred = new Predicate<IV>(new IVariableOrConstant[] {
                 new Constant<String>("Mary"), Var.var("x") }, NV
                 .asMap(new NV[] {//
@@ -141,6 +153,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
@@ -160,6 +173,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + UnsupportedOperationException.class);
         } catch (UnsupportedOperationException ex) {
@@ -179,6 +193,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + IllegalStateException.class);
         } catch (IllegalStateException ex) {
@@ -198,6 +213,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -217,6 +233,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 2),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
@@ -236,6 +253,7 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                            new NV(PipelineOp.Annotations.MAX_MEMORY,
 //                                    Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + UnsupportedOperationException.class);
         } catch (UnsupportedOperationException ex) {
@@ -258,9 +276,30 @@ public class TestHTreeHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                             new NV(PipelineOp.Annotations.MAX_MEMORY,
                                     Bytes.megabyte),//
+                            namedSet,//
                     }));
             fail("Expecting: " + UnsupportedOperationException.class);
         } catch (UnsupportedOperationException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        // w/o named set
+        try {
+            new HTreeHashJoinOp<IV>(emptyArgs, NV.asMap(new NV[] {//
+                    new NV(BOp.Annotations.BOP_ID, joinId),//
+                            new NV(HashJoinAnnotations.JOIN_VARS,new IVariable[]{x}),//
+                            new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.CONTROLLER),//
+                            new NV(AccessPathJoinAnnotations.PREDICATE,pred),//
+                            new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                            new NV(PipelineOp.Annotations.MAX_MEMORY,
+                                    Bytes.megabyte),//
+//                            namedSet,//
+                    }));
+            fail("Expecting: " + IllegalStateException.class);
+        } catch (IllegalStateException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }

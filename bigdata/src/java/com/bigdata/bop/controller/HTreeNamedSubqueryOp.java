@@ -159,37 +159,6 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         return new NamedSolutionSetStats();
 
     }
-
-//    /**
-//     * Adds reporting for the size of the named solution set.
-//     */
-//    private static class NamedSolutionSetStats extends BOpStats {
-//        
-//        private static final long serialVersionUID = 1L;
-//        
-//        final AtomicLong solutionSetSize = new AtomicLong();
-//
-//        public void add(final BOpStats o) {
-//
-//            super.add(o);
-//
-//            if (o instanceof NamedSolutionSetStats) {
-//
-//                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
-//
-//                solutionSetSize.addAndGet(t.solutionSetSize.get());
-//
-//            }
-//
-//        }
-//
-//        @Override
-//        protected void toString(final StringBuilder sb) {
-//            super.toString(sb);
-//            sb.append(",solutionSetSize=" + solutionSetSize.get());
-//        }
-//
-//    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -247,9 +216,6 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
             this.namedSetRef = (NamedSolutionSetRef) op
                     .getRequiredProperty(Annotations.NAMED_SET_REF);
-
-//            this.joinVars = (IVariable[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
             
             {
 
@@ -356,30 +322,6 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
             }
             
         }
-
-//        /**
-//         * Checkpoint the {@link HTree} containing the results of the subquery,
-//         * re-load the {@link HTree} in a read-only mode from that checkpoint
-//         * and then set the reference to the read-only view of the {@link HTree}
-//         * on the {@link IQueryAttributes}. This exposes a view of the
-//         * {@link HTree} which is safe for concurrent readers.
-//         */
-//        private void saveSolutionSet() {
-//            
-//            // Checkpoint the HTree.
-//            final Checkpoint checkpoint = solutions.writeCheckpoint2();
-//            
-//            // Get a read-only view of the HTree.
-//            final HTree readOnly = HTree.load(solutions.getStore(),
-//                    checkpoint.getCheckpointAddr(), true/* readOnly */);
-//
-////            final IQueryAttributes attrs = context.getRunningQuery()
-////                    .getAttributes();
-//
-//            if (attrs.putIfAbsent(namedSetRef, readOnly) != null)
-//                throw new AssertionError();
-//
-//        }
         
         /**
          * Run a subquery.

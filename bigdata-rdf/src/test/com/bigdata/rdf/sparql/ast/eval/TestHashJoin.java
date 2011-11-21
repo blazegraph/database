@@ -36,7 +36,9 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.join.AbstractHashJoinOp;
+import com.bigdata.bop.join.HTreeHashJoinOp;
+import com.bigdata.bop.join.JVMHashJoinOp;
+import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -73,6 +75,9 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
      *   
      *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
      * 
+     *   # Force the use of the JVM hash joins.
+     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "false" .
+     *   
      *   ?x rdf:type foaf:Person .
      * 
      *   ?x rdfs:label ?o .
@@ -93,13 +98,31 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
 
         final PipelineOp queryPlan = astContainer.getQueryPlan();
 
-        if (!BOpUtility.visitAll(queryPlan, AbstractHashJoinOp.class).hasNext()
-                && !BOpUtility.visitAll(queryPlan, AbstractHashJoinOp.class)
-                        .hasNext()) {
+        if (!BOpUtility.visitAll(queryPlan, JVMHashJoinOp.class).hasNext()) {
 
-            fail("Expecting a hash join in the query plan: "
+            fail("Expecting a JVM-based hash join in the query plan: "
                     + astContainer.toString());
             
+        }
+
+    }
+    
+    /**
+     * Variant on {@link #test_hash_join_1()} where we force the use of the
+     * {@link HTree}.
+     */
+    public void test_hash_join_1b() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("hash-join-1b")
+                .runTest();
+
+        final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+        if (!BOpUtility.visitAll(queryPlan, HTreeHashJoinOp.class).hasNext()) {
+
+            fail("Expecting an HTree-based hash join in the query plan: "
+                    + astContainer.toString());
+
         }
 
     }
