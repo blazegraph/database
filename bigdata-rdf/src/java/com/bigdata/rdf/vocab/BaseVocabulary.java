@@ -95,6 +95,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
     /**
      * Reverse lookup from {@link IV} to {@link Value}.
      */
+    @SuppressWarnings("rawtypes")
     private transient Map<IV, BigdataValue> iv2val;
     
     /**
@@ -277,61 +278,56 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
          * Assign IVs to each vocabulary item.
          */
         final int n = size();
-
-        if (n <= 255) {
-
-            // The Values in the order in which they were declared.
-            int i = 0;
-            for(Map.Entry<Value, BigdataValue> e : val2iv.entrySet()) {
-                
-                final BigdataValue value = e.getValue();
-                
-                final IV iv = new VocabURIByteIV<BigdataURI>((byte) i);
-                
-                // Cache the IV on the Value.
-                value.setIV(iv);
-                
-//                // Do not cache the Value on the IV.
-//                iv.setValue(value);
-
-                iv2val.put(iv, value);
-                
-                i++;
-                
-            }
-            
-        } else if (n <= 65535/* MaxUnsignedShort */) {
-
-            // The Values in the order in which they were declared.
-            int i = 0;
-            for(Map.Entry<Value, BigdataValue> e : val2iv.entrySet()) {
-                
-                final BigdataValue value = e.getValue();
-                                
-                final IV iv = new VocabURIShortIV<BigdataURI>((short) i);
-                
-                // Cache the IV on the Value.
-                value.setIV(iv);
-                
-//                // Do not cache the Value on the IV.
-//                iv.setValue(value);
-
-                iv2val.put(iv, value);
-                
-                i++;
-                
-            }
-
-        } else {
-
+        
+        if (n > MAX_ITEMS)
             throw new UnsupportedOperationException(
-                    "Too many vocabulary items: n=" + n);
+                    "Too many vocabulary items: n=" + n + ", but maximum is "
+                            + MAX_ITEMS);
+
+        // The #of generated IVs.
+        int i = 0;
+
+        // The Values in the order in which they were declared.
+        for (Map.Entry<Value, BigdataValue> e : val2iv.entrySet()) {
+
+            final BigdataValue value = e.getValue();
+
+            @SuppressWarnings("rawtypes")
+            final IV iv;
+
+            if (i <= 255) {
             
+                // Use a byte for the 1st 256 declared vocabulary items.
+                iv = new VocabURIByteIV<BigdataURI>((byte) i);
+                
+            } else {
+                
+                // Use a short for the next 64k declared vocabulary items.
+                iv = new VocabURIShortIV<BigdataURI>((short) i);
+                
+            }
+            
+            // Cache the IV on the Value.
+            value.setIV(iv);
+
+            // Note: Do not cache the Value on the IV.
+            // iv.setValue(value);
+
+            iv2val.put(iv, value);
+
+            i++;
+
         }
-        
+
         assert iv2val.size() == val2iv.size();
-        
+
     }
+
+    /**
+     * The maximum #of items is 256 {@link VocabURIByteIV}s plus 64k
+     * {@link VocabURIShortIV}s.
+     */
+    static private final int MAX_ITEMS = Short.MAX_VALUE + 256;
     
     final public String getNamespace() {
         
@@ -354,6 +350,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
     }
 
+    @SuppressWarnings("rawtypes")
     final public BigdataValue asValue(final IV iv) {
         
         if (val2iv == null)
@@ -366,6 +363,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
     }
 
+    @SuppressWarnings("rawtypes")
     final public IV get(final Value value) {
 
         if (val2iv == null)
@@ -383,6 +381,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
     }
 
+    @SuppressWarnings("rawtypes")
     final public IConstant<IV> getConstant(final Value value) {
 
         final IV iv = get(value);
