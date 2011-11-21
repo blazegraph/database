@@ -30,7 +30,7 @@ package com.bigdata.bop.engine;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -1464,11 +1464,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      *         {@link IRunningQuery}s and never <code>null</code>.
      */
     final public IRunningQuery[] getChildren() {
-        
+
         synchronized (children) {
-        
-            return children.toArray(new IRunningQuery[children.size()]);
-            
+
+            return children.values()
+                    .toArray(new IRunningQuery[children.size()]);
+
         }
         
     }
@@ -1487,14 +1488,24 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     
         synchronized(children) {
         
-            return children.add(childQuery);
+            final UUID childId = childQuery.getQueryId();
+            
+            if (children.containsKey(childId)) {
+
+                return false;
+                
+            }
+
+            children.put(childId, childQuery);
+            
+            return true;
             
         }
         
     }
 
-    final private LinkedHashSet<IRunningQuery> children = new LinkedHashSet<IRunningQuery>();
-    
+    final private LinkedHashMap<UUID, IRunningQuery> children = new LinkedHashMap<UUID, IRunningQuery>();
+
     /**
      * Return the textual representation of the {@link RunState} of this query.
      * <p>
