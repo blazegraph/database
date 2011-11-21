@@ -22,6 +22,7 @@ import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -460,7 +461,15 @@ public class StatusServlet extends BigdataRDFServlet {
                      * (Right now the only way to see the statistics for those
                      * children is to request the status on ALL running queries
                      * with full detail).
+                     * 
+                     * FIXME Since children are now modeled, do not display
+                     * something unless it shows up as a top-level NSS submitted
+                     * query.
                      */
+
+                    // An array of the declared child queries.
+                    final IRunningQuery[] children = ((AbstractRunningQuery) q)
+                            .getChildren();
 
                     final long elapsedMillis = q.getElapsed();
 
@@ -493,6 +502,7 @@ public class StatusServlet extends BigdataRDFServlet {
                         current.node("p")//
                                 .text("solutions=" + solutionsOut)//
                                 .text(", chunks=" + chunksOut)//
+                                .text(", children=" + children.length)//
                                 .text(", elapsed=" + elapsedMillis + "ms")//
                                 .text(", ").node("a").attr("href", detailsURL)
                                 .text("details").close()//
@@ -601,6 +611,14 @@ public class StatusServlet extends BigdataRDFServlet {
                         // Format as a table, writing onto the response.
                         QueryLog.getTableXHTML(queryString, q, w,
                                 !showQueryDetails, maxBopLength);
+
+                        // And now do the child queries (if any).
+                        for (int i = 0; i < children.length; i++) {
+
+                            QueryLog.getTableXHTML(null/* queryStr */,
+                                    children[i], w, false/* summaryOnly */, 0/* maxBopLength */);
+
+                        }
 
                     }
 

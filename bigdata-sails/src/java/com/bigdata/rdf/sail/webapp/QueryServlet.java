@@ -21,6 +21,7 @@ import org.openrdf.query.parser.sparql.ast.SimpleNode;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
@@ -503,6 +504,10 @@ public class QueryServlet extends BigdataRDFServlet {
                 
             } else {
 
+                // An array of the declared child queries.
+                final IRunningQuery[] children = ((AbstractRunningQuery) q)
+                        .getChildren();
+
                 final long elapsedMillis = q.getElapsed();
 
                 final BOpStats stats = q.getStats().get(
@@ -517,6 +522,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 current.node("p")//
                         .text("solutions=" + solutionsOut)//
                         .text(", chunks=" + chunksOut)//
+                        .text(", subqueries=" + children.length)//
                         .text(", elapsed=" + elapsedMillis + "ms")//
                         .text(q.isCancelled()?", CANCELLED.":".")
                         .close();
@@ -530,8 +536,18 @@ public class QueryServlet extends BigdataRDFServlet {
                 QueryLog.getTableXHTML(queryStr, q, w, false/* summaryOnly */,
                         0/* maxBopLength */);
 
+                // And now do the child queries (if any).
+                for (int i = 0; i < children.length; i++) {
+
+                    QueryLog.getTableXHTML(null/* queryStr */, children[i], w,
+                            false/* summaryOnly */, 0/* maxBopLength */);
+
+                }
+                
             }
+
             doc.closeAll(current);
+            
         }
 
     }
