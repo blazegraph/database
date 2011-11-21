@@ -589,7 +589,7 @@ public class QueryLog {
         w.write("<table border=\"1\" summary=\"" + attrib("Query Statistics")
                 + "\"\n>");
 
-        getTableHeaderXHTML(q, w);
+        getTableHeaderXHTML(w);
 
         // Summary first.
         getSummaryRowXHTML(queryStr, q, w, maxBopLength);
@@ -604,6 +604,10 @@ public class QueryLog {
                 for (int i = 0; i < children.length; i++) {
 
                     final IRunningQuery c = children[i];
+
+                    // Repeat the header so we can recognize what follows as a
+                    // child query.
+                    getTableHeaderXHTML(w);
 
                     // Summary first.
                     getSummaryRowXHTML(null/* queryStr */, c, w, maxBopLength);
@@ -621,7 +625,7 @@ public class QueryLog {
     	
 	}
 	
-	public static void getTableHeaderXHTML(final IRunningQuery q, final Writer w)
+	public static void getTableHeaderXHTML(final Writer w)
 			throws IOException {
 
         // header row.
