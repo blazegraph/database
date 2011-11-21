@@ -193,7 +193,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * Return <code>true</code> if the static join optimizer is enabled for the
      * given join group.
      */
-    private boolean isStaticOptimizer(AST2BOpContext context,
+    public static boolean isStaticOptimizer(final AST2BOpContext context,
             final JoinGroupNode joinGroup) {
 
         QueryOptimizerEnum optimizer = null;
