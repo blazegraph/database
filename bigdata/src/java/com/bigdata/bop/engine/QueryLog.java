@@ -100,6 +100,9 @@ public class QueryLog {
 			
 			try {
 
+                final IRunningQuery[] children = (q instanceof AbstractRunningQuery) ? ((AbstractRunningQuery) q)
+                        .getChildren() : null;
+
 				/*
 				 * Note: We could use a striped lock here over a small pool of
 				 * StringBuilder's to decrease contention for the single buffer
@@ -112,9 +115,23 @@ public class QueryLog {
 					// clear the buffer.
 					sb.setLength(0);
 
-					logDetailRows(q, sb);
+                    logSummaryRow(q, sb);
+                    
+                    logDetailRows(q, sb);
 
-					logSummaryRow(q, sb);
+                    if (children != null) {
+
+                        for (int i = 0; i < children.length; i++) {
+
+                            final IRunningQuery c = children[i];
+                            
+                            logSummaryRow(c, sb);
+                            
+                            logDetailRows(c, sb);
+
+					    }
+					    
+					}
 
 					log.info(sb);
 
@@ -130,28 +147,28 @@ public class QueryLog {
 
     }
 
-	/**
-	 * Log the query.
-	 * 
-	 * @param q
-	 *            The query.
-	 * @param sb
-	 *            Where to write the log message.
-	 */
-	static public void log(final boolean includeTableHeader,
-			final IRunningQuery q, final StringBuilder sb) {
-
-		if(includeTableHeader) {
-			
-			sb.append(getTableHeader());
-			
-		}
-		
-		logDetailRows(q, sb);
-
-    	logSummaryRow(q, sb);
-    	
-    }
+//	/**
+//	 * Log the query.
+//	 * 
+//	 * @param q
+//	 *            The query.
+//	 * @param sb
+//	 *            Where to write the log message.
+//	 */
+//	static public void log(final boolean includeTableHeader,
+//			final IRunningQuery q, final StringBuilder sb) {
+//
+//		if(includeTableHeader) {
+//			
+//			sb.append(getTableHeader());
+//			
+//		}
+//		
+//		logDetailRows(q, sb);
+//
+//    	logSummaryRow(q, sb);
+//    	
+//    }
     
 	/**
 	 * Log a detail row for each operator in the query.
@@ -565,7 +582,7 @@ public class QueryLog {
 			final IRunningQuery q,//
 			final IRunningQuery[] children,//
 			final Writer w, final boolean summaryOnly,
- final int maxBopLength)
+			final int maxBopLength)
             throws IOException {
 
         // the table start tag.
