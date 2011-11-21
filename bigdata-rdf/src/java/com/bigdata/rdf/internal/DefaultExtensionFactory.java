@@ -58,9 +58,21 @@ public class DefaultExtensionFactory implements IExtensionFactory {
             extensions.add(new XSDStringExtension<BigdataLiteral>(lex, lex
                     .getMaxInlineStringLength()));
         }
+        
+        _init(lex, extensions);
 
 		extensionsArray = extensions.toArray(new IExtension[extensions.size()]);
         
+    }
+    
+    /**
+     * Give subclasses a chance to add extensions.
+     */
+    protected void _init(final LexiconRelation lex, 
+    		final Collection<IExtension> extensions) {
+    	
+    	// noop
+    	
     }
     
     public IExtension[] getExtensions() {
