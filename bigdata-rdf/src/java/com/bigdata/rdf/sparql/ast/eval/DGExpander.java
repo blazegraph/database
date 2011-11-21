@@ -17,6 +17,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.counters.CAT;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
@@ -163,6 +164,8 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
         public boolean isEmpty() {
 
+//            System.err.println("Testing isEmpty(): "+getPredicate());
+
             final IChunkedOrderedIterator<ISPO> itr = iterator(0L/* offset */,
                     1/* limit */, 1/* capacity */);
 
@@ -263,6 +266,9 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
             //
             // private final int capacity;
 
+            private final CAT nAPsWithHits = new CAT();
+            private final CAT nhits = new CAT();
+            
             /**
              * @todo buffer chunks of {@link #ISPO}s for more efficiency (lock
              *       amortization) and better alignment with the chunked source
@@ -377,7 +383,18 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
 
             public boolean hasNext() {
 
-                return src.hasNext();
+                if (!src.hasNext()) {
+
+                    if (log.isInfoEnabled())
+                        log.info("#graphs=" + graphs.size() + ", nhits="
+                                + nhits + ", apsWithHints=" + nAPsWithHits
+                                + ", pred=" + getPredicate());
+
+                    return false;
+                    
+                }
+
+                return true;
 
             }
 
@@ -529,6 +546,8 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
                     final IAccessPath<ISPO> asBoundAP = sourceAccessPath
                             .getRelation().getAccessPath(asBound);
 
+//                    System.err.println(asBoundAP.toString());
+
                     final IChunkedOrderedIterator<ISPO> itr = asBoundAP
                             .iterator();
 
@@ -558,6 +577,11 @@ public class DGExpander implements IAccessPathExpander<ISPO> {
                             log.debug("Ran iterator: c="
                                     + termId + ", nvisited=" + n);
 
+                        if(n>0) {
+                            nhits.add(n);
+                            nAPsWithHits.increment();
+                        }
+                        
                     } finally {
 
                         itr.close();

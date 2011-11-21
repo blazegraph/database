@@ -618,10 +618,13 @@ public class AST2BOpJoins extends AST2BOpFilters {
 //        }
 
         /*
-         * FIXME Something appears to be broken in the "DGExpander". It takes
-         * way to long as the #of graphs in the data set increases. Try to put
-         * the DataSetJoin into place instead. It is already present in the
-         * named graphs code path.
+         * Decide on a SCAN+FILTER or PARALLEL SUBQUERY plan for the default
+         * graph AP.
+         * 
+         * Note: The DataSetJoin approach used for named graph access paths does
+         * not work for default graph access paths because it changes the scope
+         * of the DISTINCT SPO filter and winds up letting through duplicate
+         * SPOs.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
          */
@@ -636,19 +639,17 @@ public class AST2BOpJoins extends AST2BOpFilters {
         if(true) {
         
             /*
-             * Note: The PARALLEL SUBQUERY code path is currently disabled for
-             * default graphs due to (a) DGExpander does not scale (it is not
-             * efficient and should be debugged in the short term) and (b) we
-             * can not use the DataSetJoin pattern. See notes below for more
-             * about this issue.
-             * 
-             * Note: The problem with the DGExpander could be too much
-             * parallelism. I have since dropped the max parallel from 10 to 5,
-             * which is what we use for pipeline ops. However, since this is the
-             * per-source-solution parallelism, perhaps maxparallel on the order
-             * of 1 or 2 might do better. defaultGraphs12 can be used to test
-             * this by forcing the code to run it with SCAN+FILTER or PARALLEL
-             * SUBQUERY.
+             * TODO The "DGExpander" code appears to function correctly, but it
+             * can do way too much work and take way too long as the #of graphs
+             * in the data set increases for at least some shapes of the data
+             * and the queries. However, we currently lack a means to detect
+             * cases where the PARALLEL SUBQUERY plan is faster than the
+             * SCAN+FILTER. The approach coded here does not make the correct
+             * decisions for reasons which seem to have more to do with the data
+             * density / sparsity for the APS which would be used for
+             * SCAN+FILTER versus PARALLEL SUBQUERY. Therefore the PARALLEL
+             * SUBQUERY path for default graph access paths is currently
+             * disabled.
              * 
              * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
              */
@@ -659,52 +660,52 @@ public class AST2BOpJoins extends AST2BOpFilters {
         
         } else {
         
-        if (estimateCosts) {
-
-            /*
-             * Estimate cost of SCAN with C unbound.
-             * 
-             * Note: We need to use the global index view in order to estimate
-             * the cost of the scan regardless of whether the query runs with
-             * partitioned or global index views when it is evaluated.
-             */
-            scanCostReport = ((AccessPath) ctx.context.getAccessPath(r,
-                    (Predicate<?>) pred.setProperty(
-                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
-                    .estimateCost();
-
-            anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
-
-            /*
-             * Estimate cost of SUBQUERY with C bound (sampling).
-             * 
-             * Note: We need to use the global index view in order to estimate
-             * the cost of the scan regardless of whether the query runs with
-             * partitioned or global index views when it is evaluated.
-             */
-            subqueryCostReport = dataset == null ? null : summary
-                    .estimateSubqueryCost(ctx.context,
-                            accessPathSampleLimit,
-                            (Predicate<?>) pred.setProperty(
-                                    IPredicate.Annotations.REMOTE_ACCESS_PATH,
-                                    true));
-
-            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
-
-            scanAndFilter = subqueryCostReport == null
-                    || scanCostReport.cost < subqueryCostReport.cost;
-            
-        } else {
-
-            scanCostReport = null;
-            
-            subqueryCostReport = null;
-            
-            scanAndFilter = pred.getProperty(
-                    QueryHints.ACCESS_PATH_SCAN_AND_FILTER,
-                    ctx.accessPathScanAndFilter);
-            
-        }
+            if (estimateCosts) {
+    
+                /*
+                 * Estimate cost of SCAN with C unbound.
+                 * 
+                 * Note: We need to use the global index view in order to estimate
+                 * the cost of the scan regardless of whether the query runs with
+                 * partitioned or global index views when it is evaluated.
+                 */
+                scanCostReport = ((AccessPath) ctx.context.getAccessPath(r,
+                        (Predicate<?>) pred.setProperty(
+                                IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
+                        .estimateCost();
+    
+                anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
+    
+                /*
+                 * Estimate cost of SUBQUERY with C bound (sampling).
+                 * 
+                 * Note: We need to use the global index view in order to estimate
+                 * the cost of the scan regardless of whether the query runs with
+                 * partitioned or global index views when it is evaluated.
+                 */
+                subqueryCostReport = dataset == null ? null : summary
+                        .estimateSubqueryCost(ctx.context,
+                                accessPathSampleLimit,
+                                (Predicate<?>) pred.setProperty(
+                                        IPredicate.Annotations.REMOTE_ACCESS_PATH,
+                                        true));
+    
+                anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+    
+                scanAndFilter = subqueryCostReport == null
+                        || scanCostReport.cost < subqueryCostReport.cost;
+                
+            } else {
+    
+                scanCostReport = null;
+                
+                subqueryCostReport = null;
+                
+                scanAndFilter = pred.getProperty(
+                        QueryHints.ACCESS_PATH_SCAN_AND_FILTER,
+                        ctx.accessPathScanAndFilter);
+                
+            }
 
         }
     
@@ -779,13 +780,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                  * index but it would need to be ALL joins for a given source
                  * solution flowing through the DataSetJoin.
                  * 
-                 * However, a conceptually similar pattern COULD be made to
-                 * work. What we would need to do is execute the default graph
-                 * pattern in a sub-group (or sub-query). The sub-group would
-                 * contain the DataSetJoin and the statement index join and
-                 * would project the DISTINCT bindings on the (s,p,o) values.
-                 * That would actually wind up being a DISTINCT solution sets
-                 * operator.
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/407
                  */
 
                 // The variable to be bound.
@@ -804,16 +799,16 @@ public class AST2BOpJoins extends AST2BOpFilters {
                 /*
                  * Parallel subquery using the DGExpander.
                  * 
-                 * TODO This code path is deprecated. But see the nodes on the
-                 * DataSetJoin code path for why we can not use that approach
-                 * for parallel subquery for default graph APs.
+                 * NOte: See the notes on the DataSetJoin code path for why we
+                 * can not use that approach for parallel subquery for default
+                 * graph APs.
                  */
                 
                 final long estimatedRangeCount = subqueryCostReport.rangeCount;
 
                 // @todo default with query hint to override and relate to
                 // ClientIndexView limit in scale-out.
-                final int maxParallel = PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL;
+                final int maxParallel = 1; //PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL;
 
                 // Set subquery expander.
                 pred = (Predicate<?>) pred.setUnboundProperty(
