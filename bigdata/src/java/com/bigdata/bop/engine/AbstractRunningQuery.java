@@ -30,6 +30,7 @@ package com.bigdata.bop.engine;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -1455,6 +1456,45 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     private final IQueryAttributes queryAttributes = new DefaultQueryAttributes();
 
+    /**
+     * Report a snapshot of the known (declared) child {@link IRunningQuery}s
+     * for this {@link IRunningQuery}.
+     * 
+     * @return An array providing a snapshot of the known child
+     *         {@link IRunningQuery}s and never <code>null</code>.
+     */
+    final public IRunningQuery[] getChildren() {
+        
+        synchronized (children) {
+        
+            return children.toArray(new IRunningQuery[children.size()]);
+            
+        }
+        
+    }
+    
+    /**
+     * Attach a child query.
+     * <p>
+     * Queries as submitted do not know about parent/child relationships
+     * 
+     * @param childQuery
+     *            The child query.
+     * 
+     * @return <code>true</code> if the child query was not already declared.
+     */
+    final public boolean addChild(final IRunningQuery childQuery) {
+    
+        synchronized(children) {
+        
+            return children.add(childQuery);
+            
+        }
+        
+    }
+
+    final private LinkedHashSet<IRunningQuery> children = new LinkedHashSet<IRunningQuery>();
+    
     /**
      * Return the textual representation of the {@link RunState} of this query.
      * <p>

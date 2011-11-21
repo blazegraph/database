@@ -44,6 +44,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.aggregate.IAggregate;
+import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -91,9 +92,11 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * 
  * @todo Rename as SubqueryPipelineJoinOp.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
  * @see AbstractSubqueryOp
+ * @see JVMNamedSubqueryOp
+ * @see HTreeNamedSubqueryOp
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -396,7 +399,11 @@ public class SubqueryOp extends PipelineOp {
 
 					long ncopied = 0L;
 					try {
-						
+
+                        // Declare the child query to the parent.
+                        ((AbstractRunningQuery) parentContext.getRunningQuery())
+                                .addChild(runningSubquery);
+
 						// Iterator visiting the subquery solutions.
 						subquerySolutionItr = runningSubquery.iterator();
 
