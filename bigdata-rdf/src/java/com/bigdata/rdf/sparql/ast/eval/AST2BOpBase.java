@@ -57,24 +57,6 @@ public class AST2BOpBase {
         
     }
     
-//    /**
-//     * Flag to conditionally enable the new named and default graph support.
-//     * <p>
-//     * Note: When enabled, the {@link NamedGraphSolutionExpander} and
-//     * {@link DefaultGraphSolutionExpander} must be stripped from the
-//     * {@link IPredicate.Annotations#ACCESS_PATH_EXPANDER}. In the long term, we
-//     * will simply no longer generate them in
-//     * {@link BigdataEvaluationStrategyImpl}.
-//     * <p>
-//     * Note: If you want to test just the named graph stuff, then the default
-//     * graph processing could be handed off to the
-//     * {@link DefaultGraphSolutionExpander}.
-//     * 
-//     * @deprecated This is always used so it can just go away. So can all of the
-//     *             related classes.
-//     */
-//    protected static final boolean enableDecisionTree = true;
-
     /**
      * Annotations used to mark named and default graph patterns on the
      * {@link IPredicate}s. Rather than attaching a named or default graph
