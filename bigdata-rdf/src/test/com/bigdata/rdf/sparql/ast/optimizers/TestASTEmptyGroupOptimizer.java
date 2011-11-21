@@ -1127,5 +1127,130 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         assertSameAST(expected, actual);
 
     }
+    
+    /**
+     * https://sourceforge.net/apps/trac/bigdata/ticket/416
+     */
+    public void test_ticket416() throws Exception {
+        
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+        
+        final IV type = makeIV(RDF.TYPE);
+        
+        final IV a = makeIV(new URIImpl("http://example/a"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("r"));
+            projection.addProjectionVar(new VarNode("l"));
+            projection.setDistinct(true);
+            
+            final UnionNode union = new UnionNode(); // outer
+            
+            final JoinGroupNode left = new JoinGroupNode();
+            left.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new ConstantNode(type),
+            		new ConstantNode(a)));
+            left.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new VarNode("p"),
+            		new VarNode("r")));
+            left.addChild(new StatementPatternNode(
+            		new VarNode("r"),
+            		new ConstantNode(type),
+            		new VarNode("type")));
+            
+            final JoinGroupNode right = new JoinGroupNode();
+            right.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new ConstantNode(type),
+            		new ConstantNode(a)));
+            right.addChild(new StatementPatternNode(
+            		new VarNode("l"),
+            		new VarNode("p"),
+            		new VarNode("s")));
+            right.addChild(new StatementPatternNode(
+            		new VarNode("l"),
+            		new ConstantNode(type),
+            		new VarNode("type")));
+
+            union.addChild(left);
+            union.addChild(right);
+            
+            final JoinGroupNode where = new JoinGroupNode();
+            
+            where.addChild(union);
+
+            given.setProjection(projection);
+            given.setWhereClause(where);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("r"));
+            projection.addProjectionVar(new VarNode("l"));
+            projection.setDistinct(true);
+            
+            final UnionNode union = new UnionNode(); // outer
+            
+            final JoinGroupNode left = new JoinGroupNode();
+            left.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new ConstantNode(type),
+            		new ConstantNode(a)));
+            left.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new VarNode("p"),
+            		new VarNode("r")));
+            left.addChild(new StatementPatternNode(
+            		new VarNode("r"),
+            		new ConstantNode(type),
+            		new VarNode("type")));
+            
+            final JoinGroupNode right = new JoinGroupNode();
+            right.addChild(new StatementPatternNode(
+            		new VarNode("s"),
+            		new ConstantNode(type),
+            		new ConstantNode(a)));
+            right.addChild(new StatementPatternNode(
+            		new VarNode("l"),
+            		new VarNode("p"),
+            		new VarNode("s")));
+            right.addChild(new StatementPatternNode(
+            		new VarNode("l"),
+            		new ConstantNode(type),
+            		new VarNode("type")));
+
+            union.addChild(left);
+            union.addChild(right);
+            
+            expected.setProjection(projection);
+            expected.setWhereClause(union);
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
 
 }
