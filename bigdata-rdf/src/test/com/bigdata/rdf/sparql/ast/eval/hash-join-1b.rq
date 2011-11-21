@@ -11,8 +11,8 @@ WHERE {
   
   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
 
-  # Force the use of the JVM hash joins.
-  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "false" .
+  # Force the use of the HTree.
+  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "true" .
 
   ?x rdf:type foaf:Person .
 

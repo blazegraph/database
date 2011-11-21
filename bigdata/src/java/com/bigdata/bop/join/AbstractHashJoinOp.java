@@ -33,8 +33,12 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.NamedSetAnnotations;
 
 /**
+ * Abstract base class for both JVM and native memory hash join against a B+Tree
+ * access path.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -43,7 +47,8 @@ abstract public class AbstractHashJoinOp<E> extends PipelineOp implements
 
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AccessPathJoinAnnotations {
+    public interface Annotations extends AccessPathJoinAnnotations,
+            NamedSetAnnotations {
 
     }
 

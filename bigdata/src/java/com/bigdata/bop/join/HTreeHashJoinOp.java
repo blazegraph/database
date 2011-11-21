@@ -41,6 +41,7 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.htree.HTree;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -184,6 +185,8 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
         // Predicate for the access path must be specified.
         getPredicate();
 
+        getRequiredProperty(Annotations.NAMED_SET_REF);
+
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
@@ -295,21 +298,28 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
                  * 
                  * Note: Since the operator is not thread-safe, we do not need
                  * to use a putIfAbsent pattern here.
+                 * 
+                 * Note: Publishing the [state] as a query attribute provides
+                 * visiblility into the hash join against the access path.
                  */
-                final IQueryAttributes attrs = context.getRunningQuery()
-                        .getAttributes();
 
-                final Object joinStateKey = op.getId() + ".joinState";
+                final NamedSolutionSetRef namedSetRef = (NamedSolutionSetRef) op
+                        .getRequiredProperty(Annotations.NAMED_SET_REF);
+
+                // Lookup the attributes for the query on which we will hang the
+                // solution set.
+                final IQueryAttributes attrs = context
+                        .getQueryAttributes(namedSetRef.queryId);
 
                 HTreeHashJoinUtility state = (HTreeHashJoinUtility) attrs
-                        .get(joinStateKey);
+                        .get(namedSetRef);
 
                 if (state == null) {
 
                     state = new HTreeHashJoinUtility(context.getRunningQuery()
                             .getMemoryManager(), op, op.isOptional(), false/* filter */);
 
-                    attrs.put(joinStateKey, state);
+                    attrs.put(namedSetRef, state);
 
                 }
 

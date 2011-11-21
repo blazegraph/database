@@ -354,12 +354,14 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
      * @param joinId
      * @param joinVars
      * @param predOp
+     * @param queryId
      * @param annotations
      * @return
      */
     abstract protected PipelineOp newJoin(final BOp[] args, final int joinId,
             final IVariable<IV>[] joinVars,
             final Predicate<IV> predOp,
+            final UUID queryId,
             final NV... annotations);
     
     /*
@@ -384,6 +386,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[] { x };
+        final UUID queryId = UUID.randomUUID();
         
         final Predicate<IV> predOp = new Predicate<IV>(
                 new IVariableOrConstant[] { new Constant<IV>(setup.john),
@@ -394,7 +397,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
 
-        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp);
+        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars,
+                predOp, queryId);
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -433,7 +437,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             
         }
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
@@ -507,6 +510,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[] { /* x */};
+        final UUID queryId = UUID.randomUUID();
         
         final Predicate<IV> predOp = new Predicate<IV>(
                 new IVariableOrConstant[] { new Constant<IV>(setup.john),
@@ -517,7 +521,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
 
-        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp);
+        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars,
+                predOp, queryId);
 
         // the expected solutions.
         final IBindingSet[] expected = new IBindingSet[] {//
@@ -556,7 +561,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             
         }
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
@@ -620,7 +624,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[] { x };
-        
+        final UUID queryId = UUID.randomUUID();
+
         final Predicate<IV> predOp = new Predicate<IV>(
                 new IVariableOrConstant[] { new Constant<IV>(setup.john),
                         new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
@@ -630,7 +635,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                         new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
 
-        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp, 
+        final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars, predOp,
+                queryId,//
                 new NV(JoinAnnotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
                                 .wrap(new EQConstant(x, new Constant<IV>(setup.brad))),//
@@ -673,7 +679,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             
         }
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
@@ -737,7 +742,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final IVariable<IV> y = Var.var("y");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[] { x };
-        
+        final UUID queryId = UUID.randomUUID();
+
         final Predicate<IV> predOp = new Predicate<IV>(
                 new IVariableOrConstant[] { new Constant<IV>(setup.john),
                         new Constant<IV>(setup.knows), x }, NV.asMap(new NV[] {//
@@ -748,7 +754,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 }));
 
         final PipelineOp query = newJoin(new BOp[] {}, joinId, joinVars,
-                predOp,//
+                predOp, queryId, //
                 new NV(JoinAnnotations.SELECT,
                         new IVariable[] { x })//
         );
@@ -790,7 +796,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
             
         }
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
             
@@ -859,6 +864,7 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final Var<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[]{x};
+        final UUID queryId = UUID.randomUUID();
 
         // AP("Paul" ?x)
         final Predicate<IV> pred = new Predicate<IV>(
@@ -880,7 +886,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 new BOp[] { }, // args
                 joinId,
                 joinVars,
-                pred
+                pred,
+                queryId
                 );
 
         /**
@@ -940,7 +947,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 ),//
         };
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
 
@@ -1008,7 +1014,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
         final Var<IV> x = Var.var("x");
         @SuppressWarnings("unchecked")
         final IVariable<IV>[] joinVars = new IVariable[]{x};
-        
+        final UUID queryId = UUID.randomUUID();
+
         final Predicate<IV> pred = new Predicate<IV>(
                 new IVariableOrConstant[] { new Constant<IV>(setup.paul),
                         new Constant<IV>(setup.knows), x },
@@ -1028,7 +1035,8 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 new BOp[] { }, // args
                 joinId,
                 joinVars,
-                pred
+                pred,
+                queryId
                 );
 
         /**
@@ -1115,7 +1123,6 @@ abstract public class AbstractHashJoinOpTestCase extends TestCase2 {
                 ),//
         };
 
-        final UUID queryId = UUID.randomUUID();
         final MockQueryContext queryContext = new MockQueryContext(queryId);
         try {
 
