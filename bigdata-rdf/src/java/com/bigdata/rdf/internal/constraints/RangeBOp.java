@@ -35,6 +35,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ImmutableBOp;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 
@@ -154,6 +155,10 @@ final public class RangeBOp extends BOpBase implements IVariable<Range> {
 			return null;
 
     	try {
+    	    /*
+    	     * FIXME Should handle from/to (non-)exclusive boundaries using a
+    	     * successor pattern.
+    	     */
     		// let Range ctor() do the type checks and valid range checks
     		return new Range(from, to);
     	} catch (IllegalArgumentException ex) {
@@ -166,6 +171,9 @@ final public class RangeBOp extends BOpBase implements IVariable<Range> {
     	
     }
     
+    /**
+     * FIXME This needs to be hooked from {@link Predicate#asBound(IBindingSet)}.
+     */
     final public RangeBOp asBound(final IBindingSet bs) {
 
 		final IV from, to;
