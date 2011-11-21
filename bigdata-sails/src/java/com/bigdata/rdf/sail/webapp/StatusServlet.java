@@ -609,16 +609,8 @@ public class StatusServlet extends BigdataRDFServlet {
                         current.node("h2", "Query Evaluation Statistics");
 
                         // Format as a table, writing onto the response.
-                        QueryLog.getTableXHTML(queryString, q, w,
+                        QueryLog.getTableXHTML(queryString, q, children, w,
                                 !showQueryDetails, maxBopLength);
-
-                        // And now do the child queries (if any).
-                        for (int i = 0; i < children.length; i++) {
-
-                            QueryLog.getTableXHTML(null/* queryStr */,
-                                    children[i], w, false/* summaryOnly */, 0/* maxBopLength */);
-
-                        }
 
                     }
 

@@ -533,17 +533,9 @@ public class QueryServlet extends BigdataRDFServlet {
                  * Note: This is writing on the Writer so it goes directly into
                  * the HTML document we are building for the client.
                  */
-                QueryLog.getTableXHTML(queryStr, q, w, false/* summaryOnly */,
-                        0/* maxBopLength */);
+                QueryLog.getTableXHTML(queryStr, q, children, w,
+                        false/* summaryOnly */, 0/* maxBopLength */);
 
-                // And now do the child queries (if any).
-                for (int i = 0; i < children.length; i++) {
-
-                    QueryLog.getTableXHTML(null/* queryStr */, children[i], w,
-                            false/* summaryOnly */, 0/* maxBopLength */);
-
-                }
-                
             }
 
             doc.closeAll(current);
