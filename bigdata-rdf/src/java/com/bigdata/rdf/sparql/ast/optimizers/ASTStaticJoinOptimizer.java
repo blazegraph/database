@@ -316,27 +316,55 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                      * different (optimized) ordering.
                      */
                     final int[] slots = new int[spNodes.size()];
-
-                    int j = 0;
-                    for (int i = 0; i < joinGroup.arity(); i++) {
-
-                        if (joinGroup.get(i) instanceof StatementPatternNode) {
-
-                            slots[j++] = i;
-
-                        }
-
+                    {
+	                    int j = 0;
+	                    for (int i = 0; i < joinGroup.arity(); i++) {
+	
+	                        if (joinGroup.get(i) instanceof StatementPatternNode) {
+	
+	                            slots[j++] = i;
+	
+	                        }
+	
+	                    }
                     }
 
                     final double optimistic = Double.parseDouble( 
                     	joinGroup.getQueryHint(Annotations.OPTIMISTIC, 
                     			Annotations.DEFAULT_OPTIMISTIC));
                     
+                    final List<StatementPatternNode> required =
+                    	new LinkedList<StatementPatternNode>();
+                    
+                    final List<StatementPatternNode> optional =
+                    	new LinkedList<StatementPatternNode>();
+                    
+                    StatementPatternNode runLast = null;
+                    
+                    for (StatementPatternNode sp : spNodes) {
+                    	
+                    	if (sp.getQueryHintAsBoolean(QueryHints.RUN_LAST, false)) {
+
+                    		runLast = sp;
+                    		
+                    	} else if (sp.isOptional()) {
+                    		
+                    		optional.add(sp);
+                    		
+                    	} else {
+                    		
+                    		required.add(sp);
+                    		
+                    	}
+                    	
+                    }
+                    
                     /*
-                     * Calculate the optimized join ordering.
+                     * Calculate the optimized join ordering for the required
+                     * tails.
                      */
                     final StaticOptimizer opt = new StaticOptimizer(queryRoot,
-                            ancestry, spNodes, optimistic);
+                            ancestry, required, optimistic);
 
                     final int[] order = opt.getOrder();
 
@@ -344,77 +372,63 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                      * Reorder the statement pattern nodes within the join
                      * group.
                      */
-                    for (int i = 0; i < order.length; i++) {
+                    int i = 0;
+                    for (int j = 0; j < required.size(); j++) {
 
-                        final StatementPatternNode sp = spNodes.get(order[i]);
+                        final StatementPatternNode sp = required.get(order[j]);
 
-                        joinGroup.setArg(slots[i], sp);
-
-                    }
-
-                    /*
-                     * Update the ancestry for recursion. Only add the
-                     * non-optional statement pattern nodes - the ones that we
-                     * can count on to bind their variables.
-                     */
-                    final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
-
-                    for (IJoinNode ancestor : ancestry) {
-
-                        tmp.add(ancestor);
+                        joinGroup.setArg(slots[i++], sp);
 
                     }
+                    
+                    if (runLast != null && !runLast.isOptional()) {
+                    	
+                    	joinGroup.setArg(slots[i++], runLast);
+                    	
+                    }
+                    
+                    for (StatementPatternNode sp : optional) {
 
-                    for (int i = 0; i < order.length; i++) {
-
-                        final StatementPatternNode sp = spNodes.get(order[i]);
-
-                        if (!sp.isOptional()) {
-
-                            tmp.add(sp);
-
-                        }
-
+                        joinGroup.setArg(slots[i++], sp);
+                        
                     }
 
-                    if (tmp.size() > ancestry.length) {
-
-                        ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
-
+                    if (runLast != null && runLast.isOptional()) {
+                    	
+                    	joinGroup.setArg(slots[i++], runLast);
+                    	
                     }
-
-	        	} else {
+                    
+	        	} 
 	        	    
-                    /*
-                     * Update the ancestry for recursion. Only add the
-                     * non-optional statement pattern nodes - the ones that we
-                     * can count on to bind their variables.
-                     */
-                    final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
-	                
-	                for (IJoinNode ancestor : ancestry) {
-	                    
-	                    tmp.add(ancestor);
-	                    
-	                }
-	                
-	                for(StatementPatternNode sp : spNodes) {
-	                    
-	                    if (!sp.isOptional()) {
-	                        
-	                        tmp.add(sp);
-	                        
-	                    }
-	                    
-	                }
-	                
-	                if (tmp.size() > ancestry.length) {
-	                    
-	                    ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
-	                    
-	                }
-	                
-	        	}
+                /*
+                 * Update the ancestry for recursion. Only add the
+                 * non-optional statement pattern nodes - the ones that we
+                 * can count on to bind their variables.
+                 */
+                final List<IJoinNode> tmp = new LinkedList<IJoinNode>();
+                
+                for (IJoinNode ancestor : ancestry) {
+                    
+                    tmp.add(ancestor);
+                    
+                }
+                
+                for(StatementPatternNode sp : spNodes) {
+                    
+                    if (!sp.isOptional()) {
+                        
+                        tmp.add(sp);
+                        
+                    }
+                    
+                }
+                
+                if (tmp.size() > ancestry.length) {
+                    
+                    ancestry = tmp.toArray(new IJoinNode[tmp.size()]);
+                    
+                }
 	        
 	        }
 	        

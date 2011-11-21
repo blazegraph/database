@@ -41,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -1608,6 +1609,105 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
 
     }
     
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_runFirstRunLast_01() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(new URIImpl("http://example/a"));
+
+        @SuppressWarnings("rawtypes")
+        final IV b = makeIV(new URIImpl("http://example/b"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV c = makeIV(new URIImpl("http://example/c"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV d = makeIV(new URIImpl("http://example/d"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV e = makeIV(new URIImpl("http://example/e"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV f = makeIV(new URIImpl("http://example/f"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("x"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(b), new ConstantNode(b), 2l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(a), new ConstantNode(a), 100l)));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l)));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(d), new ConstantNode(d), 4l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(c), new ConstantNode(c), 3l));
+
+            given.setProjection(projection);
+            given.setWhereClause(whereClause);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("x"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(a), new ConstantNode(a), 100l)));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(b), new ConstantNode(b), 2l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(d), new ConstantNode(d), 4l));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l)));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true));
+
+            expected.setProjection(projection);
+            expected.setWhereClause(whereClause);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+    
     private StatementPatternNode newStatementPatternNode(
             final TermNode s, final TermNode p, final TermNode o, 
             final long cardinality) {
@@ -1616,6 +1716,105 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
     }
         
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_runFirstRunLast_02() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(new URIImpl("http://example/a"));
+
+        @SuppressWarnings("rawtypes")
+        final IV b = makeIV(new URIImpl("http://example/b"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV c = makeIV(new URIImpl("http://example/c"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV d = makeIV(new URIImpl("http://example/d"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV e = makeIV(new URIImpl("http://example/e"));
+        
+        @SuppressWarnings("rawtypes")
+        final IV f = makeIV(new URIImpl("http://example/f"));
+        
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("x"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(b), new ConstantNode(b), 2l));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
+
+            whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(a), new ConstantNode(a), 100l)));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l, true));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(d), new ConstantNode(d), 4l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(c), new ConstantNode(c), 3l));
+
+            given.setProjection(projection);
+            given.setWhereClause(whereClause);
+            
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("x"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+
+            whereClause.addChild(runFirst(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(a), new ConstantNode(a), 100l)));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(b), new ConstantNode(b), 2l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(c), new ConstantNode(c), 3l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(d), new ConstantNode(d), 4l));
+
+            whereClause.addChild(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(e), new ConstantNode(e), 1l, true));
+
+            whereClause.addChild(runLast(newStatementPatternNode(new VarNode("x"),
+                    new ConstantNode(f), new ConstantNode(f), 1l, true)));
+
+            expected.setProjection(projection);
+            expected.setWhereClause(whereClause);
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTStaticJoinOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+    
     private StatementPatternNode newStatementPatternNode(
             final TermNode s, final TermNode p, final TermNode o, 
             final long cardinality, final boolean optional) {
@@ -1632,6 +1831,16 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
         
         return sp;
         
+    }
+    
+    private StatementPatternNode runFirst(final StatementPatternNode sp) {
+    	sp.setQueryHint(QueryHints.RUN_FIRST, "true");
+    	return sp;
+    }
+
+    private StatementPatternNode runLast(final StatementPatternNode sp) {
+    	sp.setQueryHint(QueryHints.RUN_LAST, "true");
+    	return sp;
     }
 
 }
