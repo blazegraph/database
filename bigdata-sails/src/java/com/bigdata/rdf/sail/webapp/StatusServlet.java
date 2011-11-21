@@ -447,25 +447,35 @@ public class StatusServlet extends BigdataRDFServlet {
                         // Information was not requested for this query.
                         continue;
                     }
-                    
+
                     // Lookup the NanoSparqlServer's RunningQuery object.
                     final RunningQuery acceptedQuery = crosswalkMap
                             .get(queryId);
 
-                    /*
-                     * TODO A query running on the query engine which is not a
-                     * query accepted by the NanoSparqlServer is typically a
-                     * sub-query being evaluated as part of the query plan for
-                     * the top-level query. We should model the parent/child
-                     * relationship and display the data for the child query.
-                     * (Right now the only way to see the statistics for those
-                     * children is to request the status on ALL running queries
-                     * with full detail).
-                     * 
-                     * FIXME Since children are now modeled, do not display
-                     * something unless it shows up as a top-level NSS submitted
-                     * query.
-                     */
+                    if (acceptedQuery == null) {
+
+                        /*
+                         * A query running on the query engine which is not a
+                         * query accepted by the NanoSparqlServer is typically a
+                         * sub-query being evaluated as part of the query plan
+                         * for the top-level query.
+                         * 
+                         * Since we nomw model the parent/child relationship and
+                         * display the data for the child query, we want to skip
+                         * anything which is not recognizable as a top-level
+                         * query submitted to the NanoSparqlServer.
+                         * 
+                         * TODO This does leave open the possibility that a
+                         * query directly submitted against the database from an
+                         * application which embeds bigdata will not be reported
+                         * here. One way to handle that is to make a collection
+                         * of all queries which were skipped here, to remove all
+                         * queries from that collection which were identified as
+                         * subqueries below, and then to paint anything which
+                         * remains and which has not yet been terminated.
+                         */
+                        continue;
+                    }
 
                     // An array of the declared child queries.
                     final IRunningQuery[] children = ((AbstractRunningQuery) q)
