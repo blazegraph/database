@@ -250,6 +250,27 @@ public class StatusServlet extends BigdataRDFServlet {
             current.node("p", "Running query count="
                     + getBigdataRDFContext().getQueries().size());
 
+            // Offer a link to the "showQueries" page.
+            {
+
+                final String showQueriesURL = req.getRequestURL().append("?")
+                        .append(SHOW_QUERIES).toString();
+                
+                final String showQueriesDetailsURL = req.getRequestURL()
+                        .append("?").append(SHOW_QUERIES).append("=")
+                        .append(DETAILS).toString();
+
+                current.node("p").text("Show ")
+                        //
+                        .node("a").attr("href", showQueriesURL).text("queries")
+                        .close()//
+                        .text(", ")//
+                        .node("a").attr("href", showQueriesDetailsURL)//
+                        .text("query details").close()//
+                        .text(".");
+
+            }
+
             if (showNamespaces) {
 
                 final List<String> namespaces = getBigdataRDFContext()
