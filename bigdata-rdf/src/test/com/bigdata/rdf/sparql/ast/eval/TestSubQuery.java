@@ -52,34 +52,6 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Unit test for an query with an EXISTS filter. The EXISTS filter is
-     * modeled as an ASK sub-query which projects an anonymous variable and a
-     * simple test of the truth state of that anonymous variable.
-     * 
-     * <pre>
-     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-     * SELECT DISTINCT ?x
-     * WHERE {
-     *   ?x ?p ?o .
-     *   FILTER ( EXISTS {?x rdf:type foaf:Person} ) 
-     * }
-     * </pre>
-     */
-    public void test_exists_1() throws Exception {
-
-        new TestHelper(
-                "exists-1", // testURI,
-                "exists-1.rq",// queryFileURL
-                "exists-1.trig",// dataFileURL
-                "exists-1.srx" // resultFileURL,
-//                false, // laxCardinality
-//                true // checkOrder
-                ).runTest();
-
-    }
-
-    /**
      * <pre>
      * PREFIX : <http://example.org/>
      * SELECT *

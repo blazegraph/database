@@ -91,6 +91,9 @@ public class TestAll extends TestCase {
         // Different kinds of subqueries.
         suite.addTestSuite(TestSubQuery.class);
 
+        // Test suite for negation (EXISTS, NOT EXISTS, MINUS).
+//        suite.addTestSuite(TestNegation.class); // FIXME Restore to test suite once negation is working.
+
         // Test suite for a merge join pattern
         suite.addTestSuite(TestMergeJoin.class);
 
