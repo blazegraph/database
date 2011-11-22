@@ -100,6 +100,8 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-2",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-3",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-4",
+          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-exists-05",
+          "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-exists-06"
     });
 
 	/**
@@ -187,6 +189,18 @@ extends SPARQLASTQueryTest // Bigdata native AST based evaluation
     static final Collection<String> testURIs = Arrays.asList(new String[] {
     		// 8, 9, 14-19, 23-30
 
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-in-02",
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-not-in-01",
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-not-in-02",
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-not-in-03",
+    		
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-exists-05",
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-exists-06",
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-substr-02",
+//        	"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/syntax-sparql1/manifest#sparql11-substr-03"
+
+
+        	
     		// derived numeric types
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-08",
 //    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-09",
