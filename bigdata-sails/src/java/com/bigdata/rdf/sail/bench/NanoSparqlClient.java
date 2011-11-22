@@ -252,6 +252,7 @@ public class NanoSparqlClient {
 					+ "?query="
 					+ URLEncoder.encode(opts.queryStr, "UTF-8")//
 					+ (opts.explain?"&explain=":"")//
+					+ (opts.analytic!=null?"&analytic="+opts.analytic:"")//
 					+ (opts.defaultGraphUri == null ? ""
 							: ("&default-graph-uri=" + URLEncoder.encode(
 									opts.defaultGraphUri, "UTF-8")));
@@ -770,6 +771,11 @@ public class NanoSparqlClient {
 		public String defaultGraphUri = null;
 		/** When true, request an explanation for the query. */
 		public boolean explain = false;
+        /**
+         * When non-<code>null</code>, either enable or disable the analytic
+         * query package for the request.
+         */
+		public Boolean analytic = null;
 		/** The connection timeout (ms). */
 		public int timeout = DEFAULT_TIMEOUT;
 		/**
@@ -1253,6 +1259,8 @@ public class NanoSparqlClient {
 	 *            order.</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The URI of the default graph to use for the query.</dd>
+     *            <dt>-analytic=(true|false)</dt>
+     *            <dd>Request the analytic query package for the submitted queries.</dd>
 	 *            <dt>-baseURI</dt>
 	 *            <dd>The baseURI of the query (used when parsing the query).</dd>
 	 *            <dt>-help</dt>
@@ -1318,6 +1326,10 @@ public class NanoSparqlClient {
 				} else if (arg.equals("-explain")) {
 
 					opts.explain = true;
+
+                } else if (arg.equals("-analytic")) {
+
+                    opts.analytic = Boolean.valueOf(args[++i]);
 
 				} else if (arg.equals("-showParseTree")) {
 
