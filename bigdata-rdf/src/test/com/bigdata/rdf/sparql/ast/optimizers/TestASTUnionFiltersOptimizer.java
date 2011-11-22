@@ -27,47 +27,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSD;
-import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
-import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
- * Test suite for {@link ASTEmptyGroupOptimizer}.
+ * Test suite for {@link ASTUnionFiltersOptimizer}.
  * 
- * TODO Test for removal of empty UNIONs. Empty UNIONs can arise through pruning
- * based on unknown IVs, or filters which are provably false. However, I would
- * expect the pruning logic to eliminate the empty group in such cases.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id: TestASTEmptyGroupOptimizer.java 5302 2011-10-07 14:28:03Z
  *          thompsonbry $
  */
@@ -89,6 +72,7 @@ public class TestASTUnionFiltersOptimizer extends AbstractASTEvaluationTestCase 
     /**
      * https://sourceforge.net/apps/trac/bigdata/ticket/416
      */
+    @SuppressWarnings("rawtypes")
     public void test_ticket416() throws Exception {
         
         /*
