@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collections;
 
+import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -55,11 +56,13 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for the {@link ASTQueryHintOptimizer}.
@@ -148,7 +151,7 @@ public class TestASTQueryHintOptimizer extends
                 "http://www.rdfabout.com/rdf/schema/vote/votedBy"));
 
         @SuppressWarnings("rawtypes")
-        final IV scopeBGP = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHintScope.BGP));
+        final IV scopePrior = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHintScope.Prior));
         @SuppressWarnings("rawtypes")
         final IV chunkCapacity = makeIV(new URIImpl(QueryHints.NAMESPACE+BufferAnnotations.CHUNK_CAPACITY));
         @SuppressWarnings("rawtypes")
@@ -235,7 +238,7 @@ public class TestASTQueryHintOptimizer extends
                             Scope.DEFAULT_CONTEXTS));
                     
                     complexOptGroup.addChild(new StatementPatternNode(
-                            new ConstantNode(scopeBGP), new ConstantNode(
+                            new ConstantNode(scopePrior), new ConstantNode(
                                     chunkCapacity), new ConstantNode(
                                     chunkCapacityValue), null/* c */,
                             Scope.DEFAULT_CONTEXTS));
@@ -360,8 +363,8 @@ public class TestASTQueryHintOptimizer extends
      *   GRAPH ?g {
      *     ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.
      *     ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M, 17623ms for AP scan.
-     *     hint:BGP hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" . # use a hash join.
-     *     hint:BGP hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # use a specific index (default is POCS)
+     *     hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" . # use a hash join.
+     *     hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # use a specific index (default is POCS)
      *   }
      * }
      * </pre>
@@ -385,7 +388,7 @@ public class TestASTQueryHintOptimizer extends
         @SuppressWarnings("rawtypes")
         final IV scopeQuery = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Query));
         @SuppressWarnings("rawtypes")
-        final IV scopeBGP = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.BGP));
+        final IV scopePrior = makeIV(new URIImpl(QueryHints.NAMESPACE+ QueryHintScope.Prior));
         @SuppressWarnings("rawtypes")
         final IV optimizer = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.OPTIMIZER));
         @SuppressWarnings("rawtypes")
@@ -444,12 +447,12 @@ public class TestASTQueryHintOptimizer extends
                             "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
 
                     graphGroup.addChild(new StatementPatternNode(
-                            new ConstantNode(scopeBGP), new ConstantNode(
+                            new ConstantNode(scopePrior), new ConstantNode(
                                     hashJoin), new ConstantNode(t),
                             new VarNode("g"), Scope.NAMED_CONTEXTS));
 
                     graphGroup.addChild(new StatementPatternNode(
-                            new ConstantNode(scopeBGP), new ConstantNode(
+                            new ConstantNode(scopePrior), new ConstantNode(
                                     keyOrder), new ConstantNode(pcso),
                             new VarNode("g"), Scope.NAMED_CONTEXTS));
 
@@ -819,6 +822,275 @@ public class TestASTQueryHintOptimizer extends
         assertTrue(context.nativeHashJoins);
         assertTrue(context.mergeJoin);
         
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Test verifies that we can place a query hint on a {@link JoinGroupNode}
+     * using {@link QueryHintScope#Prior}.
+     * 
+     * <pre>
+     * SELECT ?_var3
+     * WHERE {
+     *   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>.
+     *   {
+     *      ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3.
+     *   }
+     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.QueryHints.runLast "true" .
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_query_hints_5() throws Exception {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[] {};
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV option = makeIV(new URIImpl(
+                "http://www.rdfabout.com/rdf/schema/vote/Option"));
+        @SuppressWarnings("rawtypes")
+        final IV votedBy = makeIV(new URIImpl(
+                "http://www.rdfabout.com/rdf/schema/vote/votedBy"));
+
+        @SuppressWarnings("rawtypes")
+        final IV scopePrior = makeIV(new URIImpl(QueryHints.NAMESPACE
+                + QueryHintScope.Prior));
+        @SuppressWarnings("rawtypes")
+        final IV runLast = makeIV(new URIImpl(QueryHints.NAMESPACE
+                + QueryHints.RUN_LAST));
+        @SuppressWarnings("rawtypes")
+        final IV t = makeIV(new LiteralImpl("true"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("_var3"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(a),
+                        new ConstantNode(option), new VarNode("g"),
+                        Scope.NAMED_CONTEXTS));
+
+                {
+
+                    final JoinGroupNode group = new JoinGroupNode();
+                    whereClause.addChild(group);
+
+                    group.addChild(new StatementPatternNode(new VarNode(
+                            "_var10"), new ConstantNode(votedBy), new VarNode(
+                            "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
+                }
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopePrior), new ConstantNode(runLast),
+                        new ConstantNode(t), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("_var3"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                whereClause.addChild(new StatementPatternNode(new VarNode(
+                        "_var10"), new ConstantNode(a),
+                        new ConstantNode(option), new VarNode("g"),
+                        Scope.NAMED_CONTEXTS));
+
+                {
+
+                    final JoinGroupNode group = new JoinGroupNode();
+                    whereClause.addChild(group);
+
+                    group.addChild(new StatementPatternNode(new VarNode(
+                            "_var10"), new ConstantNode(votedBy), new VarNode(
+                            "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
+                    
+                    group.setQueryHint(QueryHints.RUN_LAST, "true");
+                    
+                }
+
+            }
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTQueryHintOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Test verifies that we can place a query hint on a {@link ServiceNode}
+     * using {@link QueryHintScope#Prior}.
+     * 
+     * <pre>
+     * SELECT ?score
+     * WHERE {
+     *   SERVICE <http://www.bigdata.com/rdf/search#search>  {
+     *     JoinGroupNode {
+     *       StatementPatternNode(VarNode(lit), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#search]), ConstantNode(TermId(0L)[mike]), DEFAULT_CONTEXTS)
+     *       StatementPatternNode(VarNode(lit), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#relevance]), VarNode(score), DEFAULT_CONTEXTS)
+     *     }
+     *   }
+     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.QueryHints.runLast "true" .
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_query_hints_6() throws Exception {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[] {};
+
+        @SuppressWarnings("rawtypes")
+        final IV search = makeIV(BD.SEARCH);
+        @SuppressWarnings("rawtypes")
+        final IV relevance = makeIV(BD.RELEVANCE);
+        @SuppressWarnings("rawtypes")
+        final IV mike = makeIV(new LiteralImpl("mike"));
+        @SuppressWarnings("rawtypes")
+        final IV serviceURI = makeIV(new URIImpl("http://www.bigdata.com/rdf/search#search"));
+
+        @SuppressWarnings("rawtypes")
+        final IV scopePrior = makeIV(new URIImpl(QueryHints.NAMESPACE
+                + QueryHintScope.Prior));
+        @SuppressWarnings("rawtypes")
+        final IV runLast = makeIV(new URIImpl(QueryHints.NAMESPACE
+                + QueryHints.RUN_LAST));
+        @SuppressWarnings("rawtypes")
+        final IV t = makeIV(new LiteralImpl("true"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                given.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("score"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                given.setWhereClause(whereClause);
+
+                // Service
+                {
+                 
+                    final JoinGroupNode serviceGroup = new JoinGroupNode();
+
+                    serviceGroup.addChild(new StatementPatternNode(new VarNode(
+                            "lit"), new ConstantNode(search), new ConstantNode(
+                            mike), null, Scope.DEFAULT_CONTEXTS));
+
+                    serviceGroup.addChild(new StatementPatternNode(new VarNode(
+                            "lit"), new ConstantNode(relevance), new VarNode(
+                            "score"), null, Scope.DEFAULT_CONTEXTS));
+
+                    final ServiceNode service = new ServiceNode(
+                            (URI) serviceURI.getValue(), serviceGroup);
+                    
+                    whereClause.addChild(service);
+                    
+                }
+
+                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+                        scopePrior), new ConstantNode(runLast),
+                        new ConstantNode(t), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            // Main Query
+            {
+
+                final ProjectionNode projection = new ProjectionNode();
+                expected.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("score"));
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                // Service
+                {
+                 
+                    final JoinGroupNode serviceGroup = new JoinGroupNode();
+
+                    serviceGroup.addChild(new StatementPatternNode(new VarNode(
+                            "lit"), new ConstantNode(search), new ConstantNode(
+                            mike), null, Scope.DEFAULT_CONTEXTS));
+
+                    serviceGroup.addChild(new StatementPatternNode(new VarNode(
+                            "lit"), new ConstantNode(relevance), new VarNode(
+                            "score"), null, Scope.DEFAULT_CONTEXTS));
+
+                    final ServiceNode service = new ServiceNode(
+                            (URI) serviceURI.getValue(), serviceGroup);
+
+                    service.setQueryHint(QueryHints.RUN_LAST, "true");
+                    
+                    whereClause.addChild(service);
+
+                }
+
+            }
+            
+        }
+
+        final IASTOptimizer rewriter = new ASTQueryHintOptimizer();
+
+        final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+                given), store);
+
+        final IQueryNode actual = rewriter.optimize(context,
+                given/* queryNode */, bsets);
+
         assertSameAST(expected, actual);
 
     }

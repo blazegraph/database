@@ -82,12 +82,12 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * ...
  * {
  *    # query hint binds for this join group.
- *    hint:group hint:com.bigdata.bop.PipelineOp.maxParallel 10
+ *    hint:Group hint:com.bigdata.bop.PipelineOp.maxParallel 10
  *    
  *    ...
  *    
  *    # query hint binds for the next basic graph pattern in this join group.
- *    hint:bgp hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 100
+ *    hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 100
  *    
  *    ?x rdf:type foaf:Person .
  * }
@@ -95,9 +95,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * 
  * @see QueryHints
  * @see QueryHintScope
- * 
- *      TODO It should be possible to specify query hints which effect both
- *      query evaluation (pipeline ops) and query compilation.
  * 
  *      TODO We should only apply a query hint to a node for which it has
  *      semantics. For example, {@link QueryHints#QUERYID} only has semantics
@@ -107,16 +104,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  *      query hints as well as other annotations when creating a new node. I
  *      think that the {@link ASTSparql11SubqueryOptimizer} probably fails to do
  *      this when it extracts a {@link NamedSubqueryRoot}.
- * 
- *      TODO The SPARQL parser should recognize query hints when they appear
- *      within a SPARQL comment (a line whose first non-whitespace character is
- *      "#"). That would let people run the same SPARQL queries against
- *      non-bigdata end points. This would require a look ahead mechanism in the
- *      parser for the comment lines to decide whether or not they were query
- *      hints. Perhaps we could use something like "#bigdata#" at the start of
- *      such comment lines? That token would simply be stripped and the rest of
- *      the apparent "comment line" would be interpreted as a basic statement
- *      pattern which *should* be a query hint.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -258,7 +245,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * Apply the query hint to the AST node.
      * 
      * @param t
-     *            The AST node.
+     *            The AST node to which the query hint will be bound.
      * @param name
      *            The name of the query hint.
      * @param value
@@ -366,12 +353,30 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
             final int arity = group.arity();
             
-            // The last statement pattern node which was not a query hint. 
-            StatementPatternNode lastSP = null;
+            // The previous AST node which was not a query hint. 
+            ASTBase prior = null;
 
             for (int i = 0; i < arity; i++) {
             
                 final IGroupMemberNode child = (IGroupMemberNode) group.get(i);
+
+                if (child instanceof StatementPatternNode) {
+
+                    final StatementPatternNode sp = (StatementPatternNode) child;
+
+                    if (!isQueryHint(sp)) {
+                        prior = sp;
+                        continue;
+                    }
+
+                    applyQueryHint(context, queryRoot, queryBase, group, prior,
+                            sp);
+
+                    nfound++;
+                    
+                    continue;
+
+                }
 
                 /*
                  * Recursion.
@@ -387,20 +392,8 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                             ((ServiceNode) child).getGroupNode());
                 }
                 
-                if (!(child instanceof StatementPatternNode))
-                    continue;
-
-                final StatementPatternNode sp = (StatementPatternNode) child;
-
-                if(!isQueryHint(sp)) {
-                    lastSP = sp;
-                    continue;
-                }
-
-                applyQueryHint(context, queryRoot, queryBase, group, lastSP, sp);
-
-                nfound++;
-
+                prior = (ASTBase) child;
+                
             }
             
         }
@@ -594,7 +587,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      * @param context
      * @param queryRoot
      * @param group
-     * @param lastSP
+     * @param prior
      * @param s The subject position of the query hint.
      * @param o The object position of the query hint.
      */
@@ -603,7 +596,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             final QueryRoot queryRoot,// top-level query
             final QueryBase queryBase,// either top-level query or subquery.
             final GraphPatternGroup<IGroupMemberNode> group,//
-            final StatementPatternNode lastSP, // MAY be null IFF scope != BGP
+            final ASTBase prior, // MAY be null IFF scope != Prior
             final StatementPatternNode hint //
             ) {
         
@@ -641,13 +634,13 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
             applyToGroupAndSubGroups(context, scope, group, name, value);
             break;
         }
-        case BGP: {
-            if (scope == QueryHintScope.BGP && lastSP == null) {
+        case Prior: {
+            if (scope == QueryHintScope.Prior && prior == null) {
                 throw new RuntimeException(
-                        "Query hint with BGP scope must follow the statement pattern to which it will bind.");
+                        "Query hint with Prior scope must follow the AST node to which it will bind.");
             }
             // Apply to just the last SP.
-            _applyQueryHint(context, scope, (ASTBase) lastSP, name, value);
+            _applyQueryHint(context, scope, prior, name, value);
             break;
         }
         default:

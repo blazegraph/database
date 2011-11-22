@@ -92,7 +92,7 @@ public class AST2BOpContext implements IdFactory {
      * The threshold at which we will use a native hash set rather than a
      * default hash set for a default graph access path.
      */
-    public final long nativeDistinctSPOThreshold = QueryHints.DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD;
+    public long nativeDistinctSPOThreshold = QueryHints.DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD;
 
     /**
      * When <code>true</code>, will use the version of the DISTINCT SOLUTIONS

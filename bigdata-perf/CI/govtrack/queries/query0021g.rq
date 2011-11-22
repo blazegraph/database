@@ -1,0 +1,45 @@
+# Variant of query0021 where the optional groups are explicitly transformed
+# as if by the ASTComplexOptionalOptimizer and then run in a specific order.
+# If merge joins are enabled, this query will be run with a merge join of
+# [set1, set2, set3].
+
+# elapsed 161822ms
+
+PREFIX p1: <http://www.rdfabout.com/rdf/schema/usgovt/>
+PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX hint: <http://www.bigdata.com/queryHints#>
+
+SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
+WITH {
+ SELECT DISTINCT ?_var3
+ WHERE {
+  ?_var3 rdf:type <http://www.rdfabout.com/rdf/schema/politico/Politician>.
+  ?_var3 <http://www.rdfabout.com/rdf/schema/politico/hasRole> ?_var6.
+  ?_var6 <http://www.rdfabout.com/rdf/schema/politico/party> "Democrat".
+ }
+} AS %_set1
+WITH {
+    SELECT DISTINCT ?_var3 ?_var2
+    WHERE {
+            INCLUDE %_set1 .
+            ?_var10 p2:votedBy ?_var3.
+            ?_var10 rdfs:label ?_var2.
+    }
+} AS %_set2
+WITH {
+    SELECT DISTINCT ?_var3 ?_var9
+    WHERE {
+            INCLUDE %_set1 .
+            ?_var3 p1:name ?_var9
+    }
+} AS %_set3
+
+  WHERE {
+   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+   INCLUDE %_set1 .
+   OPTIONAL { INCLUDE %_set2 }
+   OPTIONAL { INCLUDE %_set3 }.
+  }
+  GROUP BY ?_var2 ?_var3

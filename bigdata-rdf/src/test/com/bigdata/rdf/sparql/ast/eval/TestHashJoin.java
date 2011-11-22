@@ -83,7 +83,7 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
      *   ?x rdfs:label ?o .
      * 
      *   # Request a hash join for the rdfs:label BGP.  
-     *   hint:BGP hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
      * 
      * }
      * </pre>
@@ -142,8 +142,8 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
      *   ?x rdfs:label ?o .
      * 
      *   # Request a hash join for the rdfs:label BGP.  
-     *   hint:BGP hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
-     *   hint:BGP hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # default is POCS
+     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+     *   hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # default is POCS
      * }
      * </pre>
      * 

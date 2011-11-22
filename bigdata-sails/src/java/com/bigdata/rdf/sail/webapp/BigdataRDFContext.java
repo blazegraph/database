@@ -89,6 +89,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     protected static final String EXPLAIN = "explain";
     
+    /**
+     * URL Query parameter used to request the "analytic" query hints.
+     */
+    protected static final String ANALYTIC = "analytic";
+    
 	private final SparqlEndpointConfig m_config;
 
     /**
@@ -232,6 +237,38 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	    
 	}
 
+    /**
+     * Return the effective boolean value of a URL query parameter such as
+     * "analytic". If the URL query parameter was not given, then the effective
+     * boolean value is the <i>defaultValue</o>. If a URL query parameter which
+     * is given without an explicit value, such as <code>&analytic</code>, then
+     * it will be reported as <code>true</code>.
+     * 
+     * @param s
+     *            The value of the URL query parameter.
+     * @param defaultValue
+     *            The default value to return if the parameter was not given.
+     * 
+     * @return The effective boolean value.
+     */
+    protected static Boolean getEffectiveBooleanValue(String s,
+            final Boolean defaultValue) {
+
+        if (s == null)
+            return defaultValue;
+
+        s = s.trim();
+
+        if (s.length() == 0) {
+
+            return true;
+
+        }
+
+        return Boolean.valueOf(s);
+
+    }
+
 	/**
      * Abstract base class for running queries handles the timing, pipe,
      * reporting, obtains the connection, and provides the finally {} semantics
@@ -333,12 +370,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
 		 */
         protected AbstractQuery sailQuery;
         
-		/**
-		 * When true, provide an "explanation" for the query (query plan, query
-		 * evaluation statistics) rather than the results of the query.
-		 */
-		final boolean explain;
-		
+        /**
+         * When true, provide an "explanation" for the query (query plan, query
+         * evaluation statistics) rather than the results of the query.
+         */
+        final boolean explain;
+        
+        /**
+         * When true, enable the "analytic" query hints. MAY be
+         * <code>null</code>, in which case we do not set the query hint.
+         */
+        final Boolean analytic;
+        
         /**
          * 
          * @param namespace
@@ -412,7 +455,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.charset = charset;
             this.fileExt = fileExt;
             this.req = req;
-			this.explain = req.getParameter(EXPLAIN) != null;
+            this.explain = req.getParameter(EXPLAIN) != null;
+            this.analytic = getEffectiveBooleanValue(
+                    req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
 //            this.queryId2 = UUID.randomUUID();
@@ -476,7 +521,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             // Override query if data set protocol parameters were used.
 			overrideDataset(query);
-            
+
+            if (analytic != null) {
+
+                // Turn analytic query on/off as requested.
+                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
+                        analytic.toString());
+                
+            }
+
 			// Set the query object.
 			this.sailQuery = query;
 			

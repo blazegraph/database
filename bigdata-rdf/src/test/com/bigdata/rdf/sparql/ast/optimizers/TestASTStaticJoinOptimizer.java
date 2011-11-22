@@ -1490,7 +1490,7 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
      *     StatementPatternNode(VarNode(review), ConstantNode(#reviewFor), VarNode(product)) [2.8m]
      *     StatementPatternNode(VarNode(review), ConstantNode(#reviewer), VarNode(reviewer)) [2.8m]
      *     StatementPatternNode(VarNode(reviewer), ConstantNode(#country), ConstantNode(#US)) [61k]
-     *     hint:BGP hint:com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.optimistic "false" .
+     *     hint:Prior hint:com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.optimistic "false" .
      *   }
      * </pre>
      *
