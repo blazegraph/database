@@ -420,6 +420,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * cardinality data (fast range counts) and uses fast algorithm to
          * reorder the joins in each required or optional join group.
          * 
+         * TODO Make the static join optimizer more robust by modifying it to
+         * process a "flattened" join group, in which SPs are lifted up from
+         * child groups and subqueries. (This is possible unless the subquery
+         * uses some aggregation mechanisms, SLICE, etc., in which case its
+         * cardinality is governed by the #of groups output by the aggregation
+         * and/or by the OFFSET/LIMIT).
+         * 
          * FIXME The static optimizer does not take responsibility for all kinds
          * of IJoinNode. It needs to handle UnionNode, JoinGroupNode,
          * SubqueryRoot, NamedSubqueryInclude, and ServiceNode, not just
@@ -481,7 +488,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * intermediate variables used solely within the complex optional group
          * are NOT projected out of the named subquery (variable pruning).
          * 
-         * Each such named subquery will INCLUDE either
+         * Each such named subquery will INCLUDE either:
          * 
          * (a) the named subquery lifted out in step (1) (if the complex
          * optionals are independent)
@@ -490,17 +497,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * 
          * (b) the result of the previous named subquery (if they complex
          * optionals must be fed into one another).
-         * 
-         * FIXME Only (b) is currently implemented. (a) is what gives us the
-         * MERGE JOIN.
-         * 
-         * FIXME This could be modified to lift any complex group. As long as
-         * those groups are independent we can do a merge join. As long as they
-         * are dependent we can feed them into one another.
-         * 
-         * FIXME Simple optionals for queries which otherwise satisify the
-         * criteria outlined above MUST NOT be lifted out if we want to do a
-         * MERGE-JOIN.
          * 
          * Note: Sub-groups, including complex optionals, are handled using a
          * hash join pattern even without this optimizer, but they are not
@@ -519,10 +515,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/253
          * 
-         *      FIXME This optimizer can not be enabled until we can correctly
-         *      predict the join variables, which is blocked on
-         *      https://sourceforge.net/apps/trac/bigdata/ticket/398 (Convert
-         *      the static optimizer into an AST rewrite)
+         *      FIXME The blocking issue is now that the static join order
+         *      optimizer does not order the sub-groups and sub-selects within
+         *      the parent group, but only the SPs within each group. The
+         *      ASTHashJoinOptimizer needs to run before the static join order
+         *      optimizer since, it were to run after, it could attempt to push
+         *      down SPs into subgroups which could create a very bad ordering
+         *      in the parent.
          */
 //        add(new ASTHashJoinOptimizer());
 
@@ -548,44 +547,15 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 //         * projected out of the subquery.
 //         */
 ////        add(new ASTSubgroupProjectionOptimizer());
-//
-//        /**
-//         * Recognizes a join group having a series of subgroup(s), subquery(s),
-//         * and/or INCLUDEs which share the same join variables and rewrites the
-//         * query to use a N-Way MERGE JOIN.
-//         * 
-//         * Any subgroup or SPARQL 1.1 subquery must be converted into a named
-//         * subquery, resulting in a series of INCLUDEs. The INCLUDEs are then
-//         * rewritten into a single N-way INCLUDE, which is then evaluated using
-//         * a MERGE JOIN operator.
-//         * 
-//         * The N-Way MERGE JOIN critically depends on the hash index solution
-//         * sets created by the named subqueries. The first named solution set
-//         * 
-//         * TODO One of the tricky bits is managing the changes to the query plan
-//         * once the static join optimizer has given us a decent join ordering.
-//         * We could probably make the static join optimizer more robust by
-//         * modifying it to process a "flattened" join group, in which SPs are 
-//         * lifted up from child groups and subqueries.  (This is possible unless
-//         * the subquery uses some aggregation mechanisms, SLICE, etc.).
-//         * 
-//         * TODO Complex optionals are already rewritten into named subqueries by
-//         * the ASTComplexOptimalOptimizer (above). The same logic could be used
-//         * to rewrite a complex non-optional sub-group.
-//         * 
-//         * TODO In fact, we could just recognize the series of INCLUDEs and use
-//         * the MERGE JOIN operator, but I like making this explicit in the AST.
-//         * (The only reason why we would need to have this be an explicit
-//         * rewrite is if there were SPARQL 1.1 subqueries involved rather than
-//         * named subqueries.)
-//         * 
-//         * TODO This might need to run after the ASTSubGroupJoinVarOptimizer.
-//         */
-////        add(new ASTMergeJoinOptimizer());
         
         /**
          * Lift {@link SubqueryRoot}s into named subqueries when appropriate or
          * necessary.
+         * 
+         * TODO In fact, we could do "as-bound" evaluation of sub-selects with a
+         * SLICE if we issued the sub-select as a full IRunningQuery using the
+         * same hash join pattern. (We can also achieve essentially the same
+         * result by feeding the result of one named subquery into another.)
          */
         add(new ASTSparql11SubqueryOptimizer());
 
