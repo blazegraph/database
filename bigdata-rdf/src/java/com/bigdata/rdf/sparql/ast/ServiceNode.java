@@ -185,6 +185,14 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
             }
         }
 
+        if (getQueryHints() != null && !getQueryHints().isEmpty()) {
+            sb.append("\n");
+            sb.append(indent(indent + 1));
+            sb.append(Annotations.QUERY_HINTS);
+            sb.append("=");
+            sb.append(getQueryHints().toString());
+        }
+        
         return sb.toString();
 
     }

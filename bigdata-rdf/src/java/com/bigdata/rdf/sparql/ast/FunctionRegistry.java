@@ -17,6 +17,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
@@ -936,6 +937,18 @@ public class FunctionRegistry {
 
 	}
 
+    /**
+     * Register a factory for a function.
+     * 
+     * @param functionURI
+     *            The function URI.
+     * @param factory
+     *            The factory.
+     * 
+     * @throws UnsupportedOperationException
+     *             if there is already a {@link Factory} registered for that
+     *             URI.
+     */
     public static final void add(final URI functionURI, final Factory factory) {
 
         if (factories.putIfAbsent(functionURI, factory) != null) {
@@ -946,6 +959,19 @@ public class FunctionRegistry {
 
 	}
 
+    /**
+     * Register an alias for a functionURI which has already been declared.
+     * 
+     * @param functionURI
+     *            The function URI.
+     * @param aliasURI
+     *            The alias.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the function URI has not been declared.
+     * @throws UnsupportedOperationException
+     *             if the alias URI has already been declared.
+     */
     public static final void addAlias(final URI functionURI, final URI aliasURI) {
 
         if (!factories.containsKey(functionURI)) {
@@ -961,8 +987,23 @@ public class FunctionRegistry {
         }
     }
 
+    /**
+     * An interface for creating {@link IValueExpression}s from a function URI
+     * and its arguments.
+     */
 	public static interface Factory {
 
+        /**
+         * Create an {@link IValueExpression} instance.
+         * 
+         * @param lex
+         *            The namespace of the lexicon.
+         * @param scalarValues
+         *            The scalar arguments (used by some {@link IAggregate}s).
+         * @param args
+         *            The function arguments.
+         * @return The {@link IValueExpression}.
+         */
 		IValueExpression<? extends IV> create(
 				final String lex,
 				final Map<String,Object> scalarValues,

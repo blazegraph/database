@@ -23,8 +23,8 @@ WITH {
 			OPTIONAL {
 				?_var10 p2:votedBy ?_var3. 
 				?_var10 rdfs:label ?_var2.
-               hint:BGP hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
-               hint:BGP hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" .
+               hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+               hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" .
 			}
 			OPTIONAL {
 				?_var3 p1:name ?_var9

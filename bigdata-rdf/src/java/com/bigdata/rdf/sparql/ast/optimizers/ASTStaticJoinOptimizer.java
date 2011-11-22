@@ -62,7 +62,6 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -193,7 +192,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * Return <code>true</code> if the static join optimizer is enabled for the
      * given join group.
      */
-    public static boolean isStaticOptimizer(final AST2BOpContext context,
+    static boolean isStaticOptimizer(final AST2BOpContext context,
             final JoinGroupNode joinGroup) {
 
         QueryOptimizerEnum optimizer = null;
@@ -452,6 +451,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
                 final QueryBase subquery = (QueryBase) child;
 
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
@@ -524,11 +524,13 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
      * @param exogenousBindings
      *            The externally given bindings (optional).
      */
+    @SuppressWarnings("rawtypes")
     private final IV getIV(final TermNode term,
             final IBindingSet exogenousBindings) {
 
         if (term != null && term.isVariable() && exogenousBindings != null) {
 
+            @SuppressWarnings("unchecked")
             final IConstant<IV> c = (IConstant<IV>) exogenousBindings
                     .get((IVariable) term.getValueExpression());
             
@@ -630,23 +632,21 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
          */
         private transient boolean[/*tailIndex*/] used;
         
-        /**
-         * <code>true</code> iff the rule was proven to have no solutions.
-         * 
-         * @todo this is not being computed.
-         */
-        private boolean empty = false;
+//        /**
+//         * <code>true</code> iff the rule was proven to have no solutions.
+//         */
+//        private boolean empty = false;
         
         /**
          * See {@link Annotations#OPTIMISTIC}.
          */
         private final double optimistic;
         
-        public boolean isEmpty() {
-            
-            return empty;
-            
-        }
+//        public boolean isEmpty() {
+//            
+//            return empty;
+//            
+//        }
         
         /**
          * Computes an evaluation plan for the rule.
