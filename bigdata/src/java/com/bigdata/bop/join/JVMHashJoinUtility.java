@@ -54,7 +54,6 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
 import cutthecrap.utils.striterators.Expander;
-import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 import cutthecrap.utils.striterators.Visitor;
 
@@ -356,18 +355,18 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             
         }
 
-        @SuppressWarnings("unchecked")
-        public Iterator<IBindingSet> bindingSetIterator() {
-            
-            return new Striterator(solutions.iterator()).addFilter(new Resolver() {
-                
-                @Override
-                protected Object resolve(Object obj) {
-                    return ((SolutionHit)obj).solution;
-                }
-            });
-            
-        }
+//        @SuppressWarnings("unchecked")
+//        public Iterator<IBindingSet> bindingSetIterator() {
+//            
+//            return new Striterator(solutions.iterator()).addFilter(new Resolver() {
+//                
+//                @Override
+//                protected Object resolve(Object obj) {
+//                    return ((SolutionHit)obj).solution;
+//                }
+//            });
+//            
+//        }
 
         /**
          * Orders the buckets based on their hash codes.
