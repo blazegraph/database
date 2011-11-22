@@ -22,12 +22,16 @@ documentation</a> for information on using the NanoSparqlServer's REST Api.
      -->
 <FORM action="sparql" method="post">
    <P>
-   <TEXTAREA name="query" rows="30" cols="100"
+   <TEXTAREA name="query" rows="30" cols="100" title="Enter SPARQL Query."
    >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
    </P><P>
-   <INPUT type="submit" value="Send">
-   <INPUT type="checkbox" name="explain" value="true"> Explain
-   <INPUT type="checkbox" name="analytic" value="true"> Analytic
+   <INPUT type="submit" value="Send" title="Submit query.">
+   <INPUT type="checkbox" name="explain" value="true"
+          title="Explain query plan rather than returning the query results."
+          > Explain
+   <INPUT type="checkbox" name="analytic" value="true"
+          title="Enable the analytic query package."
+          > Analytic
    </P>
 </FORM>
 
