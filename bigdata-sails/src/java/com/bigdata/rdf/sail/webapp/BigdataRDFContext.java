@@ -525,7 +525,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             if (analytic != null) {
 
                 // Turn analytic query on/off as requested.
-                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
+//                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
+//                        analytic.toString());
+                astContainer.setQueryHint(QueryHints.ANALYTIC,
                         analytic.toString());
                 
             }
