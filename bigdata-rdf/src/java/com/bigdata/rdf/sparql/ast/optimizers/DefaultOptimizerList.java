@@ -171,6 +171,16 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTFlattenUnionsOptimizer());
         
         /**
+         * Look for groups that have a single union and some filters, and lift
+         * those filters inside the union.
+         * 
+         * <pre>
+         * { UNION(A,B)+F } -> { UNION(A+F,B+F) }
+         * </pre>
+         */
+        add(new ASTUnionFiltersOptimizer());
+        
+        /**
          * Eliminate semantically empty join group nodes which are the sole
          * child of another join groups.
          * <pre>
