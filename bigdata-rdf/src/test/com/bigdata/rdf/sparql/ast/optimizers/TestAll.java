@@ -108,6 +108,9 @@ public class TestAll extends TestCase {
         // Unit tests for optimizer which pushes down sub-groups for hash joins.
         suite.addTestSuite(TestASTHashJoinOptimizer.class);
 
+        // Unit tests for the runFirst/runLast query hints.
+        suite.addTestSuite(TestASTRunFirstRunLastOptimizer.class);
+
         // Unit tests for static join ordering optimizer.
         suite.addTestSuite(TestASTStaticJoinOptimizer.class);
 
