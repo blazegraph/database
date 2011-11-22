@@ -379,7 +379,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
             
             given.setProjection(projection);
             given.setWhereClause(where);
-            System.err.println(given);
+
         }
 
         // The expected AST after the rewrite.
@@ -399,21 +399,6 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                                 new ConstantNode(makeIV(new LiteralImpl("0", XSD.INTEGER)))
                     })));
             
-  //*     FILTER( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(x),ConstantNode(TermId(0U)[0]))[ com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#greater-than] )
-  //*     StatementPatternNode(VarNode(a), ConstantNode(TermId(0U)[http://example/a]), ConstantNode(TermId(0U)[http://example/a]), DEFAULT_CONTEXTS)
-  //*     StatementPatternNode(VarNode(b), ConstantNode(TermId(0U)[http://example/b]), ConstantNode(TermId(0U)[http://example/b]), DEFAULT_CONTEXTS)
-  //*     {
-  //*       StatementPatternNode(VarNode(c), ConstantNode(TermId(0U)[http://example/c]), ConstantNode(TermId(0U)[http://example/c]), DEFAULT_CONTEXTS)
-  //*       StatementPatternNode(VarNode(d), ConstantNode(TermId(0U)[http://example/d]), ConstantNode(TermId(0U)[http://example/d]), DEFAULT_CONTEXTS)
-  //*     } queryHints={com.bigdata.rdf.sparql.ast.QueryHints.runLast=true}
-  //*     SERVICE {
-  //*       StatementPatternNode(VarNode(f), ConstantNode(TermId(0U)[http://example/f]), ConstantNode(TermId(0U)[http://example/f]), DEFAULT_CONTEXTS)
-  //*       StatementPatternNode(VarNode(e), ConstantNode(TermId(0U)[http://example/e]), ConstantNode(TermId(0U)[http://example/e]), DEFAULT_CONTEXTS)
-  //*     } queryHints={com.bigdata.rdf.sparql.ast.QueryHints.runFirst=true}
-  //*     StatementPatternNode(VarNode(g), ConstantNode(TermId(0U)[http://example/g]), ConstantNode(TermId(0U)[http://example/g]), DEFAULT_CONTEXTS)
-  //*     FILTER( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(y),ConstantNode(TermId(0U)[0]))[ com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#greater-than] )
-  //*     FILTER( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(z),ConstantNode(TermId(0U)[0]))[ com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#greater-than] )
-
             {
              
                 final JoinGroupNode serviceGroup = new JoinGroupNode();
