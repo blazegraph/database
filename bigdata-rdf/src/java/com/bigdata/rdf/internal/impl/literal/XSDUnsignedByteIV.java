@@ -80,20 +80,9 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
      */
     public final short promote() {
         
-        int i = value;
+        final int i = value - Byte.MIN_VALUE;
         
-        if (i < 0) {
-
-            i = i - 0x80;
-
-        } else {
-            
-            i = i + 0x80;
-            
-        }
-        
-        return (short)(i & 0xff);
-
+        return (short) i;
     }
     
     @SuppressWarnings("unchecked")
@@ -105,7 +94,7 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
     		
 			final BigdataValueFactory f = lex.getValueFactory();
 			
-			v = (V) f.createLiteral(value);
+			v = (V) f.createLiteral(value, true);
 			
 			v.setIV(this);
 			

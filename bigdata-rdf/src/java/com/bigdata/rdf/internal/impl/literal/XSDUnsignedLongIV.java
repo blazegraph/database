@@ -70,47 +70,7 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
      */
     public final BigInteger promote() {
 
-        long v = value;
-        
-        if (v < 0) {
-            
-            v = v + 0x8000000000000000L;
-
-        } else {
-            
-            v = v - 0x8000000000000000L;
-            
-        }
-
-        return BigInteger.valueOf(v);
-
-//        final BigInteger v;
-//        
-//        if (value < 0) {
-//
-//            v = BigInteger.valueOf(value - 0x80000000);
-//
-//        } else {
-//            
-//            v = BigInteger.valueOf(0x80000000 + value);
-//            
-//        }
-//
-//        return v;
-
-//        final BigInteger v = BigInteger.valueOf(value);
-//
-//        if (value < 0) {
-//
-//            v = v.subtract(BigInteger.valueOf(0x80000000)); // TODO extract constant.
-//
-//        } else {
-//            
-//            v = v.add(BigInteger.valueOf(0x80000000));// TODO extract constant.
-//            
-//        }
-//        
-//        return v;
+        return BigInteger.valueOf(value).subtract(BigInteger.valueOf(Long.MIN_VALUE));
         
     }
 

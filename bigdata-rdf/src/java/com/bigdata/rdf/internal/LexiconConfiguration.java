@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +51,10 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -83,6 +88,12 @@ public class LexiconConfiguration<V extends BigdataValue>
 //     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
 //     */
 //    private final int blobsThreshold;
+    
+    private final long MAX_UNSIGNED_BYTE = 1 << 9 - 1;
+    private final long MAX_UNSIGNED_SHORT = 1 << 17 -1;
+    private final long MAX_UNSIGNED_INT = 1L << 33 - 1;
+    private final BigInteger MAX_UNSIGNED_LONG = BigInteger.valueOf(1L << 33)
+    	.multiply(BigInteger.valueOf(1L << 33).subtract(BigInteger.valueOf(1)));
     
 	/**
 	 * <code>true</code> if xsd primitive and numeric xsd datatype literals will
@@ -584,6 +595,14 @@ public class LexiconConfiguration<V extends BigdataValue>
                         .parseDecimal(v));
             case UUID:
                 return new UUIDLiteralIV<BigdataLiteral>(UUID.fromString(v));
+            case XSDUnsignedByte:
+                return new XSDUnsignedByteIV<BigdataLiteral>(parseUnsignedByte(v));
+            case XSDUnsignedShort: 
+                return new XSDUnsignedShortIV<BigdataLiteral>(parseUnsignedShort(v));
+           case XSDUnsignedInt:
+                return new XSDUnsignedIntIV<BigdataLiteral>(parseUnsignedInt(v));
+            case XSDUnsignedLong: 
+                return new XSDUnsignedLongIV<BigdataLiteral>(parseUnsignedLong(v));
             default:
                 // Not handled.
                 return null;
@@ -609,6 +628,50 @@ public class LexiconConfiguration<V extends BigdataValue>
             
         }
 
+    }
+    
+    /**
+     * The unsigned parse must range check since it uses a parser for a higher value type
+     * before casting.
+     */
+    private byte parseUnsignedByte(final String v) {
+    	final short pv = XMLDatatypeUtil.parseShort(v);
+    	
+    	if (pv < 0 || pv > MAX_UNSIGNED_BYTE) {
+    		throw new NumberFormatException("Value out of range for unsigned byte");
+    	}
+    	
+    	return (byte) pv;
+    }
+    
+    private short parseUnsignedShort(final String v) {
+    	final int pv = XMLDatatypeUtil.parseInt(v);
+    	
+    	if (pv < 0 || pv > MAX_UNSIGNED_SHORT) {
+    		throw new NumberFormatException("Value out of range for unsigned short");
+    	}
+    	
+    	return (short) pv;
+    }
+    
+    private int parseUnsignedInt(final String v) {
+    	final long pv = XMLDatatypeUtil.parseLong(v);
+    	
+    	if (pv < 0 || pv > MAX_UNSIGNED_INT) {
+    		throw new NumberFormatException("Value out of range for unsigned int");
+    	}
+    	
+    	return (int) pv;
+    }
+    
+    private long parseUnsignedLong(final String v) {
+    	final BigInteger pv = XMLDatatypeUtil.parseInteger(v);
+    	
+    	if (pv.signum() == -1 || pv.compareTo(MAX_UNSIGNED_LONG) > 0) {
+    		throw new NumberFormatException("Value out of range for unsigned long");
+    	}
+    	
+    	return pv.longValue();
     }
     
     /**
@@ -767,7 +830,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             case XSDUnsignedShort: 
             case XSDUnsignedInt:
             case XSDUnsignedLong:
-                return false; // FIXME Make true when supporting XSD unsigned types!
+                return true; // enable supporting XSD unsigned types!
             default:
                 throw new AssertionError();
         }

@@ -62,47 +62,9 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
      */
     public final int promote() {
 
-//        int v = value<0?-value:value;
-//        return v;
-//        
-//        long v = value < 0 ? -value : value;
-//
-//        if (value < 0) {
-//
-//            v = v + 0x8000L;
-//
-//        }
-//
-//        return (int) v;
-
-        int v = value;
+    	final int v = value - Short.MIN_VALUE;
         
-        if (v < 0) {
-            
-            v = v + 0x8000;
-
-        } else {
-            
-            v = v - 0x8000;
-            
-        }
-
-        return v & 0xffff;
-//        return ((int) (short) v) & 0xffff;
-     
-//        long v = value;
-//        
-//        if (v < 0) {
-//            
-//            v = v + 0x8000L;
-//
-//        } else {
-//            
-//            v = v - 0x8000L;
-//            
-//        }
-//
-//        return (int)(v & 0xffffL);
+        return v;
 
     }
     

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -104,16 +105,19 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
             final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
 
-            // lookup/add some values.
+            // lookup/add some values, ensure range is beyond max signed values.
             final BigdataValueFactory f = store.getValueFactory();
+            
+            terms.add(f.createLiteral("135", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())));
 
-            terms.add(f.createLiteral("10", f
+            terms.add(f.createLiteral(""+ (10L + Integer.MAX_VALUE), f
                     .createURI(XSD.UNSIGNED_INT.toString())));
 
-            terms.add(f.createLiteral("12", f
+            terms.add(f.createLiteral("" + (Short.MAX_VALUE + 10), f
                     .createURI(XSD.UNSIGNED_SHORT.toString())));
 
-            terms.add(f.createLiteral("14", f
+            terms.add(f.createLiteral(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(10)).toString(), f
                     .createURI(XSD.UNSIGNED_LONG.toString())));
 
             /*
@@ -142,6 +146,93 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
                     final IV<?, ?> id = e.getKey();
 
+                    // Should be inlined
+                    assertTrue(id.isInline());
+                    
+                    assertEquals("Id mapped to a different term? : termId="
+                            + id, ids.get(id), ids2.get(id));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    /**
+     * Unsigned numerics should not be inlined at this time.
+     */
+    public void test_badrangeUnsigned() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values, ensure range is beyond max signed values.
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            // Out of range values cannot be inlined
+            terms.add(f.createLiteral("-12", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())));
+
+            terms.add(f.createLiteral("1024", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())));
+
+            terms.add(f.createLiteral("" + Integer.MAX_VALUE, f
+                    .createURI(XSD.UNSIGNED_SHORT.toString())));
+
+           terms.add(f.createLiteral(""+ Long.MAX_VALUE, f
+                    .createURI(XSD.UNSIGNED_INT.toString())));
+
+            terms.add(f.createLiteral(BigInteger.valueOf(Long.MAX_VALUE).multiply(BigInteger.valueOf(10)).toString(), f
+                    .createURI(XSD.UNSIGNED_LONG.toString())));
+
+            /*
+             * Note: Blank nodes will not round trip through the lexicon unless
+             * the "told bnodes" is enabled.
+             */
+//            terms.add(f.createBNode());
+//            terms.add(f.createBNode("a"));
+
+            final Map<IV<?,?>, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            if (store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV<?,?>, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(),ids2.size());
+                
+                for (Map.Entry<IV<?, ?>, BigdataValue> e : ids.entrySet()) {
+
+                    final IV<?, ?> id = e.getKey();
+
+                    // Should be inlined
                     assertFalse(id.isInline());
                     
                     assertEquals("Id mapped to a different term? : termId="
