@@ -104,6 +104,22 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.createLiteral(arg0);
     }
 
+	public BigdataLiteral createLiteral(int arg0, boolean unsigned) {
+        return valueFactory.createLiteral(arg0, unsigned);
+    }
+
+	public BigdataLiteral createLiteral(long arg0, boolean unsigned) {
+        return valueFactory.createLiteral(arg0, unsigned);
+    }
+
+	public BigdataLiteral createLiteral(short arg0, boolean unsigned) {
+        return valueFactory.createLiteral(arg0, unsigned);
+    }
+
+	public BigdataLiteral createLiteral(byte arg0, boolean unsigned) {
+        return valueFactory.createLiteral(arg0, unsigned);
+    }
+
 	public BigdataLiteral createLiteral(int arg0) {
         return valueFactory.createLiteral(arg0);
     }
