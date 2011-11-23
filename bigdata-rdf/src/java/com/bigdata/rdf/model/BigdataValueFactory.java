@@ -97,6 +97,14 @@ public interface BigdataValueFactory extends ValueFactory {
 
     BigdataLiteral createLiteral(long arg0);
 
+    BigdataLiteral createLiteral(byte arg0, boolean unsigned);
+
+    BigdataLiteral createLiteral(short arg0, boolean unsigned);
+
+    BigdataLiteral createLiteral(int arg0, boolean unsigned);
+
+    BigdataLiteral createLiteral(long arg0, boolean unsigned);
+
     BigdataLiteral createLiteral(float arg0);
 
     BigdataLiteral createLiteral(double arg0);

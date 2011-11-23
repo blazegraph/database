@@ -265,6 +265,18 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataURIImpl xsd_short = new BigdataURIImpl(this, xsd
             + "short");
 
+    private final BigdataURIImpl xsd_ulong = new BigdataURIImpl(this, xsd
+            + "unsignedLong");
+
+    private final BigdataURIImpl xsd_uint = new BigdataURIImpl(this,
+            xsd + "unsignedInt");
+
+    private final BigdataURIImpl xsd_ubyte = new BigdataURIImpl(this, xsd
+            + "unsignedByte");
+
+    private final BigdataURIImpl xsd_ushort = new BigdataURIImpl(this, xsd
+            + "unsignedShort");
+
     private final BigdataURIImpl xsd_double = new BigdataURIImpl(this, xsd
             + "double");
 
@@ -320,9 +332,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    public BigdataLiteralImpl createLiteral(byte arg0, final boolean unsigned) {
+
+        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ubyte : xsd_byte);
+
+    }
+
     public BigdataLiteralImpl createLiteral(short arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_short);
+
+    }
+
+    public BigdataLiteralImpl createLiteral(short arg0, final boolean unsigned) {
+
+        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ushort :xsd_short);
 
     }
 
@@ -332,9 +356,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    public BigdataLiteralImpl createLiteral(int arg0, final boolean unsigned) {
+
+        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_uint :xsd_int);
+
+    }
+
     public BigdataLiteralImpl createLiteral(long arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_long);
+
+    }
+
+    public BigdataLiteralImpl createLiteral(long arg0, final boolean unsigned) {
+
+        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ulong : xsd_long);
 
     }
 
