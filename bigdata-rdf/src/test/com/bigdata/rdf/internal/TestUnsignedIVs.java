@@ -344,11 +344,12 @@ public class TestUnsignedIVs extends TestCase2 {
         /*
          * Test promote().
          */
+        final BigInteger adjust = BigInteger.valueOf(Long.MIN_VALUE).negate();
         assertEquals(BigInteger.valueOf(0x0000000000000000L), MIN_VALUE.promote());
-        assertEquals(BigInteger.valueOf(0x7fffffffffffffffL), MINUS_ONE.promote());
-        assertEquals(BigInteger.valueOf(0x8000000000000000L), ZERO.promote());
-        assertEquals(BigInteger.valueOf(0x8000000000000001L), ONE.promote());
-        assertEquals(BigInteger.valueOf(0xffffffffffffffffL), MAX_VALUE.promote());
+        assertEquals(BigInteger.valueOf(-1).add(adjust), MINUS_ONE.promote());
+        assertEquals(adjust, ZERO.promote());
+        assertEquals(BigInteger.valueOf(1).add(adjust), ONE.promote());
+        assertEquals(BigInteger.valueOf(Long.MAX_VALUE).add(adjust), MAX_VALUE.promote());
 
         // Verify boolean conversion (there are fence posts here).
         assertFalse(MIN_VALUE.booleanValue());

@@ -70,33 +70,9 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
      */
     public final long promote() {
 
-//        long v = value;
-//        
-//        if (v < 0) {
-//
-//            v = v - 0x80000000L;
-//
-//        } else {
-//            
-//            v = 0x80000000L + v;
-//            
-//        }
-//
-//        return (long) (v & 0xffffffffL);
-
-        int v = value;
+        final long v = ((long) value) - Integer.MIN_VALUE;
         
-        if (v < 0) {
-            
-            v = v + 0x80000000;
-
-        } else {
-            
-            v = v - 0x80000000;
-            
-        }
-
-        return ((long) v) & 0xffffffffL;
+        return v;
 
     }
 
