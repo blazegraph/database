@@ -67,6 +67,8 @@ public class TestAll extends TestCase {
         // Port of unit tests original written at the AST layer.
         suite.addTestSuite(TestAST.class);
 
+        suite.addTestSuite(TestUnsigned.class);
+        
         /*
          * Test suite for named and default graph access patterns, including
          * those ported from TestNamedGraphs in the sail package.
