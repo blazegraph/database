@@ -5,23 +5,11 @@
     xmlns="http://www.w3.org/2005/sparql-results#" >
   <head>
     <variable name="x"/>
-    <variable name="o"/>
   </head>
   <results>
     <result>
       <binding name="x">
-      	<uri>http://www.bigdata.com/Mike</uri>
-      </binding>
-      <binding name="o">
-      	<literal>Mike</literal>
-      </binding>
-    </result>
-    <result>
-      <binding name="x">
-      	<uri>http://www.bigdata.com/Bryan</uri>
-      </binding>
-      <binding name="o">
-      	<literal>Bryan</literal>
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedByte">255</literal>
       </binding>
     </result>
   </results>

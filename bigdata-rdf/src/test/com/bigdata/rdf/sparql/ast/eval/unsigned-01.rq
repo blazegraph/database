@@ -1,24 +1,10 @@
+PREFIX : <http://www.bigdata.com/>
 PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-PREFIX hint: <http://www.bigdata.com/queryHints#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
-SELECT ?x ?o
+SELECT ?x
 WHERE {
-
-  # Turn off the query optimizer for this query so we can control the order
-  # in which the BGPs will be evaluated.
-  
-  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
-
-  # Force the use of the JVM hash joins.
-  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "false" .
-
-  ?x rdf:type foaf:Person .
-
-  ?x rdfs:label ?o .
-
-  # Request a hash join for the rdfs:label BGP.  
-  hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
-
+   :p :v ?x
 }
