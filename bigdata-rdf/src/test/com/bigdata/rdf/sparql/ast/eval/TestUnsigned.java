@@ -53,7 +53,7 @@ public class TestUnsigned extends AbstractDataDrivenSPARQLTestCase {
         new TestHelper(
                 "unsigned-01", // testURI,
                 "unsigned-01.rq",// queryFileURL
-                "unsigned-01.ttl",// dataFileURL
+                "unsigned-01.trig",// dataFileURL
                 "unsigned-01.srx"// resultFileURL
                 ).runTest();
 
