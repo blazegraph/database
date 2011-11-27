@@ -29,16 +29,22 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.UUID;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
- * Query hint directives understood by a bigdata SPARQL end point.
+ * Query hints are directives understood by the SPARQL end point. A query hint
+ * appears in the SPARQL query as a "virtual triple". A query hint is declared
+ * in a {@link QueryHintScope}, which specifies the parts of the SPARQL query to
+ * which it will be applied. A list of the common directives is declared by this
+ * interface. Note all query hints are permitted in all scopes.
+ * 
+ * @see QueryHintRegistry
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -46,21 +52,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 public interface QueryHints {
 
     /**
-     * The namespace prefix used in SPARQL queries to signify query hints. You
-     * can embed query hints into a SPARQL query as follows:
-     * 
-     * <pre>
-     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#name1=value1&amp;name2=value2&gt;
-     * </pre>
-     * 
-     * where <i>name</i> is the name of a query hint and <i>value</i> is the
-     * value associated with that query hint. Multiple query hints can be
-     * specified (as shown in this example) using a <code>&amp;</code> character
-     * to separate each name=value pair.
-     * <p>
-     * Query hints are either directives understood by the SPARQL end point or
-     * {@link BOp.Annotations}. A list of the known directives is declared by
-     * this interface.
+     * The namespace prefix used in SPARQL queries to signify query hints. 
      */
     String PREFIX = "BIGDATA_QUERY_HINTS";
     
@@ -68,10 +60,10 @@ public interface QueryHints {
 
     /**
      * Specify the join order optimizer. For example, you can disable the query
-     * optimizer using
+     * optimizer within some join group using
      * 
      * <pre>
-     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.optimizer=None&gt;
+     * hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None".
      * </pre>
      * 
      * Disabling the join order optimizer can be useful if you have a query for
@@ -84,6 +76,8 @@ public interface QueryHints {
      */
     String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
 
+    QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
+    
 	/**
 	 * A label which may be used to tag the instances of some SPARQL query
 	 * template in manner which makes sense to the application (default
@@ -96,6 +90,8 @@ public interface QueryHints {
 	 * 
 	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N queries)
 	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/256 (Amortize RTO cost)
+	 * 
+	 * TODO This is not currently supported.
 	 */
     String TAG = QueryHints.class.getName() + ".tag";
 
@@ -128,7 +124,8 @@ public interface QueryHints {
      * <code>false</code>, use the version based on a JVM collection class. The
      * JVM version does not scale-up as well, but it offers higher concurrency.
      */
-    String NATIVE_DISTINCT_SOLUTIONS = QueryHints.class.getName() + ".nativeDistinctSolutions";
+    String NATIVE_DISTINCT_SOLUTIONS = QueryHints.class.getName()
+            + ".nativeDistinctSolutions";
 
     boolean DEFAULT_NATIVE_DISTINCT_SOLUTIONS = DEFAULT_ANALYTIC;
 
@@ -152,7 +149,7 @@ public interface QueryHints {
      * @see #NATIVE_DISTINCT_SPO
      */
     String NATIVE_DISTINCT_SPO_THRESHOLD = QueryHints.class.getName()
-            + ".nativeDistinctSPO";
+            + ".nativeDistinctSPOThreshold";
 
     long DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD = 100 * Bytes.kilobyte32;
     
@@ -260,7 +257,7 @@ public interface QueryHints {
      * the query.
      * 
      * <pre>
-     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.queryId=36cff615-aaea-418a-bb47-006699702e45&gt;
+     * hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.queryId "36cff615-aaea-418a-bb47-006699702e45"
      * </pre>
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
@@ -280,5 +277,5 @@ public interface QueryHints {
 	 * permitted.
 	 */
 	String RUN_LAST = QueryHints.class.getName()+".runLast";
-    
+
 }

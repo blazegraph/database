@@ -32,7 +32,11 @@ import java.util.Properties;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.ModifiableBOpBase;
+import com.bigdata.bop.PipelineOp;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
  * Base class for the AST.
@@ -52,6 +56,16 @@ public class ASTBase extends ModifiableBOpBase {
         /**
          * An optional {@link Properties} object specifying query hints which
          * apply to <i>this</i> AST node.
+         * <p>
+         * The relationship between SPARQL level query hints, the annotations on
+         * the {@link ASTBase} and {@link PipelineOp} nodes is a bit complex,
+         * and this {@link Properties} object is a bit complex. Briefly, this
+         * {@link Properties} object contains property values which will be
+         * applied (copied) onto generated {@link PipelineOp}s while annotations
+         * on the {@link ASTBase} nodes are interpreted by {@link IASTOptimizer}
+         * s and {@link AST2BOpUtility}. SPARQL level query hints map into one
+         * or another of these things, or may directly set attributes on the
+         * {@link AST2BOpContext}.
          * 
          * @see ASTQueryHintOptimizer
          */
@@ -151,6 +165,20 @@ public class ASTBase extends ModifiableBOpBase {
         return Boolean.valueOf(getQueryHint(name,
                 Boolean.toString(defaultValue)));
 
+    }
+
+    /**
+     * Set the query hints.
+     * 
+     * @param queryHints
+     *            The query hints (may be <code>null</code>).
+     * 
+     * @see QueryHints
+     */
+    public void setQueryHints(final Properties queryHints) {
+
+        setProperty(Annotations.QUERY_HINTS, queryHints);
+        
     }
 
     /**

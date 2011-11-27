@@ -54,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
@@ -66,8 +67,6 @@ import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for the {@link ASTQueryHintOptimizer}.
- * 
- * TODO Unit test to verify that the caller's queryId is set on the query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -466,7 +465,7 @@ public class TestASTQueryHintOptimizer extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {            // Main Query
 
-            expected.setQueryHint(QueryHints.OPTIMIZER, "None");
+//            expected.setProperty(QueryHints.OPTIMIZER, "None");
 
             {
                 final ProjectionNode projection = new ProjectionNode();
@@ -487,13 +486,13 @@ public class TestASTQueryHintOptimizer extends
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
-                whereClause.setQueryHint(QueryHints.OPTIMIZER, "None");
+                whereClause.setProperty(QueryHints.OPTIMIZER, QueryOptimizerEnum.None);
 
                 whereClause.setContext(new VarNode("g"));
 
                 final JoinGroupNode graphGroup = new JoinGroupNode();
                 whereClause.addChild(graphGroup);
-                graphGroup.setQueryHint(QueryHints.OPTIMIZER, "None");
+                graphGroup.setProperty(QueryHints.OPTIMIZER, QueryOptimizerEnum.None);
                 {
 
                     final StatementPatternNode sp1 = new StatementPatternNode(
@@ -501,13 +500,13 @@ public class TestASTQueryHintOptimizer extends
                             new ConstantNode(option), new VarNode("g"),
                             Scope.NAMED_CONTEXTS);
                     graphGroup.addChild(sp1);
-                    sp1.setQueryHint(QueryHints.OPTIMIZER, "None");
+//                    sp1.setProperty(QueryHints.OPTIMIZER, "None");
 
                     final StatementPatternNode sp2 = new StatementPatternNode(new VarNode(
                             "_var10"), new ConstantNode(votedBy), new VarNode(
                             "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS);
                     graphGroup.addChild(sp2);
-                    sp2.setQueryHint(QueryHints.OPTIMIZER, "None");
+//                    sp2.setProperty(QueryHints.OPTIMIZER, "None");
                     sp2.setQueryHint(AST2BOpBase.Annotations.HASH_JOIN, "true");
                     sp2.setQueryHint(IPredicate.Annotations.KEY_ORDER, "PCSO");
 
@@ -611,7 +610,7 @@ public class TestASTQueryHintOptimizer extends
         
         // The expected AST after the rewrite.
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
-        {            // Main Query
+        { // Main Query
 
             {
                 final ProjectionNode projection = new ProjectionNode();
@@ -632,7 +631,7 @@ public class TestASTQueryHintOptimizer extends
 
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
-                whereClause.setQueryHint(QueryHints.OPTIMIZER, "None");
+                whereClause.setProperty(QueryHints.OPTIMIZER, QueryOptimizerEnum.None);
                 {
 
                     final StatementPatternNode sp1 = new StatementPatternNode(
@@ -640,13 +639,13 @@ public class TestASTQueryHintOptimizer extends
                             new ConstantNode(option), new VarNode("g"),
                             Scope.NAMED_CONTEXTS);
                     whereClause.addChild(sp1);
-                    sp1.setQueryHint(QueryHints.OPTIMIZER, "None");
+//                    sp1.setProperty(QueryHints.OPTIMIZER, "None");
 
                     final StatementPatternNode sp2 = new StatementPatternNode(new VarNode(
                             "_var10"), new ConstantNode(votedBy), new VarNode(
                             "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS);
                     whereClause.addChild(sp2);
-                    sp2.setQueryHint(QueryHints.OPTIMIZER, "None");
+//                    sp2.setProperty(QueryHints.OPTIMIZER, "None");
 
                 }
 
@@ -934,7 +933,7 @@ public class TestASTQueryHintOptimizer extends
                             "_var10"), new ConstantNode(votedBy), new VarNode(
                             "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS));
                     
-                    group.setQueryHint(QueryHints.RUN_LAST, "true");
+                    group.setProperty(QueryHints.RUN_LAST, true);
                     
                 }
 
@@ -1073,7 +1072,7 @@ public class TestASTQueryHintOptimizer extends
                     final ServiceNode service = new ServiceNode(
                             (URI) serviceURI.getValue(), serviceGroup);
 
-                    service.setQueryHint(QueryHints.RUN_LAST, "true");
+                    service.setProperty(QueryHints.RUN_LAST, true);
                     
                     whereClause.addChild(service);
 

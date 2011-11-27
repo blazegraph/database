@@ -9,7 +9,7 @@ WITH {
   SELECT ?a ?y {?a :y ?y}
 } as %set2
 WHERE {
-   hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.mergeJoin "true" .
+   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.mergeJoin "true" .
    INCLUDE %set1.
    OPTIONAL {INCLUDE %set2}.
 }

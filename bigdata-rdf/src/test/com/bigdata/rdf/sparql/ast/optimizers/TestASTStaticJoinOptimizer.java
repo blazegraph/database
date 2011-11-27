@@ -1834,12 +1834,12 @@ public class TestASTStaticJoinOptimizer extends AbstractASTEvaluationTestCase {
     }
     
     private StatementPatternNode runFirst(final StatementPatternNode sp) {
-    	sp.setQueryHint(QueryHints.RUN_FIRST, "true");
+    	sp.setProperty(QueryHints.RUN_FIRST, true);
     	return sp;
     }
 
     private StatementPatternNode runLast(final StatementPatternNode sp) {
-    	sp.setQueryHint(QueryHints.RUN_LAST, "true");
+    	sp.setProperty(QueryHints.RUN_LAST, true);
     	return sp;
     }
 

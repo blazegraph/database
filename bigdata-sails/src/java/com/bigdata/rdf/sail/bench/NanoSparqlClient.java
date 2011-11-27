@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -64,10 +65,13 @@ import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
 
 import com.bigdata.counters.CAT;
+import com.bigdata.journal.TemporaryStore;
 import com.bigdata.jsr166.LinkedBlockingQueue;
-import com.bigdata.rdf.sail.IBigdataParsedQuery;
-import com.bigdata.rdf.sail.sparql.BigdataSPARQLParser;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * A flyweight utility for issuing queries to an http SPARQL endpoint.
@@ -277,15 +281,21 @@ public class NanoSparqlClient {
                 /*
                  * Set an appropriate Accept header for the query.
                  * 
-                 * FIXME Do this with BigdataSparqlParser2, perhaps using a
-                 * simple empty kb instance to back up the parser.  Then we
-                 * can drop BigdataSPARQLParser entirely.
+                 * Note: We have to parse the query to really get this right.
+                 * 
+                 * TODO The query parser requires a KB reference for Value to IV
+                 * resolution. This is just passing in an empty KB backed by a
+                 * temporary store since we not really interested in resolving
+                 * anything here, just figuring out the type of the query. It
+                 * would be nice if we could not bother to pass in a KB instance
+                 * at all, but I have not yet looked at modifying the parser to
+                 * accept a null KB reference for this use case.
                  */
-                final ParsedQuery parsedQuery = new BigdataSPARQLParser()
-                        .parseQuery(opts.queryStr, opts.baseURI);
+                final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                        opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
 
-                final QueryType queryType = opts.queryType = ((IBigdataParsedQuery) parsedQuery)
-                        .getQueryType();
+                final QueryType queryType = opts.queryType = astContainer
+                        .getOriginalAST().getQueryType();
 
 				switch(queryType) {
 				case DESCRIBE:
@@ -754,6 +764,13 @@ public class NanoSparqlClient {
 	 */
 	public static class QueryOptions implements Cloneable {
 
+	    /**
+	     * Temp KB provided to the parser.  This KB is empty, but the parser
+	     * needs one to resolve RDF Values to IVs.  So, we need one to parse
+	     * even though we are not going to do any resolution.
+	     */
+	    public AbstractTripleStore tmpKb;
+	    
 		/** The URL of the SPARQL endpoint. */
 		public String serviceURL = null;
 		public String username = null;
@@ -1294,6 +1311,7 @@ public class NanoSparqlClient {
 		boolean groupQueriesBySource = false; // TODO When true, each source represents a batch of queries.
 		long interGroupDelayMillis = 0L; // Latency by the client between query batches. 
 		final QueryOptions opts = new QueryOptions();
+		opts.tmpKb = createTempKb();
         {
 
             int i = 0;
@@ -1641,6 +1659,19 @@ public class NanoSparqlClient {
 		System.exit(0);
 
 	}
+
+    /**
+     * Create a temporary kb instance for use by the query parser. Since the
+     * temporary store is backed by a buffer until that buffer overflows, there
+     * will not be a backing disk file unless someone starts writing on this.
+     */
+    private static AbstractTripleStore createTempKb() {
+       
+        final TemporaryStore tempStore = new TemporaryStore();
+        
+        return new TempTripleStore(tempStore, new Properties(), null/* db */);
+        
+    }
 
 //	/**
 //	 * A model of the query workload to be imposed on the SPARQL end point. The

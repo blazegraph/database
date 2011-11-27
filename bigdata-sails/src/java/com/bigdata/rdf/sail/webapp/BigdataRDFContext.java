@@ -276,7 +276,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public abstract class AbstractQueryTask implements Callable<Void> {
         
@@ -289,21 +288,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         public final long timestamp;
 
-//        /** The SPARQL query string. */
-//        protected final String queryStr;
-
         /**
          * The baseURI is set from the effective request URI.
          */
         protected final String baseURI;
 
-//        /**
-//         * The {@link ParsedQuery}. This will be an {@link IBigdataParsedQuery}
-//         * in order to provide access to the {@link QueryHints} and the
-//         * {@link QueryType}.
-//         */
-//        protected final ParsedQuery parsedQuery;
-        
         /**
          * The {@link ASTContainer} provides access to the original SPARQL
          * query, the query model, the query plan, etc.
@@ -413,7 +402,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected AbstractQueryTask(//
                 final String namespace,//
                 final long timestamp, //
-//                final String queryStr,//
                 final String baseURI,
                 final ASTContainer astContainer,//
                 final QueryType queryType,//
@@ -426,8 +414,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             if (namespace == null)
                 throw new IllegalArgumentException();
-//            if (queryStr == null)
-//                throw new IllegalArgumentException();
             if (baseURI == null)
                 throw new IllegalArgumentException();
             if (astContainer == null)
@@ -436,8 +422,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 throw new IllegalArgumentException();
             if (mimeType == null)
                 throw new IllegalArgumentException();
-//            if (charset == null) // Note: null for binary encodings.
-//                throw new IllegalArgumentException();
             if (fileExt == null)
                 throw new IllegalArgumentException();
             if (req == null)
@@ -447,7 +431,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             this.namespace = namespace;
             this.timestamp = timestamp;
-//            this.queryStr = queryStr;
             this.baseURI = baseURI;
             this.astContainer = astContainer;
             this.queryType = queryType;
@@ -460,7 +443,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
             this.os = os;
             this.queryId = Long.valueOf(m_queryIdFactory.incrementAndGet());
-//            this.queryId2 = UUID.randomUUID();
 
         }
 

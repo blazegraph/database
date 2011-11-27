@@ -197,21 +197,26 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
         QueryOptimizerEnum optimizer = null;
 
-        if (joinGroup.getQueryHint(QueryHints.OPTIMIZER) != null) {
+        if (joinGroup.getProperty(QueryHints.OPTIMIZER) != null) {
 
-            optimizer = QueryOptimizerEnum.valueOf(joinGroup
-                    .getQueryHint(QueryHints.OPTIMIZER));
-
-        } else {
-
-            optimizer = context == null || context.queryHints == null ? QueryOptimizerEnum.Static
-                    : QueryOptimizerEnum.valueOf(context.queryHints
-                            .getProperty(QueryHints.OPTIMIZER,
-                                    QueryOptimizerEnum.Static.toString()));
+//            optimizer = QueryOptimizerEnum.valueOf(joinGroup
+//                    .getQueryHint(QueryHints.OPTIMIZER));
+            optimizer = (QueryOptimizerEnum) joinGroup
+                    .getProperty(QueryHints.OPTIMIZER);
+            
+            return optimizer == QueryOptimizerEnum.Static;
+            
+//        } else {
+//
+//            optimizer = context == null || context.queryHints == null ? QueryOptimizerEnum.Static
+//                    : QueryOptimizerEnum.valueOf(context.queryHints
+//                            .getProperty(QueryHints.OPTIMIZER,
+//                                    QueryOptimizerEnum.Static.toString()));
 
         }
 
-        return optimizer == QueryOptimizerEnum.Static;
+//        return optimizer == QueryOptimizerEnum.Static;
+        return QueryHints.DEFAULT_OPTIMIZER == QueryOptimizerEnum.Static;
 
     }
     
@@ -342,7 +347,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                     
                     for (StatementPatternNode sp : spNodes) {
                     	
-                    	if (sp.getQueryHintAsBoolean(QueryHints.RUN_LAST, false)) {
+                    	if (sp.getProperty(QueryHints.RUN_LAST, false)) {
 
                     		runLast = sp;
                     		
@@ -810,7 +815,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
                 /*
                  * We need the optimizer to play nice with the run first hint.
                  */
-                if (pred.getQueryHintAsBoolean(QueryHints.RUN_FIRST, false)) {
+                if (pred.getProperty(QueryHints.RUN_FIRST, false)) {
                 	preferredFirstTail = i;
                 	break;
                 }

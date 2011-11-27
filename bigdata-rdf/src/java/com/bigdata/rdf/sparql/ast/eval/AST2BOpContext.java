@@ -229,16 +229,22 @@ public class AST2BOpContext implements IdFactory {
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
 
-        this.queryHints = astContainer./*getOriginalAST().*/getQueryHints();
-
         /*
          * Figure out the query UUID that will be used. This will be bound onto
          * the query plan when it is generated. We figure out what it will be up
          * front so we can refer to its UUID in parts of the query plan. For
          * example, this is used to coordinate access to bits of state on a
          * parent IRunningQuery.
+         * 
+         * Note: The queryHints:Properties object on the ASTContainer is used
+         * for the QueryID. The QueryId is somewhat special since it must
+         * defined at this point in the flow of the query through the system.
+         * Other things which might be special in a similar manner would include
+         * authentication information, etc.
          */
         
+        this.queryHints = astContainer./*getOriginalAST().*/getQueryHints();
+
         // Use either the caller's UUID or a random UUID.
         final String queryIdStr = queryHints == null ? null : queryHints
                 .getProperty(QueryHints.QUERYID);

@@ -1,5 +1,6 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,26 +21,29 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Nov 27, 2011
+ */
 
-package com.bigdata.rdf.sail;
-
-import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.store.AbstractTripleStore;
+package com.bigdata.rdf.sparql.ast.hints;
 
 /**
- * Extension API for bigdata queries.
- * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * Base class for {@link Boolean} query hints.
  */
-public interface BigdataSailQuery {
-    
-    /**
-     * Return the AST model.
-     */
-    ASTContainer getASTContainer();
-    
-    /**
-     * The backing database view.
-     */
-    AbstractTripleStore getTripleStore();
+abstract class AbstractBooleanQueryHint extends AbstractQueryHint<Boolean> {
+
+    protected AbstractBooleanQueryHint(final String name,
+            final Boolean defaultValue) {
+
+        super(name, defaultValue);
+
+    }
+
+    @Override
+    public Boolean validate(final String value) {
+
+        return Boolean.valueOf(value);
+
+    }
+
 }

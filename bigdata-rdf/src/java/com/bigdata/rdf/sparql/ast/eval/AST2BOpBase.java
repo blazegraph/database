@@ -40,7 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.ASTBase;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -175,20 +175,20 @@ public class AST2BOpBase {
 
     /**
      * Apply any query hints to the operator as annotations of that operator.
+     * <p>
+     * Note: This method is responsible for transferring query hints from
+     * {@link ASTBase#getQueryHints()} onto a generated {@link PipelineOp}.
      * 
      * @param op
      *            The operator.
      * @param queryHints
-     *            The query hints.
+     *            The query hints (from {@link ASTBase#getQueryHints()}).
      * 
      * @return A copy of that operator to which the query hints (if any) have
      *         been applied. If there are no query hints then the original
      *         operator is returned.
-     * 
-     * @deprecated by {@link ASTQueryHintOptimizer} and explict declarations of
-     *             query hints and the scope in which they should be applied.
      */
-    public static PipelineOp applyQueryHints(PipelineOp op,
+    protected static PipelineOp applyQueryHints(PipelineOp op,
             final Properties queryHints) {
 
         if (queryHints == null)
@@ -203,7 +203,8 @@ public class AST2BOpBase {
             final String value = queryHints.getProperty(name);
 
             if (log.isInfoEnabled())
-                log.info("Query hint: [" + name + "=" + value + "]");
+                log.info("Query hint: op=" + (op.getClass().getSimpleName())
+                        + " [" + name + "=" + value + "]");
 
             op = (PipelineOp) op.setProperty(name, value);
 

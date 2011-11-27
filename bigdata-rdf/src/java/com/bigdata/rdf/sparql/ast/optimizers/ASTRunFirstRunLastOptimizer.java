@@ -143,7 +143,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
             		
             		final ASTBase join = (ASTBase) child;
             		
-            		if (join.getQueryHintAsBoolean(QueryHints.RUN_FIRST, false)) {
+            		if (join.getProperty(QueryHints.RUN_FIRST, false)) {
             			
             			if (first != null) {
             				
@@ -163,7 +163,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
             			
             		}
             		
-            		if (join.getQueryHintAsBoolean(QueryHints.RUN_LAST, false)) {
+            		if (join.getProperty(QueryHints.RUN_LAST, false)) {
             			
             			if (last != null) {
             				

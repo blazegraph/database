@@ -31,8 +31,6 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.StringTokenizer;
 
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.Dataset;
@@ -70,9 +68,6 @@ import org.openrdf.query.parser.sparql.ast.VisitorException;
 import com.bigdata.rdf.sail.BigdataParsedBooleanQuery;
 import com.bigdata.rdf.sail.BigdataParsedGraphQuery;
 import com.bigdata.rdf.sail.BigdataParsedTupleQuery;
-import com.bigdata.rdf.sail.IBigdataParsedQuery;
-import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * Overridden version of the {@link SPARQLParser} class which extracts
@@ -173,26 +168,26 @@ public class BigdataSPARQLParser implements QueryParser {
 
             final ParsedQuery query;
 
-            // Note: Bigdata override.
-            final Properties queryHints = getQueryHints(qc);
+//            // Note: Bigdata override.
+//            final Properties queryHints = getQueryHints(qc);
             
             // Note: Constructors in if then else are overridden too.
             ASTQuery queryNode = qc.getQuery();
             if (queryNode instanceof ASTSelectQuery) {
-                query = new BigdataParsedTupleQuery(tupleExpr,
-                        QueryType.SELECT, queryHints);
+                query = new BigdataParsedTupleQuery(tupleExpr);
+//                        QueryType.SELECT);
             }
             else if (queryNode instanceof ASTConstructQuery) {
-                query = new BigdataParsedGraphQuery(tupleExpr, prefixes,
-                        QueryType.CONSTRUCT, queryHints);
+                query = new BigdataParsedGraphQuery(tupleExpr, prefixes);
+//                        QueryType.CONSTRUCT);
             }
             else if (queryNode instanceof ASTAskQuery) {
-                query = new BigdataParsedBooleanQuery(tupleExpr, QueryType.ASK,
-                        queryHints);
+                query = new BigdataParsedBooleanQuery(tupleExpr);//, QueryType.ASK);
             }
             else if (queryNode instanceof ASTDescribeQuery) {
-                query = new BigdataParsedGraphQuery(tupleExpr, prefixes,
-                        QueryType.DESCRIBE, queryHints);
+                query = new BigdataParsedGraphQuery(tupleExpr, prefixes
+//                        ,QueryType.DESCRIBE
+                        );
             }
             else {
                 throw new RuntimeException("Unexpected query type: " + queryNode.getClass());
@@ -230,45 +225,45 @@ public class BigdataSPARQLParser implements QueryParser {
         }
     }
 
-    static private Properties getQueryHints(final ASTQueryContainer qc)
-            throws MalformedQueryException {
-        
-        final Properties queryHints = new Properties();
-        
-        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-        
-        // iterate the namespaces
-        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
-            // if we see one that matches the magic namespace, try
-            // to parse it
-            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
-                String hints = prefix.getValue();
-                // has to have a # and it can't be at the end
-                int i = hints.indexOf('#');
-                if (i < 0 || i == hints.length() - 1) {
-                    throw new MalformedQueryException("bad query hints: "
-                            + hints);
-                }
-                hints = hints.substring(i + 1);
-                // properties are separated by &
-                final StringTokenizer st = new StringTokenizer(hints, "&");
-                while (st.hasMoreTokens()) {
-                    final String hint = st.nextToken();
-                    i = hint.indexOf('=');
-                    if (i < 0 || i == hint.length() - 1) {
-                        throw new MalformedQueryException("bad query hint: "
-                                + hint);
-                    }
-                    final String key = hint.substring(0, i);
-                    final String val = hint.substring(i + 1);
-                    queryHints.put(key, val);
-                }
-            }
-        }
-     
-        return queryHints; // Note: MAY be null.
-        
-    }
+//    static private Properties getQueryHints(final ASTQueryContainer qc)
+//            throws MalformedQueryException {
+//        
+//        final Properties queryHints = new Properties();
+//        
+//        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+//        
+//        // iterate the namespaces
+//        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
+//            // if we see one that matches the magic namespace, try
+//            // to parse it
+//            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
+//                String hints = prefix.getValue();
+//                // has to have a # and it can't be at the end
+//                int i = hints.indexOf('#');
+//                if (i < 0 || i == hints.length() - 1) {
+//                    throw new MalformedQueryException("bad query hints: "
+//                            + hints);
+//                }
+//                hints = hints.substring(i + 1);
+//                // properties are separated by &
+//                final StringTokenizer st = new StringTokenizer(hints, "&");
+//                while (st.hasMoreTokens()) {
+//                    final String hint = st.nextToken();
+//                    i = hint.indexOf('=');
+//                    if (i < 0 || i == hint.length() - 1) {
+//                        throw new MalformedQueryException("bad query hint: "
+//                                + hint);
+//                    }
+//                    final String key = hint.substring(0, i);
+//                    final String val = hint.substring(i + 1);
+//                    queryHints.put(key, val);
+//                }
+//            }
+//        }
+//     
+//        return queryHints; // Note: MAY be null.
+//        
+//    }
     
 //    public static void main(String[] args)
 //        throws java.io.IOException

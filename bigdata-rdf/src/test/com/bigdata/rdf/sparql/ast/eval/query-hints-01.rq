@@ -6,6 +6,9 @@ PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT ?x ?o
 WHERE {
 
+  # disable join order optimizer
+  hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+
   # query hint binds for the group.
   hint:Group hint:com.bigdata.bop.PipelineOp.maxParallel 10 .
 
@@ -13,7 +16,7 @@ WHERE {
   hint:GroupAndSubGroups hint:com.bigdata.bop.PipelineOp.pipelineQueueCapacity 20 .
 
   # query hint binds for the (sub)query but does not effect other (sub)queries.
-  hint:SubQuery hint:com.bigdata.relation.accesspath.IBuffer.chunkOfChunksCapacity 20 .
+  hint:SubQuery hint:com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity 20 .
 
   ?x rdfs:label ?o .
 

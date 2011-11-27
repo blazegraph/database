@@ -1,0 +1,15 @@
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+SELECT ?x ?o
+WHERE {
+
+  # Set the queryId.
+  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.queryId "458aed8b-2c76-4d29-9cf0-d18d6a74bc0e" .
+
+  ?x rdfs:label ?o .
+
+  ?x rdf:type foaf:Person .
+
+}

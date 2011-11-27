@@ -78,16 +78,6 @@ public enum QueryHintScope {
      * {@link SubqueryRoot}s.
      */
     GroupAndSubGroups(new URIImpl(QueryHints.NAMESPACE + "GroupAndSubGroups")),
-//    /**
-//     * The query hint binds on the first non-query hint basic graph pattern (aka
-//     * {@link StatementPatternNode}) immediately proceeding the query hint (the
-//     * query hint should follow the {@link StatementPatternNode} which it
-//     * modifies).
-//     * <p>
-//     * Note: {@link #Prior} has the same effect and may be used with non-SP
-//     * nodes.
-//     */
-//    BGP(new URIImpl(QueryHints.NAMESPACE + "BGP")),
     /**
      * The query hint binds on the previous non-query hint AST node which is not
      * itself a query hint. This may be used to bind a query hint on a

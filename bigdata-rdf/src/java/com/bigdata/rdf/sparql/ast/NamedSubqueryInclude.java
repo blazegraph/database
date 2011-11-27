@@ -77,6 +77,25 @@ public class NamedSubqueryInclude extends
          */
         String JOIN_VARS = "joinVars";
         
+        /**
+         * When <code>true</code>, the join variables will be ignored when
+         * performing the join. This option makes it possible to build an index
+         * using join variables, but to evaluate the join without regard to
+         * those join variables.
+         * <p>
+         * The most common use case is used when an INCLUDE appears as the first
+         * {@link IJoinNode} in a query. In this case, the only left solution is
+         * the exogenous solution which, by default, does not have any bindings.
+         * By using a naive join we can scan a hash index built using one or
+         * more join variables, testing each solution in turn against the
+         * exogenous solution. This is efficient since it uses a single pass
+         * over the hash index and correct since it ignores the join variables
+         * for the left solution.
+         */
+        String NAIVE_JOIN = "naiveJoin";
+        
+        boolean DEFAULT_NAIVE_JOIN = false;
+        
     }
 
     /**
@@ -287,6 +306,12 @@ public class NamedSubqueryInclude extends
 
         }
 
+        if (getProperty(Annotations.NAIVE_JOIN, Annotations.DEFAULT_NAIVE_JOIN)) {
+
+            sb.append(" [naiveJoin]");
+            
+        }
+        
         final List<FilterNode> filters = getAttachedJoinFilters();
         if(!filters.isEmpty()) {
             for (FilterNode filter : filters) {
