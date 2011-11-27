@@ -29,11 +29,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.StringTokenizer;
+import java.util.UUID;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
@@ -56,12 +58,16 @@ import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
 import org.openrdf.query.parser.sparql.ast.TokenMgrError;
 import org.openrdf.query.parser.sparql.ast.VisitorException;
 
-import com.bigdata.rdf.sail.IBigdataParsedQuery;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -75,6 +81,12 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
 
+    static private final URI queryScope = new URIImpl(QueryHints.NAMESPACE
+            + QueryHintScope.Query);
+
+    static private final URI queryIdHint = new URIImpl(QueryHints.NAMESPACE
+            + QueryHints.QUERYID);
+    
     private final BigdataASTContext context;
 
     public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
@@ -101,7 +113,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
                 for (ASTUpdateContainer uc : updateOperations) {
 
-                    
                     StringEscapesProcessor.process(uc);
                     BaseDeclProcessor.process(uc, baseURI);
                     
@@ -160,10 +171,12 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * The use of the alternative {@link #parseQuery2(String, String)} is
+     * strongly encouraged.
      * 
-     * @return An object which implements {@link IBigdataParsedQuery}.
-     *         Additional information is available by casting the returned
-     *         object to that interface.
+     * @return An object which aligns the {@link ASTContainer} with the
+     *         {@link ParsedQuery} interface.
      */
     public BigdataParsedQuery parseQuery(final String queryStr, final String baseURI)
             throws MalformedQueryException {
@@ -221,13 +234,15 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             // Set the parse tree on the AST.
             ast.setParseTree(qc);
 
-            final Properties queryHints = getQueryHints(qc);
-
-            if (queryHints != null) {
-
-               queryRoot.setQueryHints(queryHints);
-
-            }
+            doQueryIdHint(ast, queryRoot);
+            
+//            final Properties queryHints = getQueryHints(qc);
+//
+//            if (queryHints != null) {
+//
+//               queryRoot.setQueryHints(queryHints);
+//
+//            }
 
             /*
              * Attach namespace declarations.
@@ -301,50 +316,115 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     }
 
     /**
-     * TODO This should be handled by an AST visitor. It is just much simpler.
-     * That will also allow us to handle query hints embedded into comments
-     * (actually, the syntax <code>hintURI bd:hint hintValue</code> allows us to
-     * embed query hints into graph patterns).
+     * Looks for the {@link QueryHints#QUERYID} and copies it to the
+     * {@link ASTContainer}, which is where other code will look for a caller
+     * given QueryID.
+     * <p>
+     * Note: This needs to be done up very early on in the processing of the
+     * query since several things expect this information to already be known
+     * before the query is handed over to the {@link AST2BOpUtility}.
+     * 
+     * @param ast
+     *            The {@link ASTContainer}.
+     * @param queryRoot
+     *            The root of the query.
+     * 
+     * @throws MalformedQueryException
+     * 
+     *             TODO This does not actually modify the AST. It could be
+     *             modified to do that, but the code would have to be robust to
+     *             modification (of the AST children) during traversal. For the
+     *             moment I am just leaving the query hint in place here. It
+     *             will be stripped out when the {@link ASTQueryHintOptimizer}
+     *             runs.
      */
-    static private Properties getQueryHints(final ASTQueryContainer qc)
+    private void doQueryIdHint(final ASTContainer ast, final QueryRoot queryRoot)
             throws MalformedQueryException {
+
+        final Iterator<StatementPatternNode> itr = BOpUtility.visitAll(
+                queryRoot, StatementPatternNode.class);
+
+        while (itr.hasNext()) {
         
-        final Properties queryHints = new Properties();
-        
-        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
-        
-        // iterate the namespaces
-        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
-            // if we see one that matches the magic namespace, try
-            // to parse it
-            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
-                String hints = prefix.getValue();
-                // has to have a # and it can't be at the end
-                int i = hints.indexOf('#');
-                if (i < 0 || i == hints.length() - 1) {
-                    throw new MalformedQueryException("bad query hints: "
-                            + hints);
+            final StatementPatternNode sp = itr.next();
+            System.err.println(sp);
+            if (queryIdHint.equals(sp.p().getValue())) {
+            
+                if (!queryScope.equals(sp.s().getValue())) {
+                
+                    throw new MalformedQueryException(QueryHints.QUERYID
+                            + " must be in scope " + QueryHintScope.Query);
+                
                 }
-                hints = hints.substring(i + 1);
-                // properties are separated by &
-                final StringTokenizer st = new StringTokenizer(hints, "&");
-                while (st.hasMoreTokens()) {
-                    final String hint = st.nextToken();
-                    i = hint.indexOf('=');
-                    if (i < 0 || i == hint.length() - 1) {
-                        throw new MalformedQueryException("bad query hint: "
-                                + hint);
-                    }
-                    final String key = hint.substring(0, i);
-                    final String val = hint.substring(i + 1);
-                    queryHints.put(key, val);
+                
+                final String queryIdStr = sp.o().getValue().stringValue();
+                
+                try {
+                    // Parse (validates that this is a UUID).
+                    UUID.fromString(queryIdStr);
+                } catch (IllegalArgumentException ex) {
+                    throw new MalformedQueryException("Not a valid UUID: "
+                            + queryIdStr);
                 }
+
+                // Set the hint on the ASTContainer.
+                ast.setQueryHint(QueryHints.QUERYID, queryIdStr);
+
+                return;
+            
             }
+            
         }
-     
-        return queryHints;
-        
+
     }
+    
+//    /**
+//     * TODO This should be handled by an AST visitor. It is just much simpler.
+//     * That will also allow us to handle query hints embedded into comments
+//     * (actually, the syntax <code>hintURI bd:hint hintValue</code> allows us to
+//     * embed query hints into graph patterns).
+//     * 
+//     * @deprecated by https://sourceforge.net/apps/trac/bigdata/ticket/421
+//     */
+//    static private Properties getQueryHints(final ASTQueryContainer qc)
+//            throws MalformedQueryException {
+//        
+//        final Properties queryHints = new Properties();
+//        
+//        final Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+//        
+//        // iterate the namespaces
+//        for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
+//            // if we see one that matches the magic namespace, try
+//            // to parse it
+//            if (prefix.getKey().equalsIgnoreCase(QueryHints.PREFIX)) {
+//                String hints = prefix.getValue();
+//                // has to have a # and it can't be at the end
+//                int i = hints.indexOf('#');
+//                if (i < 0 || i == hints.length() - 1) {
+//                    throw new MalformedQueryException("bad query hints: "
+//                            + hints);
+//                }
+//                hints = hints.substring(i + 1);
+//                // properties are separated by &
+//                final StringTokenizer st = new StringTokenizer(hints, "&");
+//                while (st.hasMoreTokens()) {
+//                    final String hint = st.nextToken();
+//                    i = hint.indexOf('=');
+//                    if (i < 0 || i == hint.length() - 1) {
+//                        throw new MalformedQueryException("bad query hint: "
+//                                + hint);
+//                    }
+//                    final String key = hint.substring(0, i);
+//                    final String val = hint.substring(i + 1);
+//                    queryHints.put(key, val);
+//                }
+//            }
+//        }
+//     
+//        return queryHints;
+//        
+//    }
     
 //    public static void main(String[] args)
 //        throws java.io.IOException

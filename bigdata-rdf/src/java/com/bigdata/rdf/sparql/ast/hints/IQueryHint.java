@@ -36,7 +36,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
  * 
  * @param <T>
  *            The generic type of the value space for the query hint.
- *            
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -46,7 +46,7 @@ public interface IQueryHint<T> {
      * The name of the query hint.
      */
     String getName();
-    
+
     /**
      * The default value for this query hint (many query hints provide overrides
      * of defaults).
@@ -67,7 +67,12 @@ public interface IQueryHint<T> {
     T validate(String value);
 
     /**
-     * Attach/process the query hint.
+     * Handle the query hint.
+     * <p>
+     * Note: The name of the query hint is no longer strongly coupled to the
+     * name of the annotation. This method may be used to attach zero or more
+     * annotations as appropriate to the AST structure. It may also be used to
+     * change defaults in the {@link AST2BOpContext} or take similar actions.
      * 
      * @param ctx
      *            The query evaluation context.
@@ -78,6 +83,6 @@ public interface IQueryHint<T> {
      * @param value
      *            The value specified for the query hint.
      */
-    void attach(AST2BOpContext ctx, QueryHintScope scope, ASTBase op, T value);
+    void handle(AST2BOpContext ctx, QueryHintScope scope, ASTBase op, T value);
 
 }

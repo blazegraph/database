@@ -1,5 +1,6 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,26 +21,28 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Nov 27, 2011
+ */
 
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sparql.ast.hints;
 
-import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
- * Extension API for bigdata queries.
- * 
- * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * Exception thrown when a query hint is invalid/illegal.
  */
-public interface BigdataSailQuery {
-    
-    /**
-     * Return the AST model.
-     */
-    ASTContainer getASTContainer();
-    
-    /**
-     * The backing database view.
-     */
-    AbstractTripleStore getTripleStore();
+public final class QueryHintException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    public QueryHintException(final QueryHintScope scope, final ASTBase op,
+            final String name, final Object value) {
+
+        super("scope=" + scope + ", name=" + name + ", value=" + value
+                + ", op=" + op.getClass().getSimpleName());
+
+    }
+
 }

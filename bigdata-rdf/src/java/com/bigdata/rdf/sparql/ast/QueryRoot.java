@@ -51,14 +51,6 @@ public class QueryRoot extends QueryBase {
     public interface Annotations extends QueryBase.Annotations {
 
         /**
-         * Query hints (optional). When present, this is a {@link Properties}
-         * object.
-         * 
-         * @see QueryHints
-         */
-        String QUERY_HINTS = "queryHints";
-
-        /**
          * The namespace prefix declaration map. This is a {@link Map} with
          * {@link String} keys (prefix) and {@link String} values (the uri
          * associated with that prefix).
@@ -143,30 +135,30 @@ public class QueryRoot extends QueryBase {
 
     }
 
-    /**
-     * Return the optional query hints.
-     * 
-     * @see QueryHints
-     */
-    public Properties getQueryHints() {
-        
-        return (Properties) getProperty(Annotations.QUERY_HINTS);
-        
-    }
-    
-    /**
-     * Set the query hints.
-     * 
-     * @param queryHints
-     *            The query hints (may be <code>null</code>).
-     *            
-     * @see QueryHints
-     */
-    public void setQueryHints(final Properties queryHints) {
-
-        setProperty(Annotations.QUERY_HINTS, queryHints);
-        
-    }
+//    /**
+//     * Return the optional query hints.
+//     * 
+//     * @see QueryHints
+//     */
+//    public Properties getQueryHints() {
+//        
+//        return (Properties) getProperty(Annotations.QUERY_HINTS);
+//        
+//    }
+//    
+//    /**
+//     * Set the query hints.
+//     * 
+//     * @param queryHints
+//     *            The query hints (may be <code>null</code>).
+//     * 
+//     * @see QueryHints
+//     */
+//    public void setQueryHints(final Properties queryHints) {
+//
+//        setProperty(Annotations.QUERY_HINTS, queryHints);
+//        
+//    }
 
     /**
      * Set the dataset.

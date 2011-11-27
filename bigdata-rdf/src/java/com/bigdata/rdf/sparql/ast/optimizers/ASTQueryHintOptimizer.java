@@ -46,17 +46,20 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 
 /**
  * Query hints are identified applied to AST nodes based on the specified scope
@@ -73,7 +76,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * <p>
  * Once recognized, query hints are removed from the AST. All query hints are
  * declared internally using interfaces. It is an error if the specified query
- * hint can not be identified via reflection.
+ * hint has not been registered with the {@link QueryHintRegistry}, if the
+ * {@link IQueryHint} can not validate the value, if the {@link QueryHintScope}
+ * is not legal for the {@link IQueryHint}, etc.
  * <p>
  * For example:
  * 
@@ -96,17 +101,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * @see QueryHints
  * @see QueryHintScope
  * 
- *      TODO We should only apply a query hint to a node for which it has
- *      semantics. For example, {@link QueryHints#QUERYID} only has semantics
- *      for a {@link QueryRoot}.
- * 
- *      TODO Review the existing optimizers to make sure that they propagate
- *      query hints as well as other annotations when creating a new node. I
- *      think that the {@link ASTSparql11SubqueryOptimizer} probably fails to do
- *      this when it extracts a {@link NamedSubqueryRoot}.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ASTQueryHintOptimizer.java 5733 2011-11-22 20:08:09Z
+ *          thompsonbry $
  */
 public class ASTQueryHintOptimizer implements IASTOptimizer {
 
@@ -153,20 +150,19 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
     }
 
     /**
-     * Note: We only need to do this for those AST nodes which can interpret
-     * query hints. Right now, this is just the statement pattern nodes. If that
-     * changes, then we need to annotate more of the AST Nodes and this method
-     * will need to be modified.
-     * 
-     * @param op
-     * @return
+     * Tnis is used to avoid descent into parts of the AST which can not have
+     * query hints, such as value expressions.
      */
     private boolean isNodeAcceptingQueryHints(final BOp op) {
-        if (op instanceof StatementPatternNode || op instanceof JoinGroupNode
-                || op instanceof QueryBase) {
+      
+        if (op instanceof QueryNodeBase) {
+        
             return true;
+            
         }
+
         return false;
+        
     }
     
     /**
@@ -181,7 +177,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         if (queryHints == null || queryHints.isEmpty())
             return;
         
-        validateQueryHints(context, queryHints);
+//        validateQueryHints(context, queryHints);
         
         final Iterator<BOp> itr = BOpUtility
                 .preOrderIteratorWithAnnotations(queryRoot);
@@ -250,72 +246,85 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      *            The name of the query hint.
      * @param value
      *            The value.
-     * 
-     *            TODO This method is a hook for query hints which have
-     *            side-effects on other things. That hook should be made more
-     *            declarative.
      */
+    @SuppressWarnings("unchecked")
     private void _applyQueryHint(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase t, final String name,
             final String value) {
 
-        if (scope == QueryHintScope.Query) {
-            /*
-             * All of these hints either are only permitted in the Query scope
-             * or effect the default settings for the evaluation of this query
-             * when they appear in the Query scope. For the latter category, the
-             * hints may also appear in other scopes. For example, you can
-             * override the access path sampling behavior either for the entire
-             * query, for all BGPs in some scope, or for just a single BGP.
-             */
-            if (name.equals(QueryHints.ANALYTIC)) {
-                context.nativeHashJoins = Boolean.valueOf(value);
-                context.nativeDistinctSolutions = Boolean.valueOf(value);
-                context.nativeDistinctSPO = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.MERGE_JOIN)) {
-                context.mergeJoin = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
-                context.nativeHashJoins = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SOLUTIONS)) {
-                context.nativeDistinctSolutions = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SPO)) {
-                context.nativeDistinctSPO = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.REMOTE_APS)) {
-                context.remoteAPs = Boolean.valueOf(value);
-            } else if (name.equals(QueryHints.ACCESS_PATH_SAMPLE_LIMIT)) {
-                context.accessPathSampleLimit = Integer.valueOf(value);
-            } else if (name.equals(QueryHints.ACCESS_PATH_SCAN_AND_FILTER)) {
-                context.accessPathScanAndFilter = Boolean.valueOf(value);
-            } else {
-                t.setQueryHint(name, value);
-            }
-        } else {
-            t.setQueryHint(name, value);
+        @SuppressWarnings("rawtypes")
+        final IQueryHint queryHint = QueryHintRegistry.get(name);
+        
+        if(queryHint == null) {
+            
+            // Unknown query hint.
+            throw new QueryHintException(scope, t, name, value);
+            
         }
+
+        // Parse/validate and handle type conversion for the query hint value.
+        final Object value2 = queryHint.validate(value);
+
+        // Apply the query hint.
+        queryHint.handle(context, scope, t, value2);
+
+//        if (scope == QueryHintScope.Query) {
+//            /*
+//             * All of these hints either are only permitted in the Query scope
+//             * or effect the default settings for the evaluation of this query
+//             * when they appear in the Query scope. For the latter category, the
+//             * hints may also appear in other scopes. For example, you can
+//             * override the access path sampling behavior either for the entire
+//             * query, for all BGPs in some scope, or for just a single BGP.
+//             */
+//            if (name.equals(QueryHints.ANALYTIC)) {
+//                context.nativeHashJoins = Boolean.valueOf(value);
+//                context.nativeDistinctSolutions = Boolean.valueOf(value);
+//                context.nativeDistinctSPO = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.MERGE_JOIN)) {
+//                context.mergeJoin = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.NATIVE_HASH_JOINS)) {
+//                context.nativeHashJoins = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SOLUTIONS)) {
+//                context.nativeDistinctSolutions = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.NATIVE_DISTINCT_SPO)) {
+//                context.nativeDistinctSPO = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.REMOTE_APS)) {
+//                context.remoteAPs = Boolean.valueOf(value);
+//            } else if (name.equals(QueryHints.ACCESS_PATH_SAMPLE_LIMIT)) {
+//                context.accessPathSampleLimit = Integer.valueOf(value);
+//            } else if (name.equals(QueryHints.ACCESS_PATH_SCAN_AND_FILTER)) {
+//                context.accessPathScanAndFilter = Boolean.valueOf(value);
+//            } else {
+//                t.setQueryHint(name, value);
+//            }
+//        } else {
+//            t.setQueryHint(name, value);
+//        }
 
     }
     
-    /**
-     * Validate the global query hints.
-     * 
-     * @param queryHints
-     */
-    private void validateQueryHints(final AST2BOpContext context,
-            final Properties queryHints) {
-
-        final Enumeration<?> e = queryHints.propertyNames();
-
-        while (e.hasMoreElements()) {
-
-            final String name = (String) e.nextElement();
-
-            final String value = queryHints.getProperty(name);
-
-            validateQueryHint(context, name, value);
-            
-        }
-        
-    }
+//    /**
+//     * Validate the global query hints.
+//     * 
+//     * @param queryHints
+//     */
+//    private void validateQueryHints(final AST2BOpContext context,
+//            final Properties queryHints) {
+//
+//        final Enumeration<?> e = queryHints.propertyNames();
+//
+//        while (e.hasMoreElements()) {
+//
+//            final String name = (String) e.nextElement();
+//
+//            final String value = queryHints.getProperty(name);
+//
+//            validateQueryHint(context, name, value);
+//            
+//        }
+//        
+//    }
 
     /**
      * Recursively process a join group, applying any query hints found and
@@ -429,6 +438,15 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
     }
 
+    /**
+     * Return <code>true</code> iff this {@link StatementPatternNode} is a query
+     * hint.
+     * 
+     * @param sp
+     *            The {@link StatementPatternNode}.
+     *            
+     * @return <code>true</code> if the SP is a query hint.
+     */
     private boolean isQueryHint(final StatementPatternNode sp) {
         
         if(!(sp.p() instanceof ConstantNode))
@@ -439,9 +457,9 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         if(!(p instanceof URI))
             return false;
         
-        final BigdataURI u = (BigdataURI)p;
+        final BigdataURI u = (BigdataURI) p;
         
-        return u.getNamespace().equals(QueryHints.NAMESPACE);
+        return u.stringValue().startsWith(QueryHints.NAMESPACE);
 
     }
     
@@ -505,58 +523,51 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         
     }
     
-    /**
-     * Validates the query hint.
-     * 
-     * @param name
-     *            The name of the query hint.
-     * @param value
-     *            The value for the query hint.
-     * 
-     * @throws RuntimeException
-     *             if the query hint could not be validated.
-     * 
-     *             TODO Query hints often have a base name which is NOT the name
-     *             of the declaring interface. Therefore, maybe the best way to
-     *             control all of this is to have a separate registry for
-     *             declaring query hints. Query hints could then be verified
-     *             against that registry. This would also let us control what
-     *             people are able to override.
-     */
-    private void validateQueryHint(final AST2BOpContext context,
-            //final QueryRoot queryRoot, final QueryBase queryBase,final ASTBase node, 
-            final String name, final String value) {
-
-//        final int pos = name.lastIndexOf('.');
+//    /**
+//     * Validates the query hint.
+//     * 
+//     * @param name
+//     *            The name of the query hint.
+//     * @param value
+//     *            The value for the query hint.
+//     * 
+//     * @throws RuntimeException
+//     *             if the query hint could not be validated.
+//     */
+//    private void validateQueryHint(final AST2BOpContext context,
+//            //final QueryRoot queryRoot, final QueryBase queryBase,final ASTBase node, 
+//            final String name, final String value) {
 //
-//        if (pos == -1)
-//            throw new RuntimeException("Badly formed query hint name: " + name);
-//
-//        // The name of the class or interface which declares that query hint.
-//        final String className = name
-//                .substring(0/* beginIndex */, pos/* endIndex */);
-//
-//        // The name of the field on the class or interface for the query hint.
-//        final String fieldName = name.substring(pos + 1);
-//
-//        final Class<?> cls;
-//        try {
-//            cls = Class.forName(className);
-//        } catch (ClassNotFoundException e) {
-//            log.error(e);
-//            return;
-//        }
-//
-//        final Field f;
-//        try {
-//            f = cls.getField(fieldName);
-//        } catch (SecurityException e) {
-//            log.error(e);
-//        } catch (NoSuchFieldException e) {
-//            log.error(e);
-//        }
-        
-    }
+////        final int pos = name.lastIndexOf('.');
+////
+////        if (pos == -1)
+////            throw new RuntimeException("Badly formed query hint name: " + name);
+////
+////        // The name of the class or interface which declares that query hint.
+////        final String className = name
+////                .substring(0/* beginIndex */, pos/* endIndex */);
+////
+////        // The name of the field on the class or interface for the query hint.
+////        final String fieldName = name.substring(pos + 1);
+////
+////        final Class<?> cls;
+////        try {
+////            cls = Class.forName(className);
+////        } catch (ClassNotFoundException e) {
+////            log.error(e);
+////            return;
+////        }
+////
+////        final Field f;
+////        try {
+////            f = cls.getField(fieldName);
+////        } catch (SecurityException e) {
+////            log.error(e);
+////        } catch (NoSuchFieldException e) {
+////            log.error(e);
+////        }
+//        
+//    }
 
     /**
      * Return the value for the query hint.
@@ -615,7 +626,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         final String value = getValue(hint.o());
 
-        validateQueryHint(context, name, value);
+//        validateQueryHint(context, name, value);
 
         switch (scope) {
         case Query: {
@@ -676,11 +687,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         // Apply to all child groups of that top-level group.
         applyToGroupAndSubGroups(context, scope, group, name, value);
 
-        if (isNodeAcceptingQueryHints(queryBase)) {
+//        if (isNodeAcceptingQueryHints(queryBase)) {
 
-            _applyQueryHint(context, scope, (ASTBase) queryBase, name, value);
+        _applyQueryHint(context, scope, (ASTBase) queryBase, name, value);
 
-        }
+//        }
 
     }
 
@@ -763,11 +774,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         }
 
-        if(isNodeAcceptingQueryHints(group)) {
+//        if(isNodeAcceptingQueryHints(group)) {
 
-            _applyQueryHint(context, scope, (ASTBase) group, name, value);
+        _applyQueryHint(context, scope, (ASTBase) group, name, value);
             
-        }
+//        }
 
     }
 
@@ -789,11 +800,11 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
 
         }
 
-        if (isNodeAcceptingQueryHints(group)) {
+//        if (isNodeAcceptingQueryHints(group)) {
 
-            _applyQueryHint(context, scope, (ASTBase) group, name, value);
+        _applyQueryHint(context, scope, (ASTBase) group, name, value);
             
-        }
+//        }
 
     }
 

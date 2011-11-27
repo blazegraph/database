@@ -289,15 +289,6 @@ public class ASTContainer extends ASTBase {
 
         }
 
-//        if (getQueryHints() != null) {
-//
-//            sb.append("\n");
-//            sb.append(Annotations.QUERY_HINTS);
-//            sb.append("=");
-//            sb.append(getQueryHints().toString());
-//
-//        }
-
         return sb.toString();
 
     }

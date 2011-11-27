@@ -28,23 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import java.util.Map;
-import java.util.Properties;
 
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedGraphQuery;
-
-import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataParsedGraphQuery extends ParsedGraphQuery implements
-        IBigdataParsedQuery {
+public class BigdataParsedGraphQuery extends ParsedGraphQuery {
 
-    private final QueryType queryType;
-    private final Properties queryHints;
+//    private final QueryType queryType;
+//    private final Properties queryHints;
     
     /**
      * @param tupleExpr
@@ -55,27 +51,28 @@ public class BigdataParsedGraphQuery extends ParsedGraphQuery implements
      *        namespaces that are used in the query.
      */
     public BigdataParsedGraphQuery(final TupleExpr tupleExpr,
-            final Map<String, String> namespaces, final QueryType queryType,
-            final Properties queryHints) {
+            final Map<String, String> namespaces//, final QueryType queryType
+//            final Properties queryHints
+            ) {
 
         super(tupleExpr, namespaces);
         
-        this.queryType = queryType;
+//        this.queryType = queryType;
         
-        this.queryHints = queryHints;
-        
-    }
-
-    public QueryType getQueryType() {
-        
-        return queryType;
+//        this.queryHints = queryHints;
         
     }
 
-    public Properties getQueryHints() {
+//    public QueryType getQueryType() {
+//        
+//        return queryType;
+//        
+//    }
 
-        return queryHints;
-        
-    }
+//    public Properties getQueryHints() {
+//
+//        return queryHints;
+//        
+//    }
 
 }

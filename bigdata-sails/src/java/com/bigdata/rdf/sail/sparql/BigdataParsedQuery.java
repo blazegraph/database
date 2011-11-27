@@ -27,16 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
-import java.util.Properties;
-
 import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 
-import com.bigdata.rdf.sail.IBigdataParsedQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.QueryType;
 
 /**
  * Class extends {@link ParsedQuery} for API compliance with {@link QueryParser}
@@ -50,8 +46,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BigdataParsedQuery extends ParsedQuery implements
-        IBigdataParsedQuery {
+public class BigdataParsedQuery extends ParsedQuery {
 
     final private ASTContainer astContainer;
 
@@ -85,25 +80,25 @@ public class BigdataParsedQuery extends ParsedQuery implements
         return astContainer;
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * This is a little bit ambiguous. It is returning the {@link QueryType}
-     * associated with {@link ASTContainer#getOriginalAST()}. If the AST
-     * optimizer pipeline changes the {@link QueryType} (which happens for a
-     * DESCRIBE query) then the new {@link QueryType} shows up on the
-     * {@link ASTContainer#getOptimizedAST()}. However, in general this
-     * difference does not make a difference as we evaluate CONSTRUCT and
-     * DESCRIBE queries in the same way have they have been optimized.
-     */
-    @Override
-    public QueryType getQueryType() {
-        return astContainer.getOriginalAST().getQueryType();
-    }
-
-    @Override
-    public Properties getQueryHints() {
-        return astContainer.getOriginalAST().getQueryHints();
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * This is a little bit ambiguous. It is returning the {@link QueryType}
+//     * associated with {@link ASTContainer#getOriginalAST()}. If the AST
+//     * optimizer pipeline changes the {@link QueryType} (which happens for a
+//     * DESCRIBE query) then the new {@link QueryType} shows up on the
+//     * {@link ASTContainer#getOptimizedAST()}. However, in general this
+//     * difference does not make a difference as we evaluate CONSTRUCT and
+//     * DESCRIBE queries in the same way have they have been optimized.
+//     */
+//    @Override
+//    public QueryType getQueryType() {
+//        return astContainer.getOriginalAST().getQueryType();
+//    }
+//
+//    @Override
+//    public Properties getQueryHints() {
+//        return astContainer.getOriginalAST().getQueryHints();
+//    }
 
 }

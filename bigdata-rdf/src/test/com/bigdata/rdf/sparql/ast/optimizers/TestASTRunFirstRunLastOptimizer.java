@@ -137,7 +137,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
             final StatementPatternNode cSPN = new StatementPatternNode(new VarNode("c"),
                     new ConstantNode(c), new ConstantNode(c));
             
-            cSPN.setQueryHint(QueryHints.RUN_LAST, "true");
+            cSPN.setProperty(QueryHints.RUN_LAST, true);
             
             where.addChild(cSPN);
 
@@ -147,7 +147,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
             final StatementPatternNode eSPN = new StatementPatternNode(new VarNode("e"),
                     new ConstantNode(e), new ConstantNode(e));
             
-            eSPN.setQueryHint(QueryHints.RUN_FIRST, "true");
+            eSPN.setProperty(QueryHints.RUN_FIRST, true);
             
             where.addChild(eSPN);
 
@@ -198,7 +198,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
             final StatementPatternNode eSPN = new StatementPatternNode(new VarNode("e"),
                     new ConstantNode(e), new ConstantNode(e));
             
-            eSPN.setQueryHint(QueryHints.RUN_FIRST, "true");
+            eSPN.setProperty(QueryHints.RUN_FIRST, true);
             
             where.addChild(eSPN);
 
@@ -220,7 +220,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
             final StatementPatternNode cSPN = new StatementPatternNode(new VarNode("c"),
                     new ConstantNode(c), new ConstantNode(c));
             
-            cSPN.setQueryHint(QueryHints.RUN_LAST, "true");
+            cSPN.setProperty(QueryHints.RUN_LAST, true);
             
             where.addChild(cSPN);
 
@@ -329,7 +329,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                 final JoinGroupNode group1 = new JoinGroupNode();
                 where.addChild(group1);
 
-                group1.setQueryHint(QueryHints.RUN_LAST, "true");
+                group1.setProperty(QueryHints.RUN_LAST, true);
 
                 group1.addChild(new StatementPatternNode(new VarNode("c"),
                         new ConstantNode(c), new ConstantNode(c)));
@@ -354,7 +354,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                         new VarNode("f"), new ConstantNode(f),
                         new ConstantNode(f)));
 
-                service.setQueryHint(QueryHints.RUN_FIRST, "true");
+                service.setProperty(QueryHints.RUN_FIRST, true);
 
             }
             
@@ -416,7 +416,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                         new VarNode("f"), new ConstantNode(f),
                         new ConstantNode(f)));
 
-                service.setQueryHint(QueryHints.RUN_FIRST, "true");
+                service.setProperty(QueryHints.RUN_FIRST, true);
 
             }
 
@@ -440,7 +440,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
                 group1.addChild(new StatementPatternNode(new VarNode("d"),
                         new ConstantNode(d), new ConstantNode(d)));
 
-                group1.setQueryHint(QueryHints.RUN_LAST, "true");
+                group1.setProperty(QueryHints.RUN_LAST, true);
 
             }
 
