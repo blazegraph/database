@@ -165,6 +165,73 @@ public class TestInlining extends AbstractTripleStoreTestCase {
     }
 
     /**
+     * Verify inlined unsigned numeric values
+     */
+    public void test_verifyunsigned() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values, ensure range is beyond max signed values.
+            final BigdataValueFactory f = store.getValueFactory();
+            
+            assertTrue(f.createLiteral("198", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())).intValue() == 198);
+
+            assertTrue(f.createLiteral("0", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())).intValue() == 0);
+
+            assertTrue(f.createLiteral("50", f
+                    .createURI(XSD.UNSIGNED_BYTE.toString())).intValue() == 50);
+
+            assertTrue(f.createLiteral("" + (Short.MAX_VALUE + 10), f
+                    .createURI(XSD.UNSIGNED_SHORT.toString())).intValue() == (Short.MAX_VALUE + 10));
+
+            assertTrue(f.createLiteral("0", f
+                    .createURI(XSD.UNSIGNED_SHORT.toString())).intValue() == 0);
+
+            assertTrue(f.createLiteral(""+ (10L + Integer.MAX_VALUE), f
+                    .createURI(XSD.UNSIGNED_INT.toString())).longValue() == (10L + Integer.MAX_VALUE));
+
+            assertTrue(f.createLiteral("0", f
+                    .createURI(XSD.UNSIGNED_INT.toString())).longValue() == 0L);
+
+            BigInteger bi = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(10));
+            assertTrue(f.createLiteral(bi.toString(), f
+                    .createURI(XSD.UNSIGNED_LONG.toString())).integerValue().equals(bi));
+
+            BigInteger biz = BigInteger.valueOf(0);
+            assertTrue(f.createLiteral("0", f
+                    .createURI(XSD.UNSIGNED_LONG.toString())).integerValue().equals(biz));
+            BigInteger bi100 = BigInteger.valueOf(100);
+            assertTrue(f.createLiteral("100", f
+                    .createURI(XSD.UNSIGNED_LONG.toString())).integerValue().equals(bi100));
+
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    /**
      * Unsigned numerics should not be inlined at this time.
      */
     public void test_badrangeUnsigned() {
