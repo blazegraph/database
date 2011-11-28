@@ -101,7 +101,7 @@ abstract class AbstractQueryHint<T> implements IQueryHint<T> {
             final QueryHintScope scope, final ASTBase op, final String name,
             final T value) {
 
-        op.setQueryHint(getName(), value.toString());
+        op.setQueryHint(name, value.toString());
 
     }
 
@@ -125,7 +125,7 @@ abstract class AbstractQueryHint<T> implements IQueryHint<T> {
             final QueryHintScope scope, final ASTBase op, final String name,
             final T value) {
 
-        op.setProperty(getName(), value);
+        op.setProperty(name, value);
 
     }
 

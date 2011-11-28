@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
@@ -40,14 +42,22 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
  * subquery will be lifted out. When <code>false</code>, the subquery will not
  * be lifted unless other semantics require that it be lifted out regardless.
  * <p>
- * Note: This sets an AST annotation which is interpreted by the
- * {@link ASTSparql11SubqueryOptimizer}.
+ * For example, the following may be used to lift out the sub-select in which it
+ * appears into a {@link NamedSubqueryRoot}. The lifted expression will be
+ * executed exactly once.
+ * 
+ * <pre>
+ * hint:SubQuery hint:com.bigdata.rdf.sparql.ast.QueryHints.runOnce "true" .
+ * </pre>
+ * <p>
+ * Note: This sets the {@link SubqueryRoot.Annotations#RUN_ONCE} AST annotation
+ * which is then interpreted by the {@link ASTSparql11SubqueryOptimizer}.
  */
 final class RunOnceHint extends AbstractBooleanQueryHint {
 
     protected RunOnceHint() {
 
-        super(SubqueryRoot.Annotations.RUN_ONCE, null/* default */);
+        super(QueryHints.RUN_ONCE, null/* default */);
 
     }
 
@@ -55,13 +65,19 @@ final class RunOnceHint extends AbstractBooleanQueryHint {
     public void handle(final AST2BOpContext context,
             final QueryHintScope scope, final ASTBase op, final Boolean value) {
 
-        if (scope == QueryHintScope.Prior && op instanceof SubqueryRoot) {
-
-            _setAnnotation(context, scope, op, getName(), value);
+        if (scope != QueryHintScope.SubQuery) {
+        
+            throw new QueryHintException(scope, op,
+                    getName(), value);
 
         }
+        
+        if (op instanceof SubqueryRoot) {
 
-        throw new QueryHintException(scope, op, getName(), value);
+            _setAnnotation(context, scope, op,
+                    SubqueryRoot.Annotations.RUN_ONCE, value);
+
+        }
 
     }
 

@@ -35,17 +35,22 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.join.AbstractHashJoinOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.TestASTQueryHintOptimizer;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -73,10 +78,8 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A simple SELECT query with some query hints. This does not verify much
-     * beyond the willingness to accept the query hints and silently remove them
-     * from the AST model (the query will fail if the query hints are not
-     * removed as they will not match anything in the data).
+     * A simple SELECT query with some query hints. This verifies that the query
+     * hints are correctly applied to the AST and/or the generated query plan.
      */
     public void test_query_hints_01() throws Exception {
 
@@ -206,7 +209,7 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
                 @SuppressWarnings("rawtypes")
                 final PipelineJoin join = joins[0];
                 
-                assertEquals(RDFS.LABEL, ((IV)join.getPredicate().get(1/* p */)
+                assertEquals(RDFS.LABEL, ((IV<?,?>)join.getPredicate().get(1/* p */)
                         .get()).getValue());
                 
                 assertEquals(10, join.getMaxParallel());
@@ -225,7 +228,7 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
                 @SuppressWarnings("rawtypes")
                 final PipelineJoin join = joins[1];
 
-                assertEquals(RDF.TYPE, ((IV)join.getPredicate().get(1/* p */)
+                assertEquals(RDF.TYPE, ((IV<?,?>)join.getPredicate().get(1/* p */)
                         .get()).getValue());
 
                 assertEquals(10, join.getMaxParallel());
@@ -278,12 +281,171 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
 
         try {
         
-            new TestHelper("query-hints-03");
+            new TestHelper("query-hints-03").runTest();
 
         } catch (Throwable t) {
             
             assertTrue(InnerCause.isInnerCause(t, QueryHintException.class));
         
+        }
+        
+    }
+
+    /**
+     * Part one of a two part unit test which verifies that we lift out a
+     * {@link SubqueryRoot} which is marked the {@link QueryHints#RUN_ONCE}
+     * query hint. In this version of the test, the query hint is not present
+     * and we verify that the sub-select is NOT lifted out.
+     * 
+     * <pre>
+     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+     * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+     * 
+     * SELECT ?x ?o
+     * WHERE {
+     *   ?x rdfs:label ?o .
+     *   { 
+     *      SELECT ?x { ?x rdf:type foaf:Person }
+     *   }
+     * </pre>
+     */
+    public void test_query_hints_04a() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("query-hints-04a")
+                .runTest();
+
+        final NamedSubqueriesNode namedSubqueries = astContainer
+                .getOptimizedAST().getNamedSubqueries();
+
+        assertNull(namedSubqueries);
+
+    }
+    
+    /**
+     * Part one of a two part unit test which verifies that we lift out a
+     * {@link SubqueryRoot} which is marked the {@link QueryHints#RUN_ONCE}
+     * query hint. In this version of the test, the query hint is present and we
+     * verify that the sub-select is lifted out.
+     */
+    public void test_query_hints_04b() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("query-hints-04b")
+                .runTest();
+
+        final NamedSubqueriesNode namedSubqueries = astContainer
+                .getOptimizedAST().getNamedSubqueries();
+
+        assertNotNull(namedSubqueries);
+
+        assertEquals(1, namedSubqueries.arity());
+        
+    }
+
+    /**
+     * Unit test for the query hints {@link AST2BOpBase.Annotations#HASH_JOIN}
+     * and {@link IPredicate.Annotations#KEY_ORDER}.
+     */
+    public void test_query_hints_05() throws Exception {
+
+        final ASTContainer astContainer = new TestHelper("query-hints-05")
+                .runTest();
+
+        /*
+         * Check the optimized AST. The magic predicates which correspond to
+         * query hints should have be removed and various annotations made to
+         * the AST which capture the semantics of those query hints.
+         */
+        {
+
+            final JoinGroupNode whereClause = (JoinGroupNode) astContainer
+                    .getOptimizedAST().getWhereClause();
+
+            /*
+             * The hint to disable the join order optimizer should show up on
+             * the JoinGroupNodes. For the sample query, that means just the
+             * top-level WHERE clause.
+             */
+            assertEquals(QueryOptimizerEnum.None,
+                    whereClause.getProperty(QueryHints.OPTIMIZER));
+
+            // There are two statement pattern nodes left (after removing the
+            // query hint SPs).
+            assertEquals(2, whereClause.arity());
+
+            {
+
+                final StatementPatternNode sp = (StatementPatternNode) whereClause
+                        .get(0);
+
+                assertEquals(RDFS.LABEL, sp.p().getValue());
+
+            }
+
+            {
+
+                final StatementPatternNode sp = (StatementPatternNode) whereClause
+                        .get(1);
+
+                assertEquals(RDF.TYPE, sp.p().getValue());
+
+                assertEquals(SPOKeyOrder.PCSO.toString(),
+                        sp.getQueryHint(IPredicate.Annotations.KEY_ORDER));
+
+                assertEquals("true",
+                        sp.getQueryHint(AST2BOpBase.Annotations.HASH_JOIN));
+
+            }
+
+        } // end check of the AST.
+
+        /*
+         * Check the query plan.
+         */
+        {
+
+            // Should be one pipeline join.
+            {
+
+                @SuppressWarnings("rawtypes")
+                final Iterator<PipelineJoin> jitr = BOpUtility.visitAll(
+                        astContainer.getQueryPlan(), PipelineJoin.class);
+                
+                assertTrue(jitr.hasNext());
+                
+                @SuppressWarnings("rawtypes")
+                final PipelineJoin join = jitr.next();
+                
+                assertEquals(RDFS.LABEL, ((IV<?,?>)join.getPredicate().get(1/* p */)
+                        .get()).getValue());
+                
+                assertFalse(jitr.hasNext());
+
+            }
+
+            // Should be one hash join.
+            {
+            
+                @SuppressWarnings("rawtypes")
+                final Iterator<AbstractHashJoinOp> jitr = BOpUtility.visitAll(
+                        astContainer.getQueryPlan(), AbstractHashJoinOp.class);
+                
+                assertTrue(jitr.hasNext());
+                
+                @SuppressWarnings("rawtypes")
+                final AbstractHashJoinOp join = jitr.next();
+                
+                assertEquals(RDF.TYPE, ((IV<?,?>) join.getPredicate().get(1/* p */)
+                        .get()).getValue());
+
+                final IPredicate<?> pred = join.getPredicate();
+                
+                assertEquals(SPOKeyOrder.PCSO, pred.getKeyOrder());
+                
+                assertFalse(jitr.hasNext());
+                
+            }
+
         }
         
     }
