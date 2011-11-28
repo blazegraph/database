@@ -264,18 +264,37 @@ public interface QueryHints {
      */
     String QUERYID = QueryHints.class.getName() + ".queryId";
 
-	/**
-	 * This is an IJoinNode scope query hint that marks a particular join to be
-	 * run first among in a particular group. Only one "run first" join is
-	 * permitted.  This query hint is not permitted on optional joins.
-	 */
-	String RUN_FIRST = QueryHints.class.getName()+".runFirst";
-	
-	/**
-	 * This is an IJoinNode scope query hint that marks a particular join to be
-	 * run last among in a particular group. Only one "run last" join is
-	 * permitted.
-	 */
-	String RUN_LAST = QueryHints.class.getName()+".runLast";
+    /**
+     * This query hint may be applied to any {@link IJoinNode} and marks a
+     * particular join to be run first among in a particular group. Only one
+     * "run first" join is permitted in a given group. This query hint is not
+     * permitted on optional joins.
+     */
+    String RUN_FIRST = QueryHints.class.getName() + ".runFirst";
+
+    /**
+     * This query hint may be applied to any {@link IJoinNode} and marks a
+     * particular join to be run last among in a particular group. Only one
+     * "run last" join is permitted in a given group.
+     */
+    String RUN_LAST = QueryHints.class.getName() + ".runLast";
+
+    /**
+     * Query hint indicating whether or not a Sub-Select should be transformed
+     * into a named subquery, lifting its evaluation out of the main body of the
+     * query and replacing the subquery with an INCLUDE. When <code>true</code>,
+     * the subquery will be lifted out. When <code>false</code>, the subquery
+     * will not be lifted unless other semantics require that it be lifted out
+     * regardless.
+     * <p>
+     * For example, the following may be used to lift out the sub-select in
+     * which it appears into a {@link NamedSubqueryRoot}. The lifted expression
+     * will be executed exactly once.
+     * 
+     * <pre>
+     * hint:SubQuery hint:com.bigdata.rdf.sparql.ast.QueryHints.runOnce "true" .
+     * </pre>
+     */
+    String RUN_ONCE = QueryHints.class.getName() + ".runOnce";
 
 }
