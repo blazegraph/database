@@ -635,31 +635,36 @@ public class LexiconConfiguration<V extends BigdataValue>
      * before casting.
      */
     private byte parseUnsignedByte(final String v) {
-    	final short pv = XMLDatatypeUtil.parseShort(v);
+    	short pv = XMLDatatypeUtil.parseShort(v);
     	
     	if (pv < 0 || pv > MAX_UNSIGNED_BYTE) {
     		throw new NumberFormatException("Value out of range for unsigned byte");
     	}
+    	pv += Byte.MIN_VALUE;
     	
     	return (byte) pv;
     }
     
     private short parseUnsignedShort(final String v) {
-    	final int pv = XMLDatatypeUtil.parseInt(v);
+    	int pv = XMLDatatypeUtil.parseInt(v);
     	
     	if (pv < 0 || pv > MAX_UNSIGNED_SHORT) {
     		throw new NumberFormatException("Value out of range for unsigned short");
     	}
     	
+    	pv += Short.MIN_VALUE;
+    	
     	return (short) pv;
     }
     
     private int parseUnsignedInt(final String v) {
-    	final long pv = XMLDatatypeUtil.parseLong(v);
+    	long pv = XMLDatatypeUtil.parseLong(v);
     	
     	if (pv < 0 || pv > MAX_UNSIGNED_INT) {
     		throw new NumberFormatException("Value out of range for unsigned int");
     	}
+    	
+    	pv += Integer.MIN_VALUE;
     	
     	return (int) pv;
     }
@@ -670,8 +675,8 @@ public class LexiconConfiguration<V extends BigdataValue>
     	if (pv.signum() == -1 || pv.compareTo(MAX_UNSIGNED_LONG) > 0) {
     		throw new NumberFormatException("Value out of range for unsigned long");
     	}
-    	
-    	return pv.longValue();
+    	   	
+    	return pv.subtract(BigInteger.valueOf(Long.MIN_VALUE)).longValue();
     }
     
     /**
