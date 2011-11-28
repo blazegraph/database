@@ -347,7 +347,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         while (itr.hasNext()) {
         
             final StatementPatternNode sp = itr.next();
-            System.err.println(sp);
+            
             if (queryIdHint.equals(sp.p().getValue())) {
             
                 if (!queryScope.equals(sp.s().getValue())) {
