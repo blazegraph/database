@@ -153,7 +153,7 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
             // Verify the iterator visits all of the tuples.
             assertSameIteratorAnyOrder(keys, htree.values());
             
-        	log.info(htree.getPageInfo());
+        	if(log.isInfoEnabled()) log.info(htree.getPageInfo());
 
             } catch (Throwable t) {
             	try {
