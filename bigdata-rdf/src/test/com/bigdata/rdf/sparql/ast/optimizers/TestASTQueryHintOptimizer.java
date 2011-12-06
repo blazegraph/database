@@ -61,8 +61,8 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -95,7 +95,6 @@ public class TestASTQueryHintOptimizer extends
      * PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
      * PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
      * PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-     * PREFIX hint: <http://www.bigdata.com/queryHints#>
      * 
      * SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
      * WITH {
@@ -355,14 +354,13 @@ public class TestASTQueryHintOptimizer extends
      * {@link ASTQueryHintOptimizer}.
      * 
      * <pre>
-     * PREFIX hint: <http://www.bigdata.com/queryHints#>
      * SELECT (COUNT(?_var3) as ?count)
      * WHERE{
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+     *   hint:Query hint:optimizer "None" .
      *   GRAPH ?g {
      *     ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.
      *     ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M, 17623ms for AP scan.
-     *     hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" . # use a hash join.
+     *     hint:Prior hint:hashJoin "true" . # use a hash join.
      *     hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # use a specific index (default is POCS)
      *   }
      * }
@@ -391,7 +389,7 @@ public class TestASTQueryHintOptimizer extends
         @SuppressWarnings("rawtypes")
         final IV optimizer = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.OPTIMIZER));
         @SuppressWarnings("rawtypes")
-        final IV hashJoin = makeIV(new URIImpl(QueryHints.NAMESPACE+AST2BOpBase.Annotations.HASH_JOIN));
+        final IV hashJoin = makeIV(new URIImpl(QueryHints.NAMESPACE+QueryHints.HASH_JOIN));
         @SuppressWarnings("rawtypes")
         final IV none = makeIV(new LiteralImpl("None"));
         @SuppressWarnings("rawtypes")
@@ -507,7 +505,7 @@ public class TestASTQueryHintOptimizer extends
                             "_var3"), new VarNode("g"), Scope.NAMED_CONTEXTS);
                     graphGroup.addChild(sp2);
 //                    sp2.setProperty(QueryHints.OPTIMIZER, "None");
-                    sp2.setQueryHint(AST2BOpBase.Annotations.HASH_JOIN, "true");
+                    sp2.setQueryHint(QueryHints.HASH_JOIN, "true");
                     sp2.setQueryHint(IPredicate.Annotations.KEY_ORDER, "PCSO");
 
                 }
@@ -533,10 +531,9 @@ public class TestASTQueryHintOptimizer extends
      * top-level group.
      * 
      * <pre>
-     * PREFIX hint: <http://www.bigdata.com/queryHints#>
      * SELECT (COUNT(?_var3) as ?count)
      * WHERE {
-     *   hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+     *   hint:Group hint:optimizer "None" .
      *   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.
      *   ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3 . #2M, 17623ms for AP scan.
      * }
@@ -670,12 +667,11 @@ public class TestASTQueryHintOptimizer extends
      * MERGE JOINs using query hints.
      * 
      * <pre>
-     * PREFIX hint: <http://www.bigdata.com/queryHints#>
      * SELECT (COUNT(?_var3) as ?count)
      * WHERE {
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeDistinct "true" .
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "true" .
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.mergeJoins "true" .
+     *   hint:Query hint:nativeDistinct "true" .
+     *   hint:Query hint:nativeHashJoins "true" .
+     *   hint:Query hint:mergeJoins "true" .
      *   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>.
      *   ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3.
      * }
@@ -836,7 +832,7 @@ public class TestASTQueryHintOptimizer extends
      *   {
      *      ?_var10 <http://www.rdfabout.com/rdf/schema/vote/votedBy> ?_var3.
      *   }
-     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.QueryHints.runLast "true" .
+     *   hint:Prior hint:runLast "true" .
      * }
      * </pre>
      * 
@@ -966,7 +962,7 @@ public class TestASTQueryHintOptimizer extends
      *       StatementPatternNode(VarNode(lit), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/search#relevance]), VarNode(score), DEFAULT_CONTEXTS)
      *     }
      *   }
-     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.QueryHints.runLast "true" .
+     *   hint:Prior hint:runLast "true" .
      * }
      * </pre>
      * 

@@ -33,7 +33,6 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTRunFirstRunLastOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint to run a join last in a join group.

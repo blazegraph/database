@@ -21,7 +21,7 @@ PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
 
 SELECT DISTINCT ?product ?productLabel
 WHERE {
-        hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+        hint:Query hint:optimizer "None" .
         <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer1/Product4> bsbm:productFeature ?prodFeature .
         ?product bsbm:productFeature ?prodFeature .
         FILTER (<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromProducer1/Product4> != ?product)

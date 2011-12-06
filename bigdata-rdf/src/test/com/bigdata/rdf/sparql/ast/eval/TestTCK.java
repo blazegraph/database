@@ -54,7 +54,13 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
     /**
      * This is not a DAWG test. There is no data for the aggregation. Sesame is
      * expecting a solution set consisting of a single solution with
-     * 0^^xsd:integer. We are producing an empty solution set.
+     * 0^^xsd:integer. We are producing an empty solution set, which is the
+     * correct result. The expected answer has been modified here so the test
+     * will pass, but it will still fail in the Sesame test suite until they fix
+     * the issue in their test manifest.
+     * <p>
+     * See http://www.openrdf.org/issues/browse/SES-884 (Aggregation with an
+     * solution set as input should produce an empty solution as output)
      */
     public void test_sparql11_sum_02() throws Exception {
 

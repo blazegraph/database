@@ -39,7 +39,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
-import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 
 /**
@@ -138,24 +137,6 @@ public class AST2BOpBase {
          * named graph query.
          */
         String NKNOWN = AST2BOpBase.class.getName() + ".nknown";
-
-        /**
-         * Query hint to use a hash join against the access path for a given
-         * predicate. Hash joins should be enabled once it is recognized that
-         * the #of as-bound probes of the predicate will approach or exceed the
-         * range count of the predicate.
-         * <p>
-         * Note: {@link HashJoinAnnotations#JOIN_VARS} MUST also be specified
-         * for the predicate. The join variable(s) are variables which are (a)
-         * bound by the predicate and (b) are known bound in the source
-         * solutions. The query planner has the necessary context to figure this
-         * out based on the structure of the query plan and the join evaluation
-         * order.
-         */
-        String HASH_JOIN = AST2BOpBase.class.getPackage().getName()
-                + ".hashJoin";
-
-        boolean DEFAULT_HASH_JOIN = false;
 
     }
 

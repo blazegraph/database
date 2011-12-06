@@ -60,6 +60,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 
 /**
  * Query hints are identified applied to AST nodes based on the specified scope
@@ -83,7 +84,6 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
  * For example:
  * 
  * <pre>
- * PREFIX hint: <http://www.bigdata.com/queryHints#>
  * ...
  * {
  *    # query hint binds for this join group.

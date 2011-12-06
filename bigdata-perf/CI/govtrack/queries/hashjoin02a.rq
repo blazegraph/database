@@ -3,7 +3,6 @@
 #     [java] resultCount=1, elapsed=17194ms, source=queries/hashjoin02.rq
 #     [java] resultCount=1, elapsed=17680ms, source=queries/hashjoin02.rq
 
-PREFIX hint: <http://www.bigdata.com/queryHints#>
 SELECT (COUNT(*) as ?count)
 WHERE{
   GRAPH ?g {

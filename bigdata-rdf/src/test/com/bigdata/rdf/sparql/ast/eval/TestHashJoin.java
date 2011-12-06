@@ -73,17 +73,17 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
      *   # Turn off the query optimizer for this query so we can control the order
      *   # in which the BGPs will be evaluated.
      *   
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+     *   hint:Query hint:optimizer "None" .
      * 
      *   # Force the use of the JVM hash joins.
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.nativeHashJoins "false" .
+     *   hint:Query hint:nativeHashJoins "false" .
      *   
      *   ?x rdf:type foaf:Person .
      * 
      *   ?x rdfs:label ?o .
      * 
      *   # Request a hash join for the rdfs:label BGP.  
-     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+     *   hint:Prior hint:hashJoin "true" .
      * 
      * }
      * </pre>
@@ -135,14 +135,14 @@ public class TestHashJoin extends AbstractDataDrivenSPARQLTestCase {
      *   # Turn off the query optimizer for this query so we can control the order
      *   # in which the BGPs will be evaluated.
      *   
-     *   hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+     *   hint:Query hint:optimizer "None" .
      * 
      *   ?x rdf:type foaf:Person .
      * 
      *   ?x rdfs:label ?o .
      * 
      *   # Request a hash join for the rdfs:label BGP.  
-     *   hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+     *   hint:Prior hint:hashJoin "true" .
      *   hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" . # default is POCS
      * }
      * </pre>

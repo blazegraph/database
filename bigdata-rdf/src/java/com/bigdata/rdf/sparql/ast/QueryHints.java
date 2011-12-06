@@ -32,17 +32,19 @@ import java.util.UUID;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint
  * appears in the SPARQL query as a "virtual triple". A query hint is declared
  * in a {@link QueryHintScope}, which specifies the parts of the SPARQL query to
  * which it will be applied. A list of the common directives is declared by this
- * interface. Note all query hints are permitted in all scopes.
+ * interface. (Query hints declared elsewhere are generally for internal use
+ * only.) Note that not all query hints are permitted in all scopes.
  * 
  * @see QueryHintRegistry
  * 
@@ -66,7 +68,7 @@ public interface QueryHints {
      * optimizer within some join group using
      * 
      * <pre>
-     * hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None".
+     * hint:Group hint:optimizer "None".
      * </pre>
      * 
      * Disabling the join order optimizer can be useful if you have a query for
@@ -77,25 +79,28 @@ public interface QueryHints {
      * 
      * @see QueryOptimizerEnum
      */
-    String OPTIMIZER = QueryHints.class.getName() + ".optimizer";
+    String OPTIMIZER = "optimizer";//QueryHints.class.getName() + ".optimizer";
 
     QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
     
-	/**
-	 * A label which may be used to tag the instances of some SPARQL query
-	 * template in manner which makes sense to the application (default
-	 * {@value #DEFAULT_TAG}). The tag is used to aggregate performance
-	 * statistics for tagged queries.
-	 * 
-	 * <pre>
-	 * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.tag=Query12&gt;
-	 * </pre>
-	 * 
-	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N queries)
-	 * @see http://sourceforge.net/apps/trac/bigdata/ticket/256 (Amortize RTO cost)
-	 * 
-	 * TODO This is not currently supported.
-	 */
+	        /**
+     * A label which may be used to tag the instances of some SPARQL query
+     * template in manner which makes sense to the application (default
+     * {@value #DEFAULT_TAG}). The tag is used to aggregate performance
+     * statistics for tagged queries.
+     * 
+     * <pre>
+     * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.rdf.sparql.ast.QueryHints.tag=Query12&gt;
+     * </pre>
+     * 
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/207 (Report on Top-N
+     *      queries)
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/256 (Amortize RTO
+     *      cost)
+     * 
+     * @deprecated This is not currently supported. The feature may or may not
+     *             be re-enabled.
+     */
     String TAG = QueryHints.class.getName() + ".tag";
 
     /**
@@ -105,7 +110,7 @@ public interface QueryHints {
  
     /**
      * When <code>true</code>, enables all query hints pertaining to analytic
-     * query patterns. When <code>false</code>, disables those features.
+     * query patterns. When <code>false</code>, those features are disabled.
      * <p>
      * Note: This query hint MUST be applied in the {@link QueryHintScope#Query}
      * . Hash indices are often created by one operator and then consumed by
@@ -117,7 +122,7 @@ public interface QueryHints {
      * @see #NATIVE_HASH_JOINS
      * @see #MERGE_JOIN
      */
-    String ANALYTIC = QueryHints.class.getName() + ".analytic";
+    String ANALYTIC = "analytic";//QueryHints.class.getName() + ".analytic";
 
     boolean DEFAULT_ANALYTIC = false;
 
@@ -127,8 +132,8 @@ public interface QueryHints {
      * <code>false</code>, use the version based on a JVM collection class. The
      * JVM version does not scale-up as well, but it offers higher concurrency.
      */
-    String NATIVE_DISTINCT_SOLUTIONS = QueryHints.class.getName()
-            + ".nativeDistinctSolutions";
+    String NATIVE_DISTINCT_SOLUTIONS = "nativeDistinctSolutions";
+//            QueryHints.class.getName()+ ".nativeDistinctSolutions";
 
     boolean DEFAULT_NATIVE_DISTINCT_SOLUTIONS = DEFAULT_ANALYTIC;
 
@@ -140,8 +145,8 @@ public interface QueryHints {
      * <code>false</code>, use the version based on a JVM collection class. The
      * JVM version does not scale-up as well.
      */
-    String NATIVE_DISTINCT_SPO = QueryHints.class.getName()
-            + ".nativeDistinctSPO";
+    String NATIVE_DISTINCT_SPO = "nativeDistinctSPO";
+//            QueryHints.class.getName()+ ".nativeDistinctSPO";
 
     boolean DEFAULT_NATIVE_DISTINCT_SPO = DEFAULT_ANALYTIC;
 
@@ -151,8 +156,8 @@ public interface QueryHints {
      * 
      * @see #NATIVE_DISTINCT_SPO
      */
-    String NATIVE_DISTINCT_SPO_THRESHOLD = QueryHints.class.getName()
-            + ".nativeDistinctSPOThreshold";
+    String NATIVE_DISTINCT_SPO_THRESHOLD = "nativeDistinctSPOThreshold";
+//            QueryHints.class.getName()+ ".nativeDistinctSPOThreshold";
 
     long DEFAULT_NATIVE_DISTINCT_SPO_THRESHOLD = 100 * Bytes.kilobyte32;
     
@@ -168,7 +173,8 @@ public interface QueryHints {
      * another so the same kinds of hash indices MUST be used throughout the
      * query.
      */
-    String NATIVE_HASH_JOINS = QueryHints.class.getName() + ".nativeHashJoins";
+    String NATIVE_HASH_JOINS = "nativeHashJoins";
+            //QueryHints.class.getName() + ".nativeHashJoins";
 
     boolean DEFAULT_NATIVE_HASH_JOINS = DEFAULT_ANALYTIC;
 
@@ -177,7 +183,7 @@ public interface QueryHints {
      * appears in a join group. When <code>false</code>, this can still be
      * selectively enabled using a query hint.
      */
-    String MERGE_JOIN = QueryHints.class.getName() + ".mergeJoin";
+    String MERGE_JOIN = "mergeJoin";//QueryHints.class.getName() + ".mergeJoin";
 
     boolean DEFAULT_MERGE_JOIN = true;
 
@@ -186,7 +192,7 @@ public interface QueryHints {
      * joins. This is intended as a tool when analyzing query patterns in
      * scale-out. It should normally be <code>false</code>.
      */
-    String REMOTE_APS = QueryHints.class.getName() + ".remoteAPs";
+    String REMOTE_APS = "remoteAPs";//QueryHints.class.getName() + ".remoteAPs";
 
     /**
      * FIXME Make this [false]. It is currently enabled so we can go to native
@@ -209,8 +215,8 @@ public interface QueryHints {
      * or default graph join will always use approach specified by the boolean
      * {@link #ACCESS_PATH_SCAN_AND_FILTER}.
      */
-    String ACCESS_PATH_SAMPLE_LIMIT = QueryHints.class.getName()
-            + ".accessPathSampleLimit";
+    String ACCESS_PATH_SAMPLE_LIMIT = "accessPathSampleLimit";
+//            QueryHints.class.getName()+ ".accessPathSampleLimit";
 
     /**
      * Note: Set to ZERO to disable AP sampling for default and named graphs.
@@ -223,8 +229,8 @@ public interface QueryHints {
      * to ZERO (0), this query hint determines whether a SCAN + FILTER or
      * PARALLEL SUBQUERY (aka as-bound data set join) approach.
      */
-    String ACCESS_PATH_SCAN_AND_FILTER = QueryHints.class.getName()
-            + ".accessPathScanAndFilter";  
+    String ACCESS_PATH_SCAN_AND_FILTER = "accessPathScanAndFilter";
+//            QueryHints.class.getName()+ ".accessPathScanAndFilter";  
 
     /**
      * Note: To ALWAYS use either SCAN + FILTER or PARALLEL subquery, set
@@ -260,12 +266,12 @@ public interface QueryHints {
      * the query.
      * 
      * <pre>
-     * hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.queryId "36cff615-aaea-418a-bb47-006699702e45"
+     * hint:Query hint:queryId "36cff615-aaea-418a-bb47-006699702e45"
      * </pre>
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
      */
-    String QUERYID = QueryHints.class.getName() + ".queryId";
+    String QUERYID = "queryId";//QueryHints.class.getName() + ".queryId";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
@@ -273,14 +279,14 @@ public interface QueryHints {
      * "run first" join is permitted in a given group. This query hint is not
      * permitted on optional joins.
      */
-    String RUN_FIRST = QueryHints.class.getName() + ".runFirst";
+    String RUN_FIRST = "runFirst";//QueryHints.class.getName() + ".runFirst";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
      * particular join to be run last among in a particular group. Only one
      * "run last" join is permitted in a given group.
      */
-    String RUN_LAST = QueryHints.class.getName() + ".runLast";
+    String RUN_LAST = "runLast";//QueryHints.class.getName() + ".runLast";
 
     /**
      * Query hint indicating whether or not a Sub-Select should be transformed
@@ -295,9 +301,27 @@ public interface QueryHints {
      * will be executed exactly once.
      * 
      * <pre>
-     * hint:SubQuery hint:com.bigdata.rdf.sparql.ast.QueryHints.runOnce "true" .
+     * hint:SubQuery hint:runOnce "true" .
      * </pre>
      */
-    String RUN_ONCE = QueryHints.class.getName() + ".runOnce";
+    String RUN_ONCE = "runOnce";//QueryHints.class.getName() + ".runOnce";
+
+    /**
+     * Query hint to use a hash join against the access path for a given
+     * predicate. Hash joins should be enabled once it is recognized that
+     * the #of as-bound probes of the predicate will approach or exceed the
+     * range count of the predicate.
+     * <p>
+     * Note: {@link HashJoinAnnotations#JOIN_VARS} MUST also be specified
+     * for the predicate. The join variable(s) are variables which are (a)
+     * bound by the predicate and (b) are known bound in the source
+     * solutions. The query planner has the necessary context to figure this
+     * out based on the structure of the query plan and the join evaluation
+     * order.
+     */
+    String HASH_JOIN = "hashJoin";
+//            AST2BOpBase.class.getPackage().getName()+ ".hashJoin";
+
+    boolean DEFAULT_HASH_JOIN = false;
 
 }

@@ -965,8 +965,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
         // True iff a hash join was requested for this predicate.
         final boolean hashJoin = limit == JoinAnnotations.DEFAULT_LIMIT
-                && pred.getProperty(Annotations.HASH_JOIN,
-                        Annotations.DEFAULT_HASH_JOIN);
+                && pred.getProperty(QueryHints.HASH_JOIN,
+                        QueryHints.DEFAULT_HASH_JOIN);
         
         if (defaultGraphFilter) {
 

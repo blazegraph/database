@@ -32,7 +32,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Sets the capacity of the {@link IBindingSet}[]s used to accumulate a chunk of

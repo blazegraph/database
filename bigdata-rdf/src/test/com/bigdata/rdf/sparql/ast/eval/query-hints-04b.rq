@@ -11,7 +11,7 @@ WHERE {
      	?x rdf:type foaf:Person .
      
 	    # Lift out the sub-select as a named subquery which runs exactly once.
-    	hint:SubQuery hint:com.bigdata.rdf.sparql.ast.QueryHints.runOnce "true" .
+    	hint:SubQuery hint:runOnce "true" .
      }
   }
 }

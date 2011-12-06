@@ -6,7 +6,7 @@ SELECT ?x ?o
 WHERE {
 
   # disable join order optimizer
-  hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+  hint:Group hint:optimizer "None" .
 
   # One-bound using P___ index.
   ?x rdfs:label ?o .
@@ -15,7 +15,7 @@ WHERE {
   ?x rdf:type foaf:Person .
 
   # Request a hash join against the statement index.
-  hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+  hint:Prior hint:hashJoin "true" .
 
   # Override the statement index.
   hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" .

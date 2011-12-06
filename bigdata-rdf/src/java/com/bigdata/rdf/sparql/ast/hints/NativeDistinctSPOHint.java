@@ -31,7 +31,6 @@ import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint for turning the {@link NativeDistinctFilter} on/off.
