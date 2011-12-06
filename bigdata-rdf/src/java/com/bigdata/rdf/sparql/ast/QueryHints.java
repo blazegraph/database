@@ -51,11 +51,14 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
  */
 public interface QueryHints {
 
+//    /**
+//     * The namespace prefix used in SPARQL queries to signify query hints. 
+//     */
+//    String PREFIX = "BIGDATA_QUERY_HINTS";
+
     /**
-     * The namespace prefix used in SPARQL queries to signify query hints. 
+     * The namespace for the bigdata query hints.
      */
-    String PREFIX = "BIGDATA_QUERY_HINTS";
-    
     String NAMESPACE = "http://www.bigdata.com/queryHints#";
 
     /**
