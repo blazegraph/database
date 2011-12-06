@@ -38,6 +38,7 @@ import org.openrdf.repository.sail.SailTupleQuery;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -132,13 +133,14 @@ public class TestStrBOp extends QuadsTestCase {
             {
                 
                 String query =
-                    QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
+//                    QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
                     "prefix bd: <"+BD.NAMESPACE+"> " +
                     "prefix rdf: <"+RDF.NAMESPACE+"> " +
                     "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
                     
                     "select ?p ?o " +
                     "where { " +
+                    "  hint:Query hint:"+QueryHints.OPTIMIZER+" \""+QueryOptimizerEnum.None+"\"."+
                     "  ?s rdf:type rdfs:Resource . " +
 //                    "  ?s ?p \"foo\" . " +
                     "  ?s ?p ?o . " +
@@ -255,13 +257,14 @@ public class TestStrBOp extends QuadsTestCase {
           {
               
               String query =
-                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
+//                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
                   "prefix bd: <"+BD.NAMESPACE+"> " +
                   "prefix rdf: <"+RDF.NAMESPACE+"> " +
                   "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
                   
                   "select ?o " +
                   "where { " +
+                  "  hint:Query hint:"+QueryHints.OPTIMIZER+" \""+QueryOptimizerEnum.None+"\"."+
                   "  ?s rdf:type rdfs:Resource . " +
                   "  ?s ?p ?o . " +
 //                  "  filter(regex(str(?o), \"FOO\")) " +
@@ -385,7 +388,7 @@ SELECT ?s WHERE {
           {
               
               String query =
-                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
+//                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
                   "prefix bd: <"+BD.NAMESPACE+"> " +
                   "prefix rdf: <"+RDF.NAMESPACE+"> " +
                   "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
@@ -393,6 +396,7 @@ SELECT ?s WHERE {
                   
                   "select ?o " +
                   "where { " +
+                  "  hint:Query hint:"+QueryHints.OPTIMIZER+" \""+QueryOptimizerEnum.None+"\"."+
                   "  ?s rdf:type rdfs:Resource . " +
                   "  ?s ?p ?o . " +
                   "  FILTER(datatype(xsd:boolean(?o)) = xsd:boolean) . " +
