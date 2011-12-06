@@ -33,7 +33,6 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint indicating whether or not a Sub-Select should be transformed into
@@ -47,7 +46,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
  * executed exactly once.
  * 
  * <pre>
- * hint:SubQuery hint:com.bigdata.rdf.sparql.ast.QueryHints.runOnce "true" .
+ * hint:SubQuery hint:runOnce "true" .
  * </pre>
  * <p>
  * Note: This sets the {@link SubqueryRoot.Annotations#RUN_ONCE} AST annotation

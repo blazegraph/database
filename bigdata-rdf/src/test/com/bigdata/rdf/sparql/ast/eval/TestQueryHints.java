@@ -393,7 +393,7 @@ public class TestQueryHints extends AbstractDataDrivenSPARQLTestCase {
                         sp.getQueryHint(IPredicate.Annotations.KEY_ORDER));
 
                 assertEquals("true",
-                        sp.getQueryHint(AST2BOpBase.Annotations.HASH_JOIN));
+                        sp.getQueryHint(QueryHints.HASH_JOIN));
 
             }
 

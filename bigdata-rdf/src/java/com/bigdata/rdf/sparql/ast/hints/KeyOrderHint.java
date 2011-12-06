@@ -31,7 +31,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**

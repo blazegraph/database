@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Oct 26, 2011
  */
 
-package com.bigdata.rdf.sparql.ast.optimizers;
+package com.bigdata.rdf.sparql.ast.hints;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -39,6 +39,7 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 
 /**
  * Type safe enumeration for the scope of a query hint. The {@link URI} for each

@@ -5,7 +5,6 @@ PREFIX p1: <http://www.rdfabout.com/rdf/schema/usgovt/>
 PREFIX p2: <http://www.rdfabout.com/rdf/schema/vote/>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX hint: <http://www.bigdata.com/queryHints#>
 
 SELECT (SAMPLE(?_var9) AS ?_var1) ?_var2 ?_var3
 WITH {
@@ -17,13 +16,13 @@ WITH {
 	}
 } AS %_set1
 		WHERE {
-           hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+           hint:Query hint:optimizer "None" .
 			
 			INCLUDE %_set1 .
 			OPTIONAL {
 				?_var10 p2:votedBy ?_var3. 
 				?_var10 rdfs:label ?_var2.
-               hint:Prior hint:com.bigdata.rdf.sparql.ast.eval.hashJoin "true" .
+               hint:Prior hint:hashJoin "true" .
                hint:Prior hint:com.bigdata.bop.IPredicate.keyOrder "PCSO" .
 			}
 			OPTIONAL {

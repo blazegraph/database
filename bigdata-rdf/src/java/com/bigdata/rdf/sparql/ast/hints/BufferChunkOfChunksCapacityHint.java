@@ -31,7 +31,6 @@ import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * The maximum #of chunks that can be buffered before an the producer would

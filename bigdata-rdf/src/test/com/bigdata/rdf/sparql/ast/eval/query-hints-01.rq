@@ -1,13 +1,12 @@
 PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-PREFIX hint: <http://www.bigdata.com/queryHints#>
 
 SELECT ?x ?o
 WHERE {
 
   # disable join order optimizer
-  hint:Group hint:com.bigdata.rdf.sparql.ast.QueryHints.optimizer "None" .
+  hint:Group hint:optimizer "None" .
 
   # query hint binds for the group.
   hint:Group hint:com.bigdata.bop.PipelineOp.maxParallel 10 .
@@ -22,7 +21,7 @@ WHERE {
 
   ?x rdf:type foaf:Person .
 
-  # query hint binds for the immediately proceeeding basic graph pattern.
+  # query hint binds for the immediately proceeding basic graph pattern.
   hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1000 .
 
 }

@@ -28,10 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * Query hint used to indicate that a hash join agaist an access path should be
@@ -40,7 +39,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 final class HashJoinHint extends AbstractBooleanQueryHint {
 
     protected HashJoinHint() {
-        super(AST2BOpBase.Annotations.HASH_JOIN, Boolean.FALSE);
+        super(QueryHints.HASH_JOIN, Boolean.FALSE);
     }
 
     @Override

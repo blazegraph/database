@@ -24,7 +24,11 @@
 				<uri>http://example.org/z</uri>
 			</binding>
 			<binding name="total">
+			    <!-- Sesame expects 
 				<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">10.0</literal>
+				-->
+				<!-- Bigdata produces -->
+				<literal datatype="http://www.w3.org/2001/XMLSchema#decimal">10</literal>
 			</binding>
 		</result>
 	</results>

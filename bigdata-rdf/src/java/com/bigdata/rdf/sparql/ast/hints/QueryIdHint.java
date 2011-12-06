@@ -37,7 +37,6 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.QueryHintScope;
 
 /**
  * This just strips the {@link QueryHints#QUERYID} out of the AST. The

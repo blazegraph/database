@@ -6,11 +6,11 @@
   <head>
     <variable name="totalPrice"/>
   </head>
-  <results>
+  <results><!--
     <result>
       <binding name="totalPrice">
       	<literal datatype="http://www.w3.org/2001/XMLSchema#integer">0</literal>
       </binding>
-    </result>
+    </result>-->
   </results>
 </sparql>

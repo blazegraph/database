@@ -6,7 +6,7 @@ SELECT ?x ?o
 WHERE {
 
   # Set the queryId.
-  hint:Query hint:com.bigdata.rdf.sparql.ast.QueryHints.queryId "458aed8b-2c76-4d29-9cf0-d18d6a74bc0e" .
+  hint:Query hint:queryId "458aed8b-2c76-4d29-9cf0-d18d6a74bc0e" .
 
   ?x rdfs:label ?o .
 

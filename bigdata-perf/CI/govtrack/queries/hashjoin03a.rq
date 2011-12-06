@@ -1,5 +1,5 @@
 # Default graph query using pipeline join. 18s
-PREFIX hint: <http://www.bigdata.com/queryHints#>
+
 SELECT (COUNT(*) as ?count)
 WHERE {
   ?_var10 a <http://www.rdfabout.com/rdf/schema/vote/Option>. # 315k, 300ms for AP scan.

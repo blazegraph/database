@@ -2960,7 +2960,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         
         if (queryHints != null
                 && Boolean.parseBoolean(queryHints.getProperty(
-                        Annotations.HASH_JOIN, "false"))) {
+                        QueryHints.HASH_JOIN, "false"))) {
 
             /*
              * Use a hash join for this predicate.
@@ -2993,7 +2993,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                  * bound by the predicate.
                  */
 
-                anns.add(new NV(Annotations.HASH_JOIN, true));
+                anns.add(new NV(QueryHints.HASH_JOIN, true));
 
                 anns.add(new NV(HashJoinAnnotations.JOIN_VARS, joinVars
                         .toArray(new IVariable[joinVars.size()])));

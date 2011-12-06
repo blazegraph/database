@@ -38,6 +38,20 @@ import com.bigdata.bop.aggregate.IAggregate;
  * Base class for operators which perform aggregation operations on binding
  * sets.
  * 
+ * <h2>Aggregation semantics and errors.</h2>
+ * 
+ * Per the DAWG:
+ * <ul>
+ * The result of an Aggregate which returns an error, is an error, but the
+ * SELECT expression result of projecting an error is unbound. (Hence, the
+ * variable is not projected for which the error occurred.)</li>
+ * <li>
+ * An aggregation of an empty source solution set produces an empty output
+ * solution. <br/>
+ * See http://www.openrdf.org/issues/browse/SES-884 (Aggregation with an
+ * solution set as input should produce an empty solution as output).</li>
+ * </ul>
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: SortOp.java 3665 2010-09-28 16:53:22Z thompsonbry $
  */
