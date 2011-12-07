@@ -100,7 +100,7 @@ public class TestDeepCopy extends TestCase2 {
             // com.bigdata.rdf.spo
             SPOPredicate.class,//
             SPOStarJoin.class,//
-            com.bigdata.rdf.magic.MagicPredicate.class,//
+//            com.bigdata.rdf.magic.MagicPredicate.class,//
             // com.bigdata.rdf.internal.constraint
             CompareBOp.class,//
             IsInlineBOp.class,//

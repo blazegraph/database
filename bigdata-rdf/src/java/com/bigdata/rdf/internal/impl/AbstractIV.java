@@ -30,7 +30,7 @@ package com.bigdata.rdf.internal.impl;
 import java.io.IOException;
 import java.util.UUID;
 
-import org.deri.iris.basics.Literal;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -42,8 +42,8 @@ import com.bigdata.rdf.internal.IVUnicode;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
+import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
