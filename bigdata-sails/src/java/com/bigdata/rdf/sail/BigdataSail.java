@@ -1235,15 +1235,19 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
-     * Return a read-only connection based on a the last commit point.
+     * Return a read-only connection based on the last commit point. This method
+     * is atomic with respect to the commit protocol.
      * 
      * @return The view.
      */
     public BigdataSailConnection getReadOnlyConnection() {
         
-        final long timestamp = database.getIndexManager().getLastCommitTime();
+        // Note: This is not atomic with respect to the commit protocol.
+//        final long timestamp = database.getIndexManager().getLastCommitTime();
+//
+//        return getReadOnlyConnection(timestamp);
 
-        return getReadOnlyConnection(timestamp);
+        return getReadOnlyConnection(ITx.READ_COMMITTED);
         
     }
     
