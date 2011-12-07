@@ -6,4 +6,11 @@
 
 : {
     :p :v "255"^^xsd:unsignedByte .
+    :p :v "0"^^xsd:unsignedByte .
+    :p :v "0"^^xsd:unsignedShort .
+    :p :v "55000"^^xsd:unsignedShort .
+    :p :v "0"^^xsd:unsignedInt .
+    :p :v "3000000000"^^xsd:unsignedInt .
+    :p :v "0"^^xsd:unsignedLong .
+    :p :v "10000000000000000000"^^xsd:unsignedLong .
 }
