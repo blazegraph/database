@@ -26,6 +26,9 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
+ * 
+ * TODO AST2BOpContext should be converted into an interface for better
+ * extensibility and protection.
  */
 public class AST2BOpContext implements IdFactory {
 
