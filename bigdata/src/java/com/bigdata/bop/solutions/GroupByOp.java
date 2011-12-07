@@ -49,7 +49,27 @@ import com.bigdata.bop.aggregate.IAggregate;
  * An aggregation of an empty source solution set produces an empty output
  * solution. <br/>
  * See http://www.openrdf.org/issues/browse/SES-884 (Aggregation with an
- * solution set as input should produce an empty solution as output).</li>
+ * solution set as input should produce an empty solution as output).
+ * 
+ * <pre>
+ * > In response to 
+ * > http://lists.w3.org/Archives/Public/public-rdf-dawg-comments/2011Sep/0000.html
+ * > 
+ * > > What is the output of this query if no solutions satisify the WHERE clause?
+ * > > An empty solution set or a solution set with a single solution having 
+ * > > a binding of 0^^xsd:integer?
+ * > >
+ * > > PREFIX : <http://example/>
+ * > > SELECT (SUM(?lprice) AS ?totalPrice)
+ * > > WHERE {
+ * > >   ?book :price ?lprice .
+ * > > }
+ * > > GROUP BY ?book
+ * > 
+ * > An empty solution set.
+ * </pre>
+ * 
+ * </li>
  * </ul>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
