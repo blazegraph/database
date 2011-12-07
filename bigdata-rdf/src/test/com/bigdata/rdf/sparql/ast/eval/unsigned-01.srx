@@ -12,5 +12,40 @@
       	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedByte">255</literal>
       </binding>
     </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedByte">0</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedShort">0</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedShort">55000</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedInt">0</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedInt">3000000000</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedLong">0</literal>
+      </binding>
+    </result>
+    <result>
+      <binding name="x">
+      	<literal datatype="http://www.w3.org/2001/XMLSchema#unsignedLong">10000000000000000000</literal>
+      </binding>
+    </result>
   </results>
 </sparql>
