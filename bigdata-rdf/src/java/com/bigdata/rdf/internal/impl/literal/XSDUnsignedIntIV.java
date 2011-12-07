@@ -70,6 +70,12 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
      */
     public final long promote() {
 
+        return promote(value);
+
+    }
+
+    public static long promote(final int value) {
+
         final long v = ((long) value) - Integer.MIN_VALUE;
         
         return v;
@@ -87,7 +93,7 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
 		V v = getValueCache();
 		if (v == null) {
 			final BigdataValueFactory f = lex.getValueFactory();
-			v = (V) f.createLiteral(value);
+			v = (V) f.createLiteral(value, true);
 			v.setIV(this);
 			setValue(v);
 		}

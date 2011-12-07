@@ -31,6 +31,7 @@ import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:unsignedByte</code>. */
@@ -80,9 +81,13 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
      */
     public final short promote() {
         
-        final int i = value - Byte.MIN_VALUE;
+       return promote(value);
+    }
+    
+    public static short promote(final byte v) {
+       final int i = v - Byte.MIN_VALUE;
         
-        return (short) i;
+       return (short) i;
     }
     
     @SuppressWarnings("unchecked")

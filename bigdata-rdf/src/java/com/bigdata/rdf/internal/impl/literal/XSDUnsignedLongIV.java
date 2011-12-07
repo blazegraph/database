@@ -70,6 +70,12 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
      */
     public final BigInteger promote() {
 
+        return promote(value);
+        
+    }
+
+    public static BigInteger promote(final long value) {
+
         return BigInteger.valueOf(value).subtract(BigInteger.valueOf(Long.MIN_VALUE));
         
     }
@@ -83,7 +89,7 @@ public class XSDUnsignedLongIV<V extends BigdataLiteral> extends
 		V v = getValueCache();
 		if (v == null) {
 			final BigdataValueFactory f = lex.getValueFactory();
-			v = (V) f.createLiteral(value); // FIXME In all xsd:unsigned classes and unit test!
+			v = (V) f.createLiteral(value, true);
 			v.setIV(this);
 			setValue(v);
 		}
