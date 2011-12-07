@@ -61,6 +61,7 @@ public class Depends {
         
     }
 
+    @SuppressWarnings("unused")
     private static class OrderByLicense implements Comparator<Dependency> {
 
         public int compare(Dependency o1, Dependency o2) {
@@ -160,11 +161,11 @@ public class Depends {
             "http://fastutil.dsi.unimi.it/",
             "http://www.apache.org/licenses/LICENSE-2.0.html");
 
-    private final static Dep iris = new LGPL21Dep("iris",
-            "http://www.iris-reasoner.org");
-
-    private final static Dep jgrapht = new LGPL21Dep("jgrapht",
-            "http://www.jgrapht.org/");
+//    private final static Dep iris = new LGPL21Dep("iris",
+//            "http://www.iris-reasoner.org");
+//
+//    private final static Dep jgrapht = new LGPL21Dep("jgrapht",
+//            "http://www.jgrapht.org/");
     
     private final static Dep tuprolog = new LGPL21Dep("tuprolog",
             "http://www.alice.unibo.it/xwiki/bin/view/Tuprolog/");
@@ -246,8 +247,8 @@ public class Depends {
             flot,//
             jquery,//
             // linked, but not used.
-            iris,//
-            jgrapht,//
+//            iris,//
+//            jgrapht,//
             tuprolog,//
         };
         Arrays.sort(depends, new OrderByName());

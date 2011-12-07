@@ -26,7 +26,6 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/nxparser-6-22-2010.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/tuprolog/2p-v2.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-continuation-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-http-7.2.2.v20101205.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-io-7.2.2.v20101205.jar"/>
@@ -40,8 +39,6 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar" sourcepath="/root/.m2/repository/junit/junit/3.8.1/junit-3.8.1-sources.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/jgrapht-jdk1.5-0.7.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/browser.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/classserver.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/fiddler.jar"/>

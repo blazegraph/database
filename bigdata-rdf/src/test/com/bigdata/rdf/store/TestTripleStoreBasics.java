@@ -102,8 +102,8 @@ public class TestTripleStoreBasics extends TestCase2 {
          */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
-        // magic sets support (still under development).
-        suite.addTest(com.bigdata.rdf.magic.TestAll.suite());
+//        // magic sets support (still under development).
+//        suite.addTest(com.bigdata.rdf.magic.TestAll.suite());
         
         return suite;
 
