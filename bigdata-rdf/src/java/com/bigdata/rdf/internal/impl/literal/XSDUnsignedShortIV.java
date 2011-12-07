@@ -61,8 +61,14 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
      * Promote the <code>unsigned short</code> into a <code>signed int</code>.
      */
     public final int promote() {
+       
+        return promote(value);
 
-    	final int v = value - Short.MIN_VALUE;
+    }
+    
+    public static int promote(final short val) {
+
+    	final int v = val - Short.MIN_VALUE;
         
         return v;
 
@@ -87,7 +93,7 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
 		V v = getValueCache();
 		if (v == null) {
 			final BigdataValueFactory f = lex.getValueFactory();
-			v = (V) f.createLiteral(value);
+			v = (V) f.createLiteral(value, true);
 			v.setIV(this);
 			setValue(v);
 		}

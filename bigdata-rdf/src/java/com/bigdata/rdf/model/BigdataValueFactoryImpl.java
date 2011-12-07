@@ -43,6 +43,10 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
+import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.util.CanonicalFactory;
 
@@ -334,7 +338,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(byte arg0, final boolean unsigned) {
 
-        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ubyte : xsd_byte);
+        return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedByteIV.promote(arg0) : arg0), null, unsigned ? xsd_ubyte : xsd_byte);
 
     }
 
@@ -346,7 +350,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(short arg0, final boolean unsigned) {
 
-        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ushort :xsd_short);
+        return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedShortIV.promote(arg0) : arg0), null, unsigned ? xsd_ushort :xsd_short);
 
     }
 
@@ -358,7 +362,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(int arg0, final boolean unsigned) {
 
-        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_uint :xsd_int);
+        return new BigdataLiteralImpl(this, "" +  (unsigned ? XSDUnsignedIntIV.promote(arg0) : arg0), null, unsigned ? xsd_uint :xsd_int);
 
     }
 
@@ -370,7 +374,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(long arg0, final boolean unsigned) {
 
-        return new BigdataLiteralImpl(this, "" + arg0, null, unsigned ? xsd_ulong : xsd_long);
+        return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedLongIV.promote(arg0) : arg0), null, unsigned ? xsd_ulong : xsd_long);
 
     }
 
