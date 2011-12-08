@@ -16,7 +16,7 @@ import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
-import com.bigdata.bop.join.HashJoinEnum;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -167,7 +167,7 @@ public class HTreeDistinctBindingSetsOp extends PipelineOp {
 
                 state = new HTreeHashJoinUtility(
                         context.getMemoryManager(namedSetRef.queryId), op,
-                        HashJoinEnum.Filter);
+                        JoinTypeEnum.Filter);
 
                 if (attrs.putIfAbsent(namedSetRef, state) != null)
                     throw new AssertionError();

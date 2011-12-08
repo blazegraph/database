@@ -390,7 +390,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     /**
      * The type of join to be performed.
      */
-    private final HashJoinEnum joinType;
+    private final JoinTypeEnum joinType;
     
     /**
      * <code>true</code> iff the join is OPTIONAL.
@@ -492,7 +492,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * 
      * @see JVMHashJoinAnnotations
      */
-    public JVMHashJoinUtility(final PipelineOp op, final HashJoinEnum joinType) {
+    public JVMHashJoinUtility(final PipelineOp op, final JoinTypeEnum joinType) {
 //            final boolean optional,
 //            final boolean filter) {
 
@@ -503,8 +503,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
             throw new IllegalArgumentException();
         
         this.joinType = joinType;
-        this.optional = joinType == HashJoinEnum.Optional;
-        this.filter = joinType == HashJoinEnum.Filter;
+        this.optional = joinType == JoinTypeEnum.Optional;
+        this.filter = joinType == JoinTypeEnum.Filter;
         
         // The join variables (required).
         this.joinVars = (IVariable<?>[]) op
@@ -551,7 +551,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
     
-    public HashJoinEnum getJoinType() {
+    public JoinTypeEnum getJoinType() {
         return joinType;
     }
     

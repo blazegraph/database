@@ -318,8 +318,8 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
 
                     state = new HTreeHashJoinUtility(context.getRunningQuery()
                             .getMemoryManager(), op,
-                            op.isOptional() ? HashJoinEnum.Optional
-                                    : HashJoinEnum.Normal);
+                            op.isOptional() ? JoinTypeEnum.Optional
+                                    : JoinTypeEnum.Normal);
 
                     attrs.put(namedSetRef, state);
 

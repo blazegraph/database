@@ -237,8 +237,8 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
                 if (state == null) {
 
                     state = new JVMHashJoinUtility(op,
-                            pred.isOptional() ? HashJoinEnum.Optional
-                                    : HashJoinEnum.Normal);
+                            pred.isOptional() ? JoinTypeEnum.Optional
+                                    : JoinTypeEnum.Normal);
 
                     attrs.put(namedSetRef, state);
 

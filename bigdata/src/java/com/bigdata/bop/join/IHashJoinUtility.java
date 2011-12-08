@@ -74,7 +74,7 @@ public interface IHashJoinUtility {
      * Return the type safe enumeration indicating what kind of operation is to
      * be performed.
      */
-    HashJoinEnum getJoinType();
+    JoinTypeEnum getJoinType();
     
     /**
      * The join variables.

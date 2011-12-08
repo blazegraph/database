@@ -35,7 +35,7 @@ import com.bigdata.bop.IPredicate;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public enum HashJoinEnum {
+public enum JoinTypeEnum {
 
     /**
      * A normal join. The output is the combination of the left and right hand
