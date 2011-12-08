@@ -39,10 +39,8 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
@@ -79,30 +77,6 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
 
     public interface Annotations extends PipelineOp.Annotations,
             HashJoinAnnotations, NamedSetAnnotations {
-
-//        /**
-//         * The {@link NamedSolutionSetRef} used to locate the hash index having
-//         * the data for the named solution set. The query UUID must be extracted
-//         * and used to lookup the {@link IRunningQuery} to which the solution
-//         * set was attached. The hash index is then resolved against the
-//         * {@link IQueryAttributes} on that {@link IRunningQuery}.
-//         * 
-//         * @see NamedSolutionSetRef
-//         * @see HTreeNamedSubqueryOp.Annotations#NAMED_SET_REF
-//         */
-//        final String NAMED_SET_REF = HTreeNamedSubqueryOp.Annotations.NAMED_SET_REF;
-
-//        /**
-//         * An optional {@link IVariable}[] identifying the variables to be
-//         * retained in the {@link IBindingSet}s written out by the operator. All
-//         * variables are retained unless this annotation is specified. This is
-//         * normally set to the <em>projection</em> of the subquery, in which
-//         * case the lexical scope of the variables is will be properly managed
-//         * for the subquery INCLUDE join.
-//         * 
-//         * @see JoinAnnotations#SELECT
-//         */
-//        final String SELECT = JoinAnnotations.SELECT;
 
         /**
          * An {@link IConstraint}[] to be applied to solutions when they are
@@ -245,17 +219,9 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
 
         private final JVMHashJoinUtility state;
         
-//        private final IVariable<E>[] joinVars;
-        
         private final IConstraint[] constraints;
-
-//        private final IVariable<?>[] selectVars;
-//
-//        private final boolean optional;
         
         private final boolean release;
-        
-//        private final String namedSet;
         
         private final BaseJoinStats stats;
 
@@ -263,31 +229,12 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
         
         private final IBlockingBuffer<IBindingSet[]> sink2;
 
-//        /**
-//         * The hash index.
-//         * <p>
-//         * Note: The map is shared state and can not be discarded or cleared
-//         * until the last invocation!!!
-//         */
-//        private final Map<Key,Bucket> rightSolutions;
-
         public ChunkTask(final BOpContext<IBindingSet> context,
                 final JVMSolutionSetHashJoinOp op) {
 
             this.context = context;
 
             this.stats = (BaseJoinStats) context.getStats();
-
-//            this.selectVars = (IVariable<?>[]) op
-//                    .getProperty(Annotations.SELECT);
-//
-//            this.joinVars = (IVariable<E>[]) op
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
-//            
-//            this.constraints = (IConstraint[]) op
-//                    .getProperty(Annotations.CONSTRAINTS);
-//
-//            this.optional = op.isOptional();
 
             this.release = op.getProperty(Annotations.RELEASE,
                     Annotations.DEFAULT_RELEASE);
@@ -403,10 +350,6 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
             state.hashJoin2(leftItr, unsyncBuffer, //true/* leftIsPipeline */,
                     constraints);
             
-//            JVMHashJoinUtility.hashJoin(leftItr, unsyncBuffer, joinVars,
-//                    selectVars, constraints, rightSolutions/* hashIndex */,
-//                    /*joinSet,*/ optional, true/* leftIsPipeline */);
-
             if (state.getJoinType().isOptional() && context.isLastInvocation()) {
 
                 // where to write the optional solutions.
@@ -415,8 +358,6 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                                 op.getChunkCapacity(), sink2);
 
                 state.outputOptionals(unsyncBuffer2);
-                
-//                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)
