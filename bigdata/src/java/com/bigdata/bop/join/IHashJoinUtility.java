@@ -29,7 +29,6 @@ package com.bigdata.bop.join;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
@@ -70,18 +69,12 @@ import com.bigdata.striterator.ICloseableIterator;
  * @version $Id$
  */
 public interface IHashJoinUtility {
-
-    /**
-     * Return <code>true</code> iff this is a JOIN with OPTIONAL semantics.
-     * 
-     * @see IPredicate.Annotations#OPTIONAL
-     */
-    boolean isOptional();
     
     /**
-     * Return <code>true</code> iff this is a DISTINCT SOLUTIONS filter.
+     * Return the type safe enumeration indicating what kind of operation is to
+     * be performed.
      */
-    boolean isFilter();
+    HashJoinEnum getJoinType();
     
     /**
      * The join variables.
@@ -250,12 +243,14 @@ public interface IHashJoinUtility {
     );
     
     /**
-     * Identify and output the optional solutions. Optionals are identified
-     * using a <i>joinSet</i> containing each right solution which joined with
-     * at least one left solution. The total set of right solutions is then
-     * scanned once. For each right solution, we probe the <i>joinSet</i>. If
-     * the right solution did not join, then it is output now as an optional
-     * join.
+     * Identify and output the optional solutions. This is used with OPTIONAL
+     * and NOT EXISTS.
+     * <p>
+     * Optionals are identified using a <i>joinSet</i> containing each right
+     * solution which joined with at least one left solution. The total set of
+     * right solutions is then scanned once. For each right solution, we probe
+     * the <i>joinSet</i>. If the right solution did not join, then it is output
+     * now as an optional join.
      * 
      * @param outputBuffer
      *            Where to write the optional solutions.
@@ -271,4 +266,12 @@ public interface IHashJoinUtility {
      */
     void outputSolutions(IBuffer<IBindingSet> out);
 
+    /**
+     * Output the solutions which joined. This is used with EXISTS.
+     * 
+     * @param out
+     *            Where to write the solutions.
+     */
+    void outputJoinSet(IBuffer<IBindingSet> out);
+    
 }

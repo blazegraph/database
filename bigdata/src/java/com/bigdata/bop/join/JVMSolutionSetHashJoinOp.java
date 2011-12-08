@@ -317,7 +317,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                 
             }
 
-            if (state.isOptional() && !op.isLastPassRequested()) {
+            if (state.getJoinType().isOptional() && !op.isLastPassRequested()) {
 
                 /*
                  * An optional join requires that we observe all solutions
@@ -407,7 +407,7 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
 //                    selectVars, constraints, rightSolutions/* hashIndex */,
 //                    /*joinSet,*/ optional, true/* leftIsPipeline */);
 
-            if (state.isOptional() && context.isLastInvocation()) {
+            if (state.getJoinType().isOptional() && context.isLastInvocation()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer

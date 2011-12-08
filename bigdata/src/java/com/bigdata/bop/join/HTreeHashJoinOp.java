@@ -317,7 +317,9 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
                 if (state == null) {
 
                     state = new HTreeHashJoinUtility(context.getRunningQuery()
-                            .getMemoryManager(), op, op.isOptional(), false/* filter */);
+                            .getMemoryManager(), op,
+                            op.isOptional() ? HashJoinEnum.Optional
+                                    : HashJoinEnum.Normal);
 
                     attrs.put(namedSetRef, state);
 
@@ -392,7 +394,7 @@ public class HTreeHashJoinOp<E> extends AbstractHashJoinOp<E> {
                     ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
                     unsyncBuffer);//, false/* leftIsPipeline */);
 
-            if (state.isOptional()) {
+            if (state.getJoinType().isOptional()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer

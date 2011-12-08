@@ -52,6 +52,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
+import com.bigdata.bop.join.HashJoinEnum;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -241,7 +242,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                      */
                     state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
-                            false/* optional */, false/* filter */);
+                            HashJoinEnum.Normal);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

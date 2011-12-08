@@ -52,10 +52,10 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
     }
 
     @Override
-    protected JVMHashJoinUtility newHashJoinUtility(PipelineOp op,
-            boolean optional, boolean filter) {
+    protected JVMHashJoinUtility newHashJoinUtility(final PipelineOp op,
+            final HashJoinEnum joinType) {
         
-        return new JVMHashJoinUtility(op, optional, filter);
+        return new JVMHashJoinUtility(op, joinType);
         
     }
     
