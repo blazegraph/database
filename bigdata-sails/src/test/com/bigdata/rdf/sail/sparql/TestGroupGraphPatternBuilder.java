@@ -558,6 +558,55 @@ public class TestGroupGraphPatternBuilder extends
         assertSameAST(sparql, expected, actual);
 
     }
+    
+    /**
+     * <pre>
+     * SELECT ?s
+     * WHERE {
+     *    ?s ?p ?o .
+     *    MINUS {
+     *       ?o ?p2 ?s
+     *    }
+     * }
+     * </pre>
+     */
+    public void test_minus() throws MalformedQueryException, TokenMgrError,
+            ParseException {
+
+        final String sparql = "select ?s where {?s ?p ?o MINUS { ?o ?p2 ?s }}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("s"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o"), null/* c */,
+                    Scope.DEFAULT_CONTEXTS));
+            {
+                final JoinGroupNode joinGroup = new JoinGroupNode();
+                joinGroup.setMinus(true);
+                joinGroup.addChild(new StatementPatternNode(new VarNode("o"),
+                        new VarNode("p2"), new VarNode("s"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+                whereClause.addChild(joinGroup);
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
 
     /**
      * <pre>

@@ -29,6 +29,15 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          */
         String CONTEXT = "context";
         
+        /**
+         * When <code>true</code>, the join group has the semantics of a SPARQL
+         * MINUS operator and only those solutions in the parent group which do
+         * NOT join with this group will be output.
+         */
+        String MINUS = "minus";
+        
+        boolean DEFAULT_MINUS = false;
+        
     }
     
     /**
@@ -125,6 +134,24 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     }
 
+    /**
+     * Return <code>true</code> iff the join group represents a SPARQL MINUS
+     * operator.
+     * 
+     * @see Annotations#MINUS
+     */
+    public boolean isMinus() {
+
+        return getProperty(Annotations.MINUS, Annotations.DEFAULT_MINUS);
+
+    }
+    
+    public void setMinus(final boolean minus) {
+
+        setProperty(Annotations.MINUS, minus);
+        
+    }
+    
 	/**
 	 * Return only the statement pattern child nodes in this group.
 	 */

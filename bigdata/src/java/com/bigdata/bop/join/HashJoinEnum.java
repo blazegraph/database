@@ -46,24 +46,21 @@ public enum HashJoinEnum {
      * An optional join. The output is the combination of the left and right
      * hand solutions. Solutions which join are output, plus any left solutions
      * which did not join.
-     * <p>
-     * Note: Various annotations pertaining to JOIN processing are ignored when
-     * used as a DISTINCT filter.
      */
     Optional,
     /**
-     * A join where the left solution is output iff there exists right solution.
-     * For each left solution, that solution is output exactly once iff there is
-     * at least one right solution which joins with the left solution. In order
-     * to enforce the cardinality constraint, this winds up populating the join
-     * set and then outputs the join set once all solutions which join have been
-     * identified.
+     * A join where the left solution is output iff there exists at least one
+     * right solution which joins with that left solution. For each left
+     * solution, that solution is output either zero or one times. In order to
+     * enforce this cardinality constraint, the hash join logic winds up
+     * populating the "join set" and then outputs the join set once all
+     * solutions which join have been identified.
      */
     Exists,
     /**
-     * A filter where the left solution is output iff does not exist a right
-     * solution. This basically an optional join where the solutions which join
-     * are not output.
+     * A join where the left solution is output iff there is no right solution
+     * which joins with that left solution. This basically an optional join
+     * where the solutions which join are not output.
      * <p>
      * Note: This is also used for "MINUS" since the only difference between
      * "NotExists" and "MINUS" deals with the scope of the variables.
@@ -71,7 +68,8 @@ public enum HashJoinEnum {
     NotExists,
     /**
      * A distinct filter (not a join). Only the distinct left solutions are
-     * output.
+     * output. Various annotations pertaining to JOIN processing are ignored
+     * when the hash index is used as a DISTINCT filter.
      */
     Filter;
 
@@ -81,7 +79,9 @@ public enum HashJoinEnum {
      * @see #Filter
      */
     public boolean isFilter() {
+        
         return this == Filter;
+        
     }
 
     /**
@@ -91,7 +91,18 @@ public enum HashJoinEnum {
      * @see IPredicate.Annotations#OPTIONAL
      */
     public boolean isOptional() {
+
         return this == Optional;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff this is a {@link #Normal} join.
+     */
+    public boolean isNormal() {
+
+        return this == Normal;
+
     }
 
 }

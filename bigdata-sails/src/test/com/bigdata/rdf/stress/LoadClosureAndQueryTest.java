@@ -51,16 +51,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
-import org.openrdf.query.parser.ParsedQuery;
-import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
@@ -81,6 +77,8 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -741,8 +739,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         // list of queries to be executed.
         final List<Query> queries = readQueries(properties);
 
-        // used to parse qeries, e.g., SPARQL, etc.
-        final QueryParser queryParser = new SPARQLParserFactory().getParser();
+//        // used to parse qeries, e.g., SPARQL, etc.
+//        final QueryParser queryParser = new SPARQLParserFactory().getParser();
 
         // load the data and optionally compute the closure
         loadData(properties);
@@ -751,7 +749,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         dropFileSystemCache();
         
         // run the queries.
-        runQueries(properties, queryParser, queries);
+        runQueries(properties, /*queryParser,*/ queries);
 
         return result;
 
@@ -1420,7 +1418,6 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * Runs the queries.
      * 
      * @param properties
-     * @param queryParser
      * @param queries
      * 
      * @throws InterruptedException
@@ -1428,7 +1425,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      *             their futures.
      */
     public void runQueries(final Properties properties,
-            final QueryParser queryParser, final List<Query> queries)
+            /*final QueryParser queryParser, */
+            final List<Query> queries)
             throws InterruptedException {
 
         final int nqueries = queries.size();
@@ -1460,7 +1458,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                 final Query query = itr.next();
 
                 final ResultsOfTrials resultsOfTrials = runTrials(properties,
-                        queryParser, query, ntrials, nparallel);
+                        /*queryParser,*/ query, ntrials, nparallel);
 
                 results[queryCount] = resultsOfTrials;
 
@@ -1693,7 +1691,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * @throws InterruptedException
      */
     public ResultsOfTrials runTrials(final Properties properties,
-            final QueryParser queryParser, final Query query,
+            /*final QueryParser queryParser, */final Query query,
             final int ntrials, final int nparallel) throws InterruptedException {
 
         System.out.println("\n\n----  " + query.getLabel() + " ----\n");
@@ -1702,7 +1700,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         for (int trialCount = 0; trialCount < ntrials; trialCount++) {
 
-            final TrialResult trialResult = runTrial(properties, queryParser,
+            final TrialResult trialResult = runTrial(properties, /*queryParser,*/
                     query, nparallel);
 
             results[trialCount] = trialResult;
@@ -1735,7 +1733,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * @throws InterruptedException
      */
     public TrialResult runTrial(final Properties properties,
-            final QueryParser queryParser, final Query query,
+            /*final QueryParser queryParser, */final Query query,
             final int nparallel) throws InterruptedException {
 
         final ExecutorService service = sail.getDatabase().getIndexManager()
@@ -1746,7 +1744,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         for (int i = 0; i < nparallel; i++) {
 
-            tasks.add(new QueryTask(queryParser, query));
+            tasks.add(new QueryTask(/*queryParser,*/ query));
 
         }
 
@@ -1928,13 +1926,13 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      */
     protected class QueryTask implements Callable<Long> {
         
-        final QueryParser queryParser;
+//        final QueryParser queryParser;
         
         final Query query;
         
-        public QueryTask(final QueryParser queryParser, final Query query) {
+        public QueryTask(/*final QueryParser queryParser,*/ final Query query) {
         
-            this.queryParser = queryParser;
+//            this.queryParser = queryParser;
             
             this.query = query;
             
@@ -1950,7 +1948,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          */
         public Long call() throws Exception {
 
-            return issueQuery(queryParser, query);
+            return issueQuery(/*queryParser,*/ query);
             
         }
         
@@ -1971,7 +1969,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * @throws Exception
      *             whatever the query throws when it runs.
      */
-    protected long issueQuery(final QueryParser queryParser,
+    protected long issueQuery(//final QueryParser queryParser,
             final Query theQuery) throws Exception {
 
 //        /*
@@ -1993,7 +1991,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         if (DEBUG)
             log.debug("query: " + queryString);
 
-        final ParsedQuery query = queryParser.parseQuery(queryString, baseURI);
+//        final ParsedQuery query = queryParser.parseQuery(queryString, baseURI);
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                sail.getDatabase()).parseQuery2(queryString, baseURI);
 
         /*
          * Create a data set consisting of the contexts to be queried.
@@ -2009,7 +2009,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         // Note: Will close the [conn] for all outcomes.
         final MyQueryResult result = new MyQueryResult(conn, conn.evaluate(
-                query.getTupleExpr(), dataSet, bindingSet, includeInferred));
+                astContainer.getOriginalAST(), dataSet, bindingSet, includeInferred));
 
         long n = 0;
 
