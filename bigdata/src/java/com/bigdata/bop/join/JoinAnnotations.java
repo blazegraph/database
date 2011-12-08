@@ -58,7 +58,7 @@ public interface JoinAnnotations extends com.bigdata.bop.PipelineOp.Annotations 
      * from the AST to the physical query plan. (I believe the reason why this
      * annotation is on the Predicate is two fold. First, we originally did not
      * have the AST abstraction, and it still does not exist for IRules. Second,
-     * the believe was that the RTO would operate in terms of a Predicate[], and
+     * the idea was that the RTO would operate in terms of a Predicate[], and
      * hence the notion of "optional" needed to be on the Predicate, but it now
      * looks like it will operate in terms of the AST model instead where it is
      * visible to the RTO.)

@@ -2313,8 +2313,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
     
     /**
-     * This method handles sub-groups, including UNION, required sub-groups, and
-     * OPTIONAL subgroups.
+     * This method handles sub-groups, including UNION, required sub-groups,
+     * OPTIONAL subgroups, and MINUS.
      * <p>
      * The basic pattern for efficient sub-group evaluation is to build a hash
      * index before the sub-group, run the sub-group against the solutions in
@@ -2360,6 +2360,12 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
 		// true iff the sub-group is OPTIONAL.
         final boolean optional = subgroup.isOptional();
+        
+        // true iff the sub-group is MINUS
+        final boolean minus = subgroup instanceof JoinGroupNode
+                && ((JoinGroupNode) subgroup).isMinus();
+        
+        final boolean required = !optional && !minus;
 
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -2367,11 +2373,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(subgroup), needsMaterialization);
 
-        if (optional && joinConstraints != null) {
+        if (!required && joinConstraints != null) {
             /*
              * Note: Join filters should only be attached to required joins, not
-             * to join OPTIONAL joins (except for a simple optional statement
-             * pattern node) or OPTIONAL join groups.
+             * to OPTIONAL joins (except for a simple optional statement pattern
+             * node) or OPTIONAL join groups.
              */
             throw new AssertionError(
                     "OPTIONAL group has attached join filters: " + subgroup);
@@ -2457,7 +2463,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 subgroup, doneSet, ctx);
 
         // lastPass is required if the join is optional.
-        final boolean lastPass = optional; // iff optional.
+        final boolean lastPass = !required; // unless this is a simple required join.
 
         // true if we will release the HTree as soon as the join is done.
         // Note: also requires lastPass.

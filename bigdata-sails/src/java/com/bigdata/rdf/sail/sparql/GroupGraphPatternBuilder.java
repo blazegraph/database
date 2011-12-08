@@ -43,6 +43,7 @@ import org.openrdf.query.parser.sparql.ast.ASTGraphGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTGraphPatternGroup;
 import org.openrdf.query.parser.sparql.ast.ASTHavingClause;
 import org.openrdf.query.parser.sparql.ast.ASTLet;
+import org.openrdf.query.parser.sparql.ast.ASTMinusGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTNamedSubqueryInclude;
 import org.openrdf.query.parser.sparql.ast.ASTOptionalGraphPattern;
 import org.openrdf.query.parser.sparql.ast.ASTUnionGraphPattern;
@@ -256,10 +257,63 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         // visit the children.
         super.visit(node, null);
 
-        @SuppressWarnings("rawtypes")
-        final GroupNodeBase group = graphPattern.buildGroup(new JoinGroupNode(
-                true/* optional */));
+        final JoinGroupNode joinGroup = new JoinGroupNode();
 
+        joinGroup.setOptional(true);
+        
+        @SuppressWarnings("rawtypes")
+        final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+
+        parentGP.add(group);
+
+        graphPattern = parentGP;
+
+        return null;
+    }
+
+    /**
+     * MINUS is modeled very much like OPTIONAL in the bigdata AST. It is a
+     * {@link JoinGroupNode} which is annotated to indicate the negation
+     * semantics.
+     * <p>
+     * Note: The grammar file treats OPTIONAL somewhat differently than MINUS
+     * due to the scope of the filters. For OPTIOANL, the child group can see
+     * the variable bindings in the parent group. That is not true for MINUS.
+     * Therefore the code in this method only sets the MINUS attribute on the
+     * group and does not need to create a new group.
+     */
+    @Override
+    public Object visit(final ASTMinusGraphPattern node, Object data)
+            throws VisitorException {
+
+        final GroupGraphPattern parentGP = graphPattern;
+
+        graphPattern = new GroupGraphPattern(parentGP);
+
+        // visit the children.
+        super.visit(node, null);
+
+//        final JoinGroupNode joinGroup = new JoinGroupNode();
+//
+//        joinGroup.setMinus(true);
+//        
+//        @SuppressWarnings("rawtypes")
+//        final GroupNodeBase group = graphPattern.buildGroup(joinGroup);
+        
+        /*
+         * The child is already wrapped up as a JoinGroupNode and we need to set
+         * the MINUS annotation on that child. This takes a lazy approach and,
+         * rather than reaching into the graphPattern data structure, it builds
+         * a group which will contain just the desired child join group and then
+         * pulls it out.
+         */
+
+        final JoinGroupNode group = (JoinGroupNode) graphPattern.buildGroup(
+                new JoinGroupNode()).get(0);
+
+        // Annotate this group to give it negation semantics.
+        group.setMinus(true);
+        
         parentGP.add(group);
 
         graphPattern = parentGP;
@@ -412,26 +466,6 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         return null;
         
     }
-
-//    @Override // FIXME MinusGraphPattern
-//    public Object visit(ASTMinusGraphPattern node, Object data)
-//        throws VisitorException
-//    {
-//        GraphPattern parentGP = graphPattern;
-//
-//        TupleExpr leftArg = graphPattern.buildTupleExpr();
-//
-//        graphPattern = new GraphPattern(parentGP);
-//        node.jjtGetChild(0).jjtAccept(this, null);
-//        TupleExpr rightArg = graphPattern.buildTupleExpr();
-//
-//        parentGP = new GraphPattern();
-//        parentGP.addRequiredTE(new Difference(leftArg, rightArg));
-//        graphPattern = parentGP;
-//
-//        return null;
-//    }
-//
 
     /**
      * A BIND (or FILTER) can appear in an {@link ASTBasicGraphPattern}.

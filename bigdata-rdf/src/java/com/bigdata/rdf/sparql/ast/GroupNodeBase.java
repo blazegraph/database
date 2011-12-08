@@ -255,6 +255,12 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             sb.append(" [optional]");
 
         }
+
+        if (this instanceof JoinGroupNode && ((JoinGroupNode) this).isMinus()) {
+
+            sb.append(" [minus]");
+
+        }
         
         if (this instanceof JoinGroupNode
                 && ((JoinGroupNode) this).getContext() != null) {

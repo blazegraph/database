@@ -455,6 +455,83 @@ public class TestSubqueryPatterns extends
     }
 
     /**
+     * Unit test for EXISTS.
+     * 
+     * <pre>
+     * PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> 
+     * 
+     * SELECT ?person
+     * WHERE 
+     * {
+     *     ?person rdf:type  foaf:Person .
+     *     FILTER EXISTS { ?person foaf:name ?name }
+     * }
+     * </pre>
+     */
+    public void test_exists() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = ""//
+                + "PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> \n"//
+                + "PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> \n"//
+                + "SELECT ?person \n"//
+                + " WHERE { \n"//
+                + "       ?person rdf:type  foaf:Person . \n"//
+                + "       FILTER EXISTS { ?person foaf:name ?name } \n"//
+                + "}"//
+        ;
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ConstantNode rdfType = new ConstantNode(
+                    makeIV(valueFactory.createURI(RDF.TYPE.stringValue())));
+
+            final ConstantNode foafPerson = new ConstantNode(
+                    makeIV(valueFactory.createURI(FOAF.PERSON.stringValue())));
+
+            final ConstantNode foafName = new ConstantNode(
+                    makeIV(valueFactory.createURI(FOAF.NAME.stringValue())));
+
+            final VarNode person = new VarNode("person");
+
+            final VarNode name = new VarNode("name");
+
+            final VarNode anonvar = mockAnonVar("-exists-1");
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                prefixDecls.put("rdf", RDF.NAMESPACE);
+                prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            projection.addProjectionVar(person);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+            whereClause.addChild(new StatementPatternNode(person, rdfType,
+                    foafPerson, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode existsPattern = new JoinGroupNode();
+            existsPattern.addChild(new StatementPatternNode(person, foafName,
+                    name, null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            whereClause.addChild(new FilterNode(new ExistsNode(anonvar,
+                    existsPattern)));
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
      * Unit test for NOT EXISTS.
      * 
      * <pre>
@@ -468,8 +545,6 @@ public class TestSubqueryPatterns extends
      *     FILTER NOT EXISTS { ?person foaf:name ?name }
      * }
      * </pre>
-     * 
-     * TODO Also unit test EXISTS.
      */
     public void test_not_exists() throws MalformedQueryException,
             TokenMgrError, ParseException {
@@ -553,7 +628,8 @@ public class TestSubqueryPatterns extends
      * </pre>
      * 
      * TODO Unit test to verify no recursion through the named subquery into a
-     * named subquery.
+     * named subquery (this will be rejected at the AST level so it is not
+     * critical to validate it here).
      */
     public void test_namedSubquery() throws MalformedQueryException,
             TokenMgrError, ParseException {

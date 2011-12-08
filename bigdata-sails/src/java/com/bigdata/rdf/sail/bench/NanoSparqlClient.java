@@ -55,9 +55,6 @@ import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResultHandlerBase;
-import org.openrdf.query.parser.ParsedQuery;
-import org.openrdf.query.parser.QueryParser;
-import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParserFactory;
 import org.openrdf.rio.RDFParser;
@@ -225,17 +222,30 @@ public class NanoSparqlClient {
 			// used to measure the total execution time.
 			final long begin = System.nanoTime();
 
-			/*
-			 * Parse the query so we can figure out how it will need to be
-			 * executed.
-			 * 
-			 * Note: This will fail a query on its syntax. However, the logic
-			 * used in the tasks to execute a query will not fail a bad query
-			 * for some reason which I have not figured out yet.
-			 */
-			final QueryParser engine = new SPARQLParserFactory().getParser();
-			
-			final ParsedQuery q = engine.parseQuery(opts.queryStr, opts.baseURI);
+            /*
+             * Parse the query so we can figure out how it will need to be
+             * executed.
+             * 
+             * Note: This will fail a query on its syntax. However, the logic
+             * used in the tasks to execute a query will not fail a bad query
+             * for some reason which I have not figured out yet.
+             * 
+             * TODO The query parser requires a KB reference for Value to IV
+             * resolution. This is just passing in an empty KB backed by a
+             * temporary store since we not really interested in resolving
+             * anything here, just figuring out the type of the query. It would
+             * be nice if we could not bother to pass in a KB instance at all,
+             * but I have not yet looked at modifying the parser to accept a
+             * null KB reference for this use case.
+             */
+//			final QueryParser engine = new SPARQLParserFactory().getParser();
+//			
+//			final ParsedQuery q = engine.parseQuery(opts.queryStr, opts.baseURI);
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                    opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
+
+            final QueryType queryType = opts.queryType = astContainer
+                    .getOriginalAST().getQueryType();
 
 			if (opts.showQuery) {
 				System.err.println("---- " + Thread.currentThread().getName()
@@ -248,7 +258,7 @@ public class NanoSparqlClient {
 				System.err.println("----- Parse Tree "
 						+ (opts.source == null ? "" : " : " + opts.source)
 						+ "-----");
-				System.err.println(q.toString());
+				System.err.println(astContainer.getOriginalAST().toString());
 			}
 			
 			// Fully formed and encoded URL @todo use */* for ASK.
@@ -280,22 +290,22 @@ public class NanoSparqlClient {
 
                 /*
                  * Set an appropriate Accept header for the query.
-                 * 
-                 * Note: We have to parse the query to really get this right.
-                 * 
-                 * TODO The query parser requires a KB reference for Value to IV
-                 * resolution. This is just passing in an empty KB backed by a
-                 * temporary store since we not really interested in resolving
-                 * anything here, just figuring out the type of the query. It
-                 * would be nice if we could not bother to pass in a KB instance
-                 * at all, but I have not yet looked at modifying the parser to
-                 * accept a null KB reference for this use case.
+//                 * 
+//                 * Note: We have to parse the query to really get this right.
+//                 * 
+//                 * TODO The query parser requires a KB reference for Value to IV
+//                 * resolution. This is just passing in an empty KB backed by a
+//                 * temporary store since we not really interested in resolving
+//                 * anything here, just figuring out the type of the query. It
+//                 * would be nice if we could not bother to pass in a KB instance
+//                 * at all, but I have not yet looked at modifying the parser to
+//                 * accept a null KB reference for this use case.
                  */
-                final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                        opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
-
-                final QueryType queryType = opts.queryType = astContainer
-                        .getOriginalAST().getQueryType();
+//                final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+//                        opts.tmpKb).parseQuery2(opts.queryStr, opts.baseURI);
+//
+//                final QueryType queryType = opts.queryType = astContainer
+//                        .getOriginalAST().getQueryType();
 
 				switch(queryType) {
 				case DESCRIBE:
