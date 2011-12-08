@@ -559,7 +559,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * @param expected
      */
     protected void doHashJoinTest(//
-            final HashJoinEnum joinType,//
+            final JoinTypeEnum joinType,//
             final IVariable<?>[] joinVars,//
             final IVariable<?>[] selectVars,//
             final IConstraint[] constraints,//
@@ -641,7 +641,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * @return
      */
     abstract protected IHashJoinUtility newHashJoinUtility(PipelineOp op,
-            final HashJoinEnum joinType);
+            final JoinTypeEnum joinType);
 
     /**
      * Empty lhs and rhs with non-optional join.
@@ -666,7 +666,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[0];
 
-        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
                 left, right, expected);
 
     }
@@ -694,7 +694,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[0];
         
-        doHashJoinTest(HashJoinEnum.Optional, joinVars, selectVars,
+        doHashJoinTest(JoinTypeEnum.Optional, joinVars, selectVars,
                 constraints, left, right, expected);
 
     }
@@ -741,7 +741,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
                 left, right, expected);
 
     }
@@ -788,7 +788,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
                 left, right, expected);
 
     }
@@ -837,7 +837,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+        doHashJoinTest(JoinTypeEnum.Normal, joinVars, selectVars, constraints,
                 left, right, expected);
 
     }
@@ -1091,10 +1091,10 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     );
 
             first = newHashJoinUtility(firstOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             other = newHashJoinUtility(otherOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             // Load into [first].
             {
@@ -1375,10 +1375,10 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     );
 
             first = newHashJoinUtility(firstOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             other = newHashJoinUtility(otherOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             // Load into [first].
             {
@@ -1696,13 +1696,13 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     );
 
             first = newHashJoinUtility(firstOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             other = newHashJoinUtility(otherOp,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
-            more = newHashJoinUtility(moreOp, optional ? HashJoinEnum.Optional
-                    : HashJoinEnum.Normal);
+            more = newHashJoinUtility(moreOp, optional ? JoinTypeEnum.Optional
+                    : JoinTypeEnum.Normal);
 
             // Load into [first].
             {
@@ -1862,7 +1862,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.Exists, joinVars, selectVars, constraints,
+        doHashJoinTest(JoinTypeEnum.Exists, joinVars, selectVars, constraints,
                 left, right, expected);
 
     }
@@ -1932,7 +1932,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.NotExists, joinVars, selectVars,
+        doHashJoinTest(JoinTypeEnum.NotExists, joinVars, selectVars,
                 constraints, left, right, expected);
 
     }
@@ -1999,7 +1999,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(HashJoinEnum.NotExists, joinVars, selectVars,
+        doHashJoinTest(JoinTypeEnum.NotExists, joinVars, selectVars,
                 constraints, left, right, expected);
 
     }

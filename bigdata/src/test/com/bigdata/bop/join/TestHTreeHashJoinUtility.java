@@ -91,7 +91,7 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
     @Override
     protected HTreeHashJoinUtility newHashJoinUtility(final PipelineOp op,
-            final HashJoinEnum joinType) {
+            final JoinTypeEnum joinType) {
 
         return new HTreeHashJoinUtility(mmgr, op, joinType);
 

@@ -277,8 +277,8 @@ public class HTreeHashIndexOp extends PipelineOp {
                     
                     state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
-                            op.isOptional() ? HashJoinEnum.Optional
-                                    : HashJoinEnum.Normal);
+                            op.isOptional() ? JoinTypeEnum.Optional
+                                    : JoinTypeEnum.Normal);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

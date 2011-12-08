@@ -44,7 +44,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.HashJoinEnum;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -220,7 +220,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
         /**
          * The alternative sink to use when the join is
-         * {@link HashJoinEnum#Optional} AND {@link BOpContext#getSink2()}
+         * {@link JoinTypeEnum#Optional} AND {@link BOpContext#getSink2()}
          * returns a distinct buffer for the alternative sink. The binding sets
          * from the source are copied onto the alternative sink for an optional
          * join if the join fails. Normally the {@link BOpContext#getSink()} can
@@ -260,7 +260,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
                     Annotations.DEFAULT_OPTIONAL);
 
             this.state = new JVMHashJoinUtility(op,
-                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
+                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
 
             this.sink = context.getSink();
 

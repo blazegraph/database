@@ -53,7 +53,7 @@ public class TestJVMHashJoinUtility extends AbstractHashJoinUtilityTestCase {
 
     @Override
     protected JVMHashJoinUtility newHashJoinUtility(final PipelineOp op,
-            final HashJoinEnum joinType) {
+            final JoinTypeEnum joinType) {
         
         return new JVMHashJoinUtility(op, joinType);
         

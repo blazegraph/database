@@ -366,8 +366,8 @@ public class JVMHashIndexOp extends PipelineOp {
                     final boolean optional = op.getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
                     
                     state = new JVMHashJoinUtility(op,
-                            optional ? HashJoinEnum.Optional
-                                    : HashJoinEnum.Normal);
+                            optional ? JoinTypeEnum.Optional
+                                    : JoinTypeEnum.Normal);
 
 //                    this.first = true;
                  

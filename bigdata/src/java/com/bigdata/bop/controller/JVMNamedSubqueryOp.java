@@ -49,7 +49,7 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.HashJoinEnum;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.JVMHashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
@@ -266,7 +266,7 @@ public class JVMNamedSubqueryOp extends PipelineOp {
                     /*
                      * Note: This operator does not support optional semantics.
                      */
-                    state = new JVMHashJoinUtility(op, HashJoinEnum.Normal);
+                    state = new JVMHashJoinUtility(op, JoinTypeEnum.Normal);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();
