@@ -39,11 +39,9 @@ import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 
@@ -367,12 +365,10 @@ public class JVMHashIndexOp extends PipelineOp {
 
                     final boolean optional = op.getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
                     
-                    state = new JVMHashJoinUtility(op, optional, false/*filter*/);
-//                    solutions = new LinkedHashMap<Key, Bucket>(//
-//                            op.getInitialCapacity(),//
-//                            op.getLoadFactor()//
-//                    );
-//
+                    state = new JVMHashJoinUtility(op,
+                            optional ? HashJoinEnum.Optional
+                                    : HashJoinEnum.Normal);
+
 //                    this.first = true;
                  
                     if (attrs.putIfAbsent(namedSetRef, state) != null)

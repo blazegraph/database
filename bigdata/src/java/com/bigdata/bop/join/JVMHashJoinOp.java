@@ -236,7 +236,9 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
 
                 if (state == null) {
 
-                    state = new JVMHashJoinUtility(op, pred.isOptional(), false/* filter */);
+                    state = new JVMHashJoinUtility(op,
+                            pred.isOptional() ? HashJoinEnum.Optional
+                                    : HashJoinEnum.Normal);
 
                     attrs.put(namedSetRef, state);
 
@@ -298,8 +300,6 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
         private void acceptSolutions() {
 
             state.acceptSolutions(context.getSource(), stats);
-//            JVMHashJoinUtility.acceptSolutions(context.getSource(), joinVars,
-//                    stats, rightSolutions, optional);
 
         }
 
@@ -314,9 +314,8 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
             final IAccessPath<?> accessPath = context.getAccessPath(relation,
                     pred);
 
-            if (log.isDebugEnabled()) {
+            if (log.isDebugEnabled())
                 log.debug("accessPath=" + accessPath);
-            }
 
             stats.accessPathCount.increment();
 
@@ -327,16 +326,11 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
                     op.getChunkCapacity(), sink);
 
             state.hashJoin(
-                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
-                    unsyncBuffer 
-//                    false//leftIsPipeline
-                    );
-//            JVMHashJoinUtility.hashJoin(
-//                    ((IBindingSetAccessPath<?>)accessPath).solutions(stats),// left
-//                    unsyncBuffer, joinVars, selectVars, constraints,
-//                    rightSolutions, optional, false/*leftIsPipeline*/);
+                    ((IBindingSetAccessPath<?>) accessPath).solutions(stats),// left
+                    unsyncBuffer // where to write the solutions which join.
+            );
 
-            if (state.isOptional()) {
+            if (state.getJoinType().isOptional()) {
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
@@ -344,7 +338,6 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
                                 op.getChunkCapacity(), sink2);
 
                 state.outputOptionals(unsyncBuffer2);
-//                JVMHashJoinUtility.outputOptionals(unsyncBuffer2, rightSolutions);
 
                 unsyncBuffer2.flush();
                 if (sink2 != null)

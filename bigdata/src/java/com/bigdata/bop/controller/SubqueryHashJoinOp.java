@@ -44,6 +44,7 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
+import com.bigdata.bop.join.HashJoinEnum;
 import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -218,14 +219,15 @@ public class SubqueryHashJoinOp extends PipelineOp {
         final private IBlockingBuffer<IBindingSet[]> sink;
 
         /**
-         * The alternative sink to use when the join is {@link #optional} AND
-         * {@link BOpContext#getSink2()} returns a distinct buffer for the
-         * alternative sink. The binding sets from the source are copied onto
-         * the alternative sink for an optional join if the join fails. Normally
-         * the {@link BOpContext#getSink()} can be used for both the joins which
-         * succeed and those which fail. The alternative sink is only necessary
-         * when the failed join needs to jump out of a join group rather than
-         * routing directly to the ancestor in the operator tree.
+         * The alternative sink to use when the join is
+         * {@link HashJoinEnum#Optional} AND {@link BOpContext#getSink2()}
+         * returns a distinct buffer for the alternative sink. The binding sets
+         * from the source are copied onto the alternative sink for an optional
+         * join if the join fails. Normally the {@link BOpContext#getSink()} can
+         * be used for both the joins which succeed and those which fail. The
+         * alternative sink is only necessary when the failed join needs to jump
+         * out of a join group rather than routing directly to the ancestor in
+         * the operator tree.
          */
         final private IBlockingBuffer<IBindingSet[]> sink2;
 
@@ -257,7 +259,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
             final boolean optional = op.getProperty(Annotations.OPTIONAL,
                     Annotations.DEFAULT_OPTIONAL);
 
-            this.state = new JVMHashJoinUtility(op, optional, false/* filter */);
+            this.state = new JVMHashJoinUtility(op,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
             this.sink = context.getSink();
 
@@ -344,7 +347,7 @@ public class SubqueryHashJoinOp extends PipelineOp {
 //                                    selectVars, constraints, map, optional,
 //                                    true/* leftIsPipeline */);
                     
-                    if (state.isOptional()) {
+                    if (state.getJoinType().isOptional()) {
 
                         final IBuffer<IBindingSet> outputBuffer;
                         if (unsyncBuffer2 == null) {

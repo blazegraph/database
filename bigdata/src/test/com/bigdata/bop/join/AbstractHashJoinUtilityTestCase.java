@@ -37,6 +37,8 @@ import junit.framework.TestCase;
 
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -50,15 +52,18 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.constraint.Constraint;
+import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
@@ -137,6 +142,12 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
 
+        /**
+         * <pre>
+         * {x=brad, y=fred}
+         * {x=mary}
+         * </pre>
+         */
         @SuppressWarnings("rawtypes")
         List<IBindingSet> getLeft1() {
 
@@ -160,12 +171,22 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             return left;
         }
 
+        /**
+         * <pre>
+         * {a=paul, x=mary}
+         * {a=paul, x=brad}
+         * {a=john, x=mary}
+         * {a=john, x=brad}
+         * {a=mary, x=brad}
+         * {a=brad, x=fred}
+         * {a=brad, x=leon}
+         * </pre>
+         */
         @SuppressWarnings("rawtypes")
         List<IBindingSet> getRight1() {
 
             final IVariable<?> a = Var.var("a");
             final IVariable<?> x = Var.var("x");
-//            final IVariable<?> y = Var.var("y");
 
             // The right solutions (the hash index).
             final List<IBindingSet> right = new LinkedList<IBindingSet>();
@@ -207,16 +228,260 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             tmp.set(x, new Constant<IV>(leon));
             right.add(tmp);
 
-            // new E("Paul", "Mary"),// [0]
-            // new E("Paul", "Brad"),// [1]
-            //
-            // new E("John", "Mary"),// [2]
-            // new E("John", "Brad"),// [3]
-            //
-            // new E("Mary", "Brad"),// [4]
-            //
-            // new E("Brad", "Fred"),// [5]
-            // new E("Brad", "Leon"),// [6]
+            return right;
+
+        }
+
+    }
+
+    /**
+     * <pre>
+     * @prefix  :       <http://example/> .
+     * @prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+     * @prefix  foaf:   <http://xmlns.com/foaf/0.1/> .
+     * 
+     * :alice  rdf:type   foaf:Person .
+     * :alice  foaf:name  "Alice" .
+     * :bob    rdf:type   foaf:Person .
+     * </pre>
+     */
+    static public class ExistsSetup {
+
+        public final String namespace;
+
+        public final IV<?, ?> alice, bob, rdfType, foafName, foafPerson, aliceLabel;
+
+        public ExistsSetup(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+
+            this.namespace = namespace;
+
+            alice = makeIV(new URIImpl("http://example/alice"));
+
+            bob = makeIV(new URIImpl("http://example/bob"));
+
+            rdfType = makeIV(RDF.TYPE);
+
+            foafName = makeIV(FOAFVocabularyDecl.name);
+
+            foafPerson = makeIV(FOAFVocabularyDecl.Person);
+
+            aliceLabel = makeIV(new LiteralImpl("Alice"));
+            
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+        /**
+         * Reading from access path
+         * 
+         * <pre>
+         * ?person rdf:type  foaf:Person
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getLeft1() {
+
+            final IVariable<?> person = Var.var("person");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(person, new Constant<IV>(alice));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(person, new Constant<IV>(bob));
+            left.add(tmp);
+
+            return left;
+        }
+
+        /**
+         * Reading from access path
+         * 
+         * <pre>
+         * ?person foaf:name ?name
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getRight1() {
+
+            final IVariable<?> person = Var.var("person");
+            final IVariable<?> name = Var.var("name");
+
+            // The right solutions (the hash index).
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(person, new Constant<IV>(alice));
+            tmp.set(name, new Constant<IV>(aliceLabel));
+            right.add(tmp);
+
+            return right;
+
+        }
+
+    }
+
+    /**
+     * Setup for NOT EXISTS problem.
+     * 
+     * <pre>
+     * @prefix : <http://example/> .
+     * 
+     * :a :p 1 ; :q 1, 2 .
+     * :b :p 3.0 ; :q 4.0, 5.0 .
+     * </pre>
+     */
+    static public class NotExistsSetup {
+
+        public final String namespace;
+
+        public final IV<?, ?> a, b, one, two, three, four, five;
+
+        public NotExistsSetup(final String namespace) {
+
+            if (namespace == null)
+                throw new IllegalArgumentException();
+
+            this.namespace = namespace;
+
+            a = makeIV(new LiteralImpl("a"));
+
+            b = makeIV(new LiteralImpl("b"));
+
+            one = makeIV(new LiteralImpl("1", XSD.INTEGER));
+
+            two = makeIV(new LiteralImpl("2", XSD.INTEGER));
+
+            three = makeIV(new LiteralImpl("3.0", XSD.DECIMAL));
+
+            four = makeIV(new LiteralImpl("4.0", XSD.DECIMAL));
+
+            five = makeIV(new LiteralImpl("5.0", XSD.DECIMAL));
+            
+        }
+
+        /**
+         * Return a (Mock) IV for a Value.
+         * 
+         * @param v
+         *            The value.
+         * 
+         * @return The Mock IV.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IV makeIV(final Value v) {
+            final BigdataValueFactory valueFactory = BigdataValueFactoryImpl
+                    .getInstance(namespace);
+            final BigdataValue bv = valueFactory.asValue(v);
+            final IV iv = new TermId(VTE.valueOf(v), nextId++);
+            iv.setValue(bv);
+            return iv;
+        }
+
+        private long nextId = 1L; // Note: First id MUST NOT be 0L !!!
+
+        /**
+         * Reading from access path having this data and binding <code>?a</code>
+         * and <code>?n</code>
+         * 
+         * <pre>
+         * :a :p 1 .
+         * :b :p 3.0 .
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getLeft1() {
+
+            final IVariable<?> avar = Var.var("a");
+            final IVariable<?> nvar = Var.var("n");
+
+            // The left solutions (the pipeline).
+            final List<IBindingSet> left = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(a));
+            tmp.set(nvar, new Constant<IV>(one));
+            left.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(b));
+            tmp.set(nvar, new Constant<IV>(three));
+            left.add(tmp);
+
+            return left;
+        }
+
+        /**
+         * Reading from access path having this data and binding <code>?a</code>
+         * and <code>?m</code>
+         * 
+         * <pre>
+         * :a :q 1 .
+         * :a :q 2 .
+         * :b :q 4.0 .
+         * :b :q 5.0 .
+         * </pre>
+         */
+        @SuppressWarnings("rawtypes")
+        List<IBindingSet> getRight1(final IVariable<?> ovar) {
+
+            final IVariable<?> avar = Var.var("a");
+//            final IVariable<?> mvar = Var.var("m");
+
+            // The right solutions (the hash index).
+            final List<IBindingSet> right = new LinkedList<IBindingSet>();
+
+            IBindingSet tmp;
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(a));
+            tmp.set(ovar, new Constant<IV>(one));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(a));
+            tmp.set(ovar, new Constant<IV>(two));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(b));
+            tmp.set(ovar, new Constant<IV>(four));
+            right.add(tmp);
+
+            tmp = new ListBindingSet();
+            tmp.set(avar, new Constant<IV>(b));
+            tmp.set(ovar, new Constant<IV>(five));
+            right.add(tmp);
 
             return right;
 
@@ -286,7 +551,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
     /**
      * Test helper for required or optional join tests.
      * 
-     * @param optional
+     * @param joinType
      * @param joinVars
      * @param selectVars
      * @param left
@@ -294,7 +559,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * @param expected
      */
     protected void doHashJoinTest(//
-            final boolean optional,//
+            final HashJoinEnum joinType,//
             final IVariable<?>[] joinVars,//
             final IVariable<?>[] selectVars,//
             final IConstraint[] constraints,//
@@ -312,7 +577,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                 );
 
-        final IHashJoinUtility state = newHashJoinUtility(op, optional, false/* filter */);
+        final IHashJoinUtility state = newHashJoinUtility(op, joinType);
 
         try {
 
@@ -343,11 +608,16 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             // Compute the "required" solutions.
             state.hashJoin(leftItr, outputBuffer);//, true/* leftIsPipeline */);
 
-            if (optional) {
-
+            switch (joinType) {
+            case Optional:
+            case NotExists:
                 // Output the optional solutions.
                 state.outputOptionals(outputBuffer);
-
+                break;
+            case Exists:
+                // Output the join set.
+                state.outputJoinSet(outputBuffer);
+                break;
             }
 
             // Verify the expected solutions.
@@ -366,23 +636,17 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      * 
      * @param op
      *            The operator from which much of the state will be initialized.
-     * @param optional
-     *            <code>true</code> if the use case is a JOIN with OPTIONAL
-     *            semantics.
-     * @param filter
-     *            <code>true</code> if the use case is a DISTINCT SOLUTIONS
-     *            filter.
+     * @param joinType
+     *            The type of operation to be performed.
      * @return
      */
     abstract protected IHashJoinUtility newHashJoinUtility(PipelineOp op,
-            boolean optional, boolean filter);
+            final HashJoinEnum joinType);
 
     /**
      * Empty lhs and rhs with non-optional join.
      */
     public void test_hashJoin01() {
-
-        final boolean optional = false;
 
         // the join variables.
         final IVariable<?>[] joinVars = new IVariable[]{};
@@ -401,9 +665,9 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[0];
-        
-        doHashJoinTest(optional, joinVars, selectVars, constraints, left,
-                right, expected);
+
+        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
 
     }
 
@@ -412,8 +676,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
      */
     public void test_hashJoin02() {
 
-        final boolean optional = true;
-
         // the join variables.
         final IVariable<?>[] joinVars = new IVariable[]{};
 
@@ -432,8 +694,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         // The expected solutions to the join.
         final IBindingSet[] expected = new IBindingSet[0];
         
-        doHashJoinTest(optional, joinVars, selectVars, constraints, left,
-                right, expected);
+        doHashJoinTest(HashJoinEnum.Optional, joinVars, selectVars,
+                constraints, left, right, expected);
 
     }
     
@@ -445,8 +707,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
         final JoinSetup setup = new JoinSetup(getName());
         
-        final boolean optional = false;
-
         final IVariable<?> a = Var.var("a");
         final IVariable<?> x = Var.var("x");
         final IVariable<?> y = Var.var("y");
@@ -481,21 +741,19 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(optional, joinVars, selectVars, constraints, left,
-                right, expected);
+        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
 
     }
 
     /**
-     * Variant with no join variables.
+     * Variant of a previous non-optional join with no join variables.
      */
     @SuppressWarnings("rawtypes")
     public void test_hashJoin04() {
 
         final JoinSetup setup = new JoinSetup(getName());
         
-        final boolean optional = false;
-
         final IVariable<?> a = Var.var("a");
         final IVariable<?> x = Var.var("x");
         final IVariable<?> y = Var.var("y");
@@ -530,20 +788,18 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(optional, joinVars, selectVars, constraints, left,
-                right, expected);
+        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
 
     }
 
     /**
-     * Variant without select variables.
+     * Variant of the previous non-optional join without select variables.
      */
     @SuppressWarnings("rawtypes")
     public void test_hashJoin05() {
 
         final JoinSetup setup = new JoinSetup(getName());
-
-        final boolean optional = false;
 
         final IVariable<?> a = Var.var("a");
         final IVariable<?> x = Var.var("x");
@@ -581,8 +837,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 ),//
         };
 
-        doHashJoinTest(optional, joinVars, selectVars, constraints, left,
-                right, expected);
+        doHashJoinTest(HashJoinEnum.Normal, joinVars, selectVars, constraints,
+                left, right, expected);
 
     }
 
@@ -834,9 +1090,11 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 //                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
-            first = newHashJoinUtility(firstOp, optional, false/* filter */);
+            first = newHashJoinUtility(firstOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
-            other = newHashJoinUtility(otherOp, optional, false/* filter */);
+            other = newHashJoinUtility(otherOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
             // Load into [first].
             {
@@ -1116,9 +1374,11 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 //                    new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
-            first = newHashJoinUtility(firstOp, optional, false/* filter */);
+            first = newHashJoinUtility(firstOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
-            other = newHashJoinUtility(otherOp, optional, false/* filter */);
+            other = newHashJoinUtility(otherOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
             // Load into [first].
             {
@@ -1252,7 +1512,6 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         /**
          * Setup the source solutions for [other].
          */
-        @SuppressWarnings("rawtypes")
         final IBindingSet[] otherSolutions = new IBindingSet[] {
                 new ListBindingSet(//
                         new IVariable[] { a, y },//
@@ -1436,11 +1695,14 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                     new NV(JoinAnnotations.CONSTRAINTS, constraints)//
                     );
 
-            first = newHashJoinUtility(firstOp, optional, false/* filter */);
+            first = newHashJoinUtility(firstOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
-            other = newHashJoinUtility(otherOp, optional, false/* filter */);
+            other = newHashJoinUtility(otherOp,
+                    optional ? HashJoinEnum.Optional : HashJoinEnum.Normal);
 
-            more = newHashJoinUtility(moreOp, optional, false/* filter */);
+            more = newHashJoinUtility(moreOp, optional ? HashJoinEnum.Optional
+                    : HashJoinEnum.Normal);
 
             // Load into [first].
             {
@@ -1535,6 +1797,211 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
         assertEquals(expected.length, outputBuffer.size());
         assertSameSolutionsAnyOrder(expected, outputBuffer.iterator());
         
+    }
+
+    /**
+     * Unit test for EXISTS based on Sesame <code>sparql1-exists-01</code>.
+     * 
+     * <pre>
+     * PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+     * PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> 
+     * 
+     * SELECT ?person
+     * WHERE 
+     * {
+     *     ?person rdf:type  foaf:Person .
+     *     FILTER EXISTS { ?person foaf:name ?name }
+     * }
+     * </pre>
+     * 
+     * <pre>
+     * @prefix  :       <http://example/> .
+     * @prefix  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+     * @prefix  foaf:   <http://xmlns.com/foaf/0.1/> .
+     * 
+     * :alice  rdf:type   foaf:Person .
+     * :alice  foaf:name  "Alice" .
+     * :bob    rdf:type   foaf:Person .
+     * </pre>
+     * 
+     * <pre>
+     *     <result>
+     *       <binding name="person">
+     *         <uri>http://example/alice</uri>
+     *       </binding>
+     *     </result>
+     * </pre>
+     */
+    public void test_exists_01() {
+
+        final ExistsSetup setup = new ExistsSetup(getName());
+        
+        final IVariable<?> person = Var.var("person");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[]{person};
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { person };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getLeft1();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getRight1();
+
+        // The expected solutions to the join.
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ListBindingSet(//
+                        new IVariable[] { person},//
+                        new IConstant[] { new Constant<IV>(setup.alice) }//
+                ),//
+        };
+
+        doHashJoinTest(HashJoinEnum.Exists, joinVars, selectVars, constraints,
+                left, right, expected);
+
+    }
+    
+    /**
+     * Unit tests for NOT EXISTS based on Sesame <code>sparql11-exists-05</code>
+     * .
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT * WHERE {
+     *     ?a :p ?n
+     *     FILTER NOT EXISTS {
+     *         ?a :q ?n .
+     *     }
+     * }
+     *  
+     * :a :p 1 .
+     * :b :p 3.0 .
+     * 
+     * :a :q 1 .
+     * :a :q 2 .
+     * :b :q 4.0 .
+     * :b :q 5.0 .
+     * 
+     *     <result>
+     *       <binding name="a">
+     *         <uri>http://example/b</uri>
+     *       </binding>
+     *       <binding name="n">
+     *         <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3.0</literal>
+     *       </binding>
+     *     </result>
+     * 
+     * </pre>
+     */
+    public void test_not_exists_01() {
+
+        final NotExistsSetup setup = new NotExistsSetup(getName());
+        
+        final IVariable<?> avar = Var.var("a");
+        final IVariable<?> nvar = Var.var("n");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[]{avar};
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { avar, nvar };
+
+        // the join constraints.
+        final IConstraint[] constraints = null;
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getLeft1();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getRight1(nvar);
+
+        // The expected solutions to the join.
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ListBindingSet(//
+                        new IVariable[] { avar, nvar },//
+                        new IConstant[] { new Constant<IV>(setup.b),
+                                          new Constant<IV>(setup.three)
+                                          }//
+                ),//
+        };
+
+        doHashJoinTest(HashJoinEnum.NotExists, joinVars, selectVars,
+                constraints, left, right, expected);
+
+    }
+    
+    /**
+     * Unit tests for NOT EXISTS based on Sesame <code>sparql11-exists-06</code>
+     * . This uses the same data as the previous test (and has the same
+     * solutions), but the query is slightly different and includes a FILTER
+     * inside of the EXISTS graph pattern.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT * WHERE {
+     *     ?a :p ?n
+     *     FILTER NOT EXISTS {
+     *         ?a :q ?m .
+     *         FILTER(?n = ?m)
+     *     }
+     * }
+     * 
+     *     <result>
+     *       <binding name="a">
+     *         <uri>http://example/b</uri>
+     *       </binding>
+     *       <binding name="n">
+     *         <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3.0</literal>
+     *       </binding>
+     *     </result>
+     * 
+     * </pre>
+     */
+    public void test_not_exists_02() {
+
+        final NotExistsSetup setup = new NotExistsSetup(getName());
+        
+        final IVariable<?> avar = Var.var("a");
+        final IVariable<?> nvar = Var.var("n");
+        final IVariable<?> mvar = Var.var("m");
+        
+        // the join variables.
+        final IVariable<?>[] joinVars = new IVariable[]{avar};
+
+        // the variables projected by the join (iff non-null).
+        final IVariable<?>[] selectVars = null;//new IVariable[] { avar, nvar };
+
+        // the join constraints.
+        final IConstraint[] constraints = new IConstraint[] { Constraint
+                .wrap(new EQ(nvar, mvar)) };
+
+        // The left solutions (the pipeline).
+        final List<IBindingSet> right = setup.getLeft1();
+
+        // The right solutions (the hash index).
+        final List<IBindingSet> left = setup.getRight1(mvar);
+
+        // The expected solutions to the join.
+        @SuppressWarnings("rawtypes")
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ListBindingSet(//
+                        new IVariable[] { avar, nvar },//
+                        new IConstant[] { new Constant<IV>(setup.b),
+                                          new Constant<IV>(setup.three)
+                                          }//
+                ),//
+        };
+
+        doHashJoinTest(HashJoinEnum.NotExists, joinVars, selectVars,
+                constraints, left, right, expected);
+
     }
 
 }

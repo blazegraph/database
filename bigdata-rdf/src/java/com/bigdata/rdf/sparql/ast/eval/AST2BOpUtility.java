@@ -1014,6 +1014,23 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * join pattern instead. Also, review the variable scope rules for
              * the embedded graph pattern of an EXIST filter (which is what is
              * being mapped on an ASK filter here).
+             * 
+             * FIXME The query plan for the filter needs to build the hash
+             * index, then run the filter much as we would run a join group, and
+             * finally join against the hash index. It needs to impose a
+             * DISTINCT solutions filter on the EXISTS graph pattern since we
+             * are only interested in whether or not there is at least one right
+             * solution for a given left solution.
+             * 
+             * FIXME EXISTS is not a Sub-Select. We should add a method for
+             * exists and not exists rather than attempting to handle them here.
+             * 
+             * FIXME MINUS also needs its own method, or perhaps is handled by
+             * the same method which handles join groups. (MINUS is basically an
+             * alternative way to handle a solution set hash join for two join
+             * groups.)
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
              */
 
             final boolean aggregate = isAggregate(subqueryRoot);

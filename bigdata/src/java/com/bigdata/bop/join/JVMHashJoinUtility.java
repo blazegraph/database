@@ -388,6 +388,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final AtomicBoolean open = new AtomicBoolean(true);
     
     /**
+     * The type of join to be performed.
+     */
+    private final HashJoinEnum joinType;
+    
+    /**
      * <code>true</code> iff the join is OPTIONAL.
      */
     private final boolean optional;
@@ -458,8 +463,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         sb.append(getClass().getSimpleName());
         
         sb.append("{open=" + open);
-        sb.append(",optional=" + optional);
-        sb.append(",filter=" + filter);
+        sb.append(",joinType="+joinType);
+//        sb.append(",optional=" + optional);
+//        sb.append(",filter=" + filter);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
@@ -481,21 +487,25 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      *            hash index. The {@link HTreeAnnotations} may be specified for
      *            this operator and will control the initialization of the
      *            various {@link HTree} instances.
-     * @param optional
-     *            <code>true</code> iff the join is optional.
-     * @param filter
-     *            <code>true</code> iff the hash index is being used as a
-     *            DISTINCT filter. Various annotations pertaining to JOIN
-     *            processing are ignored when used as a DISTINCT filter.
+     * @param joinType
+     *            The type of join to be performed.
      * 
      * @see JVMHashJoinAnnotations
      */
-    public JVMHashJoinUtility(final PipelineOp op, final boolean optional,
-            final boolean filter) {
+    public JVMHashJoinUtility(final PipelineOp op, final HashJoinEnum joinType) {
+//            final boolean optional,
+//            final boolean filter) {
 
         if (op == null)
             throw new IllegalArgumentException();
 
+        if(joinType == null)
+            throw new IllegalArgumentException();
+        
+        this.joinType = joinType;
+        this.optional = joinType == HashJoinEnum.Optional;
+        this.filter = joinType == HashJoinEnum.Filter;
+        
         // The join variables (required).
         this.joinVars = (IVariable<?>[]) op
                 .getRequiredProperty(HashJoinAnnotations.JOIN_VARS);
@@ -509,11 +519,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         this.constraints = (IConstraint[]) op
                 .getProperty(JoinAnnotations.CONSTRAINTS);
 
-        // Iff the join has OPTIONAL semantics.
-        this.optional = optional;
-        
-        // Iff this is a DISTINCT filter.
-        this.filter = filter;
+//        // Iff the join has OPTIONAL semantics.
+//        this.optional = optional;
+//        
+//        // Iff this is a DISTINCT filter.
+//        this.filter = filter;
 
         /*
          * TODO Parameter for LinkedHashMap versus HashMap. HashMap is going to
@@ -541,12 +551,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
     }
     
-    public boolean isOptional() {
-        return optional;
-    }
-
-    public boolean isFilter() {
-        return filter;
+    public HashJoinEnum getJoinType() {
+        return joinType;
     }
     
     public IVariable<?>[] getJoinVars() {
@@ -738,12 +744,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * {@inheritDoc}
      * <p>
      * For each source solution materialized, the hash table is probed using the
-     * as-bound join variables for that source solution. If there is a hit in
-     * the hash table, then operator then outputs the cross product of the
-     * source solution with the solutions list in the {@link Bucket} found under
-     * that {@link Key} in the hash table, applying any optional CONSTRAINTS. A
-     * join hit counter is carried for each solution in the hash index. The join
-     * hit counter is used to support optional joins.
+     * as-bound join variables for that source solution. A join hit counter is
+     * carried for each solution in the hash index and is used to support
+     * OPTIONAL joins.
      */
     @Override
     public void hashJoin2(//
@@ -787,7 +790,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                 if (b == null)
                     continue;
 
-                for (SolutionHit right : b) {
+                final Iterator<SolutionHit> ritr = b.iterator();
+                
+                while (ritr.hasNext()) {
+
+                    final SolutionHit right = ritr.next();
 
                     nrightConsidered.increment();
                     
@@ -809,27 +816,65 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     }
 
                     // See if the solutions join. 
-                    final IBindingSet outSolution = //
-                    BOpContext.bind(//
-                            right.solution,// 
-                            left,// 
-//                            leftIsPipeline,//
+                    final IBindingSet outSolution = BOpContext.bind(//
+                            right.solution,//
+                            left,//
                             constraints,//
                             selectVars//
                             );
 
-                    if (outSolution == null) {
-                        // Join failed.
-                        continue;
+                    switch(joinType) {
+                    case Normal: {
+                        if (outSolution != null) {
+                            // Output the solution.
+                            outputSolution(outputBuffer, outSolution);
+                        }
+                        break;
                     }
-
-                    if (log.isDebugEnabled())
-                        log.debug("Output solution: " + outSolution);
-
-                    right.nhits.increment();
-
-                    // Accept this binding set.
-                    outputBuffer.add(outSolution);
+                    case Optional: {
+                        if (outSolution != null) {
+                            // Output the solution.
+                            outputSolution(outputBuffer, outSolution);
+                            // Increment counter so we know not to output the
+                            // rightSolution as an optional solution.
+                            right.nhits.increment();
+                        }
+                        break;
+                    }
+                    case Exists: {
+                        /*
+                         * The right solution is output iff there is at least
+                         * one left solution which joins with that right
+                         * solution. Each right solution is output at most one
+                         * time.
+                         */
+                        if (outSolution != null) {
+//                            if (right.nhits.get() == 0L) {
+//                                // Output the solution.
+//                                outputSolution(outputBuffer, right.solution);
+//                            }
+                            // Increment counter so we know this solution joins.
+                            right.nhits.increment();
+                        }
+                        break;
+                    }
+                    case NotExists: {
+                        /*
+                         * The right solution is output iff there does not exist
+                         * any left solution which joins with that right
+                         * solution. This basically an optional join where the
+                         * solutions which join are not output.
+                         */
+                        if (outSolution != null) {
+                            // Increment counter so we know not to output the
+                            // rightSolution as an optional solution.
+                            right.nhits.increment();
+                        }
+                        break;
+                    }
+                    default:
+                        throw new AssertionError();
+                    }
 
                 }
 
@@ -847,43 +892,72 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
     }
 
+    /**
+     * Output a solution.
+     * 
+     * @param outputBuffer
+     *            Where to write the solution.
+     * @param outSolution
+     *            The solution.
+     */
+    private void outputSolution(final IBuffer<IBindingSet> outputBuffer,
+            final IBindingSet outSolution) {
+
+        if (log.isDebugEnabled())
+            log.debug("Output solution: " + outSolution);
+
+        // Accept this binding set.
+        outputBuffer.add(outSolution);
+        
+    }
+
     @Override
     public void outputOptionals(final IBuffer<IBindingSet> outputBuffer) {
 
         try {
-        
-        final Map<Key,Bucket> rightSolutions = getRightSolutions();
-        
-        if (log.isInfoEnabled()) {
-            log.info("rightSolutions: #buckets=" + rightSolutions.size());
-        }
 
-        /*
-         * Note: when NO subquery solutions joined for a given source binding
-         * set AND the subquery is OPTIONAL then we output the _original_
-         * binding set to the sink join task(s) and DO NOT apply the
-         * CONSTRAINT(s).
-         */
+            final Map<Key, Bucket> rightSolutions = getRightSolutions();
 
-        for(Bucket b : rightSolutions.values()) {
-            
-            for(SolutionHit hit : b) {
+            final IVariable<?>[] selected = getSelectVars();
 
-                if (hit.nhits.get() > 0)
-                    continue;
+            if (log.isInfoEnabled())
+                log.info("rightSolutions: #buckets=" + rightSolutions.size());
 
-                final IBindingSet bs = hit.solution;
+            /*
+             * Note: when NO solutions joined for a given source binding set AND
+             * the join is OPTIONAL then we output the _original_ binding set to
+             * the sink join task(s) and DO NOT apply the CONSTRAINT(s).
+             */
 
-                if (log.isDebugEnabled())
-                    log.debug("Optional solution: " + bs);
+            for (Bucket b : rightSolutions.values()) {
 
-                outputBuffer.add(bs);
+                for (SolutionHit hit : b) {
+
+                    if (hit.nhits.get() > 0)
+                        continue;
+
+                    IBindingSet bs = hit.solution;
+
+                    if (selected != null) {
+
+                        // Drop variables which are not projected.
+                        bs = bs.copy(selected);
+
+                    }
+
+                    outputBuffer.add(bs);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Optional solution: " + bs);
+
+                }
 
             }
+
+        } catch (Throwable t) {
             
-        }
-        } catch(Throwable t) {
             throw launderThrowable(t);
+        
         }
         
     }
@@ -892,44 +966,93 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     public void outputSolutions(final IBuffer<IBindingSet> out) {
 
         try {
-        
-        final Map<Key,Bucket> rightSolutions = getRightSolutions();
 
-        final IVariable<?>[] selected = getSelectVars();
+            final Map<Key, Bucket> rightSolutions = getRightSolutions();
 
-        if (log.isInfoEnabled()) {
-            log.info("rightSolutions: #buckets=" + rightSolutions.size());
-        }
+            final IVariable<?>[] selected = getSelectVars();
 
-        // source.
-        final Iterator<Bucket> bucketIterator = rightSolutions.values()
-                .iterator();
+            if (log.isInfoEnabled())
+                log.info("rightSolutions: #buckets=" + rightSolutions.size());
 
-        while (bucketIterator.hasNext()) {
+            // source.
+            final Iterator<Bucket> bucketIterator = rightSolutions.values()
+                    .iterator();
 
-            final Bucket bucket = bucketIterator.next();
+            while (bucketIterator.hasNext()) {
 
-            for (SolutionHit solutionHit : bucket) {
+                final Bucket bucket = bucketIterator.next();
 
-                IBindingSet bset = solutionHit.solution;
+                for (SolutionHit solutionHit : bucket) {
 
-                if (selected != null) {
+                    IBindingSet bs = solutionHit.solution;
 
-                    // Drop variables which are not projected.
-                    bset = bset.copy(selected);
+                    if (selected != null) {
+
+                        // Drop variables which are not projected.
+                        bs = bs.copy(selected);
+
+                    }
+
+                    out.add(bs);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Optional solution: " + bs);
 
                 }
 
-                out.add(bset);
+            }
+
+        } catch (Throwable t) {
+            
+            throw launderThrowable(t);
+            
+        }
+
+    }
+
+    @Override
+    public void outputJoinSet(final IBuffer<IBindingSet> outputBuffer) {
+
+        try {
+
+            final Map<Key, Bucket> rightSolutions = getRightSolutions();
+
+            final IVariable<?>[] selected = getSelectVars();
+
+            if (log.isInfoEnabled())
+                log.info("rightSolutions: #buckets=" + rightSolutions.size());
+
+            for (Bucket b : rightSolutions.values()) {
+
+                for (SolutionHit hit : b) {
+
+                    if (hit.nhits.get() == 0)
+                        continue;
+
+                    IBindingSet bs = hit.solution;
+
+                    if (selected != null) {
+
+                        // Drop variables which are not projected.
+                        bs = bs.copy(selected);
+
+                    }
+
+                    outputBuffer.add(bs);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Output solution: " + bs);
+
+                }
 
             }
 
-        }       
-
-        } catch(Throwable t) {
+        } catch (Throwable t) {
+            
             throw launderThrowable(t);
+        
         }
-
+        
     }
 
     /**

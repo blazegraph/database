@@ -90,10 +90,10 @@ public class TestHTreeHashJoinUtility extends AbstractHashJoinUtilityTestCase {
     }
 
     @Override
-    protected HTreeHashJoinUtility newHashJoinUtility(PipelineOp op,
-            boolean optional, boolean filter) {
+    protected HTreeHashJoinUtility newHashJoinUtility(final PipelineOp op,
+            final HashJoinEnum joinType) {
 
-        return new HTreeHashJoinUtility(mmgr, op, optional, filter);
+        return new HTreeHashJoinUtility(mmgr, op, joinType);
 
     }
 
