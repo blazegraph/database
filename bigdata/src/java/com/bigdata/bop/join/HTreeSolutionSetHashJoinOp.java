@@ -256,7 +256,7 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                 
             }
 
-            if (state.getJoinType().isOptional() && !op.isLastPassRequested()) {
+            if (!state.getJoinType().isNormal() && !op.isLastPassRequested()) {
 
                 /*
                  * An optional join requires that we observe all solutions
@@ -264,10 +264,9 @@ public class HTreeSolutionSetHashJoinOp extends PipelineOp {
                  * those which do not join.
                  */
 
-                throw new UnsupportedOperationException(
-                        JoinAnnotations.OPTIONAL + " requires "
-                                + Annotations.LAST_PASS);
-            
+                throw new UnsupportedOperationException(state.getJoinType()
+                        + " requires " + Annotations.LAST_PASS);
+
             }
 
             /*

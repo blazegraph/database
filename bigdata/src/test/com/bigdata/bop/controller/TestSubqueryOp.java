@@ -39,28 +39,29 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bindingSet.HashBindingSet;
+import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.constraint.Constraint;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -200,7 +201,8 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         final SubqueryOp subqueryOp = new SubqueryOp(
                 new BOp[] {},//
                 new NV(Predicate.Annotations.BOP_ID, subqueryId),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE,JoinTypeEnum.Normal)//
                 );
 
         final PipelineOp query = subqueryOp;
@@ -308,6 +310,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
                 new BOp[] {},//
                 new NV(Predicate.Annotations.BOP_ID, subqueryId),//
                 new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE,JoinTypeEnum.Normal),//
                 new NV(SubqueryOp.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
                                 .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
@@ -408,14 +411,17 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
         final PipelineJoin<E> subquery = new PipelineJoin<E>(
                 new BOp[] { },//
                 new NV(Predicate.Annotations.BOP_ID, joinId),//
-                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE,JoinTypeEnum.Normal)//
+                );
 
         // the hash-join against the subquery.
         final SubqueryOp subqueryOp = new SubqueryOp(
                 new BOp[] {},//
                 new NV(Predicate.Annotations.BOP_ID, subqueryId),//
                 new NV(SubqueryOp.Annotations.SELECT, new IVariable[]{x}),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subquery)//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
                 );
 
         final PipelineOp query = subqueryOp;
@@ -618,7 +624,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
                 // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );
@@ -883,7 +889,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
                 // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );
@@ -1144,7 +1150,7 @@ public class TestSubqueryOp extends AbstractSubqueryTestCase {
 //                new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                        BOpEvaluationContext.CONTROLLER)//
                 // join is optional.
-                new NV(SubqueryOp.Annotations.OPTIONAL, true)//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
 //                // optional target is the same as the default target.
 //                new NV(PipelineOp.Annotations.ALT_SINK_REF, sliceId)
         );

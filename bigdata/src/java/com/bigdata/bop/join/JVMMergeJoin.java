@@ -76,9 +76,16 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
          */
         String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
         
-        String OPTIONAL = JoinAnnotations.OPTIONAL;
-        
-        boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
+        /**
+         * Only {@link JoinTypeEnum#Normal} and {@link JoinTypeEnum#Optional}
+         * merge joins are supported.
+         * 
+         * @see JoinAnnotations#JOIN_TYPE
+         */
+        String JOIN_TYPE = JoinAnnotations.JOIN_TYPE;
+//        String OPTIONAL = JoinAnnotations.OPTIONAL;
+//        
+//        boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
         
         /**
          * When <code>true</code> the hash index identified by
@@ -111,6 +118,16 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
         
         super(args, annotations);
 
+//        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+//        switch (joinType) {
+//        case Normal:
+//        case Optional:
+//            break;
+//        default:
+//            throw new UnsupportedOperationException(Annotations.JOIN_TYPE + "="
+//                    + joinType);
+//        }
+
         if (!isLastPassRequested()) {
 
             /*
@@ -119,9 +136,8 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
              * operator more than once.
              */
 
-            throw new UnsupportedOperationException(
-                    JoinAnnotations.OPTIONAL + " requires "
-                            + Annotations.LAST_PASS);
+            throw new UnsupportedOperationException("Requires "
+                    + Annotations.LAST_PASS);
         
         }
 
@@ -164,7 +180,7 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
 
 //        private final IVariable<?>[] selectVars;
 
-        private final boolean optional;
+//        private final boolean optional;
         
         private final boolean release;
         
@@ -187,8 +203,13 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
             this.constraints = (IConstraint[]) op
                     .getProperty(Annotations.CONSTRAINTS);
 
-            this.optional = op.getProperty(Annotations.OPTIONAL,
-                    Annotations.DEFAULT_OPTIONAL);
+//            final JoinTypeEnum joinType = (JoinTypeEnum) op
+//                    .getRequiredProperty(Annotations.JOIN_TYPE);
+//            
+//            this.optional = joinType.isOptional();
+//            
+//            this.optional = op.getProperty(Annotations.OPTIONAL,
+//                    Annotations.DEFAULT_OPTIONAL);
 
             this.release = op.getProperty(Annotations.RELEASE,
                     Annotations.DEFAULT_RELEASE);
@@ -248,7 +269,7 @@ public class JVMMergeJoin extends AbstractMergeJoin  {
                     }
 
                     state[0].mergeJoin(others, unsyncBuffer, constraints,
-                            optional);
+                            state[0].getJoinType().isOptional());
 
                     unsyncBuffer.flush();
 

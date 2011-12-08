@@ -48,6 +48,7 @@ import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.JoinAnnotations;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -194,7 +195,17 @@ public class SubqueryOp extends PipelineOp {
                     + " is optional, but may not be empty.");
             
         }
-        
+
+        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+        switch (joinType) {
+        case Normal:
+        case Optional:
+            break;
+        default:
+            throw new UnsupportedOperationException(Annotations.JOIN_TYPE + "="
+                    + joinType);
+        }
+
     }
 
     public SubqueryOp(final BOp[] args, NV... annotations) {
@@ -217,8 +228,8 @@ public class SubqueryOp extends PipelineOp {
     private static class ControllerTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
-        /** <code>true</code> if the subquery has optional join semantics. */
-        private final boolean optional;
+        /** The type of join. */
+        private final JoinTypeEnum joinType;
         /** <code>true</code> if the subquery is an aggregate. */
         private final boolean aggregate;
         /** The subquery which is evaluated for each input binding set. */
@@ -241,10 +252,12 @@ public class SubqueryOp extends PipelineOp {
 
             this.context = context;
 
-            this.optional = controllerOp.getProperty(
-                    Annotations.OPTIONAL,
-                    Annotations.DEFAULT_OPTIONAL);
-
+//            this.optional = controllerOp.getProperty(
+//                    Annotations.OPTIONAL,
+//                    Annotations.DEFAULT_OPTIONAL);
+            joinType = (JoinTypeEnum) controllerOp
+                    .getRequiredProperty(Annotations.JOIN_TYPE);
+            
             this.aggregate = controllerOp.getProperty(
                     Annotations.IS_AGGREGATE,
                     Annotations.DEFAULT_IS_AGGREGATE);
@@ -460,7 +473,7 @@ public class SubqueryOp extends PipelineOp {
 						
 					}
 					
-                    if (ncopied == 0L && optional) {
+                    if (ncopied == 0L && joinType.isOptional()) {
 
                         /*
                          * Since there were no solutions for the subquery, copy

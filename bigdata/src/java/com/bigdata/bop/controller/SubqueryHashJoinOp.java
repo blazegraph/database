@@ -44,8 +44,8 @@ import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.JVMHashJoinUtility;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -112,7 +112,9 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
 		}
 
-		getRequiredProperty(Annotations.SUBQUERY);
+        getRequiredProperty(Annotations.SUBQUERY);
+
+        getRequiredProperty(Annotations.JOIN_TYPE);
 
 		assertAtOnceJavaHeapOp();
 
@@ -256,11 +258,12 @@ public class SubqueryHashJoinOp extends PipelineOp {
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
-            final boolean optional = op.getProperty(Annotations.OPTIONAL,
-                    Annotations.DEFAULT_OPTIONAL);
+//            final boolean optional = op.getProperty(Annotations.OPTIONAL,
+//                    Annotations.DEFAULT_OPTIONAL);
+            final JoinTypeEnum joinType = (JoinTypeEnum) op
+                    .getRequiredProperty(Annotations.JOIN_TYPE);
 
-            this.state = new JVMHashJoinUtility(op,
-                    optional ? JoinTypeEnum.Optional : JoinTypeEnum.Normal);
+            this.state = new JVMHashJoinUtility(op, joinType);
 
             this.sink = context.getSink();
 

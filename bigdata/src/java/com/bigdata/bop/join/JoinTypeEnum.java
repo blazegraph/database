@@ -45,7 +45,8 @@ public enum JoinTypeEnum {
     /**
      * An optional join. The output is the combination of the left and right
      * hand solutions. Solutions which join are output, plus any left solutions
-     * which did not join.
+     * which did not join. Constraints on the join ARE NOT applied to the
+     * "optional" path.
      */
     Optional,
     /**

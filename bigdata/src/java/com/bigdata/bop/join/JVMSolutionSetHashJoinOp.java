@@ -272,10 +272,9 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                  * those which do not join.
                  */
 
-                throw new UnsupportedOperationException(
-                        JoinAnnotations.OPTIONAL + " requires "
-                                + Annotations.LAST_PASS);
-            
+                throw new UnsupportedOperationException(state.getJoinType()
+                        + " requires " + Annotations.LAST_PASS);
+
             }
 
             /*

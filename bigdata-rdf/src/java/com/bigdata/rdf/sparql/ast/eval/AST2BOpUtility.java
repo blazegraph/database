@@ -53,6 +53,7 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMMergeJoin;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.GroupByOp;
@@ -1047,7 +1048,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
             left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
                     new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
                     new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(SubqueryOp.Annotations.OPTIONAL, false),//
+                    new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                     new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
                     new NV(SubqueryOp.Annotations.SELECT, null),//
                     new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
@@ -1089,10 +1090,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     ctx.queryId, solutionSetName, joinVars);
 
             // Sub-Select is not optional.
-            final boolean optional = false;
+//            final boolean optional = false;
+            final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
-            // lastPass is required if the join is optional.
-            final boolean lastPass = optional; // iff optional.
+            // lastPass is required except for normal joins.
+            final boolean lastPass = false;//optional; 
 
             // true if we will release the HTree as soon as the join is done.
             // Note: also requires lastPass.
@@ -1107,7 +1109,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
@@ -1121,7 +1123,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                     new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
@@ -1934,6 +1936,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         // Figure out if the join is required or optional.
         final boolean optional = requiredIncludes.isEmpty();
+        final JoinTypeEnum joinType = optional ? JoinTypeEnum.Optional
+                : JoinTypeEnum.Normal;
         
         // The list of includes that we will process.
         final List<NamedSubqueryInclude> includes = optional ? optionalIncludes
@@ -1967,6 +1971,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
         //                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(JVMMergeJoin.Annotations.JOIN_TYPE, joinType),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
         //                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
@@ -1980,6 +1985,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                    new NV(JVMMergeJoin.Annotations.JOIN_TYPE, joinType),//
                     new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
         //                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                     new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
@@ -2043,7 +2049,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(HTreeMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
-                    new NV(HTreeMergeJoin.Annotations.OPTIONAL, optional),//
+//                    new NV(HTreeMergeJoin.Annotations.JOIN_TYPE, joinType),//
                     new NV(HTreeMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(HTreeMergeJoin.Annotations.RELEASE,
                                 release)//
@@ -2060,7 +2066,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                     new NV(JVMMergeJoin.Annotations.NAMED_SET_REF,
                             namedSolutionSetRefs),//
-                    new NV(JVMMergeJoin.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMMergeJoin.Annotations.JOIN_TYPE, joinType),//
                     new NV(JVMMergeJoin.Annotations.CONSTRAINTS, c),//
                     new NV(JVMMergeJoin.Annotations.RELEASE,
                             release)//
@@ -2365,7 +2371,9 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final boolean minus = subgroup instanceof JoinGroupNode
                 && ((JoinGroupNode) subgroup).isMinus();
         
-        final boolean required = !optional && !minus;
+        // The type of join.
+        final JoinTypeEnum joinType = optional ? JoinTypeEnum.Optional
+                : minus ? JoinTypeEnum.NotExists : JoinTypeEnum.Normal;
 
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -2373,7 +2381,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(subgroup), needsMaterialization);
 
-        if (!required && joinConstraints != null) {
+        if (!joinType.isNormal() && joinConstraints != null) {
             /*
              * Note: Join filters should only be attached to required joins, not
              * to OPTIONAL joins (except for a simple optional statement pattern
@@ -2439,7 +2447,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -2452,7 +2460,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -2463,7 +2471,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 subgroup, doneSet, ctx);
 
         // lastPass is required if the join is optional.
-        final boolean lastPass = !required; // unless this is a simple required join.
+        final boolean lastPass = !joinType.isNormal(); // unless this is a simple required join.
 
         // true if we will release the HTree as soon as the join is done.
         // Note: also requires lastPass.

@@ -165,7 +165,7 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, false),//
 //                    new NV(HTreeHashIndexOp.Annotations.RELEASE, false),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
