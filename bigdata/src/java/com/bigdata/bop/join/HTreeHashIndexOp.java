@@ -138,6 +138,9 @@ public class HTreeHashIndexOp extends PipelineOp {
 
         getRequiredProperty(Annotations.NAMED_SET_REF);
 
+        @SuppressWarnings("unused")
+        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
@@ -159,17 +162,17 @@ public class HTreeHashIndexOp extends PipelineOp {
         
     }
 
-    /**
-     * Return <code>true</code> iff the solutions on the hash index will be
-     * re-integrated using an OPTIONAL join.
-     * 
-     * @see Annotations#OPTIONAL
-     */
-    public boolean isOptional() {
-       
-        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
-        
-    }
+//    /**
+//     * Return <code>true</code> iff the solutions on the hash index will be
+//     * re-integrated using an OPTIONAL join.
+//     * 
+//     * @see Annotations#OPTIONAL
+//     */
+//    public boolean isOptional() {
+//       
+//        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+//        
+//    }
    
     @Override
     public BOpStats newStats() {
@@ -275,10 +278,12 @@ public class HTreeHashIndexOp extends PipelineOp {
 
                 if (state == null) {
                     
+                    final JoinTypeEnum joinType = (JoinTypeEnum) op
+                            .getRequiredProperty(Annotations.JOIN_TYPE);
+
                     state = new HTreeHashJoinUtility(
                             context.getMemoryManager(namedSetRef.queryId), op,
-                            op.isOptional() ? JoinTypeEnum.Optional
-                                    : JoinTypeEnum.Normal);
+                            joinType);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

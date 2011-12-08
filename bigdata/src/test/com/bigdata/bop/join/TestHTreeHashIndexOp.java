@@ -152,7 +152,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -166,7 +166,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
 //                            BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -184,7 +184,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
 //                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -203,7 +203,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -220,7 +220,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -234,7 +234,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
 //                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                     new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -251,7 +251,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -264,7 +264,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, null),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -278,7 +278,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                     new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                     new NV(HTreeHashIndexOp.Annotations.SELECT, selected)//
 //                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -320,7 +320,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{setup.namespace}),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, false),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
@@ -414,7 +414,7 @@ public class TestHTreeHashIndexOp extends TestCase2 {
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, true),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional),//
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{setup.namespace}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//

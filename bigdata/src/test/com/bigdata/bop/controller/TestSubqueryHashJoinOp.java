@@ -60,6 +60,7 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
@@ -189,7 +190,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                     new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                     new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                     new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
-                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
             );
         }
 
@@ -200,7 +202,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                     new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                     new NV(SubqueryHashJoinOp.Annotations.PIPELINED, true),//
                     new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
-                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
             );
             fail("Expecting exception");
         } catch(Throwable t) {
@@ -216,7 +219,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                     new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                     new NV(SubqueryHashJoinOp.Annotations.MAX_MEMORY, 100000L),//
                     new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
-                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
             );
             fail("Expecting exception");
         } catch(Throwable t) {
@@ -231,7 +235,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                     new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                     new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
 //                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
-                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
             );
             fail("Expecting exception");
         } catch(Throwable t) {
@@ -245,8 +250,25 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                     new BOp[] { startOp },// 
                     new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                     new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
-                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y})//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
 //                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
+            );
+            fail("Expecting exception");
+        } catch(Throwable t) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+t);
+        }
+
+        // JOIN_TYPE is required.
+        try {
+            new SubqueryHashJoinOp(//
+                    new BOp[] { startOp },// 
+                    new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
+                    new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
+                    new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x,y}),//
+                    new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery)//
+//                    new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
             );
             fail("Expecting exception");
         } catch(Throwable t) {
@@ -292,7 +314,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                 new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x}),//
-                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
                 );
 
         final PipelineOp query = subqueryHashJoin;
@@ -392,7 +415,9 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
         final PipelineJoin<E> subquery = new PipelineJoin<E>(
                 new BOp[] { },//
                 new NV(Predicate.Annotations.BOP_ID, joinId),//
-                new NV(PipelineJoin.Annotations.PREDICATE, predOp));
+                new NV(PipelineJoin.Annotations.PREDICATE, predOp),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
+                );
 
         // the hash-join against the subquery.
         final SubqueryHashJoinOp subqueryHashJoin = new SubqueryHashJoinOp(
@@ -400,7 +425,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(Predicate.Annotations.BOP_ID, subqueryHashJoinId),//
                 new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{/*x*/}),//
-                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
                 );
 
         final PipelineOp query = subqueryHashJoin;
@@ -511,6 +537,7 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS,
                         new IVariable[] { x }),//
                 new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
                 new NV(SubqueryHashJoinOp.Annotations.CONSTRAINTS,
                         new IConstraint[] { Constraint
                                 .wrap(new EQConstant(x, new Constant<String>("Brad"))),//
@@ -619,7 +646,8 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{x}),//
                 new NV(SubqueryHashJoinOp.Annotations.SELECT, new IVariable[]{x}),//
-                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery)//
+                new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subquery),//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal)//
                 );
 
         final PipelineOp query = subqueryHashJoin;
@@ -821,7 +849,7 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
                 new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
-                new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
         );
         
         final PipelineOp sliceOp = new SliceOp(//
@@ -1082,7 +1110,7 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
         new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
         new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
         new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
-        new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
+        new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
         );
 
         final PipelineOp sliceOp = new SliceOp(//
@@ -1338,7 +1366,7 @@ public class TestSubqueryHashJoinOp extends AbstractSubqueryTestCase {
                 new NV(SubqueryHashJoinOp.Annotations.PIPELINED, false),//
                 new NV(SubqueryHashJoinOp.Annotations.JOIN_VARS, new IVariable[]{b}),//
                 new NV(SubqueryHashJoinOp.Annotations.SUBQUERY, subQuery),//
-                new NV(SubqueryHashJoinOp.Annotations.OPTIONAL, true)//
+                new NV(SubqueryHashJoinOp.Annotations.JOIN_TYPE, JoinTypeEnum.Optional)//
         );
         
         final PipelineOp sliceOp = new SliceOp(//

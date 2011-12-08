@@ -168,6 +168,9 @@ public class JVMHashIndexOp extends PipelineOp {
 
         getRequiredProperty(Annotations.NAMED_SET_REF);
 
+        @SuppressWarnings("unused")
+        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
 
@@ -363,11 +366,10 @@ public class JVMHashIndexOp extends PipelineOp {
 
                 if (state == null) {
 
-                    final boolean optional = op.getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+                    final JoinTypeEnum joinType = (JoinTypeEnum) op
+                            .getRequiredProperty(Annotations.JOIN_TYPE);
                     
-                    state = new JVMHashJoinUtility(op,
-                            optional ? JoinTypeEnum.Optional
-                                    : JoinTypeEnum.Normal);
+                    state = new JVMHashJoinUtility(op, joinType);
 
 //                    this.first = true;
                  

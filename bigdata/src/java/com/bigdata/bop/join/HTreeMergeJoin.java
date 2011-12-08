@@ -37,8 +37,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.controller.HTreeNamedSubqueryOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.htree.HTree;
@@ -68,9 +66,16 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
          */
         String CONSTRAINTS = JoinAnnotations.CONSTRAINTS;
         
-        String OPTIONAL = JoinAnnotations.OPTIONAL;
-        
-        boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
+        /**
+         * Only {@link JoinTypeEnum#Normal} and {@link JoinTypeEnum#Optional}
+         * merge joins are supported.
+         * 
+         * @see JoinAnnotations#JOIN_TYPE
+         */
+        String JOIN_TYPE = JoinAnnotations.JOIN_TYPE;
+//        String OPTIONAL = JoinAnnotations.OPTIONAL;
+//        
+//        boolean DEFAULT_OPTIONAL = JoinAnnotations.DEFAULT_OPTIONAL;
         
         /**
          * When <code>true</code> the hash index identified by
@@ -100,7 +105,32 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
      * @param annotations
      */
     public HTreeMergeJoin(BOp[] args, Map<String, Object> annotations) {
+
         super(args, annotations);
+
+//        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+//        switch (joinType) {
+//        case Normal:
+//        case Optional:
+//            break;
+//        default:
+//            throw new UnsupportedOperationException(Annotations.JOIN_TYPE + "="
+//                    + joinType);
+//        }
+
+        if (!isLastPassRequested()) {
+
+            /*
+             * FIXME I am not convinced that "LAST PASS" evaluation semantics
+             * are required here. However, we should not be evaluating this
+             * operator more than once.
+             */
+
+            throw new UnsupportedOperationException("Requires "
+                    + Annotations.LAST_PASS);
+
+        }
+
     }
 
     /**
@@ -138,7 +168,7 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
 
 //        private final IVariable<?>[] selectVars;
 
-        private final boolean optional;
+//        private final boolean optional;
         
         private final boolean release;
         
@@ -161,8 +191,12 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
             this.constraints = (IConstraint[]) op
                     .getProperty(Annotations.CONSTRAINTS);
 
-            this.optional = op.getProperty(Annotations.OPTIONAL,
-                    Annotations.DEFAULT_OPTIONAL);
+//            final JoinTypeEnum joinType = (JoinTypeEnum) op
+//                    .getRequiredProperty(Annotations.JOIN_TYPE);
+//            
+//            this.optional = joinType.isOptional();
+//            this.optional = op.getProperty(Annotations.OPTIONAL,
+//                    Annotations.DEFAULT_OPTIONAL);
 
             this.release = op.getProperty(Annotations.RELEASE,
                     Annotations.DEFAULT_RELEASE);
@@ -222,7 +256,7 @@ public class HTreeMergeJoin extends AbstractMergeJoin {
                     }
 
                     state[0].mergeJoin(others, unsyncBuffer, constraints,
-                            optional);
+                            state[0].getJoinType().isOptional());
 
                     unsyncBuffer.flush();
 
