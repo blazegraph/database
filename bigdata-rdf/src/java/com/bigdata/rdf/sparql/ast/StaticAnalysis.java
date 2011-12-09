@@ -262,8 +262,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Do the siblings of the node first.  Unless it is a Union.  Siblings
          * don't see each other's bindings in a Union. 
-         * 
-         * FIXME This is also true for MINUS
          */
         if (!(parent instanceof UnionNode)) {
             
@@ -350,8 +348,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Do the siblings of the node first.  Unless it is a Union.  Siblings
          * don't see each other's bindings in a Union.
-         * 
-         * FIXME This is also true for MINUS
          */
         if (!(parent instanceof UnionNode)) {
             
