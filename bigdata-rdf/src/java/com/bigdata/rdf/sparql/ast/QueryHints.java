@@ -83,7 +83,7 @@ public interface QueryHints {
 
     QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
     
-	        /**
+    /**
      * A label which may be used to tag the instances of some SPARQL query
      * template in manner which makes sense to the application (default
      * {@value #DEFAULT_TAG}). The tag is used to aggregate performance
@@ -116,6 +116,10 @@ public interface QueryHints {
      * . Hash indices are often created by one operator and then consumed by
      * another so the same kinds of hash indices MUST be used throughout the
      * query.
+     * 
+     * <pre>
+     * hint:Query hint:analytic "true".
+     * </pre>
      * 
      * @see #NATIVE_DISTINCT_SPO
      * @see #NATIVE_DISTINCT_SOLUTIONS
