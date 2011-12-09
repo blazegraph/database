@@ -94,7 +94,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestSubQuery.class);
 
         // Test suite for negation (EXISTS, NOT EXISTS, MINUS).
-//        suite.addTestSuite(TestNegation.class); FIXME Uncomment when ready for CI.
+        suite.addTestSuite(TestNegation.class);
 
         // Test suite for a merge join pattern
         suite.addTestSuite(TestMergeJoin.class);

@@ -439,9 +439,6 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
             /*
              * Create the projection for the named subquery.
-             * 
-             * TODO Make this projection DISTINCT if that does not change the
-             * query semantics.
              */
             {
 
@@ -463,19 +460,6 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
         }
         
-//        /*
-//         * Clean up. We need to remove anything which was moved.
-//         * 
-//         * Note: We can't easily do this while iterating over the group members
-//         * so the things which get moved are collected up and then removed in a
-//         * clean up step.
-//         */
-//        for (IGroupMemberNode t : move) {
-//        
-//            group.removeArg((BOp) t);
-//            
-//        }
-
     }
 
     private void liftSparql11Subquery(final AST2BOpContext context,

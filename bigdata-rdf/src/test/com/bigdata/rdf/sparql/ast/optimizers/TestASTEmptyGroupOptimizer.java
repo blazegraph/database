@@ -1029,11 +1029,6 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
                 given/* queryNode */, bsets);
 
-        /*
-         * FIXME The ASTEmptyGroupOptimizer needs to be refactored to handle
-         * this.  We need to replace the parent with the child and also handle
-         * the case when the parent is the top-level of the WHERE clause.
-         */
         assertSameAST(expected, actual);
 
     }
@@ -1129,7 +1124,33 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
     }
     
     /**
-     * https://sourceforge.net/apps/trac/bigdata/ticket/416
+     * Top-level UNION optimizations. We should look at the plan after join
+     * attachment. If there is just a child union (because either there is no
+     * filter or because there is a filter and it was attached to the union)
+     * then we should either lift the UNION and evaluate it directly or (if we
+     * do not permit that structure) make the join group evaluation a nop in
+     * which it just enters the child (the union) and evaluates that.
+     * 
+     * <pre>
+     *     SELECT DISTINCT ?subjectUri ?p ?rightValue ?leftValue
+     *     WHERE {
+     *     {
+     *     ?subjectUri rdf:type <http://test.org/someType/a> .
+     *     ?subjectUri ?p ?rightValue .
+     *     ?rightValue rdf:type ?otherValueType .
+     *     } UNION {
+     *     ?subjectUri rdf:type <http://test.org/someType/a> .
+     *     ?leftValue ?p ?subjectUri .
+     *     ?leftValue rdf:type ?otherValueType .
+     *     }
+     *     FILTER(sameTerm(?otherValueType,
+     *     'http://test.org/someOtherType/1')
+     *     sameTerm(?otherValueType,
+     *     'http://test.org/someOtherType/2'))
+     *     }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/416
      */
     public void test_ticket416() throws Exception {
         
@@ -1138,9 +1159,9 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
          */
         final IBindingSet[] bsets = new IBindingSet[]{};
         
-        final IV type = makeIV(RDF.TYPE);
+        final IV<?,?> type = makeIV(RDF.TYPE);
         
-        final IV a = makeIV(new URIImpl("http://example/a"));
+        final IV<?,?> a = makeIV(new URIImpl("http://example/a"));
 
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -1242,6 +1263,422 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
             expected.setProjection(projection);
             expected.setWhereClause(union);
 
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(subj)
+     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+     *     JoinGroupNode [minus] {
+     *       StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), NAMED_CONTEXTS)
+     *     }
+     * </pre>
+     * 
+     * There is no change. The top-level join group is unchanged since the MINUS
+     * is not semantically empty and hence can not be lifted into it. 
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_eliminateJoinGroup10_minus() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+        bdSearchIV.setValue(store.getValueFactory().createURI(
+                BD.SEARCH.toString()));
+
+        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));           
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(subj)
+     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+     *     JoinGroupNode [minus] {
+     *       JoinGroupNode [context=VarNode(g)] {
+     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), NAMED_CONTEXTS)
+     *       }
+     *     }
+     * </pre>
+     * 
+     * There is no change. The top-level join group is unchanged since the MINUS
+     * is not semantically empty and hence can not be lifted into it. The NAMED
+     * GRAPH join group is NOT lifted since MINUS is not semantically empty and
+     * is does not share the same context as the inner join group.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_eliminateJoinGroup11_minus() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+        bdSearchIV.setValue(store.getValueFactory().createURI(
+                BD.SEARCH.toString()));
+
+        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            final JoinGroupNode graphGroup = new JoinGroupNode();
+            minusGroup.addChild(graphGroup);
+            graphGroup.setContext(new VarNode("g"));
+            
+            graphGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            final JoinGroupNode graphGroup = new JoinGroupNode();
+            minusGroup.addChild(graphGroup);
+            graphGroup.setContext(new VarNode("g"));
+            
+            graphGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(subj)
+     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+     *     JoinGroupNode [minus] {
+     *       JoinGroupNode [minus] {
+     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), DEFAULT_CONTEXTS)
+     *       }
+     *     }
+     * </pre>
+     * 
+     * The inner MINUS group can not replace the outer MINUS. This case actually
+     * corresponds to subtracting the solutions of the inner MINUS group from
+     * the solutions of the outer MINUS group (an empty set).
+     * <p>
+     * Note: For this case, we could just wipe out both of the MINUS groups
+     * since subtracting anything from an empty set yields an empty set for the
+     * MINUS groups and subtracting an empty set from the parent yeilds whatever
+     * solutions are in the parent. I.e., the MINUS groups reduce to a NOP. In
+     * fact, this probably is done by the {@link ASTBottomUpOptimizer} since
+     * there will not be any shared variables between the first level MINUS and
+     * the outer parent group.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_eliminateJoinGroup12_minus() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+        bdSearchIV.setValue(store.getValueFactory().createURI(
+                BD.SEARCH.toString()));
+
+        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            final JoinGroupNode minusGroup2 = new JoinGroupNode();
+            minusGroup.addChild(minusGroup2);
+            minusGroup2.setMinus(true);
+            
+            minusGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            final JoinGroupNode minusGroup2 = new JoinGroupNode();
+            minusGroup.addChild(minusGroup2);
+            minusGroup2.setMinus(true);
+            
+            minusGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+        
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+
+    /**
+     * Given
+     * 
+     * <pre>
+     *   SELECT VarNode(subj)
+     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+     *     JoinGroupNode [minus] {
+     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), VarNode(g), DEFAULT_CONTEXTS)
+     *       JoinGroupNode [minus] {
+     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), DEFAULT_CONTEXTS)
+     *       }
+     *     }
+     * </pre>
+     * 
+     * This must be evaluated as <code>G0 - (G1 - (G2))</code>. The two MINUS
+     * groups may not be combined.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void test_eliminateJoinGroup13_minus() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[]{};
+
+        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+        bdSearchIV.setValue(store.getValueFactory().createURI(
+                BD.SEARCH.toString()));
+
+        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+
+        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup2 = new JoinGroupNode();
+            minusGroup.addChild(minusGroup2);
+            minusGroup2.setMinus(true);
+            
+            minusGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+            
+            projection.addProjectionVar(new VarNode("subj"));
+            
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+
+            final JoinGroupNode minusGroup2 = new JoinGroupNode();
+            minusGroup.addChild(minusGroup2);
+            minusGroup2.setMinus(true);
+            
+            minusGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+                    new VarNode("p"), new VarNode("lit"),
+                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+            
         }
 
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();

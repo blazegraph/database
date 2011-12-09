@@ -330,7 +330,17 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
                     unsyncBuffer // where to write the solutions which join.
             );
 
-            if (state.getJoinType().isOptional()) {
+            switch (state.getJoinType()) {
+            case Normal:
+                /*
+                 * Nothing to do.
+                 */
+                break;
+            case Optional:
+            case NotExists: {
+                /*
+                 * Output the optional solutions.
+                 */
 
                 // where to write the optional solutions.
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
@@ -343,7 +353,33 @@ public class JVMHashJoinOp<E> extends AbstractHashJoinOp<E> {
                 if (sink2 != null)
                     sink2.flush();
 
+                break;
             }
+            case Exists: {
+                /*
+                 * Output the join set.
+                 */
+                state.outputJoinSet(unsyncBuffer);
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+
+//            if (state.getJoinType().isOptional()) {
+//
+//                // where to write the optional solutions.
+//                final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
+//                        : new UnsyncLocalOutputBuffer<IBindingSet>(
+//                                op.getChunkCapacity(), sink2);
+//
+//                state.outputOptionals(unsyncBuffer2);
+//
+//                unsyncBuffer2.flush();
+//                if (sink2 != null)
+//                    sink2.flush();
+//
+//            }
 
             unsyncBuffer.flush();
             sink.flush();

@@ -156,7 +156,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
     /**
      * Used for the prefix of the generated named set name.
      */
-    static String NAMED_SET_PREFIX = "%-named-set-badly-designed-left-join-";
+    static String NAMED_SET_PREFIX = "%-bottom-up-";
     
     /**
      * 
@@ -183,6 +183,29 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          * Hide variables which would not be in scope for bottom up evaluation.
          */
         handleFiltersWithVariablesNotInScope(context, queryRoot, bindingSets);
+
+        /*
+         * Handle MINUS when it appears without shared variables.
+         */
+        if(true){
+            
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+            
+            if (queryRoot.getNamedSubqueries() != null) {
+
+                for (NamedSubqueryRoot namedSubquery : queryRoot
+                        .getNamedSubqueries()) {
+
+                    handleMinusWithoutSharedVariables(context, sa,
+                            namedSubquery.getWhereClause());
+                }
+
+            }
+
+            handleMinusWithoutSharedVariables(context, sa,
+                    queryRoot.getWhereClause());
+
+        }
 
         return queryNode;
     
@@ -348,6 +371,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             return;
         }
 
+//        if(((JoinGroupNode)p).isMinus()) return;
+        
         final IGroupNode<? extends IGroupMemberNode> pp = p
                 .getParentJoinGroup();
 
@@ -375,7 +400,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
          * 
          * Note: We must consider the variables used in filters as well when
          * examining a candidate inner optional group for a badly designed left
-         * join. This is necessary in order to capture a uncorrelated variables
+         * join. This is necessary in order to capture uncorrelated variables
          * having the same name in the FILTER and in the parent's parent.
          */
         final Set<IVariable<?>> innerGroupVars = sa
@@ -468,25 +493,38 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         
         final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet);
 
-        if(p.isOptional()) {
-        
+        if (p.isOptional()) {
+
             /**
-             * FIXME This is a hack because the NamedSubqueryIncludeOp does not
-             * currently support optional. As a workaround the INCLUDE is
-             * stuffed into an OPTIONAL group.
-             * 
-             * Modify {@link NamedSubqueryIncludOp} to support optional
-             * semantics and modify {@link ASTBottomUpOptimizer} to mark the
-             * INCLUDE as optional.  Once we do that we will no longer have
-             * to wrap the INCLUDE inside of an OPTIONAL.
+             * FIXME This is a hack because the INCLUDE operation (a solution
+             * set hash join) does not currently support OPTIONAL. As a
+             * workaround the INCLUDE is stuffed into an OPTIONAL group.
              */
+
+            final JoinGroupNode tmp = new JoinGroupNode();
             
-            final JoinGroupNode tmp = new JoinGroupNode(true/* optional */);
+            tmp.setOptional(true);
+            
+            tmp.addChild(nsi);
+
+            pp.replaceWith(p, tmp);
+
+        } else if (p.isMinus()) {
+
+            /**
+             * FIXME This is a hack because the INCLUDE operation does not
+             * currently support MINUS. As a workaround the INCLUDE is stuffed
+             * into an MINUS group.
+             */
+
+            final JoinGroupNode tmp = new JoinGroupNode();
+            
+            tmp.setMinus(true);
 
             tmp.addChild(nsi);
 
             pp.replaceWith(p, tmp);
-            
+
         } else {
 
             // Replace with named subquery INCLUDE.
@@ -504,7 +542,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * <p>
      * Such filters and variables are identified. The variables within the
      * filters are then rewritten in a consistent manner across the filters
-     * within the group, renaming the probably unbound variables in the filters
+     * within the group, renaming the provably unbound variables in the filters
      * to anonymous variables. This provides effective bottom up evaluation
      * scope for the variables.
      * 
@@ -519,8 +557,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
         // All exogenous variables (given in the source solutions).
-        final Set<IVariable<?>> exogenous = sa.getExogenousVars(bindingSets,
-                new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> exogenous = StaticAnalysis.getExogenousVars(
+                bindingSets, new LinkedHashSet<IVariable<?>>());
 
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
@@ -698,6 +736,78 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
         ((ASTBase)parent).replaceAllWith(ovar, nvar);
         
         return true;
+
+    }
+
+    /**
+     * Handle MINUS when it appears without shared variables. We just get rid of
+     * the MINUS group since it can not interact with the parent group without
+     * shared variables (without shared variables, nothing joins and if nothing
+     * joins then nothing is removed from the parent).
+     * 
+     * @param context
+     * @param group
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private void handleMinusWithoutSharedVariables(
+            final AST2BOpContext context,
+            final StaticAnalysis sa,
+            final GraphPatternGroup<?> group) {
+
+        int arity = group.arity();
+
+        for (int i = 0; i < arity; i++) {
+
+            final IGroupMemberNode child = (IGroupMemberNode) group.get(i);
+
+            if (!(child instanceof GraphPatternGroup)) {
+                
+                continue;
+                
+            }
+
+            final GraphPatternGroup<?> childGroup = (GraphPatternGroup<?>)child;
+
+            /*
+             * Recursion.
+             */
+            handleMinusWithoutSharedVariables(context, sa,
+                        childGroup);
+
+            /*
+             * Examine this child.
+             */
+            if(childGroup.isMinus()) {
+
+                final Set<IVariable<?>> incomingBound = sa
+                        .getDefinitelyIncomingBindings(childGroup,
+                                new LinkedHashSet<IVariable<?>>());
+
+                final Set<IVariable<?>> maybeProduced = sa
+                        .getMaybeProducedBindings(childGroup,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */);
+
+                final Set<IVariable<?>> intersection = new LinkedHashSet<IVariable<?>>(
+                        incomingBound);
+
+                intersection.retainAll(maybeProduced);
+
+//                System.err.println("intersection=" + intersection + ", incoming="
+//                        + incomingBound + ", produced=" + maybeProduced);
+                
+                if (intersection.isEmpty()) {
+
+                    // Remove the MINUS operator. It can not have any effect.
+                    
+                    ((IGroupNode) group).removeChild(childGroup);
+                    
+                    i++;
+
+                }
+                
+            }
+            
+        }
 
     }
 

@@ -134,6 +134,15 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         
     }
 
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isMinus() {
+     
+        return false;
+        
+    }
+
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")

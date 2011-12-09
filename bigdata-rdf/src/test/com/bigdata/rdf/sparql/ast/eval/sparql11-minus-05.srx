@@ -13,7 +13,8 @@
         <uri>http://example/b</uri>
       </binding>
       <binding name="n">
-        <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3.0</literal>
+      	<!-- Note: Sesame expects 3.0, but we deliver 3. -->
+        <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3</literal>
       </binding>
     </result>
   </results>

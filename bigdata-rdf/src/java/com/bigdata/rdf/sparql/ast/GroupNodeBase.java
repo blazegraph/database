@@ -43,18 +43,18 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
     }
     
-    /**
-     * Note: Uses the default for the "optional" annotation.
-     */
+//    /**
+//     * Note: Uses the default for the "optional" annotation.
+//     */
     protected GroupNodeBase() {
         
     }
 
-	protected GroupNodeBase(final boolean optional) {
-		
-		setOptional( optional );
-		
-    }
+//	protected GroupNodeBase(final boolean optional) {
+//		
+//		setOptional( optional );
+//		
+//    }
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<E> iterator() {
@@ -178,18 +178,6 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 		
 	}
 	
-	final public boolean isOptional() {
-		
-        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
-		
-	}
-	
-	final public void setOptional(final boolean optional) {
-	    
-	    setProperty(Annotations.OPTIONAL, optional);
-	    
-	}
-	
     final public List<FilterNode> getAttachedJoinFilters() {
 
         @SuppressWarnings("unchecked")
@@ -250,25 +238,25 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
 
         sb.append("\n").append(s).append(getClass().getSimpleName());
 
-        if (isOptional()) {
+        if (this instanceof IJoinNode) {
 
-            sb.append(" [optional]");
+            final IJoinNode joinNode = (IJoinNode) this;
 
-        }
+            if (joinNode.isOptional())
+                sb.append(" [optional]");
+            
+            if (joinNode.isMinus())
+                sb.append(" [minus]");
 
-        if (this instanceof JoinGroupNode && ((JoinGroupNode) this).isMinus()) {
+            if (this instanceof JoinGroupNode
+                    && ((JoinGroupNode) this).getContext() != null) {
 
-            sb.append(" [minus]");
-
-        }
-        
-        if (this instanceof JoinGroupNode
-                && ((JoinGroupNode) this).getContext() != null) {
-
-            sb.append(" [context=" + ((JoinGroupNode) this).getContext() + "]");
+                sb.append(" [context=" + ((JoinGroupNode) this).getContext() + "]");
+                
+            }
             
         }
-        
+
         sb.append(" {");
 
         for (IQueryNode n : this) {

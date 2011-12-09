@@ -155,6 +155,11 @@ public interface IHashJoinUtility {
      * variables produce the same hash code). Possible matches are tested for
      * consistency and the constraints (if any) are applied. Solutions which
      * join are written on the caller's buffer.
+     * <p>
+     * Note: Some {@link JoinTypeEnum}s have side-effects on the join state. For
+     * this joins, once method has been invoked for the final time, you must
+     * then invoke either {@link #outputOptionals(IBuffer)} (Optional or
+     * NotExists) or {@link #outputJoinSet(IBuffer)} (Exists).
      * 
      * @param leftItr
      *            A stream of solutions to be joined against the hash index
@@ -172,6 +177,11 @@ public interface IHashJoinUtility {
      * constraints or additional constraints. This is used to impose join
      * constraints when a solution set is joined back into a query based on the
      * join filters in the join group in which the solution set is included.
+     * <p>
+     * Note: Some {@link JoinTypeEnum}s have side-effects on the join state. For
+     * this joins, once method has been invoked for the final time, you must
+     * then invoke either {@link #outputOptionals(IBuffer)} (Optional or
+     * NotExists) or {@link #outputJoinSet(IBuffer)} (Exists).
      * 
      * @param leftItr
      *            A stream of solutions to be joined against the hash index

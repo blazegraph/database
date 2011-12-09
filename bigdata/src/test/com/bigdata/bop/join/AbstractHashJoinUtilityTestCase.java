@@ -609,6 +609,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
             state.hashJoin(leftItr, outputBuffer);//, true/* leftIsPipeline */);
 
             switch (joinType) {
+            case Normal:
+                break;
             case Optional:
             case NotExists:
                 // Output the optional solutions.
@@ -618,6 +620,8 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
                 // Output the join set.
                 state.outputJoinSet(outputBuffer);
                 break;
+            default:
+                throw new AssertionError();
             }
 
             // Verify the expected solutions.
@@ -1937,71 +1941,88 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
 
     }
     
-    /**
-     * Unit tests for NOT EXISTS based on Sesame <code>sparql11-exists-06</code>
-     * . This uses the same data as the previous test (and has the same
-     * solutions), but the query is slightly different and includes a FILTER
-     * inside of the EXISTS graph pattern.
-     * 
-     * <pre>
-     * PREFIX : <http://example/>
-     * SELECT * WHERE {
-     *     ?a :p ?n
-     *     FILTER NOT EXISTS {
-     *         ?a :q ?m .
-     *         FILTER(?n = ?m)
-     *     }
-     * }
-     * 
-     *     <result>
-     *       <binding name="a">
-     *         <uri>http://example/b</uri>
-     *       </binding>
-     *       <binding name="n">
-     *         <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3.0</literal>
-     *       </binding>
-     *     </result>
-     * 
-     * </pre>
+    /*
+     * Note: This test has been removed. The inner FILTER needs to be applied to
+     * the join which reads from the inner access path. Thus, if we were to
+     * model it in this test suite, the filter is effectively inoperative since
+     * [?n] is not bound in that scope. The test is actually attaching the
+     * FILTER to the MINUS join, which is NOT how the SPARQL query was written.
+     * So, this test reduces to exactly the same thing as the one above unless
+     * we are testing filter placement and evaluation rather than testing the
+     * MINUS join operator.
      */
-    public void test_not_exists_02() {
-
-        final NotExistsSetup setup = new NotExistsSetup(getName());
-        
-        final IVariable<?> avar = Var.var("a");
-        final IVariable<?> nvar = Var.var("n");
-        final IVariable<?> mvar = Var.var("m");
-        
-        // the join variables.
-        final IVariable<?>[] joinVars = new IVariable[]{avar};
-
-        // the variables projected by the join (iff non-null).
-        final IVariable<?>[] selectVars = null;//new IVariable[] { avar, nvar };
-
-        // the join constraints.
-        final IConstraint[] constraints = new IConstraint[] { Constraint
-                .wrap(new EQ(nvar, mvar)) };
-
-        // The left solutions (the pipeline).
-        final List<IBindingSet> right = setup.getLeft1();
-
-        // The right solutions (the hash index).
-        final List<IBindingSet> left = setup.getRight1(mvar);
-
-        // The expected solutions to the join.
-        @SuppressWarnings("rawtypes")
-        final IBindingSet[] expected = new IBindingSet[] {//
-                new ListBindingSet(//
-                        new IVariable[] { avar, nvar },//
-                        new IConstant[] { new Constant<IV>(setup.b),
-                                          new Constant<IV>(setup.three)
-                                          }//
-                ),//
-        };
-
-        doHashJoinTest(JoinTypeEnum.NotExists, joinVars, selectVars,
-                constraints, left, right, expected);
-
-    }
+    
+//    /**
+//     * Unit tests for NOT EXISTS based on Sesame <code>sparql11-exists-06</code>
+//     * . This uses the same data as the previous test (and has the same
+//     * solutions), but the query is slightly different and includes a FILTER
+//     * inside of the EXISTS graph pattern.
+//     * <p>
+//     * NOTE: Due to the scope of the variables, <code>?n</code> IS NOT BOUND
+//     * inside of the FILTER!
+//     * 
+//     * <pre>
+//     * PREFIX : <http://example/>
+//     * SELECT * WHERE {
+//     *     ?a :p ?n
+//     *     FILTER NOT EXISTS {
+//     *         ?a :q ?m .
+//     *         FILTER(?n = ?m)
+//     *     }
+//     * }
+//     * 
+//     *     <result>
+//     *       <binding name="a">
+//     *         <uri>http://example/b</uri>
+//     *       </binding>
+//     *       <binding name="n">
+//     *         <literal datatype="http://www.w3.org/2001/XMLSchema#decimal">3.0</literal>
+//     *       </binding>
+//     *     </result>
+//     * 
+//     * </pre>
+//     * 
+//     * @see http://www.w3.org/TR/sparql11-query/#negation, section on inner
+//     *      filters.
+//     */
+//    public void test_not_exists_02() {
+//
+//        final NotExistsSetup setup = new NotExistsSetup(getName());
+//        
+//        final IVariable<?> avar = Var.var("a");
+//        final IVariable<?> nvar = Var.var("n");
+//        final IVariable<?> mvar = Var.var("m");
+//        
+//        // the join variables.
+//        final IVariable<?>[] joinVars = new IVariable[]{avar};
+//
+//        // the variables projected by the join (iff non-null).
+//        final IVariable<?>[] selectVars = null;//new IVariable[] { avar, nvar };
+//
+//        // the join constraints.
+//        final IConstraint[] constraints = new IConstraint[] { Constraint
+//                .wrap(new EQ(nvar, mvar)) };
+//
+//        // The left solutions (the pipeline).
+//        final List<IBindingSet> right = setup.getLeft1();
+//
+//        // The right solutions (the hash index).
+//        final List<IBindingSet> left = setup.getRight1(mvar);
+//
+//        // The expected solutions to the join.
+//        @SuppressWarnings("rawtypes")
+//        final IBindingSet[] expected = new IBindingSet[] {//
+//                new ListBindingSet(//
+//                        new IVariable[] { avar, nvar },//
+//                        new IConstant[] { new Constant<IV>(setup.b),
+//                                          new Constant<IV>(setup.three)
+//                                          }//
+//                ),//
+//        };
+//
+//        doHashJoinTest(JoinTypeEnum.NotExists, joinVars, selectVars,
+//                constraints, left, right, expected);
+//
+//    }
 
 }

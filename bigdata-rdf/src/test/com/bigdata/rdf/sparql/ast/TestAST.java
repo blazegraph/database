@@ -238,7 +238,7 @@ public class TestAST extends TestCase {
     	final JoinGroupNode j2 = new JoinGroupNode(false);
     	j2.addChild(sp(7)).addChild(sp(8)).addChild(filter(9));
     	
-    	final UnionNode u1 = new UnionNode(false);
+    	final UnionNode u1 = new UnionNode();
     	u1.addChild(j1).addChild(j2);
     	root.addChild(u1);
     	

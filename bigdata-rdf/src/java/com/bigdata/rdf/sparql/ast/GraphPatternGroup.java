@@ -86,13 +86,6 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
     }
 
     /**
-     * @param optional
-     */
-    public GraphPatternGroup(boolean optional) {
-        super(optional);
-    }
-
-    /**
      * The join variables for the group.
      * 
      * @see Annotations#JOIN_VARS
