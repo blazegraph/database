@@ -37,6 +37,7 @@ import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -267,8 +268,9 @@ public class ASTUnknownTermOptimizer implements IASTOptimizer {
     		
     		queryRoot.setWhereClause(new JoinGroupNode());
     		
-    	} else if (parent instanceof UnionNode || op.isOptional()) {
-    		
+        } else if (parent instanceof UnionNode
+                || ((op instanceof IJoinNode) && ((IJoinNode) op).isOptional())) {
+
     		/*
     		 * We've reached a stopping point - we can prune an optional group
     		 * and we can prune the child of a UNION.

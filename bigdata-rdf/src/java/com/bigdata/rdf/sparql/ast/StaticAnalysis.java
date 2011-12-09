@@ -236,9 +236,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * 
      * @return The argument.
      * 
-     *         FIXME This needs to consider the exogenous variables. Perhaps
-     *         modify the StaticAnalysis constructor to pass in the exogenous
+     *         FIXME Both this and
+     *         {@link #getMaybeIncomingBindings(IGroupMemberNode, Set)} need to
+     *         consider the exogenous variables. Perhaps modify the
+     *         StaticAnalysis constructor to pass in the exogenous
      *         IBindingSet[]?
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     public Set<IVariable<?>> getDefinitelyIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
@@ -256,7 +261,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         /*
          * Do the siblings of the node first.  Unless it is a Union.  Siblings
-         * don't see each other's bindings in a Union.
+         * don't see each other's bindings in a Union. 
+         * 
+         * FIXME This is also true for MINUS
          */
         if (!(parent instanceof UnionNode)) {
             
@@ -275,8 +282,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     
                     final boolean optional = child instanceof IJoinNode
                             && ((IJoinNode) child).isOptional();
+
+                    final boolean minus = child instanceof IJoinNode
+                            && ((IJoinNode) child).isMinus();
                     
-                    if (!optional) {
+                    if (!optional && !minus) {
                         getDefinitelyProducedBindings(
                                 (IBindingProducerNode) child, vars, true/* recursive */);
                     }
@@ -314,6 +324,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            variable which MIGHT or MUST be bound.
      * 
      * @return The argument.
+     * 
+     *         FIXME Both this and
+     *         {@link #getDefinitelyIncomingBindings(IGroupMemberNode, Set)}
+     *         need to consider the exogenous variables. Perhaps modify the
+     *         StaticAnalysis constructor to pass in the exogenous
+     *         IBindingSet[]?
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      */
     public Set<IVariable<?>> getMaybeIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
@@ -332,6 +350,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         /*
          * Do the siblings of the node first.  Unless it is a Union.  Siblings
          * don't see each other's bindings in a Union.
+         * 
+         * FIXME This is also true for MINUS
          */
         if (!(parent instanceof UnionNode)) {
             
@@ -348,10 +368,18 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 
                 if (child instanceof IBindingProducerNode) {
                     
-                    final boolean optional = child instanceof IJoinNode
-                            && ((IJoinNode) child).isOptional();
-                    
-                    if (!optional) {
+//                    final boolean optional = child instanceof IJoinNode
+//                            && ((IJoinNode) child).isOptional();
+
+                    final boolean minus = child instanceof IJoinNode
+                            && ((IJoinNode) child).isMinus();
+
+                    if (/* !optional && */!minus) {
+                        /*
+                         * MINUS does not produce any bindings, it just removes
+                         * solutions. On the other hand, OPTIONAL joins DO
+                         * produce bindings, they are just "maybe" bindings.
+                         */
                         getMaybeProducedBindings(
                                 (IBindingProducerNode) child, vars, true/* recursive */);
                     }
@@ -380,10 +408,17 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * method does NOT consider variables which are already bound on entry to
      * the group.
      * <p>
+     * Note: When invoked for an OPTIONAL or MINUS join group, the variables
+     * which would become bound during the evaluation of the join group are
+     * reported. Caller's who wish to NOT have variables reported for OPTIONAL
+     * or MINUS groups MUST NOT invoke this method for those groups.
+     * <p>
      * Note: The recursive analysis does not throw out variables when part of
      * the tree will provably fail to bind anything. It is the role of query
      * optimizers to identify those situations and prune the AST appropriately.
      * 
+     * @param node
+     *            The node to be analyzed.
      * @param vars
      *            Where to store the "MUST" bound variables.
      * @param recursive
@@ -418,12 +453,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
             
-            if(!sp.isOptional()) {
-
-                // Only if the statement pattern node is a required join.
+//            if(!sp.isOptional()) {
+//
+//                // Only if the statement pattern node is a required join.
                 vars.addAll(sp.getProducedBindings());
-                
-            }
+//                
+//            }
 
         } else if(node instanceof SubqueryRoot) {
 
@@ -522,13 +557,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * the group.
      * 
      * @param vars
-     *            Where to store the "MUST" bound variables.
+     *            Where to store the "MUST" and "MIGHT" be bound variables.
      * @param recursive
      *            When <code>true</code>, the child groups will be recursively
      *            analyzed. When <code>false</code>, only <i>this</i> group will
      *            be analyzed.
      *            
-     * @return The argument.
+     * @return The caller's set.
      */
     public Set<IVariable<?>> getMaybeProducedBindings(
             final IBindingProducerNode node,//
@@ -556,12 +591,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             final StatementPatternNode sp = (StatementPatternNode) node;
 
-            if(sp.isOptional()) {
-
-                // Only if the statement pattern node is an optional join.
+//            if(sp.isOptional()) {
+//
+//                // Only if the statement pattern node is an optional join.
                 vars.addAll(sp.getProducedBindings());
-                
-            }
+//                
+//            }
 
         } else if(node instanceof SubqueryRoot) {
 
@@ -672,7 +707,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                     final GraphPatternGroup<?> group = (GraphPatternGroup<?>) child;
 
-                    if (!group.isOptional()) {
+                    if (!group.isOptional() && !group.isMinus()) {
 
                         getDefinitelyProducedBindings(group, vars, recursive);
 
@@ -744,9 +779,21 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 if (child instanceof IBindingProducerNode) {
 
-                    vars.addAll(getMaybeProducedBindings(
-                            (IBindingProducerNode) child, vars, recursive));                
-                
+                    final IBindingProducerNode tmp = (IBindingProducerNode) child;
+                    
+                    if(tmp instanceof IJoinNode && ((IJoinNode)tmp).isMinus()) {
+                        
+                        // MINUS never contributes bindings, it only removes
+                        // solutions.
+                        continue;
+                        
+                    }
+
+//                    vars.addAll(
+                    getMaybeProducedBindings(tmp, vars, recursive)
+//                            )
+                    ;
+
                 }
                 
             }
@@ -762,7 +809,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final UnionNode node,
             final Set<IVariable<?>> vars, final boolean recursive) {
 
-        if (!recursive || node.isOptional()) {
+        if (!recursive || node.isOptional() || node.isMinus()) {
 
             // Nothing to contribute
             return vars;
@@ -893,9 +940,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
-     * Report "MAYBE" bound bindings projected by the query. This involves
-     * checking the WHERE clause and the {@link ProjectionNode} for the query.
-     * Note that the projection can rename variables. It can also bind a
+     * Report the "MUST" and "MAYBE" bound bindings projected by the query. This
+     * involves checking the WHERE clause and the {@link ProjectionNode} for the
+     * query. Note that the projection can rename variables. It can also bind a
      * constant on a variable. Variables which are not projected by the query
      * will NOT be reported.
      */
@@ -983,11 +1030,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
-     * Report "MAYBE" bound bindings projected by the service. This involves
-     * checking the graph pattern reported by {@link ServiceNode#getGroupNode()}
-     * . Bindings visible in the parent group are NOT projected into a SERVICE.
-     * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
-     * projected bindings.
+     * Report the "MUST" and "MAYBE" bound variables projected by the service.
+     * This involves checking the graph pattern reported by
+     * {@link ServiceNode#getGroupNode()}. Bindings visible in the parent group
+     * are NOT projected into a SERVICE. A SERVICE does NOT have an explicit
+     * PROJECTION so it can not rename the projected bindings.
      * <p>
      * Note: This assumes that services do not run "as-bound". If this is
      * permitted, then this code needs to be reviewed.
@@ -1463,7 +1510,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
     
     /**
-     * Return any variables which are used after then given node in the current
+     * Return any variables which are used after the given node in the current
      * ordering of its parent {@link JoinGroupNode} but DOES NOT consider the
      * parent or the PROJECTION for the query in which this group appears.
      * 
@@ -1520,8 +1567,16 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
-     * Return a {@link ProjectionNode} for all variables appearing in the WHERE
-     * clause. This is used when converting a sub-group into a sub-query.
+     * Return the set of variables which must be projected if the group is to be
+     * converted into a sub-query. This method identifies variables which are
+     * either MUST or MIGHT bound outside of the group which are also used
+     * within the group and includes them in the projection. It also identified
+     * variables used after the group (in the current evaluation order) which
+     * are also used within the group and include them in the projection.
+     * <p>
+     * When considering the projection of the (sub-)query in which the group
+     * appears, the SELECT EXPRESSIONS are consulted to identify variables which
+     * we need to project out of the group.
      * 
      * @param proxy
      *            The join group which will be replaced by a sub-query. This is
@@ -1535,9 +1590,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *            <code>null</code>. This condition is readily satisified if the
      *            rewrite is considering the children of some join group node as
      *            the parent of the proxy will be that join group node.)
-     * @param whereClause
-     *            The where clause (or any group) whose projection will be
-     *            computed.
+     * @param groupToLift
+     *            The group which is being lifted out and whose projection will
+     *            be computed.
      * @param query
      *            The query (or sub-query) in which that proxy node exists. This
      *            is used to identify anything which is PROJECTed out of the
@@ -1562,18 +1617,19 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     public Set<IVariable<?>> getProjectedVars(// FIXME Rename as GET PROJECTION and possible just return the PROJECTION NODE.
             final IGroupMemberNode proxy,
-            final GraphPatternGroup<?> whereClause,//
+            final GraphPatternGroup<?> groupToLift,//
             final QueryBase query,// 
             final Set<IVariable<?>> exogenousVars,//
             final Set<IVariable<?>> projectedVars) {
 
         // All variables which are used within the WHERE clause.
-        final Set<IVariable<?>> groupVars = getSpannedVariables(whereClause,
+        final Set<IVariable<?>> groupVars = getSpannedVariables(groupToLift,
                 new LinkedHashSet<IVariable<?>>());
 
         /*
          * Figure out what we need to project INTO the group.
          */
+        
         // All variables which might be incoming bound into the proxy node.
         final Set<IVariable<?>> beforeVars = getMaybeIncomingBindings(
                 proxy, new LinkedHashSet<IVariable<?>>());
@@ -1592,9 +1648,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         final Set<IVariable<?>> afterVars = getAfterVars(proxy,
                 new LinkedHashSet<IVariable<?>>());
         
-        // All variables projected out of the query in which this group appears.
+        // Gather the variables used by the SELECT EXPRESSIONS which are
+        // projected out of the query in which this group appears.
         query.getSelectExprVars(afterVars);
-//        query.getProjectedVars(afterVars); // FIXME This needs to collect the variables used in the SELECT EXPRESSIONS -NOT- the variables projected out of the query.
 
         // Drop anything not used within the group.
         afterVars.retainAll(groupVars);

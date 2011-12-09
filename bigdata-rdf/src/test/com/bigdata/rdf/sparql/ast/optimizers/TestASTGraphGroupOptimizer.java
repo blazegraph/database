@@ -53,9 +53,16 @@ import com.bigdata.rdf.sparql.ast.eval.TestNamedGraphs;
  * Test suite for {@link ASTGraphGroupOptimizer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestASTGraphGroupOptimizer.java 5701 2011-11-20 00:52:36Z
+ *          thompsonbry $
  * 
  * @see TestNamedGraphs
+ * 
+ *      FIXME Unit test where the outer graph group has a variable and the inner
+ *      graph group has a constant.
+ * 
+ *      FIXME Unit test where the outer graph group has a constant and the inner
+ *      graph group has a variable.
  */
 public class TestASTGraphGroupOptimizer extends
         AbstractASTEvaluationTestCase {
@@ -267,5 +274,662 @@ public class TestASTGraphGroupOptimizer extends
         assertSameAST(expectedClause, queryRoot.getWhereClause());
 
     }
+
+    /**
+     * A unit test where two nested graph groups have the same URI as their
+     * context. This case is legal and there is nothing that needs to be changed
+     * in the AST for enforce the graph context constraint.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_graphContexts_constants_legal()
+            throws MalformedQueryException {
+
+        final String queryStr = ""//
+                + "PREFIX : <http://example.org/>\n"//
+                + "SELECT ?s\n"//
+                + "WHERE {\n"//
+                + "  GRAPH :foo {\n"//
+                + "    ?s :p :o .\n"//
+                + "    GRAPH :foo { ?o :p2 ?s }\n"//
+                + "  }\n"//
+                + "}";
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        new ASTGraphGroupOptimizer().optimize(context,
+                astContainer.getOriginalAST(), null/* bindingSets */);
+
+    }
+
+    /**
+     * A unit test where two nested graph groups have the same URI as their
+     * context. This case is illegal and will result in a thrown exception.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_graphContexts_constants_illegal()
+            throws MalformedQueryException {
+
+        final String queryStr = ""//
+                + "PREFIX : <http://example.org/>\n"//
+                + "SELECT ?s\n"//
+                + "WHERE {\n"//
+                + "  GRAPH :foo {\n"//
+                + "    ?s :p :o .\n"//
+                + "    GRAPH :bar { ?o :p2 ?s }\n"//
+                + "  }\n"//
+                + "}";
+
+
+        final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(store)
+                .parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        try {
+
+            new ASTGraphGroupOptimizer().optimize(context,
+                    astContainer.getOriginalAST(), null/* bindingSets */);
+            
+            fail("Expecting: " + InvalidGraphContextException.class);
+            
+        } catch (InvalidGraphContextException ex) {
+            
+            // Ignore expected exception.
+            
+        }
+
+    }
+   
+    /*
+     * All of these tests were written to the assumption that we were attempting
+     * to combine non-empty join groups. However, the ASTEmptyGroupOptimizer is
+     * only working with *empty* join groups so these tests are not appropriate
+     * for that class (except to verify that it does not combine non-empty join
+     * groups).
+     * 
+     * TODO These tests might be moved into TestASTGraphGroupOptimizer.  They
+     * would have to be reworked, but they are relevant to the decisions made 
+     * by the ASTGraphGroupOptimizer.
+     */
+
+//    /**
+//     * Given
+//     * 
+//     * <pre>
+//     *   SELECT VarNode(subj)
+//     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+//     *     JoinGroupNode [minus] {
+//     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), VarNode(g), DEFAULT_CONTEXTS)
+//     *       JoinGroupNode {
+//     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), DEFAULT_CONTEXTS)
+//     *       }
+//     *     }
+//     * </pre>
+//     * 
+//     * The inner most join group members are lifted into the MINUS group.
+//     */
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//    public void test_eliminateJoinGroup14_minus() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[]{};
+//
+//        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+//        bdSearchIV.setValue(store.getValueFactory().createURI(
+//                BD.SEARCH.toString()));
+//
+//        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+//        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+//
+//        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+//        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode minusGroup = new JoinGroupNode();
+//            whereClause.addChild(minusGroup);
+//            minusGroup.setMinus(true);
+//
+//            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode minusGroup2 = new JoinGroupNode();
+//            minusGroup.addChild(minusGroup2);
+//            
+//            minusGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode minusGroup = new JoinGroupNode();
+//            whereClause.addChild(minusGroup);
+//            minusGroup.setMinus(true);
+//
+//            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//            
+//            minusGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//            
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+//        
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
+//
+//    /**
+//     * Given
+//     * 
+//     * <pre>
+//     *   SELECT VarNode(subj)
+//     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+//     *     JoinGroupNode [minus] {
+//     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), VarNode(g), DEFAULT_CONTEXTS)
+//     *       JoinGroupNode [context=g] {
+//     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), NAMED_CONTEXTS)
+//     *       }
+//     *     }
+//     * </pre>
+//     * 
+//     * The inner most join group members are NOT lifted into the MINUS group
+//     * since direct children of the MINUS group are default graph BGPs while
+//     * the inner most join group uses named graph BGPs.
+//     */
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//    public void test_eliminateJoinGroup15_minus() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[]{};
+//
+//        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+//        bdSearchIV.setValue(store.getValueFactory().createURI(
+//                BD.SEARCH.toString()));
+//
+//        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+//        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+//
+//        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+//        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode minusGroup = new JoinGroupNode();
+//            whereClause.addChild(minusGroup);
+//            minusGroup.setMinus(true);
+//
+//            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup = new JoinGroupNode();
+//            minusGroup.addChild(graphGroup);
+//            graphGroup.setContext(new VarNode("g"));
+//                        
+//            graphGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode minusGroup = new JoinGroupNode();
+//            whereClause.addChild(minusGroup);
+//            minusGroup.setMinus(true);
+//
+//            minusGroup.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//            
+//            final JoinGroupNode graphGroup = new JoinGroupNode();
+//            minusGroup.addChild(graphGroup);
+//            graphGroup.setContext(new VarNode("g"));
+//                        
+//            graphGroup.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//            
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+//        
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
+//
+//    /**
+//     * Given
+//     * 
+//     * <pre>
+//     *   SELECT VarNode(subj)
+//     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+//     *     JoinGroupNode [context=g] {
+//     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), VarNode(g), NAMED_CONTEXTS)
+//     *       JoinGroupNode [context=g] {
+//     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(g), NAMED_CONTEXTS)
+//     *       }
+//     *     }
+//     * </pre>
+//     * 
+//     * Graph groups can not be combined unless they have the same graph variable
+//     * or URI, or can be recognized as having the same constraint (e.g., an
+//     * outer URI context and an inner variable context means that the variable
+//     * is bound to the URI as a constant), in which case a FILTER needs to be
+//     * added if the groups are merged which imposes that constraint. In this
+//     * case we have the same context variable, so they can be collapsed without
+//     * further ado.
+//     */
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//    public void test_eliminateJoinGroup16_graphGroups() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[]{};
+//
+//        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+//        bdSearchIV.setValue(store.getValueFactory().createURI(
+//                BD.SEARCH.toString()));
+//
+//        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+//        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+//
+//        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+//        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new VarNode("g"));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new VarNode("g"));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new VarNode("g"));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new VarNode("g"));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//            
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+//        
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
+//
+//    /**
+//     * Given
+//     * 
+//     * <pre>
+//     *   SELECT VarNode(subj)
+//     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+//     *     JoinGroupNode [context=g] {
+//     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), VarNode(g), NAMED_CONTEXTS)
+//     *       JoinGroupNode [context=c] {
+//     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), VarNode(c), NAMED_CONTEXTS)
+//     *       }
+//     *     }
+//     * </pre>
+//     * 
+//     * In this case the graph variables are not the same, but we know that the
+//     * inner graph group MUST have a scope which is no broader than the outer
+//     * graph group. So, the groups MAY be collapsed, but we MUST add a
+//     * <code>FILTER( ?g = ?c )</code> filter to impose the constraint that
+//     * <code>?c</code> and <code>?g</code> have the same binding.
+//     * 
+//     * Note: The {@link ASTEmptyGroupOptimizer} does not currently collapse these
+//     * groups, but it could.
+//     */
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//    public void test_eliminateJoinGroup17_graphGroups() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[]{};
+//
+//        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+//        bdSearchIV.setValue(store.getValueFactory().createURI(
+//                BD.SEARCH.toString()));
+//
+//        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+//        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+//
+//        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+//        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new VarNode("g"));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new VarNode("c"));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("c"), Scope.NAMED_CONTEXTS));
+//
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new VarNode("g"));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new VarNode("g"), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new VarNode("c"));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new VarNode("c"), Scope.NAMED_CONTEXTS));
+//            
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+//        
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
+//
+//    /**
+//     * Given
+//     * 
+//     * <pre>
+//     *   SELECT VarNode(subj)
+//     *     StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("mike"), VarNode(g), DEFAULT_CONTEXTS)
+//     *     JoinGroupNode [context=http://example.org/foo] {
+//     *       StatementPatternNode(VarNode(lit), ConstantNode(bd:search), ConstantNode("rdf"), ConstantNode(http://example.org/foo), NAMED_CONTEXTS)
+//     *       JoinGroupNode [context=http://example.org/foo] {
+//     *         StatementPatternNode(VarNode(subj), VarNode(p), VarNode(lit), ConstantNode(http://example.org/foo), NAMED_CONTEXTS)
+//     *       }
+//     *     }
+//     * </pre>
+//     * 
+//     * In this case the graph URIs are the same.
+//     * 
+//     * Note: The {@link ASTEmptyGroupOptimizer} does not currently collapse these
+//     * groups, but it could.
+//     * 
+//     * Note: There are other cases which could be collapsed if the appropriate
+//     * SameTerm() filter and/or Constant/2 constructed were used to link the
+//     * constant and the variable.
+//     */
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//    public void test_eliminateJoinGroup18_graphGroups() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[]{};
+//
+//        final IV bdSearchIV = TermId.mockIV(VTE.URI);
+//        bdSearchIV.setValue(store.getValueFactory().createURI(
+//                BD.SEARCH.toString()));
+//
+//        final IV mikeIV = TermId.mockIV(VTE.LITERAL);
+//        mikeIV.setValue(store.getValueFactory().createLiteral("mike"));
+//
+//        final IV rdfIV = TermId.mockIV(VTE.LITERAL);
+//        rdfIV.setValue(store.getValueFactory().createLiteral("rdf"));
+//
+//        final IV uriIV = TermId.mockIV(VTE.URI);
+//        uriIV.setValue(store.getValueFactory().createURI("http://example.org/foo"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new ConstantNode(uriIV));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new ConstantNode(uriIV), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new ConstantNode(uriIV));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new ConstantNode(uriIV), Scope.NAMED_CONTEXTS));
+//
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//            
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//            
+//            projection.addProjectionVar(new VarNode("subj"));
+//            
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(mikeIV),
+//                    new VarNode("g"), Scope.DEFAULT_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup1 = new JoinGroupNode();
+//            whereClause.addChild(graphGroup1);
+//            graphGroup1.setContext(new ConstantNode(uriIV));
+//
+//            graphGroup1.addChild(new StatementPatternNode(new VarNode("lit"),
+//                    new ConstantNode(bdSearchIV), new ConstantNode(rdfIV),
+//                    new ConstantNode(uriIV), Scope.NAMED_CONTEXTS));
+//
+//            final JoinGroupNode graphGroup2 = new JoinGroupNode();
+//            graphGroup1.addChild(graphGroup2);
+//            graphGroup2.setContext(new ConstantNode(uriIV));
+//
+//            graphGroup2.addChild(new StatementPatternNode(new VarNode("subj"),
+//                    new VarNode("p"), new VarNode("lit"),
+//                    new ConstantNode(uriIV), Scope.NAMED_CONTEXTS));
+//            
+//        }
+//
+//        final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
+//        
+//        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+//                given/* queryNode */, bsets);
+//
+//        assertSameAST(expected, actual);
+//
+//    }
 
 }

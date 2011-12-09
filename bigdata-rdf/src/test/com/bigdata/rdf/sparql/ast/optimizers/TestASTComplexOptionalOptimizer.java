@@ -154,16 +154,6 @@ public class TestASTComplexOptionalOptimizer extends
      *      and complex optional groups into named subqueries.  At that point
      *      the test should conform to the best known query plan.
      * 
-     *      FIXME Turn this into a unit test where we predict a MERGE JOIN. The
-     *      N-way include should be MERGE %_set1, %_set2, _set3. That is, %_set1
-     *      is the hub which provides the primary join index. The other sets are
-     *      secondary sources for the merge join. All sets MUST have the same
-     *      join variables.
-     * 
-     *      FIXME Do a variant of this test where there is already an INCLUDE
-     *      for the required joins (the step 1 post-condition) and verify that
-     *      Step 2 still runs and produces the MERGE JOIN pattern.
-     * 
      *      FIXME Unit test with exogenousVars to make sure that they are being
      *      respected.
      */
@@ -401,5 +391,5 @@ public class TestASTComplexOptionalOptimizer extends
         assertSameAST(expected, actual);
 
     }
-    
+
 }

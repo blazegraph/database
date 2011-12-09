@@ -182,13 +182,24 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Eliminate semantically empty join group nodes which are the sole
          * child of another join groups.
+         * 
          * <pre>
          * { { ... } } => { ... }
          * </pre>
+         * 
          * and for non-GRAPH groups:
+         * 
          * <pre>
          * { ... {} } =? { ... }
          * </pre>
+         * <p>
+         * Note: as a policy decision in bigdata 1.1, we do not WANT to combine
+         * non-empty join groups. The group structure is left AS IS and provides
+         * a means for people to control the pruning of variables. Also, even if
+         * the group structure were automatically flattened as much as possible
+         * for non-empty groups, the optimizer(s) responsible for pruning
+         * intermediate variables would cause a group structure to be
+         * re-introduced.
          */
         add(new ASTEmptyGroupOptimizer());
         

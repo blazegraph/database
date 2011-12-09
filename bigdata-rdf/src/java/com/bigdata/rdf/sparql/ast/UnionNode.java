@@ -39,20 +39,18 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     }
 
-    /**
-	 * Construct a non-optional union.
-	 */
+//    /**
+//	 * Construct a non-optional union.
+//	 */
 	public UnionNode() {
-		
-		super(false/*optional*/);
 		
 	}
 
-	public UnionNode(final boolean optional) {
-		
-		super(optional);
-		
-	}
+//	public UnionNode(final boolean optional) {
+//		
+//		super(optional);
+//		
+//	}
 
     @Override
     public UnionNode addChild(final JoinGroupNode child) {
@@ -79,4 +77,22 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode> {
 
     }
 
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isOptional() {
+        
+        return false;
+        
+    }
+
+    /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isMinus() {
+     
+        return false;
+        
+    }
+    
 }

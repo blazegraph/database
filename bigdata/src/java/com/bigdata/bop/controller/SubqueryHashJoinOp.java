@@ -114,7 +114,20 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
         getRequiredProperty(Annotations.SUBQUERY);
 
-        getRequiredProperty(Annotations.JOIN_TYPE);
+        /*
+         * Note: The operator only nandles Normal and Optional joins. Since it
+         * is deprecated, I am not going to work through the support for Exists
+         * and NotExists.
+         */
+        final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+        switch (joinType) {
+        case Normal:
+        case Optional:
+            break;
+        default:
+            throw new IllegalArgumentException(Annotations.JOIN_TYPE + "="
+                    + joinType);
+        }
 
 		assertAtOnceJavaHeapOp();
 
@@ -126,26 +139,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
         
     }
 
-//    /**
-//     * @see HashMapAnnotations#INITIAL_CAPACITY
-//     */
-//    public int getInitialCapacity() {
-//
-//        return getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-//                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY);
-//
-//    }
-//
-//    /**
-//     * @see HashMapAnnotations#LOAD_FACTOR
-//     */
-//    public float getLoadFactor() {
-//
-//        return getProperty(HashMapAnnotations.LOAD_FACTOR,
-//                HashMapAnnotations.DEFAULT_LOAD_FACTOR);
-//
-//    }
-    
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ControllerTask(this, context));
@@ -170,30 +163,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
          * The operator which is being evaluated.
          */
         private final SubqueryHashJoinOp joinOp;
-        
-//        /**
-//         * The join variables.
-//         * 
-//         * @see SubqueryHashJoinOp.Annotations#JOIN_VARS
-//         */
-//        private final IVariable<?>[] joinVars;
-//
-//        /**
-//         * The variables to be retained by the join operator. Variables not
-//         * appearing in this list will be stripped before writing out the
-//         * binding set onto the output sink(s).
-//         * 
-//         * @see SubqueryHashJoinOp.Annotations#SELECT
-//         */
-//        final private IVariable<?>[] selectVars;
-//
-//        /**
-//         * An array of constraints to be applied to the generated solutions
-//         * (optional).
-//         * 
-//         * @see SubqueryHashJoinOp.Annotations#CONSTRAINTS
-//         */
-//        final private IConstraint[] constraints;
         
         /**
          * The subquery to be evaluated.
@@ -246,15 +215,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
             this.joinOp = op;
             
-//            this.joinVars = (IVariable<?>[]) joinOp
-//                    .getRequiredProperty(Annotations.JOIN_VARS);
-//
-//            this.selectVars = (IVariable<?>[]) joinOp
-//                    .getProperty(Annotations.SELECT);
-//
-//            this.constraints = joinOp.getProperty(
-//                    Annotations.CONSTRAINTS, null/* defaultValue */);
-
             this.subquery = (PipelineOp) op
                     .getRequiredProperty(Annotations.SUBQUERY);
 
@@ -273,9 +233,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
         public Void call() throws Exception {
 
-//            if (log.isDebugEnabled())
-//                log.debug("Evaluating subquery hash join: " + joinOp);
-
             final BaseJoinStats stats = (BaseJoinStats) context.getStats();
 
             final QueryEngine queryEngine = context.getRunningQuery()
@@ -283,19 +240,8 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
             try {
 
-//                /*
-//                 * Materialize the binding sets and populate a hash map.
-//                 */
-//                final Map<Key, Bucket> map = new LinkedHashMap<Key, Bucket>(//
-//                        joinOp.getInitialCapacity(),//
-//                        joinOp.getLoadFactor()//
-//                );
-
                 state.acceptSolutions(context.getSource(), stats);
                 
-//                JVMHashJoinUtility.acceptSolutions(context.getSource(),
-//                        joinVars, stats, map, optional);
-
                 /*
                  * Run the subquery once.
                  * 
@@ -340,16 +286,11 @@ public class SubqueryHashJoinOp extends PipelineOp {
                     state.hashJoin(new Dechunkerator<IBindingSet>(
                             subquerySolutionItr),// leftItr
                             unsyncBuffer// outputBuffer,
-//                            true// leftIsPipeline
                     );
 
-//                    JVMHashJoinUtility
-//                            .hashJoin(new Dechunkerator<IBindingSet>(
-//                                    subquerySolutionItr),
-//                                    unsyncBuffer/* outputBuffer */, joinVars,
-//                                    selectVars, constraints, map, optional,
-//                                    true/* leftIsPipeline */);
-                    
+                    // Note: This only handles Normal and Optional.  Since the
+                    // operator is deprecated I am not going to work through the
+                    // support for Exists and NotExists.
                     if (state.getJoinType().isOptional()) {
 
                         final IBuffer<IBindingSet> outputBuffer;
@@ -363,8 +304,6 @@ public class SubqueryHashJoinOp extends PipelineOp {
 
                         state.outputOptionals(outputBuffer);
                         
-//                        JVMHashJoinUtility.outputOptionals(outputBuffer, map);
-
                         if (sink2 != null) {
                             unsyncBuffer2.flush();
                             sink2.flush();

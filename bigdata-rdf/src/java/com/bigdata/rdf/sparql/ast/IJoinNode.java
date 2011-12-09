@@ -55,17 +55,30 @@ public interface IJoinNode extends IBindingProducerNode {
     
         boolean DEFAULT_OPTIONAL = false;
         
+        /**
+         * When <code>true</code>, the join group has the semantics of a SPARQL
+         * MINUS operator and only those solutions in the parent group which do
+         * NOT join with this group will be output.
+         */
+        String MINUS = "minus";
+        
+        boolean DEFAULT_MINUS = false;
+        
     }
     
     /**
      * Return whether or not this is an join with "optional" semantics. Optional
      * joins may or may not produce variable bindings, but will not reduce the
      * incoming solutions based on whether or not they bind.
-     * 
-     * TODO This will have to be expanded to cover "MINUS" as well.
      */
     boolean isOptional();
 
+    /**
+     * Return <code>true</code> iff this is a join group representing a SPARQL
+     * MINUS operator.
+     */
+    boolean isMinus();
+    
     /**
      * Return the FILTER(s) associated with this {@link IJoinNode}. Such filters
      * will be run with the JOIN for this statement pattern. As such, they MUST

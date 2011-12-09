@@ -349,18 +349,43 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
             state.hashJoin2(leftItr, unsyncBuffer, //true/* leftIsPipeline */,
                     constraints);
             
-            if (state.getJoinType().isOptional() && context.isLastInvocation()) {
+            if (context.isLastInvocation()) {
 
-                // where to write the optional solutions.
-                final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
-                        : new UnsyncLocalOutputBuffer<IBindingSet>(
-                                op.getChunkCapacity(), sink2);
+                switch (state.getJoinType()) {
+                case Normal:
+                    /*
+                     * Nothing to do.
+                     */
+                    break;
+                case Optional:
+                case NotExists: {
+                    /*
+                     * Output the optional solutions.
+                     */
 
-                state.outputOptionals(unsyncBuffer2);
+                    // where to write the optional solutions.
+                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = sink2 == null ? unsyncBuffer
+                            : new UnsyncLocalOutputBuffer<IBindingSet>(
+                                    op.getChunkCapacity(), sink2);
 
-                unsyncBuffer2.flush();
-                if (sink2 != null)
-                    sink2.flush();
+                    state.outputOptionals(unsyncBuffer2);
+
+                    unsyncBuffer2.flush();
+                    if (sink2 != null)
+                        sink2.flush();
+                    
+                    break;
+                }
+                case Exists: {
+                    /*
+                     * Output the join set.
+                     */
+                    state.outputJoinSet(unsyncBuffer);
+                    break;
+                }
+                default:
+                    throw new AssertionError();
+                }
 
             }
 

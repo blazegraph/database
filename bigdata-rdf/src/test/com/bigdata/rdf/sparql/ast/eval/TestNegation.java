@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import com.bigdata.bop.join.IHashJoinUtility;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 
 /**
  * Test suite for SPARQL negation (EXISTS and MINUS).
@@ -159,7 +161,23 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * A Sesame test.
+     * A Sesame test based on the SPARQL 1.1 LCWD.
+     * 
+     * <pre>
+     * SELECT *
+     * WHERE { ?s ?p ?o 
+     *         MINUS { ?x ?y ?z } 
+     * }
+     * </pre>
+     * 
+     * There is only one solution to the first statement pattern. Since the
+     * MINUS group binds different variables, no solutions are removed and the
+     * sole solution to the <code>?s ?p ?o</code> statement pattern should be
+     * reported.
+     * <p>
+     * Note: Since there are no shared variables, we have to lift out the MINUS
+     * group into a named subquery in order to have bottom up evaluation
+     * semantics.
      */
     public void test_sparql11_minus_02() throws Exception {
 
@@ -176,6 +194,17 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * A Sesame test.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT * 
+     * WHERE {
+     *     ?a :p ?n
+     *     MINUS {
+     *         ?a :q ?n .
+     *     }
+     * }     *
+     * </pre>
      */
     public void test_sparql11_minus_05() throws Exception {
 
@@ -192,6 +221,22 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * A Sesame test.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT * 
+     * WHERE {
+     *     ?a :p ?n
+     *     MINUS {
+     *         ?a :q ?m .
+     *         FILTER(?n = ?m)
+     *     }
+     * }
+     * </pre>
+     * 
+     * The variable <code>?n</code> is not bound inside of the FILTER (unless it
+     * is an exogenous variable) because the right hand side of MINUS does not
+     * have visibility into the variables on the left hand side of MINUS.
      */
     public void test_sparql11_minus_06() throws Exception {
 
@@ -208,6 +253,40 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * A Sesame test.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT * 
+     * WHERE {
+     *     ?a :p ?n
+     *     MINUS {
+     *         ?a :q ?m .
+     *         OPTIONAL {?a :r ?n} 
+     *         FILTER(?n = ?m)
+     *    } 
+     * }
+     * </pre>
+     * 
+     * <pre>
+     * @prefix : <http://example/> .
+     * 
+     * :a :p 1 ; :q 1, 2 .
+     * :b :p 3.0 ; :q 4.0, 5.0 .
+     * </pre>
+     * 
+     * <pre>
+     * {?a=:a, ?n=1}
+     * {?a=:b, ?n=3.0}
+     * </pre>
+     * 
+     * In this case the FILTER in the MINUS group COULD have a binding for
+     * <code>?n</code> from the OPTIONAL group.
+     * 
+     * <p>
+     * 
+     * Note: This is actually a badly formed left-join pattern. The MINUS group
+     * members get lifted into a named subquery which is then INCLUDEd into the
+     * MINUS group.
      */
     public void test_sparql11_minus_07() throws Exception {
 

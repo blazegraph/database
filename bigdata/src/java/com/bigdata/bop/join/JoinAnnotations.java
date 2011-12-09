@@ -47,7 +47,7 @@ public interface JoinAnnotations extends com.bigdata.bop.PipelineOp.Annotations 
 //     * <p>
 //     * Note: Constraints on the join ARE NOT applied to the "optional" path.
 //     * 
-//     * FIXME The code is a bit incoherent concerning where this annotation is
+//     * Note: The code is a bit incoherent concerning where this annotation is
 //     * place. For the AST, it needs to be on the node which models the join.
 //     * E.g., StatementPatternNode, JoinGroupNode, etc. For a Predicate, it is on
 //     * the Predicate. For a PipelineOp, it is found on the Predicate if the JOIN

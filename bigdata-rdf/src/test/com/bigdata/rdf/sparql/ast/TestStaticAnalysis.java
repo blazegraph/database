@@ -29,11 +29,17 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
@@ -977,7 +983,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
                 assertEquals(expectedProjected,
                         sa.getDefinitelyProducedBindings(queryRoot));
-
+                
             }
 
             // variables which must be bound in the main query's where clause.
@@ -1175,6 +1181,1018 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                 "ageA" }),
                 sa.getDefinitelyProducedBindingsAndFilterVariables(outerGroup,
                         new LinkedHashSet<IVariable<?>>()));
+
+    }
+
+    /**
+     * Unit test focused on required and optional {@link StatementPatternNode}
+     * s.
+     */
+    public void test_static_analysis_getMaybeProducedBindings() {
+
+        final IV<?, ?> p = makeIV(new URIImpl("http://example/p"));
+        final IV<?, ?> q = makeIV(new URIImpl("http://example/q"));
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause;
+        final StatementPatternNode sp1, sp2;
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            sp1 = new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n"));
+            whereClause.addChild(sp1);
+
+            sp2 = new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(q), new VarNode("m"));
+            whereClause.addChild(sp2);
+            sp2.setOptional(true);
+
+        }
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        // Where clause.
+        {
+
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            expectedVars.add(Var.var("m"));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+        
+        // sp1
+        {
+
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(sp1,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(expectedVars, sa.getDefinitelyProducedBindings(sp1,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(sp1,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+        
+        // sp2
+        {
+
+            {
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                        sp2, new LinkedHashSet<IVariable<?>>()));
+            }
+
+            {
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("m"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getDefinitelyProducedBindings(sp2,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getMaybeProducedBindings(sp2,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * Unit test of static analysis methods as they pertain to a MINUS group.
+     * Unlike OPTIONAL, the variables in the left and right hand side of a MINUS
+     * operator are not visible to one another. This has implications for (a)
+     * MINUS operators where the right hand side does not share any variables
+     * (such cases should be pruned); and (b) FILTERS in the right hand side
+     * will fail in they assume visibility of variables in the left hand side.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?a ?n 
+     * WHERE {
+     *     ?a :p ?n
+     *     MINUS {
+     *         ?a :q ?n .
+     *     }
+     * }
+     * </pre>
+     */
+    public void test_static_analysis_minus_sharedVariables() {
+        
+        final IV<?,?> p = makeIV(new URIImpl("http://example/p"));
+        final IV<?,?> q = makeIV(new URIImpl("http://example/q"));
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, minusGroup;
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n")));
+
+            minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(q), new VarNode("n")));
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+        expectedVars.add(Var.var("a"));
+        expectedVars.add(Var.var("n"));
+        
+        /*
+         * First, the QueryRoot.
+         */
+        {
+
+            assertEquals(expectedVars, sa.getDefinitelyProducedBindings(queryRoot));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        /*
+         * Now the whereClause.
+         */
+        {
+
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(Collections.emptySet(),
+                    sa.getMaybeIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        /*
+         * Finally, the MINUS group.
+         */
+        {
+            
+            assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                    minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                    minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(minusGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(minusGroup,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+        
+    }
+    
+    /**
+     * Variant test for a MINUS operator without shared variables.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?s ?p ?o
+     * WHERE {
+     *     ?s ?p ?o
+     *     MINUS {
+     *         ?x ?y ?z .
+     *     }
+     * }
+     * </pre>
+     */
+    public void test_static_analysis_minus_nothingShared() {
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, minusGroup;
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o")));
+
+            minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("x"),
+                    new VarNode("y"), new VarNode("z")));
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+        expectedVars.add(Var.var("s"));
+        expectedVars.add(Var.var("p"));
+        expectedVars.add(Var.var("o"));
+        
+        final Set<IVariable<?>> otherVars = new LinkedHashSet<IVariable<?>>();
+
+        otherVars.add(Var.var("x"));
+        otherVars.add(Var.var("y"));
+        otherVars.add(Var.var("z"));
+
+        /*
+         * First, the QueryRoot.
+         */
+        {
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        /*
+         * Now the whereClause.
+         */
+        {
+
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(Collections.emptySet(),
+                    sa.getMaybeIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        /*
+         * Finally, the MINUS group.
+         */
+        {
+            
+            assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                    minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                    minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(
+                    otherVars,
+                    sa.getDefinitelyProducedBindings(minusGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(otherVars, sa.getMaybeProducedBindings(minusGroup,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+        
+    }
+    
+    /**
+     * Variant test for query mixing MINUS and OPTIONAL groups.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?a ?n ?b
+     * WHERE {
+     *     ?a :p ?n
+     *     OPTIONAL {
+     *        ?b :p 3.0
+     *     }
+     *     MINUS {
+     *         ?a :q ?n .
+     *         OPTIONAL {
+     *            ?c :q 3.0
+     *         }
+     *     }
+     * }
+     * </pre>
+     */
+    public void test_static_analysis_minus_and_optional() {
+        
+        final IV<?,?> p = makeIV(new URIImpl("http://example/p"));
+        final IV<?,?> q = makeIV(new URIImpl("http://example/q"));
+        final IV<?, ?> three = makeIV(new LiteralImpl("3.0", XSD.DECIMAL));
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, optGroup1, minusGroup, optGroup2;
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+            projection.addProjectionVar(new VarNode("b"));
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n")));
+            
+            optGroup1 = new JoinGroupNode(true/*optional*/);
+            whereClause.addChild(optGroup1);
+            
+            optGroup1.addChild(new StatementPatternNode(new VarNode("b"),
+                    new ConstantNode(p), new ConstantNode(three)));
+            
+            minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(q), new VarNode("n")));
+
+            optGroup2 = new JoinGroupNode(true/*optional*/);
+            minusGroup.addChild(optGroup2);
+            
+            optGroup2.addChild(new StatementPatternNode(new VarNode("c"),
+                    new ConstantNode(q), new ConstantNode(three)));
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        /*
+         * First, the QueryRoot.
+         */
+        {
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(expectedVars, sa.getDefinitelyProducedBindings(queryRoot));
+
+            expectedVars.add(Var.var("b"));
+            
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        /*
+         * Now the whereClause.
+         */
+        {
+            
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(Collections.emptySet(),
+                    sa.getMaybeIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        /*
+         * Optional group1.
+         */
+        {
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyIncomingBindings(optGroup1,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeIncomingBindings(optGroup1,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            expectedVars.clear();
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(optGroup1,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(optGroup1,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        /*
+         * The MINUS group.
+         */
+        {
+
+            {
+
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                        minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+                expectedVars.add(Var.var("b"));
+
+                assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                        minusGroup, new LinkedHashSet<IVariable<?>>()));
+
+            }
+
+            {
+
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getDefinitelyProducedBindings(minusGroup,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+                expectedVars.add(Var.var("c"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getMaybeProducedBindings(minusGroup,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+            }
+
+        }
+        
+        /*
+         * Optional group 2.
+         */
+        {
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyIncomingBindings(optGroup2,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeIncomingBindings(optGroup2,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            expectedVars.clear();
+            expectedVars.add(Var.var("c"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(optGroup2,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(optGroup2,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        } 
+        
+    }
+
+    /**
+     * Variant test for query mixing normal child join groups and OPTIONAL
+     * join groups.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?a ?n ?b ?c
+     * WHERE {
+     *     ?a :p ?n
+     *     {
+     *         ?a :q ?n .
+     *         OPTIONAL {
+     *            ?c :q 3.0
+     *         }
+     *     }
+     *     OPTIONAL {
+     *         ?b :p 3.0
+     *     }
+     * }
+     * </pre>
+     */
+    public void test_static_analysis_subGroups_and_optional() {
+        
+        final IV<?,?> p = makeIV(new URIImpl("http://example/p"));
+        final IV<?,?> q = makeIV(new URIImpl("http://example/q"));
+        final IV<?, ?> three = makeIV(new LiteralImpl("3.0", XSD.DECIMAL));
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, optGroup1, childGroup, optGroup2;
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            queryRoot.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+            projection.addProjectionVar(new VarNode("b"));
+            projection.addProjectionVar(new VarNode("c"));
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n")));
+            
+            {
+                childGroup = new JoinGroupNode();
+                whereClause.addChild(childGroup);
+
+                childGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                        new ConstantNode(q), new VarNode("n")));
+
+                optGroup2 = new JoinGroupNode(true/* optional */);
+                childGroup.addChild(optGroup2);
+
+                optGroup2.addChild(new StatementPatternNode(new VarNode("c"),
+                        new ConstantNode(q), new ConstantNode(three)));
+            }
+
+            {
+                optGroup1 = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(optGroup1);
+
+                optGroup1.addChild(new StatementPatternNode(new VarNode("b"),
+                        new ConstantNode(p), new ConstantNode(three)));
+            }
+            
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        /*
+         * First, the QueryRoot.
+         */
+        {
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(expectedVars, sa.getDefinitelyProducedBindings(queryRoot));
+
+            expectedVars.add(Var.var("b"));
+            expectedVars.add(Var.var("c"));
+            
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        /*
+         * Now the whereClause.
+         */
+        {
+            
+            assertEquals(Collections.emptySet(),
+                    sa.getDefinitelyIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            assertEquals(Collections.emptySet(),
+                    sa.getMaybeIncomingBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>()));
+
+            final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("n"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            expectedVars.add(Var.var("b"));
+            expectedVars.add(Var.var("c"));
+
+            assertEquals(expectedVars, sa.getMaybeProducedBindings(whereClause,
+                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        /*
+         * The child join group.
+         */
+        {
+
+            {
+
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                        childGroup, new LinkedHashSet<IVariable<?>>()));
+
+                assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                        childGroup, new LinkedHashSet<IVariable<?>>()));
+
+            }
+
+            {
+
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getDefinitelyProducedBindings(childGroup,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+                expectedVars.add(Var.var("c"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getMaybeProducedBindings(childGroup,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+            }
+
+            /*
+             * Optional group 2 (embedded in the child join group).
+             */
+            {
+
+                {
+                    final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                    expectedVars.add(Var.var("a"));
+                    expectedVars.add(Var.var("n"));
+
+                    assertEquals(expectedVars,
+                            sa.getDefinitelyIncomingBindings(optGroup2,
+                                    new LinkedHashSet<IVariable<?>>()));
+
+                    assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                            optGroup2, new LinkedHashSet<IVariable<?>>()));
+                }
+
+                {
+                    final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+                    expectedVars.add(Var.var("c"));
+
+                    assertEquals(
+                            expectedVars,
+                            sa.getDefinitelyProducedBindings(optGroup2,
+                                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+                    assertEquals(
+                            expectedVars,
+                            sa.getMaybeProducedBindings(optGroup2,
+                                    new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+                }
+
+            } 
+
+        }
+
+        /*
+         * Optional group1.
+         */
+        {
+
+            {
+
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("a"));
+                expectedVars.add(Var.var("n"));
+
+                assertEquals(expectedVars, sa.getDefinitelyIncomingBindings(
+                        optGroup1, new LinkedHashSet<IVariable<?>>()));
+
+                expectedVars.add(Var.var("c"));
+
+                assertEquals(expectedVars, sa.getMaybeIncomingBindings(
+                        optGroup1, new LinkedHashSet<IVariable<?>>()));
+            }
+
+            {
+                
+                final Set<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+                expectedVars.add(Var.var("b"));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getDefinitelyProducedBindings(optGroup1,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+                assertEquals(
+                        expectedVars,
+                        sa.getMaybeProducedBindings(optGroup1,
+                                new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Unit test for
+     * {@link StaticAnalysis#getProjectedVars(IGroupMemberNode, GraphPatternGroup, QueryBase, Set, Set)}
+     * . This unit test is a based on
+     * <code>bigdata-perf/CI/govtrack/queries/query10.rq</code>
+     * <p>
+     * Given:
+     * 
+     * <pre>
+     * SELECT ?var1 ?var6 ?var4 ?var10
+     *  WHERE {
+     *         ?var1 a <http://www.rdfabout.com/rdf/schema/politico/Politician>
+     *         OPTIONAL {
+     *                 ?var1 <http://www.rdfabout.com/rdf/schema/usgovt/name> ?var6
+     *         }.
+     *         OPTIONAL {
+     *                 ?var12 <http://www.rdfabout.com/rdf/schema/usbill/sponsor> ?var1.
+     *                 ?var12 <http://www.rdfabout.com/rdf/schema/usbill/title> ?var4
+     *         }.
+     *         OPTIONAL {
+     *                 ?var1 <http://www.w3.org/2001/vcard-rdf/3.0#N> ?var13.
+     *                 ?var13 <http://www.w3.org/2001/vcard-rdf/3.0#Family> ?var10
+     *         }
+     * }
+     * </pre>
+     * 
+     * This test verifies that the correct projection is computed for each of
+     * the sub-groups in the query. Those projections are as follows:
+     * 
+     * <pre>
+     *         SELECT ?var1 ?var6
+     *         WHERE {
+     *                 ?var1 a <http://www.rdfabout.com/rdf/schema/politico/Politician>
+     *                 OPTIONAL {
+     *                      ?var1 <http://www.rdfabout.com/rdf/schema/usgovt/name> ?var6
+     *                 }.
+     *         }
+     * </pre>
+     * 
+     * <pre>
+     *         SELECT ?var1 ?var4
+     *         WHERE {
+     *            INCLUDE %_set1
+     *            OPTIONAL {
+     *                 ?var12 <http://www.rdfabout.com/rdf/schema/usbill/sponsor> ?var1.
+     *                 ?var12 <http://www.rdfabout.com/rdf/schema/usbill/title> ?var4
+     *            }.
+     *         }
+     * </pre>
+     * 
+     * <pre>
+     *      SELECT ?var1 ?var10
+     *      WHERE {
+     *         INCLUDE %_set1
+     *         OPTIONAL {
+     *                 ?var1 <http://www.w3.org/2001/vcard-rdf/3.0#N> ?var13.
+     *                 ?var13 <http://www.w3.org/2001/vcard-rdf/3.0#Family> ?var10
+     *         }
+     *     }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
+     */
+    public void test_getProjectedVars() {
+
+        @SuppressWarnings("rawtypes")
+        final IV a = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV polititian = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/politico/Politician"));
+        @SuppressWarnings("rawtypes")
+        final IV name = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/usgovt/name"));
+        @SuppressWarnings("rawtypes")
+        final IV sponsor = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/usgovt/sponsor"));
+        @SuppressWarnings("rawtypes")
+        final IV title = makeIV(new URIImpl("http://www.rdfabout.com/rdf/schema/usgovt/title"));
+        @SuppressWarnings("rawtypes")
+        final IV N = makeIV(new URIImpl("http://www.w3.org/2001/vcard-rdf/3.0#N"));
+        @SuppressWarnings("rawtypes")
+        final IV family = makeIV(new URIImpl("http://www.w3.org/2001/vcard-rdf/3.0#Family"));
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, optionalGroup1, optionalGroup2, optionalGroup3;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+                projection.addProjectionVar(new VarNode("var1"));
+                projection.addProjectionVar(new VarNode("var6"));
+                projection.addProjectionVar(new VarNode("var4"));
+                projection.addProjectionVar(new VarNode("var10"));
+            }
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            // ?_var1 a <http://www.rdfabout.com/rdf/schema/politico/Politician>
+            whereClause.addChild(new StatementPatternNode(new VarNode("var1"),
+                    new ConstantNode(a), new ConstantNode(polititian),
+                    null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            // ?_var1 <http://www.rdfabout.com/rdf/schema/usgovt/name> ?_var6
+            {
+                optionalGroup1 = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(optionalGroup1);
+                
+                optionalGroup1.addChild(new StatementPatternNode(
+                        new VarNode("var1"), new ConstantNode(name),
+                        new VarNode("var6"), null/* c */,
+                        Scope.DEFAULT_CONTEXTS));
+            }
+
+            {
+                optionalGroup2 = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(optionalGroup2);
+
+                // ?_var12 <http://www.rdfabout.com/rdf/schema/usbill/sponsor> ?_var1.
+                optionalGroup2.addChild(new StatementPatternNode(new VarNode(
+                        "var12"), new ConstantNode(sponsor), new VarNode(
+                        "var1"), null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+                // ?_var12 <http://www.rdfabout.com/rdf/schema/usbill/title> ?_var4
+                optionalGroup2.addChild(new StatementPatternNode(new VarNode(
+                        "var12"), new ConstantNode(title), new VarNode(
+                        "var4"), null/* c */, Scope.DEFAULT_CONTEXTS));
+                
+            }
+
+            {
+                optionalGroup3 = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(optionalGroup3);
+
+                // ?_var1 <http://www.w3.org/2001/vcard-rdf/3.0#N> ?_var13.
+                optionalGroup3.addChild(new StatementPatternNode(new VarNode(
+                        "var1"), new ConstantNode(N), new VarNode(
+                        "var13"), null/* c */, Scope.DEFAULT_CONTEXTS));
+
+                // ?_var13 <http://www.w3.org/2001/vcard-rdf/3.0#Family> ?_var10
+                optionalGroup3.addChild(new StatementPatternNode(new VarNode(
+                        "var13"), new ConstantNode(family), new VarNode(
+                        "var10"), null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+
+        }
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+        
+        // Optional group 1.
+        if(true){
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+            
+            expectedVars.add(Var.var("var1"));
+            expectedVars.add(Var.var("var6"));
+            
+            assertEquals(expectedVars, sa.getProjectedVars(optionalGroup1,
+                    optionalGroup1, queryRoot, exogenousVars,
+                    new LinkedHashSet<IVariable<?>>()// projectedVars
+                    ));
+            
+        }
+
+        // Optional group 2.
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+            
+            expectedVars.add(Var.var("var1"));
+            expectedVars.add(Var.var("var4"));
+            
+            assertEquals(expectedVars, sa.getProjectedVars(optionalGroup2,
+                    optionalGroup2, queryRoot, exogenousVars,
+                    new LinkedHashSet<IVariable<?>>()// projectedVars
+                    ));
+            
+        }
+
+        // Optional group 3.
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+            
+            expectedVars.add(Var.var("var1"));
+            expectedVars.add(Var.var("var10"));
+            
+            assertEquals(expectedVars, sa.getProjectedVars(optionalGroup3,
+                    optionalGroup3, queryRoot, exogenousVars,
+                    new LinkedHashSet<IVariable<?>>()// projectedVars
+                    ));
+            
+        }
 
     }
 

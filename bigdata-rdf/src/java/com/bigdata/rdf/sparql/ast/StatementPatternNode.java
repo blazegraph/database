@@ -259,6 +259,15 @@ public class StatementPatternNode extends
     }    
 
     /**
+     * Returns <code>false</code>.
+     */
+    final public boolean isMinus() {
+     
+        return false;
+        
+    }
+    
+    /**
      * Mark this {@link StatementPatternNode} as one which was lifted out of a
      * "simple optional" group and which therefore has "optional" semantics (we
      * will do an optional join for it).

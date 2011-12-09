@@ -27,17 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
-import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
+import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -70,8 +67,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * 
  * Or
  * 
+ * <pre>
  * { GRAPH ?g {...} } => GRAPH ?g {...}
- * 
+ * </pre>
  * 
  * Note: An empty <code>{}</code> matches a single empty solution. Since we
  * always push in an empty solution and the join of anything with an empty
@@ -84,8 +82,8 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
-    private static final Logger log = Logger
-            .getLogger(ASTEmptyGroupOptimizer.class);
+//    private static final Logger log = Logger
+//            .getLogger(ASTEmptyGroupOptimizer.class);
 
     @Override
     public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
@@ -99,6 +97,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         // Main WHERE clause
         {
 
+            @SuppressWarnings("unchecked")
             final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) queryRoot
                     .getWhereClause();
 
@@ -127,6 +126,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
                 final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
                         .get(i);
 
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
                         .getWhereClause();
 
@@ -185,6 +185,7 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 
                 final QueryBase subquery = (QueryBase) child;
 
+                @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> childGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
                         .getWhereClause();
 
@@ -229,14 +230,19 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
         		op instanceof JoinGroupNode && 
     			op.get(0) instanceof JoinGroupNode) {
             
-            /*
-             * We can always merge two JoinGroupNodes into one, but we have
-             * to make sure we get the optionality right.
-             */
-
             final JoinGroupNode parent = (JoinGroupNode) op;
 
             final JoinGroupNode child = (JoinGroupNode) op.get(0);
+
+            if (!parent.isMinus() && !child.isMinus()) {
+
+                /*
+                 * We can always merge two JoinGroupNodes into one, but we have
+                 * to make sure we get the optionality right.
+                 * 
+                 * Note: This is not true for MINUS. MINUS can only be combined
+                 * with a child join group which is using a normal join.
+                 */
 
             	/*
 1. JoinGroup1 [optional=false] { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=false] { É }
@@ -244,13 +250,16 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 3. JoinGroup1 [optional=true]  { JoinGroup2 [optional=false] { É } } -> JoinGroup2 [optional=true]  { É }
 4. JoinGroup1 [optional=false] { JoinGroup2 [optional=true]  { É } } -> JoinGroup2 [optional=true]  { É }
             	 */
-        	if (parent.isOptional() && !child.isOptional()) {
+
+                if (parent.isOptional() && !child.isOptional()) {
+
+                    child.setOptional(true);
+
+                }
+
+                swap(queryBase, parent, child);
         	
-        		child.setOptional(true);
-        		
-        	}
-        	
-        	swap(queryBase, parent, child);
+            }
             	
         } else if (arity == 1 && 
         		op instanceof UnionNode && 
@@ -282,24 +291,30 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
             
             swap(queryBase, parent, child);
 
-        } else if (arity == 1 &&
-        		op.get(0) instanceof IBindingProducerNode &&
-                op.getParent() != null &&
-                !op.isOptional() &&
-                !(((IGroupNode<?>) op.getParent()) instanceof UnionNode) &&
+        } else if (arity == 1 && //
+                op.get(0) instanceof IBindingProducerNode && //
+                op.getParent() != null && //
+                !op.isOptional() && //
+                !op.isMinus() && //
+                !isUnion(op.getParent()) && //
+//                !(((IGroupNode<?>) op.getParent()) instanceof UnionNode) &&
+                !isMinus(op.getParent()) &&
+//                !(((IGroupNode<?>) op.getParent()) instanceof JoinGroupNode && !(((JoinGroupNode) op
+//                        .getParent()).isMinus())) &&
                 op.getContext() == op.getParent().getContext()) {
 
             /*
              * The child is something which produces bindings (hence,
              * not a FILTER) and is neither a JoinGroupNode nor a
              * UnionNode and the operator is neither the top level of
-             * the WHERE clause nor a UnionNode.
+             * the WHERE clause nor a UnionNode or MINUS.
              * 
              * Just replace the parent JoinGroupNode (op) with the
              * child.
              */
 
-            ((GroupNodeBase) op.getParent()).replaceWith(op, (BOp) op.get(0));
+            ((GroupNodeBase<?>) op.getParent())
+                    .replaceWith(op, (BOp) op.get(0));
 
         }
 
@@ -310,6 +325,48 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
 //        }
 
     }
+
+    /**
+     * Return true if the operator is a UNION.
+     * 
+     * @param op
+     *            The operator.
+     */
+    static private boolean isUnion(final IGroupNode<?> op) {
+        if (op instanceof UnionNode)
+            return true;
+        return false;
+    }
+
+    /**
+     * Return true if the operator is a MINUS node.
+     * 
+     * @param op
+     *            The operator.
+     */
+    static private boolean isMinus(final IGroupNode<?> op) {
+        if (op instanceof IJoinNode) {
+            final IJoinNode g = (IJoinNode) op;
+            if (g.isMinus())
+                return true;
+        }
+        return false;
+    }
+    
+//    /**
+//     * Return true if the operator is an OPTIONAL node.
+//     * 
+//     * @param op
+//     *            The operator.
+//     */
+//    private boolean isOptional(final IGroupNode<?> op) {
+//        if (op instanceof IJoinNode) {
+//            final IJoinNode g = (IJoinNode) op;
+//            if (g.isOptional())
+//                return true;
+//        }
+//        return false;
+//    }
     
     /**
      * Swap the parent with the child inside the grandparent.  If there is no
@@ -337,8 +394,9 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
     		 * from the grandparent and replace it with the child.
     		 */
     		
-    		final GroupNodeBase grandparent = (GroupNodeBase) parent.getParent();
-    		
+            final GroupNodeBase<?> grandparent = (GroupNodeBase<?>) parent
+                    .getParent();
+
     		grandparent.replaceWith(parent, child);
     		
     	}
@@ -346,42 +404,5 @@ public class ASTEmptyGroupOptimizer implements IASTOptimizer {
     	parent.setParent(null);
     	
     }
-
-//    /**
-//     * Remove any empty (non-GRAPH) groups (normal groups and UNIONs, but not
-//     * GRAPH {}).
-//     */
-//    static private void removeEmptyChildGroups(final GraphPatternGroup<?> op) {
-//
-//        int n = op.arity();
-//
-//        for (int i = 0; i < n; i++) {
-//
-//            final BOp child = op.get(i);
-//
-//            if (!(child instanceof GroupNodeBase<?>))
-//                continue;
-//
-//            if (((GroupNodeBase<?>) child).getContext() != null) {
-//                /*
-//                 * Do not prune GRAPH ?g {} or GRAPH uri {}. Those constructions
-//                 * have special semantics.
-//                 */
-//                continue;
-//            }
-//
-//            if (child.arity() == 0) {
-//
-//                // remove an empty child group.
-//                op.removeArg(child);
-//
-//                // one less child to visit.
-//                n--;
-//
-//            }
-//
-//        }
-//
-//    }
 
 }

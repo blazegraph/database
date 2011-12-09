@@ -1699,10 +1699,10 @@ public class AST2BOpUtility extends AST2BOpJoins {
                  */
                 @SuppressWarnings("unchecked")
                 final GraphPatternGroup<IGroupMemberNode> subgroup = (GraphPatternGroup<IGroupMemberNode>) child;
-                final boolean optional = subgroup.isOptional();
-                left = addSubgroup(left, subgroup,
-                        optional ? new LinkedHashSet<IVariable<?>>(doneSet)
-                                : doneSet, ctx);
+                final boolean required = !(subgroup.isOptional() || subgroup
+                        .isMinus());
+                left = addSubgroup(left, subgroup, required ? doneSet
+                        : new LinkedHashSet<IVariable<?>>(doneSet), ctx);
                 continue;
             } else if (child instanceof FilterNode) {
                 final FilterNode filter = (FilterNode) child;
@@ -2388,7 +2388,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
              * node) or OPTIONAL join groups.
              */
             throw new AssertionError(
-                    "OPTIONAL group has attached join filters: " + subgroup);
+                    "Non-required group has attached join filters: " + subgroup);
         }
 
 	    /*

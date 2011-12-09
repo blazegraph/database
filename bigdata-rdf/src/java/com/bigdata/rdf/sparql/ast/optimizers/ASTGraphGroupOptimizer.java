@@ -91,6 +91,13 @@ import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
  * <dt>GRAPH uri { ... GRAPH uri2 ... }</dt>
  * <dd>It is an query error if a <code>GRAPH uri</code> is nested within another
  * <code>GRAPH uri</code> for distinct IRIs.</dd>
+ * <dt>GRAPH uri { ... GRAPH ?foo ... }</dt>
+ * <dd>The outer graph imposes a constant constraint. The inner graph needs to
+ * inherit that constraint. Either a SameTerm() constraint must be added to the
+ * inner graph or context for the inner graph could be rewritten using
+ * Constant/2. Again, this is an optimization which may not contribute much
+ * value except in very rare cases. Unlike the case below, we do need to impose
+ * a SameTerm() constraint to make this case correct.</dd>
  * <dt>GRAPH ?foo { ... GRAPH uri ... }</dt>
  * <dd>If a constant is nested within a <i>non-optional</i>
  * <code>GRAPH uri</code> then that constant could be lifted up and bound using
@@ -147,9 +154,9 @@ import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
  *          a specific constant then we would rewrite <code>?g</code> using
  *          Constant/2 and then handle this as <code>GRAPH uri {}</code>
  *          <p>
- *          This is basically what {@link AST2BOpJoins} does when it follows
- *          the decision tree for named and default graphs. So, maybe that logic
- *          can be lifted into this class as a rewrite?
+ *          This is basically what {@link AST2BOpJoins} does when it follows the
+ *          decision tree for named and default graphs. So, maybe that logic can
+ *          be lifted into this class as a rewrite?
  */
 public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
@@ -381,14 +388,15 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
      * @param context
      * @param innerContext
      */
-    private void assertSameURI(TermNode context, TermNode innerContext) {
+    private void assertSameURI(final TermNode context,
+            final TermNode innerContext) {
 
         // GRAPH uri1 { ... GRAPH uri2 {...} ... }
         if (!context.getValue().equals(innerContext.getValue())) {
 
             // uri1 != uri2
-            throw new RuntimeException("Conflicting GRAPH IRIs: " + context
-                    + " and " + innerContext.getValue());
+            throw new InvalidGraphContextException("Conflicting GRAPH IRIs: "
+                    + context + " and " + innerContext.getValue());
 
         }
 

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -37,6 +38,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -49,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
@@ -239,6 +242,8 @@ public class TestASTBottomUpOptimizer extends
          * OPTIONAL and ASTBottomUpOptimizer modified to mark the INCLUDE as
          * optional, at which point this problem will go away. [It may be that
          * we can do this now using the SolutionSetHashJoinOp.]
+         * 
+         * Note: Precisely the same issue exists for MINUS.
          */
         assertEquals("modifiedClause", modifiedClause,
                 queryRoot.getWhereClause());        
@@ -1070,6 +1075,185 @@ public class TestASTBottomUpOptimizer extends
         
         diff(expected,queryRoot);
         
+    }
+
+    /**
+     * The MINUS operator evaluates both sides and then removes the solution
+     * sets on the right hand side from those on the left hand side. When there
+     * are shared variables we can constrain the right hand side evaluation
+     * without violating bottom up evaluation semantics. (This example is from
+     * the Sesame TCK.)
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?a ?n 
+     * WHERE {
+     *     ?a :p ?n
+     *     MINUS {
+     *         ?a :q ?n .
+     *     }
+     * }
+     * </pre>
+     * 
+     * This query does not need to be rewritten for bottom up semantics, so the
+     * expected AST is the same as the given AST.
+     */
+    public void test_minus_sharedVariables() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[] {};
+
+        final IV<?,?> p = makeIV(new URIImpl("http://example/p"));
+        final IV<?,?> q = makeIV(new URIImpl("http://example/q"));
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n")));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(q), new VarNode("n")));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("a"));
+            projection.addProjectionVar(new VarNode("n"));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(p), new VarNode("n")));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(q), new VarNode("n")));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
+
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
+    }
+  
+    /**
+     * For this case, there are no shared variables so the MINUS group can just
+     * be eliminated (it can not produce any solutions which would be removed
+     * from the parent group).
+     * <p>
+     * This example is from the SPARQL 1.1 LCWD.
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?s ?p ?o
+     * WHERE {
+     *     ?s ?p ?o
+     *     MINUS {
+     *         ?x ?y ?z .
+     *     }
+     * }
+     * </pre>
+     * 
+     * This expected result is:
+     * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?s ?p ?o
+     * WHERE {
+     *     ?s ?p ?o
+     * }
+     * </pre>
+     */
+    public void test_minus_noSharedVariables() {
+
+        /*
+         * Note: DO NOT share structures in this test!!!!
+         */
+        final IBindingSet[] bsets = new IBindingSet[] {};
+
+        // The source AST.
+        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            given.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            given.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o")));
+
+            final JoinGroupNode minusGroup = new JoinGroupNode();
+            whereClause.addChild(minusGroup);
+            minusGroup.setMinus(true);
+
+            minusGroup.addChild(new StatementPatternNode(new VarNode("z"),
+                    new VarNode("x"), new VarNode("y")));
+
+        }
+
+        // The expected AST after the rewrite.
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+
+            final ProjectionNode projection = new ProjectionNode();
+            expected.setProjection(projection);
+
+            projection.addProjectionVar(new VarNode("s"));
+            projection.addProjectionVar(new VarNode("p"));
+            projection.addProjectionVar(new VarNode("o"));
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                    new VarNode("p"), new VarNode("o")));
+
+        }
+
+        final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
+
+        final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+                given/* queryNode */, bsets);
+
+        assertSameAST(expected, actual);
+
     }
 
 }
