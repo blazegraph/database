@@ -996,7 +996,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     out.add(bs);
 
                     if (log.isDebugEnabled())
-                        log.debug("Optional solution: " + bs);
+                        log.debug("Output solution: " + bs);
 
                 }
 

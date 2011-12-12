@@ -28,8 +28,9 @@ public class ValueExpressionNode extends ASTBase implements
     }
 
     /**
-     * FIXME Just for compatibility with SOp2ASTUtility. Remove when done
-     * with AST -> AST direct translation.
+     * @deprecated This was just for compatibility with SOp2ASTUtility. It is
+     *             only used by the test suite now. It should be removed now
+     *             that we are done with the SPARQL to AST direct translation.
      */
     @Deprecated
     public ValueExpressionNode(final IValueExpression<? extends IV> ve) {
