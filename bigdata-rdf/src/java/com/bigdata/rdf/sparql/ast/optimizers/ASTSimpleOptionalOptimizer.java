@@ -40,7 +40,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
@@ -64,8 +63,8 @@ import com.bigdata.rdf.store.BD;
  * A "simple optional" is an optional sub-group that contains only one statement
  * pattern, no sub-groups of its own, and no filters that require materialized
  * variables based on the optional statement pattern. We can lift these
- * "simple optionals" into the parent group without incurring the costs of
- * launching a {@link SubqueryOp}.
+ * "simple optionals" into the parent group where the join evaluation will be
+ * less expensive.
  * <p>
  * Note: When the filter is lifted, it must be attached to the statement pattern
  * node such that toPredicate() puts them onto the predicate since they must run
