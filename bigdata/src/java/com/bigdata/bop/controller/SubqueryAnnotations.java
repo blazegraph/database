@@ -38,6 +38,6 @@ public interface SubqueryAnnotations {
     /**
      * The subquery to be evaluated.
      */
-    String SUBQUERY = SubqueryOp.class.getName() + ".subquery";
+    String SUBQUERY = SubqueryAnnotations.class.getName() + ".subquery";
 
 }
