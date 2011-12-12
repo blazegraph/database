@@ -96,6 +96,9 @@ public class StatementPatternNode extends
          * </pre>
          * 
          * as the latter will find only one solution for <code>?g</code>.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/429
+         *      (Optimization for GRAPH uri {} and GRAPH ?foo {})
          */
         String EXISTS = "exists";
         
@@ -123,6 +126,9 @@ public class StatementPatternNode extends
          * on some join variable(s). This is in contrast to the
          * {@link SPOAccessPath}, which supports key-range constraints (prefix)
          * and range constraints (prefix with key range on a data type value).
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/429
+         *      (Optimization for GRAPH uri {} and GRAPH ?foo {})
          */
         String INLINE = "inline";
         
