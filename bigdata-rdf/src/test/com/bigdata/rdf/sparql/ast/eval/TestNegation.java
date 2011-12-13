@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 
@@ -146,6 +148,12 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
      * made. Therefore, we need to filter out all bindings (including on the
      * anonymous variable) which are made in order to help us answer a (NOT)
      * EXISTS FILTER.
+     * <p>
+     * This issue was resolved by a change to {@link ASTBottomUpOptimizer} to
+     * test when a visited {@link JoinGroupNode} was actually a graph pattern
+     * inside of a {@link FilterNode}. In this case, the group is simply skipped
+     * over as it will be properly handled when we visit the
+     * {@link JoinGroupNode} to which the {@link FilterNode} is attached.
      */
     public void test_sparql11_exists_06() throws Exception {
 
