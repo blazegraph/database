@@ -52,7 +52,6 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
-import com.bigdata.samples.SparqlBuilder.Graph;
 
 /**
  * Methods for static analysis of a query. There is one method which looks "up".
