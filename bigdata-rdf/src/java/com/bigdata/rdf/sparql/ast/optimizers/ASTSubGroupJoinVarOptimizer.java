@@ -121,12 +121,21 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
 
             if (child instanceof GraphPatternGroup<?>) {
 
-                assignJoinVars(sa, (GraphPatternGroup<IGroupMemberNode>) child);
+                @SuppressWarnings("unchecked")
+                final GraphPatternGroup<IGroupMemberNode> subGroup = (GraphPatternGroup<IGroupMemberNode>) child;
 
-            } else if(child instanceof QueryBase) {
-                
-                assignJoinVars(sa, ((QueryBase) child).getWhereClause());
-                
+                assignJoinVars(sa, subGroup);
+
+            } else if (child instanceof QueryBase) {
+
+                final QueryBase subquery = (QueryBase) child;
+
+                @SuppressWarnings("unchecked")
+                final GraphPatternGroup<IGroupMemberNode> subGroup = (GraphPatternGroup<IGroupMemberNode>) subquery
+                        .getWhereClause();
+
+                assignJoinVars(sa, subGroup);
+
             }
 
         }

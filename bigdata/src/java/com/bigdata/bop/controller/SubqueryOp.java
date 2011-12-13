@@ -91,13 +91,20 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * evaluation semantics under these conditions. This is handled by "projecting"
  * only those variables into the subquery which it will project out.
  * 
- * @todo Rename as SubqueryPipelineJoinOp.
- * 
  * @see AbstractSubqueryOp
  * @see JVMNamedSubqueryOp
  * @see HTreeNamedSubqueryOp
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * 
+ * @deprecated This operator is no longer in use. The last use case which we had
+ *             for this was in support of ASK subquery evaluation for (NOT)
+ *             EXISTS.
+ *             <p>
+ *             It is possible that another use case MIGHT be found to support
+ *             parallel evaluation of named subqueries. However, that also might
+ *             be handled by a thread pool if we move to interleaved query plan
+ *             generation and query plan evaluation in support of the RTO.
  */
 public class SubqueryOp extends PipelineOp {
 
@@ -406,6 +413,14 @@ public class SubqueryOp extends PipelineOp {
                             + "\n childSolution(in): "
                             + childSolutionIn//
                     );
+//                    System.out.println("Running subquery" //
+//                            + ": selectVars: "
+//                            + Arrays.toString(selectVars) //
+//                            + ", parentSolution(in): "
+//                            + parentSolutionIn //
+//                            + ", childSolution(in): "
+//                            + childSolutionIn//
+//                    );
                     
                     runningSubquery = queryEngine.eval(subQueryOp,
                             childSolutionIn);
@@ -431,6 +446,14 @@ public class SubqueryOp extends PipelineOp {
                                     .hasNext() ? XSDBooleanIV.TRUE
                                     : XSDBooleanIV.FALSE;
                             
+//                            System.err
+//                                    .println("in="
+//                                            + childSolutionIn
+//                                            + ", out="
+//                                            + (subquerySolutionItr.hasNext() ? subquerySolutionItr
+//                                                    .next() : "N/A")
+//                                            + ", askVar=" + success);
+//                            
                             parentSolutionIn.set(askVar,
                                     new Constant<IV<BigdataLiteral, Boolean>>(
                                             success));

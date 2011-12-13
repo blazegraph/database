@@ -37,6 +37,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.NamedSetAnnotations;
@@ -379,8 +380,18 @@ public class JVMSolutionSetHashJoinOp extends PipelineOp {
                 case Exists: {
                     /*
                      * Output the join set.
+                     * 
+                     * Note: This has special hooks to support (NOT) EXISTS
+                     * graph patterns, which must bind the "ASK_VAR" depending
+                     * on whether or not the graph pattern is satisified.
                      */
+                    final IVariable<?> askVar = state.getAskVar();
+                    // askVar := true
                     state.outputJoinSet(unsyncBuffer);
+                    if (askVar != null) {
+                        // askVar := false;
+                        state.outputOptionals(unsyncBuffer);
+                    }
                     break;
                 }
                 default:

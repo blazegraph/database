@@ -53,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -142,14 +143,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
  *          evaluation model. If this is not true then we could just lift
  *          everything into a named subquery, order the named subqueries by
  *          their dependencies and just let it run.
- * 
- *          TODO What about a badly designed left-join inside of a sub-select
- *          (or EXISTS)? If we lift that out in this manner, it will run once in
- *          a relatively under constrained named subquery. I guess that's the
- *          consequence of bottom-up evaluation. You do not have the advantage
- *          of propagation of as-bound values. However, maybe we could analyze
- *          the parent context further to develop constraints which could be
- *          imposed on the lifted group?
  */
 public class ASTBottomUpOptimizer implements IASTOptimizer {
 
@@ -173,31 +166,127 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
+        // All exogenous variables (given in the source solutions).
+        final Set<IVariable<?>> exogenousVars = StaticAnalysis.getExogenousVars(
+                bindingSets, new LinkedHashSet<IVariable<?>>());
+
         /*
          * Rewrite badly designed left joins by lifting them into a named
          * subquery.
          */
-        handleBadlyDesignedLeftJoins(context, queryRoot);
+        {
+
+            /*
+             * Collect optional groups.
+             * 
+             * Note: We can not transform graph patterns inside of SERVICE calls
+             * so this explicitly visits the interesting parts of the tree.
+             */
+
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+            // List of the inner optional groups for badly designed left joins.
+            final List<JoinGroupNode> innerOptionalGroups = new LinkedList<JoinGroupNode>();
+
+            {
+
+                if (queryRoot.getNamedSubqueries() != null) {
+
+                    for (NamedSubqueryRoot namedSubquery : queryRoot
+                            .getNamedSubqueries()) {
+
+                        @SuppressWarnings("unchecked")
+                        final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
+                                .getWhereClause();
+
+                        checkForBadlyDesignedLeftJoin(sa, group,
+                                innerOptionalGroups);
+
+                    }
+
+                }
+
+                @SuppressWarnings("unchecked")
+                final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) queryRoot
+                        .getWhereClause();
+
+                checkForBadlyDesignedLeftJoin(sa, group, innerOptionalGroups);
+
+            }
+
+            /*
+             * Convert badly designed left joins into named subqueries. This
+             * gives the join group effective "bottom-up" evaluation semantics
+             * since we will run the named subqueries before we run anything
+             * else.
+             */
+
+            for (JoinGroupNode group : innerOptionalGroups) {
+
+                liftBadlyDesignedLeftJoin(context, sa, queryRoot, group);
+
+            }
+
+        }
 
         /*
          * Hide variables which would not be in scope for bottom up evaluation.
          */
-        handleFiltersWithVariablesNotInScope(context, queryRoot, bindingSets);
+        {
 
-        /*
-         * Handle MINUS when it appears without shared variables.
-         */
-        if(true){
-            
             final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-            
+
+            // Map for renamed variables.
+            final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
+
+            // Handle named subqueries.
             if (queryRoot.getNamedSubqueries() != null) {
 
                 for (NamedSubqueryRoot namedSubquery : queryRoot
                         .getNamedSubqueries()) {
 
+//                    @SuppressWarnings("unchecked")
+//                    final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
+//                            .getWhereClause();
+//
+//                    // WHERE clause for the named subquery.
+//                    handleFiltersWithVariablesNotInScope(context, sa,
+//                            queryRoot, exogenousVars, map, namedSubquery, group);
+                    handleFiltersWithVariablesNotInScope(context, sa, namedSubquery,
+                            bindingSets);
+
+                }
+
+            }
+
+//            @SuppressWarnings("unchecked")
+//            final GraphPatternGroup<IGroupMemberNode> group = (GraphPatternGroup<IGroupMemberNode>) queryRoot
+//                    .getWhereClause();
+//
+////             The main WHERE clause.
+//            handleFiltersWithVariablesNotInScope(context, sa, queryRoot,
+//                    exogenousVars, map, queryRoot, group);
+            handleFiltersWithVariablesNotInScope(context, sa, queryRoot, bindingSets);
+
+        }
+
+        /*
+         * Handle MINUS when it appears without shared variables.
+         */
+        {
+
+            final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+            // Handle named subqueries.
+            if (queryRoot.getNamedSubqueries() != null) {
+
+                for (NamedSubqueryRoot namedSubquery : queryRoot
+                        .getNamedSubqueries()) {
+
+                    // WHERE clause for the named subquery.
                     handleMinusWithoutSharedVariables(context, sa,
                             namedSubquery.getWhereClause());
+
                 }
 
             }
@@ -209,62 +298,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         return queryNode;
     
-    }
-
-    /**
-     * Collect badly designed left join patterns and the lift them out into a
-     * named subquery.
-     * 
-     * @param context
-     * @param queryRoot
-     */
-    @SuppressWarnings("unchecked")
-    private void handleBadlyDesignedLeftJoins(final AST2BOpContext context,
-            final QueryRoot queryRoot) {
-
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
-
-        /*
-         * Collect optional groups.
-         * 
-         * Note: We can not transform graph patterns inside of SERVICE calls so
-         * this explicitly visits the interesting parts of the tree.
-         */
-
-        // List of the inner optional groups for badly designed left joins.
-        final List<JoinGroupNode> innerOptionalGroups = new LinkedList<JoinGroupNode>();
-
-        {
-
-            if (queryRoot.getNamedSubqueries() != null) {
-
-                for (NamedSubqueryRoot namedSubquery : queryRoot
-                        .getNamedSubqueries()) {
-
-                    checkForBadlyDesignedLeftJoin(sa, 
-                            namedSubquery.getWhereClause(), innerOptionalGroups);
-
-                }
-
-            }
-
-            checkForBadlyDesignedLeftJoin(sa, 
-                    queryRoot.getWhereClause(), innerOptionalGroups);
-
-        }
-
-        /*
-         * Convert badly designed left joins into named subqueries. This gives
-         * the join group effective "bottom-up" evaluation semantics since we
-         * will run the named subqueries before we run anything else.
-         */
-
-        for (JoinGroupNode group : innerOptionalGroups) {
-
-            liftBadlyDesignedLeftJoin(context, sa, queryRoot, group);
-            
-        }
-        
     }
 
     /**
@@ -350,6 +383,12 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * @param badlyDesignedLeftJoins
      *            A list of all badly designed left joins which have been
      *            identified.
+     * 
+     *            TODO This ignores the exogenous variables. unit test for this
+     *            case and fix.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     private void checkForBadlyDesignedLeftJoin2(
             final StaticAnalysis sa,
@@ -495,8 +534,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         if (p.isOptional()) {
 
-            /**
-             * FIXME This is a hack because the INCLUDE operation (a solution
+            /*
+             * TODO This is a hack because the INCLUDE operation (a solution
              * set hash join) does not currently support OPTIONAL. As a
              * workaround the INCLUDE is stuffed into an OPTIONAL group.
              */
@@ -511,8 +550,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         } else if (p.isMinus()) {
 
-            /**
-             * FIXME This is a hack because the INCLUDE operation does not
+            /*
+             * TODO This is a hack because the INCLUDE operation does not
              * currently support MINUS. As a workaround the INCLUDE is stuffed
              * into an MINUS group.
              */
@@ -534,11 +573,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
        
     }
     
-
     /**
      * Examine each {@link JoinGroupNode} in the query and each FILTER in each
      * {@link JoinGroupNode}. If the filter depends on a variable which is not
-     * "maybe" bound for that group then the variable binding is not in scope.
+     * in scope then we must rewrite the AST in order to preserve bottom up
+     * evaluation semantics.
      * <p>
      * Such filters and variables are identified. The variables within the
      * filters are then rewritten in a consistent manner across the filters
@@ -546,29 +585,135 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * to anonymous variables. This provides effective bottom up evaluation
      * scope for the variables.
      * 
-     * @param context
-     * @param queryRoot
-     * @param bindingSets
+     * FIXME This should be an "in-scope" test.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
+     *      EXISTS, NOT EXISTS, and MINUS)
      */
+//    private void handleFiltersWithVariablesNotInScope(
+//            final AST2BOpContext context, final StaticAnalysis sa,
+//            final QueryRoot queryRootx, final Set<IVariable<?>> exogenousVars,
+//            final Map<IVariable<?>/*old*/,IVariable<?>/*new*/> map,
+//            final QueryBase queryBase,
+//            final GraphPatternGroup<IGroupMemberNode> group
+//            ) {
+//
+//        /*
+//         * All variables potentially bound by joins in this group or a subgroup.
+//         */
+//        final Set<IVariable<?>> maybeBound = sa.getMaybeProducedBindings(group,
+//                new LinkedHashSet<IVariable<?>>(), true/* recursive */);
+//
+//        // All variables appearing in the source solutions.
+//        maybeBound.addAll(exogenousVars);
+//
+//        if (group.isOptional()) {
+//
+//            /*
+//             * "A FILTER inside an OPTIONAL can reference a variable bound in
+//             * the required part of the OPTIONAL."
+//             * 
+//             * Note: This is ONLY true when the [group] is OPTIONAL. Otherwise
+//             * the variables in the parent are not visible.
+//             */
+//
+//            // The "required" part of the optional is the parent group.
+//            final JoinGroupNode p = group.getParentJoinGroup();
+//
+//            if (p != null) {
+//
+//                // bindings "maybe" produced in the parent (non-recursive)
+//                final Set<IVariable<?>> incomingBound = sa
+//                        .getMaybeProducedBindings(p,
+//                                new LinkedHashSet<IVariable<?>>(), false/* recursive */);
+//
+//                // add to those visible in FILTERs for this group.
+//                maybeBound.addAll(incomingBound);
+//
+//            }
+//
+//        }
+//
+//        // For everything in this group.
+//        for (IGroupMemberNode child : group) {
+//
+//            // Only consider the FILTERs.
+//            if (!(child instanceof FilterNode))
+//                continue;
+//
+//            final FilterNode filter = (FilterNode) child;
+//
+//            if (rewriteUnboundVariablesInFilter(context, maybeBound, map,
+//                    null/* parent */, filter.getValueExpressionNode())) {
+//
+//                /*
+//                 * Re-generate the IVE for this filter.
+//                 */
+//
+//                // clear the old value expression.
+//                filter.getValueExpressionNode().setValueExpression(null);
+//
+//                // re-generate the value expression.
+//                AST2BOpUtility.toVE(context.getLexiconNamespace(),
+//                        filter.getValueExpressionNode());
+//
+//            }
+//
+//        }
+//        
+//    }
+
+ /* Old version.
+  *
+  * Note: This will see ALL join groups, including those in a SERVICE or
+  * (NOT) EXISTS annotation. This approach makes it impossible for us to
+  * identify when the FILTER is in a (NOT) EXISTS graph pattern since the
+  * graph pattern appears as an annotation and is not back linked from
+  * the FILTER in which it appears. What we need to do instead is descend
+  * recursively, building up a list of the variables which are visible in
+  * each scope.
+  */
     private void handleFiltersWithVariablesNotInScope(
-            final AST2BOpContext context, final QueryRoot queryRoot,
+            final AST2BOpContext context,
+            final StaticAnalysis sa,
+            final QueryBase queryBase,
             final IBindingSet[] bindingSets) {
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+//        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
 
         // All exogenous variables (given in the source solutions).
         final Set<IVariable<?>> exogenous = StaticAnalysis.getExogenousVars(
                 bindingSets, new LinkedHashSet<IVariable<?>>());
 
+        // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
-        final Iterator<JoinGroupNode> itr = BOpUtility.visitAll(queryRoot,
-                JoinGroupNode.class);
+        /*
+         * Visit all join groups, which is where the filters are found.
+         */
+        final Iterator<JoinGroupNode> itr = BOpUtility.visitAll(
+                queryBase.getWhereClause(), JoinGroupNode.class);
 
         while (itr.hasNext()) {
 
             final JoinGroupNode group = itr.next();
 
+            if (sa.findParent(group) instanceof FilterNode) {
+                /*
+                 * Skip EXISTS and NOT EXISTS graph patterns when they are
+                 * visited directly. These are handled when we visit the join
+                 * group containing the FILTER in which they appear.
+                 * 
+                 * Note: The only time that findParent() will report a
+                 * FilterNode is when either EXISTS or NOT EXISTS is used and
+                 * the group is the graph pattern for those functions.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
+                 * (SPARQL 1.1 EXISTS, NOT EXISTS, and MINUS)
+                 */
+                continue;
+            }
+            
             /*
              * All variables potentially bound by joins in this group or a
              * subgroup.
@@ -607,8 +752,10 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 
             }
 
+            // For everything in this group.
             for (IGroupMemberNode child : group) {
 
+                // Only consider the FILTERs.
                 if (!(child instanceof FilterNode))
                     continue;
 
@@ -730,11 +877,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             map.put(ovar,
                     nvar = Var.var(context.createVar("-unbound-var-"
                             + ovar.getName() + "-")));
-            
+
         }
-        
-        ((ASTBase)parent).replaceAllWith(ovar, nvar);
-        
+
+        ((ASTBase) parent).replaceAllWith(ovar, nvar);
+
         return true;
 
     }
@@ -779,6 +926,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             if(childGroup.isMinus()) {
 
+                // FIXME This should be an "in-scope" test (not MUST|MAYBE).
                 final Set<IVariable<?>> incomingBound = sa
                         .getDefinitelyIncomingBindings(childGroup,
                                 new LinkedHashSet<IVariable<?>>());

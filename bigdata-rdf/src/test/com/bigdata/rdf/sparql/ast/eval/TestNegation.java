@@ -27,9 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.bop.join.IHashJoinUtility;
-import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 
 /**
  * Test suite for SPARQL negation (EXISTS and MINUS).
@@ -107,7 +106,8 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * Sesame Unit <code>sparql11-exists-06</code>.
+     * Sesame Unit <code>sparql11-exists-06</code>, which appears to be the same
+     * as an example in the LCWD.
      * 
      * <pre>
      * PREFIX : <http://example/>
@@ -120,16 +120,32 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
      * }
      * </pre>
      * 
-     * FIXME This test is failing because we are not projecting the variables in
-     * the parent's context into the EXISTS subquery. EXISTS is not really the
-     * same as ASK because bindings (including both definitely and maybe bound
-     * variables) need to be projected IN, but not projected OUT.
+     * <pre>
+     * @prefix : <http://example/> .
+     * 
+     * :a :p 1 ; :q 1, 2 .
+     * :b :p 3.0 ; :q 4.0, 5.0 .
+     * </pre>
+     * 
+     * <pre>
+     * { a = b, n = 3 }
+     * </pre>
+     * 
+     * Note: There are several problems which are related to this test failure
      * <p>
-     * I believe that what is needed is a variant join in which we bind output
-     * the left solution IFF there is a JOIN, but we DO NOT output the
-     * (left+right) solution from that JOIN. This means a variant method (or
-     * constructor) on the {@link IHashJoinUtility}. It might be worth while to
-     * handle MINUS while we are at it.
+     * First, the {@link ASTBottomUpOptimizer} is incorrectly deciding that
+     * <code>?n</code> is not in scope within the inner FILTER. This causes the
+     * variable to be renamed in that context in order to model bottom up
+     * evaluation semantics which is why the inner FILTER always fails.
+     * <p>
+     * Second, the ASK subquery is not projecting in all variables which are in
+     * scope. This is simply how that subquery was put together by the
+     * {@link ASTExistsOptimizer}.
+     * <p>
+     * Finally, neither EXISTS not NOT EXISTS may cause any new bindings to be
+     * made. Therefore, we need to filter out all bindings (including on the
+     * anonymous variable) which are made in order to help us answer a (NOT)
+     * EXISTS FILTER.
      */
     public void test_sparql11_exists_06() throws Exception {
 
@@ -138,8 +154,6 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 "sparql11-exists-06.rq",// queryFileURL
                 "sparql11-exists-06.ttl",// dataFileURL
                 "sparql11-exists-06.srx" // resultFileURL,
-//                false, // laxCardinality
-//                true // checkOrder
                 ).runTest();
 
     }

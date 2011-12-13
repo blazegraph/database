@@ -53,9 +53,11 @@ import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.bop.join.JVMHashIndexOp;
 import com.bigdata.bop.join.JVMMergeJoin;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
+import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.bop.solutions.DropOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.GroupByState;
@@ -88,7 +90,6 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
-import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -102,7 +103,6 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
-import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
@@ -119,6 +119,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -402,7 +403,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     .getHaving().isEmpty() ? null : query.getHaving();
 
             // true if this is an aggregation query.
-            final boolean isAggregate = isAggregate(projection, groupBy, having);
+            final boolean isAggregate = StaticAnalysis.isAggregate(projection,
+                    groupBy, having);
 
             if (isAggregate) {
 
@@ -800,7 +802,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                         ctx.db.getNamespace()),//
                 new NV(ServiceCallJoin.Annotations.TIMESTAMP,
                         ctx.db.getTimestamp()),//
-                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints)//
+                new NV(JoinAnnotations.CONSTRAINTS, joinConstraints)//
         );
 
         /*
@@ -852,7 +854,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //             * inefficient, so we are logging a warning.
 //             */
 //
-//            log.warn("No join variables: " // TODO INFO if at all.
+//            log.warn("No join variables: " 
 //                    + subqueryInclude.getName()
 //                    + ", subquery="
 //                    + subqueryInclude.getNamedSubqueryRoot(ctx.sa
@@ -981,12 +983,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * translated into named subqueries with an include by a query optimizer
      * step. When a subquery is rewritten like this is will no longer appear as
      * a {@link SubqueryRoot} node in the AST.
-     * <p>
-     * Note: This also handles ASK subqueries, which are automatically created
-     * for {@link ExistsNode} and {@link NotExistsNode}.
      * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/232
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/232 (Support
+     *      bottom-up evaluation semantics)
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/397 (AST Optimizer
+     *      for queries with multiple complex optional groups)
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
+     *      EXISTS, NOT EXISTS, and MINUS)
      */
     private static PipelineOp addSparql11Subquery(PipelineOp left,
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
@@ -1003,76 +1006,29 @@ public class AST2BOpUtility extends AST2BOpJoins {
         final IConstraint[] joinConstraints = getJoinConstraints(
                 getJoinConstraints(subqueryRoot), needsMaterialization);
 
+        // Only Sub-Select is supported by this code path.
         switch (subqueryRoot.getQueryType()) {
-        case ASK: {
-
-            /*
-             * The projection should have just one variable, which is the
-             * variable that will be bound to true if there is a solution to the
-             * subquery and to false if there is no solution to the subquery.
-             * 
-             * FIXME ASK should not run "as-bound" with SubqueryOp. Use a hash
-             * join pattern instead. Also, review the variable scope rules for
-             * the embedded graph pattern of an EXIST filter (which is what is
-             * being mapped on an ASK filter here).
-             * 
-             * FIXME The query plan for the filter needs to build the hash
-             * index, then run the filter much as we would run a join group, and
-             * finally join against the hash index. It needs to impose a
-             * DISTINCT solutions filter on the EXISTS graph pattern since we
-             * are only interested in whether or not there is at least one right
-             * solution for a given left solution.
-             * 
-             * FIXME EXISTS is not a Sub-Select. We should add a method for
-             * exists and not exists rather than attempting to handle them here.
-             * 
-             * FIXME MINUS also needs its own method, or perhaps is handled by
-             * the same method which handles join groups. (MINUS is basically an
-             * alternative way to handle a solution set hash join for two join
-             * groups.)
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
-             */
-
-            final boolean aggregate = isAggregate(subqueryRoot);
-
-            if (projectedVars == null || projectedVars.length != 1)
-                throw new RuntimeException(
-                        "Expecting ONE (1) projected variable for ASK subquery.");
-
-            final IVariable<?> askVar = projectedVars[0];
-
-            final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
-                    subqueryRoot, doneSet, ctx);
-
-            left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-                    new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                    new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                    new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
-                    new NV(SubqueryOp.Annotations.SELECT, null),//
-                    new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
-                    new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
-            );
+        case SELECT:
             break;
+        default:
+            throw new UnsupportedOperationException();
         }
-        case SELECT: {
             
-            /*
-             * Model a sub-group by building a hash index at the start of the
-             * group. We then run the group.  Finally, we do a hash join of
-             * the hash index against the solutions in the group.  If the
-             * group is optional, then the hash join is also optional.
-             * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
-             */
-            final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
+        /*
+         * Model a sub-group by building a hash index at the start of the
+         * group. We then run the group.  Finally, we do a hash join of
+         * the hash index against the solutions in the group.  If the
+         * group is optional, then the hash join is also optional.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
+         */
+        final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
 
-            final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
-                    subqueryRoot, new LinkedHashSet<IVariable<?>>());
+        final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
+                subqueryRoot, new LinkedHashSet<IVariable<?>>());
 
-            @SuppressWarnings("rawtypes")
-            final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
 
 //            if (joinVars.length == 0) {
 //
@@ -1082,114 +1038,107 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //                 * very inefficient, so we are logging a warning.
 //                 */
 //
-//                log.warn("No join variables: " + subqueryRoot); // TODO Info if at all
+//                log.warn("No join variables: " + subqueryRoot);
 //                
 //            }
-            
-            final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
-                    ctx.queryId, solutionSetName, joinVars);
+        
+        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                ctx.queryId, solutionSetName, joinVars);
 
-            // Sub-Select is not optional.
+        // Sub-Select is not optional.
 //            final boolean optional = false;
-            final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+        final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
-            // lastPass is required except for normal joins.
-            final boolean lastPass = false;//optional; 
+        // lastPass is required except for normal joins.
+        final boolean lastPass = false;//optional; 
 
-            // true if we will release the HTree as soon as the join is done.
-            // Note: also requires lastPass.
-            final boolean release = lastPass;
+        // true if we will release the HTree as soon as the join is done.
+        // Note: also requires lastPass.
+        final boolean release = lastPass;
 
-            if(ctx.nativeHashJoins) {
-                left = new HTreeHashIndexOp(leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                    new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+        if(ctx.nativeHashJoins) {
+            left = new HTreeHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            );
-            } else {
-                left = new JVMHashIndexOp(leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                    new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                    new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+        );
+        } else {
+            left = new JVMHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
 //                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
-                    new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                ); 
-            }
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ); 
+        }
 
-            /*
-             * Only the variables which are projected by the subquery may flow
-             * into the subquery. Adding a projection operator before the
-             * subquery plan ensures that variables which are not visible are
-             * dropped out of the solutions flowing through the subquery.
-             * However, those variables are already present in the hash index so
-             * they can be reunited with the solutions for the subquery in the
-             * solution set hash join at the end of the subquery plan.
-             */
-            left = new ProjectionOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            );
-            
-            // Append the subquery plan.
-            left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
-            
-            if(ctx.nativeHashJoins) {
-                left = new HTreeSolutionSetHashJoinOp(
-                    leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+        /*
+         * Only the variables which are projected by the subquery may flow
+         * into the subquery. Adding a projection operator before the
+         * subquery plan ensures that variables which are not visible are
+         * dropped out of the solutions flowing through the subquery.
+         * However, those variables are already present in the hash index so
+         * they can be reunited with the solutions for the subquery in the
+         * solution set hash join at the end of the subquery plan.
+         */
+        left = new ProjectionOp(leftOrEmpty(left), //
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
+                new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
+        );
+        
+        // Append the subquery plan.
+        left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
+        
+        if(ctx.nativeHashJoins) {
+            left = new HTreeSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
 //                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
-                    new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                    );
-            } else {
-                left = new JVMSolutionSetHashJoinOp(
-                    leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
+        } else {
+            left = new JVMSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
 //                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
-                    new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-                    );
-            }
-
-            break;
-
-        }
-        default:
-            throw new UnsupportedOperationException();
+                new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
         }
 
         /*
@@ -1205,99 +1154,265 @@ public class AST2BOpUtility extends AST2BOpJoins {
     }
 
     /**
-     * Return <code>true</code> if any of the {@link ProjectionNode},
-     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
-     * aggregation query.
+     * Add operators to the query plan in support of the evaluation of the graph
+     * pattern for (NOT) EXISTS. An ASK subquery is used to model (NOT) EXISTS.
+     * The subquery is used to decide, for each source solution, whether the
+     * (NOT) EXISTS graph pattern is satisified. An anonymous variable becomes
+     * bound to the outcome of this test evaluation. The FILTER then tests the
+     * value of the anonymous variable.
      * 
-     * @param query
-     *            The query.
+     * @param left
+     * @param subqueryRoot
+     * @param doneSet
+     * @param ctx
+     * @return
      * 
-     * @return <code>true</code>if it is an aggregation query.
+     *         TODO isAggregate() is probably no longer necessary as we always
+     *         lift an aggregation subquery into a named subquery. Probably turn
+     *         it into an assert instead to verify that an aggregation subquery
+     *         is not being run otherwise.
+     * 
+     * @see ASTExistsOptimizer
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
      */
-    public static boolean isAggregate(final QueryBase query) {
+    private static PipelineOp addExistsSubquery(PipelineOp left,
+            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
 
-        return isAggregate(query.getProjection(), query.getGroupBy(),
-                query.getHaving());
-
+        if (true) {
+            return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
+        } else {
+            return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
+        }
+        
     }
 
-    /**
-     * Return <code>true</code> if any of the {@link ProjectionNode},
-     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
-     * aggregation query. All arguments are optional.
-     */
-    private static boolean isAggregate(final ProjectionNode projection,
-            final GroupByNode groupBy, final HavingNode having) {
+    private static PipelineOp addExistsSubqueryFast(PipelineOp left,
+            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
 
-        if (groupBy != null && !groupBy.isEmpty())
-            return true;
-
-        if (having != null && !having.isEmpty())
-            return true;
-
-        if (projection != null) {
-
-            for (IValueExpressionNode exprNode : projection) {
-
-                final IValueExpression<?> expr = exprNode.getValueExpression();
-
-                if (isObviousAggregate(expr)) {
-
-                    return true;
-
-                }
-
-            }
-
+        // Only Sub-Select is supported by this code path.
+        switch (subqueryRoot.getQueryType()) {
+        case ASK:
+            break;
+        default:
+            throw new UnsupportedOperationException();
         }
 
-        return false;
+        @SuppressWarnings("rawtypes")
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(subqueryRoot), needsMaterialization);
+
+        /*
+         * Model a sub-group by building a hash index at the start of the
+         * group. We then run the group.  Finally, we do a hash join of
+         * the hash index against the solutions in the group.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:4
+         */
+        final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
+
+        final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(
+                subqueryRoot, new LinkedHashSet<IVariable<?>>());
+
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
+
+        final NamedSolutionSetRef namedSolutionSet = new NamedSolutionSetRef(
+                ctx.queryId, solutionSetName, joinVars);
+
+        /*
+         * Note: We also need to set the "asksVar" annotation to get back T/F
+         * for each source solution depending on whether or not it passed the
+         * graph pattern. If order for this to work, we need to output both the
+         * joinSet (askVar:=true) and the set of things which did not join
+         * (askVar:=false). The set of things which did not join is identified
+         * in the same manner that we identify the "OPTIONAL" solutions, so this
+         * is really more like an "OPTIONAL" join.
+         */
+        final JoinTypeEnum joinType = JoinTypeEnum.Exists;
+
+        // lastPass is required except for normal joins.
+        final boolean lastPass = true; 
+
+        // true if we will release the HTree as soon as the join is done.
+        // Note: also requires lastPass.
+        final boolean release = lastPass;
+
+        // The variables projected by the subquery.
+        final IVariable<?>[] projectedVars = subqueryRoot.getProjection()
+                .getProjectionVars();
+
+        // The variable which gets bound if the solutions "exist".
+        final IVariable<?> askVar = subqueryRoot.getAskVar();
+
+        if (askVar == null)
+            throw new UnsupportedOperationException();
+        
+        if(ctx.nativeHashJoins) {
+            left = new HTreeHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+        );
+        } else {
+            left = new JVMHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ); 
+        }
+
+        // Everything is visible inside of the EXISTS graph pattern.
+//        /*
+//         * Only the variables which are projected by the subquery may flow
+//         * into the subquery. Adding a projection operator before the
+//         * subquery plan ensures that variables which are not visible are
+//         * dropped out of the solutions flowing through the subquery.
+//         * However, those variables are already present in the hash index so
+//         * they can be reunited with the solutions for the subquery in the
+//         * solution set hash join at the end of the subquery plan.
+//         */
+//        left = new ProjectionOp(leftOrEmpty(left), //
+//                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+//                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.CONTROLLER),//
+//                new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
+//                new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
+//        );
+        
+        // Append the subquery plan.
+//        left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
+        left = convertJoinGroupOrUnion(left, subqueryRoot.getWhereClause(),
+                new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */, ctx);
+//        left = convertQueryBaseWithScopedVars(left, subqueryRoot,
+//                new LinkedHashSet<IVariable<?>>(doneSet)/* doneSet */,
+//                false /* materializeProjection */, ctx);
+        
+        if(ctx.nativeHashJoins) {
+            left = new HTreeSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
+        } else {
+            left = new JVMSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                );
+        }
+
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        left = addMaterializationSteps(ctx, left, doneSet, needsMaterialization,
+                subqueryRoot.getQueryHints());
+
+        return left;
 
     }
-
+    
     /**
-     * Return <code>true</code> iff the {@link IValueExpression} is an obvious
-     * aggregate (it uses an {@link IAggregate} somewhere within it). This is
-     * used to identify projections which are aggregates when they are used
-     * without an explicit GROUP BY or HAVING clause.
-     * <p>
-     * Note: Value expressions can be "non-obvious" aggregates when considered
-     * in the context of a GROUP BY, HAVING, or even a SELECT expression where
-     * at least one argument is a known aggregate. For example, a constant is an
-     * aggregate when it appears in a SELECT expression for a query which has a
-     * GROUP BY clause. Another example: any value expression used in a GROUP BY
-     * clause is an aggregate when the same value expression appears in the
-     * SELECT clause.
-     * <p>
-     * This method is only to find the "obvious" aggregates which signal that a
-     * bare SELECT clause is in fact an aggregation.
+     * A slow implementation using one {@link SubqueryOp} per source solution.
      * 
-     * @param expr
-     *            The expression.
-     * 
-     * @return <code>true</code> iff it is an obvious aggregate.
+     * @deprecated by
+     *             {@link #addExistsSubqueryFast(PipelineOp, SubqueryRoot, Set, AST2BOpContext)}
      */
-    private static boolean isObviousAggregate(final IValueExpression<?> expr) {
+    private static PipelineOp addExistsSubquerySubquery(PipelineOp left,
+            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+            final AST2BOpContext ctx) {
 
-        if (expr instanceof IAggregate<?>)
-            return true;
-
-        final Iterator<BOp> itr = expr.argIterator();
-
-        while (itr.hasNext()) {
-
-            final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
-
-            if (arg != null) {
-
-                if (isObviousAggregate(arg)) // recursion.
-                    return true;
-
-            }
-
+        // Only "ASK" subqueries are allowed.
+        switch (subqueryRoot.getQueryType()) {
+        case ASK:
+            break;
+        default:
+            throw new UnsupportedOperationException();
         }
 
-        return false;
+        @SuppressWarnings("rawtypes")
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(subqueryRoot), needsMaterialization);
+
+        final boolean aggregate = StaticAnalysis.isAggregate(subqueryRoot);
+        
+        /*
+         * The anonymous variable which gets bound based on the (NOT) EXISTS
+         * graph pattern.
+         */
+        final IVariable<?> askVar = subqueryRoot.getAskVar();
+
+        if (askVar == null)
+            throw new UnsupportedOperationException();
+
+        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
+                subqueryRoot, doneSet, ctx);
+
+        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
+                new NV(SubqueryOp.Annotations.SELECT, subqueryRoot.getProjection().getProjectionVars()),//
+                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+        );
+
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        left = addMaterializationSteps(ctx, left, doneSet,
+                needsMaterialization, subqueryRoot.getQueryHints());
+
+        return left;
 
     }
 
@@ -1586,6 +1701,13 @@ public class AST2BOpUtility extends AST2BOpJoins {
         // left = addStartOp(ctx);
 
         /*
+         * Anonymous variable(s) (if any) which were injected into the solutions
+         * in support of (NOT) EXISTS and which need to be dropped before we
+         * exit this group.
+         */
+        final LinkedList<IVariable<?>> dropVars = new LinkedList<IVariable<?>>();
+        
+        /*
          * This checks to make sure that join filters were attached to join
          * nodes, in which case they should no longer be present as direct
          * children of this group.
@@ -1670,12 +1792,32 @@ public class AST2BOpUtility extends AST2BOpJoins {
                         (NamedSubqueryInclude) child, doneSet, ctx);
                 continue;
             } else if (child instanceof SubqueryRoot) {
-                /*
-                 * SPARQL 1.1 style subqueries which were not lifted out into
-                 * named subqueries.
-                 */
-                left = addSparql11Subquery(left, (SubqueryRoot) child, doneSet,
-                        ctx);
+                final SubqueryRoot subquery = (SubqueryRoot) child;
+                switch (subquery.getQueryType()) {
+                case ASK:
+                    /*
+                     * The graph pattern for (NOT) EXISTS. An anonymous variable
+                     * becomes bound to the truth state of the graph pattern
+                     * (whether or not a solution exists). The FILTER in which
+                     * the (NOT) EXISTS appears then tests the truth state of
+                     * that anonmyous variable. The graph pattern must be
+                     * evaluated before the FILTER in order for the anonymous
+                     * variable to be bound.
+                     */
+                    dropVars.add(subquery.getAskVar());
+                    left = addExistsSubquery(left, subquery, doneSet, ctx);
+                    break;
+                case SELECT:
+                    /*
+                     * SPARQL 1.1 style subqueries which were not lifted out
+                     * into named subqueries.
+                     */
+                    left = addSparql11Subquery(left, subquery, doneSet, ctx);
+                    break;
+                default:
+                    throw new UnsupportedOperationException(
+                            "Subquery has queryType=" + subquery.getQueryType());
+                }
                 continue;
             } else if (child instanceof GraphPatternGroup<?>) {
                 /*
@@ -1722,6 +1864,15 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 throw new UnsupportedOperationException("child: " + child);
             }
         } // next child.
+        
+        if (!dropVars.isEmpty()) {
+            final IVariable<?>[] a = dropVars.toArray(new IVariable[dropVars
+                    .size()]);
+            left = new DropOp(leftOrEmpty(left), new NV(BOp.Annotations.BOP_ID,
+                    ctx.nextId()), //
+                    new NV(DropOp.Annotations.DROP_VARS, a)//
+            );
+        }
         
         /*
          * Add the end operator if necessary.
@@ -1853,7 +2004,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     /*
                      * The join variables are not the same.
                      * 
-                     * FIXME It is possible to fix this for some queries since
+                     * TODO It is possible to fix this for some queries since
                      * the there is some flexibility in how we choose the join
                      * variables. However, we need to model the MERGE JOIN in
                      * the AST in order to do that since, by this time, we have
@@ -1888,7 +2039,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                     /*
                      * The join variables are not the same.
                      * 
-                     * FIXME It is possible to fix this for some queries since
+                     * TODO It is possible to fix this for some queries since
                      * the there is some flexibility in how we choose the join
                      * variables. However, we need to model the MERGE JOIN in
                      * the AST in order to do that since, by this time, we have
@@ -2192,14 +2343,11 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
         }
 
-        left = applyQueryHints(
-                new ConditionalRoutingOp(
-                        leftOrEmpty(left),
-                        NV.asMap(new NV[] {//
-                                new NV(BOp.Annotations.BOP_ID, bopId),
-                                new NV(
-                                        ConditionalRoutingOp.Annotations.CONDITION,
-                                        c), })), ctx.queryHints);
+        left = applyQueryHints(//
+                new ConditionalRoutingOp(leftOrEmpty(left), //
+                        new NV(BOp.Annotations.BOP_ID, bopId), //
+                        new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
+                ), ctx.queryHints);
 
         return left;
 
@@ -2426,7 +2574,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
 //             * inefficient, so we are logging a warning.
 //             */
 //
-//            log.warn("No join variables: " + subgroup); // TODO INFO if at all.
+//            log.warn("No join variables: " + subgroup);
 //
 //        }
         
@@ -3100,11 +3248,32 @@ public class AST2BOpUtility extends AST2BOpJoins {
          * Note: We can now stack filters so there may be other things which can
          * be leveraged here.
          * 
-         * FIXME Handle StatementPatternNode#EXISTS here (This turns into an
-         * iterator with a limit of ONE (1) on the {@link SPOAccessPath}. This
-         * should turn into a LIMIT annotation on the access path (which does
-         * not currently recognize an offset/limit annotation; instead you use
-         * an alternative iterator call).
+         * TODO Handle StatementPatternNode#EXISTS here in support of GRAPH uri
+         * {}, which is an existence test for a non-empty context. (This turns
+         * into an iterator with a limit of ONE (1) on the {@link
+         * SPOAccessPath}. This should turn into a LIMIT annotation on the
+         * access path (which does not currently recognize an offset/limit
+         * annotation; instead you use an alternative iterator call).
+         * 
+         * We may require an inline access path attached to a predicate in order
+         * to support GRAPH ?g {}, which is basically an inline AP for the
+         * dataset. That should probably be another annotation on the
+         * StatementPatternNode, perhaps COLUMN_PROJECTION (var,vals) or
+         * IN(var,vals)? There are also several StatementPatternNode annotation
+         * concepts which have been sketched out for DISTINCT, EXISTS, IN, and
+         * RANGE. Those annotations could be used to do the right thing in
+         * toPredicate().
+         * 
+         * Remove the "knownIN" stuff contributed by Matt.
+         * 
+         * @see ASTGraphGroupOptimizer
+         * 
+         * @see TestNamedGraphs
+         * 
+         * @see Inline AP + filter if AP is not perfect issues.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/429
+         * (Optimization for GRAPH uri {} and GRAPH ?foo {})
          */
         {
 
@@ -3117,14 +3286,14 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 /*
                  * Visit only the distinct values for the first key component.
                  * 
-                 * FIXME We MUST pin the choice of the index for this filter. In
+                 * TODO  We MUST pin the choice of the index for this filter. In
                  * order to do that we need to interact with the join ordering
                  * since we typically want to run this first in a join group.
                  * 
                  * TODO GRAPH ?g {} can use this to visit the distinct named
                  * graphs for which there exists a statement in the database.
                  * 
-                 * FIXME One exception where we can not use PARALLEL without
+                 * TODO One exception where we can not use PARALLEL without
                  * also imposing DISTINCT is the @DISTINCT annotation in
                  * scale-out. This is because a given IV in the first key
                  * component could span more than one shard.

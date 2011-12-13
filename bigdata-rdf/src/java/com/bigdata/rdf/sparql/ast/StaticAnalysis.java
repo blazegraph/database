@@ -28,14 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -44,6 +43,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
@@ -52,6 +52,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTLiftPreFiltersOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
+import com.bigdata.samples.SparqlBuilder.Graph;
 
 /**
  * Methods for static analysis of a query. There is one method which looks "up".
@@ -191,31 +192,382 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
  * we add an ASTContainer to provide a better home for the queryStr, the parse
  * tree, the original AST, and the optimized AST.
  * 
- * TODO Static analysis of variables which are projected by a subquery needs to
- * follow the variable into the subquery under what ever name it has within the
- * subquery scope. That is, SELECT (?x as ?y) renames the variable. So, if we
- * are following ?y in the parent scope then we need to follow ?x in the
- * subquery scope.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
-    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
+//    private static final Logger log = Logger.getLogger(StaticAnalysis.class);
     
+    /**
+     * TODO This is here as a placeholder which will be used when we address the
+     * ticket for handling exogenous variables in the static analysis of a
+     * query.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
+     */
+    final private Set<IVariable<?>> exogenousVars;
+
     /**
      * 
      * @param queryRoot
      *            The root of the query. We need to have this on hand in order
      *            to resolve {@link NamedSubqueryInclude}s during static
      *            analysis.
+     * 
+     *            TODO Drop this constructor version in favor of
+     *            {@link #StaticAnalysis(QueryRoot, IBindingSet[])} which makes
+     *            the exogenous bindings available.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
     public StaticAnalysis(final QueryRoot queryRoot) {
-
-        super(queryRoot);
+     
+        this(queryRoot, null/* bindingSet */);
         
     }
+
+    /**
+     * 
+     * @param queryRoot
+     *            The root of the query. We need to have this on hand in order
+     *            to resolve {@link NamedSubqueryInclude}s during static
+     *            analysis.
+     * @param bindingSets
+     *            The exogenous bindings.
+     */
+    public StaticAnalysis(final QueryRoot queryRoot,
+            final IBindingSet[] bindingSets) {
+
+        super(queryRoot);
+
+        if (bindingSets == null) {
+            this.exogenousVars = Collections.emptySet();
+        } else {
+            this.exogenousVars = getExogenousVars(bindingSets,
+                    new LinkedHashSet<IVariable<?>>());
+        }
+
+    }
+
+    /**
+     * Find and return the parent {@link JoinGroupNode} which is the lowest such
+     * {@link JoinGroupNode} dominating the given {@link GraphPatternGroup}.
+     * This will search the tree to locate the parent when the
+     * {@link GraphPatternGroup} appears as the annotation of a
+     * {@link QueryBase}, {@link ServiceNode}, or a {@link FilterNode} having a
+     * {@link ExistsNode} or {@link NotExistsNode}.
+     * 
+     * @param group
+     *            The given group.
+     * 
+     * @return The lowest dominating {@link JoinGroupNode} above that group.
+     */
+    public JoinGroupNode findParentJoinGroup(final GraphPatternGroup<?> group) {
+
+        final IQueryNode p = findParent(group);
+
+        if (p instanceof JoinGroupNode) {
+
+            return (JoinGroupNode) p;
+
+        } else if (p instanceof UnionNode) {
+
+            return ((UnionNode) p).getParentJoinGroup();
+
+        } else if (p instanceof SubqueryRoot) {
+
+            return ((SubqueryRoot) p).getParentJoinGroup();
+
+        } else if (p instanceof NamedSubqueryRoot || p instanceof QueryRoot) {
+
+            // top level.
+            return null;
+
+        } else if (p instanceof ServiceNode) {
+
+            return ((ServiceNode) p).getParentJoinGroup();
+
+        } else if (p instanceof FilterNode) {
+
+            return ((FilterNode) p).getParentJoinGroup();
+
+        }
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    /**
+     * Return the parent of the {@link GraphPatternGroup}. When the group has an
+     * explicit parent reference, that reference is returned immediately.
+     * Otherwise the {@link QueryRoot} is searched for a node having the given
+     * group as an annotation. This makes it possible to locate a
+     * {@link QueryBase}, {@link ServiceNode}, {@link ExistsNode}, or
+     * {@link NotExistsNode} given its {@link GraphPatternGroup}.
+     * <p>
+     * Note: The parent of a {@link SubqueryRoot} is obtained by
+     * {@link SubqueryRoot#getParent()} and is simply the {@link JoinGroupNode}
+     * in which the {@link SubqueryRoot} appears.
+     * 
+     * @param group
+     *            The group.
+     * 
+     * @return The parent of that group. This can be any of
+     *         {@link GraphPatternGroup}, {@link QueryBase}, {@link ServiceNode}
+     *         , or a {@link FilterNode}. This will be <code>null</code> iff the
+     *         group does not appear anywhere in the {@link QueryRoot}.
+     * 
+     *         TODO The parent of a {@link NamedSubqueryRoot} is less well
+     *         defined. A {@link NamedSubqueryRoot} may be included in multiple
+     *         positions within the AST. Each of those could be considered a
+     *         parent of the {@link NamedSubqueryRoot} in the sense that it
+     *         provides a context within which the result of the query may be
+     *         included. However, for the purposes of bottom up analysis, there
+     *         is no parent of a {@link NamedSubqueryRoot}. It runs as if it
+     *         were a top-level query (except that it might not have visibility
+     *         into exogenous variables?).
+     */
+    public IQueryNode findParent(final GraphPatternGroup<?> group) {
+
+        if (group == null)
+            throw new IllegalArgumentException();
+
+        IQueryNode p = group.getParentGraphPatternGroup();
+
+        if (p != null) {
+
+            return p;
+
+        }
+
+        if (queryRoot.getNamedSubqueries() != null) {
+
+            for (NamedSubqueryRoot namedSubquery : queryRoot
+                    .getNamedSubqueries()) {
+
+                @SuppressWarnings("unchecked")
+                final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) namedSubquery
+                        .getWhereClause();
+
+                if (whereClause == group) {
+
+                    return namedSubquery;
+
+                }
+
+                // Check the where clause.
+                if ((p = findParent2(whereClause, group)) != null) {
+
+                    return p;
+
+                }
+
+            }
+
+        }
+
+        {
+
+            @SuppressWarnings("unchecked")
+            final GraphPatternGroup<IGroupMemberNode> whereClause = (GraphPatternGroup<IGroupMemberNode>) queryRoot
+                    .getWhereClause();
+
+            if (whereClause == group) {
+
+                return queryRoot;
+
+            }
+
+            // Check the where clause.
+            if ((p = findParent2(whereClause, group)) != null) {
+
+                return p;
+
+            }
+
+        }
+
+        // Not found.
+        return p;
+    }
+
+    /**
+     * Search in aGroup for theGroup, peeking into
+     * {@link QueryBase#getWhereClause()}, {@link ServiceNode#getGroupNode()},
+     * and all {@link SubqueryFunctionNodeBase} instances for any
+     * {@link FilterNode}s.
+     * 
+     * @param aGroup
+     *            A group which might be the "parent" of the group you are
+     *            looking for.
+     * @param theGroup
+     *            The group which you are looking for.
+     * 
+     * @return The {@link QueryBase}, {@link ServiceNode}, or {@link FilterNode}
+     *         which is the "parent" of <i>theGroup</i>.
+     */
+    private IQueryNode findParent2(
+            final GraphPatternGroup<IGroupMemberNode> aGroup,
+            final GraphPatternGroup<?> theGroup) {
+
+        if (aGroup == theGroup) {
+            /*
+             * The caller should have reported this. Now we no longer have the
+             * context on hand.
+             */
+            throw new AssertionError();
+        }
+        
+        final int arity = aGroup.arity();
+
+        for (int i = 0; i < arity; i++) {
+
+            final IGroupMemberNode child = (IGroupMemberNode) aGroup.get(i);            
+            
+            if (child instanceof QueryBase) {
+
+                final QueryBase queryBase = (QueryBase) child;
+
+                if (queryBase.getWhereClause() == theGroup) {
+
+                    return queryBase;
+                    
+                }
+
+            } else if (child instanceof ServiceNode) {
+
+                final ServiceNode serviceNode = (ServiceNode) child;
+
+                if (serviceNode.getGroupNode() == theGroup) {
+
+                    return serviceNode;
+                    
+                }
+
+            } else if (child instanceof FilterNode) {
+
+                final FilterNode filter = (FilterNode) child;
+                
+                final Iterator<SubqueryFunctionNodeBase> itr = BOpUtility
+                        .visitAll(filter, SubqueryFunctionNodeBase.class);
+
+                while (itr.hasNext()) {
+
+                    final SubqueryFunctionNodeBase tmp = itr.next();
+
+                    if (tmp.getGraphPattern() == theGroup) {
+
+                        return filter;
+                        
+                    }
+                
+                }
+
+            }
+
+        }
+        
+        // Not found.
+        return null;
+
+    }
+
+//    /**
+//     * Return the set of variables which are "in-scope" for a given node. This
+//     * is based on bottom up evaluation semantics rather than the top-down,
+//     * left-to-right evaluation order. The "in-scope" variables are the
+//     * variables which are locally produced, which are produced in a child
+//     * group, or which are produced in the parent when the parent's variables
+//     * are in scope for the child (e.g., a FILTER in an OPTIONAL group can see
+//     * the variables in the parent group).
+//     * <p>
+//     * Note: This method does NOT need to consider exogenous bindings. The scope
+//     * of a variable is a completely different thing from whether or not the
+//     * variable is must be bound in a given scope. If a variable has an
+//     * exogenous binding but is not projected into a query, then it is still not
+//     * visible in that query. If it is projected into the query, then it is in
+//     * scope regardless of whether or not it has an exogenous binding and
+//     * regardless of whether it MUST or MIGHT be bound.
+//     * <p>
+//     * This method should be used for bottom up analysis. It SHOULD NOT be used
+//     * when you have a specific evaluation order and want to know whether or not
+//     * a given variable is incoming bound or produced by a node in the query.
+//     * 
+//     * @param node
+//     *            The node.
+//     * @param vars
+//     *            The caller's collection.
+//     * 
+//     * @return The caller's collection.
+//     * 
+//     * @see http://www.w3.org/TR/sparql11-query/#variableScope
+//     * 
+//     *      FIXME Test suite and implementation for "in-scope".
+//     */
+//    public Set<IVariable<?>> getInScopeVariables(final IGroupMemberNode node,
+//            final Set<IVariable<?>> vars) {
+//
+//        final GraphPatternGroup<IGroupMemberNode> tmp;
+//        
+//        if (node instanceof GraphPatternGroup<?>) {
+//
+//            /*
+//             * When given a group, report on the in-scope variable for this
+//             * group.
+//             */
+//            tmp = (GraphPatternGroup<IGroupMemberNode>) node;
+//
+//        } else {
+//
+//            /*
+//             * Report on the in-scope variables
+//             */
+//            tmp = (GraphPatternGroup<IGroupMemberNode>) node
+//                .getParent();
+//
+//        }
+//
+//        getInScopeVars(tmp, vars);
+//
+//        return vars;
+//        
+//    }
+//
+//    /**
+//     * Reports on all in-scope variables for a {@link JoinGroupNode} or
+//     * {@link UnionNode}.
+//     */
+//    private Set<IVariable<?>> getInScopeVars(
+//            final GraphPatternGroup<IGroupMemberNode> group,
+//            final Set<IVariable<?>> vars) {
+//
+//        for(IGroupMemberNode child : group ) {
+//
+//            // TODO In scope means produced locally or in scope in the parent
+//            // and visible locally.
+//            getDefinitelyProducedBindings(sp, vars, false/* recursive */);
+//
+//        }
+//
+//        // Plus anything which is in scope in the parent.
+//        {
+//            
+//            final JoinGroupNode p = findParentJoinGroup(group);
+//
+//            if (p != null) {
+//
+//                getInScopeVars(p, vars);
+//
+//            }
+//
+//        }
+//        
+//        return vars;
+//
+//    }
     
     /**
      * Return the set of variables which MUST be bound coming into this group
@@ -242,6 +594,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *         StaticAnalysis constructor to pass in the exogenous
      *         IBindingSet[]?
      * 
+     *         FIXME For some purposes we need to consider the top-down,
+     *         left-to-right evaluation order. However, for others, such as when
+     *         considering whether a variable appearing in a filter will be in
+     *         scope, we need to consider whether there exists some evaluation
+     *         order for which the variable would be in scope.
+     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
      */
@@ -255,6 +613,17 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          */
         if (parent == null) {
             
+            /*
+             * FIXME This is unable to look upwards when the group is the graph
+             * pattern of a subquery, a service, or a (NOT) EXISTS filter. Unit
+             * tests. This could be fixed using a method which searched the
+             * QueryRoot for the node having a given join group as its
+             * annotation. However, that would not resolve the question of
+             * evaluation order versus "in scope" visibility.
+             * 
+             * Use findParent(...) to fix this, but build up the test coverage
+             * before making the code changes.
+             */
             return vars;
             
         }
@@ -329,6 +698,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *         StaticAnalysis constructor to pass in the exogenous
      *         IBindingSet[]?
      * 
+     *         FIXME This is unable to look upwards when the group is the graph
+     *         pattern of a subquery, a service, or a (NOT) EXISTS filter.
+     *         
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
      */
     public Set<IVariable<?>> getMaybeIncomingBindings(
@@ -878,75 +1250,191 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * Note that the projection can rename variables. It can also bind a
      * constant on a variable. Variables which are not projected by the query
      * will NOT be reported.
+     * 
+     * TODO For a top-level query, any exogenously bound variables are also
+     * definitely bound (in a subquery they are definitely bound if they are
+     * projected into the subquery).
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/412
+     *      (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
+     *      
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/430 (StaticAnalysis
+     *      does not follow renames of projected variables)
      */
     // MUST : QueryBase
-    public Set<IVariable<?>> getDefinitelyProducedBindings(final QueryBase node) {
+    public Set<IVariable<?>> getDefinitelyProducedBindings(final QueryBase queryBase) {
 
-        final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-        
-        final ProjectionNode projection = node.getProjection();
+        final ProjectionNode projection = queryBase.getProjection();
         
         if(projection == null) {
 
             // If there is no projection then there is nothing to report.
-            return vars;
+            return new LinkedHashSet<IVariable<?>>();
 
         }
 
+        // The set of definitely bound variables in the query.
+        final Set<IVariable<?>> definitelyBound = new LinkedHashSet<IVariable<?>>();
+        
         @SuppressWarnings("unchecked")
-        final GraphPatternGroup<IGroupMemberNode> whereClause = node.getWhereClause();
+        final GraphPatternGroup<IGroupMemberNode> whereClause = queryBase.getWhereClause();
 
         if (whereClause != null) {
 
-            getDefinitelyProducedBindings(whereClause, vars, true/* recursive */);
+            getDefinitelyProducedBindings(whereClause, definitelyBound, true/* recursive */);
 
         }
 
         /*
-         * The set of projected variables.
+         * Now, we need to consider each select expression in turn. There are
+         * several cases:
+         * 
+         * 1. Projection of a constant.
+         * 
+         * 2. Projection of a variable under the same name.
+         * 
+         * 3. Projection of a variable under a different name.
+         * 
+         * 4. Projection of a select expression which is not an aggregate.
+         * 
+         * 5. Projection of a select expression which is an aggregate. This case
+         * is tricky. A select expression that is an aggregate which evaluates
+         * to an error will cause an unbound value for to be reported for the
+         * projected variable for the solution in which the error is computed.
+         * Therefore, we must not assume that aggregation expressions MUST be
+         * bound. (Given the schema flexible nature of RDF data, it is very
+         * difficult to prove that an aggregate expression will never result in
+         * an error without actually running the aggregation query.)
+         * 
+         * 6. Projection of an exogenously bound variable which is in scope.
+         * 
+         * TODO (5) is not yet handled! We need to know what variables are in
+         * scope at each level as we descend into subqueries. Even if we know
+         * the set of exogenous variables, the in scope exogenous varaibles are
+         * not available in the typical invocation context.
          */
-        final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
-        
-        for(AssignmentNode bind : projection) {
-        
-            if(bind.getValueExpression() instanceof IConstant<?>) {
-                
-                /*
-                 * If there is a BIND of a constant expression onto a variable,
-                 * then that variable is "MUST" bound by the query.
-                 * 
-                 * Note: This depends on pre-evaluation of constant expressions.
-                 * If the expression has not been reduced to a constant then it
-                 * will not be detected by this test!
-                 */
-                
-                vars.add(bind.getVar());               
+        {
+
+            final boolean isAggregate = isAggregate(queryBase);
+            
+            /*
+             * The set of projected variables which are definitely bound.
+             */
+            final Set<IVariable<?>> tmp = new LinkedHashSet<IVariable<?>>();
+
+            for (AssignmentNode bind : projection) {
+
+                if (bind.getValueExpression() instanceof IConstant<?>) {
+
+                    /*
+                     * 1. The projection of a constant.
+                     * 
+                     * Note: This depends on pre-evaluation of constant
+                     * expressions. If the expression has not been reduced to a
+                     * constant then it will not be detected by this test!
+                     */
+
+                    tmp.add(bind.getVar());
+
+                    continue;
+
+                }
+
+                if (bind.getVar().equals(bind.getValueExpression())) {
+
+                    if (definitelyBound.contains(bind.getVar())) {
+
+                        /*
+                         * 2. The projection of a definitely bound variable
+                         * under the same name.
+                         */
+
+                        tmp.add(bind.getVar());
+
+                    }
+                    
+                    continue;
+
+                }
+
+                if (bind.getValueExpression() instanceof IVariable<?>) {
+
+                    if (definitelyBound.contains(bind.getValueExpression())) {
+
+                        /*
+                         * 3. The projection of a definitely bound variable
+                         * under a different name.
+                         */
+
+                        tmp.add(bind.getVar());
+
+                    }
+
+                    continue;
+
+                }
+
+                if (!isAggregate) {
+
+                    /*
+                     * 4. The projection of a select expression which is not an
+                     * aggregate. The projected variable will be definitely
+                     * bound if all components of the select expression are
+                     * definitely bound.
+                     * 
+                     * TODO Does coalesce() change the semantics for this
+                     * analysis? If any of the values for coalesce() is
+                     * definitely bound, then the coalesce() will produce a
+                     * value. Can coalesce() be used to propagate an unbound
+                     * value? If so, then we must either not assume that any
+                     * value expression involving coalesce() is definitely bound
+                     * or we must do a more detailed analysis of the value
+                     * expression.
+                     */
+                    final Set<IVariable<?>> usedVars = getSpannedVariables(
+                            (BOp) bind.getValueExpression(),
+                            new LinkedHashSet<IVariable<?>>());
+
+                    usedVars.removeAll(definitelyBound);
+
+                    if (!usedVars.isEmpty()) {
+
+                        /*
+                         * There is at least one variable which is used by the
+                         * select expression which is not definitely bound.
+                         */
+                        continue;
+
+                    }
+
+                    /*
+                     * All variables used by the select expression are
+                     * definitely bound so the projected variable for that
+                     * select expression will be definitely bound.
+                     */
+                    tmp.add(bind.getVar());
+
+                }
                 
             }
-            
-            projectedVars.add(bind.getVar());
-            
-        }
 
-        // Remove anything which is not projected out of the query.
-        vars.retainAll(projectedVars);
-        
-        return vars;
+            return tmp;
+
+        }
 
     }
 
     /**
      * Report the "MUST" and "MAYBE" bound bindings projected by the query. This
-     * involves checking the WHERE clause and the {@link ProjectionNode} for the
-     * query. Note that the projection can rename variables. It can also bind a
-     * constant on a variable. Variables which are not projected by the query
-     * will NOT be reported.
+     * reduces to reporting the projected variables. We do not need to analyze
+     * the whereClause or projection any further in order to know what "might"
+     * be projected.
      */
     // MAYBE : QueryBase
     public Set<IVariable<?>> getMaybeProducedBindings(final QueryBase node) {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-        
+
         final ProjectionNode projection = node.getProjection();
         
         if(projection == null) {
@@ -956,46 +1444,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         }
 
-        @SuppressWarnings("unchecked")
-        final GraphPatternGroup<IGroupMemberNode> whereClause = node.getWhereClause();
-
-        if (whereClause != null) {
-
-            getMaybeProducedBindings(whereClause, vars, true/* recursive */);
-
-        }
-
-        /*
-         * The set of projected variables.
-         */
-        final Set<IVariable<?>> projectedVars = new LinkedHashSet<IVariable<?>>();
+        return projection.getProjectionVars(vars);
         
-        for(AssignmentNode bind : projection) {
-        
-            if(bind.getValueExpression() instanceof IConstant<?>) {
-                
-                /*
-                 * If there is a BIND of a constant expression onto a variable,
-                 * then that variable is "MUST" bound by the query.
-                 * 
-                 * Note: This depends on pre-evaluation of constant expressions.
-                 * If the expression has not been reduced to a constant then it
-                 * will not be detected by this test!
-                 */
-                
-                vars.add(bind.getVar());               
-                
-            }
-            
-            projectedVars.add(bind.getVar());
-            
-        }
-
-        // Remove anything which is not projected out of the query.
-        vars.retainAll(projectedVars);
-        
-        return vars;
-
     }
 
     /**
@@ -1611,7 +2061,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      *         of the query, then the query will not have the same behavior. So,
      *         getting this analysis correct is very important.
      */
-    public Set<IVariable<?>> getProjectedVars(// FIXME Rename as GET PROJECTION and possible just return the PROJECTION NODE.
+    public Set<IVariable<?>> getProjectedVars(
             final IGroupMemberNode proxy,
             final GraphPatternGroup<?> groupToLift,//
             final QueryBase query,// 
@@ -1720,6 +2170,103 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             return null;
 
         return bindingSets[0];
+
+    }
+
+    /**
+     * Return <code>true</code> if any of the {@link ProjectionNode},
+     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
+     * aggregation query.
+     * 
+     * @param query
+     *            The query.
+     * 
+     * @return <code>true</code>if it is an aggregation query.
+     */
+    public static boolean isAggregate(final QueryBase query) {
+
+        return isAggregate(query.getProjection(), query.getGroupBy(),
+                query.getHaving());
+
+    }
+
+    /**
+     * Return <code>true</code> if any of the {@link ProjectionNode},
+     * {@link GroupByNode}, or {@link HavingNode} indicate that this is an
+     * aggregation query. All arguments are optional.
+     */
+    public static boolean isAggregate(final ProjectionNode projection,
+            final GroupByNode groupBy, final HavingNode having) {
+
+        if (groupBy != null && !groupBy.isEmpty())
+            return true;
+
+        if (having != null && !having.isEmpty())
+            return true;
+
+        if (projection != null) {
+
+            for (IValueExpressionNode exprNode : projection) {
+
+                final IValueExpression<?> expr = exprNode.getValueExpression();
+
+                if (isObviousAggregate(expr)) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
+     * Return <code>true</code> iff the {@link IValueExpression} is an obvious
+     * aggregate (it uses an {@link IAggregate} somewhere within it). This is
+     * used to identify projections which are aggregates when they are used
+     * without an explicit GROUP BY or HAVING clause.
+     * <p>
+     * Note: Value expressions can be "non-obvious" aggregates when considered
+     * in the context of a GROUP BY, HAVING, or even a SELECT expression where
+     * at least one argument is a known aggregate. For example, a constant is an
+     * aggregate when it appears in a SELECT expression for a query which has a
+     * GROUP BY clause. Another example: any value expression used in a GROUP BY
+     * clause is an aggregate when the same value expression appears in the
+     * SELECT clause.
+     * <p>
+     * This method is only to find the "obvious" aggregates which signal that a
+     * bare SELECT clause is in fact an aggregation.
+     * 
+     * @param expr
+     *            The expression.
+     * 
+     * @return <code>true</code> iff it is an obvious aggregate.
+     */
+    private static boolean isObviousAggregate(final IValueExpression<?> expr) {
+
+        if (expr instanceof IAggregate<?>)
+            return true;
+
+        final Iterator<BOp> itr = expr.argIterator();
+
+        while (itr.hasNext()) {
+
+            final IValueExpression<?> arg = (IValueExpression<?>) itr.next();
+
+            if (arg != null) {
+
+                if (isObviousAggregate(arg)) // recursion.
+                    return true;
+
+            }
+
+        }
+
+        return false;
 
     }
 
