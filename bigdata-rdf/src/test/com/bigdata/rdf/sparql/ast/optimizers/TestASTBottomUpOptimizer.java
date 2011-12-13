@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -56,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -65,6 +67,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -323,6 +326,14 @@ public class TestASTBottomUpOptimizer extends
         ;
 
         /*
+         * The actual name assigned to the unbound variable. This is path
+         * dependent so changes to the code could change what name winds up
+         * being assigned here.
+         */
+//        final String unboundVarName = "-unbound-var--unbound-var-v-1-2";
+        final String unboundVarName = "-unbound-var-v-1";
+        
+        /*
          * Add the Values used in the query to the lexicon. This makes it
          * possible for us to explicitly construct the expected AST and the
          * verify it using equals().
@@ -405,7 +416,7 @@ public class TestASTBottomUpOptimizer extends
                             new FunctionNode(FunctionRegistry.EQ,
                                     null/* scalarValues */,
                                     new ValueExpressionNode[] { // args
-                                            new VarNode("-unbound-var-v-1"),//
+                                            new VarNode(unboundVarName),//
                                             new ConstantNode(new Constant(ONE
                                                     .getIV())) //
                                     }//
@@ -869,6 +880,12 @@ public class TestASTBottomUpOptimizer extends
      * Test when <code>?v</code> is bound in the input {@link IBindingSet}[]. In
      * this case we can not rewrite the filter.
      * 
+     * <pre>
+     * PREFIX : <http://example/>
+     * SELECT ?v
+     * { :x :p ?v . { FILTER(?v = 1) } }
+     * </pre>
+     * 
      * @throws MalformedQueryException
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -1255,5 +1272,248 @@ public class TestASTBottomUpOptimizer extends
         assertSameAST(expected, actual);
 
     }
+
+//    /**
+//     * The variable <code>?n</code> in the FILTER is the same as the
+//     * variable <code>?n</code> in the outer join group. It must not be
+//     * rewritten into an anonymous variable.
+//     * <pre>
+//     * PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+//     * PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+//     * SELECT DISTINCT ?x
+//     * WHERE {
+//     *   ?x ?p ?o .
+//     *   FILTER ( EXISTS {?x rdf:type foaf:Person} ) 
+//     * }
+//     * </pre>
+//     */
+//    public void test_exists_filter_variable_scope_01() {
+//        
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[] {};
+//
+//        final IV<?,?> rdfType = makeIV(RDF.TYPE);
+//        final IV<?,?> foafPerson = makeIV(FOAFVocabularyDecl.Person);
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//
+//            projection.setDistinct(true);
+//            projection.addProjectionVar(new VarNode("x"));
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+//                    new VarNode("p"), new VarNode("o")));
+//
+//            {
+//
+//                final JoinGroupNode existsGroup = new JoinGroupNode();
+//
+//                existsGroup
+//                        .addChild(new StatementPatternNode(new VarNode("x"),
+//                                new ConstantNode(rdfType), new ConstantNode(
+//                                        foafPerson)));
+//
+//                final FilterNode outerFilter = new FilterNode(
+//                        new NotExistsNode(new VarNode("--anonVar"), existsGroup));
+//                
+//                whereClause.addChild(outerFilter);
+//
+//            }
+//            
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//
+//            projection.setDistinct(true);
+//            projection.addProjectionVar(new VarNode("x"));
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+//                    new VarNode("p"), new VarNode("o")));
+//
+//            {
+//
+//                final JoinGroupNode existsGroup = new JoinGroupNode();
+//
+//                existsGroup
+//                        .addChild(new StatementPatternNode(new VarNode("x"),
+//                                new ConstantNode(rdfType), new ConstantNode(
+//                                        foafPerson)));
+//
+//                final FilterNode outerFilter = new FilterNode(
+//                        new NotExistsNode(new VarNode("--anonVar"), existsGroup));
+//                
+//                whereClause.addChild(outerFilter);
+//
+//            }
+//
+//        }
+//
+//        {
+//
+////            final IBindingSet[] bindingSets = new IBindingSet[] {};
+//
+//            final ASTContainer astContainer = new ASTContainer(given);
+//
+//            final AST2BOpContext context = new AST2BOpContext(astContainer,
+//                    store);
+//
+//            // TODO the ASK subquery needs to be setup correctly for this test
+//            
+//            IQueryNode actual;
+//            
+//            actual = new ASTExistsOptimizer().optimize(context,
+//                    given/* queryNode */, bsets);
+//
+//            actual = new ASTBottomUpOptimizer().optimize(context,
+//                    given/* queryNode */, bsets);
+//            
+//            assertSameAST(expected, actual);
+//
+//        }
+//        
+//    }
+//
+//    /**
+//     * The variable <code>?n</code> in the inner FILTER is the same as the
+//     * variable <code>?n</code> in the outer join group. It must not be
+//     * rewritten into an anonymous variable.
+//     * <p>
+//     * This example is from the SPARQL 1.1 LCWD.
+//     * 
+//     * <pre>
+//     * PREFIX : <http://example.com/>
+//     * SELECT ?a ?n WHERE {
+//     *         ?a :p ?n .
+//     *         FILTER NOT EXISTS {
+//     *                 ?a :q ?m .
+//     *                 FILTER(?n = ?m)
+//     *         }
+//     * }
+//     * </pre>
+//     */
+//    public void test_exists_filter_variable_scope_02() {
+//
+//        /*
+//         * Note: DO NOT share structures in this test!!!!
+//         */
+//        final IBindingSet[] bsets = new IBindingSet[] {};
+//
+//        final IV<?,?> p = makeIV(new URIImpl("http://example.com/p"));
+//        final IV<?,?> q = makeIV(new URIImpl("http://example.com/q"));
+//
+//        // The source AST.
+//        final QueryRoot given = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            given.setProjection(projection);
+//
+//            projection.addProjectionVar(new VarNode("a"));
+//            projection.addProjectionVar(new VarNode("n"));
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            given.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+//                    new ConstantNode(p), new VarNode("n")));
+//
+//            {
+//
+//                final JoinGroupNode existsGroup = new JoinGroupNode();
+//
+//                existsGroup.addChild(new StatementPatternNode(new VarNode("a"),
+//                        new ConstantNode(q), new VarNode("m")));
+//
+//                final FilterNode innerFilter = new FilterNode(
+//                        FunctionNode.sameTerm(new VarNode("n"),
+//                                new VarNode("m")));
+//                
+//                existsGroup.addChild(innerFilter);
+//
+//                final FilterNode outerFilter = new FilterNode(
+//                        new NotExistsNode(new VarNode("--anonVar"), existsGroup));
+//                
+//                whereClause.addChild(outerFilter);
+//
+//            }
+//            
+//        }
+//
+//        // The expected AST after the rewrite.
+//        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+//        {
+//
+//            final ProjectionNode projection = new ProjectionNode();
+//            expected.setProjection(projection);
+//
+//            projection.addProjectionVar(new VarNode("a"));
+//            projection.addProjectionVar(new VarNode("n"));
+//
+//            final JoinGroupNode whereClause = new JoinGroupNode();
+//            expected.setWhereClause(whereClause);
+//
+//            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+//                    new ConstantNode(p), new VarNode("n")));
+//
+//            {
+//
+//                final JoinGroupNode existsGroup = new JoinGroupNode();
+//
+//                existsGroup.addChild(new StatementPatternNode(new VarNode("a"),
+//                        new ConstantNode(q), new VarNode("m")));
+//
+//                final FilterNode innerFilter = new FilterNode(
+//                        FunctionNode.sameTerm(new VarNode("n"),
+//                                new VarNode("m")));
+//                
+//                existsGroup.addChild(innerFilter);
+//
+//                final FilterNode outerFilter = new FilterNode(
+//                        new NotExistsNode(new VarNode("--anonVar"), existsGroup));
+//                
+//                whereClause.addChild(outerFilter);
+//
+//            }
+//
+//        }
+//
+//        {
+//
+////            final IBindingSet[] bindingSets = new IBindingSet[] {};
+//
+//            final ASTContainer astContainer = new ASTContainer(given);
+//
+//            final AST2BOpContext context = new AST2BOpContext(astContainer,
+//                    store);
+//
+//            // TODO the ASK subquery needs to be setup correctly for this test
+//
+//            final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
+//
+//            final IQueryNode actual = rewriter.optimize(context,
+//                    given/* queryNode */, bsets);
+//
+//            assertSameAST(expected, actual);
+//
+//        }
+//    
+//    }
 
 }

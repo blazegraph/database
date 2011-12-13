@@ -175,4 +175,15 @@ public class FunctionNode extends ValueExpressionNode {
 
     }
 
+    /**
+     * Return a binary function <code>op(t1,t2)</code>
+     */
+    static public FunctionNode binary(final URI uri, final TermNode t1,
+            final TermNode t2) {
+
+        return new FunctionNode(uri, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
 }

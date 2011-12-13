@@ -29,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -36,6 +37,7 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
@@ -47,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTWildcardProjectionOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
+import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
 
 /**
  * Test suite for methods supporting static analysis of the variables, including
@@ -2060,7 +2063,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
      */
-    public void test_getProjectedVars() {
+    public void test_static_analysis_getProjectedVars() {
 
         @SuppressWarnings("rawtypes")
         final IV a = makeIV(RDF.TYPE);
@@ -2196,4 +2199,1184 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
     }
 
+    /**
+     * Unit test for static analysis of the MUST and MIGHT bound variables for a
+     * subquery.
+     * 
+     * <pre>
+     * SELECT (?a as ?b) {
+     *    ?a rdf:type foaf:Person
+     * }
+     * </pre>
+     * 
+     * Should report that <code>?b</code> must be bound
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/430
+     * 
+     *      TODO Extend this test to cover the case where <code>b</code> is an
+     *      exogenously bound variable.  This does not change the MUST/MIGHT
+     *      analysis of the query.
+     */
+    public void test_static_analysis_projection_01() {
+        
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("b"), new VarNode("a")));
+            }
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+            whereClause.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(rdfType), new ConstantNode(foafPerson)));
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+
+        // QueryRoot
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        // whereClause
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+
+    /**
+     * Variant with optional group binding <code>?a</code> (so <code>?b</code>
+     * is MIGHT be bound).
+     * 
+     * <pre>
+     * SELECT (?a as ?b) {
+     *    OPTIONAL {
+     *      ?a rdf:type foaf:Person
+     *    }
+     * }
+     * </pre>
+     * 
+     * Should report that <code>?b</code> might be bound
+     * 
+     * TODO Extend this test to also cover the case where <code>b</code> is an
+     * exogenously bound variable. In that case, it MUST be bound.
+     * 
+     * TODO Extend this test to also cover the case where <code>a</code> is an
+     * exogenously bound variable. Since <code>a</code> is not projected, it's
+     * bound value SHOULD NOT be visible inside of the query (variables with
+     * exogenous variables must obey the same scoping rules as variables which
+     * only become bound during query evaluation).
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/430
+     */
+    public void test_static_analysis_projection_02() {
+        
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+    
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, optionalGroup;
+        {
+    
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+    
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("b"), new VarNode("a")));
+            }
+    
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+    
+            optionalGroup = new JoinGroupNode(true/*optional*/);
+            whereClause.addChild(optionalGroup);
+            
+            optionalGroup.addChild(new StatementPatternNode(new VarNode("a"),
+                    new ConstantNode(rdfType), new ConstantNode(foafPerson)));
+    
+        }
+    
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+    
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+    
+        // QueryRoot
+        {
+    
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+    
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+    
+            expectedVars.add(Var.var("b"));
+            
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+    
+        }
+    
+        // whereClause
+        {
+    
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+    
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+    
+            expectedVars.add(Var.var("a"));
+            
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+    
+        }
+    
+        // optionalGroup
+        {
+    
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+    
+            expectedVars.add(Var.var("a"));
+            
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(optionalGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+    
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(optionalGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+    
+        }
+    
+    }
+
+    /**
+     * Unit test where the SELECT expression includes the bind of a constant
+     * onto a variable.
+     */
+    public void test_static_analysis_projection_03() {
+        
+//        @SuppressWarnings("rawtypes")
+//        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+
+        // The source AST.
+        final QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("b"), new ConstantNode(foafPerson)));
+
+            }
+
+            whereClause = new JoinGroupNode();
+            queryRoot.setWhereClause(whereClause);
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+
+        // QueryRoot
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        // whereClause
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+
+    /**
+     * Unit test for static analysis of the MUST and MIGHT bound variables for a
+     * query involving a select expression which could result in an error. Note
+     * that this query is NOT an aggregation query so the error will fail the
+     * solution.
+     * 
+     * <pre>
+     * SELECT ?a ?b (?a/?b as ?c) {
+     *    ?x rdf:type foaf:Person .
+     *    ?x :age ?a .
+     *    ?x :grade ?b .
+     * }
+     * </pre>
+     * 
+     * In this query, it is presumed that <code>?b</code> is the number of years
+     * of school and will be ZERO in the data for people who have not yet begun
+     * formal schooling. Hence, the select expression can evaluate to an error
+     * (divide by zero). However, since this is NOT an aggregation query, the
+     * error will cause the solution to be dropped. Hence, <code>?c</code> is
+     * definitely bound for this query.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/430
+     * 
+     *      TODO Extend this test to cover the case where <code>b</code> is an
+     *      exogenously bound variable. This does not change the MUST/MIGHT
+     *      analysis of the query.
+     */
+    public void test_static_analysis_projection_04() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("c"), FunctionNode.binary(
+                                FunctionRegistry.DIVIDE, new VarNode("a"),
+                                new VarNode("b"))));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(age), new VarNode("a")));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(grade), new VarNode("b")));
+            }
+
+        }
+
+        /*
+         * Note: Since it involves function nodes, we need to generate the value
+         * expressions in order to run this test.
+         */
+        {
+
+            final IBindingSet[] bindingSets = new IBindingSet[] {};
+
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
+                    store);
+
+            queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
+                    .optimize(context, queryRoot, bindingSets);
+
+        }
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+
+        // QueryRoot
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("b"));
+            expectedVars.add(Var.var("c"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        // whereClause
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("x"));
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+    
+    /**
+     * Unit test for static analysis of the MUST and MIGHT bound variables for a
+     * query involving a select expression which depends on a variable which is
+     * not definitely bound. 
+     * 
+     * <pre>
+     * SELECT ?a ?b (?a + ?b as ?c) {
+     *    ?x rdf:type foaf:Person .
+     *    ?x :age ?a .
+     *    OPTIONAL {
+     *       ?x :grade ?b .
+     *    }
+     * }
+     * </pre>
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/430
+     * 
+     *      TODO Extend this test to cover the case where <code>b</code> is an
+     *      exogenously bound variable. This does not change the MUST/MIGHT
+     *      analysis of the query.
+     */
+    public void test_static_analysis_projection_05() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, optionalGroup;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("c"), FunctionNode.binary(
+                                FunctionRegistry.DIVIDE, new VarNode("a"),
+                                new VarNode("b"))));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(age), new VarNode("a")));
+
+                optionalGroup = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(optionalGroup);
+
+                optionalGroup.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(grade), new VarNode(
+                                "b")));
+            }
+
+        }
+
+        /*
+         * Note: Since it involves function nodes, we need to generate the value
+         * expressions in order to run this test.
+         */
+        {
+
+            final IBindingSet[] bindingSets = new IBindingSet[] {};
+            
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
+                    store);
+
+            queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
+                    .optimize(context, queryRoot, bindingSets);
+
+        }
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+
+        // QueryRoot
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            expectedVars.add(Var.var("b"));
+            expectedVars.add(Var.var("c"));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        // whereClause
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("x"));
+            expectedVars.add(Var.var("a"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+        // optionalGroup
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("x"));
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(optionalGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(optionalGroup,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+
+    /**
+     * Unit test for static analysis of the MUST and MIGHT bound variables for a
+     * subquery involving aggregation and a select expression ("The result of an
+     * Aggregate which returns an error, is an error, but the SELECT expression
+     * result of projecting an error is unbound").
+     * 
+     * <pre>
+     * SELECT ?a ?b (?a/?b as ?c) {
+     *    ?x rdf:type foaf:Person .
+     *    ?x :age ?a .
+     *    ?x :grade ?b .
+     * }
+     * GROUP BY ?b
+     * </pre>
+     * 
+     * In this query, it is presumed that <code>?b</code> is the number of years
+     * of school and will be ZERO in the data for people who have not yet begun
+     * formal schooling. Hence, the select expression can evaluate to an error
+     * (divide by zero).
+     * <p>
+     * Since this is an aggregation query, the solution will still be reported
+     * with an unbound value for <code>?c</code>. This illustrates the general
+     * principle that we can not assume that a select expression based on
+     * definitely bound variables will itself be definitely bound.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/430
+     * 
+     *      TODO Extend this test to cover the case where <code>b</code> is an
+     *      exogenously bound variable. Does this change the MUST/MIGHT analysis
+     *      of the query?
+     */
+    public void test_static_analysis_projection_06() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+                projection.addProjectionExpression(new AssignmentNode(
+                        new VarNode("c"), FunctionNode.binary(
+                                FunctionRegistry.DIVIDE, new VarNode("a"),
+                                new VarNode("b"))));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(age), new VarNode("a")));
+
+                whereClause.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(grade), new VarNode("b")));
+            }
+
+            // GROUP BY
+            {
+                final GroupByNode groupBy = new GroupByNode();
+                queryRoot.setGroupBy(groupBy);
+                groupBy.addGroupByVar(new VarNode("b"));
+            }
+
+        }
+
+        /*
+         * Note: Since it involves function nodes, we need to generate the value
+         * expressions in order to run this test.
+         */
+        {
+
+            final IBindingSet[] bindingSets = new IBindingSet[] {};
+            
+            final ASTContainer astContainer = new ASTContainer(queryRoot);
+            
+            final AST2BOpContext context = new AST2BOpContext(astContainer,
+                    store);
+
+            queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
+                    .optimize(context, queryRoot, bindingSets);
+
+        }
+        
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        final Set<IVariable<?>> exogenousVars = new LinkedHashSet<IVariable<?>>();
+
+        // QueryRoot
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(expectedVars,
+                    sa.getDefinitelyProducedBindings(queryRoot));
+
+            expectedVars.add(Var.var("c"));
+
+            assertEquals(expectedVars,
+                    sa.getMaybeProducedBindings(queryRoot));
+
+        }
+
+        // whereClause
+        {
+
+            final LinkedHashSet<IVariable<?>> expectedVars = new LinkedHashSet<IVariable<?>>();
+
+            expectedVars.add(Var.var("x"));
+            expectedVars.add(Var.var("a"));
+            expectedVars.add(Var.var("b"));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getDefinitelyProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+            assertEquals(
+                    expectedVars,
+                    sa.getMaybeProducedBindings(whereClause,
+                            new LinkedHashSet<IVariable<?>>(), true/* recursive */));
+
+        }
+
+    }
+
+    /**
+     * Unit test for locating a reference go a {@link GraphPatternGroup} which
+     * appears as an annotation of another node. This covers {@link UnionNode}
+     * and {@link JoinGroupNode} when appearing as children of a
+     * {@link QueryRoot}'s whereClause.
+     * 
+     * <pre>
+     * SELECT ?a ?b {
+     *    ?x rdf:type foaf:Person .
+     *    {
+     *       ?x :age ?a
+     *    } UNION {
+     *       ?x :grade ?b
+     *    }
+     * }
+     * </pre>
+     */
+    public void test_findParent_01() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, joinGroup1, joinGroup2;
+        final UnionNode unionNode;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                unionNode = new UnionNode();
+                whereClause.addChild(unionNode);
+
+                joinGroup1 = new JoinGroupNode();
+                unionNode.addChild(joinGroup1);
+
+                joinGroup1.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(age), new VarNode("a")));
+
+                joinGroup2 = new JoinGroupNode();
+                unionNode.addChild(joinGroup2);
+                
+                joinGroup2.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(grade), new VarNode("b")));
+            }
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        assertTrue(unionNode == sa.findParent(joinGroup1));
+        assertTrue(unionNode == sa.findParent(joinGroup2));
+        assertTrue(whereClause == sa.findParent(unionNode));
+        assertTrue(queryRoot == sa.findParent(whereClause));
+        
+    }
+    
+    /**
+     * This verifies the ability to locate the parent of a graph group in a
+     * {@link SubqueryRoot}.
+     * 
+     * <pre>
+     * SELECT ?a ?b {
+     *    ?x rdf:type foaf:Person .
+     *    {
+     *       SELECT ?x ?a ?b {
+     *         ?x :age ?a
+     *         ?x :grade ?b
+     *       }
+     *    }
+     * }
+     * </pre>
+     */
+    public void test_findParent_02() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, subqueryWhereClause;
+        final SubqueryRoot subqueryRoot;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                subqueryRoot = new SubqueryRoot(QueryType.SELECT);
+                whereClause.addChild(subqueryRoot);
+
+                subqueryWhereClause = new JoinGroupNode();
+                subqueryRoot.setWhereClause(subqueryWhereClause);
+
+                subqueryWhereClause.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(age), new VarNode(
+                                "a")));
+
+                subqueryWhereClause.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(grade), new VarNode(
+                                "b")));
+            }
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        assertTrue(subqueryRoot == sa.findParent(subqueryWhereClause));
+        assertTrue(whereClause == subqueryRoot.getParent());
+
+    }
+    
+    /**
+     * This verifies the ability to locate the parent of a graph group in a
+     * {@link NamedSubqueryRoot}.
+     * 
+     * <pre>
+     * SELECT ?a ?b {
+     *    WITH {
+     *       SELECT ?x ?a ?b {
+     *         ?x :age ?a
+     *         ?x :grade ?b
+     *       }
+     *    } as %set1
+     *    ?x rdf:type foaf:Person .
+     *    INCLUDE %set1 .
+     * }
+     * </pre>
+     */
+    public void test_findParent_03() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, subqueryWhereClause;
+        final NamedSubqueryRoot subqueryRoot;
+        final NamedSubqueryInclude include;
+        final String namedSet = "set1";
+        {
+            
+            // Named subquery.
+            {
+                subqueryRoot = new NamedSubqueryRoot(QueryType.SELECT, namedSet);
+
+                subqueryWhereClause = new JoinGroupNode();
+                subqueryRoot.setWhereClause(subqueryWhereClause);
+
+                subqueryWhereClause.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(age), new VarNode(
+                                "a")));
+
+                subqueryWhereClause.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(grade), new VarNode(
+                                "b")));
+                
+                queryRoot.getNamedSubqueriesNotNull().add(subqueryRoot);
+                
+            }
+            
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+                
+                whereClause.addChild(include = new NamedSubqueryInclude(
+                        namedSet));
+
+            }
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+
+        assertTrue(subqueryRoot == sa.findParent(subqueryWhereClause));
+        assertTrue(whereClause == include.getParent());
+
+    }
+    
+    /**
+     * Unit test for locating a reference go a {@link GraphPatternGroup} which
+     * appears as an annotation of another node. This covers {@link UnionNode}
+     * and {@link JoinGroupNode} when appearing as children of a
+     * {@link QueryRoot}'s whereClause.
+     * 
+     * <pre>
+     * SELECT ?a ?b {
+     *    ?x rdf:type foaf:Person .
+     *    SERVICE {
+     *       ?x :age ?a
+     *    }
+     *    FILTER {
+     *       EXISTS {?x :grade ?b}
+     *    }
+     * }
+     * </pre>
+     */
+    public void test_findParent_04() {
+
+        @SuppressWarnings("rawtypes")
+        final IV rdfType = makeIV(RDF.TYPE);
+        @SuppressWarnings("rawtypes")
+        final IV foafPerson = makeIV(FOAFVocabularyDecl.Person);
+        @SuppressWarnings("rawtypes")
+        final IV age = makeIV(new URIImpl("http://example.org/age"));
+        @SuppressWarnings("rawtypes")
+        final IV grade = makeIV(new URIImpl("http://example.org/grade"));
+        @SuppressWarnings("rawtypes")
+        final IV serviceUri = makeIV(new URIImpl("http://example.org/service"));
+
+        // The source AST.
+        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+        final JoinGroupNode whereClause, serviceGroup, existsGroup;
+        final ServiceNode serviceNode;
+        final FilterNode filterNode;
+        {
+
+            // Top-level projection
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                queryRoot.setProjection(projection);
+
+                projection.addProjectionVar(new VarNode("a"));
+                projection.addProjectionVar(new VarNode("b"));
+            }
+
+            // WHERE clause.
+            {
+                whereClause = new JoinGroupNode();
+                queryRoot.setWhereClause(whereClause);
+
+                whereClause
+                        .addChild(new StatementPatternNode(new VarNode("x"),
+                                new ConstantNode(rdfType), new ConstantNode(
+                                        foafPerson)));
+
+                serviceGroup = new JoinGroupNode();
+                serviceGroup.addChild(new StatementPatternNode(
+                        new VarNode("x"), new ConstantNode(age), new VarNode(
+                                "a")));
+                serviceNode = new ServiceNode((URI) serviceUri.getValue(),
+                        serviceGroup);
+                whereClause.addChild(serviceNode);
+
+                existsGroup = new JoinGroupNode();
+                existsGroup.addChild(new StatementPatternNode(new VarNode("x"),
+                        new ConstantNode(grade), new VarNode("b")));
+                filterNode = new FilterNode(new ExistsNode(new VarNode(
+                        "anon-var-1"), existsGroup));
+                whereClause.addChild(filterNode);
+                
+            }
+
+        }
+
+        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+        
+        assertTrue(serviceNode == sa.findParent(serviceGroup));
+        assertTrue(filterNode == sa.findParent(existsGroup));
+        assertTrue(queryRoot == sa.findParent(whereClause));
+        
+    }
+
+//    /**
+//     * Unit test for whether or not a variable is "in-scope" in some part of the
+//     * AST.
+//     * 
+//     * <pre>
+//     * PREFIX :    <http://example/>
+//     * SELECT ?v
+//     * { 
+//     *     :x :p ?v . 
+//     *     FILTER(?v = 1) .
+//     * }
+//     * </pre>
+//     * 
+//     * The variable <code>?v</code> is in scope in the outer group and the
+//     * filter.
+//     * 
+//     * @see http://www.w3.org/TR/sparql11-query/#variableScope
+//     */
+//    public void test_static_analysis_inScope_01() {
+//
+//        @SuppressWarnings("rawtypes")
+//        final IV x = makeIV(new URIImpl("http://example.org/x"));
+//        @SuppressWarnings("rawtypes")
+//        final IV p = makeIV(new URIImpl("http://example.org/p"));
+//        @SuppressWarnings("rawtypes")
+//        final IV one = makeIV(new LiteralImpl("1", XSD.INTEGER));
+//
+//        // The source AST.
+//        QueryRoot queryRoot = new QueryRoot(QueryType.SELECT);
+//        final JoinGroupNode whereClause;
+//        final FilterNode filterNode;
+//        {
+//
+//            // Top-level projection
+//            {
+//                final ProjectionNode projection = new ProjectionNode();
+//                queryRoot.setProjection(projection);
+//
+//                projection.addProjectionVar(new VarNode("v"));
+//            }
+//
+//            // WHERE clause.
+//            {
+//                whereClause = new JoinGroupNode();
+//                queryRoot.setWhereClause(whereClause);
+//
+//                whereClause.addChild(new StatementPatternNode(new ConstantNode(
+//                        x), new ConstantNode(p), new VarNode("v")));
+//
+//                filterNode = new FilterNode(FunctionNode.binary(
+//                        FunctionRegistry.EQ, new VarNode("v"),
+//                        new ConstantNode(one)));
+//                whereClause.addChild(filterNode);
+//                
+//            }
+//
+//        }
+//
+//        final StaticAnalysis sa = new StaticAnalysis(queryRoot);
+//
+//        {
+//
+//            final Set<IVariable<?>> expected = new LinkedHashSet<IVariable<?>>();
+//
+//            expected.add(Var.var("v"));
+//            
+//            assertEquals(expected, sa.getInScopeVariables(filterNode,
+//                    new LinkedHashSet<IVariable<?>>()));
+//            
+//        }
+//        
+//    }
+//
+//    /**
+//     * <code>?v</code> is also in scope when it appears in an OPTIONAL group
+//     * 
+//     * <pre>
+//     * PREFIX :    <http://example/>
+//     * SELECT ?v
+//     * { 
+//     *     :x :p ?v .
+//     *     OPTIONAL { 
+//     *        FILTER(?v = 1) .
+//     *     }
+//     * }
+//     * </pre>
+//     */
+//   public void test_static_analysis_inScope_02() {
+//
+//   }
+//
+//    /**
+//     * This test examines a DAWG/TCK query based on a badly formed left join
+//     * pattern:
+//     * 
+//     * <pre>
+//     * PREFIX :    <http://example/>
+//     * SELECT ?v ?w ?v2
+//     * { 
+//     *     :x :p ?v . 
+//     *     { :x :q ?w 
+//     *       OPTIONAL {  :x :p ?v2 FILTER(?v = 1) }
+//     *     }
+//     * }
+//     * </pre>
+//     * 
+//     * The variable <code>?v</code> is in scope in the outer group, but it is
+//     * not in scope in the filter.
+//     * 
+//     * TODO What about when the optional group has ?v in the BPG?
+//     * 
+//     * TODO What about when the optional group has ?v and the parent group 
+//     * also has ?v?
+//     * 
+//     * TODO Examples with more variables.
+//     */
+//    public void test_static_analysis_inScope_03() {
+//
+//        fail("write tests");
+//
+//    }
+//
+//    /**
+//     * 
+//     * TODO The test suite should cover all of the bottom-up examples so we can
+//     * work out what the right behavior of this method is in each case. It
+//     * should also cover the EXISTS graph pattern, SERVICE graph pattern, and
+//     * subquery graph patterns as those are not linked in the standard
+//     * parent-child hierarchy (or write a separate test suite for finding those
+//     * things, maybe for BOpUtility).
+//     */
+//    public void test_static_analysis_inScope_xxx() {
+//
+//        fail("write tests");
+//
+//    }
+    
 }

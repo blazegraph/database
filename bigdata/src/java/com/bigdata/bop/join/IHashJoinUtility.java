@@ -77,6 +77,14 @@ public interface IHashJoinUtility {
     JoinTypeEnum getJoinType();
     
     /**
+     * The variable bound based on whether or not a solution survives an
+     * "EXISTS" graph pattern (optional).
+     * 
+     * @see HashJoinAnnotations#ASK_VAR
+     */
+    IVariable<?> getAskVar();
+    
+    /**
      * The join variables.
      * 
      * @see HashJoinAnnotations#JOIN_VARS

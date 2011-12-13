@@ -7,7 +7,6 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.EBVBOp;
-import com.bigdata.rdf.sparql.ast.DatasetNode.Annotations;
 
 /**
  * AST node models a value expression which imposes a constraint.
@@ -49,6 +48,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
 
 	}
 	
+    @SuppressWarnings("rawtypes")
 	public IValueExpression<? extends IV> getValueExpression() {
 
         final IValueExpression<? extends IV> ve = getValueExpressionNode()

@@ -52,7 +52,6 @@ import com.bigdata.rdf.sparql.ast.ServiceNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 import cutthecrap.utils.striterators.Striterator;
 
@@ -234,7 +233,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
             }
 
-            if (AST2BOpUtility.isAggregate(subqueryRoot)) {
+            if (StaticAnalysis.isAggregate(subqueryRoot)) {
 
                 /*
                  * Lift out SPARQL 1.1 subqueries which use {@link IAggregate}s.

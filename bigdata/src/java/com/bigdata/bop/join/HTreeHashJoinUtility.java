@@ -76,6 +76,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.lexicon.BlobsTupleSerializer;
 import com.bigdata.rdf.lexicon.Id2TermTupleSerializer;
@@ -261,6 +262,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 //    private final PipelineOp op;
     
     /**
+     * @see HashJoinAnnotations#ASK_VAR
+     */
+    private final IVariable<?> askVar;
+    
+    /**
      * The join variables.
      */
     private final IVariable<?>[] joinVars;
@@ -398,6 +404,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 //        sb.append(",ivCacheSchema="+ivCacheSchema);
 //        sb.append(",optional=" + optional);
 //        sb.append(",filter=" + filter);
+        if (askVar != null)
+            sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
@@ -486,6 +494,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     public JoinTypeEnum getJoinType() {
         
         return joinType;
+        
+    }
+    
+    public IVariable<?> getAskVar() {
+        
+        return askVar;
         
     }
     
@@ -668,7 +682,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         this.joinType = joinType;
         this.optional = joinType == JoinTypeEnum.Optional;
         this.filter = joinType == JoinTypeEnum.Filter;
-        
+
+        // Optional variable used for (NOT) EXISTS.
+        this.askVar = (IVariable<?>) op
+                .getProperty(HashJoinAnnotations.ASK_VAR);
+
         // The join variables (required).
         this.joinVars = (IVariable<?>[]) op
                 .getRequiredProperty(HashJoinAnnotations.JOIN_VARS);
@@ -1802,6 +1820,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         try {
 
+            @SuppressWarnings({ "rawtypes", "unchecked" })
+            final Constant f = askVar == null ? null : new Constant(
+                    XSDBooleanIV.FALSE);
+
             if (log.isInfoEnabled()) {
                 final HTree htree = this.getRightSolutions();
                 log.info("rightSolutions: #nnodes=" + htree.getNodeCount()
@@ -1881,6 +1903,15 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                     resolveCachedValues(ivCache, blobsCache, rightSolution);
 
+                    if (f != null) {
+
+                        if (selectVars == null)
+                            rightSolution = rightSolution.clone();
+                        
+                        rightSolution.set( askVar, f);
+
+                    }
+
                     outputBuffer.add(rightSolution);
 
                 }
@@ -1948,6 +1979,10 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         try {
 
+            @SuppressWarnings({ "rawtypes", "unchecked" })
+            final Constant t = askVar == null ? null : new Constant(
+                    XSDBooleanIV.TRUE);
+            
             final HTree joinSet = getJoinSet();
 
             if (log.isInfoEnabled()) {
@@ -1967,14 +2002,21 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
             while (solutionsIterator.hasNext()) {
 
-                final ITuple<?> t = solutionsIterator.next();
-
-                IBindingSet bset = decodeSolution(t);
+                IBindingSet bset = decodeSolution(solutionsIterator.next());
 
                 if (selectVars != null) {
 
                     // Drop variables which are not projected.
                     bset = bset.copy(selectVars);
+
+                }
+
+                if (t != null) {
+
+                    if (selectVars == null)
+                        bset = bset.clone();
+
+                    bset.set(askVar, t);
 
                 }
 

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 
 /**
@@ -52,6 +53,12 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
         String RUN_ONCE = "runOnce";
         
         boolean DEFAULT_RUN_ONCE = false;
+        
+        /**
+         * Annotation used to communicate the name of the anonymous variable
+         * supporting a NOT (EXISTS) graph pattern evaluation. 
+         */
+        String ASK_VAR = "askVar";
         
     }
     
@@ -107,6 +114,25 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
         return getProperty(Annotations.RUN_ONCE, Annotations.DEFAULT_RUN_ONCE);
 
+    }
+
+    /**
+     * 
+     * @see Annotations#ASK_VAR
+     */
+    public void setAskVar(final IVariable<?> askVar) {
+
+        setProperty(Annotations.ASK_VAR, askVar);
+        
+    }
+
+    /**
+     * @see Annotations#ASK_VAR
+     */
+    public IVariable<?> getAskVar() {
+        
+        return (IVariable<?>) getProperty(Annotations.ASK_VAR);
+        
     }
 
     /**
@@ -166,7 +192,13 @@ public class SubqueryRoot extends SubqueryBase implements IJoinNode {
 
         sb.append(indent(indent));
 
-        sb.append("@" + Annotations.RUN_ONCE + "=" + runOnce);
+        if (runOnce)
+            sb.append("@" + Annotations.RUN_ONCE + "=" + runOnce);
+
+        final IVariable<?> askVar = getAskVar();
+        
+        if(askVar != null)
+            sb.append("@" + Annotations.ASK_VAR + "=" + askVar);
 
         final List<FilterNode> filters = getAttachedJoinFilters();
         if(!filters.isEmpty()) {

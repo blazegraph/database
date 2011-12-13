@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import com.bigdata.bop.IVariable;
+
 /**
  * Annotations for hash joins.
  * 
@@ -53,6 +55,18 @@ public interface HashJoinAnnotations {
      */
     String JOIN_VARS = HashJoinAnnotations.class.getName() + ".joinVars";
 
+    /**
+     * When non-<code>null</code>, the {@link IVariable} which will be bound to
+     * <code>true</code> iff there is at least one solution for a
+     * {@link JoinTypeEnum#Exists} hash join.
+     * <p>
+     * Note: This supports the bridge between the evaluation of the (NOT) EXISTS
+     * graph pattern and the processing whether or not the "EXISTS" graph
+     * pattern was successful, which is encoded on the "ask variable."
+     */
+    String ASK_VAR = HashJoinAnnotations.class.getName() + ".askVar";
+
+
 //    /**
 //     * The maximum number of solutions that will be considered before a hash
 //     * join without any join variables is failed.
@@ -64,7 +78,7 @@ public interface HashJoinAnnotations {
 //            + ".noJoinVarsLimit";
 
     /**
-     * FIXME Annotation and query hint for this.
+     * TODO Annotation and query hint for this.
      * 
      * @see UnconstrainedJoinException
      */

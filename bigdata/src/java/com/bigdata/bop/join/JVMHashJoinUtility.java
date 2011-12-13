@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.HTreeAnnotations;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
@@ -50,6 +51,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -401,6 +403,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
      * <code>true</code> iff this is a DISTINCT filter.
      */
     private final boolean filter;
+
+    /**
+     * @see HashJoinAnnotations#ASK_VAR
+     */
+    private final IVariable<?> askVar;
     
     /**
      * The join variables.
@@ -466,6 +473,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         sb.append(",joinType="+joinType);
 //        sb.append(",optional=" + optional);
 //        sb.append(",filter=" + filter);
+        if (askVar != null)
+            sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
@@ -505,6 +514,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         this.joinType = joinType;
         this.optional = joinType == JoinTypeEnum.Optional;
         this.filter = joinType == JoinTypeEnum.Filter;
+
+        // Optional variable used for (NOT) EXISTS.
+        this.askVar = (IVariable<?>) op
+                .getProperty(HashJoinAnnotations.ASK_VAR);
         
         // The join variables (required).
         this.joinVars = (IVariable<?>[]) op
@@ -553,6 +566,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     
     public JoinTypeEnum getJoinType() {
         return joinType;
+    }
+    
+    public IVariable<?> getAskVar() {
+        return askVar;
     }
     
     public IVariable<?>[] getJoinVars() {
@@ -916,6 +933,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         try {
 
+            @SuppressWarnings({ "rawtypes", "unchecked" })
+            final Constant f = askVar == null ? null : new Constant(
+                    XSDBooleanIV.FALSE);
+
             final Map<Key, Bucket> rightSolutions = getRightSolutions();
 
             final IVariable<?>[] selected = getSelectVars();
@@ -942,6 +963,15 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                         // Drop variables which are not projected.
                         bs = bs.copy(selected);
+
+                    }
+
+                    if (f != null) {
+
+                        if (bs == hit.solution)
+                            bs = bs.clone();
+
+                        bs.set(askVar, f);
 
                     }
 
@@ -1015,6 +1045,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
         try {
 
+            @SuppressWarnings({ "rawtypes", "unchecked" })
+            final Constant t = askVar == null ? null : new Constant(
+                    XSDBooleanIV.TRUE);
+            
             final Map<Key, Bucket> rightSolutions = getRightSolutions();
 
             final IVariable<?>[] selected = getSelectVars();
@@ -1038,6 +1072,15 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                     }
 
+                    if (t != null) {
+
+                        if (bs == hit.solution)
+                            bs = bs.clone();
+
+                        bs.set(askVar, t);
+
+                    }
+                    
                     outputBuffer.add(bs);
 
                     if (log.isDebugEnabled())
