@@ -30,7 +30,6 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.CopyOp;
@@ -43,7 +42,6 @@ import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.bop.controller.NamedSolutionSetRef;
 import com.bigdata.bop.controller.ServiceCallJoin;
 import com.bigdata.bop.controller.Steps;
-import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.HTreeHashIndexOp;
@@ -120,6 +118,7 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -1167,29 +1166,49 @@ public class AST2BOpUtility extends AST2BOpJoins {
      * @param ctx
      * @return
      * 
-     *         TODO isAggregate() is probably no longer necessary as we always
-     *         lift an aggregation subquery into a named subquery. Probably turn
-     *         it into an assert instead to verify that an aggregation subquery
-     *         is not being run otherwise.
+     *         TODO If there are no shared variables between the (NOT) EXISTS
+     *         graph pattern and join group in which it appears (i.e., no join
+     *         variables) then the (NOT) EXISTS should be handled as a RUN_ONCE
+     *         ASK Subquery. It will produce a single solution in whicn the
+     *         anonymous variable is either true or false. As an optimization
+     *         based on the value of the anonymous variable, the entire join
+     *         group may either be failed once the solution to the ASK SUBQUERY
+     *         is known.
+     * 
+     *         TODO Mark the ASK SUBQUERY and the MINUS join group with an
+     *         annotation which identifies the "FILTER variables" which will
+     *         govern when they are to be evaluated. Use the presence of that
+     *         annotation to guide the reordering of the joins by the
+     *         {@link ASTJoinOrderByTypeOptimizer} such that we run those nodes
+     *         as early as possible and (in the case of (NOT) EXISTS before the
+     *         FILTER which references the anonymous variable which is bound by
+     *         the ASK subquery).
+     * 
+     *      TODO isAggregate() is probably no longer necessary as we always lift
+     *      an aggregation subquery into a named subquery. Probably turn it into
+     *      an assert instead to verify that an aggregation subquery is not
+     *      being run otherwise.
      * 
      * @see ASTExistsOptimizer
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
+     *      EXISTS, NOT EXISTS, and MINUS)
+     * @see http://www.w3.org/2009/sparql/wiki/Design:Negation
      */
     private static PipelineOp addExistsSubquery(PipelineOp left,
             final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
-        if (true) {
-            return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
-        } else {
-            return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
-        }
-        
-    }
-
-    private static PipelineOp addExistsSubqueryFast(PipelineOp left,
-            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
-            final AST2BOpContext ctx) {
+//        if (true) {
+//            return addExistsSubqueryFast(left, subqueryRoot, doneSet, ctx);
+//        } else {
+//            return addExistsSubquerySubquery(left, subqueryRoot, doneSet, ctx);
+//        }
+//        
+//    }
+//
+//    private static PipelineOp addExistsSubqueryFast(PipelineOp left,
+//            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+//            final AST2BOpContext ctx) {
 
         // Only Sub-Select is supported by this code path.
         switch (subqueryRoot.getQueryType()) {
@@ -1356,65 +1375,65 @@ public class AST2BOpUtility extends AST2BOpJoins {
 
     }
     
-    /**
-     * A slow implementation using one {@link SubqueryOp} per source solution.
-     * 
-     * @deprecated by
-     *             {@link #addExistsSubqueryFast(PipelineOp, SubqueryRoot, Set, AST2BOpContext)}
-     */
-    private static PipelineOp addExistsSubquerySubquery(PipelineOp left,
-            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
-            final AST2BOpContext ctx) {
-
-        // Only "ASK" subqueries are allowed.
-        switch (subqueryRoot.getQueryType()) {
-        case ASK:
-            break;
-        default:
-            throw new UnsupportedOperationException();
-        }
-
-        @SuppressWarnings("rawtypes")
-        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
-
-        final IConstraint[] joinConstraints = getJoinConstraints(
-                getJoinConstraints(subqueryRoot), needsMaterialization);
-
-        final boolean aggregate = StaticAnalysis.isAggregate(subqueryRoot);
-        
-        /*
-         * The anonymous variable which gets bound based on the (NOT) EXISTS
-         * graph pattern.
-         */
-        final IVariable<?> askVar = subqueryRoot.getAskVar();
-
-        if (askVar == null)
-            throw new UnsupportedOperationException();
-
-        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
-                subqueryRoot, doneSet, ctx);
-
-        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
-                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
-                new NV(SubqueryOp.Annotations.SELECT, subqueryRoot.getProjection().getProjectionVars()),//
-                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
-                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
-        );
-
-        /*
-         * For each filter which requires materialization steps, add the
-         * materializations steps to the pipeline and then add the filter to the
-         * pipeline.
-         */
-        left = addMaterializationSteps(ctx, left, doneSet,
-                needsMaterialization, subqueryRoot.getQueryHints());
-
-        return left;
-
-    }
+//    /**
+//     * A slow implementation using one {@link SubqueryOp} per source solution.
+//     * 
+//     * @deprecated by
+//     *             {@link #addExistsSubqueryFast(PipelineOp, SubqueryRoot, Set, AST2BOpContext)}
+//     */
+//    private static PipelineOp addExistsSubquerySubquery(PipelineOp left,
+//            final SubqueryRoot subqueryRoot, final Set<IVariable<?>> doneSet,
+//            final AST2BOpContext ctx) {
+//
+//        // Only "ASK" subqueries are allowed.
+//        switch (subqueryRoot.getQueryType()) {
+//        case ASK:
+//            break;
+//        default:
+//            throw new UnsupportedOperationException();
+//        }
+//
+//        @SuppressWarnings("rawtypes")
+//        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+//
+//        final IConstraint[] joinConstraints = getJoinConstraints(
+//                getJoinConstraints(subqueryRoot), needsMaterialization);
+//
+//        final boolean aggregate = StaticAnalysis.isAggregate(subqueryRoot);
+//        
+//        /*
+//         * The anonymous variable which gets bound based on the (NOT) EXISTS
+//         * graph pattern.
+//         */
+//        final IVariable<?> askVar = subqueryRoot.getAskVar();
+//
+//        if (askVar == null)
+//            throw new UnsupportedOperationException();
+//
+//        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
+//                subqueryRoot, doneSet, ctx);
+//
+//        left = new SubqueryOp(leftOrEmpty(left),// SUBQUERY
+//                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+//                new NV(SubqueryOp.Annotations.SUBQUERY, subqueryPlan),//
+//                new NV(SubqueryOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+//                new NV(SubqueryOp.Annotations.ASK_VAR, askVar),//
+//                new NV(SubqueryOp.Annotations.SELECT, subqueryRoot.getProjection().getProjectionVars()),//
+//                new NV(SubqueryOp.Annotations.CONSTRAINTS, joinConstraints),//
+//                new NV(SubqueryOp.Annotations.IS_AGGREGATE, aggregate)//
+//        );
+//
+//        /*
+//         * For each filter which requires materialization steps, add the
+//         * materializations steps to the pipeline and then add the filter to the
+//         * pipeline.
+//         */
+//        left = addMaterializationSteps(ctx, left, doneSet,
+//                needsMaterialization, subqueryRoot.getQueryHints());
+//
+//        return left;
+//
+//    }
 
     /**
      * Generate the query plan for a join group or union. This is invoked for
