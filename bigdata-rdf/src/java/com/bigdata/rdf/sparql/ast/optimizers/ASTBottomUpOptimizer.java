@@ -584,95 +584,16 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * within the group, renaming the provably unbound variables in the filters
      * to anonymous variables. This provides effective bottom up evaluation
      * scope for the variables.
-     * 
-     * FIXME This should be an "in-scope" test.
+     * <p>
+     * Note: This will see ALL join groups, including those in a SERVICE or
+     * (NOT) EXISTS annotation. Therefore, we use findParent() to identify when
+     * the FILTER is in a (NOT) EXISTS graph pattern since the graph pattern
+     * appears as an annotation and is not back linked from the FILTER in which
+     * it appears.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
      *      EXISTS, NOT EXISTS, and MINUS)
      */
-//    private void handleFiltersWithVariablesNotInScope(
-//            final AST2BOpContext context, final StaticAnalysis sa,
-//            final QueryRoot queryRootx, final Set<IVariable<?>> exogenousVars,
-//            final Map<IVariable<?>/*old*/,IVariable<?>/*new*/> map,
-//            final QueryBase queryBase,
-//            final GraphPatternGroup<IGroupMemberNode> group
-//            ) {
-//
-//        /*
-//         * All variables potentially bound by joins in this group or a subgroup.
-//         */
-//        final Set<IVariable<?>> maybeBound = sa.getMaybeProducedBindings(group,
-//                new LinkedHashSet<IVariable<?>>(), true/* recursive */);
-//
-//        // All variables appearing in the source solutions.
-//        maybeBound.addAll(exogenousVars);
-//
-//        if (group.isOptional()) {
-//
-//            /*
-//             * "A FILTER inside an OPTIONAL can reference a variable bound in
-//             * the required part of the OPTIONAL."
-//             * 
-//             * Note: This is ONLY true when the [group] is OPTIONAL. Otherwise
-//             * the variables in the parent are not visible.
-//             */
-//
-//            // The "required" part of the optional is the parent group.
-//            final JoinGroupNode p = group.getParentJoinGroup();
-//
-//            if (p != null) {
-//
-//                // bindings "maybe" produced in the parent (non-recursive)
-//                final Set<IVariable<?>> incomingBound = sa
-//                        .getMaybeProducedBindings(p,
-//                                new LinkedHashSet<IVariable<?>>(), false/* recursive */);
-//
-//                // add to those visible in FILTERs for this group.
-//                maybeBound.addAll(incomingBound);
-//
-//            }
-//
-//        }
-//
-//        // For everything in this group.
-//        for (IGroupMemberNode child : group) {
-//
-//            // Only consider the FILTERs.
-//            if (!(child instanceof FilterNode))
-//                continue;
-//
-//            final FilterNode filter = (FilterNode) child;
-//
-//            if (rewriteUnboundVariablesInFilter(context, maybeBound, map,
-//                    null/* parent */, filter.getValueExpressionNode())) {
-//
-//                /*
-//                 * Re-generate the IVE for this filter.
-//                 */
-//
-//                // clear the old value expression.
-//                filter.getValueExpressionNode().setValueExpression(null);
-//
-//                // re-generate the value expression.
-//                AST2BOpUtility.toVE(context.getLexiconNamespace(),
-//                        filter.getValueExpressionNode());
-//
-//            }
-//
-//        }
-//        
-//    }
-
- /* Old version.
-  *
-  * Note: This will see ALL join groups, including those in a SERVICE or
-  * (NOT) EXISTS annotation. This approach makes it impossible for us to
-  * identify when the FILTER is in a (NOT) EXISTS graph pattern since the
-  * graph pattern appears as an annotation and is not back linked from
-  * the FILTER in which it appears. What we need to do instead is descend
-  * recursively, building up a list of the variables which are visible in
-  * each scope.
-  */
     private void handleFiltersWithVariablesNotInScope(
             final AST2BOpContext context,
             final StaticAnalysis sa,
@@ -707,6 +628,11 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                  * Note: The only time that findParent() will report a
                  * FilterNode is when either EXISTS or NOT EXISTS is used and
                  * the group is the graph pattern for those functions.
+                 * 
+                 * TODO This could still fail on nested groups within the (NOT)
+                 * EXISTS graph pattern since findParent() would report a
+                 * JoinGroupNode parent rather than the eventual FilterNode
+                 * parent.
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/414
                  * (SPARQL 1.1 EXISTS, NOT EXISTS, and MINUS)

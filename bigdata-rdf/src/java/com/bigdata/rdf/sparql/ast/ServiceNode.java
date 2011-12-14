@@ -34,7 +34,6 @@ import java.util.Map;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sparql.ast.GroupNodeBase.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -42,24 +41,18 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * multisets (a SPARQL <code>SERVICE</code>).
  */
 public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
-        implements IJoinNode {
+        implements IJoinNode, IGraphPatternContainer {
 
     private static final long serialVersionUID = 1L;
 
     interface Annotations extends GroupMemberNodeBase.Annotations,
-            IJoinNode.Annotations {
+            IJoinNode.Annotations, IGraphPatternContainer.Annotations {
 
         /**
          * The service {@link URI}, which will be resolved against the
          * {@link ServiceRegistry} to obtain a {@link ServiceCall} object.
          */
         String SERVICE_URI = "serviceURI";
-
-        /**
-         * The {@link GraphPatternGroup} modeling the
-         * <code>group graph pattern</code> used to invoke the service.
-         */
-        String GROUP_NODE = "groupNode";
 
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
@@ -95,6 +88,9 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
      *            The service URI. See {@link ServiceRegistry}
      * @param groupNode
      *            The graph pattern used to invoke the service.
+     * 
+     *            FIXME This needs to permit a TermNode for the serviceUri, not
+     *            just a constant URI.
      */
     public ServiceNode(//
             final URI serviceURI,
@@ -104,24 +100,40 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
         super.setProperty(Annotations.SERVICE_URI, serviceURI);
 
-        super.setProperty(Annotations.GROUP_NODE, groupNode);
+        super.setProperty(Annotations.GRAPH_PATTERN, groupNode);
 
     }
 
+    /**
+     * The service URI.
+     */
     public URI getServiceURI() {
 
         return (URI) getRequiredProperty(Annotations.SERVICE_URI);
 
     }
 
-    /**
-     * The graph pattern which will be used provided to the service when it is
-     * invoked.
-     */
     @SuppressWarnings("unchecked")
-    public GraphPatternGroup<IGroupMemberNode> getGroupNode() {
+    public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
-        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GROUP_NODE);
+        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
+
+    }
+
+    public void setGraphPattern(
+            final GraphPatternGroup<IGroupMemberNode> graphPattern) {
+
+        /*
+         * Clear the parent reference on the new where clause.
+         * 
+         * Note: This handles cases where a join group is lifted into a named
+         * subquery. If we do not clear the parent reference on the lifted join
+         * group it will still point back to its parent in the original join
+         * group.
+         */
+        graphPattern.setParent(null);
+
+        super.setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 
     }
 
@@ -177,11 +189,11 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
         sb.append(serviceURI);
         sb.append("> ");
 
-        if (getGroupNode() != null) {
+        if (getGraphPattern() != null) {
 
             sb.append(" {");
             
-            sb.append(getGroupNode().toString(indent+1));
+            sb.append(getGraphPattern().toString(indent+1));
             
             sb.append("\n").append(indent(indent)).append("}");
             

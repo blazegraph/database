@@ -398,7 +398,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
                             ((SubqueryRoot) child).getWhereClause());
                 } else if (child instanceof ServiceNode) {
                     processGroup(context, queryRoot, queryBase,
-                            ((ServiceNode) child).getGroupNode());
+                            ((ServiceNode) child).getGraphPattern());
                 }
                 
                 prior = (ASTBase) child;
