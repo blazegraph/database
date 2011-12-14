@@ -42,19 +42,16 @@ import com.bigdata.bop.BOp;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class SubqueryFunctionNodeBase extends FunctionNode {
+abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
+        IGraphPatternContainer {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    interface Annotations extends FunctionNode.Annotations {
-
-        /**
-         * The {@link GraphPatternGroup} associated with the subquery.
-         */
-        String GRAPH_PATTERN = "graphPattern";
+    interface Annotations extends FunctionNode.Annotations,
+            IGraphPatternContainer.Annotations {
 
     }
 
@@ -97,9 +94,6 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
     }
 
-    /**
-     * Return the graph pattern associated with the subquery.
-     */
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
@@ -107,11 +101,18 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode {
 
     }
 
-    /**
-     * Set the graph pattern associated with the subquery.
-     */
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
+
+        /*
+         * Clear the parent reference on the new where clause.
+         * 
+         * Note: This handles cases where a join group is lifted into a named
+         * subquery. If we do not clear the parent reference on the lifted join
+         * group it will still point back to its parent in the original join
+         * group.
+         */
+        graphPattern.setParent(null);
 
         setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 

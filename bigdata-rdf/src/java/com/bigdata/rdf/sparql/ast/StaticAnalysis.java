@@ -395,7 +395,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
     /**
      * Search in aGroup for theGroup, peeking into
-     * {@link QueryBase#getWhereClause()}, {@link ServiceNode#getGroupNode()},
+     * {@link QueryBase#getWhereClause()}, {@link ServiceNode#getGraphPattern()},
      * and all {@link SubqueryFunctionNodeBase} instances for any
      * {@link FilterNode}s.
      * 
@@ -440,7 +440,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 final ServiceNode serviceNode = (ServiceNode) child;
 
-                if (serviceNode.getGroupNode() == theGroup) {
+                if (serviceNode.getGraphPattern() == theGroup) {
 
                     return serviceNode;
                     
@@ -1449,7 +1449,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
     /**
      * Report "MUST" bound bindings projected by the service. This involves
-     * checking the graph pattern reported by {@link ServiceNode#getGroupNode()}
+     * checking the graph pattern reported by {@link ServiceNode#getGraphPattern()}
      * . Bindings visible in the parent group are NOT projected into a SERVICE.
      * A SERVICE does NOT have an explicit PROJECTION so it can not rename the
      * projected bindings.
@@ -1462,7 +1462,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
         
-        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGroupNode();
+        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGraphPattern();
 
         if (graphPattern != null) {
 
@@ -1477,7 +1477,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     /**
      * Report the "MUST" and "MAYBE" bound variables projected by the service.
      * This involves checking the graph pattern reported by
-     * {@link ServiceNode#getGroupNode()}. Bindings visible in the parent group
+     * {@link ServiceNode#getGraphPattern()}. Bindings visible in the parent group
      * are NOT projected into a SERVICE. A SERVICE does NOT have an explicit
      * PROJECTION so it can not rename the projected bindings.
      * <p>
@@ -1489,7 +1489,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
         
-        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGroupNode();
+        final GraphPatternGroup<IGroupMemberNode> graphPattern = (GraphPatternGroup<IGroupMemberNode>) node.getGraphPattern();
 
         if (graphPattern != null) {
 

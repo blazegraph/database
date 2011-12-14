@@ -795,8 +795,8 @@ public class AST2BOpUtility extends AST2BOpJoins {
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(ServiceCallJoin.Annotations.SERVICE_URI,
                         serviceNode.getServiceURI()),//
-                new NV(ServiceCallJoin.Annotations.GROUP_NODE,
-                        serviceNode.getGroupNode()),//
+                new NV(ServiceCallJoin.Annotations.GRAPH_PATTERN,
+                        serviceNode.getGraphPattern()),//
                 new NV(ServiceCallJoin.Annotations.NAMESPACE,
                         ctx.db.getNamespace()),//
                 new NV(ServiceCallJoin.Annotations.TIMESTAMP,

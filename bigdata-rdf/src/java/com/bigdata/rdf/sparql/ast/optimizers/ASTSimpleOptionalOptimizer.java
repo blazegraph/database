@@ -190,7 +190,7 @@ public class ASTSimpleOptionalOptimizer implements IASTOptimizer {
 
                 }
 
-                collectOptionalGroups(serviceNode.getGroupNode(),
+                collectOptionalGroups(serviceNode.getGraphPattern(),
                         optionalGroups);
                 
             }

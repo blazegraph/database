@@ -925,7 +925,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
     /**
      * Unit test for analysis of a {@link ServiceNode}. The analysis of a
      * {@link ServiceNode} is just the analysis of the graph pattern reported by
-     * {@link ServiceNode#getGroupNode()}.
+     * {@link ServiceNode#getGraphPattern()}.
      * 
      * <pre>
      * PREFIX bd: <http://www.bigdata.com/rdf/search#>

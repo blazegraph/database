@@ -111,7 +111,7 @@ public class ServiceCallJoin extends PipelineOp {
         /**
          * The <code>group graph pattern</code> used to invoke the service.
          */
-        String GROUP_NODE = ServiceCallJoin.class.getName()+".groupNode";
+        String GRAPH_PATTERN = ServiceCallJoin.class.getName()+".graphPattern";
 
         /**
          * The namespace of the {@link AbstractTripleStore} instance (not the
@@ -148,7 +148,7 @@ public class ServiceCallJoin extends PipelineOp {
 
         getRequiredProperty(Annotations.SERVICE_URI);
 
-        getRequiredProperty(Annotations.GROUP_NODE);
+        getRequiredProperty(Annotations.GRAPH_PATTERN);
 
         getRequiredProperty(Annotations.NAMESPACE);
 
@@ -202,7 +202,7 @@ public class ServiceCallJoin extends PipelineOp {
 
             @SuppressWarnings("unchecked")
             final IGroupNode<IGroupMemberNode> groupNode = (IGroupNode<IGroupMemberNode>) op
-                    .getRequiredProperty(Annotations.GROUP_NODE);
+                    .getRequiredProperty(Annotations.GRAPH_PATTERN);
 
             final String namespace = (String) op
                     .getRequiredProperty(Annotations.NAMESPACE);

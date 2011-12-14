@@ -40,14 +40,15 @@ import com.bigdata.bop.IVariable;
  * @see SliceNode
  */
 abstract public class QueryBase extends QueryNodeBase implements
-        IBindingProducerNode {
+        IBindingProducerNode, IGraphPatternContainer {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends QueryNodeBase.Annotations {
+    public interface Annotations extends QueryNodeBase.Annotations,
+            IGraphPatternContainer.Annotations {
 
         /**
          * The {@link QueryType}.
@@ -69,10 +70,10 @@ abstract public class QueryBase extends QueryNodeBase implements
          */
         String PROJECTION = "projection";
 
-        /**
-         * The top-level {@link GraphPatternGroup} (optional).
-         */
-        String WHERE_CLAUSE = "whereClause";
+//        /**
+//         * The top-level {@link GraphPatternGroup} (aka whereClause) (optional).
+//         */
+//        String GRAPH_PATTERN = "whereClause";
 
         /**
          * The {@link GroupByNode} (optional).
@@ -267,7 +268,32 @@ abstract public class QueryBase extends QueryNodeBase implements
     @SuppressWarnings({ "rawtypes" })
     public GraphPatternGroup getWhereClause() {
 
-        return (GraphPatternGroup) getProperty(Annotations.WHERE_CLAUSE);
+        // Note: Synonym for getGraphPattern.
+        return getGraphPattern();
+
+    }
+
+    @SuppressWarnings("unchecked")
+    public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
+     
+        return (GraphPatternGroup<IGroupMemberNode>) getProperty(Annotations.GRAPH_PATTERN);
+        
+    }
+
+    public void setGraphPattern(
+            final GraphPatternGroup<IGroupMemberNode> graphPattern) {
+
+        /*
+         * Clear the parent reference on the new where clause.
+         * 
+         * Note: This handles cases where a join group is lifted into a named
+         * subquery. If we do not clear the parent reference on the lifted join
+         * group it will still point back to its parent in the original join
+         * group.
+         */
+        graphPattern.setParent(null);
+        
+        super.setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 
     }
 
@@ -280,17 +306,8 @@ abstract public class QueryBase extends QueryNodeBase implements
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void setWhereClause(final GraphPatternGroup whereClause) {
 
-        /*
-         * Clear the parent reference on the new where clause.
-         * 
-         * Note: This handles cases where a join group is lifted into a named
-         * subquery. If we do not clear the parent reference on the lifted join
-         * group it will still point back to its parent in the original join
-         * group.
-         */
-        whereClause.setParent(null);
-        
-        setProperty(Annotations.WHERE_CLAUSE, whereClause);
+        // Note: synonym for setGraphPattern.
+        setGraphPattern(whereClause);
 
     }
     
@@ -299,7 +316,7 @@ abstract public class QueryBase extends QueryNodeBase implements
      */
     public boolean hasWhereClause() {
     	
-    	return getProperty(Annotations.WHERE_CLAUSE) != null;
+    	return getProperty(Annotations.GRAPH_PATTERN) != null;
     	
     }
     
