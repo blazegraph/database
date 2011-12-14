@@ -47,4 +47,15 @@
 		</java>
 	</target>
 		
+	<target name="dump-journal" 
+		    description="Dump interesting facts about the loaded data.">
+		<java classname="com.bigdata.journal.DumpJournal"
+                           fork="true" failonerror="true">
+			<arg line="-pages ${bsbm.journalFile}"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
 </project>
