@@ -535,7 +535,14 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 		final MutableKeyBuffer keys = (MutableKeyBuffer) getKeys();
 		if (keys.nkeys < keys.capacity()) {
-			int insIndex = keys.search(key);
+			int insIndex;
+			// Check if an overflow BucketPage (by checking parent)
+			// and if so, then just append to end
+			if (this.getParentDirectory().isOverflowDirectory()) {
+				insIndex = keys.nkeys;
+			} else {
+				insIndex = keys.search(key);
+			}
 			if (insIndex < 0) {
 				insIndex = -insIndex - 1;
 			} else if (log.isTraceEnabled()){
