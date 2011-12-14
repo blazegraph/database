@@ -2581,9 +2581,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	    		refs++;
 	    		if (i != hashBits) {
 	    			childRefs[i] = null;
-	    			if (bp.get().isPersistent()) {
-	    				((MutableDirectoryPageData) data).childAddr[i] = IRawStore.NULL;
-	    			}
+	    			((MutableDirectoryPageData) data).childAddr[i] = IRawStore.NULL;
 	    		}
 	    	}
 	    }
