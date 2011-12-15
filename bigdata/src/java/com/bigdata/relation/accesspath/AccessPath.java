@@ -373,7 +373,8 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
                         + IPredicate.Annotations.REMOTE_ACCESS_PATH + "="
                         + remoteAccessPath + ", but "
                         + IPredicate.Annotations.PARTITION_ID + "="
-                        + partitionId);
+                        + partitionId + " for "+predicate
+                        );
             }
             
             final String namespace = relation.getNamespace();
