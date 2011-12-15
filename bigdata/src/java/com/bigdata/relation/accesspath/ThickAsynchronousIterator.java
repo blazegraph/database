@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
@@ -155,4 +157,13 @@ public class ThickAsynchronousIterator<E> implements IAsynchronousIterator<E>,
         
     }
 
+    private void readObject(ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+        
+        in.defaultReadObject();
+        
+        open = true;
+        
+   }
+    
 }
