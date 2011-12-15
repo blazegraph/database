@@ -3430,12 +3430,40 @@ public class BigdataSail extends SailBase implements Sail {
         private long tx;
 
         /**
+         * When <code>true</code>, uses a read-historical operation rather than
+         * a read-only transaction to read against a cluster.
+         * <p>
+         * Note: When enabled, the commit time against which the read will be
+         * carried out MUST be pinned. E.g., using the NanoSparqlServer or some
+         * other application to obtain a single read-only connection which pins
+         * that commit time. Queries should then be issued against the desired
+         * commit time.
+         * <p>
+         * Note: This approach allows the metadata and index caches to be
+         * reused. Those caches are indexed using a long, which is either a
+         * timestamp or a transaction identifier. However, the caches are NOT
+         * aware of the commit time associated with a transaction identifier.
+         * Each distinct transaction instances against the same commit point
+         * will fail when they probe the caches for metadata (partition
+         * locators) or data (index views).
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/431 (Read-only
+         *      tx per query on cluster defeats cache)
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/266 (Refactor
+         *      native long tx id to thin object.)
+         */
+        private final boolean clusterCacheBugFix;
+        
+        /**
          * Constructor starts a new transaction.
          */
         BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
 
             super(null/* lock */, false/* unisolated */);
-            
+
+            clusterCacheBugFix = BigdataSail.this.database instanceof IBigdataFederation;
+
             txService = getTxService();
 
             newTx(timestamp);
@@ -3455,32 +3483,46 @@ public class BigdataSail extends SailBase implements Sail {
             // The namespace of the triple store.
             final String namespace = database.getNamespace();
 
-            // Obtain a new read-only transaction reading from that timestamp.
-            this.tx = txService.newTx(timestamp);
+            if (clusterCacheBugFix) {
 
-            try {
+                /*
+                 * Use a read-historical operation
+                 */
+                this.tx = timestamp;
+                
+            } else {
                 
                 /*
-                 * Locate a view of the triple store isolated by that
-                 * transaction.
+                 * Obtain a new read-only transaction reading from that
+                 * timestamp.
                  */
-                final AbstractTripleStore txView = (AbstractTripleStore) database
-                        .getIndexManager().getResourceLocator().locate(
-                                namespace, tx);
-
-                // Attach that transaction view to this SailConnection.
-                attach(txView);
-
-            } catch (Throwable t) {
+                this.tx = txService.newTx(timestamp);
 
                 try {
-                    txService.abort(tx);
-                } catch (IOException ex) {
-                    log.error(ex, ex);
+                    
+                    /*
+                     * Locate a view of the triple store isolated by that
+                     * transaction.
+                     */
+                    final AbstractTripleStore txView = (AbstractTripleStore) database
+                            .getIndexManager().getResourceLocator().locate(
+                                    namespace, tx);
+    
+                    // Attach that transaction view to this SailConnection.
+                    attach(txView);
+    
+                } catch (Throwable t) {
+    
+                    try {
+                        txService.abort(tx);
+                    } catch (IOException ex) {
+                        log.error(ex, ex);
+                    }
+    
+                    throw new RuntimeException(t);
+    
                 }
-
-                throw new RuntimeException(t);
-
+            
             }
             
         }
@@ -3520,13 +3562,17 @@ public class BigdataSail extends SailBase implements Sail {
             
             super.close();
             
-            try {
+            if(!clusterCacheBugFix) {
+                
+                try {
 
-                txService.abort(tx);
-            
-            } catch(IOException ex) {
-                    
-                throw new SailException(ex);
+                    txService.abort(tx);
+
+                } catch (IOException ex) {
+
+                    throw new SailException(ex);
+
+                }
                 
             }
             
