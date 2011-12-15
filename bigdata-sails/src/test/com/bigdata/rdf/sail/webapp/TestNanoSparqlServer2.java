@@ -254,7 +254,9 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
         m_serviceURL = new URL("http", hostAddr, port, ""/* file */)
                 .toExternalForm();
 
-        // log.info("Setup done: "+serviceURL);
+        if (log.isInfoEnabled())
+            log.info("Setup done: name=" + getName() + ", namespace="
+                    + namespace + ", serviceURL=" + m_serviceURL);
 
     }
 

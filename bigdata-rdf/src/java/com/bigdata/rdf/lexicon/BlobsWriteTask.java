@@ -229,7 +229,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
 
 				// run the procedure.
                 ndx.submit(0/* fromIndex */, ndistinct/* toIndex */, keys,
-                        vals, ctor, new TermsWriteProcResultHandler(a,
+                        vals, ctor, new BlobsWriteProcResultHandler(a,
                                 readOnly, stats));
 
                 stats.indexTime.addAndGet(stats.termsIndexTime = System
@@ -261,7 +261,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id: Term2IdWriteTask.java 3408 2010-08-04 18:53:35Z thompsonbry $
      */
-	static class TermsWriteProcResultHandler implements
+	static class BlobsWriteProcResultHandler implements
 			IResultHandler<BlobsWriteProc.Result, Void> {
 
         private final KVO<BigdataValue>[] a;
@@ -283,7 +283,7 @@ public class BlobsWriteTask implements Callable<KVO<BigdataValue>[]> {
 		 * @param stats
 		 *            Various atomic fields are updated as a side effect.
 		 */
-		public TermsWriteProcResultHandler(final KVO<BigdataValue>[] a,
+		public BlobsWriteProcResultHandler(final KVO<BigdataValue>[] a,
 				final boolean readOnly, final WriteTaskStats stats) {
 
             if (a == null)
