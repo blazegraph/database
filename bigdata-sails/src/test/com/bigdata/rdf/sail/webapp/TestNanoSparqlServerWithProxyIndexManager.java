@@ -7,8 +7,10 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
+import junit.framework.AssertionFailedError;
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestListener;
 import junit.framework.TestResult;
 import junit.textui.ResultPrinter;
 
@@ -431,24 +433,24 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager> 
     	// Setup listener, which will write the result on System.out
     	result.addListener(new ResultPrinter(System.out));
     	
-//    	result.addListener(new TestListener() {
-//			
-//			public void startTest(Test arg0) {
-//				log.info(arg0);
-//			}
-//			
-//			public void endTest(Test arg0) {
-//				log.info(arg0);
-//			}
-//			
-//			public void addFailure(Test arg0, AssertionFailedError arg1) {
-//				log.error(arg0,arg1);
-//			}
-//			
-//			public void addError(Test arg0, Throwable arg1) {
-//				log.error(arg0,arg1);
-//			}
-//		});
+    	result.addListener(new TestListener() {
+			
+			public void startTest(Test arg0) {
+				log.info(arg0);
+			}
+			
+			public void endTest(Test arg0) {
+				log.info(arg0);
+			}
+			
+			public void addFailure(Test arg0, AssertionFailedError arg1) {
+				log.error(arg0,arg1);
+			}
+			
+			public void addError(Test arg0, Throwable arg1) {
+				log.error(arg0,arg1);
+			}
+		});
     	
     	// Open Journal / Connect to the configured federation.
 		final IIndexManager indexManager = openIndexManager(propertyFile
