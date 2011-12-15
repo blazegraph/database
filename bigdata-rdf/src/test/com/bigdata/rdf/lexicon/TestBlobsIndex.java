@@ -26,6 +26,7 @@
  */
 package com.bigdata.rdf.lexicon;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import junit.framework.TestCase2;
@@ -38,6 +39,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rdf.internal.IV;
@@ -45,7 +47,7 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
-import com.bigdata.rdf.lexicon.BlobsWriteTask.TermsWriteProcResultHandler;
+import com.bigdata.rdf.lexicon.BlobsWriteTask.BlobsWriteProcResultHandler;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -412,7 +414,7 @@ public class TestBlobsIndex extends TestCase2 {
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-						vals, ctor, new TermsWriteProcResultHandler(a,
+						vals, ctor, new BlobsWriteProcResultHandler(a,
 								readOnly, stats));
 
 				for (int i = 0; i < a.length; i++) {
@@ -436,7 +438,7 @@ public class TestBlobsIndex extends TestCase2 {
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-						vals, ctor, new TermsWriteProcResultHandler(a,
+						vals, ctor, new BlobsWriteProcResultHandler(a,
 								readOnly, stats));
 
 				// Note: [nunknown] is only set on read.
@@ -536,7 +538,7 @@ public class TestBlobsIndex extends TestCase2 {
 						readOnly, toldBNodes);
 
 				ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-						vals, ctor, new TermsWriteProcResultHandler(a,
+						vals, ctor, new BlobsWriteProcResultHandler(a,
 								readOnly, stats));
 
 				int nnotfound = 0;
@@ -640,7 +642,7 @@ public class TestBlobsIndex extends TestCase2 {
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-                        vals, ctor, new TermsWriteProcResultHandler(a,
+                        vals, ctor, new BlobsWriteProcResultHandler(a,
                                 readOnly, stats));
 
                 // Copy out the assigned IVs.
@@ -690,7 +692,7 @@ public class TestBlobsIndex extends TestCase2 {
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-                        vals, ctor, new TermsWriteProcResultHandler(a,
+                        vals, ctor, new BlobsWriteProcResultHandler(a,
                                 readOnly, stats));
 
                 // Copy out the assigned IVs.
@@ -1012,7 +1014,7 @@ public class TestBlobsIndex extends TestCase2 {
                         readOnly, storeBlankNodes);
 
                 ndx.submit(0/* fromIndex */, values.length/* toIndex */, keys,
-                        vals, ctor, new TermsWriteProcResultHandler(a,
+                        vals, ctor, new BlobsWriteProcResultHandler(a,
                                 readOnly, stats));
 
             }
@@ -1116,5 +1118,33 @@ public class TestBlobsIndex extends TestCase2 {
 //		return a;
 //
 //	}
-    
+
+    /**
+     * Unit test for {@link BlobsWriteProc.Result} serialization.
+     */
+    public void test_blobsResultSerialization() {
+       
+        final long totalBucketSize = 7L;
+        final int maxBucketSize = 3;
+        final int[] counters = new int[] { 1, 0, 2, BlobsIndexHelper.NOT_FOUND,
+                3 };
+        
+        final BlobsWriteProc.Result given = new BlobsWriteProc.Result(
+                totalBucketSize, maxBucketSize, counters);
+        
+        assertEquals("totalBucketSize", totalBucketSize, given.totalBucketSize);
+        assertEquals("maxBucketSize", maxBucketSize, given.maxBucketSize);
+        assertTrue("counters[]", Arrays.equals(counters, given.counters));
+
+        final byte[] b = SerializerUtil.serialize(given);
+
+        final BlobsWriteProc.Result actual = (BlobsWriteProc.Result) SerializerUtil
+                .deserialize(b);
+
+        assertEquals("totalBucketSize", totalBucketSize, actual.totalBucketSize);
+        assertEquals("maxBucketSize", maxBucketSize, actual.maxBucketSize);
+        assertTrue("counters[]", Arrays.equals(counters, actual.counters));
+
+    }
+
 }

@@ -47,6 +47,7 @@ import com.bigdata.io.ShortPacker;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractIV;
+import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -365,11 +366,17 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 		 */
 		public int maxBucketSize;
 
-		/**
-		 * The counters assigned to each {@link Value} in the request. The
-		 * indicates of this array are correlated with the indices of the array
-		 * provided to the request.
-		 */
+        /**
+         * The counters assigned to each {@link Value} in the request. The
+         * indicies of this array are correlated with the indices of the array
+         * provided to the request.
+         * <p>
+         * Note: The actual counters values are SHORTs, not INTs. However,
+         * {@link BlobsIndexHelper#NOT_FOUND} is an INT value used to indicate
+         * that the desired {@link BlobIV} was not discovered in the index. That
+         * means that we need to interchange and represent the counters as an
+         * int[].
+         */
 		public int[] counters;
         
         private static final long serialVersionUID = 1L;
@@ -419,6 +426,10 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
 			final int n = (int) LongPacker.unpackLong(in);
 
+            totalBucketSize = LongPacker.unpackLong(in);
+
+            maxBucketSize = LongPacker.unpackInt(in);
+			
 			counters = new int[n];
 
             for (int i = 0; i < n; i++) {

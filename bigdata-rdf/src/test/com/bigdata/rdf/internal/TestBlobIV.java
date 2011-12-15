@@ -26,13 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
+import java.util.Arrays;
 import java.util.Random;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataURI;
 
@@ -122,7 +125,7 @@ public class TestBlobIV extends TestCase2 {
 
 		assertEquals(iv, BlobIV.fromString(iv2.toString()));
 
-		assertEquals(iv, iv2);
+        assertEquals(iv, iv2);
 
     }
     
@@ -210,6 +213,58 @@ public class TestBlobIV extends TestCase2 {
  
     	doBlobIVTest(vte, hashCode, counter);
 		
+    }
+
+    /**
+     * Unit test for a specific value which was causing problems on a cluster.
+     * It turns out that the problem was the serialization of the counter[] when
+     * reading from the blobs index. E.g., a cluster specific problem.
+     */
+    public void test_BlobIV_problemValue_01() {
+        
+        final VTE vte = VTE.LITERAL;
+        
+        final int hashCode = 1974963648;
+        
+        final int counter = 0;
+ 
+        doBlobIVTest(vte, hashCode, counter);
+
+//      [TermId(-5764607523034234880U), TermId(-1152921504606846976U), BlobIV(1974963648:16:L), TermId(8070450532247928832U)]
+//        {
+//            final IV iv0 = new TermId(VTE.URI, -5764607523034234880L);
+//            final IV iv1 = new TermId(VTE.URI, -1152921504606846976L);
+//            final IV iv2 = new BlobIV(vte, hashCode, (short) counter);
+//            final IV iv3 = new TermId(VTE.URI, -8070450532247928832L);
+//            final IKeyBuilder keyBuilder = new KeyBuilder();
+//            keyBuilder.reset();
+//
+//            //0x75b78dc0
+//            final IV ivx = new BlobIV(vte, hashCode, (short) 16);
+//
+//            IVUtility.encode(keyBuilder, iv0);
+//            IVUtility.encode(keyBuilder, iv1);
+//            IVUtility.encode(keyBuilder, iv2);
+//            IVUtility.encode(keyBuilder, iv3);
+//            final byte[] key = keyBuilder.getKey();
+//            log.error(BytesUtil.toString(key));
+//            log.error(Arrays.toString(key));
+//            
+//            log.error(iv2);
+//            log.error(ivx);
+//            
+//            final byte[] k2 = IVUtility.encode(keyBuilder.reset(),iv2).getKey();
+//            final byte[] kx = IVUtility.encode(keyBuilder.reset(),ivx).getKey();
+//            
+//            log.error(BytesUtil.toString(k2));
+//            log.error(BytesUtil.toString(kx));
+//
+//            log.error(Arrays.toString(k2));
+//            log.error(Arrays.toString(kx));
+//            
+//            return;
+//        }
+
     }
 
     /**
