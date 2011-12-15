@@ -711,6 +711,7 @@ public class DumpFederation {
                             ;
 
             out.println(s);
+            log.error(s);
             
         }
 
@@ -819,6 +820,7 @@ public class DumpFederation {
             }
             
             out.println(sb.toString());
+            log.error(sb.toString());
             
         }
 
@@ -958,6 +960,9 @@ public class DumpFederation {
 
         dumpIndexLocators(indexName, metadataIndex);
 
+        // Debugging only.
+//        dumpIndexTuples(indexName, metadataIndex);
+        
     }
     
     /**
@@ -1725,6 +1730,34 @@ public class DumpFederation {
         
     }
 
+//    /**
+//     * Dumps the tuples in the scale-out index using a simple iterator.
+//     * 
+//     * @param indexName
+//     *            The name of the scale-out index.
+//     * @param metadataIndex
+//     *            The scale-out index.
+//     */
+//    private void dumpIndexTuples(final String indexName,
+//            final IMetadataIndex metadataIndex) throws InterruptedException {
+//    	
+//    	// Scale-out view of the index.
+//    	final IIndex ndx = fed.getIndex(indexName, ts);
+//    	
+//    	final ITupleIterator<?> titr = ndx.rangeIterator();
+//    	
+//    	while(titr.hasNext()) {
+//    		
+//    		final ITuple<?> t = titr.next();
+//    		
+//    		log.error(t.toString());
+////    		final IV[] a = IVUtility.decodeAll(t.getKey());
+////    		log.error("iv[]="+Arrays.toString(a));
+//    		
+//    	}
+//    	
+//    }
+    
     /**
      * Service metadata extracted by {@link DumpFederation}.
      * 
