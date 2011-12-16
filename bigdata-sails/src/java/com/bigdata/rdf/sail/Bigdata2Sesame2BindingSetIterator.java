@@ -9,14 +9,18 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryInterruptedException;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 
 /**
  * Converts a bigdata {@link ICloseableIterator} {@link IBindingSet}s containing
@@ -30,8 +34,8 @@ import com.bigdata.striterator.ICloseableIterator;
  * @param <E>
  *            The generic type of the thrown exception.
  */
-public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
-        CloseableIteration<BindingSet, E> {
+public class Bigdata2Sesame2BindingSetIterator implements
+        CloseableIteration<BindingSet, QueryEvaluationException> {
 
     final protected static Logger log = Logger
             .getLogger(Bigdata2Sesame2BindingSetIterator.class);
@@ -82,23 +86,63 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
 
     }
     
-    public boolean hasNext() throws E {
+    public boolean hasNext() throws QueryEvaluationException {
 
-        if (open && src.hasNext())
-            return true;
+        try {
         
-        close();
-        
-        return false;
-        
+            if (open && src.hasNext())
+                return true;
+
+            close();
+
+            return false;
+
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
+            
+                /*
+                 * Align with the openrdf API.
+                 */
+            
+                throw new QueryInterruptedException(t);
+                
+            } else {
+                
+                throw new QueryEvaluationException(t);
+                
+            }
+            
+        }
+
     }
 
-    public BindingSet next() throws E {
+    public BindingSet next() throws QueryEvaluationException {
 
-        if (!hasNext())
-            throw new NoSuchElementException();
+        try {
+            
+            if (!hasNext())
+                throw new NoSuchElementException();
 
-        return getBindingSet(src.next());
+            return getBindingSet(src.next());
+            
+        } catch (Throwable t) {
+
+            if (InnerCause.isInnerCause(t, QueryTimeoutException.class)) {
+
+                /*
+                 * Align with the openrdf API.
+                 */
+
+                throw new QueryInterruptedException(t);
+
+            } else {
+
+                throw new QueryEvaluationException(t);
+
+            }
+
+        }
 
     }
 
@@ -175,13 +219,13 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
     /**
      * @throws UnsupportedOperationException
      */
-    public void remove() throws E {
+    public void remove() throws QueryEvaluationException {
 
         throw new UnsupportedOperationException();
 
     }
 
-    public void close() throws E {
+    public void close() throws QueryEvaluationException {
 
         if(open) {
 
