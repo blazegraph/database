@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.service.IService;
 
 /**
@@ -32,6 +33,13 @@ public interface IQueryPeer extends Remote {
      * 
      * @throws UnsupportedOperationException
      *             unless running in scale-out.
+     * 
+     * @deprecated This method is unused and will probably disappear. The nodes
+     *             in a cluster reach back to the query controller using
+     *             {@link IQueryClient#getQuery(UUID)} to resolve the query on
+     *             its first reference. This is handled by the
+     *             {@link FederatedQueryEngine} within its run() loop where it
+     *             accepts {@link IChunkMessage}s.
      */
     void declareQuery(IQueryDecl queryDecl) throws RemoteException;
 
