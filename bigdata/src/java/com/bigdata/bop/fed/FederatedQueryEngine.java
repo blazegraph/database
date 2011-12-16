@@ -46,7 +46,6 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
-import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.DataService;
@@ -90,6 +89,12 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     private final ManagedResourceService resourceService;
 
+    /**
+     * <code>true</code> iff the query engine is hosted by a {@link DataService}
+     * .
+     */
+    private final boolean isDataService;
+    
     /**
      * The proxy for this query engine when used as a query controller.
      */
@@ -156,6 +161,16 @@ public class FederatedQueryEngine extends QueryEngine {
         return true;
         
     }
+    
+    /**
+     * Return <code>true</code> iff the query engine instance is hosted by a
+     * {@link DataService}.
+     */
+    final public boolean isDataService() {
+        
+        return isDataService;
+        
+    }
 
     /**
      * Overridden to strengthen the return type.
@@ -185,7 +200,8 @@ public class FederatedQueryEngine extends QueryEngine {
 
         this(dataService.getServiceUUID(), dataService.getFederation(),
                 new DelegateIndexManager(dataService), dataService
-                        .getResourceManager().getResourceService());
+                        .getResourceManager().getResourceService(),
+                        true/* isDataService */);
 
     }
     
@@ -204,7 +220,19 @@ public class FederatedQueryEngine extends QueryEngine {
             final IBigdataFederation<?> fed,//
             final IIndexManager indexManager,//
             final ManagedResourceService resourceService//
-            ) {
+    ) {
+
+        this(thisService, fed, indexManager, resourceService, false/* isDataService */);
+
+    }
+
+    private FederatedQueryEngine(//
+                final UUID thisService,
+                final IBigdataFederation<?> fed,//
+                final IIndexManager indexManager,//
+                final ManagedResourceService resourceService,//
+                final boolean isDataService
+                ) {
 
         super(indexManager);
 
@@ -220,6 +248,8 @@ public class FederatedQueryEngine extends QueryEngine {
         
         this.resourceService = resourceService;
 
+        this.isDataService = isDataService;
+        
         if(fed instanceof JiniFederation<?>) {
 
             /*
@@ -353,11 +383,27 @@ public class FederatedQueryEngine extends QueryEngine {
                     log.debug("accepted: " + msg);
                 FederatedQueryEngine.this.acceptChunk(msg);
             } catch (Throwable t) {
-                /*
-                 * Note: Since no one is watching the Future for this task, an
-                 * error here needs to cause the query to abort.
-                 */
-                if(q != null) q.halt(t);
+                if(q == null) {
+                    /*
+                     * I was seeing [q := null] for TCK query sort-3. I added
+                     * the check for q == null to avoid an NPE observed in the
+                     * log on a cluster. I then added the log @ ERROR to gain
+                     * some more information about the message that is being
+                     * dropped. It may be that the problem is a failure to start
+                     * the query on the node rather than a query which is
+                     * already done.
+                     * 
+                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380
+                     */
+                    log.error("Query is gone: isDataService=" + isDataService()
+                            + ", message=" + msg);
+                } else {
+                    /*
+                     * Note: Since no one is watching the Future for this task,
+                     * an error here needs to cause the query to abort.
+                     */
+                    q.halt(t);
+                }
 //                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 //                    log.warn("Interrupted.");
 //                    return;
