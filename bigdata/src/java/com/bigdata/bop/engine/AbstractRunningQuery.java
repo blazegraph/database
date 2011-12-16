@@ -446,7 +446,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         if (bopId == null)
             throw new IllegalArgumentException();
-        
+
+        if (statsMap == null)
+            throw new IllegalStateException("bopId=" + bopId + ", query="
+                    + BOpUtility.toString(query));
+
         return statsMap.get(bopId);
         
     }

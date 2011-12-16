@@ -88,20 +88,9 @@ public class ChunkedMaterializationOp extends PipelineOp {
      * @param annotations
      */
     public ChunkedMaterializationOp(BOp[] args, Map<String, Object> annotations) {
+
         super(args, annotations);
-    }
-
-    /**
-     * @param op
-     */
-    public ChunkedMaterializationOp(ChunkedMaterializationOp op) {
-        super(op);
-    }
-
-    public ChunkedMaterializationOp(final BOp[] args, NV... annotations) {
-
-        this(args, NV.asMap(annotations));
-
+        
         final IVariable<?>[] vars = (IVariable<?>[]) getProperty(Annotations.VARS);
 
         if (vars != null && vars.length == 0)
@@ -110,6 +99,21 @@ public class ChunkedMaterializationOp extends PipelineOp {
         getRequiredProperty(Annotations.RELATION_NAME);
         
         getRequiredProperty(Annotations.TIMESTAMP);
+
+    }
+
+    /**
+     * @param op
+     */
+    public ChunkedMaterializationOp(ChunkedMaterializationOp op) {
+
+        super(op);
+        
+    }
+
+    public ChunkedMaterializationOp(final BOp[] args, NV... annotations) {
+
+        this(args, NV.asMap(annotations));
 
     }
 

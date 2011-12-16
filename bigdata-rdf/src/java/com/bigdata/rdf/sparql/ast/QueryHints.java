@@ -199,11 +199,9 @@ public interface QueryHints {
     String REMOTE_APS = "remoteAPs";//QueryHints.class.getName() + ".remoteAPs";
 
     /**
-     * FIXME This should be [false]. 
-     * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/380#comment:4
      */
-    boolean DEFAULT_REMOTE_APS = true;
+    boolean DEFAULT_REMOTE_APS = false;
 
     /**
      * The #of samples to take when comparing the cost of a SCAN with an IN

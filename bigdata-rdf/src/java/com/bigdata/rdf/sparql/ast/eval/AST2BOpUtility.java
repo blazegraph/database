@@ -516,7 +516,7 @@ public class AST2BOpUtility extends AST2BOpJoins {
                             new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
                             new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                             new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
                             );
 
