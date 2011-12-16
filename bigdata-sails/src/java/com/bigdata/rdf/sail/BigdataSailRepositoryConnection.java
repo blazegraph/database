@@ -168,7 +168,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
      * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
      */
     @Override
-    public void commit() throws RepositoryException {
+   public void commit() throws RepositoryException {
         
         // auto-commit is heinously inefficient
         if (isAutoCommit() && 
@@ -180,6 +180,26 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         
         super.commit();
         
+    }
+    
+    /**
+     * Version returning the commit time that can be used to open a readOnly
+     * transaction.
+     * 
+     * @return the state associated with the commit
+     * @throws RepositoryException
+     */
+    public long commit2() throws RepositoryException {
+        
+        // auto-commit is heinously inefficient
+        if (isAutoCommit() && 
+            !((BigdataSailConnection) getSailConnection()).getAllowAutoCommit()) {
+            
+            throw new RepositoryException("please set autoCommit to false");
+
+        }
+        
+		return ((BigdataSailConnection) getSailConnection()).getTripleStore().commit();        
     }
 
     /**
