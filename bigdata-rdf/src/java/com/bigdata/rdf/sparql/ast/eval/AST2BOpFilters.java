@@ -259,7 +259,7 @@ public class AST2BOpFilters extends AST2BOpBase {
                     new NV(ChunkedMaterializationOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
                     new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
                     new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                    new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
                     new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
                     );
 //                    vars.toArray(new IVariable[nvars]), ns, timestamp)
