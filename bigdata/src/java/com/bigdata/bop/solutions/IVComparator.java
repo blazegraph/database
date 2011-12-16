@@ -33,6 +33,7 @@ package com.bigdata.bop.solutions;
 
 import info.aduna.lang.ObjectUtil;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 import org.openrdf.model.Literal;
@@ -60,7 +61,12 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class IVComparator implements Comparator<IV> {
+public class IVComparator implements Comparator<IV>, Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     public int compare(final IV o1, final IV o2) {
 
