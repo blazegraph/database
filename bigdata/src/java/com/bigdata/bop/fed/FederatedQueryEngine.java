@@ -332,9 +332,12 @@ public class FederatedQueryEngine extends QueryEngine {
         
         public MaterializeMessageTask(final IChunkMessage<IBindingSet> msg) {
             
+            if(msg == null)
+                throw new IllegalArgumentException();
+            
             this.msg = msg;
             
-            // lookup query by id.
+            // lookup query by id - MAY BE NULL!
             q = getRunningQuery(msg.getQueryId());
         
         }
@@ -354,7 +357,7 @@ public class FederatedQueryEngine extends QueryEngine {
                  * Note: Since no one is watching the Future for this task, an
                  * error here needs to cause the query to abort.
                  */
-                q.halt(t);
+                if(q != null) q.halt(t);
 //                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 //                    log.warn("Interrupted.");
 //                    return;
