@@ -386,6 +386,12 @@ public class FederatedQueryEngine extends QueryEngine {
                     log.debug("accepted: " + msg);
                 FederatedQueryEngine.this.acceptChunk(msg);
             } catch (Throwable t) {
+                /*
+                 * This can be triggered by serialization errors.
+                 */
+                log.error(
+                        "Error accepting message: queryId=" + msg.getQueryId(),
+                        t);
                 if(q == null) {
                     /*
                      * I was seeing [q := null] for TCK query sort-3. I added
@@ -452,9 +458,14 @@ public class FederatedQueryEngine extends QueryEngine {
 
                 // Get the query declaration from the query controller.
                 q = getDeclaredQuery(queryId);
-                
+                if (q == null) {
+                    /*
+                     * Note: Should never be null per getDeclaredQuery().
+                     */
+                    throw new AssertionError();
+                }
             }
-            
+
             if (!q.isCancelled() && !msg.isMaterialized()) {
 
                 // materialize the chunk for this message.
@@ -481,9 +492,20 @@ public class FederatedQueryEngine extends QueryEngine {
              */
             final PipelineOp query = msg.getQueryController().getQuery(
                     msg.getQueryId());
+            
+            if (query == null) {
+            
+                /*
+                 * Should never be null; getQuery() throws
+                 * IllegalArgumentException.
+                 */
+                
+                throw new AssertionError();
+                
+            }
 
             final FederatedRunningQuery q = newRunningQuery(
-                    /*FederatedQueryEngine.this,*/ queryId, false/* controller */,
+            /* FederatedQueryEngine.this, */queryId, false/* controller */,
                     msg.getQueryController(), query, msg);
 
             return (FederatedRunningQuery) putIfAbsent(queryId, q);
