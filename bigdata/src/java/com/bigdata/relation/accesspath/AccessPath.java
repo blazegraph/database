@@ -308,9 +308,19 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
         this.relation = relation;
 
-        final boolean remoteAccessPath = predicate.getProperty(
-                IPredicate.Annotations.REMOTE_ACCESS_PATH,
-                IPredicate.Annotations.DEFAULT_REMOTE_ACCESS_PATH);
+        final int partitionId = predicate.getPartitionId();
+
+        /*
+         * If the predicate is addressing a specific shard, then the default is
+         * to assume that it will not be using a remote access path. However, if
+         * a remote access path was explicitly request and the partitionId was
+         * specified, then it will be an error (which is trapped below).
+         */
+        final boolean remoteAccessPath = predicate
+                .getProperty(
+                        IPredicate.Annotations.REMOTE_ACCESS_PATH,
+                        partitionId == -1 ? IPredicate.Annotations.DEFAULT_REMOTE_ACCESS_PATH
+                                : false);
 
         /*
          * Chose the right index manger. If relation.getIndexManager() is not
@@ -359,7 +369,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
         
         this.historicalRead = TimestampUtility.isReadOnly(timestamp);
         
-        final int partitionId = predicate.getPartitionId();
+//        final int partitionId = predicate.getPartitionId();
         
         final IIndex ndx;
         if (partitionId != -1) {
