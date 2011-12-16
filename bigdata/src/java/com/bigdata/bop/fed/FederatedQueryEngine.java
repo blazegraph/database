@@ -358,7 +358,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
         private final IChunkMessage<IBindingSet> msg;
 
-        private final FederatedRunningQuery q;
+        private volatile FederatedRunningQuery q;
         
         public MaterializeMessageTask(final IChunkMessage<IBindingSet> msg) {
             
@@ -367,13 +367,16 @@ public class FederatedQueryEngine extends QueryEngine {
             
             this.msg = msg;
             
-            // lookup query by id - MAY BE NULL!
-            q = getRunningQuery(msg.getQueryId());
+//            Note: This was failing to demand the query from the controller.
+//            
+//            // lookup query by id - MAY BE NULL!
+//            q = getRunningQuery(msg.getQueryId());
         
         }
 
         public void run() {
             try {
+                // Note: accept() sets [q] as a side-effect!
                 if (!accept(msg)) {
                     if (log.isDebugEnabled())
                         log.debug("dropping: " + msg);
@@ -427,7 +430,7 @@ public class FederatedQueryEngine extends QueryEngine {
             final UUID queryId = msg.getQueryId();
             
             // lookup query by id.
-            FederatedRunningQuery q = getRunningQuery(queryId);
+            q = getRunningQuery(queryId);
 
             if (q == null) {
 
@@ -489,6 +492,7 @@ public class FederatedQueryEngine extends QueryEngine {
         
     }
     
+    @Deprecated // see IQueryClient
     public void declareQuery(final IQueryDecl queryDecl) {
 
         final UUID queryId = queryDecl.getQueryId();

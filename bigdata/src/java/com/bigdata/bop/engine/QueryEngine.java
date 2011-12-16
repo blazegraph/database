@@ -906,6 +906,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * IQueryPeer
      */
     
+    @Deprecated // see IQueryClient
     public void declareQuery(final IQueryDecl queryDecl) {
         
         throw new UnsupportedOperationException();
