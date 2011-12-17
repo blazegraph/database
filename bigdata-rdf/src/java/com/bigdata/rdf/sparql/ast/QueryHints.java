@@ -37,6 +37,7 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint
@@ -82,7 +83,15 @@ public interface QueryHints {
     String OPTIMIZER = "optimizer";//QueryHints.class.getName() + ".optimizer";
 
     QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
-    
+
+    /**
+     * Query hint sets the optimistic threshold for the static join order
+     * optimizer.
+     */
+    String OPTIMISTIC = "optimistic";
+
+    double DEFAULT_OPTIMISTIC = ASTStaticJoinOptimizer.Annotations.DEFAULT_OPTIMISTIC;
+
     /**
      * A label which may be used to tag the instances of some SPARQL query
      * template in manner which makes sense to the application (default

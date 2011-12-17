@@ -111,7 +111,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     	/**
     	 * See {@link #OPTIMISTIC}.
     	 */
-    	String DEFAULT_OPTIMISTIC = "1.0";
+    	Double DEFAULT_OPTIMISTIC = 1.0d;
     	
     }
     
@@ -333,9 +333,13 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 	                    }
                     }
 
-                    final double optimistic = Double.parseDouble( 
-                    	joinGroup.getQueryHint(Annotations.OPTIMISTIC, 
-                    			Annotations.DEFAULT_OPTIMISTIC));
+//                  final double optimistic = Double.parseDouble( 
+//                  joinGroup.getQueryHint(Annotations.OPTIMISTIC, 
+//                          Annotations.DEFAULT_OPTIMISTIC));
+
+                    final double optimistic = joinGroup.getProperty(
+                            Annotations.OPTIMISTIC,
+                            Annotations.DEFAULT_OPTIMISTIC);
                     
                     final List<StatementPatternNode> required =
                     	new LinkedList<StatementPatternNode>();
