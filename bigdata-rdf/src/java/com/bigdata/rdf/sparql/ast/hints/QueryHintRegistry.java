@@ -100,6 +100,7 @@ public class QueryHintRegistry {
         add(new RunLastHint());
         add(new RunOnceHint());
         add(new OptimizerQueryHint());
+        add(new OptimisticQueryHint());
 
         add(new AnalyticQueryHint());
         add(new NativeDistinctQueryHint());

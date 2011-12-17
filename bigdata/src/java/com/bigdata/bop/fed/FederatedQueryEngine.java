@@ -54,6 +54,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -367,58 +368,48 @@ public class FederatedQueryEngine extends QueryEngine {
             
             this.msg = msg;
             
-//            Note: This was failing to demand the query from the controller.
-//            
-//            // lookup query by id - MAY BE NULL!
-//            q = getRunningQuery(msg.getQueryId());
-        
         }
 
         public void run() {
+            
             try {
-                // Note: accept() sets [q] as a side-effect!
+            
+                /*
+                 * Note: accept() sets [q] as a side-effect! It SHOULD NOT be
+                 * resolved in the constructor since it may require an RMI back
+                 * to the query controller to materialize the query on this
+                 * node.
+                 */
+                
                 if (!accept(msg)) {
+                
                     if (log.isDebugEnabled())
                         log.debug("dropping: " + msg);
+                    
                     return;
+                    
                 }
+
                 if (log.isDebugEnabled())
                     log.debug("accepted: " + msg);
+                
                 FederatedQueryEngine.this.acceptChunk(msg);
+                
             } catch (Throwable t) {
-                /*
-                 * This can be triggered by serialization errors.
-                 */
-                log.error(
-                        "Error accepting message: queryId=" + msg.getQueryId(),
-                        t);
-                if(q == null) {
-                    /*
-                     * I was seeing [q := null] for TCK query sort-3. I added
-                     * the check for q == null to avoid an NPE observed in the
-                     * log on a cluster. I then added the log @ ERROR to gain
-                     * some more information about the message that is being
-                     * dropped. It may be that the problem is a failure to start
-                     * the query on the node rather than a query which is
-                     * already done.
-                     * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/380
-                     */
-                    log.error("Query is gone: isDataService=" + isDataService()
-                            + ", message=" + msg);
-                } else {
+
+                if(q != null) {
+                
                     /*
                      * Note: Since no one is watching the Future for this task,
                      * an error here needs to cause the query to abort.
                      */
+                    
                     q.halt(t);
+                    
                 }
-//                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-//                    log.warn("Interrupted.");
-//                    return;
-//                }
-//                throw new RuntimeException(t);
+                
             }
+            
         }
 
         /**
@@ -431,9 +422,15 @@ public class FederatedQueryEngine extends QueryEngine {
          * 
          * @throws RemoteException
          */
-        private boolean accept(final IChunkMessage<?> msg) throws RemoteException {
+        private boolean accept(final IChunkMessage<?> msg)
+                throws RemoteException {
 
             final UUID queryId = msg.getQueryId();
+
+            if (queryId == null) {
+                // Should never be null.
+                throw new AssertionError();
+            }
             
             // lookup query by id.
             q = getRunningQuery(queryId);
@@ -445,31 +442,83 @@ public class FederatedQueryEngine extends QueryEngine {
                         msg.getQueryController().getServiceUUID());
 
                 if (isController) {
+                    
                     /*
                      * @todo This would indicate that the query had been
                      * concurrently terminated and cleared from the set of
                      * runningQueries and that we were not retaining metadata
                      * about queries which had been terminated.
                      */
+
                     throw new AssertionError(
                             "Query not running on controller: thisService="
                                     + getServiceUUID() + ", msg=" + msg);
                 }
 
-                // Get the query declaration from the query controller.
-                q = getDeclaredQuery(queryId);
+                try {
+
+                    /*
+                     * Get the query declaration from the query controller.
+                     */
+                    
+                    q = getDeclaredQuery(queryId);
+                    
+                } catch (IllegalArgumentException ex) {
+                    
+                    /*
+                     * The query is no longer available on the query controller.
+                     * Typically, it has been cancelled. For example, by
+                     * satisifying a LIMIT.
+                     */
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Query is gone: isDataService="
+                                + isDataService() + ", message=" + msg, ex);
+                    
+                    return false;
+                    
+                }
+
                 if (q == null) {
+
                     /*
                      * Note: Should never be null per getDeclaredQuery().
                      */
+                    
                     throw new AssertionError();
+                    
                 }
+                
             }
 
             if (!q.isCancelled() && !msg.isMaterialized()) {
 
-                // materialize the chunk for this message.
-                msg.materialize(q);
+                try {
+
+                    // materialize the chunk for this message.
+                    msg.materialize(q);
+                    
+                } catch (Throwable t) {
+
+                    if (!InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    
+                        /*
+                         * Note: This can be triggered by serialization errors.
+                         * 
+                         * Whatever is thrown out here, we want to log @ ERROR
+                         * unless the root cause was an interrupt.
+                         * 
+                         * @see
+                         * https://sourceforge.net/apps/trac/bigdata/ticket/380
+                         */
+                        
+                        log.error("Problem materializing message: " + msg, t);
+                        
+                    }
+
+                    return false;
+                    
+                }
 
             }
 
@@ -490,6 +539,7 @@ public class FederatedQueryEngine extends QueryEngine {
             /*
              * Request the query from the query controller (RMI).
              */
+            
             final PipelineOp query = msg.getQueryController().getQuery(
                     msg.getQueryId());
             

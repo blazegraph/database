@@ -22,7 +22,7 @@ prefix rev: <http://purl.org/stuff/rev#>
 
 Select ?productType ?reviewCount
 {
-hint:Query hint:com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.optimistic ".67" .
+hint:Query hint:optimistic ".67" .
  { Select ?productType (count(?review) As ?reviewCount)
   {
    ?productType a bsbm:ProductType .
