@@ -711,7 +711,7 @@ public class DumpFederation {
                             ;
 
             out.println(s);
-            log.error(s);
+//            log.error(s);
             
         }
 
@@ -820,7 +820,7 @@ public class DumpFederation {
             }
             
             out.println(sb.toString());
-            log.error(sb.toString());
+//            log.error(sb.toString());
             
         }
 
