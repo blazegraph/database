@@ -35,7 +35,9 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -173,6 +175,11 @@ public interface IBigdataClient<T> {
     public int getMaxParallelTasksPerRequest();
 
     /**
+     * @see Options#CLIENT_READ_CONSISTENT
+     */
+    public boolean isReadConsistent();
+    
+    /**
      * The timeout in milliseconds for a task submitted to an
      * {@link IDataService}.
      * 
@@ -247,6 +254,27 @@ public interface IBigdataClient<T> {
                 + ".maxStaleLocatorRetries";
 
         String DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES = "100";
+
+        /**
+         * <code>true</code> iff globally consistent read operations are desired
+         * for READ-COMMITTED or UNISOLATED iterators or index procedures mapped
+         * across more than one index partition.
+         * <p>
+         * When <code>true</code> and the index is {@link ITx#READ_COMMITTED} or
+         * (if the index is {@link ITx#UNISOLATED} and the operation is
+         * read-only), {@link IIndexStore#getLastCommitTime()} is queried at the
+         * start of the operation and used as the timestamp for all requests
+         * made in support of that operation.
+         * <p>
+         * Note that {@link StaleLocatorException}s can not arise for
+         * read-consistent operations. Such operations use a read-consistent
+         * view of the {@link IMetadataIndex} and the locators therefore will
+         * not change during the operation.
+         */
+        String CLIENT_READ_CONSISTENT = IBigdataClient.class.getName()
+                + ".readConsistent";
+
+        String DEFAULT_CLIENT_READ_CONSISTENT = "true";
 
         /**
          * The maximum #of tasks that will be created and submitted in parallel

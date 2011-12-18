@@ -38,6 +38,7 @@ import org.openrdf.rio.RDFParser;
 
 import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.store.DataLoader;
@@ -131,11 +132,12 @@ public class NanoSparqlServer {
      *            <dt>readLock</dt>
      *            <dd>The commit time against which the server will assert a
      *            read lock by holding open a read-only transaction against that
-     *            commit point. When given, queries will default to read against
-     *            this commit point. Otherwise queries will default to read
-     *            against the most recent commit point on the database.
-     *            Regardless, each query will be issued against a read-only
-     *            transaction.</dt>
+     *            commit point OR <code>-1</code> (MINUS ONE) to assert a read
+     *            lock against the last commit point. When given, queries will
+     *            default to read against this commit point. Otherwise queries
+     *            will default to read against the most recent commit point on
+     *            the database. Regardless, each query will be issued against a
+     *            read-only transaction.</dt>
      *            </dl>
      *            </p>
      */
@@ -174,9 +176,12 @@ public class NanoSparqlServer {
                 } else if (arg.equals("-readLock")) {
                     final String s = args[++i];
                     readLock = Long.valueOf(s);
-                    if (!TimestampUtility.isCommitTime(readLock.longValue())) {
-                        usage(1/* status */, "Read lock must be commit time: "
-                                + readLock);
+                    if (readLock != ITx.READ_COMMITTED
+                            && !TimestampUtility.isCommitTime(readLock
+                                    .longValue())) {
+                        usage(1/* status */,
+                                "Read lock must be commit time or -1 (MINUS ONE) to assert a read lock on the last commit time: "
+                                        + readLock);
                     }
                 } else {
                     usage(1/* status */, "Unknown argument: " + arg);
