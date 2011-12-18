@@ -14,6 +14,11 @@ public class SparqlEndpointConfig {
      * The default timestamp used to query the default namespace. The server
      * will obtain a read only transaction which reads from the commit point
      * associated with this timestamp.
+     * <p>
+     * Note: When {@link ConfigParams#READ_LOCK} is specified, the
+     * {@link #timestamp} will actually be a read-only transaction identifier
+     * which is shared by default for each query against the
+     * {@link NanoSparqlServer}.
      */
     final public long timestamp;
 
