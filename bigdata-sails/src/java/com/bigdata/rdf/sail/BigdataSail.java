@@ -1262,18 +1262,15 @@ public class BigdataSail extends SailBase implements Sail {
      * @return The view.
      */
     public BigdataSailConnection getReadOnlyConnection(final long timestamp) {
-        
-//        AbstractTripleStore view = (AbstractTripleStore) database
-//            .getIndexManager().getResourceLocator().locate(
-//                    database.getNamespace(),
-//                    TimestampUtility.asHistoricalRead(timestamp));
-//
-//        return new BigdataSailConnection(view, null);
 
     	try {
-			return _getReadOnlyConnection(timestamp);
+			
+    	    return _getReadOnlyConnection(timestamp);
+    	    
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			
+		    throw new RuntimeException(e);
+		    
 		}
     	
     }
@@ -3493,14 +3490,33 @@ public class BigdataSail extends SailBase implements Sail {
                  */
                 this.tx = timestamp;
 
-                /*
-                 * Locate a view of the triple store using that read-historical
-                 * timestmap.
-                 */
-                final AbstractTripleStore txView = (AbstractTripleStore) database
-                        .getIndexManager().getResourceLocator()
-                        .locate(namespace, tx);
+                final AbstractTripleStore txView;
+                
+                if (database.getTimestamp() == timestamp) {
 
+                    /*
+                     * We already have the right view (optimization).
+                     * 
+                     * Note: This case is quite common. For example, it occurs
+                     * if the NanoSparqlServer uses a READ_LOCK to pin a commit
+                     * time on the database and then issues it's queries against
+                     * that commit time.
+                     */
+
+                    txView = database;
+                    
+                } else {
+                    
+                    /*
+                     * Locate a view of the triple store using that
+                     * read-historical timestmap.
+                     */
+
+                    txView = (AbstractTripleStore) database.getIndexManager()
+                            .getResourceLocator().locate(namespace, tx);
+
+                }
+                
                 // Attach that transaction view to this SailConnection.
                 attach(txView);
 

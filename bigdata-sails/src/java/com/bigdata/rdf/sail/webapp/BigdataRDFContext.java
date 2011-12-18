@@ -980,6 +980,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String namespace, final long timestamp)
             throws RepositoryException {
 
+        /*
+         * Note: [timestamp] will be a read-only tx view of the triple store if
+         * a READ_LOCK was specified when the NanoSparqlServer was started
+         * (unless the query explicitly overrides the timestamp of the view on
+         * which it will operate).
+         */
         final AbstractTripleStore tripleStore = getTripleStore(namespace,
                 timestamp);
         
