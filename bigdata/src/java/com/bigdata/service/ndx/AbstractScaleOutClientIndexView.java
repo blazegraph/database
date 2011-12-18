@@ -50,7 +50,13 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
+import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
+import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
+import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -59,30 +65,24 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.proc.RangeCountProcedure;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
-import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
-import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
-import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
-import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.IBigdataClient.Options;
+import com.bigdata.service.AbstractClient;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
-import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
@@ -258,22 +258,9 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
     }
     
     /**
-     * <code>true</code> iff globally consistent read operations are desired
-     * for iterators or index procedures mapped across more than one index
-     * partition. When <code>true</code> and the index is
-     * {@link ITx#READ_COMMITTED} or (if the index is {@link ITx#UNISOLATED} and
-     * the operation is read-only), {@link IIndexStore#getLastCommitTime()} is
-     * queried at the start of the operation and used as the timestamp for all
-     * requests made in support of that operation.
-     * <p>
-     * Note that {@link StaleLocatorException}s can not arise for
-     * read-consistent operations. Such operations use a read-consistent view of
-     * the {@link IMetadataIndex} and the locators therefore will not change
-     * during the operation.
-     * 
-     * @todo make this a ctor argument or settable property?
+     * @see IBigdataClient#isReadConsistent()
      */
-    final protected boolean readConsistent = true;
+    final protected boolean readConsistent;
 
     public String toString() {
 
@@ -284,6 +271,8 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         sb.append("{ name=" + name);
 
         sb.append(", timestamp=" + timestamp);
+
+        sb.append(", readConsistent=" + readConsistent);
 
         sb.append("}");
 
@@ -332,12 +321,16 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
         
         this.metadataIndexMetadata = metadataIndex.getIndexMetadata();
         
-        this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
+        final AbstractClient<?> client = fed.getClient();
         
-        this.batchOnly = fed.getClient().getBatchApiOnly();
+        this.capacity = client.getDefaultRangeQueryCapacity();
+        
+        this.batchOnly = client.getBatchApiOnly();
 
-        this.taskTimeout = fed.getClient().getTaskTimeout();
-
+        this.taskTimeout = client.getTaskTimeout();
+        
+        this.readConsistent = client.isReadConsistent();
+                
     }
 
     /**

@@ -65,6 +65,7 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
     private final long locatorCacheTimeout;
     private final int indexCacheCapacity;
     private final long indexCacheTimeout;
+    private final boolean readConsistent;    
 //    private final long tempStoreMaxExtent;
     
     /*
@@ -98,6 +99,12 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
     public int getMaxParallelTasksPerRequest() {
         
         return maxParallelTasksPerRequest;
+        
+    }
+    
+    public boolean isReadConsistent() {
+        
+        return readConsistent;
         
     }
     
@@ -183,6 +190,18 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
 
             }
             
+        }
+
+        // readConsistent
+        {
+
+            readConsistent = Boolean.valueOf(properties.getProperty(
+                    Options.CLIENT_READ_CONSISTENT,
+                    Options.DEFAULT_CLIENT_READ_CONSISTENT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.CLIENT_READ_CONSISTENT + "=" + readConsistent);
+
         }
 
         // maxParallelTasksPerRequest
