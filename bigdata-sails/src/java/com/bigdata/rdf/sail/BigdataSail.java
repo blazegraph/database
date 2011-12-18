@@ -3462,7 +3462,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             super(null/* lock */, false/* unisolated */);
 
-            clusterCacheBugFix = BigdataSail.this.database instanceof IBigdataFederation;
+            clusterCacheBugFix = BigdataSail.this.database.getIndexManager() instanceof IBigdataFederation;
 
             txService = getTxService();
 
