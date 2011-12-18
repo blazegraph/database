@@ -1601,6 +1601,9 @@ public class BigdataSail extends SailBase implements Sail {
          */
         protected synchronized void attach(final AbstractTripleStore database) {
 
+            if (database == null)
+                throw new IllegalArgumentException();
+            
             BigdataSail.this.assertOpenSail();
             
             this.database = database;
@@ -3489,7 +3492,18 @@ public class BigdataSail extends SailBase implements Sail {
                  * Use a read-historical operation
                  */
                 this.tx = timestamp;
-                
+
+                /*
+                 * Locate a view of the triple store using that read-historical
+                 * timestmap.
+                 */
+                final AbstractTripleStore txView = (AbstractTripleStore) database
+                        .getIndexManager().getResourceLocator()
+                        .locate(namespace, tx);
+
+                // Attach that transaction view to this SailConnection.
+                attach(txView);
+
             } else {
                 
                 /*
