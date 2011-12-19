@@ -165,6 +165,7 @@ final public class BTreeCounters implements Cloneable {
         nodesWritten += o.nodesWritten;
         leavesWritten += o.leavesWritten;
         bytesWritten += o.bytesWritten;
+        bytesReleased += o.bytesReleased;
         writeNanos += o.writeNanos;
         serializeNanos += o.serializeNanos;
         rawRecordsWritten += o.rawRecordsWritten;
@@ -230,6 +231,7 @@ final public class BTreeCounters implements Cloneable {
         t.nodesWritten -= o.nodesWritten;
         t.leavesWritten -= o.leavesWritten;
         t.bytesWritten -= o.bytesWritten;
+        t.bytesReleased -= o.bytesReleased;
         t.serializeNanos -= o.serializeNanos;
         t.writeNanos -= o.writeNanos;
         t.rawRecordsWritten -= o.rawRecordsWritten;
@@ -356,6 +358,7 @@ final public class BTreeCounters implements Cloneable {
     public int nodesWritten = 0;
     public int leavesWritten = 0;
     public long bytesWritten = 0L;
+	public long bytesReleased = 0L;
     public long writeNanos = 0;
 	public long serializeNanos = 0;
 	public long rawRecordsWritten = 0;
@@ -505,6 +508,15 @@ final public class BTreeCounters implements Cloneable {
     final public long getBytesWritten() {
         
         return bytesWritten;
+        
+    }
+
+    /**
+     * The number of bytes released from the backing store.
+     */
+    final public long getBytesReleased() {
+        
+        return bytesReleased;
         
     }
 
@@ -918,6 +930,12 @@ final public class BTreeCounters implements Cloneable {
                     }
                 });
                 
+                tmp.addCounter("bytesReleased", new Instrument<Long>() {
+                    protected void sample() {
+                        setValue(bytesReleased);
+                    }
+                });
+
             }
 
 //        }

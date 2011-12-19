@@ -59,6 +59,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.keys.ICUVersionRecord;
@@ -2369,18 +2372,29 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			final IRootBlockView old = _rootBlock;
 
 			final long newCommitCounter = old.getCommitCounter() + 1;
-
+			
 			final ICommitRecord commitRecord = new CommitRecord(commitTime, newCommitCounter, rootAddrs);
 
 			final long commitRecordAddr = write(ByteBuffer
 					.wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
 
 			/*
+			 * Before flushing the commitRecordIndex we need to check for
+			 * deferred frees that will prune the index.
+			 * 
+			 * Do this BEFORE adding new commit record which will otherwise
+			 * be immediately removed if no history is retained
+			 */
+			if (_bufferStrategy instanceof RWStrategy) {
+				((RWStrategy) _bufferStrategy).checkDeferredFrees(this);
+			}
+			
+			/*
 			 * Add the commit record to an index so that we can recover
 			 * historical states efficiently.
 			 */
 			_commitRecordIndex.add(commitRecordAddr, commitRecord);
-
+			
 			/*
 			 * Flush the commit record index to the store and stash the address
 			 * of its metadata record in the root block.
@@ -2394,13 +2408,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 			final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
 			
-			/*
-			 * DEBUG: The commitRecordIndexAddr should not be deleted, the
-			 * call to lockAddress forces a runtime check protecting the address
-			 */
-			if (_bufferStrategy instanceof RWStrategy) {
-				((RWStrategy) _bufferStrategy).lockAddress(commitRecordIndexAddr);
-			}
+			
 
             if (quorum != null) {
                 /*
@@ -3248,6 +3256,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 *       handling this.
 	 */
 	public ICommitRecord getCommitRecord(final long commitTime) {
+		
+		if (this._bufferStrategy instanceof RWStrategy) {
+			if (commitTime <= ((RWStrategy) _bufferStrategy).getLastReleaseTime()) {
+				return null; // no index available
+			}
+		}
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -4246,5 +4260,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         openSocket.close();
         return port;
     }
+
+    /**
+     * Remove all commit records between the two provided keys.
+     * 
+     * This is called from the RWStore when it checks for deferredFrees
+     * against the CommitRecordIndex where the CommitRecords
+     * reference the deleteBlocks that have been deferred.
+     * 
+     * Once processed the records for the effected range muct
+     * be removed as they reference invalid states.
+     * 
+     * @param fromKey
+     * @param toKey
+     */
+	public int removeCommitRecordEntries(byte[] fromKey, byte[] toKey) {
+		final CommitRecordIndex cri = _commitRecordIndex; // Use the LIVE indeex!
+		final ITupleIterator<CommitRecordIndex.Entry> commitRecords	
+			= cri.rangeIterator(fromKey, toKey, 0/* capacity*/, IRangeQuery.CURSOR, null/*filter*/);
+		
+		int removed = 0;
+		while (commitRecords.hasNext()) {
+			final ITuple<CommitRecordIndex.Entry> entry = commitRecords.next();
+			commitRecords.remove();
+			removed++;
+		}
+		
+		return removed;
+	}
 
 }

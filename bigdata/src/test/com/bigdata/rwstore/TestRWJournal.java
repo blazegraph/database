@@ -62,6 +62,8 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rwstore.RWStore.RawTx;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -109,6 +111,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		// test suite for MRMW correctness.
 		suite.addTestSuite(TestMRMW.class);
+
+		// ..and add TestAllocBits
+		suite.addTestSuite(TestAllocBits.class);
 
 		/*
 		 * Pickup the basic journal test suite. This is a proxied test suite, so
@@ -359,14 +364,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		public Properties getProperties() {
+		public Properties getProperties(final long retention) {
 
             if (log.isInfoEnabled())
                 log.info("TestRWJournal:getProperties");
 
 			final Properties properties = super.getProperties();
 
-			properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+	        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+
+	        properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 			// properties.setProperty(Options.BUFFER_MODE,
 			// BufferMode.TemporaryRW.toString());
 
@@ -406,7 +413,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		protected IRawStore getStore() {
 
-			return new Journal(getProperties());
+			return getStore(0);
+
+		}
+
+		protected IRawStore getStore(final long retention) {
+
+			return new Journal(getProperties(retention));
 
 		}
 
@@ -1356,10 +1369,23 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		public void test_stressCommitIndex() {
-			Journal journal = (Journal) getStore();
+		public void test_stressCommitIndexWithRetention() {
+
+            assertEquals(1000,doStressCommitIndex(40000L /* 20 secs history */, 1000));
+
+
+		}
+		
+		public void test_stressCommitIndexNoRetention() {
+			
+			assertEquals(1,doStressCommitIndex(0L /* no history */, 1000));
+
+		}
+		
+		public int doStressCommitIndex(final long retention, final int runs) {
+			Journal journal = (Journal) getStore(retention); // remember no history!
 			try {
-				final int cRuns = 1000;
+				final int cRuns = runs;
 				for (int i = 0; i < cRuns; i++)
 					commitSomeData(journal);
 				
@@ -1392,7 +1418,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		                }
 		            }
 		            
-		            assertTrue("Should be " + cRuns + " == " + records, cRuns == records);
+		            return records;
 		        }
 			} finally {
 				journal.destroy();
@@ -1459,7 +1485,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
 
-			rw.activateTx();
+			RawTx tx = rw.newTx();
 
 			bs.delete(faddr); // delettion protected by session
 
@@ -1470,7 +1496,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// should be able to successfully read from freed address
 			assertEquals(bb, rdBuf);
 
-			rw.deactivateTx();
+			tx.close();
 
 			store.commit();
 			} finally {
@@ -1499,7 +1525,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			ByteBuffer bb = ByteBuffer.wrap(buf);
 			
-			rw.activateTx();
+			RawTx tx = rw.newTx();
 			ArrayList<Long> addrs = new ArrayList<Long>();
 			
 			// We just want to stress a single allocator, so make 5000
@@ -1515,7 +1541,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 
 			// now release session to make addrs reavailable
-			rw.deactivateTx();
+			tx.close();
 
 
 			for (int i = 0; i < 5000; i+=2) {

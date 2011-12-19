@@ -73,6 +73,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.rwstore.RWStore.RawTx;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
@@ -320,7 +321,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 checkProperties(properties), this) {
 
-            {
+            final private AtomicReference<RawTx> m_rawTx = new AtomicReference<RawTx>(null);
+
+			{
                 
                 final long lastCommitTime = Journal.this.getLastCommitTime();
                 
@@ -339,19 +342,18 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             
             protected void activateTx(final TxState state) {
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
-                if(bufferStrategy instanceof RWStrategy) {
+                if (bufferStrategy instanceof RWStrategy) {
 //                  Logger.getLogger("TransactionTrace").info("OPEN: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
-                    ((RWStrategy)bufferStrategy).getRWStore().activateTx();
+                    m_rawTx.set(((RWStrategy)bufferStrategy).getRWStore().newTx());
                 }
                 super.activateTx(state);
             }
 
             protected void deactivateTx(final TxState state) {
                 super.deactivateTx(state);
-                final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
-                if(bufferStrategy instanceof RWStrategy) {
-//                  Logger.getLogger("TransactionTrace").info("DONE: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
-                    ((RWStrategy)bufferStrategy).getRWStore().deactivateTx();
+
+                if (m_rawTx.get() != null) {
+                	m_rawTx.get().close();
                 }
             }
             

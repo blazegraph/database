@@ -273,7 +273,7 @@ public class TestJournalShutdown extends TestCase2 {
                         jnl.getConcurrencyManager().submit(task1).get();
                         jnl.getConcurrencyManager().submit(task1b).get();
                         jnl.getConcurrencyManager().submit(task2).get();
-                        
+                         
                     } catch (ExecutionException e) {
                         log.error("Problem registering index: " + e, e);
                     }
@@ -357,10 +357,10 @@ public class TestJournalShutdown extends TestCase2 {
 
             }
 
-            if (nunfinalized.get() == ncreated.get()) {
+            if (nunfinalized.get() > 0) {
 
                 fail("Created " + ncreated
-                        + " journals.  No journals were finalized.");
+                        + " journals, and " + nunfinalized + " journals were not finalized.");
 
             }
 

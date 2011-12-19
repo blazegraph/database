@@ -653,9 +653,34 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
      * to be monitored to ensure it is not freed.
      * 
      * @param addr - address to be locked
+     * @return true - for use in assert statement
      */
-	public void lockAddress(final long addr) {
+	public boolean lockAddress(final long addr) {
 		m_store.lockAddress(decodeAddr(addr));
+		
+		return true;
+	}
+
+	/**
+	 * If history is retained this returns the time for which
+	 * data was most recently released.  No request can be made for data
+	 * earlier than this.
+	 * @return latest data release time
+	 */
+	long getLastReleaseTime() {
+		return m_store.getLastDeferredReleaseTime();
+	}
+
+	/**
+	 * Lifted to provide a direct interface from the Journal so that the
+	 * CommitRecordIndex can be pruned prior to store commit.
+	 */
+	public void checkDeferredFrees(final AbstractJournal journal) {
+		final int totalFreed = m_store.checkDeferredFrees(true, journal); // free now if possible
+		
+		if (totalFreed > 0 && log.isInfoEnabled()) {
+			log.info("Freed " + totalFreed + " deferralls on commit");
+		}
 	}
 
 }

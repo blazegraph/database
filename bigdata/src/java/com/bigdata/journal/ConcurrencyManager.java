@@ -1558,7 +1558,9 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         f.get(nanos, TimeUnit.NANOSECONDS);
 
                     } catch (TimeoutException ex) {
-
+                    	
+                    	if (log.isInfoEnabled()) log.info("Task Timeout");
+                    	
                         return futures;
 
                     } catch (ExecutionException ex) {
