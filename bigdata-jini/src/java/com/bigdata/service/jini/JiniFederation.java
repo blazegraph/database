@@ -952,7 +952,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
      * Note: The invocation layer factory is reused for each exported proxy (but
      * the exporter itself is paired 1:1 with the exported proxy).
      */
-    private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
+    final private InvocationLayerFactory invocationLayerFactory = new BasicILFactory();
     
     /**
      * Return an {@link Exporter} for a single object that implements one or
