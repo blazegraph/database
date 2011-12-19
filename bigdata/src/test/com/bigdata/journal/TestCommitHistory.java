@@ -29,8 +29,11 @@ package com.bigdata.journal;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.service.AbstractTransactionService;
 
 /**
  * Test the ability to get (exact match) and find (most recent less than or
@@ -115,8 +118,62 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      * {@link CommitRecordIndex}.
      */
     public void test_recoverCommitRecord() {
+    	final Properties properties = getProperties();
+       	// Set a release age for RWStore if required
+        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "5000");
+    	
+        final Journal journal = new Journal(properties);
 
-        final Journal journal = new Journal(getProperties());
+        try {
+
+            /*
+             * The first commit flushes the root leaves of some indices so we
+             * get back a non-zero commit timestamp.
+             */
+            assertTrue(0L != journal.commit());
+
+            /*
+             * A follow up commit in which nothing has been written should
+             * return a 0L timestamp.
+             */
+            assertEquals(0L, journal.commit());
+
+            journal.write(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
+
+            final long commitTime1 = journal.commit();
+
+            assertTrue(commitTime1 != 0L);
+
+            ICommitRecord commitRecord = journal.getCommitRecord(commitTime1);
+
+            assertNotNull(commitRecord);
+
+            assertNotNull(journal.getCommitRecord());
+
+            assertEquals(commitTime1, journal.getCommitRecord().getTimestamp());
+
+            assertEquals(journal.getCommitRecord(), commitRecord);
+
+        } finally {
+
+            journal.destroy();
+
+        }
+        
+    }
+    /**
+     * Test the ability to recover a {@link ICommitRecord} from the
+     * {@link CommitRecordIndex}.
+     * 
+     * A second commit should be void and therefore the previous record
+     * should be retrievable.
+     */
+    public void test_recoverCommitRecordNoHistory() {
+    	final Properties properties = getProperties();
+       	// Set a release age for RWStore if required
+        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+    	
+        final Journal journal = new Journal(properties);
 
         try {
 
@@ -161,7 +218,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      */
     public void test_commitRecordIndex_restartSafe() {
         
-        Journal journal = new Journal(getProperties());
+       	final Properties properties = getProperties();
+       	// Set a release age for RWStore if required
+        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "5000");
+    	
+        Journal journal = new Journal(properties);
 
         try {
 
@@ -226,11 +287,17 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      * the commit record index. This also tests restart-safety of the index with
      * multiple records (if the store is stable).
      * 
+     * The minReleaseAge property has been added to test historical data protection,
+     * and not just the retention of the CommitRecords which currently are erroneously
+     * never removed.
+     * 
      * @throws IOException 
      */
     public void test_commitRecordIndex_find() throws IOException {
         
-        Journal journal = new Journal(getProperties());
+    	final Properties props = getProperties();
+    	props.setProperty("com.bigdata.service.AbstractTransactionService.minReleaseAge","2000"); // 2 seconds
+        Journal journal = new Journal(props);
 
         try {
         
@@ -240,12 +307,20 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
         final long[] commitRecordIndexAddrs = new long[limit];
         
+        final long[] dataRecordAddrs = new long[limit];
+        final ByteBuffer[] dataRecords = new ByteBuffer[limit];
+        
         final ICommitRecord[] commitRecords = new ICommitRecord[limit];
-
+        
         for(int i=0; i<limit; i++) {
 
-            // write some data.
-            journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+            // write some data, this should be protected by minReleaseAge
+        	dataRecords[i] = ByteBuffer.wrap(new byte[]{1,2,3,(byte) i});
+            dataRecordAddrs[i] = journal.write(dataRecords[i]);
+            dataRecords[i].flip();
+            if (i > 0) {
+            	journal.delete(dataRecordAddrs[i-1]); // remove previous committed data
+            }
         
             // commit the store.
             commitTime[i] = journal.commit();
@@ -308,6 +383,9 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
                 assertEquals(commitRecords[i], journal
                         .getCommitRecord(commitTime[i]));
                 
+                final ByteBuffer rdbuf = journal.read(dataRecordAddrs[i]);
+                assertTrue(dataRecords[i].compareTo(rdbuf) == 0);
+                
             }
             
         }
@@ -357,8 +435,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      * reference to the commit record of interest).
      */
     public void test_canonicalizingCache() {
-        
-        final Journal journal = new Journal(getProperties());
+       	final Properties properties = getProperties();
+       	// Set a release age for RWStore if required
+        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "5000");
+       
+        final Journal journal = new Journal(properties);
         
         try {
 

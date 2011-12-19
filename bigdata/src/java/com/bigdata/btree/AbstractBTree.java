@@ -2025,7 +2025,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                      * have an acceptable error rate.
                      */
                     
-                    filter.disable();
+                    final long curAddr = filter.disable();
+                    store.delete(curAddr);
                     
                     log.warn("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="
@@ -4172,11 +4173,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		if (isReadOnly())
 			throw new IllegalStateException(ERROR_READ_ONLY);
 
-		getStore().delete(addr);
-
 		final int nbytes = getStore().getByteCount(addr);
-
+        btreeCounters.bytesReleased += nbytes;
 		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-nbytes);
+        
+		getStore().delete(addr);
 
 	}
 

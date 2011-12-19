@@ -1125,13 +1125,13 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             final LockFutureTask task = (LockFutureTask) getTaskWithLocks(resource);
             
-            if(task == null) {
+            if (task == null) {
                 
                 /*
                  * There is no task holding all of these locks.
                  */
                 
-                throw new IllegalStateException();
+                throw new IllegalStateException("Task does not hold all required locks");
                 
             }
             

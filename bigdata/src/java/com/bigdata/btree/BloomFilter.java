@@ -559,20 +559,27 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * At that point the {@link BTree} is dirty. {@link Checkpoint} will notice
      * that the bloom filter is disabled will write its address as 0L so the
      * bloom filter is no longer reachable from the post-checkpoint record.
+     * <p>
+     * @return the current address for recycling
      */
-    final public void disable() {
-
+    final public long disable() {
+    	final long ret = addr;
+    	
         if (enabled) {
 
             enabled = false;
 
             // release the filter impl. this is often 1-10M of data!
             filter = null;
+            addr = 0; 
 
             if (log.isInfoEnabled())
                 log.info("disabled.");
+            
 
-        }
+        } 
+        
+        return ret;
 
     }
 

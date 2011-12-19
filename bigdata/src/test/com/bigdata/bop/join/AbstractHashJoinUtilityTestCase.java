@@ -1550,6 +1550,7 @@ abstract public class AbstractHashJoinUtilityTestCase extends TestCase {
          * (?a,     ?x)   (?a,     ?y)   (?a,     ?z)
          * (john, mary)   (john, brad)   (john, mary)// many-to-many join
          * (john, leon)   (john, fred) 
+         * (fred, lyon)
          * </pre>
          */
         final IBindingSet[] expected;

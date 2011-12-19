@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -47,6 +48,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -2205,11 +2207,11 @@ public class RWStore implements IStore, IBufferedWriter {
 		
 		try {
 		
-			final int totalFreed = checkDeferredFrees(true, journal); // free now if possible
-			
-			if (totalFreed > 0 && log.isInfoEnabled()) {
-				log.info("Freed " + totalFreed + " deferralls on commit");
-			}
+//			final int totalFreed = checkDeferredFrees(true, journal); // free now if possible
+//			
+//			if (totalFreed > 0 && log.isInfoEnabled()) {
+//				log.info("Freed " + totalFreed + " deferralls on commit");
+//			}
 			// free old storageStatsAddr
 			if (m_storageStatsAddr != 0) {
 				int len = (int) (m_storageStatsAddr & 0xFFFF);				
@@ -2315,7 +2317,7 @@ public class RWStore implements IStore, IBufferedWriter {
      * 
      * returns number of addresses freed
      */
-    /* public */int checkDeferredFrees(final boolean freeNow,
+    public /* public */int checkDeferredFrees(final boolean freeNow,
             final AbstractJournal journal) {
 
         // Note: Invoked from unit test w/o the lock...
@@ -2324,42 +2326,65 @@ public class RWStore implements IStore, IBufferedWriter {
 		
         if (journal != null) {
 		
-            final AbstractTransactionService transactionService = (AbstractTransactionService) journal
-                    .getLocalTransactionManager().getTransactionService();
+        	/**
+        	 * Since this is now called direct from the AbstractJournal commit method we muct take the
+        	 * allocaiton lock.
+        	 * 
+        	 * This may have adverse effects wrt concurrency deadlock issues, but none have
+        	 * been noticed so far.
+        	 */
+    		m_allocationLock.lock();
+    		
+    		try {
+				final AbstractTransactionService transactionService = (AbstractTransactionService) journal
+						.getLocalTransactionManager().getTransactionService();
 
-//            // the previous commit point.
-//            long lastCommitTime = journal.getLastCommitTime(); 
-//
-//            if (lastCommitTime == 0L) {
-//                // Nothing committed.
-//                return;
-//            }
-            
-            // the effective release time.
-            long latestReleasableTime = transactionService.getReleaseTime();
+				// // the previous commit point.
+				// long lastCommitTime = journal.getLastCommitTime();
+				//
+				// if (lastCommitTime == 0L) {
+				// // Nothing committed.
+				// return;
+				// }
 
-            /*
-             * add one because we want to read the delete blocks for all commit
-             * points up to and including the first commit point that we may not
-             * release.
-             */
-            latestReleasableTime++;
+				/**
+				 *  The effective release time does not need a lock since we are called
+				 *  from within the AbstractJournal commit.  The calculation can
+				 *  safely be based on the system time, the min release age and the
+				 *  earliest active transaction.  
+				 *  
+				 *  The purpose is to ensure the RWStore can recycle any storage 
+				 *  released since this time.
+				 */
+				long latestReleasableTime = transactionService
+						.getEarliestReleaseTime();
+				// long latestReleasableTime =
+				// transactionService.getReleaseTime(); // revert for test
 
-            /*
-             * add one to give this inclusive upper bound semantics to the range
-             * scan.
-             */
-            latestReleasableTime++;
+				/*
+				 * add one because we want to read the delete blocks for all
+				 * commit points up to and including the first commit point that
+				 * we may not release.
+				 */
+				latestReleasableTime++;
 
-            /*
-             * Free deferrals.
-             * 
-             * Note: This adds one to the lastDeferredReleaseTime to give
-             * exclusive lower bound semantics.
-             */
-            return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
-                    latestReleasableTime);
-            
+				/*
+				 * add one to give this inclusive upper bound semantics to the
+				 * range scan.
+				 */
+				latestReleasableTime++;
+
+				/*
+				 * Free deferrals.
+				 * 
+				 * Note: This adds one to the lastDeferredReleaseTime to give
+				 * exclusive lower bound semantics.
+				 */
+				return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
+						latestReleasableTime);
+			} finally {
+    			m_allocationLock.unlock();
+     		}
         } else {
         	return 0;
         }
@@ -3442,6 +3467,8 @@ public class RWStore implements IStore, IBufferedWriter {
 				
 				nxtAddr = strBuf.readInt();
 			}
+			// now free delete block
+			immediateFree(addr, sze);
             m_lastDeferredReleaseTime = lastReleaseTime;
             if (log.isTraceEnabled())
                 log.trace("Updated m_lastDeferredReleaseTime="
@@ -3470,12 +3497,14 @@ public class RWStore implements IStore, IBufferedWriter {
             final long toTime) {
 
         final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
-	    {
             /*
              * Commit can be called prior to Journal initialisation, in which
              * case the commitRecordIndex will not be set.
              */
             final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
+            if (commitRecordIndex == null) {
+            	return 0;
+            }
     
             final IndexMetadata metadata = commitRecordIndex
                     .getIndexMetadata();
@@ -3489,10 +3518,6 @@ public class RWStore implements IStore, IBufferedWriter {
             commitRecords = commitRecordIndex
                     .rangeIterator(fromKey, toKey);
             
-        }
-
-        if(log.isTraceEnabled())
-            log.trace("fromTime=" + fromTime + ", toTime=" + toTime);
 
         int totalFreed = 0;
         
@@ -3501,21 +3526,38 @@ public class RWStore implements IStore, IBufferedWriter {
             final ITuple<CommitRecordIndex.Entry> tuple = commitRecords.next();
 
             final CommitRecordIndex.Entry entry = tuple.getObject();
-
-            final ICommitRecord record = CommitRecordSerializer.INSTANCE
-                    .deserialize(journal.read(entry.addr));
-
-            final long blockAddr = record
-                    .getRootAddr(AbstractJournal.DELETEBLOCK);
-			
-            if (blockAddr != 0) {
-			
-                totalFreed += freeDeferrals(blockAddr, record.getTimestamp());
-                
-			}
+            
+            try {	
+	            final ICommitRecord record = CommitRecordSerializer.INSTANCE
+	                    .deserialize(journal.read(entry.addr));
+	
+	            final long blockAddr = record
+	                    .getRootAddr(AbstractJournal.DELETEBLOCK);
+				
+	            if (blockAddr != 0) {
+				
+	                totalFreed += freeDeferrals(blockAddr, record.getTimestamp());
+	                
+				}
+	            
+	            immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+            } catch (RuntimeException re) {
+            	log.warn("Problem with entry at " + entry.addr);
+            	throw re;
+            }
 
         }
         
+        // Now remove all record entries
+        final int removed = journal.removeCommitRecordEntries(fromKey, toKey);
+        if (removed > 0) {
+            if(log.isInfoEnabled())
+                log.info("Removed " + removed + " commit records");
+        }
+        
+        if(log.isInfoEnabled())
+            log.info("fromTime=" + fromTime + ", toTime=" + toTime + ", totalFreed=" + totalFreed);
+
         return totalFreed;
 	}
 
@@ -4456,7 +4498,23 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_storageStats;
 	}
 
-    public void activateTx() {
+	public class RawTx {
+		final AtomicBoolean m_open = new AtomicBoolean(true);
+		RawTx() {
+			activateTx();
+		}
+		
+		public void close() {
+			if (m_open.getAndSet(false))
+				deactivateTx();
+		}
+	}
+	
+	public RawTx newTx() {
+		return new RawTx();
+	}
+	
+    private void activateTx() {
         m_allocationLock.lock();
         try {
             m_activeTxCount++;
@@ -4467,7 +4525,7 @@ public class RWStore implements IStore, IBufferedWriter {
         }
     }
     
-    public void deactivateTx() {
+    private void deactivateTx() {
         m_allocationLock.lock();
         try {
         	if (m_activeTxCount == 0) {
@@ -4545,6 +4603,16 @@ public class RWStore implements IStore, IBufferedWriter {
 
 	public CounterSet getWriteCacheCounters() {
 		return m_writeCache.getCounters();
+	}
+
+	/**
+	 * If historical data is maintained then this will return the earliest time for which
+	 * data can be safely retrieved.
+	 * 
+	 * @return time of last release
+	 */
+	public long getLastDeferredReleaseTime() {
+		return m_lastDeferredReleaseTime;
 	}
 
     

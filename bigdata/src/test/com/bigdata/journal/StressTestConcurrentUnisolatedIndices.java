@@ -145,12 +145,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
              */
             doConcurrentClientTest(journal,//
                 30,// timeout
-                20,// nresources
+                20, // 3,// nresources // 20
                 1, // minLocks
-                3, // maxLocks
-                100, // ntrials
+                3, // 5 // maxLocks
+                100, //5000, // ntrials // 1000
                 3, // keyLen
-                1000, // nops
+                1000, // 1000, // nops
                 0.02d // failureRate
         );
         
@@ -468,7 +468,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                     final Thread other = btrees.putIfAbsent(name, t);
                     
                     if (other != null) {
-
+                    	log.error("Unisolated index already in use: " + resource[i]);
                         throw new AssertionError(
                                 "Unisolated index already in use: "
                                         + resource[i] + ", currentThread=" + t
@@ -524,18 +524,20 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase<Journal
                  */
                 for (int i = 0; i < resource.length; i++) {
 
-                    final String name = resource[i];
-
-                    final Thread tmp = btrees.remove(name);
-
-                    if (tmp != t) {
-
-                        throw new AssertionError(
-                                "Index associated with another thread? index="
-                                        + name + ", currentThread=" + t
-                                        + ", otherThread=" + tmp);
-
-                    }
+                	if (indices[i] != null) { // do NOT remove if never added!
+	                    final String name = resource[i];
+	
+	                    final Thread tmp = btrees.remove(name);
+	
+	                    if (tmp != t) {
+	
+	                        throw new AssertionError(
+	                                "Index associated with another thread? index="
+	                                        + name + ", currentThread=" + t
+	                                        + ", otherThread=" + tmp);
+	
+	                    }
+                	}
 
                 }
 
