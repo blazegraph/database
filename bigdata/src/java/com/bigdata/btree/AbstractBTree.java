@@ -2026,7 +2026,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                      */
                     
                     final long curAddr = filter.disable();
-                    store.delete(curAddr);
+                    if (curAddr != IRawStore.NULL)
+                        store.delete(curAddr);
                     
                     log.warn("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="

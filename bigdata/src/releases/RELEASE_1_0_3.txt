@@ -37,6 +37,7 @@ Change log:
 
 1.0.3
 
+ - http://sourceforge.net/apps/trac/bigdata/ticket/217 (BTreeCounters does not track bytes released)
  - http://sourceforge.net/apps/trac/bigdata/ticket/269 (Refactor performance counters using accessor interface)
  - http://sourceforge.net/apps/trac/bigdata/ticket/329 (B+Tree should delete bloom filter when it is disabled.)
  - http://sourceforge.net/apps/trac/bigdata/ticket/372 (RWStore does not prune the CommitRecordIndex)
