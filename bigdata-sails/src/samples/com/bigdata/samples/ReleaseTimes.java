@@ -2,32 +2,24 @@ package com.bigdata.samples;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Properties;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.btree.IIndex;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.journal.Tx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.service.AbstractClient;
 import com.bigdata.service.AbstractTransactionService;
 
 /**
@@ -42,11 +34,11 @@ import com.bigdata.service.AbstractTransactionService;
  * On closing and re-opening the store, the historical data remains
  * accessible, however, the release time is recalculated when connections
  * are closed.  The code clarifies several of the issues involved.
+ *
+ * @see http://sourceforge.net/apps/mediawiki/bigdata/index.php?title=RetentionHistory
  * 
  * @author Martyn Cutcher
- *
  */
-
 public class ReleaseTimes {
 
 		public static void main(String[] args) throws IOException, InterruptedException, SailException, RepositoryException {
@@ -160,10 +152,8 @@ public class ReleaseTimes {
 			
 			check(cxn.getStatements(id, pred, label, false).hasNext());
 	        
-	        cxn.commit();
-	        
-	        // Return the time of the commit
-	        return cxn.getRepository().getDatabase().getIndexManager().getLastCommitTime();
+            // Return the time of the commit
+	        return cxn.commit2();
 		}
 
 		/**
