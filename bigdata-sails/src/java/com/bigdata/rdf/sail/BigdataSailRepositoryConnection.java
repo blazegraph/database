@@ -160,34 +160,16 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 	   
     /**
-     * {@inheritDoc}
+     * Commit, returning the timestamp associated with the new commit point.
      * <p>
      * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
      * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
      * 
-     * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
-     */
-    @Override
-   public void commit() throws RepositoryException {
-        
-        // auto-commit is heinously inefficient
-        if (isAutoCommit() && 
-            !((BigdataSailConnection) getSailConnection()).getAllowAutoCommit()) {
-            
-            throw new RepositoryException("please set autoCommit to false");
-
-        }
-        
-        super.commit();
-        
-    }
-    
-    /**
-     * Version returning the commit time that can be used to open a readOnly
-     * transaction.
+     * @return The timestamp associated with the new commit point. This will be
+     *         <code>0L</code> if the write set was empty such that nothing was
+     *         committed.
      * 
-     * @return the state associated with the commit
-     * @throws RepositoryException
+     * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
      */
     public long commit2() throws RepositoryException {
         
@@ -199,7 +181,31 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         }
         
-		return ((BigdataSailConnection) getSailConnection()).getTripleStore().commit();        
+        // Note: Just invokes sailConnection.commit()
+//        super.commit();
+        try {
+//            sailConnection.commit();
+            return getSailConnection().commit2();
+        }
+        catch (SailException e) {
+            throw new RepositoryException(e);
+        }
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
+     * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
+     * 
+     * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
+     */
+    @Override
+    public void commit() throws RepositoryException {
+
+        commit2();
+                
     }
 
     /**
