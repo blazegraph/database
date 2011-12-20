@@ -68,7 +68,7 @@ Change log:
  - http://sourceforge.net/apps/trac/bigdata/ticket/408 (xsd:string cast fails for non-numeric data)
  - http://sourceforge.net/apps/trac/bigdata/ticket/421 (New query hints model.)
  - http://sourceforge.net/apps/trac/bigdata/ticket/431 (Use of read-only tx per query defeats cache on cluster)
-
+ 
 1.0.3
 
  - http://sourceforge.net/apps/trac/bigdata/ticket/217 (BTreeCounters does not track bytes released)
@@ -87,7 +87,9 @@ Change log:
  - http://sourceforge.net/apps/trac/bigdata/ticket/425 (Bug fix to DEFAULT_RDF_FORMAT for bulk data loader in scale-out)
  - http://sourceforge.net/apps/trac/bigdata/ticket/426 (Support either lockfile (procmail) and dotlockfile (liblockfile1) in scale-out)
  - http://sourceforge.net/apps/trac/bigdata/ticket/427 (BigdataSail#getReadOnlyConnection() race condition with concurrent commit)
-
+ - http://sourceforge.net/apps/trac/bigdata/ticket/435 (Address is 0L)
+ - http://sourceforge.net/apps/trac/bigdata/ticket/436 (TestMROWTransactions failure in CI)
+ 
 1.0.2
 
  - http://sourceforge.net/apps/trac/bigdata/ticket/32  (Query time expansion of (foo rdf:type rdfs:Resource) drags in SPORelation for scale-out.)
