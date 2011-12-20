@@ -894,7 +894,12 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
                  * it on the store now.
                  */
             	
-            	recycle(filter.getAddr());
+            	final long oldAddr = filter.getAddr();
+            	if (oldAddr != IRawStore.NULL) {
+            		this.getBtreeCounters().bytesReleased += store.getByteCount(oldAddr);
+
+            		store.delete(oldAddr);
+            	}
             	
                 filter.write(store);
 
@@ -917,11 +922,17 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
         
         // delete old checkpoint data       
         final long oldAddr = checkpoint != null ? checkpoint.addrCheckpoint : IRawStore.NULL;
-        recycle(oldAddr);
-         
+        if (oldAddr != IRawStore.NULL) {
+       		this.getBtreeCounters().bytesReleased += store.getByteCount(oldAddr);
+        	store.delete(oldAddr);
+        }
+        
         // delete old root data if changed
         final long oldRootAddr = checkpoint != null ? checkpoint.getRootAddr() : IRawStore.NULL;
-        recycle(oldRootAddr);
+        if (oldRootAddr != IRawStore.NULL && oldRootAddr != root.identity) {
+       		this.getBtreeCounters().bytesReleased += store.getByteCount(oldRootAddr);
+        	store.delete(oldRootAddr);
+        }
         
         // create new checkpoint record.
         checkpoint = metadata.newCheckpoint(this);
@@ -2047,7 +2058,6 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     protected static class Stack {
 
@@ -2223,7 +2233,6 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
      * Note: The {@link MutableBTreeTupleCursor} does register such listeners.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public class LeafCursor implements ILeafCursor<Leaf> {
 
