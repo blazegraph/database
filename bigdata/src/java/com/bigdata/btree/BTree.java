@@ -894,12 +894,7 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
                  * it on the store now.
                  */
             	
-            	final long oldAddr = filter.getAddr();
-            	if (oldAddr != IRawStore.NULL) {
-            		this.getBtreeCounters().bytesReleased += store.getByteCount(oldAddr);
-
-            		store.delete(oldAddr);
-            	}
+            	recycle(filter.getAddr());
             	
                 filter.write(store);
 
@@ -922,17 +917,11 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
         
         // delete old checkpoint data       
         final long oldAddr = checkpoint != null ? checkpoint.addrCheckpoint : IRawStore.NULL;
-        if (oldAddr != IRawStore.NULL) {
-       		this.getBtreeCounters().bytesReleased += store.getByteCount(oldAddr);
-        	store.delete(oldAddr);
-        }
-        
+        recycle(oldAddr);
+         
         // delete old root data if changed
         final long oldRootAddr = checkpoint != null ? checkpoint.getRootAddr() : IRawStore.NULL;
-        if (oldRootAddr != IRawStore.NULL && oldRootAddr != root.identity) {
-       		this.getBtreeCounters().bytesReleased += store.getByteCount(oldRootAddr);
-        	store.delete(oldRootAddr);
-        }
+        recycle(oldRootAddr);
         
         // create new checkpoint record.
         checkpoint = metadata.newCheckpoint(this);
