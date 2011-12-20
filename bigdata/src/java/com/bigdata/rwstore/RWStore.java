@@ -2336,7 +2336,14 @@ public class RWStore implements IStore, IBufferedWriter {
     		m_allocationLock.lock();
     		
     		try {
-				final AbstractTransactionService transactionService = (AbstractTransactionService) journal
+    			/**
+    	    	 * if session protected then do not free any deferrals!
+    	    	 */  	
+    	    	if (this.m_activeTxCount > 0 || this.m_contexts.size() > 0) {
+    	    		return 0;
+    	    	}
+    			
+    	        final AbstractTransactionService transactionService = (AbstractTransactionService) journal
 						.getLocalTransactionManager().getTransactionService();
 
 				// // the previous commit point.
