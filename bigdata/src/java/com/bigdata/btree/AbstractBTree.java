@@ -353,7 +353,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     static class ChildMemoizer extends
             Memoizer<LoadChildRequest/* request */, AbstractNode<?>/* child */> {
@@ -2025,7 +2024,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                      * have an acceptable error rate.
                      */
                     
-                    recycle(filter.disable());
+                    final long curAddr = filter.disable();
+                    if (curAddr != IRawStore.NULL)
+                        store.delete(curAddr);
                     
                     log.warn("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="
@@ -3956,7 +3957,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * {@link Reference} (a runtime security manager exception will result).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * 
      * @param <T>
      */
@@ -4149,7 +4149,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		if(isReadOnly())
 			throw new IllegalStateException(ERROR_READ_ONLY);
 
-		btreeCounters.bytesOnStore_rawRecords.addAndGet(-recycle(addr));		
+		getStore().delete(addr);
+		
+		final int nbytes = getStore().getByteCount(addr);
+		
+		btreeCounters.bytesOnStore_rawRecords.addAndGet(-nbytes);
+		
 	}
 
 	/**
@@ -4167,20 +4172,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		if (isReadOnly())
 			throw new IllegalStateException(ERROR_READ_ONLY);
 
-		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-recycle(addr));
+		final int nbytes = getStore().getByteCount(addr);
+        btreeCounters.bytesReleased += nbytes;
+		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-nbytes);
+        
+		getStore().delete(addr);
 
 	}
 
-	int recycle(final long addr) {
-		if (addr != IRawStore.NULL) {
-			final int nbytes = store.getByteCount(addr);
-    		getBtreeCounters().bytesReleased += nbytes;
-    		
-			store.delete(addr);
-			
-			return nbytes;
-		} else {
-			return 0;
-		}
-	}
 }
