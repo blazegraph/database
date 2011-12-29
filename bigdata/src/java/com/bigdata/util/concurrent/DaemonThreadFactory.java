@@ -62,7 +62,7 @@ public class DaemonThreadFactory implements ThreadFactory {
     public DaemonThreadFactory(String basename) {
 
         this(Executors.defaultThreadFactory(), basename);
-        
+
     }
     
     /**
@@ -101,7 +101,7 @@ public class DaemonThreadFactory implements ThreadFactory {
         
         t.setDaemon(true);
         
-//        System.err.println("new thread: "+t.getName());
+//        System.err.println("new thread: "+t.getName()+", id="+t.getId());
         
         return t;
         
