@@ -54,6 +54,43 @@ import com.bigdata.btree.BTree;
 public class HardReferenceQueueWithBatchingUpdates<T> implements
         IHardReferenceQueue<T> {
 
+    /*
+     * Thread local buffer stuff.
+     */
+
+    /**
+     * The concurrency level of the cache.
+     */
+    private final int concurrencyLevel;
+
+    /**
+     * When <code>true</code> true thread-local buffers will be used. Otherwise,
+     * striped locks will be used and each lock will protect its own buffer.
+     * 
+     * @see #add(Object)
+     */
+    private final boolean threadLocalBuffers;
+
+    /*
+     * Used iff striped locks are used.
+     */
+    /**
+     * The striped locks and <code>null</code> if per-thread {@link BatchQueue}s
+     * are being used.
+     */
+//    private final Semaphore[] permits;
+    private final Lock[] permits;
+
+    /**
+     * The {@link BatchQueue}s protected by the striped locks and <code>null</code> if
+     * per-thread {@link BatchQueue}s are being used.
+     */
+    private final BatchQueue<T>[] buffers;
+
+    /*
+     * Used iff true thread-local buffers are used.
+     */
+
     /**
      * The thread-local queues.
      */
@@ -78,7 +115,7 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
     /**
      * Optional listener is notified when updates are batched through.
      */
-    private final IBatchedUpdateListener batchedUpdatedListener;
+    private final IBatchedUpdateListener<T> batchedUpdatedListener;
     
     /**
      * Lock used to synchronize operations on the {@link #sharedQueue}.
@@ -145,14 +182,27 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             final int threadLocalQueueNScan,//
             final int threadLocalQueueCapacity,//
             final int threadLocalTryLockSize,//
-            final IBatchedUpdateListener batchedUpdateListener//
+            final IBatchedUpdateListener<T> batchedUpdateListener//
+    ) {
+        this(true/* threadLocalBuffers */, 16/* concurrencyLevel */,
+                sharedQueue, threadLocalQueueNScan, threadLocalQueueCapacity,
+                threadLocalTryLockSize, batchedUpdateListener);
+    }
+
+    public HardReferenceQueueWithBatchingUpdates(
+            final boolean threadLocalBuffers,
+            final int concurrencyLevel,
+            final IHardReferenceQueue<T> sharedQueue,
+//            final HardReferenceQueueEvictionListener<T> listener,
+//            final int capacity,//
+            final int threadLocalQueueNScan,//
+            final int threadLocalQueueCapacity,//
+            final int threadLocalTryLockSize,//
+            final IBatchedUpdateListener<T> batchedUpdateListener//
             ) {
 
         if (sharedQueue == null)
             throw new IllegalArgumentException();
-        
-        // @todo configure concurrency, initialCapacity (defaults are pretty good).
-        threadLocalQueues = new ConcurrentHashMap<Thread, BatchQueue<T>>();
         
         this.sharedQueue = sharedQueue;
 //        sharedQueue = new HardReferenceQueue<T>(listener, capacity, 0/* nscan */);
@@ -189,6 +239,40 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             }
 
         };
+
+        this.threadLocalBuffers = threadLocalBuffers;
+        this.concurrencyLevel = concurrencyLevel;
+        if (threadLocalBuffers) {
+            /*
+             * Per-thread buffers.
+             */
+            permits = null;
+            buffers = null;
+            threadLocalQueues = new ConcurrentHashMap<Thread, BatchQueue<T>>(
+                    16,// initialCapacity
+                    0.75f,// load factor (default is .75f)
+                    concurrencyLevel//
+            );
+        } else {
+            /*
+             * Striped locks.
+             */
+//            permits = new Semaphore[concurrencyLevel];
+            permits = new Lock[concurrencyLevel];
+            buffers = new BatchQueue[concurrencyLevel];
+            threadLocalQueues = null;
+            for (int i = 0; i < concurrencyLevel; i++) {
+//                permits[i] = new Semaphore(1, false/* fair */);
+                permits[i] = new ReentrantLock(false/*fair*/);
+                buffers[i] = new BatchQueue<T>(//
+                        i,// id
+                        threadLocalQueueNScan, threadLocalQueueCapacity,//
+                        threadLocalTryLockSize, lock,//
+                        threadLocalQueueEvictionListener,//
+                        batchedUpdatedListener//
+                        );
+            }
+        }
         
     }
     
@@ -222,7 +306,8 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
         if (tmp == null) {
 
-            if (threadLocalQueues.put(t, tmp = new BatchQueue<T>(
+            if (threadLocalQueues.put(t, tmp = new BatchQueue<T>(//
+                    0/* idIsIgnored */,
                     threadLocalQueueNScan, threadLocalQueueCapacity,
                     threadLocalTryLockSize, lock,
                     threadLocalQueueEvictionListener,
@@ -244,6 +329,35 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
         return tmp;
 
     }
+
+//    /**
+//     * Acquire a {@link BatchQueue} from an internal array of {@link BatchQueue}
+//     * instances using a striped lock pattern.
+//     */
+//    private BatchQueue<T> acquire() throws InterruptedException {
+//        
+//        // Note: Thread.getId() is a positive integer.
+//        final int i = (int) (Thread.currentThread().getId() % concurrencyLevel);
+//
+////        permits[i].acquire();
+//        permits[i].lock();
+//
+//        return buffers[i];
+//        
+//    }
+//
+//    /**
+//     * Release a {@link BatchQueue} obtained using {@link #acquire()}.
+//     * 
+//     * @param b
+//     *            The {@link BatchQueue}.
+//     */
+//    private void release(final BatchQueue<T> b) {
+//
+////        permits[b.id].release();
+//        permits[b.id].unlock();
+//
+//    }
 
     /*
      * IHardReferenceQueue
@@ -318,16 +432,102 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
     /**
      * Adds the reference to the thread-local queue, returning <code>true</code>
-     * iff the queue was modified as a result. This is non-blocking unless the
+     * iff the queue was modified as a result.
+     * <p>
+     * When using true thread-local buffers, this is non-blocking unless the
      * thread-local queue is full. If the thread-local queue is full, the
      * existing references will be batched first onto the shared queue.
+     * <p>
+     * Contention can arise when using striped locks. For the synthetic test (on
+     * a 2 core laptop with 8 threads), implementing using per-thread
+     * {@link BatchQueue}s scores <code>6,984,896</code> ops/sec whereas
+     * implementing using striped locks the performance score is only
+     * <code>4,654,673</code>. One thread on the laptop has a throughput of
+     * <code>4,856,814</code>, the maximum possible throughput for 2 threads is
+     * ~ 9M. The actual performance of the striped locks approach depends on the
+     * degree of collision in the {@link Thread#getId()} values and the #of
+     * {@link BatchQueue} instances in the array.
+     * <p>
+     * While striped locks clearly have less throughput when compared to thread-
+     * local {@link BatchQueue}s, the striped lock performance can be
+     * significantly better than implementations without lock amortization
+     * strategies and we do not have to worry about references on
+     * {@link BatchQueue}s "escaping" when we rarely see requests for some
+     * threads (which is basically a memory leak).
+     * 
+     * @return The {@link BatchQueue}.
+     * 
+     * @throws InterruptedException
+     * 
+     *             TODO Actually, using the CHM (7M ops/sec) rather than
+     *             acquiring a permit (4.7M ops/sec) is MUCH less expensive even
+     *             when using only one thread. The permit is clearly costing us.
+     *             Striped locks might do as well as thread-local locks if we
+     *             could replace the permit with a less expensive lock.
      */
     final public boolean add(final T ref) {
         
-        return getThreadLocalQueue().add(ref);
+        if (threadLocalBuffers) {
+
+            /*
+             * Per-thread buffers.
+             */
+            return getThreadLocalQueue().add(ref);
+            
+        } else {
+            
+            /*
+             * Striped locks.
+             */
+            
+            // Note: Thread.getId() is a positive integer.
+//            final int i = (int) (Thread.currentThread().getId() % concurrencyLevel);
+            final int i = hash(ref);
+
+            BatchQueue<T> t = null;
+            try {
+
+//                permits[i].acquire();
+//              t = acquire();
+                permits[i].lockInterruptibly();
+
+                t = buffers[i];
+
+                return t.add(ref);
+
+            } catch (InterruptedException ex) {
+
+                throw new RuntimeException(ex);
+
+            } finally {
+
+                if (t != null) {
+//                    release(t);
+                    permits[i].unlock();
+                }
+
+            }
+            
+        }
         
     }
 
+    private int hash(final T ref) {
+        
+        int h;
+        
+        // Note: Thread.getId() is a positive integer.
+        h = (int) (Thread.currentThread().getId() % concurrencyLevel);
+//        h = ((int) Thread.currentThread().getId()) % concurrencyLevel;
+
+//      h = ref.hashCode();
+//
+//        h = h > 0 ? h % concurrencyLevel : -(h % concurrencyLevel);
+        
+        return h;
+
+    }
+    
     /**
      * Offers the reference to the thread-local queue, returning
      * <code>true</code> iff the queue was modified as a result. This is
@@ -411,31 +611,42 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      * contention for the lock required to provide safe access to the outer
      * {@link HardReferenceQueue} during updates.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
      * @param <T>
      */
     static private class BatchQueue<T> extends RingBuffer<T> implements
             IHardReferenceQueue<T> {
 
+        private final int id;
         private final int nscan;
         private final int tryLockSize;
         private final Lock lock;
         private final HardReferenceQueueEvictionListener<T> listener;
-        private final IBatchedUpdateListener batchedUpdatedListener;
+        private final IBatchedUpdateListener<T> batchedUpdatedListener;
 
+        /**
+         * 
+         * @param id The identifier for this instance (used with striped locks).
+         * @param nscan
+         * @param capacity
+         * @param tryLockSize
+         * @param lock
+         * @param listener
+         * @param batchedUpdateListener
+         */
         public BatchQueue(
+                final int id,//
                 final int nscan,//
                 final int capacity,//
                 final int tryLockSize, //
                 final ReentrantLock lock,//
                 final HardReferenceQueueEvictionListener<T> listener,//
-                final IBatchedUpdateListener batchedUpdateListener//
+                final IBatchedUpdateListener<T> batchedUpdateListener//
                 ) {
 
             super(capacity);
 
+            this.id = id;
+            
             this.nscan = nscan;
 
             this.tryLockSize = tryLockSize;
@@ -659,17 +870,6 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             
         }
 
-    }
-
-    /**
-     * This callback is invoked when updates are batched through from the
-     * thread-local queue to the shared queue. The default implementation does
-     * nothing.
-     */
-    interface IBatchedUpdateListener {
-       
-        void didBatchUpdates();
-        
     }
     
 }

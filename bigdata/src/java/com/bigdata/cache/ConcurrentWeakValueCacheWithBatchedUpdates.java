@@ -9,7 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates.IBatchedUpdateListener;
 
 /**
  * A low-contention/high concurrency weak value cache. This class can offer
@@ -273,11 +272,13 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
             throw new IllegalArgumentException();
         
         this.queue = new HardReferenceQueueWithBatchingUpdates<V>(//
+                true,// threadLocalBuffers
+                16,  // concurrencyLevel
                 queue, // sharedQueue
                 10, // threadLocalQueueNScan
                 64, // threadLocalQueueCapacity
                 32, // threadLocalTryLockSize
-                new IBatchedUpdateListener() {
+                new IBatchedUpdateListener<V>() {
                     /**
                      * Since processing the ReferenceQueue requires a lock, we
                      * let the thread which batches the access order updates

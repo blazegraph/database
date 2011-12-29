@@ -157,18 +157,20 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         
         // pre-populate array of reference objects since Integer.valueOf() blocks.
         final Integer[] vals = new Integer[ndistinct];
-        for(int i=0; i<ndistinct; i++) {
+        for (int i = 0; i < ndistinct; i++) {
             vals[i] = Integer.valueOf(i);
         }
         
         doStressTest(//
                 10L,// timeout
                 TimeUnit.SECONDS,// unit
-                8, // threadPoolSize
+                false, // threadLocalBuffers (vs striped locks)
+                16, // concurrencyLevel (typically GTE threadPoolSize)
+                1, // threadPoolSize (#of test driver threads)
                 8000, // queue capacity
                 0, // threadLocalNScan
-                32,//64, // threadLocalQueueCapacity
-                16,//32, // threadLocalTryLockSize
+                64,//32,//64, // threadLocalQueueCapacity
+                32,//16,//32, // threadLocalTryLockSize
                 new Callable<Object>() {
                     public Object call() throws Exception {
 //                        final int nspin = spinMax == 0 ? 0 : Math.abs(r.next()
@@ -230,18 +232,32 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
      * @throws TimeoutException
      * @throws ExecutionException
      */
-    public long doStressTest(final long timeout, final TimeUnit unit,
-            final int threadPoolSize, final int capacity,
-            final int threadLocalNScan, final int threadLocalQueueCapacity,
-            final int threadLocalTryLockSize, final Callable<?> worker)
-            throws InterruptedException, BrokenBarrierException,
-            TimeoutException, ExecutionException {
+    public long doStressTest(//
+            final long timeout, final TimeUnit unit,//
+            final boolean threadLocalBuffers,//
+            final int concurrencyLevel,//
+            final int threadPoolSize,//
+            final int capacity,//
+            final int threadLocalNScan,//
+            final int threadLocalQueueCapacity,//
+            final int threadLocalTryLockSize, //
+            final Callable<?> worker//
+    ) throws InterruptedException, BrokenBarrierException, TimeoutException,
+            ExecutionException {
 
         final HardReferenceQueueWithBatchingUpdates<Object> queue = new HardReferenceQueueWithBatchingUpdates<Object>(
-                new HardReferenceQueue<Object>(null/*listener*/, capacity, 0/* nscan */),
+                threadLocalBuffers,//
+                concurrencyLevel,//
+                new HardReferenceQueue<Object>(//
+                        null,// listener
+                        capacity,//
+                        0// nscan
+                ),
 //                null/* listener */, capacity, 
-                threadLocalNScan, threadLocalQueueCapacity,
-                threadLocalTryLockSize, null// batched updates listener
+                threadLocalNScan, //
+                threadLocalQueueCapacity,//
+                threadLocalTryLockSize, //
+                null// batched updates listener
                 );
 
         final ExecutorService service = Executors.newFixedThreadPool(
@@ -479,6 +495,10 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         final TimeUnit units = TimeUnit.valueOf(properties
                 .getProperty(TestOptions.UNITS));
 
+        final boolean threadLocalBuffers = true;// TODO param
+
+        final int concurrencyLevel = 16; // TODO param
+        
         final int threadPoolSize = Integer.parseInt(properties
                 .getProperty(TestOptions.NTHREADS));
         
@@ -512,6 +532,8 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
 
         final long touchesPerUnit = doStressTest(timeout,
                 units, //
+                threadLocalBuffers,//
+                concurrencyLevel,//
                 threadPoolSize, //
                 capacity,//
                 threadLocalNScan, threadLocalCapacity, threadLocalTryLockSize,
