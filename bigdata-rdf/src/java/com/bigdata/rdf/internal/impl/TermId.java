@@ -91,6 +91,20 @@ public class TermId<V extends BigdataValue>
 
     }
 
+    public IV<V, Void> clone(final boolean clearCache) {
+
+        final TermId<V> tmp = new TermId<V>(flags, termId);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
     /**
      * Constructor for a term identifier when you are decoding and already have
      * the flags.

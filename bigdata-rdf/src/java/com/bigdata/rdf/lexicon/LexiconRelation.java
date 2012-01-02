@@ -419,11 +419,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 /*
                  * Unshared for any other view of the triple store.
                  */
-                termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>(//
+                termCache = new TermCache<IV<?,?>, BigdataValue>(//
+                        new ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>(//
                         termCacheCapacity, // queueCapacity
                         .75f, // loadFactor (.75 is the default)
                         16 // concurrency level (16 is the default)
-                );
+                ));
 
             }
             
@@ -2133,21 +2134,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
-    final private ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue> termCache;
+//    final private ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue> termCache;
+    final private ITermCache<IV<?,?>,BigdataValue> termCache;
     
     /**
      * Factory used for {@link #termCache} for read-only views of the lexicon.
      */
-    static private CanonicalFactory<NT/* key */, ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>, Integer/* state */> termCacheFactory = new CanonicalFactory<NT, ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>, Integer>(
+    static private CanonicalFactory<NT/* key */, ITermCache<IV<?,?>, BigdataValue>, Integer/* state */> termCacheFactory = new CanonicalFactory<NT, ITermCache<IV<?,?>, BigdataValue>, Integer>(
             1/* queueCapacity */) {
         @Override
-        protected ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue> newInstance(
+        protected ITermCache<IV<?,?>, BigdataValue> newInstance(
                 NT key, Integer termCacheCapacity) {
-            return new ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>(//
+            return new TermCache<IV<?,?>,BigdataValue>(//
+                    new ConcurrentWeakValueCacheWithBatchedUpdates<IV<?,?>, BigdataValue>(//
                     termCacheCapacity.intValue(),// backing hard reference LRU queue capacity.
                     .75f, // loadFactor (.75 is the default)
                     16 // concurrency level (16 is the default)
-            );
+            ));
         }
     };
     

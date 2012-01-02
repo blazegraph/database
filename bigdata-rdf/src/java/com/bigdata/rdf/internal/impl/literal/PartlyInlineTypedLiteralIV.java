@@ -6,12 +6,14 @@ import java.math.BigInteger;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.INonInlineExtensionCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractNonInlineExtensionIVWithDelegateIV;
+import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 /**
@@ -31,6 +33,20 @@ public class PartlyInlineTypedLiteralIV<V extends BigdataLiteral>
 	 */
 	private static final long serialVersionUID = 1503294264280588030L;
 	
+    public IV<V, Literal> clone(final boolean clearCache) {
+
+        final PartlyInlineTypedLiteralIV<V> tmp = new PartlyInlineTypedLiteralIV<V>(
+                getDelegate(), getExtensionIV());
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+
+        }
+
+        return tmp;
+
+    }
 
 	public PartlyInlineTypedLiteralIV(
 			final AbstractLiteralIV<BigdataLiteral, ?> delegate, 

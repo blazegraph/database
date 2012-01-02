@@ -45,10 +45,23 @@ public class UUIDLiteralIV<V extends BigdataLiteral> extends
 	 * 
 	 */
 	private static final long serialVersionUID = 6411134650187983925L;
-	
-	
+		
 	private final UUID value;
 
+    public IV<V, UUID> clone(final boolean clearCache) {
+
+        final UUIDLiteralIV<V> tmp = new UUIDLiteralIV<V>(value);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+    
     public UUIDLiteralIV(final UUID value) {
         
         super(DTE.UUID);

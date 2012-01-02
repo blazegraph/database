@@ -25,7 +25,30 @@ public class PartlyInlineURIIV<V extends BigdataURI> extends
 	 * 
 	 */
 	private static final long serialVersionUID = -4548354704407887640L;
-	
+
+	/**
+     * {@inheritDoc}
+     * <p>
+     * Note: The extensionIV and delegateIV are NOT cloned. The rationale is
+     * that we are only cloning to break the hard reference from the {@link IV}
+     * to to cached value. If that needs to be done for the extensionIV and
+     * delegateIV, then it will be done separately for those objects when they
+     * are inserted into the termsCache.
+	 */
+    public IV<V, URI> clone(final boolean clearCache) {
+
+        final PartlyInlineURIIV<V> tmp = new PartlyInlineURIIV<V>(
+                getDelegate(), getExtensionIV());
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
 
 	public PartlyInlineURIIV(
 			final AbstractLiteralIV<BigdataLiteral, ?> delegate, 

@@ -172,6 +172,68 @@ public abstract class AbstractEncodeDecodeKeysTestCase extends TestCase2 {
             
         }
     
+        /*
+         * clone(true)
+         */
+        {
+    
+            for (int i = 0; i < e.length; i++) {
+    
+                final IV<?,?> expected = e[i];
+    
+                final IV<?, ?> actual = expected.clone(true);
+    
+                if (!expected.equals(actual)) {
+    
+                    fail("Clone problem: expected=" + expected + ", actual="
+                            + actual);
+
+                }
+    
+                if (expected.hashCode() != actual.hashCode()) {
+    
+                    fail("hashCodes differ @ index=" + Integer.toString(i)
+                            + " : expected=" + expected + "(hash="
+                            + expected.hashCode() + ")" + ", actual=" + actual
+                            + "(hash=" + actual.hashCode() + ")");
+    
+                }
+    
+            }
+            
+        }
+    
+        /*
+         * clone(false)
+         */
+        {
+    
+            for (int i = 0; i < e.length; i++) {
+    
+                final IV<?,?> expected = e[i];
+    
+                final IV<?, ?> actual = expected.clone(false);
+    
+                if (!expected.equals(actual)) {
+    
+                    fail("Clone problem: expected=" + expected + ", actual="
+                            + actual);
+
+                }
+    
+                if (expected.hashCode() != actual.hashCode()) {
+    
+                    fail("hashCodes differ @ index=" + Integer.toString(i)
+                            + " : expected=" + expected + "(hash="
+                            + expected.hashCode() + ")" + ", actual=" + actual
+                            + "(hash=" + actual.hashCode() + ")");
+    
+                }
+    
+            }
+            
+        }
+    
         return a;
         
     }

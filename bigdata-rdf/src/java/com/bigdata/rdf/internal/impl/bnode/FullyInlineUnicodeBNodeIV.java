@@ -53,6 +53,24 @@ public class FullyInlineUnicodeBNodeIV<V extends BigdataBNode> extends
     
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
+
+    public IV<V, String> clone(final boolean clearCache) {
+
+        final FullyInlineUnicodeBNodeIV<V> tmp = new FullyInlineUnicodeBNodeIV<V>(
+                id);
+
+        // propagate transient state if available.
+        tmp.byteLength = byteLength;
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
     
     public FullyInlineUnicodeBNodeIV(final String id) {
 

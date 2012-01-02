@@ -14,7 +14,6 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.cache.IConcurrentWeakValueCache;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.model.BigdataValue;
@@ -35,7 +34,7 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
     private final IIndex ndx;
     private final Collection<BlobIV<?>> ivs;
     private final ConcurrentHashMap<IV<?,?>/* iv */, BigdataValue/* term */> ret;
-    private final IConcurrentWeakValueCache<IV<?,?>, BigdataValue> termCache;
+    private final ITermCache<IV<?,?>, BigdataValue> termCache;
     private final BigdataValueFactory valueFactory;
 
     public BatchResolveBlobIVsTask(
@@ -43,7 +42,7 @@ class BatchResolveBlobIVsTask implements Callable<Void> {
             final IIndex ndx,
             final Collection<BlobIV<?>> ivs,
             final ConcurrentHashMap<IV<?, ?>/* iv */, BigdataValue/* term */> ret,
-            final IConcurrentWeakValueCache<IV<?,?>, BigdataValue> termCache,
+            final ITermCache<IV<?,?>, BigdataValue> termCache,
             final BigdataValueFactory valueFactory) {
 
         this.service = service;

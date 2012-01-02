@@ -31,7 +31,6 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 
@@ -84,7 +83,7 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	 */
 	private static final long serialVersionUID = 685148537376856907L;
 	
-	private static final transient Logger log = Logger.getLogger(SidIV.class);
+//	private static final transient Logger log = Logger.getLogger(SidIV.class);
 
 	/**
 	 * The inline spo.
@@ -101,7 +100,27 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
 	 */
 	private transient V bnode;
 
-	/**
+    public IV<V, ISPO> clone(final boolean clearCache) {
+
+        final SidIV<V> tmp = new SidIV<V>(spo);
+
+        // Propagate the cached byte[] key.
+        tmp.key = key;
+        
+        // Propagate the cached BigdataValue.
+        tmp.bnode = bnode;
+        
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
+    /**
 	 * Ctor with internal value spo specified.
 	 */
 	public SidIV(final ISPO spo) {

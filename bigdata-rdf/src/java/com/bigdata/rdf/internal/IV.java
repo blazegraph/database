@@ -46,7 +46,7 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *            The generic type for the inline value.
  */
 public interface IV<V extends BigdataValue, T> extends Serializable, 
-        Comparable<IV>, IVCache<V> {
+        Comparable<IV>, IVCache<V,T> {
 
     /**
      * The value of the flags representing the {@link VTE} and the {@link DTE}.
