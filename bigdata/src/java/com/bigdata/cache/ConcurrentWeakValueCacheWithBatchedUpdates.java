@@ -46,11 +46,11 @@ import org.apache.log4j.Logger;
 public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
         IConcurrentWeakValueCache<K, V> {
 
-    protected static transient final Logger log = Logger.getLogger(ConcurrentWeakValueCacheWithBatchedUpdates.class);
+    private static transient final Logger log = Logger.getLogger(ConcurrentWeakValueCacheWithBatchedUpdates.class);
     
-    protected static transient final boolean INFO = log.isInfoEnabled();
+//    private static transient final boolean INFO = log.isInfoEnabled();
 
-    protected static transient final boolean DEBUG = log.isDebugEnabled();
+    private static transient final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * A concurrency-savvy map.
@@ -689,11 +689,11 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
         }
         
         if( counter > 1 ) {
-            
-            if( INFO ) {
-                
+
+            if (log.isInfoEnabled()) {
+
                 log.info("Removed " + counter + " cleared references");
-                
+
             }
             
         }

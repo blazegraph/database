@@ -135,28 +135,28 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      */
     private final HardReferenceQueueEvictionListener<T> threadLocalQueueEvictionListener;
 
-    /**
-     * @param listener
-     *            The eviction listener (sees only evictions from the outer
-     *            class).
-     * @param capacity
-     *            The capacity of this cache (does not include the capacity of
-     *            the thread-local caches).
-     */
-    public HardReferenceQueueWithBatchingUpdates(
-            final HardReferenceQueueEvictionListener<T> listener,
-            final int capacity) {
-
-            this(//
-                    new HardReferenceQueue<T>(listener, capacity, 0/* nscan */),
-//                    listener, capacity,
-                IHardReferenceQueue.DEFAULT_NSCAN,// threadLocalNScan
-                64,// threadLocalCapacity
-                32, // threadLocalTryLockSize
-                null // batched update listener
-                );
-
-    }
+//    /**
+//     * @param listener
+//     *            The eviction listener (sees only evictions from the outer
+//     *            class).
+//     * @param capacity
+//     *            The capacity of this cache (does not include the capacity of
+//     *            the thread-local caches).
+//     */
+//    public HardReferenceQueueWithBatchingUpdates(
+//            final HardReferenceQueueEvictionListener<T> listener,
+//            final int capacity) {
+//
+//            this(//
+//                    new HardReferenceQueue<T>(listener, capacity, 0/* nscan */),
+////                    listener, capacity,
+//                IHardReferenceQueue.DEFAULT_NSCAN,// threadLocalNScan
+//                64,// threadLocalCapacity
+//                32, // threadLocalTryLockSize
+//                null // batched update listener
+//                );
+//
+//    }
 
     /**
      * Designated constructor.
