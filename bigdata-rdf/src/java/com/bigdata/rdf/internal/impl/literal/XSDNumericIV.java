@@ -48,8 +48,21 @@ public class XSDNumericIV<V extends BigdataLiteral> extends
      */
     private static final long serialVersionUID = 2330208360371357672L;
     
-    
     private final Number number;
+
+    public IV<V, Number> clone(final boolean clearCache) {
+
+        final XSDNumericIV<V> tmp = new XSDNumericIV<V>(number, getDTE());
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
 
     private XSDNumericIV(final Number number, final DTE dte) {
         

@@ -10,7 +10,6 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.cache.IConcurrentWeakValueCache;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
@@ -34,7 +33,7 @@ class ResolveTermTask implements Callable<Void> {
     private final byte[][] keys;
     private final TermId<?>[] notFound;
     private final ConcurrentHashMap<IV<?,?>, BigdataValue> map;
-    private final IConcurrentWeakValueCache<IV<?,?>, BigdataValue> termCache;
+    private final ITermCache<IV<?,?>, BigdataValue> termCache;
     private final BigdataValueFactory valueFactory;
 
     /**
@@ -62,7 +61,7 @@ class ResolveTermTask implements Callable<Void> {
     ResolveTermTask(final IIndex ndx, final int fromIndex,
             final int toIndex, final byte[][] keys, final TermId<?>[] notFound,
             final ConcurrentHashMap<IV<?,?>, BigdataValue> map,
-            final IConcurrentWeakValueCache<IV<?,?>, BigdataValue> termCache,
+            final ITermCache<IV<?,?>, BigdataValue> termCache,
             final BigdataValueFactory valueFactory) {
 
         this.ndx = ndx;

@@ -84,6 +84,24 @@ public class FullyInlineTypedLiteralIV<V extends BigdataLiteral> extends
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
 
+    public IV<V, String> clone(final boolean clearCache) {
+
+        final FullyInlineTypedLiteralIV<V> tmp = new FullyInlineTypedLiteralIV<V>(
+                label, language, datatype);
+
+        // propagate transient state if available.
+        tmp.byteLength = byteLength;
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+    
     public FullyInlineTypedLiteralIV(final String label) {
      
         this(label, null/* languageCode */, null/* datatype */);

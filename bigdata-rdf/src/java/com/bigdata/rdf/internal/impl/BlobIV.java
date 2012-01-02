@@ -138,6 +138,20 @@ public class BlobIV<V extends BigdataValue> extends
      */
     private final short counter;
     
+    public IV<V, Void> clone(final boolean clearCache) {
+
+        final BlobIV<V> tmp = new BlobIV<V>(flags, hash, counter);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
     /**
 	 * @param vte
 	 *            The {@link VTE}.

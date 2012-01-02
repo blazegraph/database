@@ -185,18 +185,18 @@ public class TestIVCache extends AbstractTripleStoreTestCase {
 			assertTrue(val == iv.getValue());
 		}
 
-		/*
-		 * Drop the value and verify that it is no longer found in the cache.
-		 */
-		iv.dropValue();
-		
-		// not found in the cache.
-		try {
-			iv.getValue();
-			fail("Expecting: " + NotMaterializedException.class);
-		} catch (NotMaterializedException e) {
-			// ignore.
-		}		
+//		/*
+//		 * Drop the value and verify that it is no longer found in the cache.
+//		 */
+//		iv.dropValue();
+//		
+//		// not found in the cache.
+//		try {
+//			iv.getValue();
+//			fail("Expecting: " + NotMaterializedException.class);
+//		} catch (NotMaterializedException e) {
+//			// ignore.
+//		}		
 		
 	}
 

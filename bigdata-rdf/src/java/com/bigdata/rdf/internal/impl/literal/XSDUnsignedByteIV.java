@@ -31,7 +31,6 @@ import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataLiteralImpl;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:unsignedByte</code>. */
@@ -57,6 +56,20 @@ public class XSDUnsignedByteIV<V extends BigdataLiteral> extends
         
     }
     
+    public IV<V, Short> clone(final boolean clearCache) {
+
+        final XSDUnsignedByteIV<V> tmp = new XSDUnsignedByteIV<V>(value);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
     /**
      * 
      * @param value

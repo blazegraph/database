@@ -92,10 +92,7 @@ public interface BigdataValue extends Value, IElement {//, Comparable<BigdataVal
      * exception is when the {@link BigdataValue} has been materialized from the
      * {@link IV} by joining against the lexicon. The query plan is responsible
      * for deciding when to materialize the {@link BigdataValue} from the
-     * {@link IV} and when to {@link #dropValue() drop} the cached
-     * {@link BigdataValue}. (The cached {@link BigdataValue} SHOULD be dropped
-     * as soon the query plan not longer requires the materialized {@link Value}
-     * .)
+     * {@link IV}.
      * 
      * @param iv
      *            The internal value.

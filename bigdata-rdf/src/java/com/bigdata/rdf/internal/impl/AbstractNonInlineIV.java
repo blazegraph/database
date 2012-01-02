@@ -65,17 +65,17 @@ abstract public class AbstractNonInlineIV<V extends BigdataValue, T>
 
     }
 
-    /**
-     * Callers must explicitly populate the value cache.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    final public V setValue(V v) {
-    	
-    	return super.setValue(v);
-    	
-    }
+//    /**
+//     * Callers must explicitly populate the value cache.
+//     * <p>
+//     * {@inheritDoc}
+//     */
+//    @Override
+//    final public V setValue(V v) {
+//    	
+//    	return super.setValue(v);
+//    	
+//    }
     
     /**
      * Operation is not supported because this {@link IV} type is not 100%

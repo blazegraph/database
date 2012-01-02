@@ -73,7 +73,21 @@ public class XSDUnsignedShortIV<V extends BigdataLiteral> extends
         return v;
 
     }
-    
+
+    public IV<V, Integer> clone(final boolean clearCache) {
+
+        final XSDUnsignedShortIV<V> tmp = new XSDUnsignedShortIV<V>(value);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
     public XSDUnsignedShortIV(final short value) {
         
         super(DTE.XSDUnsignedShort);

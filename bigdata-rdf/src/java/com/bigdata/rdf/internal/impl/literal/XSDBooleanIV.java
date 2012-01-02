@@ -24,11 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.literal;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-
 import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
@@ -50,11 +46,25 @@ public class XSDBooleanIV<V extends BigdataLiteral> extends
     static public transient final XSDBooleanIV<BigdataLiteral> FALSE = 
     	new XSDBooleanIV<BigdataLiteral>(false);
     
-    static public final XSDBooleanIV valueOf(final boolean b) {
+    static public final XSDBooleanIV<BigdataLiteral> valueOf(final boolean b) {
     	return b ? TRUE : FALSE;
     }
     
     private final boolean value;
+
+    public IV<V, Boolean> clone(final boolean clearCache) {
+
+        final XSDBooleanIV<V> tmp = new XSDBooleanIV<V>(value);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
 
     public XSDBooleanIV(final boolean value) {
         

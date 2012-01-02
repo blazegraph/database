@@ -113,6 +113,10 @@ public class TestEncodeDecodeKeys extends AbstractEncodeDecodeKeysTestCase {
                     public int hashCode() {
                         return 0;
                     }
+
+                    public IV<?, ?> clone(boolean clearCache) {
+                        throw new UnsupportedOperationException();
+                    }
                     
                     public int _compareTo(IV o) {
                         throw new UnsupportedOperationException();

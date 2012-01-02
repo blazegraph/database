@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.impl.uri;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
@@ -53,9 +54,21 @@ public class VocabURIShortIV<V extends BigdataURI> extends AbstractInlineIV<V, S
 	 * 
 	 */
 	private static final long serialVersionUID = -3354960247086946301L;
-	
-	
+		
 	final private short value;
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Always returns <i>this</i>. (The rationale is that the vocabulary
+     * {@link IV}s already pin their cached value so there is no point in 
+     * creating a clone with the cleared cache reference.)
+     */
+    public IV<V, Short> clone(final boolean clearCache) {
+
+        return this;
+        
+    }
 
 	public VocabURIShortIV(final short value) {
 

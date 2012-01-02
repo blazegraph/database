@@ -44,11 +44,34 @@ public class LiteralExtensionIV<V extends BigdataLiteral>
      * 
      */
     private static final long serialVersionUID = 8267554196603121194L;
-
     
     private final AbstractLiteralIV<BigdataLiteral, ?> delegate;
     
     private final IV<BigdataURI, ?> datatype;
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The extensionIV and delegateIV are NOT cloned. The rationale is
+     * that we are only cloning to break the hard reference from the {@link IV}
+     * to to cached value. If that needs to be done for the extensionIV and
+     * delegateIV, then it will be done separately for those objects when they
+     * are inserted into the termsCache.
+     */
+    public IV<V, Object> clone(final boolean clearCache) {
+
+        final LiteralExtensionIV<V> tmp = new LiteralExtensionIV<V>(delegate,
+                datatype);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
     
     public LiteralExtensionIV(
     		final AbstractLiteralIV<BigdataLiteral, ?> delegate, 

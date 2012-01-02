@@ -55,6 +55,23 @@ public class FullyInlineURIIV<V extends BigdataURI> extends AbstractInlineIV<V, 
     /** The cached byte length of this {@link IV}. */
     private transient int byteLength = 0;
 
+    public IV<V, URI> clone(final boolean clearCache) {
+
+        final FullyInlineURIIV<V> tmp = new FullyInlineURIIV<V>(uri);
+        
+        // propagate transient state if available.
+        tmp.byteLength = byteLength;
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+    
     public FullyInlineURIIV(final URI uri) {
 
         this(uri, 0/* byteLength */);

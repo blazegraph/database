@@ -57,6 +57,20 @@ public class XSDUnsignedIntIV<V extends BigdataLiteral> extends
         
     }
 
+    public IV<V, Long> clone(final boolean clearCache) {
+
+        final XSDUnsignedIntIV<V> tmp = new XSDUnsignedIntIV<V>(value);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
+    }
+
     public XSDUnsignedIntIV(final int value) {
         
         super(DTE.XSDUnsignedInt);

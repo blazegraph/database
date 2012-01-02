@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.impl.bnode;
 
-import org.openrdf.model.Value;
+import org.openrdf.model.BNode;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
@@ -58,6 +58,20 @@ public class NumericBNodeIV<V extends BigdataBNode> extends
     	
     	return id;
     	
+    }
+    
+    public IV<V, Integer> clone(final boolean clearCache) {
+
+        final NumericBNodeIV<V> tmp = new NumericBNodeIV<V>(id);
+
+        if (!clearCache) {
+
+            tmp.setValue(getValueCache());
+            
+        }
+        
+        return tmp;
+
     }
     
     public NumericBNodeIV(final int id) {
