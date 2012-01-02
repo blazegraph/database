@@ -1201,6 +1201,8 @@ abstract public class AbstractHTree implements ICounterSetAccess {
              */
             
             return new HardReferenceQueueWithBatchingUpdates<PO>(//
+                    BigdataStatics.threadLocalBuffers, // threadLocalBuffers
+                    16,// concurrencyLevel
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             writeRetentionQueueCapacity, 0/* nscan */),
 //                    new DefaultEvictionListener(),//

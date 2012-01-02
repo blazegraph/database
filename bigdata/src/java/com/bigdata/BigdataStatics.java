@@ -55,5 +55,17 @@ public class BigdataStatics {
      * @see ProcessHelper
      */
     public static int echoProcessStartupLineCount = 20;
+
+    /**
+     * Global switch controlling whether true thread local buffers or striped
+     * locks are used for some things.
+     * 
+     * @deprecated This is ugly. Remove once the issue has been resolved.
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/437 (Thread-local
+     *      cache combined with unbounded thread pools causes effective memory
+     *      leak)
+     */
+    public static final boolean threadLocalBuffers = false;
     
 }

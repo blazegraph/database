@@ -554,15 +554,28 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
         try {
 
-            for (BatchQueue<T> q : threadLocalQueues.values()) {
-            
-                // clear the thread local queues.
-                q.clear(clearRefs);
+            if (threadLocalBuffers) {
+                
+                for (BatchQueue<T> q : threadLocalQueues.values()) {
+
+                    // clear the thread local queues.
+                    q.clear(clearRefs);
+
+                }
+
+                // discard map entries.
+                threadLocalQueues.clear();
+
+            } else {
+
+                for(BatchQueue<T> q : buffers) {
+
+                    // clear the thread local queues.
+                    q.clear(clearRefs);
+
+                }
                 
             }
-
-            // discard map entries.
-            threadLocalQueues.clear();
 
             // clear the shared backing queue.
             sharedQueue.clear(true/* clearRefs */);

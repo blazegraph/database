@@ -1052,6 +1052,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              */
             
             return new HardReferenceQueueWithBatchingUpdates<PO>(//
+                    BigdataStatics.threadLocalBuffers, // threadLocalBuffers
+                    16,// concurrencyLevel
                     new HardReferenceQueue<PO>(new DefaultEvictionListener(),
                             metadata.getWriteRetentionQueueCapacity(), 0/* nscan */),
 //                    new DefaultEvictionListener(),//
@@ -4165,21 +4167,21 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 		if (isReadOnly())
 			throw new IllegalStateException(ERROR_READ_ONLY);
 
-		btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-recycle(addr));
+        btreeCounters.bytesOnStore_nodesAndLeaves.addAndGet(-recycle(addr));
 
-	}
+    }
 
-	int recycle(final long addr) {
-		if (addr != IRawStore.NULL) {
-			final int nbytes = store.getByteCount(addr);
-    		getBtreeCounters().bytesReleased += nbytes;
-    		
-			store.delete(addr);
-			
-			return nbytes;
-		} else {
-			return 0;
-		}
-	}
+    protected int recycle(final long addr) {
+        if (addr != IRawStore.NULL) {
+            final int nbytes = store.getByteCount(addr);
+            getBtreeCounters().bytesReleased += nbytes;
+            
+            store.delete(addr);
+            
+            return nbytes;
+        } else {
+            return 0;
+        }
+    }
 
 }
