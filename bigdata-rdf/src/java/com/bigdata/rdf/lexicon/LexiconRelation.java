@@ -1423,6 +1423,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
+     * Return the threshold at which a literal would be stored in the
+     * {@link LexiconKeyOrder#BLOBS} index.
+     * 
+     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+     */
+    public int getBlobsThreshold() {
+        
+        return blobsThreshold;
+        
+    }
+    
+    /**
      * Batch insert of terms into the database.
      * <p>
      * Note: Duplicate {@link BigdataValue} references and {@link BigdataValue}s
