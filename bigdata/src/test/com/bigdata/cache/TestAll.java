@@ -65,6 +65,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestHardReferenceQueueWithBatchingUpdates.class);
         
+        suite.addTestSuite(TestConcurrentWeakValueCacheWithBatchingUpdates.class);
+        
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
 
