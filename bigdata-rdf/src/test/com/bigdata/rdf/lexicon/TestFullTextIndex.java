@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
@@ -35,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
 
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
@@ -166,9 +166,41 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         
     }
 
-    /**
-     * TODO Must also verify text index over blobs.
-     */
+    private LiteralImpl getLargeLiteral(final AbstractTripleStore store) {
+        
+        final int len = store.getLexiconRelation().getBlobsThreshold();
+
+        final StringBuilder sb = new StringBuilder(len);
+
+        final String[] tokens = new String[] {
+                "apple",
+                "mary",
+                "john",
+                "barley",
+                "mellow",
+                "pudding",
+                "fries",
+                "peal",
+                "gadzooks"
+        };
+        
+        for (int i = 0; sb.length() < len; i++) {
+
+            sb.append(tokens[(i % tokens.length)]);
+
+            sb.append(" ");
+
+        }
+
+        final String s = sb.toString();
+
+        if (log.isInfoEnabled())
+            log.info("length(s)=" + s.length());
+
+        return new LiteralImpl(s);
+    
+    }
+    
     public void test_fullTextIndex01() throws InterruptedException {
 
         AbstractTripleStore store = getStore();
@@ -178,6 +210,8 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             assertNotNull(store.getLexiconRelation().getSearchEngine());
 
             final BigdataValueFactory f = store.getValueFactory();
+            
+            final LiteralImpl largeLiteral = getLargeLiteral(store);
             
             final BigdataValue[] terms = new BigdataValue[] {//
                     f.createLiteral("abc"),//
@@ -194,6 +228,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                     f.createBNode(UUID.randomUUID().toString()),//
                     f.createBNode("a12"),//
+                    f.asValue(largeLiteral),//
             };
 
             store.addTerms(terms);
@@ -246,6 +281,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
             // 'the' is a stopword, so there are no hits.
             assertExpectedHits(store, "the", "en", new BigdataValue[] {});
 
+            // BLOB.
+            assertExpectedHits(store, largeLiteral.getLabel(), null/*lang*/, //
+                    .0f, // minCosine
+                    new BigdataValue[] {
+                    f.asValue(largeLiteral)
+                    });
+
             /*
              * re-open the store before search to verify that the data were made
              * restart safe.
@@ -292,6 +334,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                         new BigdataValue[] {
                         f.createLiteral("good day", "en"),
                         f.createLiteral("the first day", "en") });
+
+                // BLOB
+                assertExpectedHits(store, largeLiteral.getLabel(), null/*lang*/, //
+                        .0f, // minCosine
+                        new BigdataValue[] {
+                        f.asValue(largeLiteral)
+                        });
                 
             }
             
@@ -376,7 +425,19 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                 assertNotNull(store.getLexiconRelation().getSearchEngine());
                 
-                // @todo retest.
+                assertExpectedHits(store, "brown", "en", //
+                        0f, // minCosine,
+                        new BigdataValue[] {//
+                        f.createLiteral("quick brown fox"), //
+                        f.createLiteral("slow brown dog", XMLSchema.STRING) //
+                        });
+                
+                assertExpectedHits(store, "cat", "en", //
+//                        0f, // minCosine,
+                        new BigdataValue[] {//
+                        f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
+                                f.asValue(XMLSchema.ANYURI))//
+                        });
                 
             }
             
@@ -472,7 +533,19 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                 assertNotNull(store.getLexiconRelation().getSearchEngine());
                 
-                // @todo retest.
+                assertExpectedHits(store, "brown", "en", //
+                        0f, // minCosine,
+                        new BigdataValue[] {//
+                        f.createLiteral("quick brown fox"), //
+                        f.createLiteral("slow brown dog", XMLSchema.STRING) //
+                        });
+                
+                assertExpectedHits(store, "cat", "en", //
+//                        0f, // minCosine,
+                        new BigdataValue[] {//
+                        f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
+                                f.asValue(XMLSchema.ANYURI))//
+                        });
                 
             }
             
@@ -486,8 +559,6 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
     /**
      * Unit test for {@link LexiconRelation#rebuildTextIndex()}.
-     * 
-     * TODO Must also test rebuild of text index over blobs.
      */
     public void test_rebuildIndex() {
         
@@ -499,6 +570,8 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             final BigdataValueFactory f = store.getValueFactory();
             
+            final LiteralImpl largeLiteral = getLargeLiteral(store);
+
             final BigdataValue[] terms = new BigdataValue[] {//
                     f.createLiteral("abc"),//
                     f.createLiteral("abc", "en"),//
@@ -514,6 +587,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                     f.createBNode(UUID.randomUUID().toString()),//
                     f.createBNode("a12"),//
+                    
+                    f.asValue(largeLiteral),//
+
             };
 
             store.addTerms(terms);
@@ -565,6 +641,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
             // 'the' is a stopword, so there are no hits.
             assertExpectedHits(store, "the", "en", new BigdataValue[] {});
+
+            // BLOB
+            assertExpectedHits(store, largeLiteral.getLabel(), null/*lang*/, //
+                    .0f, // minCosine
+                    new BigdataValue[] {
+                    f.asValue(largeLiteral)
+                    });
 
             /*
              * re-open the store before search to verify that the data were made
@@ -632,6 +715,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                         new BigdataValue[] {
                         f.createLiteral("good day", "en"),
                         f.createLiteral("the first day", "en") });
+                
+                // BLOB
+                assertExpectedHits(store, largeLiteral.getLabel(), null/*lang*/, //
+                        .0f, // minCosine
+                        new BigdataValue[] {
+                        f.asValue(largeLiteral)
+                        });
                 
             }
             
