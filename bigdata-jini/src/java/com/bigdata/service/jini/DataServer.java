@@ -44,8 +44,12 @@ import org.apache.log4j.MDC;
 
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.btree.proc.RangeCountProcedure;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
+import com.bigdata.service.proxy.ThickFuture;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
@@ -355,8 +359,51 @@ public class DataServer extends AbstractServer {
 //                clearLoggingContext();
 //
 //            }
+            
+            // Submit the procedure for evaluation, obtaining it's Future.
+            final Future f = super.submit(tx, name, proc);
+            
+            if(proc instanceof RangeCountProcedure) {
 
-            return getFederation().getProxy(super.submit(tx, name, proc));
+                /*
+                 * This code turns a request for a fast range count into a
+                 * synchronous RMI call. Rather than returning a Future which is
+                 * a proxy for the outcome of the fast range count operation,
+                 * this blocks until the Future is done and then returns a thick
+                 * object which embodies the outcome. Fast range counts are
+                 * extremely common requests and generally have low latency. If
+                 * they are wrapped up as proxy objects, then the DGC for the
+                 * exported proxy objects becomes a problem and we wind up with
+                 * a large number of threads waiting on the DGC leases for the
+                 * proxy objects to expire.
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/433
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/437
+                 */
+                
+                final RangeCountProcedure p = (RangeCountProcedure) proc;
+                
+                // Get the effective timestamp that the procedure will run with.
+                // Choose READ_COMMITTED iff proc is read-only and UNISOLATED
+                // was requested.
+                final long timestamp = (tx == ITx.UNISOLATED
+                        && proc.isReadOnly() ? ITx.READ_COMMITTED : tx);
+
+                if (TimestampUtility.isReadOnly(timestamp) && !p.isExact()) {
+
+                    /*
+                     * Return a thick future. This turns the request into a sync
+                     * RPC operation.
+                     */
+
+                    return new ThickFuture(f);
+
+                }
+                
+            }
+
+            return getFederation().getProxy(f);
 
         }
 

@@ -331,6 +331,17 @@ public class ListServices {
             sb.append("Discovered " + registrars.length
                     + " jini service registrars.\n");
 
+            if(true) {
+            
+                // Show the host(s) running the service registrars.
+                for (ServiceRegistrar r : registrars) {
+                
+                    sb.append("   " + r.getLocator().getHost()+"\n");
+                    
+                }
+                
+            }
+
             sb.append("Discovered " + a.length + " services\n");
 
             sb.append("Discovered " + staleServices.size()
