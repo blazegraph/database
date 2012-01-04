@@ -1560,26 +1560,26 @@ abstract public class DataService extends AbstractService
 
     }
     
-    /**
-     * Encapsulate the {@link Future} within a proxy that may be marshalled by
-     * RMI and sent to a remote client. The client will interact with the
-     * unmarshalled {@link Future}, which in turn will use RMI to control the
-     * original {@link Future} within the {@link DataService}.
-     * <p>
-     * The default implementation simply returns the <i>future</i> and MUST be
-     * overriden when remote clients will use RMI to execute methods on the
-     * {@link DataService}.
-     * 
-     * @param future
-     *            The future.
-     * 
-     * @return The encapsulated future.
-     */
-    protected Future wrapFuture(Future future) {
-        
-        return future;
-        
-    }
+//    /**
+//     * Encapsulate the {@link Future} within a proxy that may be marshalled by
+//     * RMI and sent to a remote client. The client will interact with the
+//     * unmarshalled {@link Future}, which in turn will use RMI to control the
+//     * original {@link Future} within the {@link DataService}.
+//     * <p>
+//     * The default implementation simply returns the <i>future</i> and MUST be
+//     * overriden when remote clients will use RMI to execute methods on the
+//     * {@link DataService}.
+//     * 
+//     * @param future
+//     *            The future.
+//     * 
+//     * @return The encapsulated future.
+//     */
+//    protected Future wrapFuture(Future future) {
+//        
+//        return future;
+//        
+//    }
     
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
             byte[] toKey, int capacity, int flags, IFilter filter)

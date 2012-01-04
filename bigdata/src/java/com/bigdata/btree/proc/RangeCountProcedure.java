@@ -91,6 +91,25 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
     }
     
     /**
+     * Return <code>true</code> iff the result count must be exact.
+     */
+    public final boolean isExact() {
+        
+        return exact;
+        
+    }
+
+    /**
+     * Return <code>true</code> iff deleted tuples must be included in the
+     * result.
+     */
+    public final boolean isDeleted() {
+        
+        return deleted;
+        
+    }
+
+    /**
      * <p>
      * Range count of entries in a key range for the index.
      * </p>
