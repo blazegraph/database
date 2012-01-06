@@ -165,6 +165,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		// ensure history retention to force deferredFrees
 		// properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE,
 		// "1"); // Non-zero
+		
+		// Set OVERWRITE_DELETE
+		// properties.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
 
 		return properties;
 

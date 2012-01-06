@@ -268,13 +268,20 @@ abstract public class WriteCache implements IWriteCache {
 		 */
 		public final int recordLength;
 
-		public RecordMetadata(final long fileOffset, final int bufferOffset, final int recordLength) {
+		/**
+		 * Indicates whether this record is an overwrite record
+		 */
+		private final boolean overwrite;
+
+		public RecordMetadata(final long fileOffset, final int bufferOffset, final int recordLength, final boolean overwrite) {
 
 			this.fileOffset = fileOffset;
 
 			this.bufferOffset = bufferOffset;
 
 			this.recordLength = recordLength;
+
+			this.overwrite = overwrite;
 
 		}
 
@@ -283,6 +290,10 @@ abstract public class WriteCache implements IWriteCache {
 			return getClass().getSimpleName() + "{fileOffset=" + fileOffset + ",off=" + bufferOffset + ",len="
 					+ recordLength + "}";
 
+		}
+
+		public boolean isOverwrite() {
+			return overwrite;
 		}
 
 	}
@@ -629,6 +640,11 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+	public boolean write(final long offset, final ByteBuffer data, final int chk, boolean writeChecksum) 
+	throws InterruptedException {
+		return write(offset, data, chk, writeChecksum, false/* overwrite */);
+	}
+
 	/**
 	 * 
 	 * @param offset
@@ -640,7 +656,7 @@ abstract public class WriteCache implements IWriteCache {
 	 * @return
 	 * @throws InterruptedException
 	 */
-	boolean write(final long offset, final ByteBuffer data, final int chk, boolean writeChecksum)
+	boolean write(final long offset, final ByteBuffer data, final int chk, boolean writeChecksum, final boolean overwrite)
 			throws InterruptedException {
 
 		// Note: The offset MAY be zero. This allows for stores without any
@@ -746,7 +762,8 @@ abstract public class WriteCache implements IWriteCache {
 			 * Add metadata for the record so it can be read back from the
 			 * cache.
 			 */
-			if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, datalen)) != null) {
+			final RecordMetadata xentry = recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, datalen, overwrite));
+			if (xentry != null && !xentry.isOverwrite()) {
 				/*
 				 * Note: This exception indicates that the abort protocol did
 				 * not reset() the current write cache before new writes were
@@ -1720,7 +1737,7 @@ abstract public class WriteCache implements IWriteCache {
 					recordMap.remove(addr); // should only happen if previous write already made to the buffer
 											// but the allocation has since been freed
 				} else {
-					recordMap.put(addr, new RecordMetadata(addr, pos + 12, sze));
+					recordMap.put(addr, new RecordMetadata(addr, pos + 12, sze, false));
 				}
 				pos += 12 + sze; // hop over buffer info (addr + sze) and then
 									// data
@@ -2204,8 +2221,12 @@ abstract public class WriteCache implements IWriteCache {
 
 		recordMap.clear();
 
-		recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(), 0, buf.limit()));
+		recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(), 0, buf.limit(), false));
 
+	}
+
+	protected RecordMetadata getMetadata(long offset) {
+		return recordMap.get(offset);
 	}
 
 }

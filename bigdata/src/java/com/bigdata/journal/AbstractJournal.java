@@ -1040,6 +1040,15 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			// new or re-load commit record index from store via root block.
 			this._commitRecordIndex = _getCommitRecordIndex();
+			
+			/**
+			 * If the store can recycle storage then we must provide a hook to
+			 * allow the removal of cached data when it is available for recycling.
+			 */
+			if (_bufferStrategy instanceof RWStrategy) {
+				((RWStrategy) _bufferStrategy).getRWStore().registerExternalCache(historicalIndexCache,
+						getByteCount(_commitRecordIndex.getCheckpoint().getCheckpointAddr()));
+			}
 
             // new or re-load from the store.
 			this._icuVersionRecord = _getICUVersionRecord();
@@ -2221,6 +2230,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * restored root block.
 			 */
 			abort();
+			
+			/**
+			 * Ensure cache is clear to prevent access to invalid BTree from last
+			 * commit point
+			 */
+			historicalIndexCache.clear();
 
 		} finally {
 
@@ -3489,10 +3504,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		 * 
 		 * Note: We use putIfAbsent() here rather than the [synchronized]
 		 * keyword for higher concurrency with atomic semantics.
+		 * 
+		 * DO NOT use the checkpointAddr but rather the physical address
+		 * without the length, this will enable the RWStore to clear the
+		 * cache efficiently without mocking up an address requiring
+		 * access to the checkpointAddr size
 		 */
 		// synchronized (historicalIndexCache) {
-		// BTree btree = (BTree) historicalIndexCache.get(checkpointAddr);
-		BTree btree = historicalIndexCache.get(checkpointAddr);
+		// DO NOT use checkpointAddr but rather determine the physical
+		//	address and store against that
+		final long offset  = getPhysicalAddress(checkpointAddr);
+		BTree btree = historicalIndexCache.get(offset);
 
 		if (btree == null) {
 
@@ -3503,11 +3525,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 
 			btree = BTree.load(this, checkpointAddr, true/* readOnly */);
-
+			
 		}
 
 		// Note: putIfAbsent is used to make concurrent requests atomic.
-		BTree oldval = historicalIndexCache.putIfAbsent(checkpointAddr, btree);
+		BTree oldval = historicalIndexCache.putIfAbsent(offset, btree);
 
 		if (oldval != null) {
 
@@ -3518,7 +3540,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			btree = oldval;
 
 		}
-
+		
 		// historicalIndexCache.put(checkpointAddr, (ICommitter)btree,
 		// false/*dirty*/);
 
@@ -3743,6 +3765,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	final public long getOffset(long addr) {
 		return _bufferStrategy.getOffset(addr);
+	}
+
+	final public long getPhysicalAddress(long addr) {
+		return _bufferStrategy.getAddressManager().getPhysicalAddress(addr);
 	}
 
 	final public int getByteCount(long addr) {
@@ -4288,5 +4314,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		
 		return removed;
 	}
+
+	/**
+	 * When a BTree index is updated, remove the historical cache.
+	 * 
+	 * @param oldAddr - removed checkpointAddr offset
+	 */
+//	public void removeCachedIndex(final long oldAddr) {
+//		this.historicalIndexCache.remove(oldAddr);
+//	}
 
 }

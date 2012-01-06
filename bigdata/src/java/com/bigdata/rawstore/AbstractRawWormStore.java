@@ -96,11 +96,17 @@ abstract public class AbstractRawWormStore extends AbstractRawStore implements I
         
     }
 
-    final public long getOffset(final long addr) {
+   final public long getOffset(final long addr) {
         
         return am.getOffset(addr);
         
     }
+
+   final public long getPhysicalAddress(final long addr) {
+       
+       return am.getPhysicalAddress(addr);
+       
+   }
 
     final public int getByteCount(final long addr) {
 

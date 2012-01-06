@@ -22,6 +22,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -67,6 +68,13 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 		return props;
 
+	}
+	
+	protected Properties getProperties(int retention) {
+		final Properties props = getProperties();
+		props.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+
+		return props;
 	}
 
     protected void setUp() throws Exception {
@@ -199,7 +207,15 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 	// similar to test_multiple_transactions but uses direct AbsractTripleStore
 	// manipulations rather than RepositoryConnections
-	public void test_multiple_csem_transaction() throws Exception {
+	public void test_multiple_csem_transaction_nohistory() throws Exception {
+		domultiple_csem_transaction(0);
+	}
+	
+	public void test_multiple_csem_transaction_withHistory() throws Exception {
+		domultiple_csem_transaction(60);
+	}
+	
+	public void domultiple_csem_transaction(final int retention) throws Exception {
 
 		/**
 		 *  The most likely problem is related to the session protection in the
@@ -223,7 +239,7 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 		final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(null);
 		// Set [true] iff there are no failures by the time we cancel the running tasks.
 		final AtomicBoolean success = new AtomicBoolean(false);
-        final BigdataSail sail = getSail();
+        final BigdataSail sail = getSail(getProperties(retention));
 		try {
 
 	        sail.initialize();
@@ -402,4 +418,109 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 	}
 
+	public void test_multiple_csem_transaction_onethread_nohistory() throws Exception {
+		domultiple_csem_transaction_onethread(0);
+	}
+	
+	public void test_multiple_csem_transaction_onethread_withHistory() throws Exception {
+		domultiple_csem_transaction_onethread(60);
+	}
+	
+// Open a read committed transaction
+    //do reads
+    //do write without closing read
+    //commit write
+    //close read
+    //repeat
+    public void domultiple_csem_transaction_onethread(final int retention) throws Exception {
+
+        final int nuris = 2000; // 2000; // number of unique subject/objects
+        final int npreds = 50; // 50; //
+        final Random r = new Random();
+
+        final CAT writes = new CAT();
+        final CAT reads = new CAT();
+        final AtomicReference<Throwable> failex = new AtomicReference<Throwable>(
+                null);
+        // Set [true] iff there are no failures by the time we cancel the
+        // running tasks.
+        final AtomicBoolean success = new AtomicBoolean(false);
+        final BigdataSail sail = getSail(getProperties(retention));
+        try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final AbstractTripleStore origStore = repo.getDatabase();
+
+            final URI[] subs = new URI[nuris];
+            for (int i = 0; i < nuris; i++) {
+                subs[i] = uri("uri:" + i);
+            }
+            final URI[] preds = new URI[npreds];
+            for (int i = 0; i < npreds; i++) {
+                preds[i] = uri("pred:" + i);
+            }
+            final int nwrites = 600;
+            final int nreads = 50;
+            final boolean isQuads = origStore.isQuads();
+
+            for (int loop = 0; loop < 20; loop++) {
+                final Long txId = ((Journal) origStore.getIndexManager())
+                        .newTx(ITx.READ_COMMITTED);
+                try {
+                	// System.err.println("READ_STATE: " + txId);
+                    final AbstractTripleStore readstore = (AbstractTripleStore) origStore
+                            .getIndexManager().getResourceLocator()
+                            .locate(origStore.getNamespace(), txId);
+                    for (int i = 0; i < nreads; i++) {
+                        final BigdataStatementIterator stats = readstore
+                        .getStatements(subs[nuris/2 + loop], null,
+                                null);
+//                        .getStatements(subs[r.nextInt(nuris)], null,
+//                                null);
+                        while (stats.hasNext()) {
+                            stats.next();
+                            reads.increment();
+                        }
+                    }
+
+                    Thread.sleep(r.nextInt(1000) + 500);
+                    try {
+
+                        for (int i = 0; i < nwrites; i++) {
+                            origStore.addStatement(subs[r.nextInt(nuris)],
+                                    preds[r.nextInt(npreds)],
+                                    subs[r.nextInt(nuris)],
+                                    isQuads ? subs[r.nextInt(nuris)] : null);
+//                            origStore.addStatement(subs[nuris/2 + loop],
+//                                    preds[npreds/2 + loop],
+//                                    subs[nuris/2 - loop],
+//                                    isQuads ? subs[nuris/2 + loop] : null);
+                            writes.increment();
+                            // System.out.print('.');
+                        }
+                        // System.out.println("\n");
+
+                    } finally {
+                        origStore.commit();
+                        if (log.isInfoEnabled()) {
+                            log.info("Commit");
+                        }
+                    }
+                    // Close Read Connection
+                    ((Journal) readstore.getIndexManager()).abort(txId);
+
+                } catch (Throwable ise) {
+                    log.error("firstCause:" + ise, ise);
+                    throw new Exception(ise);
+                }
+            }
+
+        } finally {
+
+            sail.__tearDownUnitTest();
+
+        }
+
+    }
 }

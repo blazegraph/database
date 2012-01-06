@@ -1552,6 +1552,10 @@ public class IndexSegmentStore extends AbstractRawStore {
         return addressManager.getOffset(addr);
     }
 
+    final public long getPhysicalAddress(long addr) {
+		return addressManager.getPhysicalAddress(addr);
+	}
+    
 //    final public void packAddr(DataOutput out, long addr) throws IOException {
 //        addressManager.packAddr(out, addr);
 //    }

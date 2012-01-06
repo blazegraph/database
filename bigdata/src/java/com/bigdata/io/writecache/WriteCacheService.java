@@ -1390,7 +1390,12 @@ abstract public class WriteCacheService implements IWriteCache {
     throws InterruptedException, IllegalStateException {
     	return write(offset, data, chk, useChecksum);
     }
-   /**
+
+    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
+    throws InterruptedException, IllegalStateException {
+    	return write(offset, data, chk, useChecksum, false /*overwrite*/);  	
+    }
+    /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
      * Otherwise it is written onto a cache buffer which is lazily flushed onto
@@ -1426,7 +1431,7 @@ abstract public class WriteCacheService implements IWriteCache {
      *       store but would require an override of this method specific to that
      *       implementation.
      */
-    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
+    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum, final boolean overwrite)
             throws InterruptedException, IllegalStateException {
 
         if (log.isTraceEnabled()) {
@@ -1477,19 +1482,23 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache cache = acquireForWriter();
 
 			try {
+				final WriteCache xcache = recordMap.get(offset);
+				if (xcache != null) {
+					final WriteCache.RecordMetadata rdata = xcache.getMetadata(offset);
+					// Is the data entry an overwrite marking recycled data?
+					if (rdata.isOverwrite()) {
+						// if so then just remove it
+						xcache.clearAddrMap(offset);
+						recordMap.remove(offset);
+					} else {
+						throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
+					}
+				}
 				debugAddrs(offset, data.remaining(), 'A');
 
 				// write on the cache.
-				if (cache.write(offset, data, chk, useChecksum)) {
-					WriteCache old = recordMap.put(offset, cache);
-					// There should be no duplicate address in the record
-					//	map since these entries should be removed, although
-					//	write data may still exist in an old WriteCache.
-					// A duplicate may also be indicative of an allocation
-					//	error, which we need to be pretty strict about!
-					if (old == cache) {
-						throw new AssertionError("Record already in cache: offset=" + offset + " " + addrDebugInfo(offset));
-					}
+				if (cache.write(offset, data, chk, useChecksum, overwrite)) {
+					recordMap.put(offset, cache);
 
 					return true;
 
@@ -1534,7 +1543,7 @@ abstract public class WriteCacheService implements IWriteCache {
 				try {
 
 					// While holding the write lock, see if the record fits.
-					if (cache.write(offset, data, chk, useChecksum)) {
+					if (cache.write(offset, data, chk, useChecksum, overwrite)) {
 
 						/*
 						 * It fits: someone already changed to a new cache,
@@ -1616,7 +1625,7 @@ abstract public class WriteCacheService implements IWriteCache {
 						current.set(cache = newBuffer);
 
 						// Try to write on the new buffer.
-						if (cache.write(offset, data, chk, useChecksum)) {
+						if (cache.write(offset, data, chk, useChecksum, overwrite)) {
 
 							// This must be the only occurrence of this record.
 							if (recordMap.put(offset, cache) != null) {

@@ -376,6 +376,10 @@ public class TestRawRecords extends AbstractBTreeTestCase {
 			return delegate.getOffset(addr);
 		}
 
+       public long getPhysicalAddress(final long addr) {
+            return delegate.getPhysicalAddress(addr);
+        }
+
 		public IResourceMetadata getResourceMetadata() {
 			return delegate.getResourceMetadata();
 		}
