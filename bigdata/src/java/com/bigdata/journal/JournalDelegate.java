@@ -170,6 +170,10 @@ public class JournalDelegate implements IJournal {
 		return delegate.getOffset(addr);
 	}
 
+    public long getPhysicalAddress(final long addr) {
+        return delegate.getPhysicalAddress(addr);
+    }
+
 	public long toAddr(int nbytes, long offset) {
 		return delegate.toAddr(nbytes, offset);
 	}

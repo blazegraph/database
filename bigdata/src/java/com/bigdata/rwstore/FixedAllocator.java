@@ -440,7 +440,7 @@ public class FixedAllocator implements Allocator {
 
 	private final ArrayList<AllocBlock> m_allocBlocks;
 
-	final private RWStore m_store;
+	final RWStore m_store;
 
 	/**
 	 * Calculating the number of ints (m_bitSize) cannot rely on a power of 2.  Previously this

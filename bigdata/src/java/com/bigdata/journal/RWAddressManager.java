@@ -20,6 +20,11 @@ public class RWAddressManager implements IAddressManager {
 
     public long getOffset(final long addr) {
         return addr >> 32;
+        
+    }
+
+    public long getPhysicalAddress(final long addr) {
+        return m_store.physicalAddress((int) getOffset(addr)) ;   
     }
 
     public long toAddr(final int nbytes, final long offset) {

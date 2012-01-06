@@ -46,7 +46,7 @@ import com.bigdata.quorum.Quorum;
 public class RWWriteCacheService extends WriteCacheService implements IWriteCacheManager {
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
-    
+      
     public RWWriteCacheService(final int nbuffers, final long fileExtent,
             final IReopenChannel<? extends Channel> opener,
             final Quorum quorum) throws InterruptedException,
@@ -78,6 +78,29 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
 
 	public boolean removeWriteToAddr(long address) {
 		return clearWrite(address);
+	}
+	
+	private byte[] m_delbytes = null;
+	public void overwrite(final long clr, final int sze) {
+		if (m_delbytes != null) {
+			try {
+				write(clr, ByteBuffer.wrap(m_delbytes, 0, sze), 0, false, true); // OVERWRITE
+			} catch (IllegalStateException e) {
+				throw new RuntimeException("Problem with overwrite", e);
+			} catch (InterruptedException e) {
+				log.warn("Overwrite interrupted", e);
+			}
+		}
+	}
+
+	public void setOverwriteBuffer(final int maxFixedAlloc) {
+		assert m_delbytes == null;
+		
+		final byte[] src = {'D', 'E','L','E','T','E', ' '};
+		m_delbytes = new byte[maxFixedAlloc];
+		for (int i = 0; i < maxFixedAlloc; i++) {
+			m_delbytes[i] = src[i % src.length];
+		}
 	}
     
 }

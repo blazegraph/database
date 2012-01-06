@@ -309,6 +309,11 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		return m_am.getOffset(addr);
 	}
 
+
+	public long getPhysicalAddress(long addr) {
+		return m_am.getPhysicalAddress(addr);
+	}
+
 	public long toAddr(final int nbytes, final long offset) {
 		return m_am.toAddr(nbytes, offset);
 	}
@@ -334,6 +339,10 @@ public class MemStore extends AbstractRawStore implements IRawStore {
 		public String toString(final long addr) {
 			return "{off=" + getOffset(addr) + ",len=" + getByteCount(addr)
 					+ "}";
+		}
+
+		public long getPhysicalAddress(long addr) {
+	        return getOffset(addr);   
 		}
 
 	}

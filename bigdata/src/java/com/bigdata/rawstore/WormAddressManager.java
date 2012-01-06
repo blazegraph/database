@@ -407,6 +407,10 @@ public class WormAddressManager implements IAddressManager {
 
     }
 
+    public long getPhysicalAddress(final long addr) {
+        return getOffset(addr);
+    }
+
 //    /**
 //     * Breaks an address into its offset and size and packs each component
 //     * separately. This provides much better packing then writing the entire

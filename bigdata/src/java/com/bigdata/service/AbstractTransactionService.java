@@ -851,7 +851,7 @@ abstract public class AbstractTransactionService extends AbstractService
                 throw new IllegalArgumentException();
             
             activeTx.put(state.tx, state);
-
+            
             synchronized(startTimeIndex) {
                 
                 /*

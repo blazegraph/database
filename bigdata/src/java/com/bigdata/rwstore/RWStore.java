@@ -48,12 +48,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.BTree.Counter;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -302,6 +304,14 @@ public class RWStore implements IStore, IBufferedWriter {
         String DOUBLE_BUFFER_WRITES = RWStore.class.getName() + ".doubleBuffer";
         
         String DEFAULT_DOUBLE_BUFFER_WRITES = "true";
+        
+        /**
+         * When <code>true</code> fills recycled storage with a recognizable
+         * byte pattern.
+         */
+        String OVERWRITE_DELETE = RWStore.class.getName() + ".overwriteDelete";
+        
+        String DEFAULT_OVERWRITE_DELETE = "false";
         
     }
 
@@ -693,7 +703,13 @@ public class RWStore implements IStore, IBufferedWriter {
         		
         		m_storageStats = new StorageStats(m_allocSizes);
 
-        		// commitChanges(null);
+        		// Check for overwrite option and set overwrite buffer if
+        		// required
+        		if (Boolean.valueOf(fileMetadata.getProperty(
+		                Options.OVERWRITE_DELETE,
+		                Options.DEFAULT_OVERWRITE_DELETE))) {
+        			m_writeCache.setOverwriteBuffer(m_maxFixedAlloc);
+        		}
 			} else {
 				
 				initfromRootBlock(m_rb);
@@ -1741,7 +1757,7 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 
 		m_allocationLock.lock();
-		try {
+		try {		
 			final FixedAllocator alloc = getBlockByAddress(addr);
 			final int addrOffset = getOffset(addr);
 			if (alloc == null) {
@@ -1759,6 +1775,7 @@ public class RWStore implements IStore, IBufferedWriter {
 			// only clear any existing write to cache if no active session
 			if (overrideSession || !this.isSessionProtected()) {
 				m_writeCache.clearWrite(pa);
+				m_writeCache.overwrite(pa, sze);
 			}
 			m_frees++;
 			
@@ -1774,6 +1791,12 @@ public class RWStore implements IStore, IBufferedWriter {
 			m_allocationLock.unlock();
 		}
 
+	}
+	
+	void removeFromExternalCache(final long clr, final int sze) {
+		assert m_allocationLock.isLocked();
+		if (m_externalCache != null && sze == 0 || sze == m_cachedDatasize)
+			m_externalCache.remove(clr);
 	}
 
 	/**
@@ -4512,8 +4535,9 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 		
 		public void close() {
-			if (m_open.getAndSet(false))
+			if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
 				deactivateTx();
+			}
 		}
 	}
 	
@@ -4620,6 +4644,31 @@ public class RWStore implements IStore, IBufferedWriter {
 	 */
 	public long getLastDeferredReleaseTime() {
 		return m_lastDeferredReleaseTime;
+	}
+
+	private ConcurrentWeakValueCache<Long, BTree> m_externalCache = null;
+	private int m_cachedDatasize = 0;
+	/**
+	 * Call made from AbstractJournal to register the cache used.  This can then
+	 * be accessed to clear entries when storage is made availabel for re-cycling.
+	 * 
+	 * It is not safe to clear at the point of the delete request since the data
+	 * could still be loaded if the data is retained for a period due to a non-zero
+	 * retention period or session protection.
+	 * 
+	 * @param externalCache - used by the Journal to cache historical BTree references
+	 * @param dataSize - the size of the checkpoint data (fixed for any version)
+	 */
+	public void registerExternalCache(
+			final ConcurrentWeakValueCache<Long, BTree> externalCache, final int dataSize) {
+		
+		m_allocationLock.lock();
+		try {
+			m_externalCache = externalCache;
+			m_cachedDatasize = getSlotSize(dataSize);
+		} finally {
+			m_allocationLock.unlock();
+		}
 	}
 
     

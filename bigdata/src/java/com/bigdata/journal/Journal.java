@@ -321,7 +321,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 checkProperties(properties), this) {
 
-            final private AtomicReference<RawTx> m_rawTx = new AtomicReference<RawTx>(null);
+            final private ConcurrentHashMap<Long, RawTx> m_rawTxs = new ConcurrentHashMap<Long, RawTx>();
 
 			{
                 
@@ -344,16 +344,21 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
                 if (bufferStrategy instanceof RWStrategy) {
 //                  Logger.getLogger("TransactionTrace").info("OPEN: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
-                    m_rawTx.set(((RWStrategy)bufferStrategy).getRWStore().newTx());
+                	final RawTx tx = ((RWStrategy)bufferStrategy).getRWStore().newTx();
+                	final RawTx otx = m_rawTxs.put(state.tx, tx);
+                	if (otx != null) {
+                		throw new IllegalStateException("Unexpected existing RawTx");
+                	}
                 }
                 super.activateTx(state);
             }
 
             protected void deactivateTx(final TxState state) {
                 super.deactivateTx(state);
-
-                if (m_rawTx.get() != null) {
-                	m_rawTx.get().close();
+                
+                final RawTx tx = m_rawTxs.remove(state.tx);
+                if (tx != null) {
+                	tx.close();
                 }
             }
             
