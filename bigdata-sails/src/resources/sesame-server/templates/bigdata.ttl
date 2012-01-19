@@ -11,9 +11,10 @@
    rep:repositoryID "{%Repository ID|bigdata%}" ;
    rdfs:label "{%Repository title|Bigdata store%}" ;
    rep:repositoryImpl [
-      rep:repositoryType "openrdf:SailRepository" ;
-      sr:sailImpl [
-         sail:sailType "bigdata:BigdataSail" ;
-         ns:properties "{%Properties%}"
-      ]
+      rep:repositoryType "bigdata:BigdataRepository" ;
+      ns:properties "{%Properties%}"
+#      sr:sailImpl [
+#         sail:sailType "bigdata:BigdataSail" ;
+#         ns:properties "{%Properties%}"
+#      ]
    ].
