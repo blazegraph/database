@@ -1,0 +1,12 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<body>
+This package provides a full implementation of the ganglia protocol, including
+the ability to listen and report on metrics, metadata, and metadata requests.
+<p>
+Applications embed a {@link GangliaService} and participate in a ganglia network.
+The {@link GangliaService} provides hooks which an application can use to register
+{@link IGangliaMetricsCollector}s.  Applications can provide metadata declarations
+for custom metrics by implementing the {@link IGangliaMetadataFactory} interface. 
+</body>
+</html>
