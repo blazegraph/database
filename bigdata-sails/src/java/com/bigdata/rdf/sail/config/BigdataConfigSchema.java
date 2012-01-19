@@ -5,12 +5,12 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
 /**
- * Defines constants for the BigdataSail schema which is used by
- * {@link BigdataStoreFactory}s to initialize {@link BigdataSail}s.
+ * Defines constants for the schema which is used by
+ * {@link BigdataSailFactory} and {@link BigdataRepositoryFactory}.
  */
-public class BigdataStoreSchema {
+public class BigdataConfigSchema {
 
-	/** The BigdataSail schema namespace 
+	/** The bigdata schema namespace 
      * (<tt>http://www.bigdata.com/config/sail/bigdata#</tt>). 
      */
 	public static final String NAMESPACE = 

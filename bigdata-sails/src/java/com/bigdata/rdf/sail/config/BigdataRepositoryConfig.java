@@ -6,15 +6,16 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
+
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.util.GraphUtil;
 import org.openrdf.model.util.GraphUtilException;
-import org.openrdf.sail.config.SailConfigException;
-import org.openrdf.sail.config.SailImplConfigBase;
+import org.openrdf.repository.config.RepositoryConfigException;
+import org.openrdf.repository.config.RepositoryImplConfigBase;
 
-public class BigdataStoreConfig extends SailImplConfigBase {
+public class BigdataRepositoryConfig extends RepositoryImplConfigBase {
 
 	/*-----------*
 	 * Variables *
@@ -26,15 +27,10 @@ public class BigdataStoreConfig extends SailImplConfigBase {
 	 * Constructors *
 	 *--------------*/
 
-	public BigdataStoreConfig() {
-		super(BigdataStoreFactory.SAIL_TYPE);
+	public BigdataRepositoryConfig(final String type) {
+		super(type);
 	}
-
-	public BigdataStoreConfig(String propertiesFile) {
-		this();
-		setPropertiesFile(propertiesFile);
-	}
-
+	
 	/*---------*
 	 * Methods *
 	 *---------*/
@@ -67,7 +63,7 @@ public class BigdataStoreConfig extends SailImplConfigBase {
 		Resource implNode = super.export(graph);
 
 		if (propertiesFile != null) {
-			graph.add(implNode, BigdataStoreSchema.PROPERTIES, 
+			graph.add(implNode, BigdataConfigSchema.PROPERTIES, 
                     graph.getValueFactory().createLiteral(propertiesFile));
 		}
 
@@ -76,21 +72,21 @@ public class BigdataStoreConfig extends SailImplConfigBase {
 
 	@Override
 	public void parse(Graph graph, Resource implNode)
-		throws SailConfigException
+		throws RepositoryConfigException
 	{
 		super.parse(graph, implNode);
 
 		try {
 			Literal propertiesLit = GraphUtil.getOptionalObjectLiteral(
-                    graph, implNode, BigdataStoreSchema.PROPERTIES);
+                    graph, implNode, BigdataConfigSchema.PROPERTIES);
 			if (propertiesLit != null) {
 				setPropertiesFile((propertiesLit).getLabel());
 			} else {
-                throw new SailConfigException("Properties file required");
+                throw new RepositoryConfigException("Properties file required");
             }
 		}
 		catch (GraphUtilException e) {
-			throw new SailConfigException(e.getMessage(), e);
+			throw new RepositoryConfigException(e.getMessage(), e);
 		}
 	}
 }

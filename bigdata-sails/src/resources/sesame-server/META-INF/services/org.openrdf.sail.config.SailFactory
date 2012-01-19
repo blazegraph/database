@@ -1,1 +1,1 @@
-com.bigdata.rdf.sail.config.BigdataStoreFactory
+com.bigdata.rdf.sail.config.BigdataSailFactory
