@@ -81,13 +81,20 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
     static {
     
-    	String s;
-        try {
-            s = NicUtil.getIpAddress("default.nic", "default", false);
-        } catch(Throwable t) {//for now, maintain same failure logic as used previously
-            t.printStackTrace();
-            s = NicUtil.getIpAddressByLocalHost();
-        }
+		String s;
+		try {
+			/*
+			 * Note: This should be the host *name* NOT an IP address of a
+			 * preferred Ethernet adaptor.
+			 */
+			s = InetAddress.getLocalHost().getCanonicalHostName();
+			// s = NicUtil.getIpAddress("default.nic", "default", false);
+		} catch (Throwable t) {
+			// fall back
+			log.error("Could not resolve name for host: " + t);
+			s = NicUtil.getIpAddressByLocalHost();
+			log.warn("Falling back to " + s);
+		}
         
         fullyQualifiedHostName = s;
 
@@ -105,6 +112,9 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /** Reporting interval in seconds. */
     final protected int interval;
     
+    /** The name of this process. */
+    private final String processName;
+    
     /**
      * The interval in seconds at which the counter values are read from the
      * host platform.
@@ -113,16 +123,32 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
         return interval;
         
-    }
-    
-    protected AbstractStatisticsCollector(final int interval) {
-    
+	}
+
+	/**
+	 * The name of the process (or more typically its service {@link UUID})
+	 * whose per-process performance counters are to be collected.
+	 */
+	public String getProcessName() {
+
+		return processName;
+
+	}
+
+	protected AbstractStatisticsCollector(final int interval,
+			final String processName) {
+
         if (interval <= 0)
             throw new IllegalArgumentException();
 
+        if(processName == null)
+        	throw new IllegalArgumentException();
+        
         if(log.isInfoEnabled()) log.info("interval=" + interval);
         
         this.interval = interval;
+        
+        this.processName = processName;
         
     }
     
@@ -371,7 +397,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @param counterSet
      *            The counters set that is the direct parent.
      */
-    static public void addGarbageCollectorMXBeanCounters(CounterSet counterSet) {
+	static public void addGarbageCollectorMXBeanCounters(
+			final CounterSet counterSet) {
 
         final String name_pools = "Memory Pool Names";
 
@@ -580,7 +607,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             
         } else if(SystemUtil.isWindows()) {
             
-            return new StatisticsCollectorForWindows(interval);
+            return new StatisticsCollectorForWindows(interval, processName);
             
 //        } else if(osname.contains("os x")) {
             

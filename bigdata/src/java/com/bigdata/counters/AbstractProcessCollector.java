@@ -60,7 +60,7 @@ abstract public class AbstractProcessCollector implements IStatisticsCollector {
      *            The interval at which the performance counters will be
      *            read in milliseconds.
      */
-    public AbstractProcessCollector(int interval) {
+    public AbstractProcessCollector(final int interval) {
 
         if (interval == 0)
             throw new IllegalArgumentException();

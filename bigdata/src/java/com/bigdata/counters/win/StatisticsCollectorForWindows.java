@@ -30,9 +30,10 @@ public class StatisticsCollectorForWindows extends AbstractStatisticsCollector {
      * @param interval
      *            Reporting interval in seconds.
      */
-    public StatisticsCollectorForWindows(int interval) {
+	public StatisticsCollectorForWindows(final int interval,
+			final String processName) {
 
-        super(interval);
+        super(interval, processName);
 
         typeperf = new TypeperfCollector(interval);
         

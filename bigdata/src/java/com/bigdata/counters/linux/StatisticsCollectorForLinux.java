@@ -187,7 +187,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
     public StatisticsCollectorForLinux(final int interval,
             final String processName) {
 
-        super(interval);
+        super(interval, processName);
 
         if (processName == null)
             throw new IllegalArgumentException();

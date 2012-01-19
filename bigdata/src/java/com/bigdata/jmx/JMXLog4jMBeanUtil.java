@@ -70,7 +70,7 @@ import org.apache.log4j.spi.LoggerRepository;
  */
 public class JMXLog4jMBeanUtil {
 
-    protected static final Logger log = Logger.getLogger(JMXLog4jMBeanUtil.class);
+    private static final Logger log = Logger.getLogger(JMXLog4jMBeanUtil.class);
     
     /**
      * Register the log4j JMX mbeans. 

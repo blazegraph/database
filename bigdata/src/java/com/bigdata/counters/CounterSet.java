@@ -233,7 +233,8 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
 
             if (existingChild.isCounter() && !replace) {
 
-                log.warn("Will not replace existing counter: "
+                if(log.isInfoEnabled())
+                	log.info("Will not replace existing counter: "
                         + existingChild.getPath());
                 
                 return;
