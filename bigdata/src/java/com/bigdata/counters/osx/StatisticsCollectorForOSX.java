@@ -56,11 +56,11 @@ public class StatisticsCollectorForOSX extends AbstractStatisticsCollector {
 //
 //    }
 
-    /**
-     * The name of the process (or more typically its service {@link UUID})
-     * whose per-process performance counters are to be collected.
-     */
-    private final String processName;
+//    /**
+//     * The name of the process (or more typically its service {@link UUID})
+//     * whose per-process performance counters are to be collected.
+//     */
+//    private final String processName;
 
 	/**
 	 * Reports on the host disk and CPU utilization (but not IOWait and does not
@@ -262,12 +262,12 @@ public class StatisticsCollectorForOSX extends AbstractStatisticsCollector {
     public StatisticsCollectorForOSX(final int interval,
             final String processName) {
 
-        super(interval);
+        super(interval, processName);
 
-        if (processName == null)
-            throw new IllegalArgumentException();
-        
-        this.processName = processName;
+//        if (processName == null)
+//            throw new IllegalArgumentException();
+//        
+//        this.processName = processName;
         
 		// host wide collection
 		iostat = new IOStatCollector(interval, true/* cpuStats */);
