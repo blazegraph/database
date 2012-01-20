@@ -100,6 +100,33 @@ public class PseudoRandom {
 	}
 	
     /**
+     * The next number modulo the range.
+     * 
+     * @param range
+     *            The range.
+     * @return The number.
+     * 
+     * @throws IllegalArgumentException
+     *             if the range is negative.
+     * @throws IllegalStateException
+     *             if the range is greater than the range specified to the
+     *             constructor (ie., the generated could not produce all numbers
+     *             in the given range).
+     */
+    public int nextInt(final int range) {
+        if (range == 0)
+            return 0;
+        
+        if (range < 0)
+            throw new IllegalArgumentException();
+        if (range > m_max)
+            throw new IllegalStateException(
+                    "Range exceeds max range of generator");
+        
+        return next() % range;
+    }
+
+    /**
      * Reset the pseudo random generator to a state where it has just visited
      * <i>prev</i>.
      * 
