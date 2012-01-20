@@ -2036,6 +2036,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                      * 
                      * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
                      */
+                    filter.disable();
 //                    recycle(filter.disable());
                     
                     log.warn("Bloom filter disabled - maximum error rate would be exceeded"
