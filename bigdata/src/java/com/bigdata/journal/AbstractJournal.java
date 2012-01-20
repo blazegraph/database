@@ -173,7 +173,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
 	private static final Logger log = Logger.getLogger(AbstractJournal.class);
 
-	/**
+    /**
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
+     *      RWStore transaction service and recycler)
+     */
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+
+    /**
 	 * The index of the root address containing the address of the persistent
 	 * {@link Name2Addr} mapping names to {@link BTree}s registered for the
 	 * store.
@@ -2350,6 +2356,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * root at this time). However, subsequent commits without
 			 * intervening data written on the store should not cause any
 			 * committers to update their root address.
+             * 
+             * Note: This also checkpoints the deferred free block list.
 			 */
 			final long[] rootAddrs = notifyCommitters(commitTime);
 
@@ -2531,6 +2539,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // reload the commit record from the new root block.
                 _commitRecord = _getCommitRecord();
 
+                if (txLog.isInfoEnabled())
+                    txLog.info("COMMIT: commitTime=" + commitTime);
+
             } else {
                 
                 /*
@@ -2608,7 +2619,44 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
+//    /**
+//     * (debug only) For the {@link RWStrategy}, scans the
+//     * {@link #historicalIndexCache} and verifies that there are no checkpoint
+//     * addresses present which are "locked".
+//     */
+//    private boolean assertHistoricalIndexCacheIsClean() {
+//        
+//        if (true) return true; // disable
+//
+//        if (!(getBufferStrategy() instanceof RWStrategy))
+//            return true;
+//
+//        final RWStrategy bufferStrategy = (RWStrategy) getBufferStrategy();
+//
+//        final Iterator<Map.Entry<Long, WeakReference<BTree>>> itr = historicalIndexCache
+//                .entryIterator();
+//
+//        while (itr.hasNext()) {
+//
+//            final Map.Entry<Long, WeakReference<BTree>> e = itr.next();
+//
+//            bufferStrategy.assertNotLocked(e.getKey());
+//
+//            final BTree btree = e.getValue().get();
+//
+//            if (btree != null) {
+//
+//                bufferStrategy.assertNotLocked(btree.getCheckpoint()
+//                        .getCheckpointAddr());
+//            }
+//
+//        }
+//
+//        return true;
+//
+//    }
+    
+    /**
 	 * Method verifies that the commit time strictly advances on the local store
 	 * by checking against the current root block.
 	 * 
@@ -4287,41 +4335,54 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return port;
     }
 
-    /**
-     * Remove all commit records between the two provided keys.
+    /*
+     * FIXME Restore this code when addressing 
      * 
-     * This is called from the RWStore when it checks for deferredFrees
-     * against the CommitRecordIndex where the CommitRecords
-     * reference the deleteBlocks that have been deferred.
-     * 
-     * Once processed the records for the effected range muct
-     * be removed as they reference invalid states.
-     * 
-     * @param fromKey
-     * @param toKey
+     * https://sourceforge.net/apps/trac/bigdata/ticket/440
      */
-	public int removeCommitRecordEntries(byte[] fromKey, byte[] toKey) {
-		final CommitRecordIndex cri = _commitRecordIndex; // Use the LIVE indeex!
-		final ITupleIterator<CommitRecordIndex.Entry> commitRecords	
-			= cri.rangeIterator(fromKey, toKey, 0/* capacity*/, IRangeQuery.CURSOR, null/*filter*/);
-		
-		int removed = 0;
-		while (commitRecords.hasNext()) {
-			final ITuple<CommitRecordIndex.Entry> entry = commitRecords.next();
-			commitRecords.remove();
-			removed++;
-		}
-		
-		return removed;
-	}
-
-	/**
-	 * When a BTree index is updated, remove the historical cache.
-	 * 
-	 * @param oldAddr - removed checkpointAddr offset
-	 */
-//	public void removeCachedIndex(final long oldAddr) {
-//		this.historicalIndexCache.remove(oldAddr);
-//	}
+//    /**
+//     * Remove all commit records between the two provided keys.
+//     * 
+//     * This is called from the RWStore when it checks for deferredFrees against
+//     * the CommitRecordIndex where the CommitRecords reference the deleteBlocks
+//     * that have been deferred.
+//     * 
+//     * Once processed the records for the effected range muct be removed as they
+//     * reference invalid states.
+//     * 
+//     * @param fromKey
+//     * @param toKey
+//     */
+//    public int removeCommitRecordEntries(final byte[] fromKey,
+//            final byte[] toKey) {
+//
+//        // Use the LIVE indeex!
+//        final CommitRecordIndex cri = _commitRecordIndex;
+//
+//        @SuppressWarnings("unchecked")
+//        final ITupleIterator<CommitRecordIndex.Entry> commitRecords = cri
+//                .rangeIterator(fromKey, toKey, 0/* capacity */,
+//                        IRangeQuery.DEFAULT | IRangeQuery.CURSOR, null/* filter */);
+//
+//        int removed = 0;
+//        
+//        while (commitRecords.hasNext()) {
+//
+//            final ITuple<CommitRecordIndex.Entry> t = commitRecords.next();
+//            
+//            // Delete the associated ICommitRecord.
+//            delete(t.getObject().addr);
+//            
+//            // Remove the entry for the commit record from the commit record
+//            // index.
+//            commitRecords.remove();
+//            
+//            removed++;
+//            
+//        }
+//        
+//        return removed;
+//        
+//    }
 
 }

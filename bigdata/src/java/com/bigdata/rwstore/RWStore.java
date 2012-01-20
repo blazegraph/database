@@ -236,6 +236,12 @@ public class RWStore implements IStore, IBufferedWriter {
     private static final transient Logger log = Logger.getLogger(RWStore.class);
 
     /**
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
+     *      RWStore transaction service and recycler)
+     */
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+
+    /**
      * Options understood by the {@link RWStore}.
      */
     public interface Options {
@@ -305,13 +311,13 @@ public class RWStore implements IStore, IBufferedWriter {
         
         String DEFAULT_DOUBLE_BUFFER_WRITES = "true";
         
-        /**
-         * When <code>true</code> fills recycled storage with a recognizable
-         * byte pattern.
-         */
-        String OVERWRITE_DELETE = RWStore.class.getName() + ".overwriteDelete";
-        
-        String DEFAULT_OVERWRITE_DELETE = "false";
+//        /**
+//         * When <code>true</code> fills recycled storage with a recognizable
+//         * byte pattern.
+//         */
+//        String OVERWRITE_DELETE = RWStore.class.getName() + ".overwriteDelete";
+//        
+//        String DEFAULT_OVERWRITE_DELETE = "false";
         
     }
 
@@ -703,13 +709,13 @@ public class RWStore implements IStore, IBufferedWriter {
         		
         		m_storageStats = new StorageStats(m_allocSizes);
 
-        		// Check for overwrite option and set overwrite buffer if
-        		// required
-        		if (Boolean.valueOf(fileMetadata.getProperty(
-		                Options.OVERWRITE_DELETE,
-		                Options.DEFAULT_OVERWRITE_DELETE))) {
-        			m_writeCache.setOverwriteBuffer(m_maxFixedAlloc);
-        		}
+//        		// Check for overwrite option and set overwrite buffer if
+//        		// required
+//        		if (Boolean.valueOf(fileMetadata.getProperty(
+//		                Options.OVERWRITE_DELETE,
+//		                Options.DEFAULT_OVERWRITE_DELETE))) {
+//        			m_writeCache.setOverwriteBuffer(m_maxFixedAlloc);
+//        		}
 			} else {
 				
 				initfromRootBlock(m_rb);
@@ -1681,7 +1687,16 @@ public class RWStore implements IStore, IBufferedWriter {
 	 * @return whether there is a logical active session
 	 */
 	boolean isSessionProtected() {
-		return m_minReleaseAge == 0 && (m_activeTxCount > 0 || !m_contexts.isEmpty());
+	    
+	    if (!m_allocationLock.isHeldByCurrentThread()) {
+            /*
+             * In order for changes to m_activeTxCOunt to be visible the caller
+             * MUST be holding the lock.
+             */
+            throw new IllegalMonitorStateException();
+        }
+      
+	    return m_minReleaseAge == 0 && (m_activeTxCount > 0 || !m_contexts.isEmpty());
 	}
 
 	/**
@@ -1775,7 +1790,11 @@ public class RWStore implements IStore, IBufferedWriter {
 			// only clear any existing write to cache if no active session
 			if (overrideSession || !this.isSessionProtected()) {
 				m_writeCache.clearWrite(pa);
-				m_writeCache.overwrite(pa, sze);
+                // Only overwrite if NOT committed
+                if (!alloc.isCommitted(addrOffset)) {
+//                    m_writeCache.overwrite(pa, sze);
+                    removeFromExternalCache(pa, sze);
+                }
 			}
 			m_frees++;
 			
@@ -2340,85 +2359,88 @@ public class RWStore implements IStore, IBufferedWriter {
      * 
      * returns number of addresses freed
      */
-    public /* public */int checkDeferredFrees(final boolean freeNow,
+    public /* public */int checkDeferredFrees(final boolean freeNowIsIgnored,
             final AbstractJournal journal) {
-
-        // Note: Invoked from unit test w/o the lock...
+//        return 0;
+//        // Note: Invoked from unit test w/o the lock...
 //        if (!m_allocationLock.isHeldByCurrentThread())
 //            throw new IllegalMonitorStateException();
-		
-        if (journal != null) {
-		
-        	/**
-        	 * Since this is now called direct from the AbstractJournal commit method we muct take the
-        	 * allocaiton lock.
-        	 * 
-        	 * This may have adverse effects wrt concurrency deadlock issues, but none have
-        	 * been noticed so far.
-        	 */
-    		m_allocationLock.lock();
-    		
-    		try {
-    			/**
-    	    	 * if session protected then do not free any deferrals!
-    	    	 */  	
-    	    	if (this.m_activeTxCount > 0 || this.m_contexts.size() > 0) {
-    	    		return 0;
-    	    	}
-    			
-    	        final AbstractTransactionService transactionService = (AbstractTransactionService) journal
-						.getLocalTransactionManager().getTransactionService();
-
-				// // the previous commit point.
-				// long lastCommitTime = journal.getLastCommitTime();
-				//
-				// if (lastCommitTime == 0L) {
-				// // Nothing committed.
-				// return;
-				// }
-
-				/**
-				 *  The effective release time does not need a lock since we are called
-				 *  from within the AbstractJournal commit.  The calculation can
-				 *  safely be based on the system time, the min release age and the
-				 *  earliest active transaction.  
-				 *  
-				 *  The purpose is to ensure the RWStore can recycle any storage 
-				 *  released since this time.
-				 */
-				long latestReleasableTime = transactionService
-						.getEarliestReleaseTime();
-				// long latestReleasableTime =
-				// transactionService.getReleaseTime(); // revert for test
-
-				/*
-				 * add one because we want to read the delete blocks for all
-				 * commit points up to and including the first commit point that
-				 * we may not release.
-				 */
-				latestReleasableTime++;
-
-				/*
-				 * add one to give this inclusive upper bound semantics to the
-				 * range scan.
-				 */
-				latestReleasableTime++;
-
-				/*
-				 * Free deferrals.
-				 * 
-				 * Note: This adds one to the lastDeferredReleaseTime to give
-				 * exclusive lower bound semantics.
-				 */
-				return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
-						latestReleasableTime);
-			} finally {
-    			m_allocationLock.unlock();
-     		}
-        } else {
-        	return 0;
-        }
         
+        if (journal == null)
+            return 0;
+
+        /**
+         * Since this is now called direct from the AbstractJournal commit
+         * method we must take the allocation lock.
+         * 
+         * This may have adverse effects wrt concurrency deadlock issues, but
+         * none have been noticed so far.
+         */
+        m_allocationLock.lock();
+
+        try {
+            /**
+             * if session protected then do not free any deferrals!
+             */
+            if (isSessionProtected()) {
+                return 0;
+            }
+
+            final AbstractTransactionService transactionService = (AbstractTransactionService) journal
+                    .getLocalTransactionManager().getTransactionService();
+
+            // the previous commit point.
+            final long lastCommitTime = journal.getLastCommitTime();
+
+            if (lastCommitTime == 0L) {
+                // Nothing committed.
+                return 0;
+            }
+
+            /*
+             * The timestamp for which we may release commit state.
+             */
+            final long latestReleasableTime = transactionService.getReleaseTime();
+
+// Note: This is longer true. Delete blocks are attached to the
+// commit point in which the deletes were made. 
+//              /*
+//               * add one because we want to read the delete blocks for all
+//               * commit points up to and including the first commit point that
+//               * we may not release.
+//               */
+//              latestReleasableTime++;
+
+//              /*
+//               * add one to give this inclusive upper bound semantics to the
+//               * range scan.
+//               */
+//              latestReleasableTime++;
+
+            if (txLog.isInfoEnabled())
+                txLog.info("lastCommitTime=" + lastCommitTime
+                        + ", latestReleasableTime=" + latestReleasableTime
+                        + ", lastDeferredReleaseTime="
+                        + m_lastDeferredReleaseTime + ", activeTxCount="
+                        + m_activeTxCount);
+
+            /*
+             * Free deferrals.
+             * 
+             * Note: This adds one to the lastDeferredReleaseTime to give
+             * exclusive lower bound semantics.
+             * 
+             * FIXME Discuss lower bound again with Martyn. 0L should be Ok.
+             */
+            return freeDeferrals(journal, m_lastDeferredReleaseTime + 1,
+                    latestReleasableTime);
+
+        } finally {
+        
+            m_allocationLock.unlock();
+            
+        }
+
     }
 
     /**
@@ -3525,15 +3547,15 @@ public class RWStore implements IStore, IBufferedWriter {
     private int freeDeferrals(final AbstractJournal journal,
             final long fromTime,
             final long toTime) {
-
+        
         final ITupleIterator<CommitRecordIndex.Entry> commitRecords;
             /*
              * Commit can be called prior to Journal initialisation, in which
              * case the commitRecordIndex will not be set.
              */
             final IIndex commitRecordIndex = journal.getReadOnlyCommitRecordIndex();
-            if (commitRecordIndex == null) {
-            	return 0;
+            if (commitRecordIndex == null) { // TODO Why is this here?
+                return 0;
             }
     
             final IndexMetadata metadata = commitRecordIndex
@@ -3550,6 +3572,7 @@ public class RWStore implements IStore, IBufferedWriter {
             
 
         int totalFreed = 0;
+        int commitPointsRecycled = 0;
         
         while (commitRecords.hasNext()) {
             
@@ -3557,40 +3580,58 @@ public class RWStore implements IStore, IBufferedWriter {
 
             final CommitRecordIndex.Entry entry = tuple.getObject();
             
-            try {	
-	            final ICommitRecord record = CommitRecordSerializer.INSTANCE
-	                    .deserialize(journal.read(entry.addr));
-	
-	            final long blockAddr = record
-	                    .getRootAddr(AbstractJournal.DELETEBLOCK);
-				
-	            if (blockAddr != 0) {
-				
-	                totalFreed += freeDeferrals(blockAddr, record.getTimestamp());
-	                
-				}
-	            
-	            immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+            try {   
+
+                final ICommitRecord record = CommitRecordSerializer.INSTANCE
+                        .deserialize(journal.read(entry.addr));
+    
+                final long blockAddr = record
+                        .getRootAddr(AbstractJournal.DELETEBLOCK);
+                
+                if (blockAddr != 0) {
+                
+                    totalFreed += freeDeferrals(blockAddr,
+                            record.getTimestamp());
+                    
+                }
+                
+// Note: This is releasing the ICommitRecord itself.  I've moved the responsibilty
+// for that into AbstractJournal#removeCommitRecordEntries() (invoked below).
+//              
+//                immediateFree((int) (entry.addr >> 32), (int) entry.addr);
+
+                commitPointsRecycled++;
+                
             } catch (RuntimeException re) {
-            	log.warn("Problem with entry at " + entry.addr);
-            	throw re;
+
+                throw new RuntimeException("Problem with entry at "
+                        + entry.addr, re);
+                
             }
 
         }
         
-        // Now remove all record entries
-        final int removed = journal.removeCommitRecordEntries(fromKey, toKey);
-        if (removed > 0) {
-            if(log.isInfoEnabled())
-                log.info("Removed " + removed + " commit records");
-        }
+        /*
+         * FIXME Restore this code when addressing 
+         * 
+         * https://sourceforge.net/apps/trac/bigdata/ticket/440
+         */
         
-        if(log.isInfoEnabled())
-            log.info("fromTime=" + fromTime + ", toTime=" + toTime + ", totalFreed=" + totalFreed);
+//        // Now remove the commit record entries from the commit record index.
+//        final int commitPointsRemoved = journal.removeCommitRecordEntries(
+//                fromKey, toKey);
 
+        if (txLog.isInfoEnabled())
+            txLog.info("fromTime=" + fromTime + ", toTime=" + toTime
+                    + ", totalFreed=" + totalFreed 
+                    + ", commitPointsRecycled=" + commitPointsRecycled
+//                    + ", commitPointsRemoved=" + commitPointsRemoved
+                    );
+
+//        assert commitPointsRecycled == commitPointsRemoved;
+                
         return totalFreed;
-	}
-
+    }
 
     /**
      * When a new context is started it must be registered to ensure it is

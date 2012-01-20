@@ -105,6 +105,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     private static final Logger log = Logger.getLogger(Journal.class);
 
     /**
+     * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
+     *      RWStore transaction service and recycler)
+     */
+    private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
+
+    /**
      * Object used to manage local transactions. 
      */
     private final AbstractLocalTransactionManager localTransactionManager; 
@@ -321,6 +327,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 checkProperties(properties), this) {
 
+            /*
+             * @see http://sourceforge.net/apps/trac/bigdata/ticket/445 (RWStore
+             * does not track tx release correctly)
+             */
             final private ConcurrentHashMap<Long, RawTx> m_rawTxs = new ConcurrentHashMap<Long, RawTx>();
 
 			{
@@ -343,22 +353,33 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             protected void activateTx(final TxState state) {
                 final IBufferStrategy bufferStrategy = Journal.this.getBufferStrategy();
                 if (bufferStrategy instanceof RWStrategy) {
-//                  Logger.getLogger("TransactionTrace").info("OPEN: txId="+state.tx+", readsOnCommitTime="+state.readCommitTime);
-                	final RawTx tx = ((RWStrategy)bufferStrategy).getRWStore().newTx();
-                	final RawTx otx = m_rawTxs.put(state.tx, tx);
-                	if (otx != null) {
-                		throw new IllegalStateException("Unexpected existing RawTx");
-                	}
+                    if (txLog.isInfoEnabled())
+                        txLog.info("OPEN : txId=" + state.tx
+                                + ", readsOnCommitTime=" + state.readCommitTime);
+                    final RawTx tx = ((RWStrategy)bufferStrategy).getRWStore().newTx();
+                    if (m_rawTxs.put(state.tx, tx) != null) {
+                        throw new IllegalStateException(
+                                "Unexpected existing RawTx");
+                    }
                 }
                 super.activateTx(state);
             }
 
             protected void deactivateTx(final TxState state) {
+                if (txLog.isInfoEnabled())
+                    txLog.info("CLOSE: txId=" + state.tx
+                            + ", readsOnCommitTime=" + state.readCommitTime);
+                /*
+                 * Note: We need to deactivate the tx before RawTx.close() is
+                 * invoked otherwise the activeTxCount will never be zero inside
+                 * of RawTx.close() and the session protection mode of the
+                 * RWStore will never be able to release storage.
+                 */
                 super.deactivateTx(state);
                 
                 final RawTx tx = m_rawTxs.remove(state.tx);
                 if (tx != null) {
-                	tx.close();
+                    tx.close();
                 }
             }
             
@@ -962,22 +983,52 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @see ITransactionService#newTx(long)
      */
     public long newTx(final long timestamp) {
-        
+
+        RawTx tx = null;
         try {
+            if (getBufferStrategy() instanceof RWStrategy) {
+                
+                /*
+                 * This code pre-increments the active transaction count within
+                 * the RWStore before requesting a new transaction from the
+                 * transaction service. This ensures that the RWStore does not
+                 * falsely believe that there are no open transactions during
+                 * the call to AbstractTransactionService#newTx().
+                 * 
+                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440#comment:13
+                 */
+                tx = ((RWStrategy) getBufferStrategy()).getRWStore().newTx();
+            }
+            try {
 
-			return getTransactionService().newTx(timestamp);
+                return getTransactionService().newTx(timestamp);
 
-        } catch (IOException e) {
+            } catch (IOException ioe) {
 
-            /*
-             * Note: IOException is declared for RMI but will not be thrown
-             * since the transaction service is in fact local.
-             */
+                /*
+                 * Note: IOException is declared for RMI but will not be thrown
+                 * since the transaction service is in fact local.
+                 */
 
-            throw new RuntimeException(e);
+                throw new RuntimeException(ioe);
 
-        }
+            }
+
+        } finally {
         
+            if (tx != null) {
+            
+                /*
+                 * If we had pre-incremented the transaction counter in the
+                 * RWStore, then we decrement it before leaving this method.
+                 */
+
+                tx.close();
+
+            }
+            
+        }
+
     }
 
     /**

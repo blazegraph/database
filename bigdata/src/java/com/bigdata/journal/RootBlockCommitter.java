@@ -47,7 +47,7 @@ public class RootBlockCommitter implements ICommitter {
 	 * to be stored in the CommitRecord.
 	 */
 	public long handleCommit(final long commitTime) {
-		IRootBlockView view = journal.getRootBlockView();
+		final IRootBlockView view = journal.getRootBlockView();
 		
 		final ByteBuffer rbv = view.asReadOnlyBuffer();
 		/*
@@ -58,7 +58,7 @@ public class RootBlockCommitter implements ICommitter {
 		 * but has a non-zero array offset (a mutable slice of a ByteBuffer).
 		 */
 //		return journal.write(rbv);
-		ByteBuffer bb = ByteBuffer.allocate(rbv.capacity());
+		final ByteBuffer bb = ByteBuffer.allocate(rbv.capacity());
 		for (int i = 0; i < rbv.capacity(); i++) {
 			bb.put(rbv.get());
 		}

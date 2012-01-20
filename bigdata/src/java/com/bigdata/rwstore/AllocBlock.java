@@ -335,7 +335,7 @@ public class AllocBlock {
 					
 					cache.clearWrite(clr);
 					
-					cache.overwrite(clr, m_allocator.m_size);
+//					cache.overwrite(clr, m_allocator.m_size);
 					
 					m_allocator.m_store.removeFromExternalCache(clr, m_allocator.m_size);
 					

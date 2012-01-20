@@ -797,22 +797,22 @@ abstract public class AbstractTransactionService extends AbstractService
     }
     private volatile long releaseTime = 0L;
     
-    /**
-     * Provides correct value for RWStore deferred store releases to be
-     * recycled. The effective release time does not need a lock since we are
-     * called from within the AbstractJournal commit. The calculation can safely
-     * be based on the system time, the min release age and the earliest active
-     * transaction. The purpose is to permit the RWStore to recycle data based
-     * on the release time which will be in effect at the commit point.
-     * 
-     * @return earliest time that data can be released
-     */
-	public long getEarliestReleaseTime() {
-		final long immediate = System.currentTimeMillis() - minReleaseAge;
-		
-		return earliestTxStartTime == 0 || immediate < earliestTxStartTime 
-			? immediate : earliestTxStartTime;
-	}
+//    /** Note: This code is incorrect.
+//     * Provides correct value for RWStore deferred store releases to be
+//     * recycled. The effective release time does not need a lock since we are
+//     * called from within the AbstractJournal commit. The calculation can safely
+//     * be based on the system time, the min release age and the earliest active
+//     * transaction. The purpose is to permit the RWStore to recycle data based
+//     * on the release time which will be in effect at the commit point.
+//     * 
+//     * @return earliest time that data can be released
+//     */
+//	public long getEarliestReleaseTime() {
+//		final long immediate = System.currentTimeMillis() - minReleaseAge;
+//		
+//		return earliestTxStartTime == 0 || immediate < earliestTxStartTime 
+//			? immediate : earliestTxStartTime;
+//	}
 	
     /**
      * Sets the new release time.
