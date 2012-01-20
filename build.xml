@@ -805,6 +805,8 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
             tofile="${dist.lib}/fastutil.jar" />
+      <copy file="${bigdata.lib}/bigdata-ganglia-1.0.0.jar"
+            tofile="${dist.lib}/bigdata-ganglia.jar" />
       <copy file="${bigdata.lib}/icu/icu4j-${icu.version}.jar"
             tofile="${dist.lib}/icu4j.jar" />
       <copy file="${bigdata.lib}/icu/icu4j-charset-${icu.version}.jar"
@@ -1092,6 +1094,9 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/lgpl-utils/src">
         <fileset dir="${bigdata.dir}/lgpl-utils/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-ganglia/src">
+        <fileset dir="${bigdata.dir}/bigdata-ganglia/src" />
+      </copy>
 
       <!-- stage library dependencies. -->
       <mkdir dir="${build.dir}/bigdata/lib" />
@@ -1166,6 +1171,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-war/src/**" />
           <include name="ctc-striterators/src/**" />
           <include name="lgpl-utils/src/**" />
+          <include name="bigdata-ganglia/src/**" />
           <include name="bigdata/lib/**" />
           <include name="bigdata-jini/lib/**" />
           <include name="bigdata-rdf/lib/**" />
@@ -1430,7 +1436,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}" />
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
 
       <echo>javac
 </echo>
@@ -1760,6 +1766,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/dsiutils.jar" />
         <pathelement location="${dist.lib}/lgplutils.jar" />
         <pathelement location="${dist.lib}/fastutil.jar" />
+        <pathelement location="${dist.lib}/bigdata-ganglia.jar" />
         <pathelement location="${dist.lib}/icu4j.jar" />
         <pathelement location="${dist.lib}/icu4j-charset.jar" />
         <pathelement location="${dist.lib}/jsk-lib.jar" />
@@ -1786,7 +1793,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/servlet-api.jar" />
       </path>
 
-      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
+      <property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/servlet-api.jar" />
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1912,6 +1919,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="dsiutils.jar" value="${dist.lib}/dsiutils.jar" />
         <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
+        <sysproperty key="bigdata-ganglia.jar" value="${dist.lib}/bigdata-ganglia.jar" />
         <sysproperty key="icu4j.jar" value="${dist.lib}/icu4j.jar" />
         <sysproperty key="icu4j-charset.jar" value="${dist.lib}/icu4j-charset.jar" />
         <sysproperty key="jsk-lib.jar" value="${dist.lib}/jsk-lib.jar" />
