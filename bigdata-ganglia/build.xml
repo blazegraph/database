@@ -139,8 +139,6 @@
 	   </javadoc>
 	</target>
 
-	<target name="all" depends="clean, test, jar, javadoc" description="clean, jar, javadoc." />
-
     <target name="release" depends="prepare"
             description="Create complete source tar file.">
       <tar destfile="${bigdata-ganglia.dir}/DIST.${version}.tgz" compression="gzip">
@@ -156,5 +154,8 @@
         </tarfileset>
       </tar>
     </target>
+
+   	<target name="all" depends="clean, test, jar, javadoc, release"
+      	    description="clean, test, jar, javadoc, release" />
 
 </project>
