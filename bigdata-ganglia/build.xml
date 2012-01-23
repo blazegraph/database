@@ -31,7 +31,9 @@
 		<tstamp>
 			<format property="today" pattern="ddMMyy" locale="en,US" />
 		</tstamp>
-		<condition property="version" value="bigdata-ganglia-${build.ver}-${today}" else="bigdata-ganglia-${build.ver}">
+		<condition property="version"
+		    value="bigdata-ganglia-${build.ver}-${today}"
+		    else="bigdata-ganglia-${build.ver}">
 			<istrue value="${snapshot}" />
 		</condition>
 		<!--<echo message="today=${today}"/>-->
@@ -138,5 +140,21 @@
 	</target>
 
 	<target name="all" depends="clean, test, jar, javadoc" description="clean, jar, javadoc." />
+
+    <target name="release" depends="prepare"
+            description="Create complete source tar file.">
+      <tar destfile="${bigdata-ganglia.dir}/DIST.${version}.tgz" compression="gzip">
+        <tarfileset dir="${bigdata-ganglia.dir}" prefix="${version}">
+          <include name="build.properties" />
+          <include name="build.xml" />
+          <include name="NOTICE" />
+          <include name="**/LEGAL/*" />
+          <include name="src/**" />
+          <exclude name="classes/**" />
+          <exclude name="ant-build/**" />
+          <exclude name="lib/**" />
+        </tarfileset>
+      </tar>
+    </target>
 
 </project>
