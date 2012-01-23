@@ -28,10 +28,16 @@ import com.bigdata.ganglia.IGangliaMetadataFactory;
  *         TODO Research how to make ganglia recognize a value which is not
  *         being reported as "not available" rather than just painting the last
  *         reported value. Tmax? DMax?
- *         
- *         TODO Can metrics be declared which automatically collect history
- *         from the sampled counters?  It would be nice to abstract that stuff
- *         out of bigdata.
+ * 
+ *         TODO Can metrics be declared which automatically collect history from
+ *         the sampled counters? It would be nice to abstract that stuff out of
+ *         bigdata.
+ * 
+ *         TODO We should be reporting out the CPU context switches and
+ *         interrupts per second data from vmstat. Ganglia does not collect this
+ *         stuff and it provides interesting insight into the CPU workload and
+ *         instruction stalls, especially when correlated with the application
+ *         workload (load, vs closure, vs query).
  */
 public class BigdataGangliaService extends GangliaService {
 
