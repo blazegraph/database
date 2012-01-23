@@ -47,6 +47,7 @@ Change log:
 - http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for RWStore transaction service and recycler)
 - http://sourceforge.net/apps/trac/bigdata/ticket/445 (RWStore does not track tx release correctly)
 - http://sourceforge.net/apps/trac/bigdata/ticket/446 (HTTP Repostory broken with bigdata 1.1.0)
+- http://sourceforge.net/apps/trac/bigdata/ticket/451 (Serialization error in SIDs mode on cluster)
 
 1.1.0 (*)
 
