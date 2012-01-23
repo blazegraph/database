@@ -2026,18 +2026,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                      * have an acceptable error rate.
                      */
                     
-                    /*
-                     * TODO The code to recycle the old checkpoint addr, the old
-                     * root addr, and the old bloom filter has been disabled in
-                     * writeCheckpoint2 and AbstractBTree#insert pending the
-                     * resolution of ticket #440. This is being done to minimize
-                     * the likelyhood that the underlying bug for that ticket
-                     * can be tripped by the code.
-                     * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
-                     */
-                    filter.disable();
-//                    recycle(filter.disable());
+//                    /*
+//                     * TODO The code to recycle the old checkpoint addr, the old
+//                     * root addr, and the old bloom filter has been disabled in
+//                     * writeCheckpoint2 and AbstractBTree#insert pending the
+//                     * resolution of ticket #440. This is being done to minimize
+//                     * the likelyhood that the underlying bug for that ticket
+//                     * can be tripped by the code.
+//                     * 
+//                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+//                     */
+//                    filter.disable();
+                    recycle(filter.disable());
                     
                     log.warn("Bloom filter disabled - maximum error rate would be exceeded"
                                     + ": entryCount="

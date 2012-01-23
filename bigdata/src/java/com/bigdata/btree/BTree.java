@@ -894,19 +894,19 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
                  * it on the store now.
                  */
             	
-                /*
-                 * TODO The code to recycle the old checkpoint addr, the old
-                 * root addr, and the old bloom filter has been disabled in
-                 * writeCheckpoint2 and AbstractBTree#insert pending the
-                 * resolution of ticket #440. This is being done to minimize
-                 * the likelyhood that the underlying bug for that ticket
-                 * can be tripped by the code.
-                 * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
-                 */
-//            	recycle(filter.getAddr());
-            	
-                filter.write(store);
+//                /*
+//                 * TODO The code to recycle the old checkpoint addr, the old
+//                 * root addr, and the old bloom filter has been disabled in
+//                 * writeCheckpoint2 and AbstractBTree#insert pending the
+//                 * resolution of ticket #440. This is being done to minimize
+//                 * the likelyhood that the underlying bug for that ticket
+//                 * can be tripped by the code.
+//                 * 
+//                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
+//                 */
+            	recycle(filter.getAddr());
+//            	
+//                filter.write(store);
 
             }
             

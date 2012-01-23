@@ -52,6 +52,29 @@ import com.bigdata.ganglia.util.DaemonThreadFactory;
  * and can register an {@link IGangliaMetricsCollector} to periodically report
  * performance metrics out to the ganglia network. You can also use
  * {@link #setMetric(String, Object)} to directly update a metric.
+ * <p>
+ * The ganglia protocol replicates soft state into all <code>gmond</code> and
+ * <code>gmetad</code> instances. The {@link GangliaService} is a full
+ * participant in the protocol and will also develop a snapshot of the soft
+ * state of the cluster. This protocol has a lot of benefits, but the metadata
+ * declarations can stick around and be discovered long after you have shutdown
+ * the {@link GangliaService}.
+ * <p>
+ * When developing with the embedded {@link GangliaService} it is a Good Idea to
+ * use a private <code>gmond</code> / <code>gmetad</code> configuration
+ * (non-default address and/or port). Then, if you wind up making some mistakes
+ * when declaring your application counters and those mistakes replicated into
+ * the soft state of the ganglia services you can just shutdown your private
+ * service instances.
+ * <p>
+ * Another trick is to use the [mock] mode (it is a constructor argument) while
+ * you are developing so the {@link GangliaService} does not actually send out
+ * any packets.
+ * <p>
+ * Finally, there is also a utility class (in the test suite) which can be used
+ * to monitor the ganglia network for packets which can not be round-tripped.
+ * This can be used to identify bugs if you are doing development on embedded
+ * {@link GangliaService} code base.
  * 
  * @see <a href="http://ganglia.sourceforge.net/"> The ganglia monitoring
  *      system</a>
@@ -85,9 +108,9 @@ import com.bigdata.ganglia.util.DaemonThreadFactory;
  *         sample data) can be obtained using
  *         <code>telenet localhost 8649</code>. This is the hook used for the
  *         ganglia web UI, some nagios integrations, etc.
- *         
+ * 
  *         FIXME Provide a sample collector for the JVM and use it in main().
- *         
+ * 
  *         TODO Port the more sophisticated collectors into this module?
  */
 public class GangliaService implements Runnable, IGangliaMetricsReporter {
