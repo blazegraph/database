@@ -204,6 +204,8 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
 	public void setUp() throws Exception {
 	    
 		super.setUp();
+
+		log.warn("Setting up test:" + getName());
 		
 		final Properties properties = getProperties();
 
@@ -263,7 +265,8 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
     @Override
 	public void tearDown() throws Exception {
 
-		log.info("tearing down test");
+//		if (log.isInfoEnabled())
+			log.warn("tearing down test: " + getName());
 
 		if (m_fixture != null) {
 
@@ -1291,7 +1294,6 @@ public class TestNanoSparqlServer2<S extends IIndexManager> extends ProxyTestCas
      * Test of insert and retrieval of a large literal.
      */
     public void test_INSERT_veryLargeLiteral() throws Exception {
-        
 
         final Graph g = new GraphImpl();
         
