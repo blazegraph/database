@@ -265,6 +265,8 @@ public class SidIV<V extends BigdataBNode> extends AbstractInlineIV<V, ISPO>
      */
     private static class SidIVState implements Externalizable {
 
+        private static final long serialVersionUID = -1L;
+
 //        private byte flags;
         private byte[] key;
         
