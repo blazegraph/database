@@ -43,7 +43,7 @@ public class BigdataStatics {
      * of the flag makes it easier to figure out where those {@link System#err}
      * messages are coming from. This should always be off in the trunk.
      */
-    public static final boolean debug = false;
+    public static final boolean debug = Boolean.getBoolean("com.bigdata.debug");
 
     /**
      * The #of lines of output from a child process which will be echoed onto
@@ -66,6 +66,7 @@ public class BigdataStatics {
      *      cache combined with unbounded thread pools causes effective memory
      *      leak)
      */
-    public static final boolean threadLocalBuffers = false;
+    public static final boolean threadLocalBuffers = Boolean
+            .getBoolean("com.bigdata.threadLocalBuffers");
     
 }
