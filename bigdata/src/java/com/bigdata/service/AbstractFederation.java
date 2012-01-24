@@ -173,6 +173,26 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
         try {
 
+            {
+                /*
+                 * Note: The embedded GangliaService is executed on the main
+                 * thread pool. We need to terminate the GangliaService in order
+                 * for the thread pool to shutdown.
+                 */
+
+                final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
+
+                if (ft != null) {
+
+                    ft.cancel(true/* mayInterruptIfRunning */);
+
+                }
+                
+                // Clear the state reference.
+                gangliaService.set(null);
+                
+            }
+            
             // allow client requests to finish normally.
             new ShutdownHelper(threadPool, 10L/*logTimeout*/, TimeUnit.SECONDS) {
               
@@ -199,21 +219,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             
             }
 
-            {
-
-                final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
-
-                if (ft != null) {
-
-                    ft.cancel(true/* mayInterruptIfRunning */);
-
-                }
-                
-                // Clear the state reference.
-                gangliaService.set(null);
-                
-            }
-            
             // terminate sampling and reporting tasks.
             new ShutdownHelper(scheduledExecutorService, 10L/* logTimeout */,
                     TimeUnit.SECONDS) {
