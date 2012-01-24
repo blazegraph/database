@@ -1243,6 +1243,17 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 		
 	}
 	
+    /**
+     * The soft-state as maintained using the ganglia protocol and including any
+     * metrics collected by this host regardless of whether they are being
+     * reported to other hosts.
+     */
+    public IGangliaState getGangliaState() {
+    
+	    return gangliaState;
+	    
+	}
+	
 	/**
 	 * Return the factory for metric declarations. If you supply a
 	 * {@link GangliaMetadataFactory} instance to the constructor (which is the

@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  * {@link IGangliaMetadataMessage#getMetricType()} when an
  * {@link IGangliaMetricMessage} is generated from the current value.
  */
-public class TimestampMetricValue {
+public class TimestampMetricValue implements ITimestampMetricValue {
 
 	/**
 	 * The metric metadata declaration record.
@@ -40,11 +40,11 @@ public class TimestampMetricValue {
 	 */
 	private Object value;
 
-	/**
-	 * The timestamp associated with the most recent value for this metric and
-	 * initially ZERO (0) if the metric is newly declared.
-	 */
-	private volatile long timestamp = 0L;
+    /**
+     * The timestamp (in milliseconds) associated with the most recent value for
+     * this metric and initially ZERO (0) if the metric is newly declared.
+     */
+    private volatile long timestamp = 0L;
 
 	public TimestampMetricValue(final IGangliaMetadataMessage decl) {
 
@@ -55,22 +55,15 @@ public class TimestampMetricValue {
 
 	}
 
-	/**
-	 * The metadata declaration for this metric.
-	 */
-	public IGangliaMetadataMessage getMetadata() {
+	@Override
+    public IGangliaMetadataMessage getMetadata() {
 		
 		return decl;
 		
 	}
 
-	/**
-	 * The timestamp of the last reported/received value (milliseconds).
-	 * <p>
-	 * Note: Tmax is expressed in seconds, so be sure to do the conversion when
-	 * necessary.
-	 */
-	public long getTimestamp() {
+	@Override
+    public long getTimestamp() {
 		
 		return timestamp;
 		
@@ -86,12 +79,8 @@ public class TimestampMetricValue {
 		
 	}
 	
-	/**
-	 * The age in seconds of the last reported/received value (this reports
-	 * seconds for compatibility with tmax and dmax, both of which also use
-	 * seconds).  
-	 */
-	public int getAge() {
+	@Override
+    public int getAge() {
 		
 		if (timestamp == 0L) {
 		
@@ -109,11 +98,8 @@ public class TimestampMetricValue {
 		
 	}
 
-	/**
-	 * The last reported/received value and <code>null</code> if no value has
-	 * been reported/received.
-	 */
-	synchronized public Object getValue() {
+	@Override
+    synchronized public Object getValue() {
 		
 		return value;
 		

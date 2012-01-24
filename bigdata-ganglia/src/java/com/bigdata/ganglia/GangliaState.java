@@ -26,7 +26,7 @@ import org.apache.log4j.Logger;
  * for all known metrics and the metrics for all known metrics on all known
  * hosts.
  */
-public class GangliaState {
+public class GangliaState implements IGangliaState {
 	
 	private static final Logger log = Logger.getLogger(GangliaState.class);
 
@@ -91,10 +91,8 @@ public class GangliaState {
 
 	}
 
-	/**
-	 * Return the name of this host.
-	 */
-	public String getHostName() {
+	@Override
+    public String getHostName() {
 		
 		return hostName;
 		
@@ -111,27 +109,15 @@ public class GangliaState {
 		
 	}
 	
-	/**
-	 * Return a snapshot of the known hosts.
-	 * 
-	 * @return The names of the known hosts and never <code>null</code>.
-	 */
-	public String[] getKnownHosts() {
+	@Override
+    public String[] getKnownHosts() {
 		
 		return knownHosts.keySet().toArray(new String[0]);
 		
 	}
 
-	/**
-	 * Return an iterator which will visit all timestamped metrics for the
-	 * specified host.
-	 * 
-	 * @param hostName
-	 *            The host name.
-	 * 
-	 * @return The iterator and never <code>null</code>.
-	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
 	public Iterator<TimestampMetricValue> iterator(final String hostName) {
 
 		assertValidHostName(hostName);
@@ -149,16 +135,8 @@ public class GangliaState {
 		
 	}
 	
-	/**
-	 * Return the metadata for the given metric.
-	 * 
-	 * @param metricName
-	 *            The metric name (as it appears in ganglia messages).
-	 * 
-	 * @return The metadata for that metric iff it is a known metric and
-	 *         otherwise <code>null</code>.
-	 */
-	public IGangliaMetadataMessage getMetadata(final String metricName) {
+	@Override
+    public IGangliaMetadataMessage getMetadata(final String metricName) {
 		
 		return metadata.get(metricName);
 		
@@ -253,29 +231,8 @@ public class GangliaState {
 		
 	}
 
-	/**
-	 * Return current {@link TimestampMetricValue} of metric on host
-	 * (thread-safe).
-	 * <p>
-	 * If an {@link IGangliaMetadataMessage} is declared for that name, then
-	 * either the pre-existing {@link TimestampMetricValue} will be returned
-	 * -or- a new {@link TimestampMetricValue} will be atomically created and
-	 * returned.
-	 * <p>
-	 * Otherwise, this method will return <code>null</code> since it lacks the
-	 * necessary information to create an {@link IGangliaMetadataMessage} by
-	 * itself.
-	 * 
-	 * @param hostName
-	 *            The name of the host.
-	 * @param metricName
-	 *            The name of the metric.
-	 * 
-	 * @return The current value of the metric on that host -or-
-	 *         <code>null</code> if there is no {@link IGangliaMetadataMessage}
-	 *         for that metric.
-	 */
-	public TimestampMetricValue getMetric(final String hostName,
+	@Override
+    public TimestampMetricValue getMetric(final String hostName,
 			final String metricName) {
 		
 		assertValidHostName(hostName);
