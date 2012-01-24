@@ -64,6 +64,10 @@ public class TestAll extends TestCase {
 		 */
 		suite.addTestSuite(TestGangliaMessageEncodeDecode31.class);
 
+		// Test suite verifies correct listener shutdown.
+		suite.addTestSuite(TestGangliaListenerShutdown.class);
+		
+		// Test suite verifies correct service shutdown.
 		suite.addTestSuite(TestGangliaServiceShutdown.class);
 		
         return suite;

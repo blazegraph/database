@@ -58,6 +58,18 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 	/** Messages are dispatched to this listener as they are received. */
 	private final IGangliaMessageHandler handler;
 
+	private volatile boolean listening = false;
+	
+    /**
+     * Return <code>true</code> iff the listener is running when this method is
+     * invoked.
+     */
+	public boolean isListening() {
+	 
+	    return listening;
+	    
+	}
+	
 	/**
 	 * Listen at the default multicast group address and port.
 	 * 
@@ -163,6 +175,8 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 			final DatagramPacket packet = new DatagramPacket(buffer,
 					0/* off */, buffer.length/* len */);
 
+			listening = true;
+			
 			// Listen for messages.
 			while (true) {
 
@@ -176,8 +190,10 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
                      */
                     datagramSocket.receive(packet);
 
-                    if(Thread.interrupted()) {
-                        
+                    if (Thread.interrupted()) {
+                        /*
+                         * Stop listening if we are interrupted.
+                         */
                         break;
                     }
                     
@@ -215,6 +231,8 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 				
 			}
 
+            listening = false;
+            
         }
 
     }

@@ -1,33 +1,24 @@
-/**
+/*
+   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+       http://www.apache.org/licenses/LICENSE-2.0
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 */
 /*
- * Created on Jan 24, 2012
+ * Created on Oct 14, 2006
  */
 
 package com.bigdata.ganglia;
 
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -38,7 +29,7 @@ import java.util.concurrent.FutureTask;
 import junit.framework.TestCase;
 
 /**
- * Unit test for shutdown of the {@link GangliaService}.
+ * Unit test for shutdown of the {@link GangliaListener}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -59,12 +50,10 @@ public class TestGangliaServiceShutdown extends TestCase {
     }
 
     /**
-     * Note: This test does not really verify that the {@link GangliaListener}
-     * is done in a timely manner. The problem is that it can block awaiting a
-     * datagram packet. If no packet arrives, then it could hang there since
-     * {@link DatagramSocket#receive(java.net.DatagramPacket)} does not notice
-     * an interrupt. NIO for multicast is not available in JDK 6 (it was added
-     * in JDK 7).
+     * Test verifies correct shutdown of the {@link GangliaService} ASSUMING
+     * that the {@link GangliaListener} shuts down correctly.
+     * 
+     * @see TestGangliaListenerShutdown
      */
     public void test_gangliaService_shutdown() throws UnknownHostException,
             InterruptedException {
