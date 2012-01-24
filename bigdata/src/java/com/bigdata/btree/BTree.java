@@ -905,8 +905,8 @@ public class BTree extends AbstractBTree implements ICommitter, ICheckpointProto
 //                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
 //                 */
             	recycle(filter.getAddr());
-//            	
-//                filter.write(store);
+            	
+                filter.write(store);
 
             }
             
