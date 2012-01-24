@@ -44,12 +44,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -74,7 +77,6 @@ import com.bigdata.ganglia.GangliaMetadataFactory;
 import com.bigdata.ganglia.GangliaService;
 import com.bigdata.ganglia.GangliaSlopeEnum;
 import com.bigdata.ganglia.IGangliaDefaults;
-import com.bigdata.ganglia.IGangliaState;
 import com.bigdata.ganglia.util.GangliaUtil;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
@@ -208,7 +210,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 }
                 
                 // Clear the state reference.
-                gangliaState.set(null);
+                gangliaService.set(null);
                 
             }
             
@@ -326,7 +328,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             }
 
             // Clear the state reference.
-            gangliaState.set(null);
+            gangliaService.set(null);
             
         }
         
@@ -576,9 +578,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     private final AtomicReference<FutureTask<Void>> gangliaFuture = new AtomicReference<FutureTask<Void>>();
 
     /**
-     * A read-only view of the ganglia soft state.
+     * The embedded ganglia peer.
      */
-    private final AtomicReference<IGangliaState> gangliaState = new AtomicReference<IGangliaState>();
+    private final AtomicReference<BigdataGangliaService> gangliaService = new AtomicReference<BigdataGangliaService>();
     
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
@@ -597,12 +599,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
 
     /**
-     * Return the soft state associated with the ganglia view of the performance
-     * metrics for the cluster.
+     * The embedded ganglia peer. This can be used to obtain load balanced host
+     * reports, etc.
      */
-    public final IGangliaState getGangliaState() {
+    public final BigdataGangliaService getGangliaService() {
 
-        return gangliaState.get();
+        return gangliaService.get();
         
     }
     
@@ -615,64 +617,83 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * remember any history (including the load balancer). Returning a new
      * object every time here basically throws away the data we want.
      */
-    final synchronized public CounterSet getCounters() {
+    final public CounterSet getCounters() {
 
-        if (countersRoot == null) {
+        countersLock.lock();
+        try {
+            
+            if (countersRoot == null) {
 
-        countersRoot = new CounterSet();
-        {
+                countersRoot = new CounterSet();
+                {
 
-            final AbstractStatisticsCollector tmp = statisticsCollector.get();
+                    final AbstractStatisticsCollector tmp = statisticsCollector
+                            .get();
 
-            if (tmp != null) {
+                    if (tmp != null) {
 
-                countersRoot.attach(tmp.getCounters());
+                        countersRoot.attach(tmp.getCounters());
+
+                    }
+
+                }
+
+                serviceRoot = countersRoot
+                        .makePath(getServiceCounterPathPrefix());
+
+                {
+
+                    final String s = httpdURL.get();
+
+                    if (s != null) {
+
+                        // add counter reporting that url to the load balancer.
+                        serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
+                                new OneShotInstrument<String>(s));
+
+                    }
+
+                }
+
+                /*
+                 * Basic counters.
+                 */
+
+                AbstractStatisticsCollector.addBasicServiceOrClientCounters(
+                        serviceRoot, getServiceName(), getServiceIface(),
+                        getClient().getProperties());
 
             }
-        
-        }
 
-        serviceRoot = countersRoot.makePath(getServiceCounterPathPrefix());
-
-        {
-
-            final String s = httpdURL.get();
+            return countersRoot;
             
-            if (s != null) {
+        } finally {
             
-                // add counter reporting that url to the load balancer.
-                serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
-                        new OneShotInstrument<String>(s));
-
-            }
+            countersLock.unlock();
             
         }
-            
-            /*
-             * Basic counters.
-             */
-
-            AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                    serviceRoot, getServiceName(), getServiceIface(),
-                    getClient().getProperties());
-
-        }
-
-        return countersRoot;
         
     }
 
     /**
+     * Lock guarding {@link #countersRoot} and {@link #serviceRoot}.
+     * <p>
+     * Note: These objects can not be guarded by <code>synchronized(this)</code>
+     * without risking a deadlock in {@link #shutdown()}.
+     */
+    private final Lock countersLock = new ReentrantLock(false/*fair*/);
+    
+    /**
      * The top-level of the counterset hierarchy.
      * <p>
-     * Guarded by synchronized(this).
+     * Guarded by {@link #countersLock}
      */
     private CounterSet countersRoot;
 
     /**
      * The root of the service specific section of the counterset hierarchy.
      * <p>
-     * Guarded by synchronized(this).
+     * Guarded by {@link #countersLock}
      */
     private CounterSet serviceRoot;
 
@@ -1292,10 +1313,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  * the cluster metrics in memory and will self-report metrics
                  * from the performance counter hierarchy to the ganglia
                  * network.
-                 * 
-                 * TODO Disabled for the moment while I debug this.
                  */
-                //startGangliaService(statisticsCollector);
+                //startGangliaService(statisticsCollector.get());
                 
                 // // notify the load balancer of this service join.
                 // notifyJoin();
@@ -1405,12 +1424,33 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         protected void startGangliaService(
                 final AbstractStatisticsCollector statisticsCollector) {
 
+            if(statisticsCollector == null)
+                return;
+            
             try {
 
                 final Properties properties = getClient().getProperties();
 
                 final String hostName = AbstractStatisticsCollector.fullyQualifiedHostName;
 
+                /*
+                 * Note: This needs to be the value reported by the statistics
+                 * collector since that it what makes it into the counter set
+                 * path prefix for this service.
+                 * 
+                 * TODO This implies that we can not enable the embedded ganglia
+                 * peer unless platform level statistics collection is enabled.
+                 * We should be able to separate out the collection of host
+                 * metrics from whether or not we are collecting metrics from
+                 * the bigdata service. Do this when moving the host and process
+                 * (pidstat) collectors into the bigdata-ganglia module.
+                 * 
+                 * TODO The LBS currently does not collect platform statistics.
+                 * Once we move the platform statistics collection into the
+                 * bigdata-ganglia module we can change that. However, the LBS
+                 * will be going aware entirely once we (a) change over the
+                 * ganglia state for host reports; and (b) 
+                 */
                 final String serviceName = statisticsCollector.getProcessName();
 
                 final InetAddress listenGroup = InetAddress
@@ -1491,7 +1531,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                         heartbeatInterval));
 
                 // The embedded ganglia peer.
-                final GangliaService gangliaService = new BigdataGangliaService(
+                final BigdataGangliaService gangliaService = new BigdataGangliaService(
                         hostName, //
                         serviceName, //
                         metricsServers,//
@@ -1523,11 +1563,22 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 gangliaFuture.set(ft);
 
                 // Set the state reference.
-                gangliaState.set(gangliaService.getGangliaState());
+                AbstractFederation.this.gangliaService.set(gangliaService);
 
                 // Start the embedded ganglia service.
                 getExecutorService().submit(ft);
 
+            } catch (RejectedExecutionException t) {
+                
+                /*
+                 * Ignore.
+                 * 
+                 * Note: This occurs if the federation shutdown() before we
+                 * start the embedded ganglia peer. For example, it is common
+                 * when running a short lived utility service such as
+                 * ListServices.
+                 */
+                
             } catch (Throwable t) {
 
                 log.error(t, t);
