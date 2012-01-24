@@ -2,8 +2,6 @@ package com.bigdata.counters.ganglia;
 
 import java.util.Iterator;
 
-import org.eclipse.jetty.util.log.Log;
-
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
@@ -49,7 +47,7 @@ public class HostMetricsCollector implements IGangliaMetricsCollector {
 	@Override
 	public void collect(final IGangliaMetricsReporter reporter) {
 
-		Log.warn(statisticsCollector.getCounters().toString());
+//		Log.warn(statisticsCollector.getCounters().toString());
 
 		// Common base path which is NOT included in the generated metric name.
 		final String basePrefix = ICounterSet.pathSeparator
