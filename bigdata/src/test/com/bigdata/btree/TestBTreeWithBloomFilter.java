@@ -136,7 +136,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         assertNotNull(btree.getBloomFilter());
 
         // show the filter state.
-        System.err.println(btree.getBloomFilter().toString());
+        if(log.isInfoEnabled())
+            log.info(btree.getBloomFilter().toString());
         
         final byte[] k0 = new byte[]{0};
         final byte[] k1 = new byte[]{1};
@@ -160,13 +161,15 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         assertTrue(btree.getBloomFilter().contains(k0));
 
         // show the filter state.
-        System.err.println(btree.getBloomFilter().toString());
+        if(log.isInfoEnabled())
+            log.info(btree.getBloomFilter().toString());
 
         // remove the index entry.
         assertEquals(k0,btree.remove(k0));
 
         // show the filter state.
-        System.err.println(btree.getBloomFilter().toString());
+        if(log.isInfoEnabled())
+            log.info(btree.getBloomFilter().toString());
 
         // verify at BTree API (contains)
         assertFalse(btree.contains(k1));
@@ -207,7 +210,7 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
 //        assertNotNull(btree.getBloomFilter());
 //
 //        // show the filter state.
-//        System.err.println(btree.getBloomFilter().toString());
+//        if(log.isInfoEnabled()) log.info(btree.getBloomFilter().toString());
 //        
 //        final byte[] k0 = new byte[]{0};
 //        final byte[] k1 = new byte[]{1};
@@ -231,7 +234,7 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
 //        assertTrue(btree.getBloomFilter().contains(k0));
 //
 //        // show the filter state.
-//        System.err.println(btree.getBloomFilter().toString());
+//        if(log.isInfoEnabled()) log.info(btree.getBloomFilter().toString());
 //
 //        /*
 //         * verify that the normal iterator is used for [k0] since the filter
@@ -285,7 +288,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         btree.getRoot();
 
         // show the filter state.
-        System.err.println(btree.getBloomFilter().toString());
+        if(log.isInfoEnabled())
+            log.info(btree.getBloomFilter().toString());
 
         final byte[] k0 = new byte[]{0};
         final byte[] k1 = new byte[]{1};
@@ -306,7 +310,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         assertTrue(btree.getBloomFilter().contains(k0));
 
         // show the filter state.
-        System.err.println("before checkpoint: "+btree.getBloomFilter());
+        if(log.isInfoEnabled())
+            log.info("before checkpoint: "+btree.getBloomFilter());
 
         // write a checkpoint (should force the bloom filter to the store).
         final long addrCheckpoint = btree.writeCheckpoint();
@@ -320,7 +325,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
             // load the checkpoint record.
             final Checkpoint checkpoint = Checkpoint.load(store, addrCheckpoint);
             
-            System.err.println(checkpoint.toString());
+            if(log.isInfoEnabled())
+                log.info(checkpoint.toString());
             
             // assert bloom filter address is defined.
             assertNotSame(0L, checkpoint.getBloomFilterAddr());
@@ -329,7 +335,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
             final BloomFilter bloomFilter = (BloomFilter) SerializerUtil
                     .deserialize(store.read(checkpoint.getBloomFilterAddr()));
             
-            System.err.println("as read from store: "+bloomFilter);
+            if(log.isInfoEnabled())
+                log.info("as read from store: "+bloomFilter);
 
             /*
              * Verify that we read in a bloom filter instance that has the same
@@ -340,7 +347,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
             assertTrue(bloomFilter.contains(k0));
             
             // show the filter state.
-            System.err.println(btree.getBloomFilter().toString());
+            if(log.isInfoEnabled())
+                log.info(btree.getBloomFilter().toString());
 
         }
         
@@ -361,7 +369,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
             assertNotNull(btree.getBloomFilter());
 
             // show the filter state.
-            System.err.println(btree.getBloomFilter().toString());
+            if(log.isInfoEnabled())
+                log.info(btree.getBloomFilter().toString());
 
             /*
              * Verify that the auto-magical reappearance of the bloom filter
@@ -578,7 +587,8 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
             
             maxN = factory.maxN;
             
-            System.err.println("factory="+factory);
+            if(log.isInfoEnabled())
+                log.info("factory="+factory);
             
             btree = BTree.create(store, metadata);
             

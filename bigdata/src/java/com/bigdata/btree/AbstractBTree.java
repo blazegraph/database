@@ -4182,17 +4182,29 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
+    /**
+     * Recycle (aka delete) the allocation. This method also adjusts the #of
+     * bytes released in the {@link BTreeCounters}.
+     * 
+     * @param addr
+     *            The address to be recycled.
+     * 
+     * @return The #of bytes which were recycled and ZERO (0) if the address is
+     *         {@link IRawStore#NULL}.
+     */
     protected int recycle(final long addr) {
-        if (addr != IRawStore.NULL) {
-            final int nbytes = store.getByteCount(addr);
-            getBtreeCounters().bytesReleased += nbytes;
-            
-            store.delete(addr);
-            
-            return nbytes;
-        } else {
+        
+        if (addr == IRawStore.NULL) 
             return 0;
-        }
+        
+        final int nbytes = store.getByteCount(addr);
+        
+        getBtreeCounters().bytesReleased += nbytes;
+        
+        store.delete(addr);
+        
+        return nbytes;
+
     }
 
 }
