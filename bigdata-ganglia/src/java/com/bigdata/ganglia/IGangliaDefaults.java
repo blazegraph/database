@@ -49,9 +49,19 @@ public interface IGangliaDefaults {
 	 */
 	int INITIAL_DELAY = 20;
 	
-	/**
-	 * The default heartbeat interval for ganglia hosts.
-	 */
+    /**
+     * The default heartbeat interval for ganglia hosts.
+     * <p>
+     * Note: Use ZERO (0) if you are running <code>gmond</code> on the same
+     * host. That will prevent the {@link GangliaService} from transmitting a
+     * different heartbeat, which would confuse <code>gmond</code> and
+     * <code>gmetad</code>.
+     * <p>
+     * The {@link GangliaService} MUST NOT send out a heartbeat if
+     * <code>gmond</code> is also running on the host since the two heartbeats
+     * will be different (they are the start time of <code>gmond</code>) and
+     * <code>gmond</code> and <code>gmetad</code> will both get confused.
+     */
 	int HEARTBEAT_INTERVAL = 20;
 	
 	/**
