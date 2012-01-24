@@ -263,13 +263,23 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	private static final Comparator<IHostReport> defaultHostReportComparator = new HostReportComparator(
 			"load_one", false/* asc */);
 	
-	/**
-	 * Simple constructor uses the defaults for everything.
-	 * @param serviceName 
-	 * 		The name of the service in which you are embedding ganglia support.
-	 * 
-	 * @throws UnknownHostException
-	 */
+    /**
+     * Simple constructor uses the defaults for everything <strong>except the
+     * heartbeart</strong>.
+     * <p>
+     * Note: The heartbeat is set to ZERO (0) under the assumption that
+     * <code>gmond</code> will be running on the same host. The
+     * {@link GangliaService} MUST NOT send out a heartbeat if
+     * <code>gmond</code> is also running on the host since the two heartbeats
+     * will be different (they are the start time of <code>gmond</code>) and
+     * <code>gmond</code> and <code>gmetad</code> will both get confused.
+     * 
+     * @param serviceName
+     *            The name of the service in which you are embedding ganglia
+     *            support.
+     * 
+     * @throws UnknownHostException
+     */
 	public GangliaService(final String serviceName) throws UnknownHostException {
 			this(
 					getCanonicalHostName(),// host name
@@ -288,7 +298,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 					false,// mock (does not transmit when true).
 					IGangliaDefaults.QUIET_PERIOD,//
 					IGangliaDefaults.INITIAL_DELAY,//
-					IGangliaDefaults.HEARTBEAT_INTERVAL,//
+					0,// heartbeat => NO HEARTBEAT BY DEFAULT!
+					//IGangliaDefaults.HEARTBEAT_INTERVAL,//
 					IGangliaDefaults.MONITORING_INTERVAL, //
 					IGangliaDefaults.DEFAULT_DMAX,//
 					new GangliaMetadataFactory(//metadataFactory
@@ -300,44 +311,48 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 									)));
 	}
 	
-	/**
-	 * Core constructor for an embedded {@link GangliaService} - see
-	 * {@link #run()} to actually run the service.
-	 * 
-	 * @param hostName
-	 *            The name of this host.
-	 * @param serviceName
-	 *            The name of the service which is embedding ganglia support.
-	 * @param metricsServers
-	 *            The unicast or multicast addresses for sending out packets.
-	 * @param listenGroup
-	 *            The multicast join group on which to listen for packets.
-	 * @param listenPort
-	 *            The port for the multicast join group.
-	 * @param listen
-	 *            <code>true</code> iff the service should listen for packets.
-	 * @param report
-	 *            <code>true</code> iff the service should report metrics.
-	 * @param mock
-	 *            <code><code>true</code> iff the service should do everything
-	 *            EXCEPT sending out the packets (they are logged instead). This
-	 *            is a debugging option.
-	 * @param quietPeriod
-	 *            The ganglia quiet period.
-	 * @param initialDelay
-	 *            The initial delay before metrics are reported.
-	 * @param heartbeatInterval
-	 *            The ganglia heartbeat interval.
-	 * @param monitoringInterval
-	 *            The delay between sweeps to collect performance counters from
-	 *            the application.
-	 * @param globalDMax
-	 *            The global value of DMax.
-	 * @param metadataFactory
-	 *            An application hook for providing nice metric declarations.
-	 * 
-	 * @see IGangliaDefaults
-	 */
+    /**
+     * Core constructor for an embedded {@link GangliaService} - see
+     * {@link #run()} to actually run the service.
+     * 
+     * @param hostName
+     *            The name of this host.
+     * @param serviceName
+     *            The name of the service which is embedding ganglia support.
+     * @param metricsServers
+     *            The unicast or multicast addresses for sending out packets.
+     * @param listenGroup
+     *            The multicast join group on which to listen for packets.
+     * @param listenPort
+     *            The port for the multicast join group.
+     * @param listen
+     *            <code>true</code> iff the service should listen for packets.
+     * @param report
+     *            <code>true</code> iff the service should report metrics.
+     * @param mock
+     *            <code><code>true</code> iff the service should do everything
+     *            EXCEPT sending out the packets (they are logged instead). This
+     *            is a debugging option.
+     * @param quietPeriod
+     *            The ganglia quiet period.
+     * @param initialDelay
+     *            The initial delay before metrics are reported.
+     * @param heartbeatInterval
+     *            The ganglia heartbeat interval. <strong>Use ZERO (0) if you
+     *            are running <code>gmond</code> on the same host</strong>. That
+     *            will prevent the {@link GangliaService} from transmitting a
+     *            different heartbeat, which would confuse <code>gmond</code>
+     *            and <code>gmetad</code>.
+     * @param monitoringInterval
+     *            The delay between sweeps to collect performance counters from
+     *            the application.
+     * @param globalDMax
+     *            The global value of DMax.
+     * @param metadataFactory
+     *            An application hook for providing nice metric declarations.
+     * 
+     * @see IGangliaDefaults
+     */
 	public GangliaService(
 			final String hostName,//
 			final String serviceName,//
