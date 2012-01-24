@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -477,11 +478,34 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 
 	}
 
+    /**
+     * Return <code>true</code> if the {@link GangliaService} is currently
+     * listening.
+     */
+	protected boolean isListening() {
+	    
+	    if(!listen)
+	        return false;
+	    
+	    final Future<?> f = listenerFuture;
+	    
+	    if(f == null)
+	        return false;
+	    
+	    if(f.isDone())
+	        return false;
+	    
+	    return true;
+	    
+	}
+	
 	/**
 	 * Run the ganglia service.
 	 */
 	public void run() {
 
+	    GangliaListener gangliaListener = null;
+	    
 		try {
 
 			final ThreadFactory threadFactory = new DaemonThreadFactory(
@@ -510,39 +534,46 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 			scheduledService = Executors.newScheduledThreadPool(3,
 					threadFactory);
 
-			/*
-			 * Setup sender.
-			 */
+			// Setup sender.
 			gangliaSender = new GangliaSender(metricsServers,
-					IGangliaDefaults.BUFFER_SIZE);
+                    IGangliaDefaults.BUFFER_SIZE);
 
-			/*
-			 * Setup listener.
-			 */
-			listenerFuture = new FutureTask<Void>(new GangliaListener(
-					listenGroup, listenPort, messageDecoder,
-					new GangliaServiceHandler()));
+            /*
+             * Start processes.
+             */
 
-			/*
-			 * Start processes.
-			 */
+            if (listen) {
 
-			if (listen) {
-				// ganglia message listener
-				listenService.submit(listenerFuture);
-			}
+                // Setup listener.
+                gangliaListener = new GangliaListener(listenGroup, listenPort,
+                        messageDecoder, new GangliaServiceHandler());
 
-			if (report) {
-				
-				if (heartbeatInterval > 0) {
-				
-					/*
-					 * Heartbeat for the host.
-					 * 
-					 * Note: When ZERO (0), we assume that gmond is running and
-					 * that it will take care of this metric for us.
-					 */
-					scheduledService.scheduleWithFixedDelay(new HeartBeatTask(),
+                // Wrap as Future.
+                listenerFuture = new FutureTask<Void>(gangliaListener);
+
+                // Start listener
+                listenService.submit(listenerFuture);
+
+            }
+
+            if (report) {
+
+                if (heartbeatInterval > 0) {
+
+                    /*
+                     * Heartbeat for the host.
+                     * 
+                     * Note: When ZERO (0), we assume that gmond is running and
+                     * that it will take care of this metric for us.
+                     * 
+                     * Note: DO NOT enable the heartbeat if gmond is running on
+                     * the host. The heartbeat is the start time of gmond.
+                     * Having two different heartbeats for the same host will
+                     * look like gmond is being bounced every time a heatbeat
+                     * is sent out by the GangliaService or gmond!
+                     */
+
+				    scheduledService.scheduleWithFixedDelay(new HeartBeatTask(),
 							initialDelay, heartbeatInterval, TimeUnit.SECONDS);
 					
 				}
@@ -595,13 +626,17 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 
 			}
 
+		} catch (InterruptedException t) {
+
+		    // Ignore. Normal shutdown.
+		    
 		} catch (Throwable t) {
 
 			log.error(t, t);
 
 		} finally {
-
-			if (listenerFuture != null) {
+		    
+            if (listenerFuture != null) {
 				listenerFuture.cancel(true/* mayInterruptIfRunning */);
 			}
 
@@ -609,6 +644,21 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 				listenService.shutdownNow();
 			}
 
+            if (gangliaSender != null) {
+                /*
+                 * Send through a mock message. The GangliaListener can be
+                 * blocked in DatagramSocket.receive(). This will get it
+                 * unblocked so it can exit in a timely manner.
+                 * 
+                 * TODO Java 7 supports non-blocking multicast channels. We
+                 * would not have to do this with a listener class which is
+                 * using NIO multicast support since it would not be blocked
+                 * until the next packet.
+                 */
+                sendMessage(new GangliaRequestMessage(hostName, "shutdown",
+                        false/* spoof */));
+            }
+            
 			if (sendService != null) {
 				sendService.shutdownNow();
 			}

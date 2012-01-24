@@ -15,31 +15,12 @@
 */
 package com.bigdata.ganglia;
 
-import java.net.DatagramPacket;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 
-
-import com.bigdata.ganglia.GangliaListener;
-import com.bigdata.ganglia.GangliaMessageDecoder31;
-import com.bigdata.ganglia.GangliaMessageEncoder31;
-import com.bigdata.ganglia.GangliaMessageTypeEnum;
-import com.bigdata.ganglia.GangliaMetadataMessage;
-import com.bigdata.ganglia.GangliaMetricMessage;
-import com.bigdata.ganglia.GangliaService;
-import com.bigdata.ganglia.GangliaSlopeEnum;
-import com.bigdata.ganglia.GangliaState;
-import com.bigdata.ganglia.IGangliaAttributes;
-import com.bigdata.ganglia.IGangliaDefaults;
-import com.bigdata.ganglia.IGangliaMessage;
-import com.bigdata.ganglia.IGangliaMessageHandler;
-import com.bigdata.ganglia.IGangliaMetadataMessage;
-import com.bigdata.ganglia.IGangliaMetricMessage;
-import com.bigdata.ganglia.IGangliaRequestMessage;
-import com.bigdata.ganglia.NOPMetadataFactory;
-import com.bigdata.ganglia.xdr.XDROutputBuffer;
-
 import junit.framework.TestCase;
+
+import com.bigdata.ganglia.xdr.XDROutputBuffer;
 
 /**
  * Test suite for encode/decode of the Ganglia 3.1 wire format messages. The
@@ -402,14 +383,15 @@ public class TestGangliaMessageEncodeDecode31 extends TestCase {
 		
 		final GangliaListener listener = new GangliaListener(handler) {
 			
-			protected IGangliaMessage decodeRecord(final DatagramPacket packet) {
+            protected IGangliaMessage decodeRecord(final byte[] data,
+                    final int off, final int len) {
 				
-				final IGangliaMessage msg = super.decodeRecord(packet);
-				
+                final IGangliaMessage msg = super.decodeRecord(data, off, len);
+
 				if(msg != null) {
 				
-					accept(packet, msg, gangliaState, messageGenerator, xdr,
-							nreceived, nerrors);
+                    accept(data, off, len, msg, gangliaState, messageGenerator,
+                            xdr, nreceived, nerrors);
 
 				}
 
@@ -418,25 +400,28 @@ public class TestGangliaMessageEncodeDecode31 extends TestCase {
 			}
 		};
 
+		System.out.println("Listening for packets.");
+		
 		// runs until killed.
 		listener.call();
 
 	}
 	
-	static protected void accept(final DatagramPacket packet,
-			final IGangliaMessage msg, final GangliaState gangliaState,
-			final GangliaMessageEncoder31 messageGenerator,
-			final XDROutputBuffer xdr, final AtomicLong nreceived,
-			final AtomicLong nerrors) {
+    static protected void accept(final byte[] data, final int off,
+            final int len, final IGangliaMessage msg,
+            final GangliaState gangliaState,
+            final GangliaMessageEncoder31 messageGenerator,
+            final XDROutputBuffer xdr, final AtomicLong nreceived,
+            final AtomicLong nerrors) {
 
-		nreceived.incrementAndGet();
+        nreceived.incrementAndGet();
 		
-		final byte[] expected = new byte[packet.getLength()];
+		final byte[] expected = new byte[len];
 		
-		System.arraycopy(packet.getData()/* src */,
-				packet.getOffset()/* srcPos */, expected/* dst */, 0/* destPos */,
-				expected.length);
-		
+        System.arraycopy(data,/* src */
+                off/* srcPos */, expected/* dst */, 0/* destPos */,
+                expected.length);
+
 		/*
 		 * Note: In order to test regeneration of the message we need to track
 		 * the metadata declarations so we have it on hand when we need to
