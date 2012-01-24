@@ -31,15 +31,19 @@ package com.bigdata.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -59,7 +63,17 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.ganglia.BigdataGangliaService;
+import com.bigdata.counters.ganglia.BigdataMetadataFactory;
+import com.bigdata.counters.ganglia.HostMetricsCollector;
+import com.bigdata.counters.ganglia.ServiceMetricsCollector;
 import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.ganglia.DefaultMetadataFactory;
+import com.bigdata.ganglia.GangliaMetadataFactory;
+import com.bigdata.ganglia.GangliaService;
+import com.bigdata.ganglia.GangliaSlopeEnum;
+import com.bigdata.ganglia.IGangliaDefaults;
+import com.bigdata.ganglia.util.GangliaUtil;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
@@ -493,6 +507,13 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * for reporting to the {@link ILoadBalancerService}.
      */
     private AbstractStatisticsCollector statisticsCollector;
+    
+    /**
+     * Future for an embedded {@link GangliaService} which listens to
+     * <code>gmond</code> instances and other {@link GangliaService}s and
+     * reports out metrics from {@link #getCounters()} to the ganglia network.
+     */
+    private FutureTask<Void> gangliaFuture;
     
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
@@ -1188,6 +1209,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  */
                 startQueueStatisticsCollection();
 
+                /*
+                 * Start embedded Ganglia peer. It will develop a snapshot of
+                 * the cluster metrics in memory and will self-report metrics
+                 * from the performance counter hierarchy to the ganglia
+                 * network.
+                 */
+                startGangliaService(statisticsCollector);
+                
                 // // notify the load balancer of this service join.
                 // notifyJoin();
 
@@ -1287,6 +1316,142 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             if (log.isInfoEnabled())
                 log.info("Collecting platform statistics: uuid=" + serviceUUID);
+
+        }
+
+        /**
+         * Start embedded Ganglia peer. It will develop a snapshot of the
+         * cluster metrics in memory and will self-report metrics from the
+         * performance counter hierarchy to the ganglia network.
+         * 
+         * @param statisticsCollector
+         *            Performance counters will be harvested from here.
+         */
+        void startGangliaService(
+                final AbstractStatisticsCollector statisticsCollector) {
+
+            try {
+
+                final Properties properties = getClient().getProperties();
+
+                final String hostName = AbstractStatisticsCollector.fullyQualifiedHostName;
+
+                final String serviceName = statisticsCollector.getProcessName();
+
+                final InetAddress listenGroup = InetAddress
+                        .getByName(properties.getProperty(
+                                IBigdataClient.Options.GANGLIA_LISTEN_GROUP,
+                                IBigdataClient.Options.DEFAULT_GANGLIA_LISTEN_GROUP));
+
+                final int listenPort = Integer.valueOf(properties.getProperty(
+                        IBigdataClient.Options.GANGLIA_LISTEN_PORT,
+                        IBigdataClient.Options.DEFAULT_GANGLIA_LISTEN_PORT));
+
+                final boolean listen = Boolean.valueOf(properties.getProperty(
+                        IBigdataClient.Options.GANGLIA_LISTEN,
+                        IBigdataClient.Options.DEFAULT_GANGLIA_LISTEN));
+
+                final boolean report = Boolean.valueOf(properties.getProperty(
+                        IBigdataClient.Options.GANGLIA_REPORT,
+                        IBigdataClient.Options.DEFAULT_GANGLIA_REPORT));
+
+                // Note: defaults to the listenGroup and port if nothing given.
+                final InetSocketAddress[] metricsServers = GangliaUtil.parse(
+                        // server(s)
+                        properties.getProperty(
+                        IBigdataClient.Options.GANGLIA_SERVERS,
+                        IBigdataClient.Options.DEFAULT_GANGLIA_SERVERS),
+                        // default host (same as listenGroup)
+                        listenGroup.getHostName(),
+                        // default port (same as listenGroup)
+                        listenPort
+                        );
+
+                final int quietPeriod = IGangliaDefaults.QUIET_PERIOD;
+
+                final int initialDelay = IGangliaDefaults.INITIAL_DELAY;
+
+                /*
+                 * Note: Use ZERO (0) if you are running gmond on the same host.
+                 * That will prevent the GangliaService from transmitting a
+                 * different heartbeat, which would confuse gmond and gmetad.
+                 */
+                final int heartbeatInterval = 0; // IFF using gmond.
+                // final int heartbeatInterval =
+                // IGangliaDefaults.HEARTBEAT_INTERVAL;
+
+                // Use the report delay for the interval in which we scan the
+                // performance counters.
+                final int monitoringInterval = (int) TimeUnit.MILLISECONDS
+                        .toSeconds(Long.parseLong(properties.getProperty(
+                                Options.REPORT_DELAY,
+                                Options.DEFAULT_REPORT_DELAY)));
+
+                final String defaultUnits = IGangliaDefaults.DEFAULT_UNITS;
+
+                final GangliaSlopeEnum defaultSlope = IGangliaDefaults.DEFAULT_SLOPE;
+
+                final int defaultTMax = IGangliaDefaults.DEFAULT_TMAX;
+
+                final int defaultDMax = IGangliaDefaults.DEFAULT_DMAX;
+
+                // Note: Factory is extensible (application can add its own
+                // delegates).
+                final GangliaMetadataFactory metadataFactory = new GangliaMetadataFactory(
+                        new DefaultMetadataFactory(//
+                                defaultUnits,//
+                                defaultSlope,//
+                                defaultTMax,//
+                                defaultDMax//
+                        ));
+
+                /*
+                 * Layer on the ability to (a) recognize and align host
+                 * bigdata's performance counters hierarchy with those declared
+                 * by ganglia and; (b) provide nice declarations for various
+                 * application counters of interest.
+                 */
+                metadataFactory.add(new BigdataMetadataFactory(hostName,
+                        serviceName, defaultSlope, defaultTMax, defaultDMax,
+                        heartbeatInterval));
+
+                // The embedded ganglia peer.
+                final GangliaService gangliaService = new BigdataGangliaService(
+                        hostName, //
+                        serviceName, //
+                        metricsServers,//
+                        listenGroup,//
+                        listenPort, //
+                        listen,// listen
+                        report,// report
+                        false,// mock,
+                        quietPeriod, //
+                        initialDelay, //
+                        heartbeatInterval,//
+                        monitoringInterval, //
+                        defaultDMax,// globalDMax
+                        metadataFactory);
+
+                // Collect and report host metrics.
+                gangliaService.addMetricCollector(new HostMetricsCollector(
+                        statisticsCollector));
+
+                // Collect and report service metrics.
+                gangliaService.addMetricCollector(new ServiceMetricsCollector(
+                        statisticsCollector, null/* filter */));
+
+                // Wrap as Future.
+                gangliaFuture = new FutureTask<Void>(gangliaService,
+                        (Void) null);
+
+                // Start the embedded ganglia service.
+                getExecutorService().submit(gangliaFuture);
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+            }
 
         }
 

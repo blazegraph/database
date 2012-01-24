@@ -35,6 +35,8 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.ganglia.GangliaService;
+import com.bigdata.ganglia.IGangliaDefaults;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
@@ -496,7 +498,65 @@ public interface IBigdataClient<T> {
          * port will be chosen.
          */
         String DEFAULT_HTTPD_PORT = "0";
+
+        /*
+         * Ganglia
+         */
         
+        // Listen
+
+        /**
+         * The multicast group used to join the ganglia performance monitoring
+         * network.
+         */
+        String GANGLIA_LISTEN_GROUP = IBigdataClient.class.getName()
+                + ".ganglia.listenGroup";
+
+        String DEFAULT_GANGLIA_LISTEN_GROUP = IGangliaDefaults.DEFAULT_GROUP;
+
+        /**
+         * The port for the multicast group used to join the ganglia performance
+         * monitoring network.
+         */
+        String GANGLIA_LISTEN_PORT = IBigdataClient.class.getName()
+                + ".ganglia.listenPort";
+
+        String DEFAULT_GANGLIA_LISTEN_PORT = Integer
+                .toString(IGangliaDefaults.DEFAULT_PORT);
+
+        /**
+         * When <code>true</code>, the embedded {@link GangliaService} will
+         * listen on to the specified multicast group.
+         */
+        String GANGLIA_LISTEN = IBigdataClient.class.getName()
+                + ".ganglia.listen";
+
+        String DEFAULT_GANGLIA_LISTEN = "true";
+
+        // Report
+
+        /**
+         * When <code>true</code>, the embedded {@link GangliaService} will
+         * report performance metrics to the specified gmetad server(s).
+         */
+        String GANGLIA_REPORT = IBigdataClient.class.getName()
+                + ".ganglia.report";
+
+        String DEFAULT_GANGLIA_REPORT = "true";
+
+        /**
+         * An list of the metric servers (<code>gmetad</code> instances) to
+         * which metrics will be sent. The default is to send metrics to the
+         * well known multicast group for ganglia. Zero or more hosts may be
+         * specified, separated by whitespace or commas. The port for each host
+         * is optional and defaults to the well known port for ganglia. Each
+         * host may be either a unicast address or a multicast group.
+         */
+        String GANGLIA_SERVERS = IBigdataClient.class.getName()
+                + ".ganglia.servers";
+
+        String DEFAULT_GANGLIA_SERVERS = IGangliaDefaults.DEFAULT_GROUP;
+
     };
 
 }
