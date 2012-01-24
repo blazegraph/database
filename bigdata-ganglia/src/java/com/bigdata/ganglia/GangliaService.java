@@ -546,8 +546,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 				
 			}
 
-			System.out
-					.println("Running on " + hostName + " for " + serviceName);
+            if (log.isInfoEnabled())
+                log.info("Running on " + hostName + " for " + serviceName);
 
 			if (listen) {
 
