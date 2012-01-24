@@ -74,6 +74,7 @@ import com.bigdata.ganglia.GangliaMetadataFactory;
 import com.bigdata.ganglia.GangliaService;
 import com.bigdata.ganglia.GangliaSlopeEnum;
 import com.bigdata.ganglia.IGangliaDefaults;
+import com.bigdata.ganglia.IGangliaState;
 import com.bigdata.ganglia.util.GangliaUtil;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
@@ -206,6 +207,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
                 }
                 
+                // Clear the state reference.
+                gangliaState.set(null);
+                
             }
             
             // terminate sampling and reporting tasks.
@@ -320,6 +324,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 ft.cancel(true/* mayInterruptIfRunning */);
 
             }
+
+            // Clear the state reference.
+            gangliaState.set(null);
             
         }
         
@@ -567,6 +574,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * reports out metrics from {@link #getCounters()} to the ganglia network.
      */
     private final AtomicReference<FutureTask<Void>> gangliaFuture = new AtomicReference<FutureTask<Void>>();
+
+    /**
+     * A read-only view of the ganglia soft state.
+     */
+    private final AtomicReference<IGangliaState> gangliaState = new AtomicReference<IGangliaState>();
     
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
@@ -584,6 +596,16 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
+    /**
+     * Return the soft state associated with the ganglia view of the performance
+     * metrics for the cluster.
+     */
+    public final IGangliaState getGangliaState() {
+
+        return gangliaState.get();
+        
+    }
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -1499,6 +1521,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 
                 // Save reference to future.
                 gangliaFuture.set(ft);
+
+                // Set the state reference.
+                gangliaState.set(gangliaService.getGangliaState());
 
                 // Start the embedded ganglia service.
                 getExecutorService().submit(ft);
