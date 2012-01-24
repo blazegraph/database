@@ -38,7 +38,7 @@ public interface IGangliaDefaults {
 	 * This is done to avoid multicast storms when several services are
 	 * restarted during a short interval.
 	 */
-	int QUIET_PERIOD = 60 * 10;
+	int QUIET_PERIOD = 60 * 10; // aka 10 minutes.
 
 	/**
 	 * The waiting period in seconds before the first reporting pass.
@@ -76,7 +76,7 @@ public interface IGangliaDefaults {
 	 * 
 	 * @see IGangliaDefaults#MONITORING_INTERVAL
 	 */
-	int MONITORING_INTERVAL = 20;
+	int MONITORING_INTERVAL = 20; // 20 seconds.
 	
 	/**
 	 * The default "slope" used to shape curves in RRDTOOL.
@@ -92,13 +92,13 @@ public interface IGangliaDefaults {
 	 * retransmitted unless TMAX might be exceeded before their next reporting
 	 * period.
 	 */
-	int DEFAULT_TMAX = 180;
+	int DEFAULT_TMAX = 180; // aka 3 minutes.
 
 	/**
 	 * Time in seconds after weak a counter which has not been reported will be
 	 * purged -or- ZERO (0) to never purge a counter.
 	 */
-	int DEFAULT_DMAX = 3600;
+	int DEFAULT_DMAX = 3600; // aka one hour.
 
 	/**
 	 * The default units for reported metrics (ganglia allows metadata for a

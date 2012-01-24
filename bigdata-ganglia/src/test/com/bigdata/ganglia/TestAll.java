@@ -64,6 +64,8 @@ public class TestAll extends TestCase {
 		 */
 		suite.addTestSuite(TestGangliaMessageEncodeDecode31.class);
 
+		suite.addTestSuite(TestGangliaServiceShutdown.class);
+		
         return suite;
         
     }

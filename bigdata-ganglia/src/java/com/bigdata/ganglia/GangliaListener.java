@@ -115,21 +115,31 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 
 	}
 
-	/**
-	 * Listens for ganglia messages. Each message is decoded as as it is
-	 * received. Bad packets are dropped. Valid messages are dispatched using a
-	 * second thread to avoid latency in the thread which is listening to the
-	 * ganglia protocol.
-	 */
+    /**
+     * Listens for ganglia messages. Each message is decoded as as it is
+     * received. Bad packets are dropped. Valid messages are dispatched using a
+     * second thread to avoid latency in the thread which is listening to the
+     * ganglia protocol.
+     * <p>
+     * Note: This method BLOCKS and does NOT notice an interrupt. This is
+     * because JDK 6 does not support multicast NIO.
+     * 
+     * TODO Java 6 does not support non-blocking multicast receive. Write a JDK
+     * 7 specific version of class class which uses multicast with non-blocking
+     * IO and hence can be interrupted.
+     * 
+     * @see <a href="http://blogs.oracle.com/alanb/entry/multicasting_with_nio">
+     *      Multicasting with NIO.</a>
+     * 
+     * @see <a
+     *      href="http://docs.oracle.com/javase/7/docs/api/java/nio/channels/MulticastChannel.html">
+     *      MulticastChannel </a>
+     */
 	public Void call() throws Exception {
 
-		/*
-		 * Per the javadoc for MulticastSocket.
-		 */
-
-		// Ganglia services use this port by default.
-		MulticastSocket datagramSocket = null;
-		
+		// Socket supports multicast.
+	    MulticastSocket datagramSocket = null;
+	    
 		// Service used to dispatch messages.
 		ExecutorService service = null;
 
@@ -145,23 +155,35 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 			service = Executors
 					.newSingleThreadScheduledExecutor(new DaemonThreadFactory(
 							"GangliaListener"));
-			
-			final byte[] buffer = new byte[BUFFER_SIZE];
 
-			// Construct packet for receiving data.
+			// Buffer reused for each receive.
+            final byte[] buffer = new byte[BUFFER_SIZE];
+
+            // Construct packet for receiving data.
 			final DatagramPacket packet = new DatagramPacket(buffer,
 					0/* off */, buffer.length/* len */);
 
 			// Listen for messages.
 			while (true) {
 
-				try {
+                try {
 
-					// Wait for a packet (blocks).
-					datagramSocket.receive(packet);
+                    /*
+                     * Note: This BLOCKS and does NOT notice an interrupt().
+                     * 
+                     * Note: In Java 6 you can not have both multicast and
+                     * non-blocking receive.
+                     */
+                    datagramSocket.receive(packet);
 
-					// Decode the record.
-					final IGangliaMessage msg = decodeRecord(packet);
+                    if(Thread.interrupted()) {
+                        
+                        break;
+                    }
+                    
+                    // Decode the record.
+                    final IGangliaMessage msg = decodeRecord(packet.getData(),
+                            packet.getOffset(), packet.getLength());
 
 					if (msg != null) {
 						
@@ -177,6 +199,8 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 
 			}
 			
+			return (Void) null;
+			
 		} finally {
 
 			if (service != null) {
@@ -188,31 +212,27 @@ public class GangliaListener implements Callable<Void>, IGangliaDefaults {
 			if (datagramSocket != null) {
 
 				datagramSocket.close();
-
+				
 			}
 
-		}
+        }
 
-	}
+    }
 
-	/**
-	 * Decode a Ganglia message from the datagram packet.
-	 * 
-	 * @param packet
-	 *            The packet.
-	 * 
-	 * @return The decoded record.
-	 */
-	protected IGangliaMessage decodeRecord(final DatagramPacket packet) {
-
-		final byte[] data = packet.getData();
-
-		final int off = packet.getOffset();
-
-		final int len = packet.getLength();
-
-		if (log.isDebugEnabled())
-			log.debug("receivedFrom=" + packet.getAddress() + ", len=" + len);
+    /**
+     * Decode a Ganglia message from the datagram packet.
+     * 
+     * @param data
+     *            The packet data.
+     * @param off
+     *            The offset of the first byte in the packet.
+     * @param len
+     *            The #of bytes in the packet.
+     * 
+     * @return The decoded record.
+     */
+    protected IGangliaMessage decodeRecord(final byte[] data, final int off,
+            final int len) {
 
 		if (log.isTraceEnabled())
 			log.trace(BytesUtil.toString(data, off, len));
