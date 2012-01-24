@@ -36,7 +36,6 @@ import java.net.InetSocketAddress;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -49,6 +48,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
@@ -109,7 +110,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * The client (if connected).
      */
-    private AbstractClient<T> client;
+    private final AtomicReference<AbstractClient<T>> client = new AtomicReference<AbstractClient<T>>();
     
     private final boolean collectPlatformStatistics;
     private final boolean collectQueueStatistics;
@@ -122,19 +123,22 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * itself so its reference to the federation will be cleared along with 
      * the federation's reference to the client.
      */
-    private boolean open;
+    private final AtomicBoolean open = new AtomicBoolean(false);
     
     public AbstractClient<T> getClient() {
-        
-        assertOpen();
-        
-        return client;
-        
+
+        final AbstractClient<T> t = client.get();
+
+        if (t == null)
+            throw new IllegalStateException();
+
+        return t;
+
     }
     
     final public boolean isOpen() {
         
-        return open;
+        return open.get();
         
     }
     
@@ -154,9 +158,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     synchronized public void shutdown() {
 
-        if(!isOpen()) return;
-
-        open = false;
+        if (!open.compareAndSet(true/* expect */, false/* update */)) {
+            // Already closed.
+            return;
+        }
         
         final long begin = System.currentTimeMillis();
 
@@ -178,14 +183,31 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             };
 
-            if (statisticsCollector != null) {
+            {
 
-                statisticsCollector.stop();
+                final AbstractStatisticsCollector t = statisticsCollector
+                        .getAndSet(null);
 
-                statisticsCollector = null;
+                if (t != null) {
 
+                    t.stop();
+
+                }
+            
             }
 
+            {
+
+                final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
+
+                if (ft != null) {
+
+                    ft.cancel(true/* mayInterruptIfRunning */);
+
+                }
+                
+            }
+            
             // terminate sampling and reporting tasks.
             new ShutdownHelper(scheduledExecutorService, 10L/* logTimeout */,
                     TimeUnit.SECONDS) {
@@ -210,26 +232,33 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         new SendEventsTask().run();
 
         // optional httpd service for the local counters.
-        if (httpd != null) {
+        {
 
-            httpd.shutdown();
+            final AbstractHTTPD t = httpd.getAndSet(null);
 
-            httpd = null;
+            if (t != null) {
 
-            httpdURL = null;
+                t.shutdown();
+
+            }
+
+            httpdURL.set(null);
 
         }
         
         if (log.isInfoEnabled())
             log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
 
-        if (client != null) {
+        {
+            // Get and Release our reference to the client.
+            final AbstractClient<T> t = client.getAndSet(null);
 
-            // Force the client to release its reference to the federation.
-            client.disconnect(false/*immediateShutdown*/);
+            if (t != null) {
 
-            // Release our reference to the client.
-            client = null;
+                // Force the client to release its reference to the federation.
+                t.disconnect(false/* immediateShutdown */);
+
+            }
             
         }
 
@@ -255,10 +284,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * The implementation must be a NOP if the federation is already shutdown.
      */
     synchronized public void shutdownNow() {
-        
-        if(!isOpen()) return;
-        
-        open = false;
+
+        if (!open.compareAndSet(true/* expect */, false/* update */)) {
+            // Already closed.
+            return;
+        }
 
         final long begin = System.currentTimeMillis();
         
@@ -268,14 +298,31 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         // stop client requests.
         threadPool.shutdownNow();
         
-        if (statisticsCollector != null) {
+        {
 
-            statisticsCollector.stop();
+            final AbstractStatisticsCollector t = statisticsCollector
+                    .getAndSet(null);
 
-            statisticsCollector = null;
+            if (t != null) {
 
+                t.stop();
+
+            }
+        
         }
 
+        {
+
+            final FutureTask<Void> ft = gangliaFuture.getAndSet(null);
+
+            if (ft != null) {
+
+                ft.cancel(true/* mayInterruptIfRunning */);
+
+            }
+            
+        }
+        
         // terminate sampling and reporting tasks immediately.
         scheduledExecutorService.shutdownNow();
 
@@ -283,26 +330,34 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         events.clear();
 
         // terminate the optional httpd service for the client's live counters.
-        if( httpd != null) {
-            
-            httpd.shutdownNow();
-            
-            httpd = null;
-            
-            httpdURL = null;
-            
-        }
+        {
 
+            final AbstractHTTPD t = httpd.getAndSet(null);
+
+            if (t != null) {
+
+                t.shutdownNow();
+
+            }
+
+            httpdURL.set(null);
+
+        }
+        
         if (log.isInfoEnabled())
             log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
-        
-        if (client != null) {
 
-            // Force the client to release its reference to the federation.
-            client.disconnect(true/* immediateShutdown */);
+        {
+            
+            // Get and release our reference to the client.
+            final AbstractClient<T> t = client.get();
 
-            // Release our reference to the client.
-            client = null;
+            if (t != null) {
+
+                // Force the client to release its reference to the federation.
+                t.disconnect(true/* immediateShutdown */);
+
+            }
             
         }
         
@@ -323,7 +378,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * @throws IllegalStateException
      *                if the client has disconnected from the federation.
      */
-    protected void assertOpen() {
+    final protected void assertOpen() {
 
         if (client == null) {
 
@@ -342,9 +397,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Used to sample and report on the queue associated with the
      * {@link #threadPool}.
      */
-    private final ScheduledExecutorService scheduledExecutorService = Executors
-            .newSingleThreadScheduledExecutor(new DaemonThreadFactory
-                    (getClass().getName()+".sampleService"));
+    private final ScheduledExecutorService scheduledExecutorService;
     
     /**
      * A service which may be used to schedule performance counter sampling
@@ -392,17 +445,17 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * httpd reporting the live counters for the client while it is connected to
      * the federation.
      */
-    private AbstractHTTPD httpd;
+    private final AtomicReference<AbstractHTTPD> httpd = new AtomicReference<AbstractHTTPD>();
     
     /**
      * The URL that may be used to access the httpd service exposed by this
      * client.
      */
-    private String httpdURL;
+    private final AtomicReference<String> httpdURL = new AtomicReference<String>();
 
     final public String getHttpdURL() {
         
-        return httpdURL;
+        return httpdURL.get();
         
     }
     
@@ -506,14 +559,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Collects interesting statistics on the client's host and process
      * for reporting to the {@link ILoadBalancerService}.
      */
-    private AbstractStatisticsCollector statisticsCollector;
+    private final AtomicReference<AbstractStatisticsCollector> statisticsCollector = new AtomicReference<AbstractStatisticsCollector>();
     
     /**
      * Future for an embedded {@link GangliaService} which listens to
      * <code>gmond</code> instances and other {@link GangliaService}s and
      * reports out metrics from {@link #getCounters()} to the ganglia network.
      */
-    private FutureTask<Void> gangliaFuture;
+    private final AtomicReference<FutureTask<Void>> gangliaFuture = new AtomicReference<FutureTask<Void>>();
     
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
@@ -547,7 +600,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         countersRoot = new CounterSet();
         {
 
-            final AbstractStatisticsCollector tmp = statisticsCollector;
+            final AbstractStatisticsCollector tmp = statisticsCollector.get();
 
             if (tmp != null) {
 
@@ -561,13 +614,13 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
         {
 
-            final String s = httpdURL;
+            final String s = httpdURL.get();
             
             if (s != null) {
             
                 // add counter reporting that url to the load balancer.
                 serviceRoot.addCounter(IServiceCounters.LOCAL_HTTPD,
-                        new OneShotInstrument<String>(httpdURL));
+                        new OneShotInstrument<String>(s));
 
             }
             
@@ -578,15 +631,27 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
              */
 
             AbstractStatisticsCollector.addBasicServiceOrClientCounters(
-                    serviceRoot, getServiceName(), getServiceIface(), client
-                            .getProperties());
+                    serviceRoot, getServiceName(), getServiceIface(),
+                    getClient().getProperties());
 
         }
 
         return countersRoot;
         
     }
+
+    /**
+     * The top-level of the counterset hierarchy.
+     * <p>
+     * Guarded by synchronized(this).
+     */
     private CounterSet countersRoot;
+
+    /**
+     * The root of the service specific section of the counterset hierarchy.
+     * <p>
+     * Guarded by synchronized(this).
+     */
     private CounterSet serviceRoot;
 
     public CounterSet getHostCounterSet() {
@@ -663,19 +728,20 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         if (client == null)
             throw new IllegalArgumentException();
 
-        this.open = true;
+        this.open.set(true);
         
-        this.client = (AbstractClient<T>) client;
+        final AbstractClient<T> client2 = (AbstractClient<T>) client;
+        
+        this.client.set(client2);
 
-        if (this.client.getDelegate() == null) {
+        if (client2.getDelegate() == null) {
 
             /*
              * If no one has set the delegate by this point then we setup a
              * default delegate.
              */
 
-            this.client
-                    .setDelegate(new DefaultClientDelegate<T>(this, null/* clientOrService */));
+            client2.setDelegate(new DefaultClientDelegate<T>(this, null/* clientOrService */));
 
         }
         
@@ -694,6 +760,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     (getClass().getName()+".executorService"));
 
         }
+        
+        scheduledExecutorService = Executors
+                .newSingleThreadScheduledExecutor(new DaemonThreadFactory
+                        (getClass().getName()+".scheduledService"));
 
         tempStoreFactory = new TemporaryStoreFactory(client.getProperties());
 
@@ -935,32 +1005,26 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Delegated. {@inheritDoc}
      */
     public T getService() {
-    
-        assertOpen();
 
-        return (T)client.getDelegate().getService();
-        
+        return (T) getClient().getDelegate().getService();
+
     }
 
     /**
      * Delegated. {@inheritDoc}
      */
     public String getServiceName() {
-    
-        assertOpen();
 
-        return client.getDelegate().getServiceName();
-        
+        return getClient().getDelegate().getServiceName();
+
     }
-    
+
     /**
      * Delegated. {@inheritDoc}
      */
     public Class getServiceIface() {
 
-        assertOpen();
-
-        return client.getDelegate().getServiceIface();
+        return getClient().getDelegate().getServiceIface();
         
     }
     
@@ -969,9 +1033,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     public UUID getServiceUUID() {
         
-        assertOpen();
-
-        return client.getDelegate().getServiceUUID();
+        return getClient().getDelegate().getServiceUUID();
         
     }
     
@@ -980,7 +1042,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     public boolean isServiceReady() {
 
-        final AbstractClient<T> thisClient = this.client;
+        final AbstractClient<T> thisClient = client.get();
 
         if (thisClient == null)
             return false;
@@ -1001,9 +1063,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     public void reattachDynamicCounters() {
         
-        assertOpen();
-
-        client.getDelegate().reattachDynamicCounters();
+        getClient().getDelegate().reattachDynamicCounters();
         
     }
     
@@ -1012,9 +1072,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     public void didStart() {
 
-        assertOpen();
-
-        client.getDelegate().didStart();
+        getClient().getDelegate().didStart();
         
     }
 
@@ -1024,9 +1082,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     public AbstractHTTPD newHttpd(final int httpdPort,
             final ICounterSetAccess accessor) throws IOException {
 
-        assertOpen();
-
-        return client.getDelegate().newHttpd(httpdPort, accessor);
+        return getClient().getDelegate().newHttpd(httpdPort, accessor);
         
     }
 
@@ -1043,7 +1099,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
         }
 
-        client.getDelegate().serviceJoin(service, serviceUUID);
+        getClient().getDelegate().serviceJoin(service, serviceUUID);
 
     }
 
@@ -1054,14 +1110,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
         if(!isOpen()) return;
         
-        if(log.isInfoEnabled()) {
-            
-            log.info("serviceUUID="+serviceUUID);
-            
+        if (log.isInfoEnabled()) {
+
+            log.info("serviceUUID=" + serviceUUID);
+
         }
 
         // @todo really, we should test like this everywhere.
-        final AbstractClient thisClient = this.client;
+        final AbstractClient<T> thisClient = client.get();
 
         if (thisClient != null && thisClient.isConnected()) {
 
@@ -1306,14 +1362,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                         .newInstance(p);
 
                 tmp.start();
-                
-                // Note: synchronized to keep findbugs happy.
-                synchronized (AbstractFederation.this) {
-                
-                    statisticsCollector = tmp;
-                    
-                }
-                
+
+                statisticsCollector.set(tmp);
+
             }
 
             if (log.isInfoEnabled())
@@ -1329,7 +1380,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          * @param statisticsCollector
          *            Performance counters will be harvested from here.
          */
-        void startGangliaService(
+        protected void startGangliaService(
                 final AbstractStatisticsCollector statisticsCollector) {
 
             try {
@@ -1443,11 +1494,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                         statisticsCollector, null/* filter */));
 
                 // Wrap as Future.
-                gangliaFuture = new FutureTask<Void>(gangliaService,
-                        (Void) null);
+                final FutureTask<Void> ft = new FutureTask<Void>(
+                        gangliaService, (Void) null);
+                
+                // Save reference to future.
+                gangliaFuture.set(ft);
 
                 // Start the embedded ganglia service.
-                getExecutorService().submit(gangliaFuture);
+                getExecutorService().submit(ft);
 
             } catch (Throwable t) {
 
@@ -1528,16 +1582,18 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             if (httpd != null) {
 
                 // save reference to the daemon.
-                AbstractFederation.this.httpd = httpd;
+                AbstractFederation.this.httpd.set(httpd);
                 
                 // the URL that may be used to access the local httpd.
-                httpdURL = "http://"
+                final String s = "http://"
                         + AbstractStatisticsCollector.fullyQualifiedHostName
                         + ":" + httpd.getPort() + "/?path="
                         + URLEncoder.encode(path, "UTF-8");
 
+                httpdURL.set(s);
+
                 if (log.isInfoEnabled())
-                    log.info("start:\n" + httpdURL);
+                    log.info("start:\n" + s);
 
             }
 
