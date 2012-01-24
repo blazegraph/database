@@ -805,7 +805,7 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/lgplutils.jar" />
       <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
             tofile="${dist.lib}/fastutil.jar" />
-      <copy file="${bigdata.lib}/bigdata-ganglia-1.0.0.jar"
+      <copy file="${bigdata.lib}/bigdata-ganglia-1.0.1.jar"
             tofile="${dist.lib}/bigdata-ganglia.jar" />
       <copy file="${bigdata.lib}/icu/icu4j-${icu.version}.jar"
             tofile="${dist.lib}/icu4j.jar" />
