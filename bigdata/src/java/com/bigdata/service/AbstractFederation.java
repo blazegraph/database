@@ -1214,8 +1214,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  * the cluster metrics in memory and will self-report metrics
                  * from the performance counter hierarchy to the ganglia
                  * network.
+                 * 
+                 * TODO Disabled for the moment while I debug this.
                  */
-                startGangliaService(statisticsCollector);
+                //startGangliaService(statisticsCollector);
                 
                 // // notify the load balancer of this service join.
                 // notifyJoin();
