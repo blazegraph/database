@@ -553,7 +553,8 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
         /**
          * 
-         * @param client
+         * @param server
+         * @param clientRef
          *            The client socket, selector, etc.
          * @param message
          *            The message carrying metadata about the data to be
