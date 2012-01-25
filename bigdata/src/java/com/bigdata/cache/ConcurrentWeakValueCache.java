@@ -781,6 +781,10 @@ public class ConcurrentWeakValueCache<K, V> implements
 
         }
 
+        public String toString() {
+			return super.toString() + "{key=" + k + ",val=" + get() + "}";
+        }
+        
     }
 
 }
