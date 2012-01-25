@@ -601,7 +601,7 @@ public class BytesUtil {
 		for (int i = off; i < off + len; i++) {
 
 			if (i > 0)
-				sb.append(", ");
+				sb.append(",");
 
 			// as an unsigned integer.
 			// sb.append(Integer.toHexString(key[i] & 0xff));
