@@ -78,25 +78,25 @@ public interface IFederationDelegate<T> {
     public UUID getServiceUUID();
 
     /**
-     * Offers the service an opportunity to dynamically detach and re-attach
-     * performance counters. This can be invoked either in response to an http
-     * GET or the periodic reporting of performance counters to the
-     * {@link ILoadBalancerService}. In general, implementations should limit
-     * the frequency of update, e.g., to no more than once a second.
+	 * Offers the service an opportunity to dynamically detach and re-attach
+	 * performance counters. This can be invoked either in response to an http
+	 * GET or the periodic reporting of performance counters to the
+	 * {@link ILoadBalancerService}. In general, implementations should limit
+	 * the frequency of update, e.g., to no more than once a second.
+	 * <p>
+	 * Note: For most purposes, this has been replaced by
+	 * {@link ICounterSetAccess} which is now passed into
+	 * {@link CounterSetHTTPD}. That provides the necessary indirection for
+	 * periodic refresh of the performance counters. The {@link CounterSetHTTPD}
+	 * now also handles the limitation on the update frequency for the
+	 * materialized counters.
+	 * <p>
+	 * However, there are still some counters which need to be dynamically
+	 * reattached. For example, any counter set which is dynamic in its
+	 * structure, such as the DirectBufferPool.
      * 
      * FIXME TransactionServer counters might not be properly attached.
-     * 
-     * FIXME DataServer counters might not be properly attached. See the
-     * DataService's {@link IFederationDelegate}'s setupCounters() method.
-     * 
-     * @deprecated This has been replaced by {@link ICounterSetAccess} which is
-     *             now passed into {@link CounterSetHTTPD}. That provides the
-     *             necessary indirection for periodic refresh of the performance
-     *             counters. The {@link CounterSetHTTPD} now also handles the
-     *             limitation on the update frequency for the materialized
-     *             counters. With this change none of the services should be
-     *             caching a local {@link CounterSet} object anymore.
-     */
+	 */
     public void reattachDynamicCounters();
 
     /**
