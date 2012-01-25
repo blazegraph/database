@@ -1319,7 +1319,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                  * from the performance counter hierarchy to the ganglia
                  * network.
                  */
-                //startGangliaService(statisticsCollector.get());
+                if(false) startGangliaService(statisticsCollector.get());
                 
                 // // notify the load balancer of this service join.
                 // notifyJoin();

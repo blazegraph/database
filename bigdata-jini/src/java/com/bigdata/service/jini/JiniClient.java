@@ -33,6 +33,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -86,24 +89,47 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
     }
     
     /**
-     * The federation and <code>null</code> iff not connected.
+     * The value is the connected federation and <code>null</code> iff not
+     * connected.
      */
-    private JiniFederation<T> fed = null;
+    private final AtomicReference<JiniFederation<T>> fed = new AtomicReference<JiniFederation<T>>();
 
-    synchronized public boolean isConnected() {
+    /**
+     * The lock used to guard {@link #connect()} and
+     * {@link #disconnect(boolean)}.
+     * <p>
+     * Note: In order to avoid some deadlocks during the shutdown protocol, I
+     * refactored several methods which were using synchronized(this) to either
+     * use an {@link AtomicReference} (for {@link #fed} or to use a hidden lock.
+     */
+    private final Lock connectLock = new ReentrantLock(false/* fair */);
+
+    public boolean isConnected() {
         
-        return fed != null;
+        return fed.get() != null;
         
     }
     
+    public JiniFederation<T> getFederation() {
+
+        final JiniFederation<T> fed = this.fed.get();
+        
+        if (fed == null) {
+
+            throw new IllegalStateException();
+
+        }
+
+        return fed;
+
+    }
+
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: Immediate shutdown can cause odd exceptions to be logged. Normal
      * shutdown is recommended unless there is a reason to force immediate
      * shutdown.
-     * 
-     * @param immediateShutdown
-     *            When <code>true</code> the shutdown is <em>abrupt</em>.
-     *            You can expect to see messages about interrupted IO such as
      * 
      * <pre>
      * java.rmi.MarshalException: error marshalling arguments; nested exception is: 
@@ -116,48 +142,68 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
      * 
      * These messages may be safely ignored if they occur during immediate
      * shutdown.
+     * 
+     * @param immediateShutdown
+     *            When <code>true</code> the shutdown is <em>abrupt</em>. You
+     *            can expect to see messages about interrupted IO such as
      */
-    synchronized public void disconnect(final boolean immediateShutdown) {
-        
-        if (fed != null) {
+//    synchronized 
+    public void disconnect(final boolean immediateShutdown) {
 
-            if(immediateShutdown) {
-                
-                fed.shutdownNow();
-                
-            } else {
-                
-                fed.shutdown();
-                
+        connectLock.lock();
+        
+        try {
+
+            final JiniFederation<T> fed = this.fed.get();
+
+            if (fed != null) {
+
+                if (immediateShutdown) {
+
+                    fed.shutdownNow();
+
+                } else {
+
+                    fed.shutdown();
+
+                }
+
             }
-            
+
+            this.fed.set(null);
+
+        } finally {
+
+            connectLock.unlock();
+
         }
-        
-        fed = null;
 
     }
 
-    synchronized public JiniFederation<T> getFederation() {
+//    synchronized 
+    public JiniFederation<T> connect() {
 
-        if (fed == null) {
+        connectLock.lock();
 
-            throw new IllegalStateException();
+        try {
+
+            JiniFederation<T> fed = this.fed.get();
+
+            if (fed == null) {
+
+                fed = new JiniFederation<T>(this, jiniConfig, zooConfig);
+
+                this.fed.set(fed);
+
+            }
+
+            return fed;
+
+        } finally {
+
+            connectLock.unlock();
 
         }
-
-        return fed;
-
-    }
-
-    synchronized public JiniFederation<T> connect() {
-
-        if (fed == null) {
-
-            fed = new JiniFederation<T>(this, jiniConfig, zooConfig);
-
-        }
-
-        return fed;
 
     }
 
