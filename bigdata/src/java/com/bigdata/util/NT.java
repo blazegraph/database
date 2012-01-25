@@ -89,10 +89,10 @@ public class NT implements Serializable {
         if (this == o)
             return true;
 
-        if (!this.name.equals(o.name))
+        if (this.timestamp != o.timestamp)
             return false;
 
-        if (this.timestamp != o.timestamp)
+        if (!this.name.equals(o.name))
             return false;
 
         return true;
