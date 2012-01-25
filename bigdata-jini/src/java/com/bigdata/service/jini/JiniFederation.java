@@ -1378,10 +1378,9 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
      * 
      * @param mayInterruptIfRunning
      */
-    synchronized public void cancelMonitoredTasks(
-            final boolean mayInterruptIfRunning) {
+    public void cancelMonitoredTasks(final boolean mayInterruptIfRunning) {
 
-        for (TaskFuture tmp : futures) {
+        for (TaskFuture<?> tmp : futures) {
 
             if (!tmp.future.isDone()) {
 
