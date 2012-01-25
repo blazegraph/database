@@ -61,10 +61,10 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.btree.IRangeQuery;
@@ -72,6 +72,7 @@ import com.bigdata.io.IStreamSerializer;
 import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.DelegateTransactionService;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -587,10 +588,48 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         if (transactionServiceClient == null)
             return null;
 
-        return transactionServiceClient.getTransactionService();
+        final ITransactionService proxy = transactionServiceClient
+                .getTransactionService();
 
+        if(proxy == null)
+            return proxy;
+
+        if (true) {
+            
+            return proxy;
+            
+        } else {
+
+            /*
+             * Wrap with a delegation pattern so we can intercept requests for a
+             * new transaction. This needs to be done on the client in order to
+             * provide stack traces for where those calls are originating on the
+             * client.
+             */
+            
+            return new DelegateTransactionService(proxy) {
+
+                @Override
+                public long newTx(long timestamp) throws IOException {
+
+                    final long tx = proxy.newTx(timestamp);
+
+                    log.warn(
+                            "timestamp="
+                                    + com.bigdata.journal.TimestampUtility
+                                            .toString(timestamp) + " => " + tx,
+                            new RuntimeException());
+                    
+                    return tx;
+                    
+                }
+
+            };
+
+        }
+        
     }
-    
+   
     public IResourceLockService getResourceLockService() {
         
         return resourceLockService;
