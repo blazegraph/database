@@ -72,9 +72,39 @@ public class ServiceMetricsCollector implements IGangliaMetricsCollector {
 			// The full path to the metric name.
 			final String path = c.getPath();
 
+            /*
+             * By using pathPrefix, we remove the hostName, the service
+             * interface type, and the service UUID from the counter path before
+             * accepting the rest of the path as the metric name. As long as
+             * there is one "key" service per node (CS, DS, etc), this provides
+             * exact information. When there are multiple services on a node,
+             * this will cause the information from those services to contend
+             * rather than aggregate. Since there is typically an SMS also
+             * running on the node, the SMS should not be reporting out these
+             * counters or it could overwrite the main services counters when
+             * they are combined in gmetad.
+             * 
+             * TODO A better approach would be to match and remove the UUID from
+             * the counter name. That way the SMS and DS/CS/MDS metrics would
+             * have different prefixes but different DS instances on different
+             * nodes would use the same name for a given performance counter.
+             * 
+             * / bigdata10.bigdata.com / service /
+             * com.bigdata.service.IMetadataService /
+             * f4c2ee13-0679-494d-913d-76d14f7d0385 / ...
+             */
+//            final String s = path.substring(pathPrefix.length());
+            
+            /*
+             * With this approach all metric names are unique since we are only
+             * removing the host name from the counter path. However, the
+             * presence of the UUID in the metric name makes it difficult to
+             * aggregate this stuff in the ganglia UI.
+             */
+            final String s = path.substring(basePrefix.length());
+
 			// Just the metric name.
-			final String metricName = GangliaMunge.munge(path.substring(
-					basePrefix.length()).replace('/', '.'));
+			final String metricName = GangliaMunge.munge(s).replace('/', '.');
 
 			reporter.setMetric(metricName, value);
 

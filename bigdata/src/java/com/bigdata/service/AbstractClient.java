@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
@@ -337,14 +338,14 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
 
     }
     
-    private IFederationDelegate<T> delegate = null;
+    private final AtomicReference<IFederationDelegate<T>> delegate = new AtomicReference<IFederationDelegate<T>>();
 
     /**
      * The delegate for the federation.
      */
-    public final synchronized IFederationDelegate<T> getDelegate() {
+    public final IFederationDelegate<T> getDelegate() {
         
-        return delegate;
+        return delegate.get();
         
     }
 
@@ -356,11 +357,13 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
      * @throws IllegalStateException
-     *             if the property has already been set to a value.
+     *             if the property has already been set to a different value.
      * @throws IllegalStateException
      *             if the client is already connected.
      */
-    public final synchronized void setDelegate(final IFederationDelegate<T> delegate) {
+    public final 
+//    synchronized 
+    void setDelegate(final IFederationDelegate<T> delegate) {
         
         if (delegate == null) {
 
@@ -371,16 +374,31 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
         if(isConnected()) {
             
             throw new IllegalStateException();
-            
-        }
-        
-        if (this.delegate != null && this.delegate != delegate) {
 
-            throw new IllegalStateException();
+        }
+
+        // Try to set, expecting current value is [null]
+        if (!this.delegate
+                .compareAndSet(null/* expect */, delegate/* update */)) {
+            
+            // Try to set, expecting current value is [delegate].
+            if (!this.delegate
+                    .compareAndSet(delegate/* expect */, delegate/* update */)) {
+
+                // Current value is not [null] and is not [delegate].
+                throw new IllegalStateException();
+                
+            }
             
         }
-        
-        this.delegate = delegate;
+
+//        if (this.delegate.get() != null && this.delegate.get() != delegate) {
+//
+//            throw new IllegalStateException();
+//            
+//        }
+//        
+//        this.delegate.set(delegate);
         
     }
 
