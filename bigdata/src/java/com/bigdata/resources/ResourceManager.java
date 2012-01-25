@@ -373,7 +373,7 @@ abstract public class ResourceManager extends OverflowManager implements
                         new Instrument<Long>() {
                             public void sample() {
                                 final ManagedJournal liveJournal = getLiveJournal();
-                                long lastCommitTime = liveJournal.getLastCommitTime();
+                                final long lastCommitTime = liveJournal.getLastCommitTime();
                                 if (lastCommitTime == 0L) {
                                     /*
                                      * This warning will be issued for the first
@@ -382,8 +382,8 @@ abstract public class ResourceManager extends OverflowManager implements
                                      * application registers an index on that
                                      * data service.
                                      */
-                                    log
-                                            .warn("No commit points on the live journal?");
+                                    if(log.isInfoEnabled())
+                                            log.info("No commit points on the live journal?");
                                     return;
                                 }
                                 final long indexCount = liveJournal
