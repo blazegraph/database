@@ -12,7 +12,7 @@ http://sourceforge.net/projects/bigdata/
 
 You can checkout this release from:
 
-https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_1_0
+https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/BIGDATA_RELEASE_1_1_1
 
 New features:
 
