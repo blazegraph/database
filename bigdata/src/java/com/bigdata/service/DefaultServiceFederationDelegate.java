@@ -37,8 +37,11 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.IProcessCounters;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -91,27 +94,27 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
 	public void reattachDynamicCounters() {
 
-//	    /* Reattaches the {@link DirectBufferPool} counters. */
-//		// The service's counter set hierarchy.
-//		final CounterSet serviceRoot = service.getFederation()
-//				.getServiceCounterSet();
-//
-//		// Ensure path exists.
-//		final CounterSet tmp = serviceRoot.makePath(IProcessCounters.Memory);
-//
-//		/*
-//		 * Add counters reporting on the various DirectBufferPools.
-//		 */
-//		synchronized (tmp) {
-//
-//			// detach the old counters (if any).
-//			tmp.detach("DirectBufferPool");
-//
-//			// attach the current counters.
-//			tmp.makePath("DirectBufferPool").attach(
-//					DirectBufferPool.getCounters());
-//
-//        }
+	    /* Reattaches the {@link DirectBufferPool} counters. */
+		// The service's counter set hierarchy.
+		final CounterSet serviceRoot = service.getFederation()
+				.getServiceCounterSet();
+
+		// Ensure path exists.
+		final CounterSet tmp = serviceRoot.makePath(IProcessCounters.Memory);
+
+		/*
+		 * Add counters reporting on the various DirectBufferPools.
+		 */
+		synchronized (tmp) {
+
+			// detach the old counters (if any).
+			tmp.detach("DirectBufferPool");
+
+			// attach the current counters.
+			tmp.makePath("DirectBufferPool").attach(
+					DirectBufferPool.getCounters());
+
+        }
 
 
     }
