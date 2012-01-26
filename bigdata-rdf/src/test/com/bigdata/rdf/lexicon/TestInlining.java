@@ -29,18 +29,23 @@ package com.bigdata.rdf.lexicon;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.ColorsEnumExtension;
 import com.bigdata.rdf.internal.EpochExtension;
+import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.SampleExtensionFactory;
 import com.bigdata.rdf.internal.XSD;
@@ -53,7 +58,9 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.rdf.vocab.VocabularyDecl;
 
 /**
  * Test suite for adding terms to the lexicon.
@@ -428,7 +435,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         final Properties properties = getProperties();
         
         // test w/o predefined vocab.
-        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+        properties.setProperty(Options.VOCABULARY_CLASS, MyVocabulary.class
                 .getName());
 
         // test w/o axioms - they imply a predefined vocab.
@@ -520,12 +527,62 @@ public class TestInlining extends AbstractTripleStoreTestCase {
 
     }
 
+    /**
+     * Declares URIs to support the {@link IExtension} examples.
+     */
+    static private class MyVocabularyDecl implements VocabularyDecl {
+
+        static private final URI[] myVocabURIs = new URI[] {//
+            ColorsEnumExtension.COLOR,
+            EpochExtension.EPOCH
+        };
+
+        public MyVocabularyDecl() {
+        }
+
+        public Iterator<URI> values() {
+
+            return Collections.unmodifiableList(Arrays.asList(myVocabURIs))
+                    .iterator();
+
+        }
+
+    }
+    
+    /**
+     * Declares URIs to support the {@link IExtension} examples.
+     */
+    public static class MyVocabulary extends BaseVocabulary {
+        
+        /**
+         * De-serialization ctor.
+         */
+        public MyVocabulary() {
+            
+            super();
+            
+        }
+        
+        public MyVocabulary(final String namespace) {
+
+            super( namespace );
+            
+        }
+
+        @Override
+        protected void addValues() {
+
+            addDecl(new MyVocabularyDecl());
+
+        }
+    }
+    
     public void test_colorsEnum() {
 
         final Properties properties = getProperties();
         
         // test w/o predefined vocab.
-        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+        properties.setProperty(Options.VOCABULARY_CLASS, MyVocabulary.class
                 .getName());
 
         // test w/o axioms - they imply a predefined vocab.

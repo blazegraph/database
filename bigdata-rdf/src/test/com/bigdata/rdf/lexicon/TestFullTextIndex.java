@@ -374,10 +374,10 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                 AbstractTripleStore.Options.MAX_INLINE_TEXT_LENGTH,
                 "0");
 
-        // We do not need any vocabulary to test this.
-        properties.setProperty(
-                AbstractTripleStore.Options.VOCABULARY_CLASS,
-                NoVocabulary.class.getName());
+//        // We do not need any vocabulary to test this.
+//        properties.setProperty(
+//                AbstractTripleStore.Options.VOCABULARY_CLASS,
+//                NoVocabulary.class.getName());
 
         AbstractTripleStore store = getStore(properties);
 

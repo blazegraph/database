@@ -581,6 +581,11 @@ abstract public class AbstractTripleStore extends
          * {@link #DEFAULT_VOCABULARY_CLASS}. You can create your own
          * {@link VocabularyDecl} classes and combine them within your own
          * {@link Vocabulary}, but it must extend {@link BaseVocabulary}.
+         * <p>
+         * Note: There is an interaction between the {@link Vocabulary} and
+         * {@link IExtension}s. The {@link IDatatypeURIResolver} requires that
+         * URIs used by an {@link IExtension} are pre-declared by the
+         * {@link Vocabulary}.
          */
         String VOCABULARY_CLASS = AbstractTripleStore.class.getName() + ".vocabularyClass";
 
