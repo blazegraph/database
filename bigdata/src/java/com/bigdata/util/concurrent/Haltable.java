@@ -410,10 +410,14 @@ public class Haltable<V> implements IHaltable<V> {
     /**
      * This logs all unexpected causes @ WARN (anything not reported as normal
      * termination by {@link #isNormalTerminationCause(Throwable)}), not just
-     * the first cause. All exceptions are logged @ TRACE.
+     * the first cause. All exceptions are logged @ TRACE. The firstCause is
+     * always logged @ ERROR.
      */
     protected void logCause(final boolean isFirstCause, final Throwable cause) {
-        if (log.isEnabledFor(Level.WARN)) {
+        if(isFirstCause) {
+            log.error(this + " : isFirstCause=" + isFirstCause + " : "
+                    + cause, cause);
+        } else if (log.isEnabledFor(Level.WARN)) {
             if (error) {
                 log.warn(this + " : isFirstCause=" + isFirstCause + " : "
                         + cause, cause);
