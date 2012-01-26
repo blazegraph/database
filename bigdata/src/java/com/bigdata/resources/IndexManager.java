@@ -1175,14 +1175,6 @@ abstract public class IndexManager extends StoreManager {
                         + ", journal=" + journal.getResourceMetadata());
 
         }
-
-        if (btree == null) {
-
-            // No such index.
-
-            return null;
-
-        }
         
         return getIndexSources(name, timestamp, btree);
 
