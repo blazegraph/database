@@ -205,7 +205,7 @@ public class Banner {
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/362
                  */
-                if (InnerCause.isInnerCause(t, NoSuchMethodException.class)) {
+                if (InnerCause.isInnerCause(t, NoSuchMethodError.class)) {
 
                     log.error("Unable to raise the default log level to WARN."
                             + " Logging is NOT properly configured."
