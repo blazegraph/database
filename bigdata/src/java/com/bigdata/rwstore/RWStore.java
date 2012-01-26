@@ -273,7 +273,8 @@ public class RWStore implements IStore, IBufferedWriter {
          * @see #ALLOCATION_SIZES
          */
         //String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128";
-        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520";
+        // String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520";
+        String DEFAULT_ALLOCATION_SIZES = "1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512";
         // private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
         // private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
@@ -1757,6 +1758,44 @@ public class RWStore implements IStore, IBufferedWriter {
 		}
 	}
 
+	private boolean freeImmediateBlob(final int hdr_addr, final int sze) {
+		if (sze <= (m_maxFixedAlloc-4))
+			throw new IllegalArgumentException("Unexpected address size");
+		
+        if (m_storageStats != null) {
+        	m_storageStats.deleteBlob(sze);
+        }
+
+        final int alloc = m_maxFixedAlloc-4;
+		final int blcks = (alloc - 1 + sze)/alloc;		
+		
+		// read in header block, then free each reference
+		final byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
+		getData(hdr_addr, hdr);
+		
+		final DataInputStream instr = new DataInputStream(
+				new ByteArrayInputStream(hdr, 0, hdr.length-4) );
+		
+		// retain lock for all frees
+		m_allocationLock.lock();
+		try {
+			final int allocs = instr.readInt();
+			int rem = sze;
+			for (int i = 0; i < allocs; i++) {
+				final int nxt = instr.readInt();
+				immediateFree(nxt, rem <= alloc ? rem : alloc);
+				rem -= alloc;
+			}
+			immediateFree(hdr_addr, hdr.length);
+			
+			return true;
+		} catch (IOException ioe) {
+			throw new RuntimeException(ioe);
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+
 	//	private long immediateFreeCount = 0;
 	private void immediateFree(final int addr, final int sze) {
 		immediateFree(addr, sze, false);
@@ -1768,6 +1807,12 @@ public class RWStore implements IStore, IBufferedWriter {
 		case 0:
 		case -1:
 		case -2:
+			return;
+		}
+
+		if (sze > (this.m_maxFixedAlloc-4)) {
+			freeImmediateBlob(addr, sze);
+			
 			return;
 		}
 

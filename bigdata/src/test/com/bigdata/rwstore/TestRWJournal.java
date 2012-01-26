@@ -1026,6 +1026,61 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		/**
+		 * This test releases over a blobs worth of deferred frees
+		 */
+		public void test_blobDeferredFrees() {
+			Journal store = (Journal) getStore(5);
+			try {
+
+				RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+
+				ArrayList<Long> addrs = new ArrayList<Long>();
+				for (int i = 0; i < 4000; i++) {
+					addrs.add(bs.write(randomData(45)));
+				}
+				store.commit();
+
+				Thread.currentThread().sleep(5000);
+
+				for (long addr : addrs) {
+					bs.delete(addr);
+				}
+				// assertTrue(bs.isCommitted(addrs.get(0)));
+
+				store.commit();
+
+				// modify store but do not allocate similar size block
+				// as that we want to see has been removed
+				final long addr2 = bs.write(randomData(220)); // modify store
+
+				store.commit();
+				bs.delete(addr2); // modify store
+				store.commit();
+
+				// delete is actioned
+				assertFalse(false /* bs.isCommitted(addrs.get(0)) */);
+			} catch (InterruptedException e) {
+
+			} finally {
+				store.destroy();
+			}
+		}
+		
+		ByteBuffer randomData(final int sze) {
+			byte[] buf = new byte[sze + 4]; // extra for checksum
+			r.nextBytes(buf);
+			
+			return ByteBuffer.wrap(buf, 0, sze);
+		}
+		
+		byte[] randomBytes(final int sze) {
+			byte[] buf = new byte[sze + 4]; // extra for checksum
+			r.nextBytes(buf);
+			
+			return buf;
+		}
+
+		/**
 		 * Test of blob allocation, does not check on read back, just the
 		 * allocation
 		 */
