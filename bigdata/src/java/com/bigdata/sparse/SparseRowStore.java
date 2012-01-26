@@ -38,6 +38,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.journal.TimestampUtility;
+import com.bigdata.service.ndx.IClientIndex;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -502,12 +505,21 @@ public class SparseRowStore implements IRowStoreConstants {
             final long fromTime, final long toTime, final INameFilter filter) {
 
         assertArgs(schema, primaryKey, fromTime, toTime);
-        
-        if (log.isInfoEnabled())
-            log.info("schema=" + schema.getName() + ", primaryKey="
-                    + primaryKey + ", fromTime=" + fromTime + ", toTime="
-                    + toTime + ", filter="
+
+        if (log.isInfoEnabled()) {
+            String ts = "N/A";
+            if (getIndex() instanceof IClientIndex) {
+                ts = TimestampUtility.toString(((IClientIndex) getIndex())
+                        .getTimestamp());
+            } else if (getIndex() instanceof AbstractBTree) {
+                ts = TimestampUtility.toString(((AbstractBTree) getIndex())
+                        .getLastCommitTime());
+            }
+            log.info("ts=" + ts + ", schema=" + schema.getName()
+                    + ", primaryKey=" + primaryKey + ", fromTime=" + fromTime
+                    + ", toTime=" + toTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName()));
+        }
         
         final AtomicRowRead proc = new AtomicRowRead(schema, primaryKey,
                 fromTime, toTime, filter);

@@ -415,10 +415,7 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * that contract for ACID unisolated operations is limited to operations
      * where the data is located on a single data service instance. For ACID
      * operations that cross multiple data service instances the client MUST use
-     * a fully isolated transaction. While read-committed transactions impose
-     * low system overhead, clients interested in the higher possible total
-     * throughput SHOULD choose unisolated read operations in preference to a
-     * read-committed transaction.
+     * a fully isolated transaction.
      * </p>
      * 
      * @param tx
