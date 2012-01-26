@@ -1472,10 +1472,7 @@ abstract public class IndexManager extends StoreManager {
 
                 if (isolatedIndex == null) {
 
-                    log.warn("No such index: name=" + name + ", tx="
-                            + timestamp);
-
-                    return null;
+                    return logNoSuchIndex(name, timestamp);
 
                 }
 
@@ -1509,22 +1506,16 @@ abstract public class IndexManager extends StoreManager {
                         }
 
                     }
-                    
+
                     final AbstractBTree[] sources = getIndexSources(name,
                             timestamp);
 
                     if (sources == null) {
 
-                        if (log.isInfoEnabled())
-                            log.info("No such index: name=" + name
-                                    + ", timestamp=" + timestamp);
-
-                        return null;
+                        return logNoSuchIndex(name, timestamp);
 
                     }
 
-//                    System.err.println("getIndex(name="+name+", timestamp="+timestamp);
-                    
                     assert sources.length > 0;
 
                     assert sources[0].isReadOnly();
@@ -1601,11 +1592,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        if (log.isInfoEnabled())
-                            log.info("No such index: name=" + name
-                                    + ", timestamp=" + timestamp);
-
-                        return null;
+                        return logNoSuchIndex(name, timestamp);
 
                     }
 
@@ -1657,6 +1644,21 @@ abstract public class IndexManager extends StoreManager {
 
     }
 
+    /**
+     * Note: It is useful when debugging to have a common code path for this
+     * condition, which can arise in more than one way in the method above.
+     */
+    private ILocalBTreeView logNoSuchIndex(final String name,
+            final long timestamp) {
+
+        if (log.isInfoEnabled())
+            log.info("No such index: name=" + name + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
+        
+        return null;
+        
+    }
+    
     /**
      * Dump index metadata as of the timestamp.
      * 
