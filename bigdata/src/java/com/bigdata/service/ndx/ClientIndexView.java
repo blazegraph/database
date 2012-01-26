@@ -1144,9 +1144,29 @@ public class ClientIndexView implements IScaleOutClientIndex {
         
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Because the procedure is submitted against a single key, it is
+     * assumed to address a single shard. Therefore, a read-consistent view of
+     * the index will NOT be obtained for read-committed or unisolated requests
+     * as the operation should already be shard-wise ACID and it addresses only
+     * a single shard. This effects all read-only point operations on the index,
+     * including lookup() and contains() as well as custom procedures such as
+     * GRS reads.
+     * <p>
+     * Procedures which require read-consistent protection across more than one
+     * shard MUST be designed with a <i>fromKey</i> and a <i>toKey</i> rather
+     * than just a <i>key</i>. The <i>fromKey</i> and <i>toKey</i> are used to
+     * identify the relevant shard(s) spanned by the operation. Read-consistent
+     * isolation is then optionally imposed depending on the client.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/454">
+     *      Global Row Store Read on Cluster uses Tx </a>
+     */
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
-        if (readConsistent && proc.isReadOnly()
+        if (false && readConsistent && proc.isReadOnly()
                 && TimestampUtility.isReadCommittedOrUnisolated(getTimestamp())) {
             /*
              * Use globally consistent reads for the mapped procedure.
@@ -1223,7 +1243,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             }
 
             // required to get the result back from the procedure.
-            final IResultHandler resultHandler = new IdentityHandler();
+            final IResultHandler<?, ?> resultHandler = new IdentityHandler();
 
             final SimpleDataServiceProcedureTask task = new SimpleDataServiceProcedureTask(
                     this, key, ts, new Split(locator, 0, 0), proc, resultHandler);
@@ -1232,7 +1252,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             getThreadPool().submit(task).get(taskTimeout, TimeUnit.MILLISECONDS);
 
             // the singleton result.
-            Object result = resultHandler.getResult();
+            final Object result = resultHandler.getResult();
 
             return result;
 
