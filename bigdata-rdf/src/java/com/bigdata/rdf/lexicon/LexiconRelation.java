@@ -85,6 +85,8 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
+import com.bigdata.rdf.internal.NoExtensionFactory;
+import com.bigdata.rdf.internal.NoSuchVocabularyItem;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -98,6 +100,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -196,9 +199,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     @SuppressWarnings("unchecked")
     protected Class<IExtensionFactory> determineExtensionFactoryClass() {
 
+        final String defaultClassName;
+        if (vocab == null || vocab.getClass() == NoVocabulary.class) {
+            /*
+             * If there is no vocabulary then you can not use the default
+             * extension class (or probably any extension class for that matter
+             * since the vocbulary is required in order to be able to resolve
+             * the URIs for the extension).
+             * 
+             * @see https://sourceforge.net/apps/trac/bigdata/ticket/456
+             */
+            defaultClassName = NoExtensionFactory.class.getName();
+        } else {
+            defaultClassName = AbstractTripleStore.Options.DEFAULT_EXTENSION_FACTORY_CLASS;
+        }
+
         final String className = getProperty(
                 AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS,
-                AbstractTripleStore.Options.DEFAULT_EXTENSION_FACTORY_CLASS);
+                defaultClassName);
         
         final Class<?> cls;
         try {
@@ -460,6 +478,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.REJECT_INVALID_XSD_VALUES,
                     AbstractTripleStore.Options.DEFAULT_REJECT_INVALID_XSD_VALUES));
             
+            // Resolve the vocabulary.
+            vocab = getContainer().getVocabulary();
+            
+            final IExtensionFactory xFactory;
             try {
                 
             	/*
@@ -468,18 +490,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 final Class<IExtensionFactory> xfc = 
                     determineExtensionFactoryClass();
 
-                final IExtensionFactory xFactory = xfc.newInstance();
-
-                /*
-                 * Setup the lexicon configuration.
-                 */
-                
-                final Vocabulary vocab = getContainer().getVocabulary();
-                
-                lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
-                        inlineLiterals, inlineTextLiterals,
-                        maxInlineTextLength, inlineBNodes, inlineDateTimes,
-                        rejectInvalidXSDValues, xFactory, vocab);
+                xFactory = xfc.newInstance();
 
             } catch (InstantiationException e) {
                 throw new IllegalArgumentException(
@@ -488,6 +499,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
             }
+
+            /*
+             * Setup the lexicon configuration.
+             */
+            
+            lexiconConfiguration = new LexiconConfiguration<BigdataValue>(
+                    inlineLiterals, inlineTextLiterals,
+                    maxInlineTextLength, inlineBNodes, inlineDateTimes,
+                    rejectInvalidXSDValues, xFactory, vocab);
 
         }
         
@@ -1332,27 +1352,53 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * See {@link IDatatypeURIResolver}.
+     * {@inheritDoc}
+     * 
+     * @see IDatatypeURIResolver
      */
     public BigdataURI resolve(final URI uri) {
-        
-        final BigdataURI buri = valueFactory.asValue(uri);
-        
-        if (buri.getIV() == null) {
+
+        if(uri == null)
+            throw new IllegalArgumentException();
+
+        // Turn the caller's argument into a BigdataURI.
+        final BigdataURI value = valueFactory.asValue(uri);
+
+        // Lookup against the Vocabulary.
+        final IV<?, ?> iv = vocab.get(value);
+
+        if (iv == null) {
+
+            /*
+             * The request URI is not part of the pre-declared vocabulary.
+             */
             
-            // Will set IV as a side effect
-            final IV<?, ?> iv = getTermId(buri);
-
-            if (iv == null) {
-
-                // Will set IV as a side effect
-                addTerms(new BigdataValue[] { buri }, 1, false);
-
-            }
+            throw new NoSuchVocabularyItem("uri=" + uri + ", vocab=" + vocab);
 
         }
         
-        return buri.getIV() != null ? buri : null;
+        // Cache the IV on the BigdataValue.
+        value.setIV(iv);
+
+        return value;
+        
+//        final BigdataURI buri = valueFactory.asValue(uri);
+//        
+//        if (buri.getIV() == null) {
+//            
+//            // Will set IV as a side effect
+//            final IV<?, ?> iv = getTermId(buri);
+//
+//            if (iv == null) {
+//
+//                // Will set IV as a side effect
+//                addTerms(new BigdataValue[] { buri }, 1, false);
+//
+//            }
+//
+//        }
+//        
+//        return buri.getIV() != null ? buri : null;
         
     }
 
@@ -2155,6 +2201,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     };
     
     /**
+     * The {@link Vocabulary} implementation class.
+     */
+    private final Vocabulary vocab;
+    
+    /**
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
      */
@@ -2442,10 +2493,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * lookup of a single {@link Value}. Note, however, that single value lookup
      * is NOT efficient. {@link #getTerms(Collection)} SHOULD be used for
      * efficient batch resolution of {@link Value}s to {@link IV}s.
+     * <p>
+     * <strong>WARNING DO NOT USE OUTSIDE OF THE UNIT TESTS OR CAREFULLY VETTED
+     * CODE: </strong> This method is extremely inefficient for scale-out as it
+     * does one RMI per request!
      * 
      * @param value
      *            the value to lookup
-     *            
+     * 
      * @return The {@link IV} for the value
      */
     private IV<?,?> getTermId(final Value value) {
@@ -2460,6 +2515,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
     }
     
+    /**
+     * 
+     * <strong>WARNING DO NOT USE OUTSIDE OF THE UNIT TESTS OR CAREFULLY VETTED
+     * CODE: </strong> This method is extremely inefficient for scale-out as it
+     * does one RMI per request!
+     * 
+     * @param value
+     * @return
+     */
     private TermId<?> getTermIV(final Value value) {
 
         final IIndex ndx = getTerm2IdIndex();
@@ -2518,6 +2582,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
     
+    /**
+     * <strong>WARNING DO NOT USE OUTSIDE OF THE UNIT TESTS OR CAREFULLY VETTED
+     * CODE: </strong> This method is extremely inefficient for scale-out as it
+     * does one RMI per request!
+     */
     private BlobIV<?> getBlobIV(final Value value) {
         
         final IKeyBuilder keyBuilder = h.newKeyBuilder();

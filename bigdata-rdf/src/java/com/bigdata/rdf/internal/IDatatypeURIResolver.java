@@ -26,42 +26,46 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 
-import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
  * Specialized interface for resolving (and creating if necessary) datatype
  * URIs. This interface requires access to a mutable view of the database since
  * unknown URIs will be registered.
  * 
- * TODO This is not going to be efficient in scale-out since it does not batch
- * the resolution of the URIs. It will be more efficient to pass in the set of
- * URIs of interest and have them all be registered at once.
- * {@link LexiconRelation#addTerms(com.bigdata.rdf.model.BigdataValue[], int, boolean)}
- * already provides for this kind of batched resolution.
- * 
  * @author mrpersonick
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/456">
+ *      IExtension implementations do point lookups on lexicon</a>
  */
 public interface IDatatypeURIResolver {
 
     /**
-     * Returns a fully resolved datatype URI with the {@link BlobIV} set.
-     * {@link IExtension}s will handle encoding and decoding of inline literals
-     * for custom datatypes, however to do so they will need the term identifier
-     * for the custom datatype.  By passing an instance of this interface to
-     * the {@link IExtension}, it will be able to resolve its datatype URI and 
-     * cache it for future use.
+     * Returns a fully resolved datatype URI with the {@link IV} set.
      * <p>
-     * If the datatype URI is not already in the lexicon this method MUST add
-     * it to the lexicon so that it has an assigned term identifier. 
+     * {@link IExtension}s handle encoding and decoding of inline literals for
+     * custom datatypes, however to do so they need the {@link IV} for the
+     * custom datatype. By passing an instance of this interface to the
+     * {@link IExtension}, it will be able to resolve its datatype URI(s) and
+     * cache them for future use.
      * <p>
-     * This is implemented by the {@link LexiconRelation}. 
-     *  
-     * @param uri   
-     *          the term to resolve
-     * @return
-     *          the fully resolved term
+     * The URIs used by {@link IExtension}s MUST be pre-declared by the
+     * {@link Vocabulary}.
+     * <p>
+     * This interface is implemented by the {@link LexiconRelation}.
+     * 
+     * @param uri
+     *            the term to resolve
+     * 
+     * @return The fully resolved term
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws NoSuchVocabularyItem
+     *             if the argument is not part of the pre-declared
+     *             {@link Vocabulary}.
      */
     BigdataURI resolve(final URI datatypeURI);
     
