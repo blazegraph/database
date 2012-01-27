@@ -2811,8 +2811,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if (resource == null) {
 
-            if (log.isInfoEnabled())
-                log.info("No such journal: timestamp=" + timestamp);
+            log.warn("No such journal: timestamp=" + timestamp);
 
             return null;
 

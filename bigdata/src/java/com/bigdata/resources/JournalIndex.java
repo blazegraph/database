@@ -103,7 +103,7 @@ public class JournalIndex extends BTree {
      * 
      * @return The corresponding key.
      */
-    protected byte[] getKey(final long commitTime) {
+    private byte[] getKey(final long commitTime) {
 
 //        return metadata.getTupleSerializer().serializeKey(commitTime);
 
@@ -140,6 +140,7 @@ public class JournalIndex extends BTree {
         if(index == -1) {
             
             // No match.
+            log.warn("Not found: " + timestamp);
             
             return null;
             
@@ -154,8 +155,12 @@ public class JournalIndex extends BTree {
      */
     private JournalMetadata valueAtIndex(final long index) {
 
+        final byte[] val = super.valueAt(index);
+
+        assert val != null : "Entry has null value: index=" + index;
+        
         final JournalMetadata entry = (JournalMetadata) SerializerUtil
-                .deserialize(super.valueAt(index));
+                .deserialize(val);
 
         return entry;
 
