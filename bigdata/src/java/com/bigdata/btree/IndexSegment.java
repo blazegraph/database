@@ -120,60 +120,98 @@ public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 //        return leafByteCount;
 //        
 //    }
-    
-    final public int getHeight() {
 
-        reopen();
+    final public int getHeight() {
+        // Note: fileStore.checkpoint is now final. reopen() is not required.
+//        reopen();
 
         return fileStore.getCheckpoint().height;
 
     }
 
     final public long getNodeCount() {
-
-        reopen();
+        // Note: fileStore.checkpoint is now final. reopen() is not required.
+//        reopen();
 
         return fileStore.getCheckpoint().nnodes;
 
     }
 
     final public long getLeafCount() {
-
-        reopen();
+        // Note: fileStore.checkpoint is now final. reopen() is not required.
+//        reopen();
 
         return fileStore.getCheckpoint().nleaves;
 
     }
 
     final public long getEntryCount() {
-
-        reopen();
+        // Note: fileStore.checkpoint is now final. reopen() is not required.
+//        reopen();
 
         return fileStore.getCheckpoint().nentries;
 
     }
 
     /**
-     * Note: This is synchronized in order to prevent a concurrent process from
-     * closing the {@link IndexSegment} during this method. In particular,
-     * {@link #getEntryCount()} uses the {@link IndexSegmentCheckpoint} and that
-     * is only available while the {@link IndexSegmentStore} is open.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to be thread-safe without requiring any locks.
      */
     public String toString() {
 
-        // make sure the fileStore will remain open.
-        synchronized(fileStore) {
+        /*
+         * I moved to code to generate the human friendly representation into
+         * this class in order to avoid any locking. Taking a lock in toString()
+         * just makes me nervous. Most of the information is in the
+         * IndexSegmentCheckpoint, which is a final reference on the
+         * IndexSegmentStore. The rest of the information is on the
+         * IndexMetadata object, which is also final on the IndexSegmentStore.
+         * 
+         * We could probably rely on the overrides of the relevant access
+         * methods on IndexSegment, e.g., getEntryCount(), etc. and just use
+         * super.toString(). However, it seems safer and more future proof to
+         * directly access the relevant fields from within this implementation.
+         */
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(getClass().getSimpleName());
+        
+        sb.append("{ ");
+        
+        // Note: Guaranteed available on the IndexSegmentStore.
+        final IndexMetadata metadata = fileStore.getIndexMetadata();
 
-            // make sure the indexSegment will remain open.
-            synchronized(this) {
-                
-                // super class.  getEntry() will reopen the index iff necessary.
-                return super.toString();
-                
-            }
-            
+        if (metadata.getName() != null) {
+
+            sb.append("name=" + metadata.getName());
+
+        } else {
+
+            sb.append("uuid=" + metadata.getIndexUUID());
+
         }
         
+        // Note: Guaranteed available on the IndexSegmentStore.
+        final IndexSegmentCheckpoint chk = fileStore.getCheckpoint();
+        
+        // Note: [branchingFactor is final on AbstractBTree
+        sb.append(", m=" + branchingFactor);//getBranchingFactor());
+
+        sb.append(", height=" + chk.height);
+
+        sb.append(", entryCount=" + chk.nentries);
+
+        sb.append(", nodeCount=" + chk.nnodes);
+
+        sb.append(", leafCount=" + chk.nleaves);
+
+        sb.append(", lastCommitTime=" + chk.commitTime);
+
+        sb.append("}");
+        
+        return sb.toString();
+
     }
 
 //    /**
