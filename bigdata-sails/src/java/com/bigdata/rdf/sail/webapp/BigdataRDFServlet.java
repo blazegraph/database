@@ -132,9 +132,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     protected static RuntimeException launderThrowable(final Throwable t,
             final HttpServletResponse resp, final String queryStr)
             throws Exception {
+        final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
             // log an error for the service.
-            log.error("cause=" + t + ", query=" + queryStr, t);
+            log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
         } finally {
             // ignore any problems here.
         }
