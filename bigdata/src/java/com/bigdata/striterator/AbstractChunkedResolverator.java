@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.util.InnerCause;
 
 /**
  * Wraps an {@link IChunkedIterator} and asynchronously resolves chunks.
@@ -230,7 +231,21 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                         break;
                     }
                     
-                    final F[] converted = resolveChunk(chunk);
+                    final F[] converted;
+                    try {
+                        converted = resolveChunk(chunk);
+                    } catch (Throwable t) {
+                        /*
+                         * @see https://sourceforge.net/apps/trac/bigdata/ticket/460
+                         */
+                        if (InnerCause.isInnerCause(t,
+                                InterruptedException.class)) {
+//                            buffer.abort(t);
+                            buffer.close();
+                            break;
+                        }
+                        throw new RuntimeException(t);
+                    }
                     
                     assert converted.length == chunk.length;
                     
