@@ -400,6 +400,31 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
 
             if (ndx == null) {
 
+                /*
+                 * Some possible root causes for failing to find a shard on a DS
+                 * are listed below. You should verify that the addressed shard
+                 * was actually present on the addressed data service as of the
+                 * effect read time of the request.
+                 * 
+                 * 
+                 * - The as-bound predicate was mapped onto the wrong shard.
+                 * Some subtle problems have been tracked back to this. See
+                 * https://sourceforge.net/apps/trac/bigdata/ticket/457. There
+                 * was also a problem where as were failing to use the as-bound
+                 * predicate when mapping the predicate onto a shard.
+                 * 
+                 * - A failure in IndexManager to locate the shard. This could
+                 * include concurrency holes in the indexCache, the access to
+                 * the journal for the appropriate commit time, a
+                 * read-historical request without a read-lock (application
+                 * error), etc.
+                 * 
+                 * - The shard was moved (but this will be a
+                 * StaleLocatorException and can only occur with the unisolated
+                 * index view, at least until we implement shard caching as part
+                 * of the hybrid shared disk / shared nothing architecture).
+                 */
+                
 //            	// For debugging only - comment this out.
 //				dumpMDI((AbstractScaleOutFederation<?>) relation
 //						.getIndexManager(), relation.getNamespace(), timestamp,
