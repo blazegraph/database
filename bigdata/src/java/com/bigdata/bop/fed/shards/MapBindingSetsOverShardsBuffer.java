@@ -1,6 +1,5 @@
 package com.bigdata.bop.fed.shards;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -56,7 +55,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       In fact, this is pretty much just doing a join against the metadata
  *       index. However, it presumes that there are far fewer index partitions
  *       than tuples flowing through the system and that it is better to read
- *       remotely from the {@link IMetadataIndex} and cache than do use the
+ *       remotely from the {@link IMetadataIndex} and cache than ro use the
  *       general purpose pipeline join, which would cause all binding sets to be
  *       routed through the centralized {@link IMetadataIndex}.
  */

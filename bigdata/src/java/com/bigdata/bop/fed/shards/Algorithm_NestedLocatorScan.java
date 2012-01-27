@@ -10,11 +10,15 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * This does a locatorScan for each binding set. This is a general purpose
  * technique, but it will issue one query to the {@link IMetadataIndex} per
  * source {@link IBindingSet}.
+ * 
+ * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/457">
+ *      "No such index" on cluster under concurrent query workload </a>
  */
 class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
         IShardMapper<E, F> {
@@ -41,6 +45,8 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
 
 		// The most recently discovered locator.
 		PartitionLocator current = null;
+		// The key order for [current]
+		IKeyOrder<?> currentKeyOrder = null;
 		
 //		// The list of binding sets which are bound for the current locator.
 //		List<IBindingSet> list = new LinkedList<IBindingSet>();
@@ -52,6 +58,7 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
 			final Bundle<F> bundle = bitr.next();
 
 			if (current != null
+			        && currentKeyOrder == bundle.keyOrder // same s/o index
 					&& BytesUtil.rangeCheck(bundle.fromKey, current
 							.getLeftSeparatorKey(), current
 							.getRightSeparatorKey())
@@ -59,13 +66,25 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
 							.getLeftSeparatorKey(), current
 							.getRightSeparatorKey())) {
 
-				/*
-				 * Optimization when the bundle fits inside of the last index
-				 * partition scanned (this optimization is only possible when
-				 * the asBound predicate will be mapped onto a single index
-				 * partition, but this is a very common case since we try to
-				 * choose selective indices for access paths).
-				 */
+                /*
+                 * Optimization when the bundle fits inside of the last index
+                 * partition scanned (this optimization is only possible when
+                 * the asBound predicate will be mapped onto a single index
+                 * partition, but this is a very common case since we try to
+                 * choose selective indices for access paths).
+                 * 
+                 * Note: The bundle MUST be for the scale-out index associated
+                 * with the last PartitionLocator. We enforce this constraint by
+                 * tracking the IKeyOrder for the last PartitionLocator and
+                 * verifying that the Bundle is associated with the same
+                 * IKeyOrder.
+                 * 
+                 * Note: Bundle#compareTo() is written to group together the
+                 * [Bundle]s first by their IKeyOrder and then by their fromKey.
+                 * That provides the maximum possibility of reuse of the last
+                 * PartitionLocator. It also provides ordered within scale-out
+                 * index partition locator scans.
+                 */
 				
                 final IBuffer<IBindingSet[]> sink = op.getBuffer(current);
 
@@ -82,6 +101,13 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
             final Iterator<PartitionLocator> itr = op.locatorScan(
                     bundle.keyOrder, bundle.fromKey, bundle.toKey);
 
+            // Clear the old partition locator.
+            current = null;
+
+            // Update key order for the partition that we are scanning.
+            currentKeyOrder = bundle.keyOrder;
+            
+            // Scan locators.
             while (itr.hasNext()) {
 
                 final PartitionLocator locator = current = itr.next();

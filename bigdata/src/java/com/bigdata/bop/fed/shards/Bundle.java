@@ -6,6 +6,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -46,11 +47,27 @@ class Bundle<F> implements Comparable<Bundle<F>> {
     }
 
     /**
-     * Imposes an unsigned byte[] order on the {@link #fromKey}.
+     * Orders {@link Bundle}s first by their {@link IKeyOrder} and then imposes
+     * an <code>unsigned byte[]</code> order on the {@link #fromKey}. This
+     * groups {@link Bundle}s for the same scale-out index together which allows
+     * us to make more efficient requests against the MDS and makes it more
+     * likely that we can reuse the last {@link PartitionLocator} for the next
+     * as-bound predicate.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/457">
+     *      "No such index" on cluster under concurrent query workload </a>
      */
     public int compareTo(final Bundle<F> o) {
 
-        return BytesUtil.compareBytes(this.fromKey, o.fromKey);
+        int ret = keyOrder.getIndexName().compareTo(o.keyOrder.getIndexName());
+
+        if (ret == 0) {
+
+            ret = BytesUtil.compareBytes(this.fromKey, o.fromKey);
+
+        }
+
+        return ret;
 
     }
 
@@ -66,8 +83,11 @@ class Bundle<F> implements Comparable<Bundle<F>> {
         if (!(o instanceof Bundle))
             return false;
 
-        final Bundle t = (Bundle) o;
+        final Bundle<F> t = (Bundle<F>) o;
 
+        if(keyOrder == t.keyOrder)
+            return false;
+        
         if (compareTo(t) != 0)
             return false;
 
