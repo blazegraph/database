@@ -68,23 +68,23 @@ public class IndexSegmentCheckpoint {
     /**
      * The file is empty.
      */
-    protected static final String ERR_EMPTY = "Empty file";
+    private static final String ERR_EMPTY = "Empty file";
 
     /**
      * The file is non-empty, but is too small to contain a valid root block.
      */
-    protected static final String ERR_TOO_SMALL = "Too small for valid root block";
+    private static final String ERR_TOO_SMALL = "Too small for valid root block";
     
-    static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
-    static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
-    static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_INT;
-    static final int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_INT;
-    static final int SIZEOF_COUNTS = Bytes.SIZEOF_INT;
-    static final int SIZEOF_NBYTES = Bytes.SIZEOF_INT;
-    static final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
-    static final int SIZEOF_ERROR_RATE = Bytes.SIZEOF_DOUBLE;
-    static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
-    static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_MAGIC = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_VERSION = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_OFFSET_BITS = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_BRANCHING_FACTOR = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_COUNTS = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_NBYTES = Bytes.SIZEOF_INT;
+    private static final int SIZEOF_ADDR = Bytes.SIZEOF_LONG;
+    private static final int SIZEOF_ERROR_RATE = Bytes.SIZEOF_DOUBLE;
+    private static final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
+    private static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
 
 	/**
 	 * The #of unused bytes in the checkpoint record format for various versions

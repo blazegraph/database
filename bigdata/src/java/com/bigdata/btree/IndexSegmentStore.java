@@ -176,7 +176,6 @@ public class IndexSegmentStore extends AbstractRawStore {
      * Counters specific to the {@link IndexSegmentStore}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class IndexSegmentStoreCounters {
 
@@ -523,11 +522,11 @@ public class IndexSegmentStore extends AbstractRawStore {
 
                 try {
 
-                    @SuppressWarnings("unchecked")
+                    @SuppressWarnings("rawtypes")
                     final Class cl = Class.forName(indexMetadata
                             .getBTreeClassName());
 
-                    @SuppressWarnings("unchecked")
+                    @SuppressWarnings({ "rawtypes", "unchecked" })
                     final Constructor ctor = cl
                             .getConstructor(new Class[] { IndexSegmentStore.class });
 
@@ -676,7 +675,7 @@ public class IndexSegmentStore extends AbstractRawStore {
      * {@link #open} to <code>false</code>. All exceptions are trapped, a log
      * message is written, and the exception is NOT re-thrown.
      */
-    synchronized private void _close() {
+    private void _close() {
 
         lock.lock();
 
@@ -789,7 +788,7 @@ public class IndexSegmentStore extends AbstractRawStore {
      * Atomically closes the store (iff open) and then deletes the backing file.
      * Any records for the store are cleared from the {@link IGlobalLRU}.
      */
-    synchronized public void destroy() {
+    public void destroy() {
 
         lock.lock();
 
@@ -829,11 +828,11 @@ public class IndexSegmentStore extends AbstractRawStore {
         
     }
 
-    synchronized public CounterSet getCounters() {
+    public CounterSet getCounters() {
 
-        if (counterSet == null) {
+//        if (counterSet == null) {
         
-            counterSet = new CounterSet();
+            final CounterSet counterSet = new CounterSet();
             
             counterSet.addCounter("file", new OneShotInstrument<String>(file
                     .toString()));
@@ -920,12 +919,12 @@ public class IndexSegmentStore extends AbstractRawStore {
 
             }
 
-        }
+//        }
         
         return counterSet;
         
     }
-    private CounterSet counterSet;
+//    private CounterSet counterSet;
 
     /**
      * Read a record from the {@link IndexSegmentStore}. If the request is in
@@ -966,12 +965,35 @@ public class IndexSegmentStore extends AbstractRawStore {
             
             counters.nodesRead++;
             
-            synchronized (this) { // @todo Why is this synchronized here?
+            /*
+             * Note: In order to read from [buf_nodes] we MUST be holding the
+             * [lock] since it could otherwise be concurrently returned to the
+             * DirectBufferPool by _close().
+             * 
+             * FIXME Because this takes the global [lock] it forces reads
+             * against the nodes buffer to be single threaded. That will
+             * probably cause [lock] to be contended. If so, then it should be
+             * replaced by a ReadWriteLock. The readLock would be used to read
+             * on the buffer. The writeLock would be used to allocate or release
+             * the buffer.
+             */
 
-                if (buf_nodes != null) {
+            if (buf_nodes != null) {
 
-                    return readFromBuffer(offset, length);
+                lock.lock();
+            
+                try {
 
+                    if (buf_nodes != null) {
+
+                        return readFromBuffer(offset, length);
+
+                    }
+
+                } finally {
+
+                    lock.unlock();
+                    
                 }
 
             }
@@ -1002,26 +1024,35 @@ public class IndexSegmentStore extends AbstractRawStore {
      * The [addr] addresses a node and the data are buffered. Create and return
      * a read-only view so that concurrent reads do not modify the buffer state.
      * <p>
-     * Note: The caller MUST be synchronized on [this] and ensure that the
-     * {@link #buf_nodes} is non-<code>null</code> before calling this
-     * method. This ensures that the buffer is valid across the call.
+     * Note: The caller MUST be synchronized such that {@link #buf_nodes} is
+     * in a known state (either allocated or released).
      * 
      * @param offset
      * @param length
-     * @return
+     * @return 
      */
     final private ByteBuffer readFromBuffer(final long offset, final int length) {
         
         /*
-         * Note: As long as the state of [buf_nodes] (its position and limit)
-         * can not be changed concurrently, we should not need to serialize
-         * creations of the view (this is a bit paranoid, but the operation is
-         * very lightweight).
+         * Note: In order to allow concurrent readers against the buffer, we
+         * need to take a slice() on the buffer and we need to be holding a lock
+         * such that the offset and position of the buffer can not change while
+         * we take that slice. (Creation of the slice views must be serialized.)
+         * 
+         * Note: NOT read-only until we decide if we have a direct buffer or not
+         * when we take the slice.
          */
         final ByteBuffer tmp;
-        synchronized(this) {
+        {
+         
+            final ByteBuffer t = buf_nodes.buffer();
             
-            tmp = buf_nodes.buffer().asReadOnlyBuffer();
+            synchronized (t) {
+
+                // Take slice. Still a read/write direct buffer.
+                tmp = t.slice();
+
+            }
             
         }
 
@@ -1029,20 +1060,48 @@ public class IndexSegmentStore extends AbstractRawStore {
         final long off = offset - checkpoint.offsetNodes;
 
         // set the limit on the buffer to the end of the record.
-        tmp.limit((int)(off + length));
+        tmp.limit((int) (off + length));
 
         // set the position on the buffer to the start of the record.
-        tmp.position((int)off);
+        tmp.position((int) off);
 
         /*
          * Create a slice of that view showing only the desired record. The
-         * position() of the slice will be zero(0) and the limit() will be
-         * the #of bytes in the record.
+         * position() of the slice will be zero(0) and the limit() will be the
+         * #of bytes in the record.
          * 
-         * Note: slice restricts the view available to the caller to the
-         * view that was setup on the buffer at the moment that the slice
-         * was obtained.
+         * Note: slice restricts the view available to the caller to the view
+         * that was setup on the buffer at the moment that the slice was
+         * obtained.
+         * 
+         * Note: We MUST NOT return a view of the direct buffer since the direct
+         * buffer could be released at any time. Therefore, if [tmp] is a direct
+         * buffer, we copy the data into a byte[] and then wrap and return that
+         * byte[].
+         * 
+         * Note: We DO NOT want to make the returned byte[] a read-only view.
+         * The B+Tree code requires access to the backing byte[]. If we make the
+         * view read-only then a new byte[] and a new view will have to be
+         * created by the NodeSerializer. (Plus, the returned buffer is wrapping
+         * a copy of the data so any writes on it just mess up the caller.)
          */
+
+        if (tmp.isDirect()) {
+            
+            // Just the piece we are interested in.
+            final ByteBuffer slice = tmp.slice();
+            
+            // backing array is not accessible, so copy into new byte[].
+            final byte[] a = new byte[length];
+            
+            // Copy data.
+            slice.get(a);
+            
+            // Wrap and return.
+            return ByteBuffer.wrap(a);
+
+        }
+        
         return tmp.slice();
         
     }
@@ -1123,11 +1182,11 @@ public class IndexSegmentStore extends AbstractRawStore {
      * {@link BloomFilter}, etc. All we have to do is re-open the
      * {@link FileChannel}.
      * <p>
-     * Note: This method is synchronized so that concurrent readers do not try
-     * to all open the store at the same time. Further, this is the only method
-     * other than {@link #_close()} that can set {@link #raf}. Since both this
-     * method and {@link #_close()} are synchronized the state of that field is
-     * well known inside of this method.
+     * Note: This method is internally synchronized so that concurrent readers
+     * do not try to all open the store at the same time. Further, this is the
+     * only method other than {@link #_close()} that can set {@link #raf}. Since
+     * both this method and {@link #_close()} are synchronized the state of that
+     * field is well known inside of this method.
      * <p>
      * Note: {@link OverlappingFileLockException}s can arise when there are
      * concurrent requests to obtain a shared lock on the same file. Personally,
@@ -1137,8 +1196,8 @@ public class IndexSegmentStore extends AbstractRawStore {
      * shared lock was not available. This is still somewhat fragile since it
      * someone does not test the {@link FileLock} and was in fact granted an
      * exclusive lock when they requested a shared lock then this code will be
-     * unwilling to send the resource. There are two ways to make that work out -
-     * either we DO NOT use {@link FileLock} for read-only files (index
+     * unwilling to send the resource. There are two ways to make that work out
+     * - either we DO NOT use {@link FileLock} for read-only files (index
      * segments) or we ALWAYS discard the {@link FileLock} if it is not shared
      * when we requested a shared lock and proceed without a lock. For this
      * reason, the behavior of this class and {@link ResourceService} MUST
@@ -1153,8 +1212,26 @@ public class IndexSegmentStore extends AbstractRawStore {
      * @throws IOException
      *             if the backing file can not be locked.
      */
-    final synchronized private FileChannel reopenChannel() throws IOException {
+    final private FileChannel reopenChannel() throws IOException {
 
+        /*
+         * Note: This is basically a double-checked locking pattern. It is
+         * used to avoid synchronizing when the backing channel is already
+         * open.
+         */
+        {
+            final RandomAccessFile tmp = raf;
+            if (tmp != null) {
+                final FileChannel channel = tmp.getChannel();
+                if (channel.isOpen()) {
+                    // The channel is still open.
+                    return channel;
+                }
+            }
+        }
+        
+        lock.lock();
+        try {
         /*
          * Note: closing an IndexSegmentStore DOES NOT prevent it from being
          * transparently reopened.
@@ -1264,7 +1341,9 @@ public class IndexSegmentStore extends AbstractRawStore {
         }
 
         return raf.getChannel();
-        
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
