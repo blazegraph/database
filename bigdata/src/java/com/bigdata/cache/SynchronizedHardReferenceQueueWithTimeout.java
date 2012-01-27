@@ -43,23 +43,23 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <p>
  * Thread-safe version with timeout for clearing stale references from the
  * queue. Clearing of stale entries is accomplished when a value is added to the
- * {@link SynchronizedHardReferenceQueue}. If the value implements the
- * {@link IValueAge} interface, then the tail of the queue is tested and any
- * entry on the tail whose age as reported by that interface exceeds a timeout
- * is evicted. This continues until we reach the first value on the tail of the
- * queue whose age is greater than the timeout. This behavior is enabled if a
- * non-ZERO timeout is specified. Stales references are also cleared by a
- * background thread.
+ * {@link SynchronizedHardReferenceQueue}. The tail of the queue is tested and
+ * any entry on the tail whose age exceeds a timeout is evicted. This continues
+ * until we reach the first value on the tail of the queue whose age is greater
+ * than the timeout. This behavior is enabled if a non-ZERO timeout is
+ * specified. Stales references are also cleared by a background thread.
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: SynchronizedHardReferenceQueueWithTimeout.java 4410 2011-04-17
+ *          20:11:44Z thompsonbry $
  */
 public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         IHardReferenceQueue<T> {
 
-    private static final Logger log = Logger.getLogger(SynchronizedHardReferenceQueueWithTimeout.class);
-    
+    private static final Logger log = Logger
+            .getLogger(SynchronizedHardReferenceQueueWithTimeout.class);
+
     /**
      * Note: Synchronization for the inner {@link #queue} is realized using the
      * <strong>outer</strong> reference!
@@ -100,7 +100,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      *            The timeout (in nanoseconds) for an entry in the queue. When
      *            ZERO (0L), the timeout is disabled.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("rawtypes")
     public SynchronizedHardReferenceQueueWithTimeout(final int capacity,
             final int nscan, final long timeout) {
 
@@ -129,7 +129,6 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      * @param <T>
      *            The generic type of the queue entries for this inner class.
      */
@@ -380,7 +379,6 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * timeout.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class Cleaner implements Runnable {
 
@@ -451,7 +449,6 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * last accessed.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <T>
      *            The generic type of the wrapped object.
      */
