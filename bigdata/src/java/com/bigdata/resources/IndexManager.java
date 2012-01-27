@@ -1043,11 +1043,13 @@ abstract public class IndexManager extends StoreManager {
             // open index on that journal (MAY be null).
             btree = (BTree) journal.getIndex(name, commitRecord);
 
-            if (btree != null) {
-
+            if (btree == null)
                 log.warn("Index not found: name=" + name + ", timestamp="
                         + TimestampUtility.toString(timestamp) + ", ts=" + ts
-                        + ", commitRecord=" + commitRecord);
+                        + ", commitRecord=" + commitRecord + ", ds="
+                        + getDataServiceUUID());
+
+            if (btree != null) {
 
                 assert ((BTree) btree).getLastCommitTime() != 0;
 
