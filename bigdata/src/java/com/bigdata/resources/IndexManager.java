@@ -1045,6 +1045,10 @@ abstract public class IndexManager extends StoreManager {
 
             if (btree != null) {
 
+                log.warn("Index not found: name=" + name + ", timestamp="
+                        + TimestampUtility.toString(timestamp) + ", ts=" + ts
+                        + ", commitRecord=" + commitRecord);
+
                 assert ((BTree) btree).getLastCommitTime() != 0;
 
             }
@@ -1161,9 +1165,8 @@ abstract public class IndexManager extends StoreManager {
 
             if (btree == null) {
 
-                if (log.isInfoEnabled())
-                    log.info("No such index: name=" + name + ", timestamp="
-                            + timestamp);
+                log.warn("No such index: name=" + name + ", timestamp="
+                        + TimestampUtility.toString(timestamp));
 
                 return null;
 
@@ -1464,7 +1467,10 @@ abstract public class IndexManager extends StoreManager {
 
                 if (isolatedIndex == null) {
 
-                    return logNoSuchIndex(name, timestamp);
+                    log.warn("No such index: name=" + name + ", timestamp="
+                            + TimestampUtility.toString(timestamp));
+
+                    return null;
 
                 }
 
@@ -1504,7 +1510,10 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        return logNoSuchIndex(name, timestamp);
+                        log.warn("No such index: name=" + name + ", timestamp="
+                                + TimestampUtility.toString(timestamp));
+
+                        return null;
 
                     }
 
@@ -1584,7 +1593,10 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        return logNoSuchIndex(name, timestamp);
+                        log.warn("No such index: name=" + name + ", timestamp="
+                                + TimestampUtility.toString(timestamp));
+                        
+                        return null;
 
                     }
 
@@ -1634,21 +1646,6 @@ abstract public class IndexManager extends StoreManager {
             
         }
 
-    }
-
-    /**
-     * Note: It is useful when debugging to have a common code path for this
-     * condition, which can arise in more than one way in the method above.
-     */
-    private ILocalBTreeView logNoSuchIndex(final String name,
-            final long timestamp) {
-
-        if (log.isInfoEnabled())
-            log.info("No such index: name=" + name + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-        
-        return null;
-        
     }
     
     /**
