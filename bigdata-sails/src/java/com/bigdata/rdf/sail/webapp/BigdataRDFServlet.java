@@ -134,7 +134,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             throws Exception {
         try {
             // log an error for the service.
-            log.error(t, t);
+            log.error("cause=" + t + ", query=" + queryStr, t);
         } finally {
             // ignore any problems here.
         }
