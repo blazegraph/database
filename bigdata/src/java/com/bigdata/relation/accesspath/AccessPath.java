@@ -37,11 +37,9 @@ import java.util.concurrent.RejectedExecutionException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.bop.cost.BTreeCostModel;
