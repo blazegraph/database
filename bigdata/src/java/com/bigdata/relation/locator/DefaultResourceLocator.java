@@ -271,6 +271,16 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         /*
          * Since there was a cache miss, acquire a lock for the named relation
          * so that the locate + cache.put sequence will be atomic.
+         * 
+         * TODO Better javadoc. This is a mixed blessing. Obviously, any request
+         * for the same timestamp or the same commit time should hit this lock
+         * so we serialize such efforts. However, lacking the commitTime for a
+         * request, this serializes all lookups against the same namespace. If
+         * we have concurrent queries arriving against different commit times
+         * then this lock could be too broad. Ideally, the lock would be on
+         * (namespace,commitTime). Fix this when we address
+         * http://sourceforge.net/apps/trac/bigdata/ticket/266 (Refactor native
+         * long tx id to thin object).
          */
         final Lock lock = namedLock.acquireLock(namespace);
 
@@ -286,104 +296,30 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
                 return resource;
 
-            }
-            
-            if (log.isInfoEnabled())
-                log.info("cache miss: namespace=" + namespace + ", timestamp="
-                        + timestamp);
-          
-            /*
-             * First, test this locator, including any [seeAlso] IIndexManager
-             * objects.
-             */
-            final AtomicReference<IIndexManager> foundOn = new AtomicReference<IIndexManager>();
-
-            final Properties properties = locateResource(namespace, timestamp,
-                    foundOn);
-            
-            if (properties == null) {
-
-                // Not found by this locator.
-                
-                if(delegate != null) {
-                    
-                    /*
-                     * A delegate was specified, so see if the delegate can
-                     * resolve this request.
-                     */
-                    
-                    if(log.isInfoEnabled()) {
-                        
-                        log.info("Not found - passing to delegate: namespace="
-                                + namespace + ", timestamp=" + timestamp);
-                        
-                    }
-                    
-                    // pass request to delegate.
-                    resource = delegate.locate(namespace, timestamp);
-                    
-                    if (resource != null) {
-
-                        if (log.isInfoEnabled()) {
-
-                            log.info("delegate answered: " + resource);
-
-                        }
-
-                        return resource;
-
-                    }
-
-                }
+            } else {
 
                 if (log.isInfoEnabled())
-                    log.info("Not found: namespace=" + namespace
+                    log.info("cache miss: namespace=" + namespace
                             + ", timestamp=" + timestamp);
 
-                // not found.
-                return null;
+                resource = cacheMiss(nt);
 
             }
 
-            if (log.isDebugEnabled()) {
+            if (resource == null) {
 
-                log.debug(properties.toString());
+                if (log.isInfoEnabled())
+                    log.info("Not found: " + nt);
 
-            }
+            } else {
 
-            // can throw a ClassCastException.
-            final String className = properties.getProperty(RelationSchema.CLASS);
+                if (log.isInfoEnabled())
+                    log.info("Caching: " + nt + " as " + resource);
 
-            if (className == null) {
-
-                throw new IllegalStateException("Required property not found: namespace="
-                        + namespace + ", property=" + RelationSchema.CLASS);
-
-            }
-
-            final Class<? extends T> cls;
-            try {
-
-                cls = (Class<? extends T>) Class.forName(className);
-
-            } catch (ClassNotFoundException e) {
-
-                throw new RuntimeException(e);
+                // Add to the cache.
+                resourceCache.put(nt, resource);
 
             }
-
-            if (log.isDebugEnabled()) {
-
-                log.debug("Implementation class=" + cls.getName());
-
-            }
-
-            // create a new instance of the relation.
-            resource = newInstance(cls, foundOn.get(), namespace, timestamp,
-                    properties);
-
-            // Add to the cache.
-            resourceCache.put(nt, resource);
 
             return resource;
 
@@ -395,6 +331,108 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
     }
 
+    /**
+     * Handle a cache miss.
+     * 
+     * @param nt
+     *            The (namespace, timestamp) tuple.
+     *            
+     * @return The resolved resource -or- <code>null</code> if the resource
+     *         could not be resolved for that namespace and timestamp.
+     */
+    private T cacheMiss(final NT nt) {
+
+        T resource = null;
+      
+        /*
+         * First, test this locator, including any [seeAlso] IIndexManager
+         * objects.
+         */
+        final AtomicReference<IIndexManager> foundOn = new AtomicReference<IIndexManager>();
+
+        final Properties properties = locateResource(nt.getName(),
+                nt.getTimestamp(), foundOn);
+        
+        if (properties == null) {
+
+            // Not found by this locator.
+            
+            if(delegate != null) {
+
+                /*
+                 * A delegate was specified, so see if the delegate can resolve
+                 * this request.
+                 */
+
+                if (log.isInfoEnabled()) {
+
+                    log.info("Not found - passing to delegate: " + nt);
+
+                }
+
+                // pass request to delegate.
+                resource = delegate.locate(nt.getName(), nt.getTimestamp());
+
+                if (resource != null) {
+
+                    if (log.isInfoEnabled()) {
+
+                        log.info("delegate answered: " + resource);
+
+                    }
+
+                    return resource;
+
+                }
+
+            }
+
+            // not found.
+            return null;
+
+        }
+
+        if (log.isDebugEnabled()) {
+
+            log.debug(properties.toString());
+
+        }
+
+        // can throw a ClassCastException.
+        final String className = properties.getProperty(RelationSchema.CLASS);
+
+        if (className == null) {
+
+            throw new IllegalStateException(
+                    "Required property not found: namespace=" + nt.getName()
+                            + ", property=" + RelationSchema.CLASS);
+
+        }
+
+        final Class<? extends T> cls;
+        try {
+
+            cls = (Class<? extends T>) Class.forName(className);
+
+        } catch (ClassNotFoundException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("Implementation class=" + cls.getName());
+
+        }
+
+        // create a new instance of the relation.
+        resource = newInstance(cls, foundOn.get(), nt, properties);
+
+        return resource;
+        
+    }
+    
     /**
      * Note: Caller is synchronized for this <i>namespace</i>.
      * 
@@ -695,8 +733,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
      * @return A new instance of the identified resource.
      */
     protected T newInstance(final Class<? extends T> cls,
-            final IIndexManager indexManager, final String namespace,
-            final long timestamp, final Properties properties) {
+            final IIndexManager indexManager, final NT nt,
+            final Properties properties) {
 
         if (cls == null)
             throw new IllegalArgumentException();
@@ -704,7 +742,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         if (indexManager == null)
             throw new IllegalArgumentException();
         
-        if (namespace == null)
+        if (nt == null)
             throw new IllegalArgumentException();
         
         if (properties == null)
@@ -732,8 +770,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
 
             r = ctor.newInstance(new Object[] {//
                     indexManager,//
-                    namespace, //
-                    timestamp, //
+                    nt.getName(), //
+                    nt.getTimestamp(), //
                     properties //
                     });
 

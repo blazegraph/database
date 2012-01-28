@@ -27,13 +27,13 @@ public class NT implements Serializable {
 
     private final int hashCode;
 
-    public String getName() {
+    final public String getName() {
         
         return name;
         
     }
     
-    public long getTimestamp() {
+    final public long getTimestamp() {
         
         return timestamp;
         
