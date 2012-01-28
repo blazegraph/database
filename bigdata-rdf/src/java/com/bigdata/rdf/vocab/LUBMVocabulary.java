@@ -27,11 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.vocab;
 
+import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.decls.LUBMVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.OWLVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFSVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.RDFVocabularyDecl;
+import com.bigdata.rdf.vocab.decls.XMLSchemaVocabularyDecl;
 
 /**
  * A {@link Vocabulary} covering the ontologies used by LUBM.
@@ -62,6 +64,20 @@ public class LUBMVocabulary extends BaseVocabulary {
         
     }
 
+    /**
+     * Note: The current revision of this class declares vocabulary items which
+     * are required by the {@link DerivedNumericsExtension}. This version of the
+     * class is NOT compatible with the previous version of the class. This
+     * should not be a problem since the LUBM data is just for benchmark
+     * purposes.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/463">
+     *      NoSuchVocabularyItem with LUBMVocabulary for
+     *      DerivedNumericsExtension </a>
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/456">
+     *      IExtension implementations do point lookups on lexicon </a>
+     */
     @Override
     protected void addValues() {
 
@@ -69,6 +85,9 @@ public class LUBMVocabulary extends BaseVocabulary {
         addDecl(new RDFSVocabularyDecl());
         addDecl(new OWLVocabularyDecl());
         addDecl(new LUBMVocabularyDecl());
+
+        // Note: Required by DerivedNumericsExtension.
+        addDecl(new XMLSchemaVocabularyDecl());
 
     }
 
