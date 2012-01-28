@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.striterator;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
@@ -236,10 +237,18 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
                         converted = resolveChunk(chunk);
                     } catch (Throwable t) {
                         /*
-                         * @see https://sourceforge.net/apps/trac/bigdata/ticket/460
+                         * If the root cause of the throwable was an interrupt,
+                         * then close the buffer (aka the sink) and break out of
+                         * the loop (we will not read anything more from the
+                         * source).
+                         * 
+                         * @see
+                         * https://sourceforge.net/apps/trac/bigdata/ticket/460
                          */
                         if (InnerCause.isInnerCause(t,
-                                InterruptedException.class)) {
+                                InterruptedException.class)
+                                || InnerCause.isInnerCause(t,
+                                        ClosedByInterruptException.class)) {
 //                            buffer.abort(t);
                             buffer.close();
                             break;
