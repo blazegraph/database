@@ -1512,7 +1512,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * the key range of an index partition.
      * <p>
      * Note: An index partition is identified by
-     * {@link IndexMetadata#getPartitionMetadata()} returning non-<code>null</code>.
+     * {@link IndexMetadata#getPartitionMetadata()} returning non-
+     * <code>null</code>.
      * <p>
      * Note: This method is used liberally in <code>assert</code>s to detect
      * errors that can arise is client code when an index partition is split,
@@ -1522,11 +1523,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            The key.
      * 
      * @param allowUpperBound
-     *            <code>true</code> iff the <i>key</i> represents an
-     *            inclusive upper bound and thus must be allowed to be LTE to
-     *            the right separator key for the index partition. For example,
-     *            this would be <code>true</code> for the <i>toKey</i>
-     *            parameter on rangeCount or rangeIterator methods.
+     *            <code>true</code> iff the <i>key</i> represents an inclusive
+     *            upper bound and thus must be allowed to be LTE to the right
+     *            separator key for the index partition. For example, this would
+     *            be <code>true</code> for the <i>toKey</i> parameter on
+     *            rangeCount or rangeIterator methods.
      * 
      * @return <code>true</code> always.
      * 
@@ -1534,68 +1535,44 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *             if the key is <code>null</code>
      * @throws KeyOutOfRangeException
      *             if the key does not lie within the index partition.
+     * 
+     * @deprecated This method has been disabled. It always returns true.
+     *             <p>
+     *             The method is disabled because it forces the caller to ensure
+     *             that the query lies within the specified range. While that is
+     *             all well and good, this places an undue burden on
+     *             {@link FusedView} which must substitute the actual key range
+     *             of a shard view for the caller's key range. This makes the
+     *             test effectively into a self-check of whether
+     *             {@link FusedView} has correctly done this substitution rather
+     *             than a check of whether a request was mapped onto the correct
+     *             shard, which was the original purpose of this test. The logic
+     *             for performing such range checks was moved into
+     *             {@link RangeCheckUtil}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/461">
+     *      KeyAfterPartitionException </a>
      */
-    protected boolean rangeCheck(final byte[] key, final boolean allowUpperBound) {
+    final protected boolean rangeCheck(final byte[] key,
+            final boolean allowUpperBound) {
 
-        if (key == null)
-            throw new IllegalArgumentException();
+//        if (key == null)
+//            throw new IllegalArgumentException();
+//
+//        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
+//
+//        if (pmd == null) {
+//
+//            // nothing to check.
+//
+//            return true;
+//
+//        }
+//
+//        return RangeCheckUtil.rangeCheck(pmd, key, allowUpperBound);
 
-        final LocalPartitionMetadata pmd = metadata.getPartitionMetadata();
-        
-        if (pmd == null) {
-
-            // nothing to check.
-            
-            return true;
-            
-        }
-        
-        final byte[] leftSeparatorKey = pmd.getLeftSeparatorKey();
-
-        final byte[] rightSeparatorKey = pmd.getRightSeparatorKey();
-
-        if (BytesUtil.compareBytes(key, leftSeparatorKey) < 0) {
-
-            throw new KeyBeforePartitionException(key, allowUpperBound,
-                    pmd, getStore().getFile());
-
-        }
-
-        if (rightSeparatorKey != null ) {
-            
-            final int ret = BytesUtil.compareBytes(key, rightSeparatorKey);
-            
-            if (allowUpperBound) {
-
-                if (ret <= 0) {
-
-                    // key less than or equal to the exclusive upper bound.
-
-                } else {
-
-                    throw new KeyAfterPartitionException(key, allowUpperBound,
-                            pmd, getStore().getFile());                }
-
-            } else {
-
-                if (ret < 0) {
-
-                    // key strictly less than the exclusive upper bound.
-                    
-                } else {
-
-                    throw new KeyAfterPartitionException(key, allowUpperBound,
-                            pmd, getStore().getFile());
-
-                }
-                
-            }
-
-        }
-        
-        // key lies within the index partition.
         return true;
-            
+        
     }
     
     /*
