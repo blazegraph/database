@@ -28,9 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.File;
-
-import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.mdi.ISeparatorKeys;
 
 /**
  * An exception thrown when a key lies after the half-open range of an index
@@ -50,15 +48,13 @@ public class KeyAfterPartitionException extends KeyOutOfRangeException {
      * @param key
      * @param allowUpperBound
      * @param pmd
-     * @param storeFile
      */
     public KeyAfterPartitionException(final byte[] key,
-            final boolean allowUpperBound, final LocalPartitionMetadata pmd,
-            final File storeFile) {
-        
+            final boolean allowUpperBound, final ISeparatorKeys pmd) {
+
         super("key=" + BytesUtil.toString(key) + ", allowUpperBound="
-                + allowUpperBound + ", pmd=" + pmd + ", storeFile=" + storeFile);
-        
+                + allowUpperBound + ", pmd=" + pmd);
+
     }
 
 }

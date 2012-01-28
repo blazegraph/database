@@ -189,13 +189,13 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         
         if (fromKey != null) {
 
-            btree.rangeCheck(fromKey, false/* allowUpperBound */);
+            assert btree.rangeCheck(fromKey, false/* allowUpperBound */);
 
         }
 
         if (toKey != null) {
 
-            btree.rangeCheck(toKey, true/* allowUpperBound */);
+            assert btree.rangeCheck(toKey, true/* allowUpperBound */);
             
         }
 
