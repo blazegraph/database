@@ -8,32 +8,11 @@
 </head>
 <body>
 
-<p>
-
-Welcome to bigdata&#174;.  Please consult the 
+<h2>Welcome to bigdata&#174;.</h2>  
+<p>Please consult the 
 <a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"> 
 documentation</a> for information on using the NanoSparqlServer's REST Api.
-
 </p>
-
-<!-- Note: Some applications (firefox 7) can not handle a GET with a very long
-     URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
-     use GET for database queries since they are, by and large, idempotent. 
-     -->
-<FORM action="sparql" method="post">
-   <P>
-   <TEXTAREA name="query" rows="30" cols="100" title="Enter SPARQL Query."
-   >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
-   </P><P>
-   <INPUT type="submit" value="Send" title="Submit query.">
-   <INPUT type="checkbox" name="explain" value="true"
-          title="Explain query plan rather than returning the query results."
-          > Explain
-   <INPUT type="checkbox" name="analytic" value="true"
-          title="Enable the analytic query package."
-          > Analytic
-   </P>
-</FORM>
 
 <p>
 The following URLs should be active when deployed in the default configuration:
@@ -54,5 +33,44 @@ Where <i>hostname</i> is the name of this host and <i>port</i> is the port at
 which this page was accessed.
 </p>
 
+<!-- Note: Some applications (firefox 7) can not handle a GET with a very long
+     URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
+     use GET for database queries since they are, by and large, idempotent. 
+     -->
+<h2>Query Data:</h2>
+<FORM action="sparql" method="post">
+   <P>
+   <TEXTAREA name="query" rows="30" cols="100" title="Enter SPARQL Query."
+   >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
+   </P><P>
+   <INPUT type="submit" value="Send" title="Submit query.">
+   <INPUT type="checkbox" name="explain" value="true"
+          title="Explain query plan rather than returning the query results."
+          > Explain
+   <INPUT type="checkbox" name="analytic" value="true"
+          title="Enable the analytic query package."
+          > Analytic
+   </P>
+</FORM>
+<p>
+Here are some useful namespaces for queries:
+</p>
+<dl>
+<dt>prefix dc: &lt;http://purl.org/dc/elements/1.1/&gt;</dt>
+<dt>prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt;</dt>
+<dt>prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt;</dt>
+<dt>prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;</dt>
+<dt>prefix owl: &lt;http://www.w3.org/2002/07/owl#&gt;</dt>
+</dl>
+
+<h2>Upload Data (URL):</h2>
+<form action="sparql" method="post">
+    <p>
+    <textarea name="uri" rows="1" cols="100">file:/</textarea>
+    </p><p>
+    <input type="submit" value="Upload">
+    </p>
+</form>
+----
 </body>
 </html>
