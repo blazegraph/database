@@ -1556,9 +1556,20 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 gangliaService.addMetricCollector(new HostMetricsCollector(
                         statisticsCollector));
 
+                /*
+                 * TODO The problem with reporting per-service statistics is
+                 * that ganglia lacks a facility to readily aggregate statistics
+                 * across services on a host (SMS + anything). The only way this
+                 * can readily be made to work is if each service has a distinct
+                 * metric for the same value (e.g., Mark and Sweep GC). However,
+                 * that causes a very large number of distinct metrics. I have
+                 * commented this out for now while I think it through some
+                 * more.  Maybe we will wind up only reporting the per-host
+                 * counters to ganglia?
+                 */
                 // Collect and report service metrics.
-                gangliaService.addMetricCollector(new ServiceMetricsCollector(
-                        statisticsCollector, null/* filter */));
+//                gangliaService.addMetricCollector(new ServiceMetricsCollector(
+//                        statisticsCollector, null/* filter */));
 
                 // Wrap as Future.
                 final FutureTask<Void> ft = new FutureTask<Void>(
