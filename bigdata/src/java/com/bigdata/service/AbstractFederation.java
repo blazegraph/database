@@ -1425,6 +1425,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          * 
          * @param statisticsCollector
          *            Performance counters will be harvested from here.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/441 (Ganglia
+         *      Integration).
          */
         protected void startGangliaService(
                 final AbstractStatisticsCollector statisticsCollector) {
