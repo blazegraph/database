@@ -28,6 +28,7 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 
 /**
@@ -382,6 +383,16 @@ public class AllocBlock {
 		return freebits;
 	}
 
+    /**
+     * Releases entries in the {@link WriteCacheService} which are no longer
+     * committed but which were committed as of the previous commit point. This
+     * is invoked as part of the commit protocol.
+     * 
+     * @param cache
+     *            The {@link WriteCacheService}.
+     *            
+     * @return The number bits that were cleared.
+     */
 	int releaseCommitWrites(final RWWriteCacheService cache) {
 		int freebits = 0;
 		

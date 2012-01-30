@@ -4335,11 +4335,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         return port;
     }
 
-    /*
-     * FIXME Restore this code when addressing 
-     * 
-     * https://sourceforge.net/apps/trac/bigdata/ticket/440
-     */
     /**
      * Remove all commit records between the two provided keys.
      * 
@@ -4352,6 +4347,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * 
      * @param fromKey
      * @param toKey
+     * 
+     * @see https://sourceforge.net/apps/trac/bigdata/ticket/440
      */
     public int removeCommitRecordEntries(final byte[] fromKey,
             final byte[] toKey) {

@@ -57,9 +57,9 @@ import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
-import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -368,14 +368,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		public Properties getProperties(final long retention) {
+		public Properties getProperties() {
 
             if (log.isInfoEnabled())
                 log.info("TestRWJournal:getProperties");
 
-			final Properties properties = super.getProperties();
-
-	        properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE, "" + retention);
+//			final Properties properties = PropertyUtil.flatCopy(super.getProperties());
+            final Properties properties = new Properties(super.getProperties());
 
 	        properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 			// properties.setProperty(Options.BUFFER_MODE,
@@ -403,8 +402,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			// properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
 			// "1,2,3,5,8,12,16,32,48,64,128"); // 8K - max blob = 2K * 8K = 16M
 			// properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
-			properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16,24,32"); // 2K max
-
+//			properties.setProperty(RWStore.Options.ALLOCATION_SIZES, "1,2,3,5,8,12,16"); // 2K
+			
 			// ensure history retention to force deferredFrees
 			// properties.setProperty(AbstractTransactionService.Options.MIN_RELEASE_AGE,
 			// "1"); // Non-zero
@@ -419,11 +418,23 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
-		protected IRawStore getStore(final long retention) {
-
-			return new Journal(getProperties(retention));
-
+		protected Journal getStore(final Properties p) {
+		   
+		    return new Journal(p);
+		    
 		}
+
+        protected Journal getStore(final long retentionMillis) {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, ""
+                            + retentionMillis);
+
+            return getStore(properties);
+
+        }
 
 		// /**
 		// * Test that allocate() pre-extends the store when a record is
@@ -702,11 +713,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * @throws IOException
 		 */
 		public void test_reallocation() throws IOException {
-			final Properties properties = getProperties();
-			File tmpfile = File.createTempFile("TestRW", ".rw");
+			final Properties properties = new Properties(getProperties());
+			final File tmpfile = File.createTempFile("TestRW", ".rw");
 			properties.setProperty(Options.FILE, tmpfile.getAbsolutePath());
-			properties.remove(Options.CREATE_TEMP_FILE);
-			Journal store = new Journal(properties);
+			properties.setProperty(Options.CREATE_TEMP_FILE,"false");
+//			Journal store = new Journal(properties);
+			Journal store = getStore(properties);
 
 			try {
 
@@ -1699,7 +1711,16 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * This test releases over a blobs worth of deferred frees
 		 */
 		public void test_blobDeferredFrees() {
-			Journal store = (Journal) getStore(4);
+		    
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "4000");
+
+            properties.setProperty(RWStore.Options.ALLOCATION_SIZES,
+                    "1,2,3,5,8,12,16,24,32"); // 2K
+
+			Journal store = (Journal) getStore(properties);
             try {
 
             	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
@@ -1715,7 +1736,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	for (long addr : addrs) {
             		bs.delete(addr);
             	}
-            	assertTrue(bs.isCommitted(addrs.get(0)));
+                for (int i = 0; i < 4000; i++) {
+                    if(!bs.isCommitted(addrs.get(i))) {
+                        fail("i="+i+", addr="+addrs.get(i));
+                    }
+                }
 
                	store.commit();
                	
@@ -1728,7 +1753,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
                	store.commit();
             	
                	// delete is actioned
-            	assertFalse(bs.isCommitted(addrs.get(0)));
+                for (int i = 0; i < 4000; i++) {
+                    if(bs.isCommitted(addrs.get(i))) {
+                        fail("i="+i+", addr="+addrs.get(i));
+                    }
+                }
              } catch (InterruptedException e) {
 			} finally {
             	store.destroy();
