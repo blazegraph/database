@@ -30,7 +30,6 @@ package com.bigdata.bop.join;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
@@ -181,36 +180,36 @@ public class HTreeHashIndexOp extends PipelineOp {
 
     }
 
-    /**
-     * Adds reporting for the size of the named solution set.
-     */
-    private static class NamedSolutionSetStats extends BOpStats {
-        
-        private static final long serialVersionUID = 1L;
-        
-        final AtomicLong solutionSetSize = new AtomicLong();
-
-        public void add(final BOpStats o) {
-
-            super.add(o);
-
-            if (o instanceof NamedSolutionSetStats) {
-
-                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
-
-                solutionSetSize.addAndGet(t.solutionSetSize.get());
-
-            }
-
-        }
-
-        @Override
-        protected void toString(final StringBuilder sb) {
-            super.toString(sb);
-            sb.append(",solutionSetSize=" + solutionSetSize.get());
-        }
-
-    }
+//    /**
+//     * Adds reporting for the size of the named solution set.
+//     */
+//    public static class NamedSolutionSetStats extends BOpStats {
+//        
+//        private static final long serialVersionUID = 1L;
+//        
+//        final AtomicLong solutionSetSize = new AtomicLong();
+//
+//        public void add(final BOpStats o) {
+//
+//            super.add(o);
+//
+//            if (o instanceof NamedSolutionSetStats) {
+//
+//                final NamedSolutionSetStats t = (NamedSolutionSetStats) o;
+//
+//                solutionSetSize.addAndGet(t.solutionSetSize.get());
+//
+//            }
+//
+//        }
+//
+//        @Override
+//        protected void toString(final StringBuilder sb) {
+//            super.toString(sb);
+//            sb.append(",solutionSetSize=" + solutionSetSize.get());
+//        }
+//
+//    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
