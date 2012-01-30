@@ -380,8 +380,8 @@ public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
 		// ensure using RWStore
 		props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
-		props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
-		props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
+//		props.setProperty(RWStore.Options.MAINTAIN_BLACKLIST, "false");
+//		props.setProperty(RWStore.Options.OVERWRITE_DELETE, "true");
 		// props.setProperty(Options.CREATE_TEMP_FILE, "false");
 		// props.setProperty(Options.FILE, "/Volumes/SSDData/csem.jnl");
 		
