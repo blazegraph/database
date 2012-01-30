@@ -23,9 +23,9 @@ public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
      */
     protected static transient final String ERR_NO_METADATA_SERVICE = "Metadata service";
     
-    private final AbstractScaleOutFederation fed;
+    private final AbstractScaleOutFederation<?> fed;
 
-    public MetadataIndexCache(final AbstractScaleOutFederation fed,
+    public MetadataIndexCache(final AbstractScaleOutFederation<?> fed,
             final int capacity, final long timeout) {
         
         super(capacity, timeout);
@@ -38,7 +38,7 @@ public class MetadataIndexCache extends AbstractIndexCache<IMetadataIndex>{
     }
 
     @Override
-    protected IMetadataIndex newView(String name, long timestamp) {
+    protected IMetadataIndex newView(final String name, final long timestamp) {
         
         final MetadataIndexMetadata mdmd = getMetadataIndexMetadata(
                 name, timestamp);
