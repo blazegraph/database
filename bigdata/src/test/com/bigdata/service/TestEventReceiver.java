@@ -615,6 +615,10 @@ public class TestEventReceiver extends TestCase2 {
         public SparseRowStore getGlobalRowStore() {
             return null;
         }
+        
+        public SparseRowStore getGlobalRowStore(final long timstamp) {
+            return null;
+        }
 
         public String getHttpdURL() {
             return null;

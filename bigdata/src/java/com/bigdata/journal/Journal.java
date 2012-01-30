@@ -1449,16 +1449,16 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    /**
-     * Return a view of the global row store as of the specified timestamp. This
-     * is mainly used to provide access to historical views. 
-     * 
-     * @param timestamp
-     *            The specified timestamp.
-     * 
-     * @return The global row store view -or- <code>null</code> if no view
-     *         exists as of that timestamp.
-     */
+//    /**
+//     * Return a view of the global row store as of the specified timestamp. This
+//     * is mainly used to provide access to historical views. 
+//     * 
+//     * @param timestamp
+//     *            The specified timestamp.
+//     * 
+//     * @return The global row store view -or- <code>null</code> if no view
+//     *         exists as of that timestamp.
+//     */
     public SparseRowStore getGlobalRowStore(final long timestamp) {
 
         return getGlobalRowStoreHelper().get(timestamp);

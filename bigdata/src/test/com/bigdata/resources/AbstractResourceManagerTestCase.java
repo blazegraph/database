@@ -480,6 +480,11 @@ public class AbstractResourceManagerTestCase extends
             return null;
         }
 
+        public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+            return null;
+        }
+
         public IClientIndex getIndex(String name, long timestamp) {
 
             return null;

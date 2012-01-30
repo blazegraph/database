@@ -107,6 +107,12 @@ class DelegateIndexManager implements IIndexManager {
 
     }
 
+    public SparseRowStore getGlobalRowStore(final long timestamp) {
+
+        return dataService.getFederation().getGlobalRowStore(timestamp);
+
+    }
+
     public long getLastCommitTime() {
 
         return dataService.getFederation().getLastCommitTime();

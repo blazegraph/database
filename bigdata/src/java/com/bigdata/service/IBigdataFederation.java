@@ -39,8 +39,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.service.ndx.IClientIndex;
-import com.bigdata.sparse.GlobalRowStoreSchema;
-import com.bigdata.sparse.SparseRowStore;
 
 /**
  * The client-facing interface to a bigdata federation. Note that each bigdata
@@ -337,13 +335,13 @@ public interface IBigdataFederation<T> extends IIndexManager,
      */
     public boolean isStable();
     
-    /**
-     * Return the global {@link SparseRowStore} used to store named property
-     * sets in the federation.
-     * 
-     * @see GlobalRowStoreSchema
-     */
-    public SparseRowStore getGlobalRowStore(/*long timestamp*/);
+//    /**
+//     * Return the global {@link SparseRowStore} used to store named property
+//     * sets in the federation.
+//     * 
+//     * @see GlobalRowStoreSchema
+//     */
+//    public SparseRowStore getGlobalRowStore();
     
     /**
      * Destroys all discovered services belonging to the federation and their

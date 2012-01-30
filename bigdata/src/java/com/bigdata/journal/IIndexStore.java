@@ -58,24 +58,31 @@ public interface IIndexStore {
     public IIndex getIndex(String name, long timestamp);
 
     /**
-     * Return the global {@link SparseRowStore} used to store named property
-     * sets.
+     * Return an unisolated view of the global {@link SparseRowStore} used to
+     * store named property sets.
      * 
      * @see GlobalRowStoreSchema
      */
-    /*
+    public SparseRowStore getGlobalRowStore();
+
+    /**
+     * Return a view of the global {@link SparseRowStore} used to store named
+     * property sets as of the specified timestamp.
      * <p>
      * The {@link SparseRowStore} only permits {@link ITx#UNISOLATED} writes, so
      * you MUST specify {@link ITx#UNISOLATED} as the timestamp if you intend to
      * write on the global row store!
      * <p>
      * You can request the most recent committed state of the global row store
-     * by specifying {@link ITx#READ_COMMITTED}. 
+     * by specifying {@link ITx#READ_COMMITTED}.
      * 
      * @param timestamp
      *            The timestamp of the view.
+     *            
+     * @return The global row store view -or- <code>null</code> if no view
+     *         exists as of that timestamp.
      */
-    public SparseRowStore getGlobalRowStore(/*long timestamp*/);
+    public SparseRowStore getGlobalRowStore(long timestamp);
     
     /**
      * Return the global file system used to store block-structured files and
