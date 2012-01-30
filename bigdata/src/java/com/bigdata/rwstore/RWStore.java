@@ -312,22 +312,22 @@ public class RWStore implements IStore, IBufferedWriter {
         
         String DEFAULT_DOUBLE_BUFFER_WRITES = "true";
         
-        /**
-         * When <code>true</code> fills recycled storage with a recognizable
-         * byte pattern.
-         */
-        String OVERWRITE_DELETE = RWStore.class.getName() + ".overwriteDelete";
-        
-        String DEFAULT_OVERWRITE_DELETE = "false";
-        
-        /**
-         * When <code>true</code> the RWStore will protect any address from
-         * recycling, and generate an exception if the address is subsequently
-         * accessed
-         */
-        String MAINTAIN_BLACKLIST = RWStore.class.getName() + ".maintainBlacklist";
-        
-        String DEFAULT_MAINTAIN_BLACKLIST = "false";
+//        /**
+//         * When <code>true</code> fills recycled storage with a recognizable
+//         * byte pattern.
+//         */
+//        String OVERWRITE_DELETE = RWStore.class.getName() + ".overwriteDelete";
+//        
+//        String DEFAULT_OVERWRITE_DELETE = "false";
+//        
+//        /**
+//         * When <code>true</code> the RWStore will protect any address from
+//         * recycling, and generate an exception if the address is subsequently
+//         * accessed
+//         */
+//        String MAINTAIN_BLACKLIST = RWStore.class.getName() + ".maintainBlacklist";
+//        
+//        String DEFAULT_MAINTAIN_BLACKLIST = "false";
         
     }
 
@@ -542,17 +542,17 @@ public class RWStore implements IStore, IBufferedWriter {
     private volatile boolean m_open = true;
     
     
-    /**
-     * If m_blacklist is non-null then a request to blacklist as address will
-     * add the address to the blacklist.
-     * 
-     * When a blacklisted address is freed and is re-allocated, the re-allocation
-     * is intercepted (see alloc()), the address is locked and a new allocation is made.
-     * 
-     * The purpose of the blacklist is to trap erroneus references to an
-     * address that is retained (and used) after it should be.
-     */
-    private ConcurrentHashMap<Integer, String> m_blacklist = null;
+//    /**
+//     * If m_blacklist is non-null then a request to blacklist as address will
+//     * add the address to the blacklist.
+//     * 
+//     * When a blacklisted address is freed and is re-allocated, the re-allocation
+//     * is intercepted (see alloc()), the address is locked and a new allocation is made.
+//     * 
+//     * The purpose of the blacklist is to trap erroneus references to an
+//     * address that is retained (and used) after it should be.
+//     */
+//    private ConcurrentHashMap<Integer, String> m_blacklist = null;
     private ConcurrentHashMap<Integer, Long> m_lockAddresses = null;
 
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
@@ -775,12 +775,12 @@ public class RWStore implements IStore, IBufferedWriter {
 			
 			m_deferredFreeOut = PSOutputStream.getNew(this, m_maxFixedAlloc, null);
 
-    		if (Boolean.valueOf(fileMetadata.getProperty(
-	                Options.MAINTAIN_BLACKLIST,
-	                Options.DEFAULT_MAINTAIN_BLACKLIST))) {
-    			m_blacklist = new ConcurrentHashMap<Integer, String>();
-    			m_lockAddresses = new ConcurrentHashMap<Integer, Long>();
-    		}
+//    		if (Boolean.valueOf(fileMetadata.getProperty(
+//	                Options.MAINTAIN_BLACKLIST,
+//	                Options.DEFAULT_MAINTAIN_BLACKLIST))) {
+//    			m_blacklist = new ConcurrentHashMap<Integer, String>();
+//    			m_lockAddresses = new ConcurrentHashMap<Integer, Long>();
+//    		}
 
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to initialize store", e);
@@ -4789,28 +4789,28 @@ public class RWStore implements IStore, IBufferedWriter {
 		return m_writeCache.isPresent(physicalAddress(rwaddr, true));
 	}  
 
-    /**
-     * Only blacklist the addr if not already available, in other words
-     * a blacklisted address only makes sense if it for previously 
-     * committed data and not instantly recyclable.
-     */
-    public void blacklistAddress(int addr, final String info) {
-    	if (m_blacklist == null) {
-    		// add delay/synchronization to emulate blacklist delay?
-    		return;
-    	}
-    	
-        if (physicalAddress(addr) == 0)
-            throw new IllegalStateException("Blacklist should only be called for a valid address");
-        
-        if (info == null) {
-            throw new IllegalStateException("Blacklist must have info String");
-        }
-        
-        if ( m_blacklist.putIfAbsent(addr, info) != null)
-            throw new IllegalStateException("Address already blacklisted: "
-                    + addr + ", info: " + info + ", prev: " + m_blacklist.get(addr));
-
-       ;
-    }
+//    /**
+//     * Only blacklist the addr if not already available, in other words
+//     * a blacklisted address only makes sense if it for previously 
+//     * committed data and not instantly recyclable.
+//     */
+//    public void blacklistAddress(int addr, final String info) {
+//    	if (m_blacklist == null) {
+//    		// add delay/synchronization to emulate blacklist delay?
+//    		return;
+//    	}
+//    	
+//        if (physicalAddress(addr) == 0)
+//            throw new IllegalStateException("Blacklist should only be called for a valid address");
+//        
+//        if (info == null) {
+//            throw new IllegalStateException("Blacklist must have info String");
+//        }
+//        
+//        if ( m_blacklist.putIfAbsent(addr, info) != null)
+//            throw new IllegalStateException("Address already blacklisted: "
+//                    + addr + ", info: " + info + ", prev: " + m_blacklist.get(addr));
+//
+//       ;
+//    }
 }
